@@ -1,7 +1,10 @@
+from typing import cast
+
 from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
+from django.db.models import Model
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
@@ -13,7 +16,12 @@ from cl.donate.admin import (
 )
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
 from cl.favorites.models import UserTag
-from cl.lib.admin import AdminTweaksMixin, generate_admin_links
+from cl.lib.admin import (
+    AdminLinkConfig,
+    AdminTweaksMixin,
+    generate_admin_links,
+)
+from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
     EmailFlag,
@@ -22,9 +30,12 @@ from cl.users.models import (
     UserProfile,
 )
 
-UserProxyEvent = apps.get_model("users", "UserProxyEvent")
-UserProfileEvent = apps.get_model("users", "UserProfileEvent")
-UserSearchQuery = apps.get_model("search", "SearchQuery")
+UserProxyEvent: type[Model] = cast(
+    type[Model], apps.get_model("users", "UserProxyEvent")
+)
+UserProfileEvent: type[Model] = cast(
+    type[Model], apps.get_model("users", "UserProfileEvent")
+)
 
 
 class TokenInline(admin.StackedInline):
@@ -91,34 +102,24 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         """Add links to related event admin pages filtered by user/profile."""
         extra_context = extra_context or {}
         user = self.get_object(request, object_id)
-        profile_id = (
-            user.profile.pk if user and hasattr(user, "profile") else None
-        )
-        has_tags = (
-            user and hasattr(user, "user_tags") and user.user_tags.count()
-        )
 
-        custom_links = [
+        custom_links: list[AdminLinkConfig] = [
             {
-                "should_add": True,
                 "label": "UserProxy Events",
                 "model_class": UserProxyEvent,
                 "query_params": {"pgh_obj": object_id},
             },
             {
-                "should_add": profile_id,
                 "label": "UserProfile Events",
                 "model_class": UserProfileEvent,
-                "query_params": {"pgh_obj": profile_id},
+                "query_params": {"pgh_obj": user.profile.pk},
             },
             {
-                "should_add": user and hasattr(user, "search_queries"),
                 "label": "Search Queries",
-                "model_class": UserSearchQuery,
+                "model_class": SearchQuery,
                 "query_params": {"user": object_id},
             },
             {
-                "should_add": has_tags,
                 "label": "Tags",
                 "model_class": UserTag,
                 "query_params": {"user": object_id},

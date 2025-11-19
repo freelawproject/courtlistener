@@ -48,7 +48,6 @@ def build_admin_url(
 
 
 class AdminLinkConfig(TypedDict):
-    should_add: bool
     label: str
     model_class: type[Model]
     query_params: dict[str, Any] | None
@@ -73,18 +72,14 @@ def generate_admin_links(
     generated_links: list[AdminLink] = []
 
     for link in links:
-        try:
-            if link["should_add"]:
-                generated_links.append(
-                    {
-                        "href": build_admin_url(
-                            link["model_class"],
-                            query_params=link["query_params"],
-                        ),
-                        "label": link["label"],
-                    }
-                )
-        except KeyError:
-            continue
+        generated_links.append(
+            {
+                "href": build_admin_url(
+                    link["model_class"],
+                    query_params=link["query_params"],
+                ),
+                "label": link["label"],
+            }
+        )
 
     return generated_links
