@@ -251,6 +251,15 @@ async def add_depth_counts(
         return None
 
 
+def has_semantic_params(params: QueryDict) -> bool:
+    """Check if query parameters are a valid semantic search query."""
+    return (
+        bool(params.get("semantic"))
+        and params.get("q", "")
+        and params.get("type", SEARCH_TYPES.OPINION) in [SEARCH_TYPES.OPINION]
+    )
+
+
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
     """Saves an user's search query in a SearchQuery model
 
@@ -259,7 +268,7 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :return None
     """
     is_error = search_results.get("error")
-    is_semantic = bool(request.GET.get("semantic"))
+    is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -296,7 +305,7 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
-    is_semantic = bool(request.GET.get("semantic"))
+    is_semantic = has_semantic_params(request.GET)
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
