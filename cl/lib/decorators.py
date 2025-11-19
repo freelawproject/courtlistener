@@ -114,16 +114,10 @@ def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
             should_use_time_based_prefix = (
                 cache_alias == "s3" and not is_dev_or_test
             )
-            # handle S3 cache keys differently
+            cache_key = f"custom.views.decorator.cache:{hash_key.hexdigest()}"
             if should_use_time_based_prefix:
                 days = int(ceil(timeout / (60 * 60 * 24)))
-                # Compute the time-based prefix
-                time_based_prefix = f"{days}-days"
-                cache_key = f"{time_based_prefix}:custom.views.decorator.cache.{hash_key.hexdigest()}"
-            else:
-                cache_key = (
-                    f"custom.views.decorator.cache:{hash_key.hexdigest()}"
-                )
+                cache_key = f"{days}-days:{cache_key}"
 
             try:
                 # If the cache alias is "s3" but we're in DEVELOPMENT or TESTING
