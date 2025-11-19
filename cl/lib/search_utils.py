@@ -253,8 +253,8 @@ async def add_depth_counts(
 
 def has_semantic_params(params: QueryDict) -> bool:
     """Check if query parameters are a valid semantic search query."""
-    return (
-        bool(params.get("semantic"))
+    return bool(
+        params.get("semantic")
         and params.get("q", "")
         and params.get("type", SEARCH_TYPES.OPINION) in [SEARCH_TYPES.OPINION]
     )
