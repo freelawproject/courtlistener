@@ -64,7 +64,6 @@ def generate_admin_links(
     """
     Construct a list of links with links to given admin views.
     Each link should have the following keys:
-    - should_add: Condition to check whether the link should be added.
     - label: Label for the link.
     - model_class: The Django model class for which the admin URL will be built.
     - query_params: Query parameters to append to the URL (e.g. {"docket": 123}).
