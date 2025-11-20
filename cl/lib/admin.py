@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, TypedDict
 from urllib.parse import urlencode
 
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -45,3 +45,40 @@ def build_admin_url(
     )
     encoded_query_params = urlencode(query_params)
     return f"{entries_changelist_url}?{encoded_query_params}"
+
+
+class AdminLinkConfig(TypedDict):
+    label: str
+    model_class: type[Model]
+    query_params: dict[str, Any] | None
+
+
+class AdminLink(TypedDict):
+    href: str
+    label: str
+
+
+def generate_admin_links(
+    links: list[AdminLinkConfig],
+) -> list[AdminLink]:
+    """
+    Construct a list of links with links to given admin views.
+    Each link should have the following keys:
+    - label: Label for the link.
+    - model_class: The Django model class for which the admin URL will be built.
+    - query_params: Query parameters to append to the URL (e.g. {"docket": 123}).
+    """
+    generated_links: list[AdminLink] = []
+
+    for link in links:
+        generated_links.append(
+            {
+                "href": build_admin_url(
+                    link["model_class"],
+                    query_params=link["query_params"],
+                ),
+                "label": link["label"],
+            }
+        )
+
+    return generated_links
