@@ -12,6 +12,7 @@ from cl.lib.string_utils import normalize_dashes, trunc
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
+scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
 
 
 def is_docket_number(value: str) -> bool:
@@ -57,7 +58,20 @@ def clean_docket_number(docket_number: str | None) -> str:
     if len(bankr_m) == 1:
         return bankr_m[0]
 
+    # Match SCOUTS A docket numbers.
+    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
+    if len(scotus_a_m) == 1:
+        return scotus_a_m[0]
+
     return ""
+
+
+def make_appellate_bankr_number_core(cleaned_docket_number: str) -> str | None:
+    bankr_m = re.search(appellate_bankr_d_num_regex, cleaned_docket_number)
+    if bankr_m:
+        # Pad to six characters because some courts have a LOT of bankruptcies
+        return f"{bankr_m.group(1)}{int(bankr_m.group(2)):06d}"
+    return None
 
 
 def make_docket_number_core(docket_number: str | None) -> str:
@@ -90,10 +104,26 @@ def make_docket_number_core(docket_number: str | None) -> str:
     if district_m:
         return f"{district_m.group(1)}{int(district_m.group(2)):05d}"
 
-    bankr_m = re.search(appellate_bankr_d_num_regex, cleaned_docket_number)
-    if bankr_m:
-        # Pad to six characters because some courts have a LOT of bankruptcies
-        return f"{bankr_m.group(1)}{int(bankr_m.group(2)):06d}"
+    if bankr_n_core := make_appellate_bankr_number_core(cleaned_docket_number):
+        return bankr_n_core
+
+    return ""
+
+
+def make_scotus_docket_number_core(docket_number: str | None) -> str:
+    """Normalize SCOTUS docket numbers like 16A985."""
+    if not docket_number:
+        return ""
+
+    cleaned_docket_number = clean_docket_number(docket_number)
+
+    if bankr_n_core := make_appellate_bankr_number_core(cleaned_docket_number):
+        return bankr_n_core
+
+    scouts_a_m = re.search(scotus_d_a_num_regex, cleaned_docket_number)
+    if scouts_a_m:
+        year, serial = scouts_a_m.groups()
+        return f"{year}A{int(serial):05d}"
 
     return ""
 

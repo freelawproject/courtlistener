@@ -43,6 +43,7 @@ from cl.lib.model_helpers import (
     linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
+    make_scotus_docket_number_core,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
@@ -831,8 +832,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
-            self.docket_number_core = make_docket_number_core(
-                self.docket_number
+            self.docket_number_core = (
+                make_scotus_docket_number_core(self.docket_number)
+                if self.court_id == "scotus"
+                else make_docket_number_core(self.docket_number)
             )
 
         if self.source in self.RECAP_SOURCES():
@@ -3907,9 +3910,7 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         default=False,
     )
     discretionary_court_decision = models.DateField(
-        help_text=(
-            "The date of the Court's discretionary decision."
-        ),
+        help_text=("The date of the Court's discretionary decision."),
         blank=True,
         null=True,
     )
