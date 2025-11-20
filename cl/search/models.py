@@ -42,6 +42,7 @@ from cl.lib.model_helpers import (
     CSVExportMixin,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_pdf_path,
     make_recap_path,
     make_scotus_docket_number_core,
     make_upload_path,
@@ -3928,8 +3929,10 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         blank=True,
     )
     questions_presented_file = models.FileField(
-        help_text="A local copy of the 'Questions Presented' document.",
-        upload_to="scotus/questions_presented/",
+        help_text="A local copy of the 'Questions Presented' document."
+        "The path is AWS S3 where the file is saved.",
+        upload_to=make_pdf_path,
+        storage=IncrementingAWSMediaStorage(),
         max_length=1000,
         blank=True,
     )

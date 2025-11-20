@@ -1,8 +1,13 @@
+from unittest import mock
+
+from django.core.files.base import ContentFile
 from django.test import TestCase
 
+from cl.corpus_importer.tasks import download_qp_scotus_pdf
 from cl.recap.mergers import merge_scotus_docket
 from cl.search.factories import (
     CourtFactory,
+    DocketFactory,
     ScotusDocketDataFactory,
 )
 from cl.search.models import Docket, ScotusDocketMetadata
@@ -97,3 +102,73 @@ class ScotusDocketMergeTest(TestCase):
             "Docket number can't be missing in SCOTUS dockets.",
         ):
             merge_scotus_docket(data)
+
+    @mock.patch("cl.corpus_importer.tasks.is_pdf", return_value=True)
+    @mock.patch("cl.corpus_importer.tasks.requests.get")
+    def test_download_qp_scotus_pdf_downloads_and_stores_file(
+        self,
+        mock_get,
+        mock_is_pdf,
+    ) -> None:
+        """Confirm the SCOTUS QP PDF is downloaded and stored."""
+
+        docket = DocketFactory.create(court=self.court)
+        scotus_meta = ScotusDocketMetadata.objects.create(
+            docket=docket,
+            questions_presented_url="https://www.supremecourt.gov/qp.pdf",
+        )
+        self.assertFalse(scotus_meta.questions_presented_file)
+
+        # Mock the response from requests.get
+        mock_response = mock.Mock()
+        mock_response.iter_content.return_value = [b"fake pdf content"]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        download_qp_scotus_pdf.delay(docket.id)
+
+        mock_get.assert_called_once_with(
+            scotus_meta.questions_presented_url,
+            stream=True,
+            timeout=60,
+            headers={"User-Agent": "Free Law Project"},
+        )
+
+        scotus_meta.refresh_from_db()
+
+        # Confirm the file was stored
+        self.assertTrue(scotus_meta.questions_presented_file)
+        self.assertTrue(
+            scotus_meta.questions_presented_file.name.endswith("-qp.pdf")
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.logger.info")
+    @mock.patch("cl.corpus_importer.tasks.requests.get")
+    def test_download_qp_scotus_pdf_skips_if_file_already_present(
+        self,
+        mock_get,
+        mock_logger_info,
+    ) -> None:
+        """Confirm download is skipped when questions_presented_file exists."""
+
+        docket = DocketFactory.create(court=self.court)
+        scotus_meta = ScotusDocketMetadata.objects.create(
+            docket=docket,
+            questions_presented_url="https://www.supremecourt.gov/qp.pdf",
+        )
+        scotus_meta.questions_presented_file.save(
+            "existing.pdf",
+            ContentFile(b"existing content"),
+            save=True,
+        )
+
+        download_qp_scotus_pdf.delay(docket.id)
+
+        # No GET request should have been made
+        mock_get.assert_not_called()
+
+        mock_logger_info.assert_called_with(
+            "SCOTUS PDF download: questions_presented_file already present "
+            "for docket %s; skipping.",
+            docket.id,
+        )

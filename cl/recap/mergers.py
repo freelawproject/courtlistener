@@ -2136,7 +2136,7 @@ def process_case_query_report(
 def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
     """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
 
-    This function will create or update the Docket row for the SCOTUS court and
+    This will create or update the Docket row for the SCOTUS and
     then create or update the related ScotusDocketMetadata instance.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.

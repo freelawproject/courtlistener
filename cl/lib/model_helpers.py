@@ -1,6 +1,7 @@
 import os
 import re
 from collections.abc import Callable
+from pathlib import Path
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -58,7 +59,7 @@ def clean_docket_number(docket_number: str | None) -> str:
     if len(bankr_m) == 1:
         return bankr_m[0]
 
-    # Match SCOUTS A docket numbers.
+    # Match SCOTUS docket numbers.
     scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
     if len(scotus_a_m) == 1:
         return scotus_a_m[0]
@@ -111,7 +112,13 @@ def make_docket_number_core(docket_number: str | None) -> str:
 
 
 def make_scotus_docket_number_core(docket_number: str | None) -> str:
-    """Normalize SCOTUS docket numbers like 16A985."""
+    """Normalize SCOTUS docket numbers like 16A985.
+
+    :param docket_number: The docket number to condense.
+    :return: empty string if no change possible, or the condensed version if it
+    worked. Note that all values returned are strings. We cannot return an int
+    because that'd strip leading zeroes, which we need.
+    """
     if not docket_number:
         return ""
 
@@ -175,7 +182,11 @@ def base_recap_path(instance, filename, base_dir):
 
 def make_pdf_path(instance, filename, thumbs=False):
     from cl.lasc.models import LASCPDF
-    from cl.search.models import ClaimHistory, RECAPDocument
+    from cl.search.models import (
+        ClaimHistory,
+        RECAPDocument,
+        ScotusDocketMetadata,
+    )
 
     if isinstance(instance, RECAPDocument):
         root = "recap"
@@ -191,6 +202,10 @@ def make_pdf_path(instance, filename, thumbs=False):
         file_name = f"gov.ca.lasc.{instance.docket_number}.{instance.document_id}.{slug}.pdf"
 
         return os.path.join(root, file_name)
+    elif isinstance(instance, ScotusDocketMetadata):
+        slug = slugify(Path(filename).stem)
+        file_name = f"gov.scotus.{slug}.pdf"
+        return str(Path("scotus") / "qp" / file_name)
     else:
         raise ValueError(
             f"Unknown model type in make_pdf_path function: {type(instance)}"

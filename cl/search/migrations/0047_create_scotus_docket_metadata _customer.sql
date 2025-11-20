@@ -7,7 +7,4 @@ CREATE TABLE "search_scotusdocketmetadata" ("id" integer NOT NULL PRIMARY KEY GE
 ALTER TABLE "search_scotusdocketmetadata" ADD CONSTRAINT "search_scotusdocketm_docket_id_7f309bff_fk_search_do" FOREIGN KEY ("docket_id") REFERENCES "search_docket" ("id") DEFERRABLE INITIALLY DEFERRED;
 CREATE INDEX "search_scotusdocketmetadata_date_created_ced780b2" ON "search_scotusdocketmetadata" ("date_created");
 CREATE INDEX "search_scotusdocketmetadata_date_modified_a1a87833" ON "search_scotusdocketmetadata" ("date_modified");
-CREATE INDEX "search_scotusdocketmetadataevent_docket_id_41821f24" ON "search_scotusdocketmetadataevent" ("docket_id");
-CREATE INDEX "search_scotusdocketmetadataevent_pgh_context_id_38134506" ON "search_scotusdocketmetadataevent" ("pgh_context_id");
-CREATE INDEX "search_scotusdocketmetadataevent_pgh_obj_id_a29062ed" ON "search_scotusdocketmetadataevent" ("pgh_obj_id");
 COMMIT;
