@@ -2,7 +2,7 @@
 {% require_script "js/alpine/components/expansion_panel.js" %}
 {% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
 
-<div class="bg-greyscale-100 border-greyscale-100 p-4 m-8 rounded-lg">
+<div class="bg-greyscale-100 border-greyscale-100 p-4 m-8 rounded-lg" x-data="expansionPanel">
     <!-- Eyebrow -->
     <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>
 
@@ -17,8 +17,7 @@
         {% if b.dropdown %}
             <button
                 type="button"
-                class="inline-block z-10 hover:shadow-md {{b.style}}"
-                x-data="expansionPanel"
+                class="flex-row z-10 hover:shadow-md {{b.style}}"
                 x-on:click="toggleExpansion"
                 x-bind:aria-expanded="isExpanded"
                 aria-controls="banner-button-menu"
@@ -27,9 +26,9 @@
                 >
                 {{ b.name }}
                 <span
+                    x-bind:class="supportCaretClass"
                     class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
                     aria-hidden="true"
-                    x-show="isExpanded"
                     x-cloak
                 >{% svg 'chevron' class="w-full h-full text-white" %}
                 </span>
@@ -40,7 +39,6 @@
                 id="banner-button-menu"
                 class="top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
                 role="menu"
-                x-data="expansionPanel"
                 x-show="isExpanded"
                 x-cloak
                 x-bind:area-expanded="isExpanded"
