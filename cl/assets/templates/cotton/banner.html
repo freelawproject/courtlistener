@@ -57,9 +57,9 @@
                 {% endfor %}
                 </menu>
         {% else %}
-            <button class="inline-block {{b.style}}">
+            <a class="flex-row {{b.style}}" href={{ b.dest }}>
                 {{ b.name }}
-            </button>
+            </a>
         {% endif %}
      {% endfor %}
 
