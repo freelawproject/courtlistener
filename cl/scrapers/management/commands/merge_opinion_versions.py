@@ -326,7 +326,7 @@ def get_query_from_url(url: str, url_filter: str) -> Q:
     return Q(download_url=url) | Q(download_url=extra_query)
 
 
-def group_opinions_by_url(query: Q):
+def group_opinions_by_url(query: Q) -> QuerySet:
     """Get duplicate candidates queryset by grouping opinions by `download_url`
 
     :param query: a Q object to filter the opinions
@@ -348,7 +348,16 @@ def group_opinions_by_url(query: Q):
     return qs
 
 
-def get_same_url_opinions(opinion_group: dict, seen_urls: set):
+def get_same_url_opinions(
+    opinion_group: dict, seen_urls: set
+) -> QuerySet | None:
+    """Given a URL, get a queryset for all opinions with that URL
+
+    :param opinion_group: a dictionary with a 'download_url' key
+    :param seen_urls: a set to keep track of seen URLs.
+        Useful to skip urls we have already processed
+    :return: a queryset or None
+    """
     standard_url = opinion_group["download_url"].replace("https", "http")
     if standard_url in seen_urls:
         return
