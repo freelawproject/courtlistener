@@ -559,8 +559,8 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
 @admin.register(SearchQuery)
 class SearchQueryAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("user",)
-    list_display = ("__str__", "engine", "source")
-    list_filter = ("engine", "source")
+    list_display = ("__str__", "engine", "source", "query_mode")
+    list_filter = ("engine", "source", "query_mode")
     search_fields = ("user__username",)
 
 

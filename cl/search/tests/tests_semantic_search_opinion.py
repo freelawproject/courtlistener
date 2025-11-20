@@ -22,7 +22,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
+from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion, SearchQuery
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
@@ -410,6 +410,10 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         # Perform search and check that exactly two results are returned
         search_params = {"q": self.situational_query, "semantic": True}
         r = self._test_api_results_count(search_params, 2, "semantic query")
+
+        # Ensure a SearchQuery row was logged with SEMANTIC querymode
+        last_query = SearchQuery.objects.last()
+        self.assertEqual(last_query.query_mode, SearchQuery.SEMANTIC)
 
         content = r.content.decode()
         # Check that the expected clusters appear in the results

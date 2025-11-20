@@ -3777,6 +3777,12 @@ class SearchQuery(models.Model):
         (ELASTICSEARCH, "Elasticsearch"),
         (SOLR, "Solr"),
     )
+    KEYWORD = 1
+    SEMANTIC = 2
+    QUERY_MODES = (
+        (KEYWORD, "Keyword"),
+        (SEMANTIC, "Semantic"),
+    )
     user = models.ForeignKey(
         User,
         help_text="The user who performed this search query.",
@@ -3804,6 +3810,11 @@ class SearchQuery(models.Model):
     )
     engine = models.SmallIntegerField(
         help_text="The engine that executed the search", choices=ENGINES
+    )
+    query_mode = models.SmallIntegerField(
+        help_text="Whether the query used keyword or semantic search.",
+        choices=QUERY_MODES,
+        default=KEYWORD,
     )
     date_created = models.DateTimeField(
         help_text="Datetime when the record was created.",
