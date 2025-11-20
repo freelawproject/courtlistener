@@ -26,6 +26,7 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     get_facet_dict_for_search_query,
+    has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
@@ -249,15 +250,6 @@ async def add_depth_counts(
             return cited_cluster
     else:
         return None
-
-
-def has_semantic_params(params: QueryDict) -> bool:
-    """Check if query parameters are a valid semantic search query."""
-    return bool(
-        params.get("semantic")
-        and params.get("q", "")
-        and params.get("type", SEARCH_TYPES.OPINION) in [SEARCH_TYPES.OPINION]
-    )
 
 
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
