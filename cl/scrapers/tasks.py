@@ -204,6 +204,14 @@ def extract_opinion_content(
         f"content must be of type str, not {type(content)}"
     )
 
+    # clean content before saving
+    court_id = opinion.cluster.docket.court.pk
+    site = get_scraper_object_by_name(court_id, juriscraper_module)
+    if site is not None:
+        content = site.cleanup_extracted_text(content)
+    else:
+        logger.debug("No site found %s", juriscraper_module)
+
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)
 
@@ -342,6 +350,14 @@ def extract_doc_content(
     assert isinstance(content, str), (
         f"content must be of type str, not {type(content)}"
     )
+
+    # clean content before saving
+    court_id = opinion.cluster.docket.court.pk
+    site = get_scraper_object_by_name(court_id, juriscraper_module)
+    if site is not None:
+        content = site.cleanup_extracted_text(content)
+    else:
+        logger.debug("No site found %s", juriscraper_module)
 
     set_blocked_status(opinion, content, extension)
     update_document_from_text(opinion, juriscraper_module)
