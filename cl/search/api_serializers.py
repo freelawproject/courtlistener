@@ -42,6 +42,7 @@ from cl.search.documents import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -95,6 +96,16 @@ class OriginalCourtInformationSerializer(
         fields = "__all__"
 
 
+class BankruptcyInformationSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    class Meta:
+        model = BankruptcyInformation
+        fields = "__all__"
+
+
 class DocketSerializer(
     RetrieveFilteredFieldsMixin,
     DynamicFieldsMixin,
@@ -133,6 +144,10 @@ class DocketSerializer(
         view_name="person-detail",
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
+    )
+    bankruptcy_information = serializers.HyperlinkedRelatedField(
+        read_only=True,
+        view_name="bankruptcyinformation-detail",
     )
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
