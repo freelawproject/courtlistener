@@ -15,7 +15,7 @@ from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_scotus_judges
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import make_safe_filename
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
@@ -100,7 +100,7 @@ def make_objects(
     extension = get_extension(content)
     if extension not in [".mp3", ".wma"]:
         extension = f".{item['download_urls'].lower().rsplit('.', 1)[1]}"
-    file_name = trunc(item["case_names"].lower(), 75) + extension
+    file_name = make_safe_filename(item["case_names"]) + extension
     audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
     check_duplicate_ingestion(audio_file.local_path_original_file.name)
