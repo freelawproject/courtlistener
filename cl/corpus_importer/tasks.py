@@ -20,7 +20,7 @@ from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile, File
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
@@ -51,6 +51,7 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
+from juriscraper.pacer.utils import is_pdf
 from openai import (
     APIConnectionError,
     APIError,
@@ -66,6 +67,7 @@ from requests.exceptions import (
     HTTPError,
     ReadTimeout,
     RequestException,
+    Timeout,
 )
 from rest_framework.renderers import JSONRenderer
 from sentry_sdk import capture_exception
@@ -148,6 +150,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    ScotusDocketMetadata,
     Tag,
 )
 
@@ -3174,3 +3177,105 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
             "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
             cluster.id,
         )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        ConnectionError,
+        Timeout,
+    ),
+    max_retries=5,
+    ignore_result=True,
+)
+def download_qp_scotus_pdf(self, docket_id: int) -> None:
+    """Download and store the SCOTUS 'Questions Presented' PDF for a docket.
+
+    This task looks up the Docket and its ScotusDocketMetadata, extracts the
+    questions_presented_url, validates that the response is a PDF, and stores
+    it in the questions_presented_file field.
+
+    :param: docket_id: The related Docket ID
+    :return: None
+    """
+    try:
+        docket = Docket.objects.get(pk=docket_id)
+    except Docket.DoesNotExist:
+        logger.warning(
+            "SCOTUS PDF download: Docket %s does not exist; skipping.",
+            docket_id,
+        )
+        return
+
+    scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
+
+    qp_url = scotus_meta.questions_presented_url
+    if not qp_url:
+        logger.info(
+            "SCOTUS PDF download: No questions_presented_url for docket %s.",
+            docket_id,
+        )
+        return
+
+    # Avoid re-downloading if we already have a file.
+    if scotus_meta.questions_presented_file:
+        logger.info(
+            "SCOTUS PDF download: questions_presented_file already present "
+            "for docket %s; skipping.",
+            docket_id,
+        )
+        return
+
+    logger.info(
+        "SCOTUS PDF download: Fetching Questions Presented PDF for docket %s "
+        "from %s",
+        docket_id,
+        qp_url,
+    )
+    try:
+        response = requests.get(
+            qp_url,
+            stream=True,
+            timeout=60,
+            headers={"User-Agent": "Free Law Project"},
+        )
+        response.raise_for_status()
+    except RequestException as exc:
+        logger.warning(
+            "SCOTUS PDF download: Unable to download %s for docket %s. "
+            "Exception was: %s",
+            qp_url,
+            docket_id,
+            exc,
+        )
+        return
+
+    if not is_pdf(response):
+        logger.warning(
+            "SCOTUS PDF download: Expected application/pdf for docket %s "
+            "from %s; aborting.",
+            docket_id,
+            qp_url,
+        )
+        return
+
+    with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
+        # Download the PDF into a tmp file to avoid using too much memory
+        for chunk in response.iter_content(chunk_size=8 * 1024):
+            if chunk:
+                tmp.write(chunk)
+
+        tmp.flush()
+        tmp.seek(0)
+
+        filename = f"{docket_id}-qp.pdf"
+        scotus_meta.questions_presented_file.save(
+            filename,
+            File(tmp),
+            save=True,
+        )
+
+    logger.info(
+        "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
+        docket_id,
+    )
