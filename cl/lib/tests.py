@@ -48,7 +48,7 @@ from cl.lib.redis_utils import (
     release_redis_lock,
 )
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
-from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.string_utils import make_safe_filename, normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
     check_unbalanced_parenthesis,
@@ -357,6 +357,96 @@ class TestStringUtils(SimpleTestCase):
         for test, answer in tests.items():
             computed = normalize_dashes(test)
             self.assertEqual(computed, answer)
+
+    def test_make_safe_filename(self) -> None:
+        """Does make_safe_filename properly sanitize case names for S3 paths?"""
+
+        tests = (
+            # Basic case names
+            {
+                "input": "Smith v. Jones",
+                "result": "smith-v-jones",
+            },
+            # Apostrophes should be removed
+            {
+                "input": "O'Hara v. Smith",
+                "result": "ohara-v-smith",
+            },
+            # Accented characters should be normalized
+            {
+                "input": "José García v. State",
+                "result": "jose-garcia-v-state",
+            },
+            # German umlauts and special characters
+            {
+                "input": "Müller & Associés",
+                "result": "muller-associes",
+            },
+            # Em dash should be converted to hyphen
+            {
+                "input": "State v. Doe — 2023",
+                "result": "state-v-doe-2023",
+            },
+            # Multiple spaces should become single hyphens
+            {
+                "input": "State   v.   Jones",
+                "result": "state-v-jones",
+            },
+            # Numbers should be preserved
+            {
+                "input": "Case No. 12-345",
+                "result": "case-no-12-345",
+            },
+            # The problematic â character from issue #6400
+            {
+                "input": "Martânez v. State",
+                "result": "martinez-v-state",
+            },
+            # Mixed special characters
+            {
+                "input": "Çağlar & Østerberg v. Naïve LLC",
+                "result": "caglar-osterberg-v-naive-llc",
+            },
+            # Empty string should return empty
+            {
+                "input": "",
+                "result": "",
+            },
+            # Test truncation - string longer than 75 chars
+            {
+                "input": "This is a very long case name that should be truncated because it exceeds the maximum length",
+                "result": "this-is-a-very-long-case-name-that-should-be-truncated-because-it-exceeds",
+            },
+            # Test custom max_length
+            {
+                "input": "Smith v. Jones",
+                "max_length": 10,
+                "result": "smith-v",
+            },
+            # Punctuation should be removed
+            {
+                "input": "State (Plaintiff) v. Doe [Defendant]",
+                "result": "state-plaintiff-v-doe-defendant",
+            },
+        )
+
+        for test_dict in tests:
+            max_length = test_dict.get("max_length", 75)
+            result = make_safe_filename(
+                test_dict["input"],
+                max_length=max_length,
+            )
+            self.assertEqual(
+                result,
+                test_dict["result"],
+                msg=f"Failed with input: {test_dict['input']!r}.\n"
+                f"Expected: {test_dict['result']!r}, Got: {result!r}",
+            )
+            # Verify length constraint
+            self.assertTrue(
+                len(result) <= max_length,
+                msg=f"Result '{result}' exceeds max_length {max_length}",
+            )
 
 
 class TestModelHelpers(TestCase):

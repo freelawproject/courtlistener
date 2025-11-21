@@ -1,6 +1,7 @@
 import re
 
 import tiktoken
+from django.utils.text import slugify
 
 
 def camel_to_snake(key: str) -> str:
@@ -41,6 +42,19 @@ def trunc(s: str, length: int, ellipsis: str | None = None) -> str:
         if ellipsis:
             s = f"{s}{ellipsis}"
         return s
+
+
+def make_safe_filename(case_name: str, max_length: int = 75) -> str:
+    """Create a safe filename from a case name.
+
+    Slugifies the case name to remove special characters and ensures
+    it's safe for use in S3 paths.
+
+    :param case_name: The original case name
+    :param max_length: Maximum length before truncation
+    :return: Safe filename string (without extension)
+    """
+    return trunc(slugify(case_name), max_length)
 
 
 def filter_invalid_XML_chars(input: str) -> str:
