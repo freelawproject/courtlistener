@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
@@ -102,7 +103,7 @@ def make_get_string(
 
 
 def merge_form_with_courts(
-    courts: dict,
+    courts: QuerySet[Court],
     search_form: SearchForm,
 ) -> tuple[dict[str, list], str, str]:
     """Merges the courts dict with the values from the search form.
@@ -536,6 +537,7 @@ def do_es_search(
     facet: bool = True,
     cache_key: str | None = None,
     is_csv_export: bool = False,
+    courts: QuerySet[Court] | None = None,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -548,11 +550,13 @@ def do_es_search(
     is set or used. Results are saved for six hours.
     :param is_csv_export: Indicates if the data being processed is intended for
     an export process.
+    :param courts: QuerySet of courts used in the jurisdiction picker.
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
+    if courts is None:
+        courts = Court.objects.filter(in_use=True)
     paged_results = None
-    courts = Court.objects.filter(in_use=True)
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
@@ -683,7 +687,7 @@ def do_es_search(
                     search_form,
                 )
 
-    courts, court_count_human, court_count = merge_form_with_courts(
+    courts_dict, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
     search_summary_str = search_form.as_text(court_count_human)
@@ -702,7 +706,7 @@ def do_es_search(
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
         "error": error,
-        "courts": courts,
+        "courts": courts_dict,
         "court_count_human": court_count_human,
         "court_count": court_count,
         "query_citation": query_citation,
