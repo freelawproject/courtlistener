@@ -5,68 +5,73 @@
 <c-vars eyebrow_text title_text paragraph_text buttons image_source image_alt></c-vars>
 
 <div class="bg-greyscale-100 border-greyscale-100 p-4 m-8 rounded-lg" x-data="expansionPanel">
-    <!-- Eyebrow -->
-    <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>
+  <div class="p-8">
+      <!-- Eyebrow -->
+      <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>
 
-    <!-- Title -->
-    <h2 class="font-semibold m-2">{{ title_text }}</h2>
+      <!-- Title -->
+      <h2 class="font-semibold m-2">{{ title_text }}</h2>
 
-    <!-- Paragraph -->
-    <p class="text-gray-700 m-2">{{ paragraph_text }}</p>
+      <!-- Paragraph -->
+      <p class="text-gray-700 m-2">{{ paragraph_text }}</p>
 
-    <!-- Buttons -->
-     {% for b in buttons %}
-        {% if b.dropdown %}
-            <button
-                type="button"
-                class="flex-row z-10 hover:shadow-md {{b.style}}"
-                x-on:click="toggleExpansion"
-                x-bind:aria-expanded="isExpanded"
-                aria-controls="banner-button-menu"
-                aria-haspopup="menu"
-                aria-label="Toggle menu"
-                >
-                {{ b.name }}
-                <span
-                    x-bind:class="supportCaretClass"
-                    class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
-                    aria-hidden="true"
-                    x-cloak
-                >{% svg 'chevron' class="w-full h-full text-white" %}
-                </span>
-            </button>
-
-         {#  support menu  #}
-            <menu
-                id="banner-button-menu"
-                class="top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
-                role="menu"
-                x-show="isExpanded"
-                x-cloak
-                x-bind:area-expanded="isExpanded"
-            >
-                {% for opt in b.options%}
-                    <li
-                        class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
+      <!-- Buttons -->
+      <div class="inline-flex gap-x-1">
+         {% for b in buttons %}
+            {% if b.dropdown %}
+                <button
+                    type="button"
+                    class="flex-row z-10 hover:shadow-md {{b.style}}"
+                    x-on:click="toggleExpansion"
+                    x-bind:aria-expanded="isExpanded"
+                    aria-controls="banner-button-menu"
+                    aria-haspopup="menu"
+                    aria-label="Toggle menu"
                     >
-                        <a href="{{ opt.dest }}" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
-                        {% svg opt.icon class="text-greyscale-500" aria_hidden="true" %}
-                        {{ opt.name }}
-                        </a>
-                    </li>
-                {% endfor %}
-                </menu>
-        {% else %}
-            <a class="flex-row {{b.style}}" href={{ b.dest }}>
-                {{ b.name }}
-            </a>
-        {% endif %}
-     {% endfor %}
+                    {{ b.name }}
+                    <span
+                        x-bind:class="supportCaretClass"
+                        class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+                        aria-hidden="true"
+                        x-cloak
+                    >{% svg 'chevron' class="w-full h-full text-white" %}
+                    </span>
+                </button>
+
+             {#  support menu  #}
+                <menu
+                    id="banner-button-menu"
+                    class="top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+                    role="menu"
+                    x-show="isExpanded"
+                    x-cloak
+                    x-bind:area-expanded="isExpanded"
+                >
+                    {% for opt in b.options%}
+                        <li
+                            class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
+                        >
+                            <a href="{{ opt.dest }}" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+                            {% svg opt.icon class="text-greyscale-500" aria_hidden="true" %}
+                            {{ opt.name }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                    </menu>
+            {% else %}
+                <a class="{{b.style}}" href={{ b.dest }}>
+                    {{ b.name }}
+                </a>
+            {% endif %}
+         {% endfor %}
+      </div>
+  </div>
 
     <!-- Image -->
      <img
-        class="place-content-center hidden md:block"
+        class="place-self-center hidden md:block"
         src="{{image_source}}"
         alt="{{image_alt}}"
      />
 </div>
+
