@@ -70,6 +70,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    SearchQuery,
 )
 from cl.search.tasks import (
     es_save_document,
@@ -1367,6 +1368,10 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "text_query")
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
+
+        # Ensure a SearchQuery row was logged with KEYWORD querymode
+        last_query = await SearchQuery.objects.alast()
+        self.assertEqual(last_query.query_mode, SearchQuery.KEYWORD)
 
         # Search by court_id
         search_params = {"q": "ca1"}
