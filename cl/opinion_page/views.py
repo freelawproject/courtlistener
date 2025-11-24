@@ -411,7 +411,7 @@ async def view_docket(
     return TemplateResponse(request, "docket.html", context)
 
 
-@cache_page_ignore_params(300)
+@cache_page_ignore_params(300, cache_alias="s3")
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
