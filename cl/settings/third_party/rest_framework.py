@@ -136,6 +136,7 @@ REST_FRAMEWORK = {
         "cadebe2258": "1/hour",
         "NicolasMadan": "10/hour",
         # Running bad queries
+        "Luris.ai": "1/hour",
         "tannero20": "1/hour",
         # Too difficult
         "aanshshah": "1/hour",

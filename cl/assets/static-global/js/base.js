@@ -226,16 +226,20 @@ $(document).ready(function () {
   //////////////////////////
   // Popup Cookie Handling//
   //////////////////////////
-  $('.alert-dismissible button').on("click", function () {
-    let that = $(this);
-    let duration = parseInt(that.data('duration'), 10);
-    let cookie_name = that.data('cookie-name');
-    let date = new Date();
-    date.setTime(date.getTime() + (duration * 24 * 60 * 60 * 1000));
-    let expires = "; expires=" + date.toGMTString();
-    document.cookie = cookie_name + "=" + 'true' + expires + "; samesite=lax; path=/";
-    that.closest('.alert-dismissible').addClass('hidden');
-  });
+  function popupCookieHandling(buttonSelector, containerSelector) {
+    $(buttonSelector).on('click', function () {
+      let that = $(this);
+      let duration = parseInt(that.data('duration'), 10);
+      let cookie_name = that.data('cookie-name');
+      let date = new Date();
+      date.setTime(date.getTime() + (duration * 24 * 60 * 60 * 1000));
+      let expires = '; expires=' + date.toGMTString();
+      document.cookie = cookie_name + '=' + 'true' + expires + '; samesite=lax; path=/';
+      that.closest(containerSelector).addClass('hidden');
+    });
+  }
+  popupCookieHandling('.alert-dismissible button', '.alert-dismissible')
+  popupCookieHandling('[data-dismissible-alert] button', '[data-dismissible-alert]')
 
   ///////////////////////
   // Utility Functions //
