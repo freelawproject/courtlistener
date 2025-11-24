@@ -8,6 +8,8 @@
     - cookie_name: Name of the cookie used to remember if the user has already
     dismissed the banner. This prevents them from seeing the same message
     repeatedly.
+    - cookie_sleep_duration (optional): Number of days to snooze the banner after the
+    user has dismissed it. Defaults to 20.
     - responsive (optional): When `True`, text and button are in a row in larger screens,
     and in a column in smaller ones. When `False`, layout is always the same, with the
     button below the text.
@@ -58,7 +60,7 @@
       class="close {% if responsive %}absolute-max-md{% else %}absolute{% endif %}"
       style="right: 1.4rem; top: 0.5rem; padding: 1rem"
       data-cookie-name="{{cookie_name}}"
-      data-duration="20"
+      data-duration="{% if cookie_sleep_duration %}{{ cookie_sleep_duration }}{% else %}20{% endif %}"
       aria-label="Close"
     >
       <span aria-hidden="true" class="x-large">&times;</span>
