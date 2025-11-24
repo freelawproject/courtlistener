@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load svg_tags component_tags humanize %}
+{% load static svg_tags component_tags humanize %}
 
 {% block head %}
   {% require_script "js/alpine/components/homepage.js" %}
@@ -302,7 +302,7 @@
               'dest': 'https://free.law/recap'
           }
         ]"
-        image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
+        image_source="{%  static 'png/recap_search_container.png' %}"
         image_alt="Alt image description must be written when correct image becomes available"
       >
   </c-banner>
@@ -317,7 +317,7 @@
               'dest': 'https://www.courtlistener.com/help/api/'
           }
         ]"
-        image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
+        image_source="{%  static 'png/api_setup_container.png' %}"
         image_alt="Alt image description must be written when correct image becomes available"
       >
   </c-banner>
