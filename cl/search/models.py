@@ -363,6 +363,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
+    date_rehearing_denied = models.DateField(
+        help_text="The date the petition for rehearing was denied at the "
+        "lower court.",
+        blank=True,
+        null=True,
+    )
 
     @property
     def administrative_link(self):

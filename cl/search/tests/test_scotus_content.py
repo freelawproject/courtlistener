@@ -17,12 +17,20 @@ class ScotusDocketMergeTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.lower_court = CourtFactory(
+            id="ca2",
+            full_name="United States Court of Appeals for the Second Circuit",
+            jurisdiction="A",
+        )
 
     def test_merge_scotus_docket_creates_docket_and_metadata(self) -> None:
         """Confirm SCOTUS data is merged into Docket and metadata."""
 
         data = ScotusDocketDataFactory(
-            docket_number="23-1434", capital_case=False
+            docket_number="23-1434",
+            capital_case=False,
+            lower_court="United States Court of Appeals for the Second Circuit",
+            lower_court_case_numbers=["22-16375", "22-16622"],
         )
         docket = merge_scotus_docket(data)
         docket.refresh_from_db()
@@ -35,6 +43,9 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(docket.date_filed, data["date_filed"])
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
 
+        self.assertEqual(docket.appeal_from_str, data["lower_court"])
+        self.assertEqual(docket.appeal_from_id, self.lower_court.pk)
+
         # ScotusDocketMetadata fields
         metadata = docket.scotus_metadata
         self.assertFalse(metadata.capital_case)
@@ -45,6 +56,19 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(metadata.linked_with, data["links"])
         self.assertEqual(
             metadata.questions_presented_url, data["questions_presented"]
+        )
+
+        # OriginatingCourtInformation fields
+        oci = docket.originating_court_information
+        expected_numbers = "22-16375, 22-16622"
+        self.assertEqual(oci.docket_number, expected_numbers)
+        self.assertEqual(
+            oci.date_judgment,
+            data["lower_court_decision_date"],
+        )
+        self.assertEqual(
+            oci.date_rehearing_denied,
+            data["lower_court_rehearing_denied_date"],
         )
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:

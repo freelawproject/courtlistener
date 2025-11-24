@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
+from courts_db import find_court
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
@@ -2132,6 +2133,41 @@ def process_case_query_report(
     return None
 
 
+def find_scotus_lower_court(lower_court_name: str) -> Court | None:
+    """Find the lower court for a SCOTUS docket using courts-db.
+
+    :param lower_court_name: The name of the lower court to look for.
+    :return: The lower court if found, else None.
+    """
+    if not lower_court_name:
+        return None
+
+    court_ids = find_court(lower_court_name)
+    if not court_ids:
+        logger.error(
+            "Could not map lower court from name '%s' for SCOTUS docket.",
+            lower_court_name,
+        )
+        return None
+
+    if len(court_ids) > 1:
+        logger.error(
+            "Ambiguous lower court name '%s' in courts-db: %s",
+            lower_court_name,
+            court_ids,
+        )
+
+    try:
+        return Court.objects.get(pk=court_ids[0])
+    except Court.DoesNotExist:
+        logger.error(
+            "Court object does not exist in DB for id '%s' (name: '%s').",
+            court_ids[0],
+            lower_court_name,
+        )
+        return None
+
+
 @transaction.atomic
 def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
     """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
@@ -2149,7 +2185,7 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
 
     case_name = report_data.get("case_name") or ""
     date_filed = report_data.get("date_filed")
-    lower_court = report_data.get("lower_court")
+    lower_court_name = report_data.get("lower_court")
 
     d = async_to_sync(find_docket_object)(
         court.pk,
@@ -2165,7 +2201,47 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
     d.docket_number_raw = docket_number
     d.case_name = case_name if case_name else d.case_name
     d.date_filed = date_filed if date_filed else d.date_filed
-    d.appeal_from_str = lower_court if lower_court else d.appeal_from_str
+    d.appeal_from_str = (
+        lower_court_name if lower_court_name else d.appeal_from_str
+    )
+    if lower_court_name:
+        lower_court = find_scotus_lower_court(lower_court_name)
+        d.appeal_from = (
+            lower_court if lower_court is not None else d.appeal_from
+        )
+
+    lower_court_case_numbers = report_data.get("lower_court_case_numbers")
+    lower_court_decision_date = report_data.get("lower_court_decision_date")
+    lower_court_rehearing_denied_date = report_data.get(
+        "lower_court_rehearing_denied_date"
+    )
+    if (
+        lower_court_case_numbers
+        or lower_court_decision_date
+        or lower_court_rehearing_denied_date
+    ):
+        oci = d.originating_court_information
+        # Create originating_court_information if missing
+        if not oci:
+            oci = OriginatingCourtInformation.objects.create()
+
+        oci.docket_number = (
+            ", ".join(lower_court_case_numbers)
+            if lower_court_case_numbers
+            else oci.docket_number
+        )
+        oci.date_judgment = (
+            lower_court_decision_date
+            if lower_court_decision_date
+            else oci.date_judgment
+        )
+        oci.date_rehearing_denied = (
+            lower_court_rehearing_denied_date
+            if lower_court_rehearing_denied_date
+            else oci.date_rehearing_denied
+        )
+        oci.save()
+        d.originating_court_information = oci
     d.save()
 
     # Merge ScotusDocketMetadata
