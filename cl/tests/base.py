@@ -20,6 +20,7 @@ from timeout_decorator import TimeoutError
 
 from cl.lib.decorators import retry
 from cl.lib.test_helpers import SerializeLockFileTestMixin
+from cl.lib.utils import create_selenium_driver
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
 
@@ -51,24 +52,7 @@ class BaseSeleniumTest(
 
     @staticmethod
     def _create_browser() -> webdriver.Chrome:
-        options = webdriver.ChromeOptions()
-        if settings.SELENIUM_HEADLESS is True:
-            options.add_argument("headless")
-        options.add_argument("silent")
-
-        # Workaround for
-        # https://bugs.chromium.org/p/chromium/issues/detail?id=1033941
-        options.add_argument(
-            "--disable-features=AvoidFlashBetweenNavigation,PaintHolding"
-        )
-
-        if settings.DOCKER_SELENIUM_HOST:
-            return webdriver.Remote(
-                settings.DOCKER_SELENIUM_HOST,
-                options=options,
-                keep_alive=True,
-            )
-        return webdriver.Chrome(options=options, keep_alive=True)
+        return create_selenium_driver()
 
     @classmethod
     def setUpClass(cls) -> None:

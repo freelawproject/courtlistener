@@ -6,6 +6,7 @@ import traceback
 from collections import defaultdict
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+import celery
 import httpx
 import requests
 from asgiref.sync import async_to_sync
@@ -37,7 +38,7 @@ from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
-from cl.lib.utils import is_iter
+from cl.lib.utils import is_iter, create_selenium_driver
 from cl.recap.mergers import save_iquery_to_docket
 from cl.scrapers.management.commands.merge_opinion_versions import (
     get_query_from_url,
@@ -699,7 +700,18 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     return "".join(characters)
 
 
-@app.task(max_retries=3, autoretry_for=(ScrapeFailed))
+class SeleniumInteractionTask(celery.Task):
+    """Persists webdriver between tasks to avoid unnecessary overhead"""
+    _driver: webdriver.Chrome | None = None
+
+    @property
+    def driver(self) -> webdriver.Chrome:
+        if self._driver is None:
+            self._driver = create_selenium_driver()
+        return self._driver
+
+
+@app.task(bind=True, max_retries=3, base=SeleniumInteractionTask, autoretry_for=(ScrapeFailed,))
 @throttle_task("1/m")
 def subscribe_to_scotus_updates(self, pk: int) -> None:
     """Subscribe to SCOTUS updates for a given opinion"""
@@ -717,9 +729,7 @@ def subscribe_to_scotus_updates(self, pk: int) -> None:
         )
     )
 
-    chrome_options = ChromeOptions()
-    chrome_options.add_argument("--headless=new")
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = self.driver
 
     driver.get(subscription_url)
     captcha_image = driver.find_element(
