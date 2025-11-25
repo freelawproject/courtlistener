@@ -202,6 +202,42 @@
     </li>
   </ul>
 
+    <h4 id="cluster-redirections">Opinion Cluster Redirections (Coming Soon to API)</h4>
+
+    <p>
+        CourtListener maintains a policy of preserving persistent URLs for all opinion
+        clusters. Even when a cluster becomes obsolete, its original
+        <code>cluster_id</code> is never removed. Instead, an internal
+        <code>ClusterRedirection</code> record maps the obsolete cluster to the current,
+        active one.
+    </p>
+
+    <p>
+        Clusters may be removed or consolidated for several reasons, including:
+    </p>
+
+    <ul>
+        <li>Duplicate clusters being merged</li>
+        <li>Clusters replaced by a newer version of the same opinion</li>
+        <li>Clusters removed or sealed by court order</li>
+    </ul>
+
+    <p>
+        When a cluster is removed, its <code>cluster_id</code> is stored as a
+        <code>deleted_cluster_id</code>, and a redirection is created that points to the
+        new surviving cluster. This ensures no dead links and allows clients to maintain
+        persistent references even across merges or data corrections.
+    </p>
+
+
+    <p>
+        <strong>Note:</strong> Cluster redirection data is not yet exposed via the
+        REST API. Replication clients should be aware that an old
+        <code>cluster_id</code> may internally redirect to a different, newer
+        cluster.
+    </p>
+
+
 
   <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>
   {% include "includes/court-endpoint.html" %}
