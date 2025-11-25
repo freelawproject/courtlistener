@@ -6,7 +6,6 @@ import os
 import socket
 from contextlib import contextmanager
 
-from django.conf import settings
 from django.core.management import call_command
 from django.test.utils import override_settings, tag
 from selenium import webdriver

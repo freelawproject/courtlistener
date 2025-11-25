@@ -18,7 +18,6 @@ from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
 from selenium import webdriver
 from selenium.webdriver import ActionChains
-from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 
@@ -38,7 +37,7 @@ from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
-from cl.lib.utils import is_iter, create_selenium_driver
+from cl.lib.utils import create_selenium_driver, is_iter
 from cl.recap.mergers import save_iquery_to_docket
 from cl.scrapers.management.commands.merge_opinion_versions import (
     get_query_from_url,
@@ -702,6 +701,7 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
 
 class SeleniumInteractionTask(celery.Task):
     """Persists webdriver between tasks to avoid unnecessary overhead"""
+
     _driver: webdriver.Chrome | None = None
 
     @property
@@ -711,7 +711,12 @@ class SeleniumInteractionTask(celery.Task):
         return self._driver
 
 
-@app.task(bind=True, max_retries=3, base=SeleniumInteractionTask, autoretry_for=(ScrapeFailed,))
+@app.task(
+    bind=True,
+    max_retries=3,
+    base=SeleniumInteractionTask,
+    autoretry_for=(ScrapeFailed,),
+)
 @throttle_task("1/m")
 def subscribe_to_scotus_updates(self, pk: int) -> None:
     """Subscribe to SCOTUS updates for a given opinion"""
