@@ -448,7 +448,9 @@ class ApiQueryCountTests(TestCase):
             self.client.get(path)
 
         with self.assertNumQueries(2):
-            path = reverse("bankruptcyinformation-list", kwargs={"version": "v3"})
+            path = reverse(
+                "bankruptcyinformation-list", kwargs={"version": "v3"}
+            )
             self.client.get(path)
 
     def test_party_endpoint_query_counts(self, mock_logging_prefix) -> None:
