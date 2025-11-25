@@ -1,6 +1,6 @@
 import instructor
-from pydantic import BaseModel
 from openai import OpenAI
+from pydantic import BaseModel
 
 
 def call_llm(
@@ -69,9 +69,5 @@ def call_llm_transcription(
     client = OpenAI(api_key=api_key)
 
     return client.audio.transcriptions.create(
-        model=model,
-        file=audio,
-        response_format='text'
+        model=model, file=audio, response_format="text"
     )
-
-
