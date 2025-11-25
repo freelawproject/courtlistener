@@ -2,10 +2,11 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.db import connection
-from django.test import AsyncClient
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from lxml import html as lhtml
+from waffle.testutils import override_flag
 
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -13,7 +14,6 @@ from cl.lib.test_helpers import (
     RECAPSearchTestCase,
     SearchTestCase,
     SimpleUserDataMixin,
-    new_design_enabled,
 )
 from cl.search.models import Docket, Opinion, RECAPDocument
 from cl.search.utils import get_v2_homepage_stats
@@ -42,6 +42,7 @@ def data_value_for_label(label_text: str, html: str) -> str:
     return data_nodes[0]
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_transitional_waffle")
 class HomepageTransitionalTest(TestCase):
     """
     Transitional tests for current behavior that will change in the future as new templates are implemented.
@@ -73,27 +74,29 @@ class HomepageTransitionalTest(TestCase):
 
 @patch("cl.search.views.get_v2_homepage_stats", return_value=FAKE_STATS)
 @patch("cl.search.views.get_homepage_stats", return_value=FAKE_STATS)
+@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_routing_waffle")
 class HomepageRoutingTest(TestCase):
     """
     Router chooses legacy vs new homepage correctly.
     We patch methods to get stats so routing tests don't interact with the DB/Redis.
     """
 
-    @new_design_enabled(False)
+    @override_flag("use_new_design", False)
     def test_flag_off_routes_to_legacy(self, *mocks):
         resp = self.client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "homepage.html")
         self.assertNotIn('x-data="header"', resp.content.decode())
 
-    @new_design_enabled()
+    @override_flag("use_new_design", True)
     def test_flag_on_get_no_params_routes_to_new_homepage(self, *mocks):
         resp = self.client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
 
 
-@new_design_enabled()
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_stats_smoke_waffle")
 class HomepageStatsSmokeTest(TestCase):
     """Minimal test for stats block rendering on the new homepage."""
 
@@ -106,7 +109,8 @@ class HomepageStatsSmokeTest(TestCase):
         self.assertIn("Number of federal cases in the RECAP Archive", html)
 
 
-@new_design_enabled()
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_async_homepage_waffle")
 class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
     """Tests new homepage renders correctly for authenticated and anonymous users."""
 
@@ -128,7 +132,8 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         self.assertIn('id="header-profile-menu"', resp.content.decode())
 
 
-@new_design_enabled()
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_structure_waffle")
 class HomepageStructureTest(SimpleUserDataMixin, TestCase):
     """Structural tests for the new homepage layout."""
 
@@ -168,8 +173,9 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
                 self.assertIn(label, html, f"Not found in template: {label}")
 
 
-@new_design_enabled()
+@override_flag("use_new_design", True)
 @patch("cl.lib.redis_utils.get_redis_interface")
+@override_settings(WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle")
 class HomepageStatsTest(
     RECAPSearchTestCase,
     CourtTestCase,
