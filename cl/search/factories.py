@@ -407,7 +407,7 @@ class ScotusDocketDataFactory(DictFactory):
     docket_number = Faker("federal_district_docket_number")
     links = Faker("federal_district_docket_number")
     lower_court = Faker("court_name")
-    lower_court_case_numbers = [Faker("federal_district_docket_number")]
+    lower_court_case_numbers = []
     lower_court_case_numbers_raw = Faker("federal_district_docket_number")
     lower_court_decision_date = Faker("date_object")
     lower_court_rehearing_denied_date = Faker("date_object")

@@ -2156,6 +2156,7 @@ def find_scotus_lower_court(lower_court_name: str) -> Court | None:
             lower_court_name,
             court_ids,
         )
+        return None
 
     try:
         return Court.objects.get(pk=court_ids[0])
