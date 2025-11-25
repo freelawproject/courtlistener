@@ -1,7 +1,10 @@
+import base64
 import logging
 import random
+import re
 import traceback
 from collections import defaultdict
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import httpx
 import requests
@@ -12,6 +15,11 @@ from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
+from selenium import webdriver
+from selenium.webdriver import Keys, ActionChains
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -20,7 +28,9 @@ from cl.citations.tasks import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
+from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
+from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
@@ -650,3 +660,104 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         tag_names=None,
         skip_iquery_sweep=True,
     )
+
+
+def process_scotus_captcha_transcription(transcription: str) -> str:
+    """Converts the transcription of a SCOTUS audio CAPTCHA into a list of five alphanumeric characters. Throws an error if it is unable to do so.
+
+    SCOTUS audio CAPTCHAs consist of three alphanumeric characters read out using the NATO phonetic alphabet. This makes extracting them from a transcription quite easy. The main challenge is that certain transcription models may choose odd spellings of certain phonetic characters, alternatively spell or not spell numbers, and insert punctuation in arbitrary locations. This method attempts to deal with all of those.
+
+    :param transcription: The transcription of the CAPTCHA.
+    :return: The alphanumeric characters extracted from the transcription."""
+
+    numeric_map = {
+        'zero': '0',
+        'one': '1',
+        'two': '2',
+        'three': '3',
+        'four': '4',
+        'five': '5',
+        'six': '6',
+        'seven': '7',
+        'eight': '8',
+        'nine': '9',
+    }
+
+    words = [re.sub(r'\W+', word, '') for word in transcription.lower().split(' ')]
+
+    if len(words) != 5:
+        raise ValueError(f"Expected 5 words, got {len(words)}")
+    if any([len(word) == 0 for word in words]):
+        raise ValueError("Expected all words to be non-empty")
+
+    characters = [numeric_map[word] if word in numeric_map else word[0] for word in words]
+
+    return ''.join(characters)
+
+
+@app.task(
+    max_retries=3,
+    autoretry_for=(
+        ScrapeFailed
+    )
+)
+@throttle_task("1/m")
+def subscribe_to_scotus_updates(self, pk: int) -> None:
+    """Subscribe to SCOTUS updates for a given opinion"""
+    docket = Docket.objects.get(pk=pk, court_id='scotus')
+    docket_number = docket.docket_number_raw
+
+    subscription_url = urlunparse((
+        'https',
+        'www.supremecourt.gov',
+        'casenotification',
+        '',
+        urlencode({'caseNumber': docket_number}),
+        ''
+    ))
+
+    chrome_options = ChromeOptions()
+    chrome_options.add_argument("--headless=new")
+    driver = webdriver.Chrome(options=chrome_options)
+
+    driver.get(subscription_url)
+    captcha_image = driver.find_element(by=By.CSS_SELECTOR, value='.k-captcha-image img')
+    wait = WebDriverWait(driver, timeout=2)
+    wait.until(lambda d: captcha_image.is_displayed())
+    captcha_image_source = captcha_image.get_attribute('src')
+    captcha_id = parse_qs(urlparse(captcha_image_source).query)['captchaId'][0]
+
+    # Input the email before listening to the CAPTCHA since that's what a normal human would do
+    email_input = driver.find_element(by=By.CSS_SELECTOR, value="#Email")
+    ActionChains(driver).send_keys_to_element(
+        email_input, "scotus@recap.email"
+    ).perform()
+
+    audio_source = urlunparse((
+        'https',
+        'www.supremecourt.gov',
+        'Captcha/audio',
+        '',
+        urlencode({'captchaId': captcha_id}),
+        ''
+    ))
+    # It was unclear what headers were required to get SCOTUS to actually return a result, so we use this suboptimal solution that works.
+    audio_bytes_b64 = base64.b64encode(bytearray(driver.execute_script("""
+        return await fetch(\"""" + audio_source + """\").then((response) => response.bytes())
+    """))).decode('utf-8')
+    solution = process_scotus_captcha_transcription(call_llm_transcription(audio_bytes_b64))
+
+    captcha_input = driver.find_element(by=By.CSS_SELECTOR, value='#captcha')
+    ActionChains(driver).send_keys_to_element(
+        captcha_input,
+        solution
+    ).perform()
+
+    subscribe_button = driver.find_element(by=By.CSS_SELECTOR, value='#SubscribeButton')
+    subscribe_button.click()
+
+    result = driver.find_element(by=By.CSS_SELECTOR, value="#CaseNotificationResult>fieldset>div>div")
+    wait.until(lambda d: result.is_displayed())
+
+    if result.text.find('Success') < 0:
+        raise ScrapeFailed(f"Failed to subscribe to SCOTUS updates for case {docket_number}: {result.text}")
