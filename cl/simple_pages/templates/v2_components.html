@@ -236,13 +236,25 @@ Sample code here.
           {
             'dropdown': 'True',
             'style': 'btn-primary',
-            'name': 'Add to Chrome',
-            'options': [{'name': 'Add to Chrome', 'dest': 'https://www.courtlistener.com/', 'icon': 'magnifier'}, {'name': 'Add to Edge', 'dest': 'https://www.courtlistener.com/', 'icon': 'tag'}]
+            'name': 'Install now',
+            'options': [
+              {
+                'name': 'Add to Chrome',
+                'dest': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
+                'icon': 'logos/chrome'
+              }, {
+                'name': 'Add to Edge',
+                'dest': '/recap/edge',
+                'icon': 'logos/edge'
+              }
+            ]
           }, {
               'style': 'btn-white',
               'name': 'Learn more'
           }
-        ]"      image_source="https://storage.courtlistener.com/static/png/donate-button.f21707e5ec7d.png"
+        ]"
+        image_source="{%  static 'png/recap_search_container.png' %}"
+        image_alt=""
       &gt;
     &lt;/c-banner>
       </c-code>
