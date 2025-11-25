@@ -4285,6 +4285,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
+        assert docket_with_bankruptcy is not None  # for mypy
 
         # Confirm the bankruptcy_information field is present and is a URL
         self.assertIn("bankruptcy_information", docket_with_bankruptcy)
@@ -4300,6 +4301,7 @@ class BankruptcyInformationAPITests(TestCase):
             None,
         )
         self.assertIsNotNone(docket_without_bankruptcy)
+        assert docket_without_bankruptcy is not None  # for mypy
 
         # Confirm the bankruptcy_information field is None for dockets without it
         self.assertIn("bankruptcy_information", docket_without_bankruptcy)
@@ -4355,6 +4357,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
+        assert docket_with_bankruptcy is not None  # for mypy
 
         # Confirm the bankruptcy_information field is NOT present
         self.assertNotIn("bankruptcy_information", docket_with_bankruptcy)
@@ -4391,6 +4394,7 @@ class BankruptcyInformationAPITests(TestCase):
             (d for d in results if d["id"] == self.docket.id), None
         )
         self.assertIsNotNone(docket_with_bankruptcy)
+        assert docket_with_bankruptcy is not None  # for mypy
 
         # Should only have the requested fields
         self.assertEqual(
