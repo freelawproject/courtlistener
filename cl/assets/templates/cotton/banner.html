@@ -4,8 +4,8 @@
 
 <c-vars eyebrow_text title_text paragraph_text buttons image_source image_alt></c-vars>
 
-<div class="bg-greyscale-100 border-greyscale-100 p-4 m-8 rounded-lg" x-data="expansionPanel">
-  <div class="p-8">
+<div class="bg-greyscale-100 border-greyscale-100 p-8 m-8 rounded-lg" x-data="expansionPanel">
+  <div class="pb-8">
       <!-- Eyebrow -->
       <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>
 
@@ -66,12 +66,11 @@
          {% endfor %}
       </div>
   </div>
-
-    <!-- Image -->
-     <img
-        class="place-self-center hidden md:block"
-        src="{{image_source}}"
-        alt="{{image_alt}}"
-     />
+  <!-- Image -->
+   <img
+      class="place-self-center hidden md:block"
+      src="{{image_source}}"
+      alt="{{image_alt}}"
+   />
 </div>
 
