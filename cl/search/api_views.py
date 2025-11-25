@@ -115,7 +115,22 @@ class BankruptcyInformationViewSet(DeferredFieldsMixin, viewsets.ModelViewSet):
         "date_created",
         "date_modified",
     ]
-    queryset = BankruptcyInformation.objects.all().order_by("-id")
+    queryset = (
+        BankruptcyInformation.objects.select_related("docket")
+        .only(
+            "id",
+            "date_created",
+            "date_modified",
+            "date_converted",
+            "date_last_to_file_claims",
+            "date_last_to_file_govt",
+            "date_debtor_dismissed",
+            "chapter",
+            "trustee_str",
+            "docket__id",
+        )
+        .order_by("-id")
+    )
 
 
 class DocketViewSet(
@@ -154,6 +169,7 @@ class DocketViewSet(
             "referred_to",
             "originating_court_information",
             "idb_data",
+            "bankruptcy_information",
         )
         .prefetch_related("panel", "clusters", "audio_files", "tags")
         .order_by("-id")
