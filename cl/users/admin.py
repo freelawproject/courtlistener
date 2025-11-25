@@ -1,7 +1,10 @@
+from typing import cast
+
 from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
+from django.db.models import Model
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
@@ -12,7 +15,13 @@ from cl.donate.admin import (
     NeonMembershipInline,
 )
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
-from cl.lib.admin import AdminTweaksMixin, build_admin_url
+from cl.favorites.models import UserTag
+from cl.lib.admin import (
+    AdminLinkConfig,
+    AdminTweaksMixin,
+    generate_admin_links,
+)
+from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
     EmailFlag,
@@ -21,9 +30,12 @@ from cl.users.models import (
     UserProfile,
 )
 
-UserProxyEvent = apps.get_model("users", "UserProxyEvent")
-UserProfileEvent = apps.get_model("users", "UserProfileEvent")
-UserSearchQuery = apps.get_model("search", "SearchQuery")
+UserProxyEvent: type[Model] = cast(
+    type[Model], apps.get_model("users", "UserProxyEvent")
+)
+UserProfileEvent: type[Model] = cast(
+    type[Model], apps.get_model("users", "UserProfileEvent")
+)
 
 
 class TokenInline(admin.StackedInline):
@@ -76,13 +88,14 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "profile__stub_account",
     )
     search_help_text = (
-        "Search Users by username, first name, last name, or email."
+        "Search Users by username, first name, last name, email, or pk."
     )
     search_fields = (
         "username",
         "first_name",
         "last_name",
         "email",
+        "pk",
     )
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
@@ -90,23 +103,30 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         extra_context = extra_context or {}
         user = self.get_object(request, object_id)
 
-        extra_context["proxy_events_url"] = build_admin_url(
-            UserProxyEvent,
-            {"pgh_obj": object_id},
-        )
+        custom_links: list[AdminLinkConfig] = [
+            {
+                "label": "UserProxy Events",
+                "model_class": UserProxyEvent,
+                "query_params": {"pgh_obj": object_id},
+            },
+            {
+                "label": "UserProfile Events",
+                "model_class": UserProfileEvent,
+                "query_params": {"pgh_obj": user.profile.pk},
+            },
+            {
+                "label": "Search Queries",
+                "model_class": SearchQuery,
+                "query_params": {"user": object_id},
+            },
+            {
+                "label": "Tags",
+                "model_class": UserTag,
+                "query_params": {"user": object_id},
+            },
+        ]
 
-        if user and hasattr(user, "profile"):
-            profile_id = user.profile.pk
-            extra_context["profile_events_url"] = build_admin_url(
-                UserProfileEvent,
-                {"pgh_obj": profile_id},
-            )
-
-        if user and hasattr(user, "search_queries"):
-            extra_context["search_queries_url"] = build_admin_url(
-                UserSearchQuery,
-                {"user": object_id},
-            )
+        extra_context["custom_links"] = generate_admin_links(custom_links)
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context

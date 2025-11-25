@@ -39,7 +39,7 @@ from cl.stats.utils import tally_stat
 MAX_RT_ITEM_QUERY = 1000
 
 
-DAYS_WEEK = 7
+DAYS_WEEK = 6
 DAYS_MONTH = 28
 
 
@@ -59,7 +59,7 @@ def get_cut_off_start_date(rate: str, d: date) -> date:
         case Alert.DAILY:
             # For daily alerts: Set cut_off_date to the previous day since the
             # cron job runs early in the morning.
-            return d - timedelta(days=1)
+            return d
         case Alert.WEEKLY:
             return d - timedelta(days=DAYS_WEEK)
         case Alert.MONTHLY:
@@ -91,7 +91,7 @@ def get_cut_off_end_date(rate: str, cutoff_start_date: date) -> date | None:
         case Alert.DAILY:
             return cutoff_start_date
         case Alert.WEEKLY:
-            return cutoff_start_date + timedelta(days=DAYS_WEEK - 1)
+            return cutoff_start_date + timedelta(days=DAYS_WEEK)
         case Alert.MONTHLY:
             last_day = calendar.monthrange(
                 cutoff_start_date.year, cutoff_start_date.month

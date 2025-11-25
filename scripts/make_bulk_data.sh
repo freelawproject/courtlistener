@@ -61,7 +61,8 @@ docket_fields='(id, date_created, date_modified, source, appeal_from_str,
 	       ia_date_first_change, view_count, date_blocked, blocked, appeal_from_id, assigned_to_id,
 	       court_id, idb_data_id, originating_court_information_id, referred_to_id,
 	       federal_dn_case_type, federal_dn_office_code, federal_dn_judge_initials_assigned,
-	       federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id
+	       federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id,
+           docket_number_raw
 	       )'
 dockets_csv_filename="dockets-$(date -I).csv"
 
@@ -125,7 +126,8 @@ opinionscited_csv_filename="citation-map-$(date -I).csv"
 
 # search_citation
 citation_fields='(
-	       id, volume, reporter, page, type, cluster_id
+	       id, volume, reporter, page, type, cluster_id, date_created,
+           date_modified
 	   )'
 citations_csv_filename="citations-$(date -I).csv"
 
