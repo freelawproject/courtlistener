@@ -189,7 +189,7 @@ async def find_docket_object(
         # match b/c of punctuation or whatever, but we can try. Avoid lookups
         # by blank docket_number values.
         lookups.append(
-            {"pacer_case_id": None, "docket_number": docket_number},
+            {"pacer_case_id": None, "docket_number_raw": docket_number},
         )
 
     for kwargs in lookups:

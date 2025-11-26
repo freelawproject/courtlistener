@@ -2557,7 +2557,7 @@ def fetch_appellate_docket(self, fq_pk):
     )
 
     docket_number = fq.docket_number or getattr(
-        fq.docket, "docket_number", None
+        fq.docket, "docket_number_raw", None
     )
     start_time = now()
     try:
