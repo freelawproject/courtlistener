@@ -58,4 +58,4 @@ def svg(name, **kwargs):
         key = key.replace("_", "-")
         svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
-    return format_html(svg_content.replace("<svg", '<svg role="img"'))
+    return format_html("{}", svg_content.replace("<svg", '<svg role="img"'))

@@ -1542,8 +1542,10 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
-        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body goes here</p>\n"
+        )
 
         # Confirm if email is sent
         self.assertEqual(len(mail.outbox), 1)
@@ -1557,8 +1559,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here\n")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
 
     def test_email_message_class(self) -> None:
         """This test checks if Django EmailMessage class works properly using
@@ -1570,7 +1572,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             "Body goes here",
             "testing@courtlistener.com",
             ["success@simulator.amazonses.com"],
-            ["bcc_success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
             reply_to=["reply_success@simulator.amazonses.com"],
@@ -1584,7 +1586,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
         self.assertEqual(
             stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
         )
@@ -1610,7 +1612,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message only has plain/text version
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
         self.assertEqual(html_body, "")
 
     def test_multialternative_email(self) -> None:
@@ -1638,9 +1640,11 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here 世界 ñ ⚖️")
         self.assertEqual(
-            stored_email[0].html_message, "<p>Body goes here 世界 ñ ⚖️</p>"
+            stored_email[0].plain_text, "Body goes here 世界 ñ ⚖️\n"
+        )
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body goes here 世界 ñ ⚖️</p>\n"
         )
         self.assertEqual(
             stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
@@ -1664,8 +1668,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has a plain and html version
-        self.assertEqual(plaintext_body, "Body goes here 世界 ñ ⚖️")
-        self.assertEqual(html_body, "<p>Body goes here 世界 ñ ⚖️</p>")
+        self.assertEqual(plaintext_body, "Body goes here 世界 ñ ⚖️\n")
+        self.assertEqual(html_body, "<p>Body goes here 世界 ñ ⚖️</p>\n")
 
     def test_multialternative_only_plain_email(self) -> None:
         """This test checks if Django EmailMultiAlternatives class works
@@ -1687,7 +1691,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
         self.assertEqual(stored_email[0].html_message, "")
 
         # Confirm if email is sent
@@ -1704,7 +1708,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has only plain/text version
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
         self.assertEqual(html_body, "")
 
     def test_multialternative_only_html_email(self) -> None:
@@ -1727,7 +1731,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.latest("id")
-        self.assertEqual(stored_email.html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email.html_message, "<p>Body goes here</p>\n")
         self.assertEqual(stored_email.plain_text, "")
 
         # Confirm if email is sent
@@ -1742,7 +1746,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has only html/text version
         self.assertEqual(plaintext_body, "")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
 
     def test_sending_email_with_attachment(self) -> None:
         """This test checks if Django EmailMessage class works
@@ -1754,7 +1758,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             "Body goes here",
             "testing@courtlistener.com",
             ["success@simulator.amazonses.com"],
-            ["bcc_success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
@@ -1894,7 +1898,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             stored_email.plain_text,
             stored_email.from_email,
             stored_email.to,
-            stored_email.bcc,
+            bcc=stored_email.bcc,
             cc=stored_email.cc,
             reply_to=stored_email.reply_to,
             headers=stored_email.headers,
@@ -1916,8 +1920,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         plaintext_body, html_body = get_email_body(message)
         # Compare second message sent with the original message content
         self.assertEqual(message_sent.subject, "This is the subject")
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here\n")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["success@simulator.amazonses.com"])
         self.assertEqual(
@@ -2002,7 +2006,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
                 "bounce@simulator.amazonses.com",
                 "<complaint@simulator.amazonses.com>",
             ],
-            ["BCC User <bcc@example.com>", "bcc@example.com"],
+            bcc=["BCC User <bcc@example.com>", "bcc@example.com"],
             cc=["CC User <cc@example.com>", "cc@example.com"],
             reply_to=["Reply User <another@example.com>", "reply@example.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
@@ -2040,12 +2044,12 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         plaintext_body, html_body = get_email_body(message)
 
         # Confirm if normal email version is sent
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
 
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
         self.assertEqual(
             stored_email[0].from_email,
             "User Admin <testing@courtlistener.com>",
@@ -2328,7 +2332,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             [
                 "Admin User <success@simulator.amazonses.com>",
             ],
-            ("BCC User <bcc@example.com>", "bcc@example.com"),
+            bcc=("BCC User <bcc@example.com>", "bcc@example.com"),
         )
         email.send()
         message_sent = mail.outbox[1]
@@ -2379,7 +2383,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             [
                 "Admin User <success@simulator.amazonses.com>",
             ],
-            ("BCC User <bcc@example.com>", "bcc@example.com"),
+            bcc=("BCC User <bcc@example.com>", "bcc@example.com"),
         )
         email.send()
         message_sent = mail.outbox[1]
@@ -2646,8 +2650,8 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Compare second message sent with the original message content
         self.assertEqual(message_sent.subject, "This is the subject")
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here\n")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["new_address@courtlistener.com"])
         self.assertEqual(message_sent.bcc, [])
@@ -2684,7 +2688,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         message = message_sent.message()
         plaintext_body, html_body = get_email_body(message)
         self.assertEqual(message_sent.subject, "This is the subject")
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["anon_address@courtlistener.com"])
 
