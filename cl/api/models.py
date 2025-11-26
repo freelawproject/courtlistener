@@ -44,7 +44,7 @@ class Webhook(AbstractDateTimeModel):
     )
     event_type: models.IntegerField = models.IntegerField(
         help_text="The event type that triggers the webhook.",
-        choices=WebhookEventType.choices,
+        choices=WebhookEventType,
     )
     url: models.URLField = models.URLField(
         help_text="The URL that receives a POST request from the webhook.",
@@ -56,7 +56,7 @@ class Webhook(AbstractDateTimeModel):
     )
     version: models.IntegerField = models.IntegerField(
         help_text="The specific version of the webhook provisioned.",
-        choices=WebhookVersions.choices,
+        choices=WebhookVersions,
         default=WebhookVersions.v1,
     )
     failure_count: models.IntegerField = models.IntegerField(
