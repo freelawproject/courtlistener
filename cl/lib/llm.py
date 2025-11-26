@@ -57,7 +57,7 @@ def call_llm(
 
 
 def call_llm_transcription(
-    audio: str,
+    audio,
     model: str = "gpt-4o-mini-transcribe",
     api_key: str | None = None,
 ) -> str:

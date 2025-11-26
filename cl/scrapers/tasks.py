@@ -1,12 +1,12 @@
-import base64
 import logging
 import random
 import re
 import traceback
 from collections import defaultdict
+from io import BufferedReader, BytesIO
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-import celery
+import environ
 import httpx
 import requests
 from asgiref.sync import async_to_sync
@@ -16,9 +16,9 @@ from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
-from selenium import webdriver
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 from cl.audio.models import Audio
@@ -51,6 +51,8 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
+
+env = environ.FileAwareEnv()
 
 logger = logging.getLogger(__name__)
 
@@ -684,7 +686,7 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     }
 
     words = [
-        re.sub(r"\W+", word, "") for word in transcription.lower().split(" ")
+        re.sub(r"\W+", "", word) for word in transcription.lower().split(" ")
     ]
 
     if len(words) != 5:
@@ -699,34 +701,18 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     return "".join(characters)
 
 
-class SeleniumInteractionTask(celery.Task):
-    """Persists webdriver between tasks to avoid unnecessary overhead"""
-
-    _driver: webdriver.Chrome | None = None
-
-    @property
-    def driver(self) -> webdriver.Chrome:
-        if self._driver is None:
-            self._driver = create_selenium_driver()
-        return self._driver
-
-
-@app.task(
-    bind=True,
-    max_retries=3,
-    base=SeleniumInteractionTask,
-    autoretry_for=(ScrapeFailed,),
-)
+@app.task(bind=True, max_retries=3, autoretry_for=(ScrapeFailed,))
 @throttle_task("1/m")
 def subscribe_to_scotus_updates(self, pk: int) -> None:
     """Subscribe to SCOTUS updates for a given opinion"""
-    docket = Docket.objects.get(pk=pk, court_id="scotus")
-    docket_number = docket.docket_number_raw
+
+    docket = Docket.objects.get(pk=pk)
+    docket_number = docket.docket_number
 
     subscription_url = urlunparse(
         (
             "https",
-            "www.supremecourt.gov",
+            "file.supremecourt.gov",
             "casenotification",
             "",
             urlencode({"caseNumber": docket_number}),
@@ -734,65 +720,82 @@ def subscribe_to_scotus_updates(self, pk: int) -> None:
         )
     )
 
-    driver = self.driver
+    driver = create_selenium_driver(keep_alive=False)
 
-    driver.get(subscription_url)
-    captcha_image = driver.find_element(
-        by=By.CSS_SELECTOR, value=".k-captcha-image img"
-    )
-    wait = WebDriverWait(driver, timeout=2)
-    wait.until(lambda d: captcha_image.is_displayed())
-    captcha_image_source = captcha_image.get_attribute("src")
-    captcha_id = parse_qs(urlparse(captcha_image_source).query)["captchaId"][0]
-
-    # Input the email before listening to the CAPTCHA since that's what a normal human would do
-    email_input = driver.find_element(by=By.CSS_SELECTOR, value="#Email")
-    ActionChains(driver).send_keys_to_element(
-        email_input, "scotus@recap.email"
-    ).perform()
-
-    audio_source = urlunparse(
-        (
-            "https",
-            "www.supremecourt.gov",
-            "Captcha/audio",
-            "",
-            urlencode({"captchaId": captcha_id}),
-            "",
-        )
-    )
-    # It was unclear what headers were required to get SCOTUS to actually return a result, so we use this suboptimal solution that works.
-    audio_bytes_b64 = base64.b64encode(
-        bytearray(
-            driver.execute_script(
-                """
-        return await fetch(\""""
-                + audio_source
-                + """\").then((response) => response.bytes())
-    """
+    try:
+        driver.get(subscription_url)
+        wait = WebDriverWait(driver, timeout=2)
+        wait.until(
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, ".k-captcha-image img")
             )
         )
-    ).decode("utf-8")
-    solution = process_scotus_captcha_transcription(
-        call_llm_transcription(audio_bytes_b64)
-    )
-
-    captcha_input = driver.find_element(by=By.CSS_SELECTOR, value="#captcha")
-    ActionChains(driver).send_keys_to_element(
-        captcha_input, solution
-    ).perform()
-
-    subscribe_button = driver.find_element(
-        by=By.CSS_SELECTOR, value="#SubscribeButton"
-    )
-    subscribe_button.click()
-
-    result = driver.find_element(
-        by=By.CSS_SELECTOR, value="#CaseNotificationResult>fieldset>div>div"
-    )
-    wait.until(lambda d: result.is_displayed())
-
-    if result.text.find("Success") < 0:
-        raise ScrapeFailed(
-            f"Failed to subscribe to SCOTUS updates for case {docket_number}: {result.text}"
+        captcha_image = driver.find_element(
+            by=By.CSS_SELECTOR, value=".k-captcha-image img"
         )
+        captcha_image_source = captcha_image.get_attribute("src")
+        captcha_id = parse_qs(urlparse(captcha_image_source).query)[
+            "captchaId"
+        ][0]
+
+        # Input the email before listening to the CAPTCHA since that's what a normal human would do
+        email_input = driver.find_element(by=By.CSS_SELECTOR, value="#Email")
+        ActionChains(driver).send_keys_to_element(
+            email_input, "scotus@recap.email"
+        ).perform()
+
+        audio_source = urlunparse(
+            (
+                "https",
+                "file.supremecourt.gov",
+                "Captcha/audio",
+                "",
+                urlencode({"captchaId": captcha_id}),
+                "",
+            )
+        )
+        # It was unclear what headers were required to get SCOTUS to actually return a result, so we use this suboptimal solution that works.
+        audio_bytes_b64 = BufferedReader(
+            BytesIO(
+                bytearray(
+                    driver.execute_script(
+                        """return await fetch(\""""
+                        + audio_source
+                        + """\").then((response) => response.arrayBuffer()).then(buffer => new Uint8Array(buffer))"""
+                    )
+                )
+            )
+        )
+        solution = process_scotus_captcha_transcription(
+            call_llm_transcription(("file.wav", audio_bytes_b64))
+        )
+
+        captcha_input = driver.find_element(
+            by=By.CSS_SELECTOR, value="#captcha"
+        )
+        ActionChains(driver).send_keys_to_element(
+            captcha_input, solution
+        ).perform()
+
+        subscribe_button = driver.find_element(
+            by=By.CSS_SELECTOR, value="#SubscribeButton"
+        )
+        subscribe_button.click()
+
+        wait.until(
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, "#CaseNotificationResult>fieldset>div>div")
+            )
+        )
+        result = driver.find_element(
+            by=By.CSS_SELECTOR,
+            value="#CaseNotificationResult>fieldset>div>div",
+        )
+        if result.text.find("Success") < 0:
+            raise ScrapeFailed(
+                f"Failed to subscribe to SCOTUS updates for case {docket_number}: {result.text}"
+            )
+    except Exception as e:
+        raise e
+    finally:
+        driver.quit()

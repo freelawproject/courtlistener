@@ -586,7 +586,7 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
         raise InvalidRelativeDateSyntax(QueryType.FILTER)
 
 
-def create_selenium_driver() -> webdriver.Chrome:
+def create_selenium_driver(keep_alive=True) -> webdriver.Chrome:
     options = webdriver.ChromeOptions()
     if settings.SELENIUM_HEADLESS is True:
         options.add_argument("headless")
@@ -602,6 +602,6 @@ def create_selenium_driver() -> webdriver.Chrome:
         return webdriver.Remote(
             settings.DOCKER_SELENIUM_HOST,
             options=options,
-            keep_alive=True,
+            keep_alive=keep_alive,
         )
-    return webdriver.Chrome(options=options, keep_alive=True)
+    return webdriver.Chrome(options=options, keep_alive=keep_alive)
