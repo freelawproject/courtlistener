@@ -31,6 +31,7 @@ class ScotusDocketMergeTest(TestCase):
             capital_case=False,
             lower_court="United States Court of Appeals for the Second Circuit",
             lower_court_case_numbers=["22-16375", "22-16622"],
+            lower_court_case_numbers_raw="Docket Num. 22-16375, Docket Num. 22-16622",
         )
         docket = merge_scotus_docket(data)
         docket.refresh_from_db()
@@ -62,6 +63,9 @@ class ScotusDocketMergeTest(TestCase):
         oci = docket.originating_court_information
         expected_numbers = "22-16375, 22-16622"
         self.assertEqual(oci.docket_number, expected_numbers)
+        self.assertEqual(
+            oci.docket_number_raw, data.get("lower_court_case_numbers_raw")
+        )
         self.assertEqual(
             oci.date_judgment,
             data["lower_court_decision_date"],

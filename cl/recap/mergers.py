@@ -2212,6 +2212,9 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
         )
 
     lower_court_case_numbers = report_data.get("lower_court_case_numbers")
+    lower_court_case_numbers_raw = report_data.get(
+        "lower_court_case_numbers_raw"
+    )
     lower_court_decision_date = report_data.get("lower_court_decision_date")
     lower_court_rehearing_denied_date = report_data.get(
         "lower_court_rehearing_denied_date"
@@ -2230,6 +2233,11 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
             ", ".join(lower_court_case_numbers)
             if lower_court_case_numbers
             else oci.docket_number
+        )
+        oci.docket_number_raw = (
+            lower_court_case_numbers_raw
+            if lower_court_case_numbers_raw
+            else oci.docket_number_raw
         )
         oci.date_judgment = (
             lower_court_decision_date

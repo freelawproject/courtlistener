@@ -301,6 +301,14 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     docket_number = models.TextField(
         help_text="The docket number in the lower court.", blank=True
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     assigned_to = models.ForeignKey(
         "people_db.Person",
         help_text="The judge the case was assigned to.",
