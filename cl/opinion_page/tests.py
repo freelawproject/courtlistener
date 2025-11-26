@@ -26,6 +26,7 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import RelatedFactory
+from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -121,6 +122,7 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
+@override_flag("citing_and_related_enabled", True)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
