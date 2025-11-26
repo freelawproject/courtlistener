@@ -4879,5 +4879,5 @@ class EmailWithSurrogatesTest(TestCase):
         email = EmailSent.objects.first()
         self.assertEqual(
             email.plain_text,
-            "government interest.” Saxe v. State Coll.",
+            "government interest.” Saxe v. State Coll.\n",
         )

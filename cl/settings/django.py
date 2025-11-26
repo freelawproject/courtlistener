@@ -151,6 +151,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.humanize",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.sessions",
     "django.contrib.sites",
     "django.contrib.sitemaps",
@@ -228,12 +229,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 # system time zone.
 TIME_ZONE = env("TIMEZONE", default="America/Los_Angeles")
 
-MANAGERS = [
-    (
-        env("MANAGER_NAME", default="Joe Schmoe"),
-        env("MANAGER_EMAIL", default="joe@courtlistener.com"),
-    )
-]
+MANAGERS = [env("MANAGER_EMAIL", default="joe@courtlistener.com")]
 
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"
@@ -249,7 +245,6 @@ MESSAGE_TAGS = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
-FORMS_URLFIELD_ASSUME_HTTPS = True
 
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle
