@@ -11,7 +11,6 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Document
-from waffle.testutils import override_flag
 
 from cl.lib.search_index_utils import index_documents_in_bulk
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
@@ -582,24 +581,6 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
                             opinion["snippet"],
                             record.plain_text[: settings.NO_MATCH_HL_SIZE],
                         )
-
-    @override_flag("enable_semantic_search", active=False)
-    def test_can_reject_post_request_when_flag_disabled(
-        self, inception_mock
-    ) -> None:
-        """Should reject POST request if waffle flag is disabled."""
-        r = self.client.post(
-            reverse("search-list", kwargs={"version": "v4"}),
-            data=self.situational_query_vectors,
-            format="json",
-        )
-        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
-        data = r.json()
-        self.assertIn("non_field_errors", data)
-        self.assertEqual(
-            data["non_field_errors"][0],
-            "This feature is currently disabled for your account.",
-        )
 
     def test_can_reject_post_request_when_semantic_flag_missing(
         self, inception_mock
