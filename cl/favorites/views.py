@@ -236,7 +236,7 @@ async def create_prayer_view(
     request: HttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
-    is_htmx_request = request.META.get("HTTP_HX_REQUEST", False)
+    is_htmx_request = request.headers.get("hx-request", False)
     regular_size = bool(request.POST.get("regular_size"))
     if not (await prayer_eligible(request.user))[0]:
         if is_htmx_request:
@@ -287,7 +287,7 @@ async def delete_prayer_view(
     await delete_prayer(user, recap_document)
     regular_size = bool(request.POST.get("regular_size"))
     source = request.POST.get("source", "")
-    if request.META.get("HTTP_HX_REQUEST"):
+    if request.headers.get("hx-request"):
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
