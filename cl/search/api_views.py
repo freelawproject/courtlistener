@@ -13,7 +13,6 @@ from rest_framework.permissions import (
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
-from waffle import flag_is_active
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
@@ -506,16 +505,6 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         )
 
     def create(self, request, *args, **kwargs):
-        # Check if waffle flag is enabled for this account
-        if not flag_is_active(request, "enable_semantic_search"):
-            raise ValidationError(
-                {
-                    "non_field_errors": [
-                        "This feature is currently disabled for your account."
-                    ]
-                }
-            )
-
         # Validate query parameters (from URL) and request body (JSON)
         query_params = SearchForm(request.GET, request=request)
         request_body = VectorSerializer(data=request.data)
