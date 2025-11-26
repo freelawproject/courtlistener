@@ -71,6 +71,7 @@ from cl.corpus_importer.utils import (
     should_check_acms_court,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
+from cl.lib.email_utils import retrieve_email_from_queue
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import rd_page_count_service
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
@@ -82,7 +83,6 @@ from cl.lib.pacer_session import (
     get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import get_document_filename
-from cl.lib.storage import RecapEmailSESStorage
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -3084,16 +3084,8 @@ def open_and_validate_email_notification(
     or None otherwise, the raw notification body to store in next steps.
     """
 
-    message_id = epq.message_id
-    bucket = RecapEmailSESStorage()
-    # Try to read the file using utf-8.
-    # If it fails fallback on iso-8859-1
     try:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("utf-8")
-    except UnicodeDecodeError:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("iso-8859-1")
+        body = retrieve_email_from_queue(epq)
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             msg = "File not found."
