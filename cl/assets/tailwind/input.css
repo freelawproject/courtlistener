@@ -102,7 +102,7 @@
     @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus-visible:ring-4 focus-visible:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400;
   }
   .btn-outline {
-    @apply btn text-greyscale-700 hover:bg-greyscale-100 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:border-greyscale-200 disabled:text-greyscale-400;
+    @apply btn btn-white text-greyscale-700 hover:bg-greyscale-100 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:border-greyscale-200 disabled:text-greyscale-400;
   }
   .btn-dark {
     @apply btn text-white bg-greyscale-900 hover:bg-greyscale-800 outline-none focus-visible:ring-4 focus-visible:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200;
@@ -112,9 +112,6 @@
   }
   .btn-grey {
     @apply btn bg-greyscale-100 hover:bg-greyscale-200 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:text-greyscale-400 disabled:bg-greyscale-50;
-  }
-  .btn-white {
-    @apply btn text-greyscale-700 bg-white hover:bg-greyscale-100 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:border-greyscale-200 disabled:text-greyscale-400;
   }
   .banner {
     @apply flex flex-col gap-4 rounded-2xl bg-greyscale-100 border-2 border-greyscale-200 justify-between;

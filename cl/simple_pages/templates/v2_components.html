@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load svg_tags %}
+{% load static svg_tags %}
 
 {% block title %}Components Library - CourtListener.com{% endblock %}
 
@@ -240,16 +240,16 @@ Sample code here.
             'options': [
               {
                 'name': 'Add to Chrome',
-                'dest': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
+                'href': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
                 'icon': 'logos/chrome'
               }, {
                 'name': 'Add to Edge',
-                'dest': '/recap/edge',
+                'href': '/recap/edge',
                 'icon': 'logos/edge'
               }
             ]
           }, {
-              'style': 'btn-white',
+              'style': 'btn-outline',
               'name': 'Learn more'
           }
         ]"

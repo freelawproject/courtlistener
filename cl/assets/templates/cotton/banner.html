@@ -30,7 +30,7 @@
                     >
                     {{ b.name }}
                     <span
-                        x-bind:class="supportCaretClass"
+                        x-bind:class="iconClass"
                         class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
                         aria-hidden="true"
                         x-cloak
@@ -38,7 +38,6 @@
                     </span>
                 </button>
 
-             {#  support menu  #}
                 <menu
                     id="banner-button-menu"
                     class="top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
@@ -51,7 +50,7 @@
                         <li
                             class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
                         >
-                            <a href="{{ opt.dest }}" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+                            <a href="{{ opt.href }}" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 flex justify-start gap-2 w-full">
                             {% svg opt.icon class="text-greyscale-500" aria_hidden="true" %}
                             {{ opt.name }}
                             </a>
@@ -59,7 +58,7 @@
                     {% endfor %}
                     </menu>
             {% else %}
-                <a class="{{b.style}}" href={{ b.dest }}>
+                <a class="{{b.style}}" href={{ b.href }}>
                     {{ b.name }}
                 </a>
             {% endif %}
