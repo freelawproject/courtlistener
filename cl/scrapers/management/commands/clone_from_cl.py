@@ -212,10 +212,10 @@ def clone_opinion_cluster(
         docket = clone_docket(
             session,
             [docket_id],
-            add_docket_entries,
-            False,
-            False,
-            person_positions,
+            add_docket_entries=add_docket_entries,
+            add_audio_files=False,
+            add_clusters=False,
+            person_positions=person_positions,
         )[0]
 
         # Assign docket pk in cluster data
@@ -413,6 +413,7 @@ def clone_docket(
     add_audio_files: bool,
     add_clusters: bool,
     person_positions: bool = False,
+    download_local_file: bool = False,
     no_update: bool = False,
 ):
     """Download docket data from courtlistener.com and add it to local
@@ -426,6 +427,7 @@ def clone_docket(
     :param add_clusters: flag to clone related opinion clusters when
         cloning a docket
     :param person_positions: True is we should clone person positions
+    :param download_local_file: True if we should download local_path file from opinion when add_clusters is True
     :param no_update: If True, skip updating object if it already exists
     :return: list of docket objects
     """
@@ -501,7 +503,7 @@ def clone_docket(
                     download_cluster_files=False,
                     add_docket_entries=False,
                     person_positions=person_positions,
-                    download_opinion_files=False,
+                    download_opinion_files=download_local_file,
                     no_update=no_update,
                 )
 
@@ -560,6 +562,7 @@ def clone_audio_files(
                     add_audio_files=False,
                     add_clusters=False,
                     person_positions=False,
+                    download_local_file=False,
                     no_update=no_update,
                 )[0]
             audio_json["docket"] = docket
@@ -1186,6 +1189,7 @@ class Command(BaseCommand):
                     options["add_audio_files"],
                     options["add_clusters"],
                     clone_person_positions,
+                    download_opinion_files,
                     no_update,
                 )
             case "people_db.Person":
