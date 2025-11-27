@@ -5,7 +5,6 @@ from django.conf import settings
 from elasticsearch_dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
-from waffle import flag_is_active
 
 from cl.api.utils import (
     DynamicFieldsMixin,
@@ -477,9 +476,9 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
         """
         Returns the appropriate score serialization for a given result object.
 
-        If the `enable_semantic_search` flag is active, this method uses
-        `SemanticSearchScoreSerializer`, which includes both semantic and BM25
-        scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
+        If the `semantic` keyword is included in the query string with a truthy value,
+        this method uses `SemanticSearchScoreSerializer`, which includes both semantic
+        and BM25 scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
         context is not available, it also falls back to `ScoreDataSerializer`.
         """
         request = self.context.get("request", None)
@@ -488,9 +487,7 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
 
         semantic = request.GET.get("semantic", False)
         serializer_class = (
-            SemanticSearchScoreSerializer
-            if flag_is_active(request, "enable_semantic_search") and semantic
-            else ScoreDataSerializer
+            SemanticSearchScoreSerializer if semantic else ScoreDataSerializer
         )
         return serializer_class(obj).data
 
