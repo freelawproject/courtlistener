@@ -1,0 +1,156 @@
+{% extends 'new_base.html' %}
+
+{% block title %}PACER Data API Help{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#the-apis', 'text': 'The APIs', 'children': [
+      {'href': '#dockets', 'text': 'Dockets'},
+      {'href': '#courts', 'text': 'Courts'},
+      {'href': '#docker-entries', 'text': 'Docker Entries},
+      {'href': '#documents', 'text': 'Documents'},
+      {'href': '#parties', 'text': 'Parties'},
+      {'href': '#attorneys', 'text': 'Attorneys'},
+      {'href': '#orig-court-info', 'text': 'Originating Court Info'},
+      {'href': '#integrated-db', 'text': 'Integrated Database'},
+    ]},
+    {'href': '#fast-doc-lookup', 'text': 'Fast Document Lookup'},
+  ]"
+>
+  <c-layout-with-navigation.section id="about">
+    <h1 class="font-sans text-display-xs font-semibold text-greyscale-900">PACER Data APIs</h1>
+    <p class="lead">Use these APIs to access almost half a billion items we have in our collection of PACER data.</p>
+    <p>To learn more about what's in the collection and how we gather PACER data each day, see <a href="{% url "coverage_recap" %}">our coverage page on the topic.</a></p>
+    <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.</p>
+    <p>In any legal proceeding, there are roughly three things: Documents, people, and organizations. Documents are grouped together into docket entries, which are grouped together into dockets. People and organizations are examples of parties. Parties have attorneys who act on their behalf in particular ways, which we call the attorney's role in the case.</p>
+    <p>Each of these relationships is interlinked and has metadata that describes it. Use these APIs to explore this data.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="the-apis">
+    <h2>Dockets, Courts, Docket Entries, and Documents</h2>
+    <p>A docket is a list of docket entries and some metadata. Each docket entry is a collection of documents that is uploaded to the court by a party or their attorney at a given time.</p>
+    <p>The endpoints described in this section explain these objects and how they can be accessed in our system.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="dockets">
+    <h3>Dockets — <code>/api/rest/v4/dockets/</code></h3>
+    <p><code>Docket</code> objects sit at the top of the object hierarchy. In our PACER database, dockets link together docket entries, parties, and attorneys.</p>
+    <p>In our case law database, dockets sit above <code>Opinion Clusters</code>. In our oral argument database, they sit above <code>Audio</code> objects.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request:</p>
+    <c-code>
+      curl -v \
+        -X OPTIONS \
+        --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+        "http://localhost:8000/api/rest/v4/dockets/"
+    </c-code>
+    <p>To look up a particular docket, use its ID:</p>
+    <c-code>
+      curl -v \
+        --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+        "http://localhost:8000/api/rest/v4/dockets/4214664/"
+    </c-code>
+    <p>The response you get will not list the docket entries, parties, or attorneys for the docket (doing so doesn't scale), but will have many other metadata fields:</p>
+    <c-code>
+      {
+        "resource_uri": "https://www.courtlistener.com/api/rest/v4/dockets/4214664/",
+        "id": 4214664,
+        "court": "https://www.courtlistener.com/api/rest/v4/courts/dcd/",
+        "court_id": "dcd",
+        "original_court_info": null,
+        "idb_data": null,
+        "clusters": [],
+        "audio_files": [],
+        "assigned_to": "https://www.courtlistener.com/api/rest/v4/people/1124/",
+        "referred_to": null,
+        "absolute_url": "/docket/4214664/national-veterans-legal-services-program-v-united-states/",
+        "date_created": "2016-08-20T07:25:37.448945-07:00",
+        "date_modified": "2024-05-20T03:59:23.387426-07:00",
+        "source": 9,
+        "appeal_from_str": "",
+        "assigned_to_str": "Paul L. Friedman",
+        "referred_to_str": "",
+        "panel_str": "",
+        "date_last_index": "2024-05-20T03:59:23.387429-07:00",
+        "date_cert_granted": null,
+        "date_cert_denied": null,
+        "date_argued": null,
+        "date_reargued": null,
+        "date_reargument_denied": null,
+        "date_filed": "2016-04-21",
+        "date_terminated": null,
+        "date_last_filing": "2024-05-15",
+        "case_name_short": "",
+        "case_name": "NATIONAL VETERANS LEGAL SERVICES PROGRAM v. United States",
+        "case_name_full": "",
+        "slug": "national-veterans-legal-services-program-v-united-states",
+        "docket_number": "1:16-cv-00745",
+        "docket_number_core": "1600745",
+        "pacer_case_id": "178502",
+        "cause": "28:1346 Tort Claim",
+        "nature_of_suit": "Other Statutory Actions",
+        "jury_demand": "None",
+        "jurisdiction_type": "U.S. Government Defendant",
+        "appellate_fee_status": "",
+        "appellate_case_type_information": "",
+        "mdl_status": "",
+        "filepath_ia": "https://www.archive.org/download/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.docket.xml",
+        "filepath_ia_json": "https://archive.org/download/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.docket.json",
+        "ia_upload_failure_count": null,
+        "ia_needs_upload": true,
+        "ia_date_first_change": "2018-09-30T00:00:00-07:00",
+        "date_blocked": null,
+        "blocked": false,
+        "appeal_from": null,
+        "tags": [
+          "https://www.courtlistener.com/api/rest/v4/tag/1316/"
+        ],
+        "panel": []
+      }
+    </c-code>
+    <p>Ideally, docket entries, parties, and attorneys would be nested within the docket object you request, but this is not possible because some dockets have a vast number of these objects. Listing so many values in a single response from the server is impractical. To access docket entries, parties, or attorneys for a specific docket, use the docket entry, party, or attorney endpoints and filter by docket ID.</p>
+    <p>The court fields are references to our Court API, described below.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="courts">
+    <h3>Courts — <code>/api/rest/v4/courts/</code></h3>
+    <p>This API contains data about the courts we have in our database, and is joined into nearly every other API so that you can know where an event happened, a judge worked, etc.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+    <p>You can generally cache this API. It does not change often.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="docker-entries">
+    <h3>Docket Entries <small> — <code>{% url "docketentry-list" version=version %}</code></small></h3>
+    <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.</p>
+    <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
+    <p>To filter to the docket entries for a particular docket use the <code>docket</code> filter:</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="documents">
+    <h3>Documents <small> — <code>{% url "recapdocument-list" version=version %}</code></small></h3>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="parties">
+    <h3>Parties</h3>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="attorneys">
+    <h3>Attorneys</h3>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="orig-court-info">
+    <h3>Originating Court Info</h3>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="integrated-db">
+    <h3>Integrated Database</h3>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="fast-doc-lookup">
+    <h2>Fast Document Lookup</h2>
+  </c-layout-with-navigation.section>
+
+</c-layout-with-navigation>
+{% endblock %}
