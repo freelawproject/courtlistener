@@ -498,11 +498,11 @@ def clone_docket(
                 clone_opinion_cluster(
                     session,
                     c_ids,
-                    False,
-                    False,
-                    person_positions,
-                    False,
-                    no_update,
+                    download_cluster_files=False,
+                    add_docket_entries=False,
+                    person_positions=person_positions,
+                    download_opinion_files=False,
+                    no_update=no_update,
                 )
 
             if add_docket_entries:
