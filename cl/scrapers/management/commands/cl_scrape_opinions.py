@@ -318,7 +318,7 @@ class Command(ScraperCommand):
         if item.get("content"):
             content = item.pop("content")
         else:
-            content = site.download_content(
+            content = async_to_sync(site.download_content)(
                 item["download_urls"], media_root=settings.MEDIA_ROOT
             )
 
@@ -386,7 +386,7 @@ class Command(ScraperCommand):
         )
 
     def parse_and_scrape_site(self, mod, options: dict):
-        site = mod.Site(save_response_fn=save_response).parse()
+        site = async_to_sync(mod.Site(save_response_fn=save_response).parse)()
         self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):

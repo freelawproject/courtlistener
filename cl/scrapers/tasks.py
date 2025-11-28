@@ -4,7 +4,6 @@ import traceback
 from collections import defaultdict
 
 import httpx
-import requests
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -105,7 +104,7 @@ def update_document_from_text(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -244,7 +243,7 @@ def extract_opinion_content(
 # TODO: Remove after the new extract_opinion_content is deployed.
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(httpx.ConnectError, httpx.ReadTimeout),
     max_retries=5,
     retry_backoff=10,
 )
@@ -536,8 +535,8 @@ async def extract_recap_pdf_base(
 @app.task(
     bind=True,
     autoretry_for=(
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.ConnectError,
+        httpx.ReadTimeout,
         httpx.TimeoutException,
     ),
     max_retries=3,
@@ -616,7 +615,7 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    session_data = get_or_cache_pacer_cookies(
+    session_data = async_to_sync(get_or_cache_pacer_cookies)(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
@@ -630,8 +629,8 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     d = Docket.objects.get(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
     try:
-        report.query(d.pacer_case_id)
-    except (requests.Timeout, requests.RequestException) as exc:
+        async_to_sync(report.query)(d.pacer_case_id)
+    except (httpx.Timeout, httpx.RequestError) as exc:
         logger.warning(
             "Timeout or unknown RequestException on iquery crawl. "
             "Trying again if retries not exceeded."

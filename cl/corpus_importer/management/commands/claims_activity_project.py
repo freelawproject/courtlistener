@@ -6,6 +6,7 @@ import os
 from datetime import date
 
 import pandas as pd
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from juriscraper.pacer import ClaimsActivity
 
@@ -45,7 +46,7 @@ def query_and_parse_claims_activity(
     }
 
     s = ProxyPacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
-    s.login()
+    async_to_sync(s.login)()
     for court_id in courts:
         court = map_cl_to_pacer_id(court_id)
         for alias, creditor_name in creditor_names.items():
