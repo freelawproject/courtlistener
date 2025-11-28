@@ -3,24 +3,20 @@ import random
 import re
 import traceback
 from collections import defaultdict
-from io import BufferedReader, BytesIO
-from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from io import BytesIO
 
 import celery
 import environ
 import httpx
 import requests
 from asgiref.sync import async_to_sync
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
 from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
-from selenium.webdriver import ActionChains
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.wait import WebDriverWait
 
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -710,98 +706,137 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     :param self: The celery task
     :param pk: The primary key of the Docket object to subscribe for.
     :return: None
+    :raises ScrapeFailed: If the subscription form could not be found, the CAPTCHA could not be solved, a JSON response
+    could not be decoded, or the subscription process failed for any other reason.
     """
 
     docket = Docket.objects.get(pk=pk)
     docket_number = docket.docket_number
 
-    subscription_url = urlunparse(
-        (
-            "https",
-            "file.supremecourt.gov",
-            "casenotification",
-            "",
-            urlencode({"caseNumber": docket_number}),
-            "",
-        )
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": "Free Law Project",
+        }
     )
 
-    driver = create_selenium_driver(keep_alive=False)
-
+    base_url = "https://file.supremecourt.gov"
+    form_url = f"{base_url}/casenotification?caseNumber={docket_number}"
     try:
-        driver.get(subscription_url)
-        wait = WebDriverWait(driver, timeout=2)
-        wait.until(
-            EC.visibility_of_element_located(
-                (By.CSS_SELECTOR, ".k-captcha-image img")
-            )
-        )
-        captcha_image = driver.find_element(
-            by=By.CSS_SELECTOR, value=".k-captcha-image img"
-        )
-        captcha_image_source = captcha_image.get_attribute("src")
-        captcha_id = parse_qs(urlparse(captcha_image_source).query)[
-            "captchaId"
-        ][0]
+        logger.info(f"Fetching subscription page for case %s", docket_number)
+        response = session.get(form_url, timeout=10)
+        response.raise_for_status()
+        scotus_html = BeautifulSoup(response.content, "html.parser")
+        form = scotus_html.find("form", id="CaseNotificationForm")
+        if not form:
+            raise ScrapeFailed("Could not find the main subscription form.")
 
-        # Input the email before listening to the CAPTCHA since that's what a normal human would do
-        email_input = driver.find_element(by=By.CSS_SELECTOR, value="#Email")
-        ActionChains(driver).send_keys_to_element(
-            email_input, "scotus@recap.email"
-        ).perform()
+        # Collect all form inputs and include the anti-forgery token and CaseNumber
+        payload = {}
+        for input_tag in form.find_all("input"):
+            name = input_tag.get("name")
+            value = input_tag.get("value", "")
+            if name:
+                payload[name] = value
 
-        audio_source = urlunparse(
-            (
-                "https",
-                "file.supremecourt.gov",
-                "Captcha/audio",
-                "",
-                urlencode({"captchaId": captcha_id}),
-                "",
-            )
-        )
-        # It was unclear what headers were required to get SCOTUS to actually return a result, so we use this suboptimal solution that works.
-        audio_bytes_b64 = BufferedReader(
-            BytesIO(
-                bytearray(
-                    driver.execute_script(
-                        """return await fetch(\""""
-                        + audio_source
-                        + """\").then((response) => response.arrayBuffer()).then(buffer => new Uint8Array(buffer))"""
-                    )
-                )
-            )
-        )
-        solution = process_scotus_captcha_transcription(
-            call_llm_transcription(("file.wav", audio_bytes_b64))
-        )
+        anti_forgery_token = payload.get("__RequestVerificationToken")
+        if not anti_forgery_token:
+            raise ScrapeFailed("Could not find __RequestVerificationToken.")
 
-        captcha_input = driver.find_element(
-            by=By.CSS_SELECTOR, value="#captcha"
+        captcha_reset_url = f"{base_url}/Captcha/Reset"
+        captcha_payload = {"__RequestVerificationToken": anti_forgery_token}
+        reset_response = session.post(
+            captcha_reset_url,
+            data=captcha_payload,
+            headers={
+                "Referer": form_url,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=10,
         )
-        ActionChains(driver).send_keys_to_element(
-            captcha_input, solution
-        ).perform()
-
-        subscribe_button = driver.find_element(
-            by=By.CSS_SELECTOR, value="#SubscribeButton"
-        )
-        subscribe_button.click()
-
-        wait.until(
-            EC.visibility_of_element_located(
-                (By.CSS_SELECTOR, "#CaseNotificationResult>fieldset>div>div")
-            )
-        )
-        result = driver.find_element(
-            by=By.CSS_SELECTOR,
-            value="#CaseNotificationResult>fieldset>div>div",
-        )
-        if result.text.find("Success") < 0:
+        reset_response.raise_for_status()
+        reset_data = reset_response.json()
+        captcha_id = reset_data.get("captchaId")
+        if not captcha_id:
             raise ScrapeFailed(
-                f"Failed to subscribe to SCOTUS updates for case {docket_number}: {result.text}"
+                f"Failed to get captchaId from /Captcha/Reset. Response: {reset_response.text}"
             )
+
+        # Fetch the Audio
+        audio_url = f"{base_url}/Captcha/audio?captchaId={captcha_id}"
+        audio_response = session.get(
+            audio_url, headers={"Referer": form_url}, timeout=10
+        )
+        audio_response.raise_for_status()
+
+        # Solve the captcha
+        audio_file = BytesIO(audio_response.content)
+        audio_file.name = "captcha.wav"
+        transcription = call_llm_transcription(audio_file, api_key="")
+        solution = process_scotus_captcha_transcription(transcription)
+        logger.info(f"Solved CAPTCHA: %s ", solution)
+
+        # Validate Kendo captcha.
+        captcha_validate_url = f"{base_url}/Captcha/validate"
+        validate_payload = {
+            "captchaId": captcha_id,
+            "captcha": solution,
+            "__RequestVerificationToken": anti_forgery_token,
+        }
+        validate_response = session.post(
+            captcha_validate_url,
+            data=validate_payload,
+            headers={
+                "Referer": form_url,
+                "X-Requested-With": "XMLHttpRequest",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            },
+            timeout=10,
+        )
+        validate_response.raise_for_status()
+
+        # Kendo validation returns JSON: true or false
+        if validate_response.json() is not True:
+            raise ScrapeFailed(
+                f"CAPTCHA validation failed via AJAX. Response: {validate_response.text}"
+            )
+
+        # Main Form Submission
+        final_submit_url = f"{base_url}{form.get('action')}"
+
+        # Final Payload Update
+        payload.update(
+            {
+                "Email": "scotus@recap.email",
+                "captcha": solution,
+                "SubscribeButton": "Subscribe",
+            }
+        )
+        # Send the final request
+        post_response = session.post(
+            final_submit_url, data=payload, timeout=10
+        )
+        post_response.raise_for_status()
+
+        if (
+            "Docket Case Notification" in post_response.text
+            and "verification link will be sent" in post_response.text
+        ):
+            logger.info(
+                f"Successfully submitted subscription for case %s. Verification email pending.",
+                docket_number,
+            )
+        else:
+            # Try to check other errors from the HTML response and log them...
+            raise ScrapeFailed(
+                f"Main form submission failed for case {docket_number}."
+            )
+    except requests.JSONDecodeError as e:
+        logger.error(f"Failed to decode JSON response during SCOTUS subscription: %s", e)
+        raise ScrapeFailed(f"Failed to decode JSON response: {e}")
+    except requests.RequestException as e:
+        logger.error(f"Network error during SCOTUS subscription: %s", e)
+        raise ScrapeFailed(f"Network error: {e}")
     except Exception as e:
-        raise e
-    finally:
-        driver.quit()
+        logger.exception("Unexpected error during SCOTUS subscription")
+        raise ScrapeFailed(str(e))
