@@ -4243,6 +4243,7 @@ class RECAPAlertsPercolatorTest(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
                 docket_number="1:21-bk-1234",
+                docket_number_raw="1:21-bk-1234",
                 source=Docket.RECAP,
                 pacer_case_id="999555",
             )
