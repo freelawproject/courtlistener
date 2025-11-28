@@ -711,8 +711,12 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     could not be decoded, or the subscription process failed for any other reason.
     """
     if settings.OPENAI_TRANSCRIPTION_KEY is None:
-        logger.error("OPENAI_TRANSCRIPTION_KEY environment variable is not set.")
-        raise ScrapeFailed("OPENAI_TRANSCRIPTION_KEY environment variable is not set.")
+        logger.error(
+            "OPENAI_TRANSCRIPTION_KEY environment variable is not set."
+        )
+        raise ScrapeFailed(
+            "OPENAI_TRANSCRIPTION_KEY environment variable is not set."
+        )
 
     docket = Docket.objects.get(pk=pk)
     docket_number = docket.docket_number
@@ -727,7 +731,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     base_url = "https://file.supremecourt.gov"
     form_url = f"{base_url}/casenotification?caseNumber={docket_number}"
     try:
-        logger.info(f"Fetching subscription page for case %s", docket_number)
+        logger.info("Fetching subscription page for case %s", docket_number)
         response = session.get(form_url, timeout=10)
         response.raise_for_status()
         scotus_html = BeautifulSoup(response.content, "html.parser")
@@ -775,9 +779,12 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
 
         # Solve the captcha
         audio_file = BytesIO(audio_response.content)
-        transcription = call_llm_transcription(("captcha.wav", audio_file), api_key=settings.OPENAI_TRANSCRIPTION_KEY)
+        transcription = call_llm_transcription(
+            ("captcha.wav", audio_file),
+            api_key=settings.OPENAI_TRANSCRIPTION_KEY,
+        )
         solution = process_scotus_captcha_transcription(transcription)
-        logger.info(f"Solved CAPTCHA: %s ", solution)
+        logger.info("Solved CAPTCHA: %s ", solution)
 
         # Validate Kendo captcha.
         captcha_validate_url = f"{base_url}/Captcha/validate"
@@ -826,7 +833,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
             and "verification link will be sent" in post_response.text
         ):
             logger.info(
-                f"Successfully submitted subscription for case %s. Verification email pending.",
+                "Successfully submitted subscription for case %s. Verification email pending.",
                 docket_number,
             )
         else:
@@ -835,13 +842,15 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
                 f"Main form submission failed for case {docket_number}."
             )
     except requests.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON response during SCOTUS subscription: %s", e)
+        logger.error(
+            "Failed to decode JSON response during SCOTUS subscription: %s", e
+        )
         raise ScrapeFailed(f"Failed to decode JSON response: {e}")
     except openai.APIError as e:
-        logger.error(f"OpenAI API error during SCOTUS subscription: %s", e)
+        logger.error("OpenAI API error during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"OpenAI API error: {e}")
     except requests.RequestException as e:
-        logger.error(f"Network error during SCOTUS subscription: %s", e)
+        logger.error("Network error during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"Network error: {e}")
     except Exception as e:
         logger.exception("Unexpected error during SCOTUS subscription")

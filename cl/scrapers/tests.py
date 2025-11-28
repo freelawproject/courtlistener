@@ -1876,7 +1876,9 @@ class DeleteDuplicatesTest(TestCase):
 class SubscribeToSCOTUSTest(TestCase):
     def setUp(self):
         self.scotus = CourtFactory.create(id="scotus")
-        self.docket_scotus = DocketFactory.create(court=self.scotus, docket_number="25-250")
+        self.docket_scotus = DocketFactory.create(
+            court=self.scotus, docket_number="25-250"
+        )
         self.docket_pk = self.docket_scotus.pk
 
     # @mock.patch.dict("os.environ", {""})
