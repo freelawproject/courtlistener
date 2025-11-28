@@ -8,6 +8,7 @@ from io import BytesIO
 import celery
 import environ
 import httpx
+import openai
 import requests
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -34,7 +35,7 @@ from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
-from cl.lib.utils import create_selenium_driver, is_iter
+from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
 from cl.scrapers.management.commands.merge_opinion_versions import (
     get_query_from_url,
@@ -709,6 +710,9 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     :raises ScrapeFailed: If the subscription form could not be found, the CAPTCHA could not be solved, a JSON response
     could not be decoded, or the subscription process failed for any other reason.
     """
+    if settings.OPENAI_TRANSCRIPTION_KEY is None:
+        logger.error("OPENAI_TRANSCRIPTION_KEY environment variable is not set.")
+        raise ScrapeFailed("OPENAI_TRANSCRIPTION_KEY environment variable is not set.")
 
     docket = Docket.objects.get(pk=pk)
     docket_number = docket.docket_number
@@ -771,8 +775,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
 
         # Solve the captcha
         audio_file = BytesIO(audio_response.content)
-        audio_file.name = "captcha.wav"
-        transcription = call_llm_transcription(audio_file, api_key="")
+        transcription = call_llm_transcription(("captcha.wav", audio_file), api_key=settings.OPENAI_TRANSCRIPTION_KEY)
         solution = process_scotus_captcha_transcription(transcription)
         logger.info(f"Solved CAPTCHA: %s ", solution)
 
@@ -834,6 +837,9 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     except requests.JSONDecodeError as e:
         logger.error(f"Failed to decode JSON response during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"Failed to decode JSON response: {e}")
+    except openai.APIError as e:
+        logger.error(f"OpenAI API error during SCOTUS subscription: %s", e)
+        raise ScrapeFailed(f"OpenAI API error: {e}")
     except requests.RequestException as e:
         logger.error(f"Network error during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"Network error: {e}")

@@ -47,6 +47,7 @@ from cl.scrapers.tasks import (
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
+    subscribe_to_scotus_updates,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
@@ -1870,3 +1871,14 @@ class DeleteDuplicatesTest(TestCase):
             self.fail("Should raise error due to unsupported court")
         except ValueError:
             pass
+
+
+class SubscribeToSCOTUSTest(TestCase):
+    def setUp(self):
+        self.scotus = CourtFactory.create(id="scotus")
+        self.docket_scotus = DocketFactory.create(court=self.scotus, docket_number="25-250")
+        self.docket_pk = self.docket_scotus.pk
+
+    # @mock.patch.dict("os.environ", {""})
+    def test_subscription_task(self):
+        subscribe_to_scotus_updates.delay(self.docket_pk).get()
