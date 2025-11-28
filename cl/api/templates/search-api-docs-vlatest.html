@@ -34,9 +34,7 @@
       <li><a href="#usage">Basic Usage</a></li>
       <li><a href="#understanding">Understanding</a></li>
       <ul>
-        {% flag "enable_semantic_search" %}
         <li><a href="#semantic-search">Semantic Search</a></li>
-        {% endflag %}
         <li><a href="#type">Result Types</a></li>
         <li><a href="#ordering">Ordering</a></li>
         <li><a href="#filtering">Filtering</a></li>
@@ -144,7 +142,6 @@
   <p>This means that it does not use the same approach to ordering, filtering, or field definitions as our other APIs, and sending an HTTP <code>OPTIONS</code> request won't be useful.
   </p>
 
-  {% flag "enable_semantic_search" %}
   <p>CourtListener's search results are powered by the <a href="{% url "citegeist_help" %}">Citegeist Relevancy Engine</a>, which supports both keyword search and semantic search.
   </p>
   <p>Semantic search makes it possible to query the case law database using plain language queries, instead of keywords. It can be a better tool for untrained users, while keyword search provides a powerful ranking system with deep pagination that may be more familiar to attorneys.
@@ -180,7 +177,6 @@
     </li>
   </ul>
   <p>Semantic search is only available for the case law search engine.</p>
-  {% endflag %}
 
   <h3 id="type">Setting the Result <code>type</code></h3>
   <p>The most important parameter in this API is <code>type</code>. This parameter sets the type of object you are querying:
