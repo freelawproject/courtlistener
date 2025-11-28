@@ -1,11 +1,14 @@
 import os
+import pickle
+import urllib
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
-from unittest import TestCase, mock
-from unittest.mock import patch
+from unittest import mock
+from unittest.mock import MagicMock, patch
 
+import requests
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -47,6 +50,7 @@ from cl.scrapers.tasks import (
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
+    process_scotus_captcha_transcription,
     subscribe_to_scotus_updates,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
@@ -1873,14 +1877,160 @@ class DeleteDuplicatesTest(TestCase):
             pass
 
 
+def load_pickle(path):
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
 class SubscribeToSCOTUSTest(TestCase):
     def setUp(self):
         self.scotus = CourtFactory.create(id="scotus")
+        self.docket_number = "25a261"
         self.docket_scotus = DocketFactory.create(
-            court=self.scotus, docket_number="25-250"
+            court=self.scotus, docket_number=self.docket_number
         )
         self.docket_pk = self.docket_scotus.pk
+        self.requests: list[requests.PreparedRequest] = []
+        self.responses: list[requests.Response] = [
+            load_pickle(
+                "cl/scrapers/test_assets/scotus_subscription/1_get.pickle"
+            ),
+            load_pickle(
+                "cl/scrapers/test_assets/scotus_subscription/2_post.pickle"
+            ),
+            load_pickle(
+                "cl/scrapers/test_assets/scotus_subscription/3_get.pickle"
+            ),
+            load_pickle(
+                "cl/scrapers/test_assets/scotus_subscription/4_post.pickle"
+            ),
+            load_pickle(
+                "cl/scrapers/test_assets/scotus_subscription/5_post.pickle"
+            ),
+        ]
 
-    # @mock.patch.dict("os.environ", {""})
-    def test_subscription_task(self):
-        subscribe_to_scotus_updates.delay(self.docket_pk).get()
+    def test_transcription_cleaning(self):
+        messy = "RoMeo Juleett.; 5 Seven- .Three"
+        clean = process_scotus_captcha_transcription(messy)
+        self.assertEqual(clean, "rj573")
+
+    def mock_send(self, request: requests.PreparedRequest, **kwargs):
+        self.requests.append(request)
+        return self.responses.pop(0)
+
+    @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")
+    @mock.patch("cl.scrapers.tasks.call_llm_transcription")
+    @mock.patch("cl.lib.celery_utils.get_task_wait")
+    def test_subscription_task(
+        self, mock_wait: MagicMock, mock_transcription: MagicMock
+    ):
+        mock_wait.return_value = 0
+        mock_transcription.return_value = "m o 9 s u"
+        with mock.patch("requests.Session.send", side_effect=self.mock_send):
+            subscribe_to_scotus_updates.delay(self.docket_pk).get()
+
+        form_url = f"https://file.supremecourt.gov/casenotification?caseNumber={self.docket_number}"
+        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmcsiY6yxS91Hh4V2YQfpnhRyQc6duZzowbK_Sh5raEMZ7eNYVPnmJbsx8s5npCanzu1_hQCoUmrQy6wcvKc2PQgvp2H1OIF6ZLcT7YtWxkGAS2yJJXOY0APEmgUjQ7Q_UA"
+        captcha_id = "00d43cb9-8476-41f6-906c-482d5cb44005"
+        captcha_solution = "mo9su"
+        subscription_email = "scotus@recap.email"
+
+        self.assertEqual(len(self.requests), 5, "Should have sent 5 requests")
+        self.assertEqual(
+            len(mock_transcription.mock_calls),
+            1,
+            "Should have requested exactly 1 transcription",
+        )
+
+        # Get subscription form
+        self.assertEqual(
+            self.requests[0].method, "GET", "Request 1 verb should be GET"
+        )
+        self.assertEqual(
+            self.requests[0].url, form_url, "Incorrect URL for request 1"
+        )
+
+        # Generate new CAPTCHA
+        self.assertEqual(
+            self.requests[1].method, "POST", "Request 2 verb should be POST"
+        )
+        self.assertEqual(
+            self.requests[1].url,
+            "https://file.supremecourt.gov/Captcha/Reset",
+            "Incorrect URL for request 2",
+        )
+        self.assertEqual(
+            self.requests[1].body,
+            f"__RequestVerificationToken={verification_token}",
+            "Request 1 body should include correct verification token",
+        )
+        self.assertEqual(
+            self.requests[1].headers["Referer"],
+            form_url,
+            "Request 2 should have correct Referer header",
+        )
+        self.assertEqual(
+            self.requests[1].headers["X-Requested-With"],
+            "XMLHttpRequest",
+            "Request 2 should have correct X-Requested-With header",
+        )
+
+        # Get CAPTCHA audio file
+        self.assertEqual(
+            self.requests[2].method, "GET", "Request 3 verb should be GET"
+        )
+        self.assertEqual(
+            self.requests[2].url,
+            f"https://file.supremecourt.gov/Captcha/audio?captchaId={captcha_id}",
+            "Incorrect URL for request 3",
+        )
+        self.assertEqual(
+            self.requests[2].headers["Referer"],
+            form_url,
+            "Request 3 should have correct Referer header",
+        )
+
+        # Validate CAPTCHA solution
+        self.assertEqual(
+            self.requests[3].method, "POST", "Request 4 verb should be POST"
+        )
+        self.assertEqual(
+            self.requests[3].url,
+            "https://file.supremecourt.gov/Captcha/validate",
+            "Incorrect URL for request 4",
+        )
+        self.assertEqual(
+            self.requests[3].headers["Referer"],
+            form_url,
+            "Request 4 should have correct Referer header",
+        )
+        self.assertEqual(
+            self.requests[3].headers["X-Requested-With"],
+            "XMLHttpRequest",
+            "Request 4 should have correct X-Requested-With header",
+        )
+        self.assertEqual(
+            self.requests[3].headers["Content-Type"],
+            "application/x-www-form-urlencoded; charset=UTF-8",
+            "Request 4 should have correct Content-Type header",
+        )
+        self.assertEqual(
+            self.requests[3].body,
+            f"captchaId={captcha_id}&captcha={captcha_solution}&__RequestVerificationToken={verification_token}",
+            "Request 4 body should include correct verification token, CAPTCHA ID, and CAPTCHA solution",
+        )
+
+        # Submit subscription form
+        self.assertEqual(
+            self.requests[4].method, "POST", "Request 5 verb should be POST"
+        )
+        self.assertEqual(
+            self.requests[4].url,
+            "https://file.supremecourt.gov/CaseNotification/Subscribe",
+            "Incorrect URL for request 5",
+        )
+        self.assertEqual(
+            self.requests[4].body,
+            f"CaseNumber={self.docket_number}&Email={urllib.parse.quote_plus(subscription_email)}&btnRestart=Enter+another+email&btnSearch=Return+to+Search&WebDocketUrl=https%3A%2F%2Fwww.supremecourt.gov%2Fsearch.aspx%3Ffilename%3D%2Fdocket%2FDocketFiles%2Fhtml%2FPublic%2F{self.docket_number}.html&captcha={captcha_solution}&SubscribeButton=Subscribe&btnCancel=Cancel&__RequestVerificationToken={verification_token}",
+            "Incorrect body for request 5",
+        )

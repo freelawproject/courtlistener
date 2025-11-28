@@ -784,7 +784,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
             api_key=settings.OPENAI_TRANSCRIPTION_KEY,
         )
         solution = process_scotus_captcha_transcription(transcription)
-        logger.info("Solved CAPTCHA: %s ", solution)
+        logger.info("Solved CAPTCHA: %s", solution)
 
         # Validate Kendo captcha.
         captcha_validate_url = f"{base_url}/Captcha/validate"
