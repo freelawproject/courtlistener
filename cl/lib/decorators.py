@@ -12,6 +12,9 @@ from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
 from django.utils.cache import patch_response_headers
+from django.utils.decorators import decorator_from_middleware_with_args
+
+from cl.lib.cache import CacheMiddlewareS3Compatible
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +88,22 @@ def retry(
             return f_retry  # true decorator
 
     return deco_retry
+
+
+def cache_page_s3_compatible(timeout, *, cache=None, key_prefix=None):
+    """
+    Decorator for views that caches the response using `CacheMiddlewareS3Compatible`.
+
+    Works like Django's built-in `cache_page` decorator but generates cache keys
+    compatible with `S3ExpressCacheBackend`.
+    """
+    is_dev_or_test = settings.DEVELOPMENT or settings.TESTING
+    alias = "default" if cache == "s3" and is_dev_or_test else cache
+    return decorator_from_middleware_with_args(CacheMiddlewareS3Compatible)(
+        page_timeout=timeout,
+        cache_alias=alias,
+        key_prefix=key_prefix,
+    )
 
 
 def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
