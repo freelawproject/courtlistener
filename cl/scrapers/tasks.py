@@ -6,6 +6,7 @@ from collections import defaultdict
 from io import BufferedReader, BytesIO
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
+import celery
 import environ
 import httpx
 import requests
@@ -703,8 +704,13 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
 
 @app.task(bind=True, max_retries=3, autoretry_for=(ScrapeFailed,))
 @throttle_task("1/m")
-def subscribe_to_scotus_updates(self, pk: int) -> None:
-    """Subscribe to SCOTUS updates for a given opinion"""
+def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
+    """Subscribe to SCOTUS email updates for a given opinion.
+
+    :param self: The celery task
+    :param pk: The primary key of the Docket object to subscribe for.
+    :return: None
+    """
 
     docket = Docket.objects.get(pk=pk)
     docket_number = docket.docket_number
