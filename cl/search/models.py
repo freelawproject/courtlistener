@@ -1303,7 +1303,7 @@ class AbstractPacerDocument(models.Model):
 class RECAPDocument(
     AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
 ):
-    """The model for Docket Documents and Attachments."""
+    """The model for RECAP Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
     ATTACHMENT = 2
@@ -1524,7 +1524,7 @@ class RECAPDocument(
         self,
         update_fields=None,
         do_extraction=False,
-        index=False,
+        _index=False,
         *args,
         **kwargs,
     ):
