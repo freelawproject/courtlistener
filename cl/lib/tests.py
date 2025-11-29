@@ -451,39 +451,31 @@ class TestModelHelpers(TestCase):
 
     def test_clean_docket_number(self) -> None:
         """Can we clean and return a docket number if it has a valid format?"""
+        test_cases = {
+            # Not valid docket number formats for district, bankruptcy or appellate
+            # no docket number returned
+            "Nos. C 123-80-123-82": "",
+            "Nos. C 123-80-123": "",
+            "Nos. 212-213": "",
+            # Multiple valid docket numbers, no docket number returned
+            "Nos. 14-13542, 14-13657, 15-10967, 15-11166": "",
+            "12-33112, 12-33112": "",
+            # One valid docket number, return the cleaned number
+            "CIVIL ACTION NO. 7:17-CV-00426": "7:17-cv-00426",
+            "Case No.1:19-CV-00118-MRB": "1:19-cv-00118",
+            "Case 12-33112": "12-33112",
+            "12-33112": "12-33112",
+            "12-cv-01032-JKG-MJL": "12-cv-01032",
+            "Nos. 212-213, Dockets 27264, 27265": "",
+            "Nos. 12-213, Dockets 27264, 27265": "12-213",
+            # SCOTUS A Dockets.
+            "Docket: 16A989": "16a989",
+            "Case  17A80": "17a80",
+        }
 
-        # Not valid docket number formats for district, bankruptcy or appellate
-        # not docket number returned
-        self.assertEqual(clean_docket_number("Nos. C 123-80-123-82"), "")
-        self.assertEqual(clean_docket_number("Nos. C 123-80-123"), "")
-        self.assertEqual(clean_docket_number("Nos. 212-213"), "")
-
-        # Multiple valid docket numbers, not docket number returned
-        self.assertEqual(
-            clean_docket_number("Nos. 14-13542, 14-13657, 15-10967, 15-11166"),
-            "",
-        )
-        self.assertEqual(clean_docket_number("12-33112, 12-33112"), "")
-
-        # One valid docket number, return the cleaned number
-        self.assertEqual(
-            clean_docket_number("CIVIL ACTION NO. 7:17-CV-00426"),
-            "7:17-cv-00426",
-        )
-        self.assertEqual(
-            clean_docket_number("Case No.1:19-CV-00118-MRB"), "1:19-cv-00118"
-        )
-        self.assertEqual(clean_docket_number("Case 12-33112"), "12-33112")
-        self.assertEqual(clean_docket_number("12-33112"), "12-33112")
-        self.assertEqual(
-            clean_docket_number("12-cv-01032-JKG-MJL"), "12-cv-01032"
-        )
-        self.assertEqual(
-            clean_docket_number("Nos. 212-213, Dockets 27264, 27265"), ""
-        )
-        self.assertEqual(
-            clean_docket_number("Nos. 12-213, Dockets 27264, 27265"), "12-213"
-        )
+        for raw, expected in test_cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_docket_number(raw), expected)
 
     def test_is_docket_number(self) -> None:
         """Test is_docket_number method correctly detects a docket number."""
