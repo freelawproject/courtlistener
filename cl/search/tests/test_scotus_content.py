@@ -17,12 +17,21 @@ class ScotusDocketMergeTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.lower_court = CourtFactory(
+            id="ca2",
+            full_name="United States Court of Appeals for the Second Circuit",
+            jurisdiction="A",
+        )
 
     def test_merge_scotus_docket_creates_docket_and_metadata(self) -> None:
         """Confirm SCOTUS data is merged into Docket and metadata."""
 
         data = ScotusDocketDataFactory(
-            docket_number="23-1434", capital_case=False
+            docket_number="23-1434",
+            capital_case=False,
+            lower_court="United States Court of Appeals for the Second Circuit",
+            lower_court_case_numbers=["22-16375", "22-16622"],
+            lower_court_case_numbers_raw="Docket Num. 22-16375, Docket Num. 22-16622",
         )
         docket = merge_scotus_docket(data)
         docket.refresh_from_db()
@@ -35,6 +44,9 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(docket.date_filed, data["date_filed"])
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
 
+        self.assertEqual(docket.appeal_from_str, data["lower_court"])
+        self.assertEqual(docket.appeal_from_id, self.lower_court.pk)
+
         # ScotusDocketMetadata fields
         metadata = docket.scotus_metadata
         self.assertFalse(metadata.capital_case)
@@ -45,6 +57,22 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(metadata.linked_with, data["links"])
         self.assertEqual(
             metadata.questions_presented_url, data["questions_presented"]
+        )
+
+        # OriginatingCourtInformation fields
+        oci = docket.originating_court_information
+        expected_numbers = "22-16375, 22-16622"
+        self.assertEqual(oci.docket_number, expected_numbers)
+        self.assertEqual(
+            oci.docket_number_raw, data.get("lower_court_case_numbers_raw")
+        )
+        self.assertEqual(
+            oci.date_judgment,
+            data["lower_court_decision_date"],
+        )
+        self.assertEqual(
+            oci.date_rehearing_denied,
+            data["lower_court_rehearing_denied_date"],
         )
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
@@ -67,6 +95,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23A1434",
             capital_case=True,
             linked_with="23-6433",
+            lower_court_case_numbers=["23-6433"],
         )
         updated_docket = merge_scotus_docket(data)
         updated_docket.refresh_from_db()
@@ -171,4 +200,80 @@ class ScotusDocketMergeTest(TestCase):
             "SCOTUS PDF download: questions_presented_file already present "
             "for docket %s; skipping.",
             docket.id,
+        )
+
+    @mock.patch("cl.recap.mergers.logger")
+    def test_logs_error_when_lower_court_not_found(self, mock_logger) -> None:
+        """Confirm merge logs error when lower court is not found in courts-db."""
+        data = ScotusDocketDataFactory(
+            docket_number="23-1435",
+            lower_court="Imaginary Court of The Dragons",
+            lower_court_case_numbers=["10-1000"],
+        )
+
+        docket = merge_scotus_docket(data)
+        docket.refresh_from_db()
+
+        self.assertEqual(docket.appeal_from_str, data["lower_court"])
+        self.assertIsNone(docket.appeal_from)
+
+        mock_logger.error.assert_called_with(
+            "Could not map lower court from name '%s' for SCOTUS docket.",
+            "Imaginary Court of The Dragons",
+        )
+
+    @mock.patch("cl.recap.mergers.find_court")
+    @mock.patch("cl.recap.mergers.logger")
+    def test_logs_error_when_lower_court_ambiguous(
+        self,
+        mock_logger,
+        mock_find_court,
+    ) -> None:
+        """Confirm merge logs error when lower courts-db lookup is ambiguous."""
+        mock_find_court.return_value = ["mab", "mad"]
+
+        data = ScotusDocketDataFactory(
+            docket_number="23-1436",
+            lower_court="District of Massachusetts",
+            lower_court_case_numbers=["10-2000"],
+        )
+
+        docket = merge_scotus_docket(data)
+        docket.refresh_from_db()
+
+        self.assertEqual(docket.appeal_from_str, data["lower_court"])
+        self.assertIsNone(docket.appeal_from)
+
+        mock_logger.error.assert_called_with(
+            "Ambiguous lower court name '%s' in courts-db: %s",
+            "District of Massachusetts",
+            ["mab", "mad"],
+        )
+
+    @mock.patch("cl.recap.mergers.find_court")
+    @mock.patch("cl.recap.mergers.logger")
+    def test_logs_error_when_lower_court_id_missing_in_db(
+        self,
+        mock_logger,
+        mock_find_court,
+    ) -> None:
+        """Confirm merge logs error when lower court_id does not exist in DB."""
+        mock_find_court.return_value = ["cadc123"]
+
+        data = ScotusDocketDataFactory(
+            docket_number="23-1437",
+            lower_court="Non-existent Court",
+            lower_court_case_numbers=["10-3000"],
+        )
+
+        docket = merge_scotus_docket(data)
+        docket.refresh_from_db()
+
+        self.assertEqual(docket.appeal_from_str, data["lower_court"])
+        self.assertIsNone(docket.appeal_from)
+
+        mock_logger.error.assert_called_with(
+            "Court object does not exist in DB for id '%s' (name: '%s').",
+            "cadc123",
+            "Non-existent Court",
         )
