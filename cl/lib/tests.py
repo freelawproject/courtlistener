@@ -24,6 +24,7 @@ from cl.lib.model_helpers import (
     is_docket_number,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_scotus_docket_number_core,
     make_upload_path,
 )
 from cl.lib.pacer import (
@@ -450,39 +451,31 @@ class TestModelHelpers(TestCase):
 
     def test_clean_docket_number(self) -> None:
         """Can we clean and return a docket number if it has a valid format?"""
+        test_cases = {
+            # Not valid docket number formats for district, bankruptcy or appellate
+            # no docket number returned
+            "Nos. C 123-80-123-82": "",
+            "Nos. C 123-80-123": "",
+            "Nos. 212-213": "",
+            # Multiple valid docket numbers, no docket number returned
+            "Nos. 14-13542, 14-13657, 15-10967, 15-11166": "",
+            "12-33112, 12-33112": "",
+            # One valid docket number, return the cleaned number
+            "CIVIL ACTION NO. 7:17-CV-00426": "7:17-cv-00426",
+            "Case No.1:19-CV-00118-MRB": "1:19-cv-00118",
+            "Case 12-33112": "12-33112",
+            "12-33112": "12-33112",
+            "12-cv-01032-JKG-MJL": "12-cv-01032",
+            "Nos. 212-213, Dockets 27264, 27265": "",
+            "Nos. 12-213, Dockets 27264, 27265": "12-213",
+            # SCOTUS A Dockets.
+            "Docket: 16A989": "16a989",
+            "Case  17A80": "17a80",
+        }
 
-        # Not valid docket number formats for district, bankruptcy or appellate
-        # not docket number returned
-        self.assertEqual(clean_docket_number("Nos. C 123-80-123-82"), "")
-        self.assertEqual(clean_docket_number("Nos. C 123-80-123"), "")
-        self.assertEqual(clean_docket_number("Nos. 212-213"), "")
-
-        # Multiple valid docket numbers, not docket number returned
-        self.assertEqual(
-            clean_docket_number("Nos. 14-13542, 14-13657, 15-10967, 15-11166"),
-            "",
-        )
-        self.assertEqual(clean_docket_number("12-33112, 12-33112"), "")
-
-        # One valid docket number, return the cleaned number
-        self.assertEqual(
-            clean_docket_number("CIVIL ACTION NO. 7:17-CV-00426"),
-            "7:17-cv-00426",
-        )
-        self.assertEqual(
-            clean_docket_number("Case No.1:19-CV-00118-MRB"), "1:19-cv-00118"
-        )
-        self.assertEqual(clean_docket_number("Case 12-33112"), "12-33112")
-        self.assertEqual(clean_docket_number("12-33112"), "12-33112")
-        self.assertEqual(
-            clean_docket_number("12-cv-01032-JKG-MJL"), "12-cv-01032"
-        )
-        self.assertEqual(
-            clean_docket_number("Nos. 212-213, Dockets 27264, 27265"), ""
-        )
-        self.assertEqual(
-            clean_docket_number("Nos. 12-213, Dockets 27264, 27265"), "12-213"
-        )
+        for raw, expected in test_cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_docket_number(raw), expected)
 
     def test_is_docket_number(self) -> None:
         """Test is_docket_number method correctly detects a docket number."""
@@ -497,6 +490,52 @@ class TestModelHelpers(TestCase):
         self.assertEqual(is_docket_number("21-string"), False)
         self.assertEqual(is_docket_number("string-2134"), False)
         self.assertEqual(is_docket_number("21"), False)
+
+    def test_making_scotus_docket_number_core(self) -> None:
+        """Test make_scotus_docket_number_core method correctly creates
+        docket number core for scotus dockets.
+        """
+
+        self.assertEqual(make_scotus_docket_number_core(None), "")
+        self.assertEqual(make_scotus_docket_number_core(""), "")
+
+        # SCOTUS A dockets
+        self.assertEqual(
+            make_scotus_docket_number_core("16A985"),
+            "16A00985",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("16a985"),
+            "16A00985",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("22A1"),
+            "22A00001",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("22A12345"),
+            "22A12345",
+        )
+
+        # Appellate style docket numbers (YY-NNNNNN)
+        self.assertEqual(
+            make_scotus_docket_number_core("12-33112"),
+            "12033112",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("12-000001"),
+            "12000001",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("06-10672"),
+            "06010672",
+        )
+
+        # Non-matching docket numbers should return empty string.
+        self.assertEqual(
+            make_scotus_docket_number_core("23-cv-001"),
+            "",
+        )
 
 
 class S3PrivateUUIDStorageTest(TestCase):

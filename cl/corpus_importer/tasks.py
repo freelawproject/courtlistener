@@ -3205,7 +3205,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: Docket %s does not exist; skipping.",
             docket_id,
         )
-        return
+        return None
 
     scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
 
@@ -3215,7 +3215,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: No questions_presented_url for docket %s.",
             docket_id,
         )
-        return
+        return None
 
     # Avoid re-downloading if we already have a file.
     if scotus_meta.questions_presented_file:
@@ -3224,7 +3224,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "for docket %s; skipping.",
             docket_id,
         )
-        return
+        return None
 
     logger.info(
         "SCOTUS PDF download: Fetching Questions Presented PDF for docket %s "
@@ -3233,49 +3233,51 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         qp_url,
     )
     try:
-        response = requests.get(
+        with requests.get(
             qp_url,
             stream=True,
             timeout=60,
             headers={"User-Agent": "Free Law Project"},
-        )
-        response.raise_for_status()
+        ) as response:
+            response.raise_for_status()
+            if not is_pdf(response):
+                logger.warning(
+                    "SCOTUS PDF download: Expected application/pdf for docket %s "
+                    "from %s; aborting.",
+                    docket_id,
+                    qp_url,
+                )
+                return None
+            with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
+                # Download the PDF into a tmp file to avoid using too much memory
+                for chunk in response.iter_content(chunk_size=8 * 1024):
+                    if chunk:
+                        tmp.write(chunk)
+
+                tmp.flush()
+                tmp.seek(0)
+
+                filename = f"{docket_id}-qp.pdf"
+                scotus_meta.questions_presented_file.save(
+                    filename,
+                    File(tmp),
+                    save=True,
+                )
+            logger.info(
+                "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
+                docket_id,
+            )
     except RequestException as exc:
-        logger.warning(
-            "SCOTUS PDF download: Unable to download %s for docket %s. "
-            "Exception was: %s",
-            qp_url,
-            docket_id,
-            exc,
+        if self.request.retries == self.max_retries:
+            logger.warning(
+                "SCOTUS PDF download: Unable to download %s for docket %s. "
+                "Exception was: %s",
+                qp_url,
+                docket_id,
+                exc,
+            )
+            return None
+        logger.info(
+            "SCOTUS PDF download: Ran into a RequestException. Retrying."
         )
-        return
-
-    if not is_pdf(response):
-        logger.warning(
-            "SCOTUS PDF download: Expected application/pdf for docket %s "
-            "from %s; aborting.",
-            docket_id,
-            qp_url,
-        )
-        return
-
-    with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
-        # Download the PDF into a tmp file to avoid using too much memory
-        for chunk in response.iter_content(chunk_size=8 * 1024):
-            if chunk:
-                tmp.write(chunk)
-
-        tmp.flush()
-        tmp.seek(0)
-
-        filename = f"{docket_id}-qp.pdf"
-        scotus_meta.questions_presented_file.save(
-            filename,
-            File(tmp),
-            save=True,
-        )
-
-    logger.info(
-        "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
-        docket_id,
-    )
+        raise self.retry(exc=exc)

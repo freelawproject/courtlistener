@@ -1740,6 +1740,38 @@ class DeleteDuplicatesTest(TestCase):
             cluster=cls.cluster_to_keep, **same_opinion_fields
         )
 
+        # for text comparison
+        coloctapp = CourtFactory.create(id="coloctapp")
+        dn = "2222"
+        docket = DocketFactory.create(court=coloctapp, docket_number=dn)
+        same_cluster_fields["docket"] = docket
+
+        # make sure we only delete identical opinions, after timestamp cleaning
+        cls.timestamped_op_do_not_delete = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="yyy",
+            plain_text="Something 20 Dec 2024 21:06:18 Something else",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+        cls.timestamped_op_to_delete = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="xxx",
+            plain_text="Something 19 Dec 2024 21:06:18",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+        cls.timestamped_op_to_keep = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="zzzz",
+            plain_text="Something 01 Jan 2024 01:06:18",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+
     def test_same_hash_duplicate_deletion(self):
         """Test that we can delete same hash duplicates
 
@@ -1815,3 +1847,26 @@ class DeleteDuplicatesTest(TestCase):
             ).exists(),
             "ClusterRedirection with proper values was not created",
         )
+
+    def test_delete_by_text_comparison(self):
+        """Test that we can delete opinions by text comparison"""
+        stats = defaultdict(lambda: 0)
+
+        delete_duplicates.delete_by_text_comparison(stats, "coloctapp")
+
+        try:
+            self.timestamped_op_to_delete.refresh_from_db()
+            self.fail("Timestamped opinion should be deleted")
+        except Opinion.DoesNotExist:
+            pass
+
+        try:
+            self.timestamped_op_do_not_delete.refresh_from_db()
+        except Opinion.DoesNotExist:
+            self.fail("Should not delete an opinion with different text")
+
+        try:
+            delete_duplicates.delete_by_text_comparison(stats, "scotus")
+            self.fail("Should raise error due to unsupported court")
+        except ValueError:
+            pass

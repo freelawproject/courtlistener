@@ -152,7 +152,7 @@ class ScotusDocketMergeTest(TestCase):
         mock_response = mock.Mock()
         mock_response.iter_content.return_value = [b"fake pdf content"]
         mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        mock_get.return_value.__enter__.return_value = mock_response
 
         download_qp_scotus_pdf.delay(docket.id)
 
