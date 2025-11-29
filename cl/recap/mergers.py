@@ -2226,8 +2226,7 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
     ):
         oci = d.originating_court_information
         # Create originating_court_information if missing
-        if not oci:
-            oci = OriginatingCourtInformation.objects.create()
+        oci = OriginatingCourtInformation() if not oci else oci
 
         oci.docket_number = (
             ", ".join(lower_court_case_numbers)
@@ -2254,7 +2253,10 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
     d.save()
 
     # Merge ScotusDocketMetadata
-    scotus_data, _ = ScotusDocketMetadata.objects.get_or_create(docket=d)
+    scotus_data = ScotusDocketMetadata.objects.filter(docket=d).first()
+    scotus_data = (
+        ScotusDocketMetadata(docket=d) if scotus_data is None else scotus_data
+    )
     scotus_data.capital_case = bool(report_data.get("capital_case") or False)
     scotus_data.discretionary_court_decision = report_data.get(
         "discretionary_court_decision"
