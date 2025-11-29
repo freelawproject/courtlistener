@@ -500,7 +500,7 @@ class TestModelHelpers(TestCase):
         self.assertEqual(is_docket_number("21"), False)
 
     def test_making_scotus_docket_number_core(self) -> None:
-        """ Test make_scotus_docket_number_core method correctly creates
+        """Test make_scotus_docket_number_core method correctly creates
         docket number core for scotus dockets.
         """
 
