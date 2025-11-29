@@ -3233,13 +3233,40 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         qp_url,
     )
     try:
-        response = requests.get(
+        with requests.get(
             qp_url,
             stream=True,
             timeout=60,
             headers={"User-Agent": "Free Law Project"},
-        )
-        response.raise_for_status()
+        ) as response:
+            response.raise_for_status()
+            if not is_pdf(response):
+                logger.warning(
+                    "SCOTUS PDF download: Expected application/pdf for docket %s "
+                    "from %s; aborting.",
+                    docket_id,
+                    qp_url,
+                )
+                return
+            with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
+                # Download the PDF into a tmp file to avoid using too much memory
+                for chunk in response.iter_content(chunk_size=8 * 1024):
+                    if chunk:
+                        tmp.write(chunk)
+
+                tmp.flush()
+                tmp.seek(0)
+
+                filename = f"{docket_id}-qp.pdf"
+                scotus_meta.questions_presented_file.save(
+                    filename,
+                    File(tmp),
+                    save=True,
+                )
+            logger.info(
+                "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
+                docket_id,
+            )
     except RequestException as exc:
         logger.warning(
             "SCOTUS PDF download: Unable to download %s for docket %s. "
@@ -3249,33 +3276,3 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             exc,
         )
         return
-
-    if not is_pdf(response):
-        logger.warning(
-            "SCOTUS PDF download: Expected application/pdf for docket %s "
-            "from %s; aborting.",
-            docket_id,
-            qp_url,
-        )
-        return
-
-    with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
-        # Download the PDF into a tmp file to avoid using too much memory
-        for chunk in response.iter_content(chunk_size=8 * 1024):
-            if chunk:
-                tmp.write(chunk)
-
-        tmp.flush()
-        tmp.seek(0)
-
-        filename = f"{docket_id}-qp.pdf"
-        scotus_meta.questions_presented_file.save(
-            filename,
-            File(tmp),
-            save=True,
-        )
-
-    logger.info(
-        "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
-        docket_id,
-    )
