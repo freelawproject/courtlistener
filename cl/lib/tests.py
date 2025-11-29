@@ -24,6 +24,7 @@ from cl.lib.model_helpers import (
     is_docket_number,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_scotus_docket_number_core,
     make_upload_path,
 )
 from cl.lib.pacer import (
@@ -497,6 +498,52 @@ class TestModelHelpers(TestCase):
         self.assertEqual(is_docket_number("21-string"), False)
         self.assertEqual(is_docket_number("string-2134"), False)
         self.assertEqual(is_docket_number("21"), False)
+
+    def test_making_scotus_docket_number_core(self) -> None:
+        """ Test make_scotus_docket_number_core method correctly creates
+        docket number core for scotus dockets.
+        """
+
+        self.assertEqual(make_scotus_docket_number_core(None), "")
+        self.assertEqual(make_scotus_docket_number_core(""), "")
+
+        # SCOTUS A dockets
+        self.assertEqual(
+            make_scotus_docket_number_core("16A985"),
+            "16A00985",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("16a985"),
+            "16A00985",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("22A1"),
+            "22A00001",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("22A12345"),
+            "22A12345",
+        )
+
+        # Appellate style docket numbers (YY-NNNNNN)
+        self.assertEqual(
+            make_scotus_docket_number_core("12-33112"),
+            "12033112",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("12-000001"),
+            "12000001",
+        )
+        self.assertEqual(
+            make_scotus_docket_number_core("06-10672"),
+            "06010672",
+        )
+
+        # Non-matching docket numbers should return empty string.
+        self.assertEqual(
+            make_scotus_docket_number_core("23-cv-001"),
+            "",
+        )
 
 
 class S3PrivateUUIDStorageTest(TestCase):
