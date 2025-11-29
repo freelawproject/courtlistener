@@ -3205,7 +3205,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: Docket %s does not exist; skipping.",
             docket_id,
         )
-        return
+        return None
 
     scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
 
@@ -3215,7 +3215,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: No questions_presented_url for docket %s.",
             docket_id,
         )
-        return
+        return None
 
     # Avoid re-downloading if we already have a file.
     if scotus_meta.questions_presented_file:
@@ -3224,7 +3224,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "for docket %s; skipping.",
             docket_id,
         )
-        return
+        return None
 
     logger.info(
         "SCOTUS PDF download: Fetching Questions Presented PDF for docket %s "
@@ -3247,7 +3247,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                     docket_id,
                     qp_url,
                 )
-                return
+                return None
             with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
                 # Download the PDF into a tmp file to avoid using too much memory
                 for chunk in response.iter_content(chunk_size=8 * 1024):
@@ -3268,11 +3268,16 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                 docket_id,
             )
     except RequestException as exc:
-        logger.warning(
-            "SCOTUS PDF download: Unable to download %s for docket %s. "
-            "Exception was: %s",
-            qp_url,
-            docket_id,
-            exc,
+        if self.request.retries == self.max_retries:
+            logger.warning(
+                "SCOTUS PDF download: Unable to download %s for docket %s. "
+                "Exception was: %s",
+                qp_url,
+                docket_id,
+                exc,
+            )
+            return None
+        logger.info(
+            "SCOTUS PDF download: Ran into a RequestException. Retrying."
         )
-        return
+        raise self.retry(exc=exc)
