@@ -1891,23 +1891,19 @@ class SubscribeToSCOTUSTest(TestCase):
         )
         self.docket_pk = self.docket_scotus.pk
         self.requests: list[requests.PreparedRequest] = []
-        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "scrapers" / "test_assets" / "scotus_subscription"
+        test_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "scrapers"
+            / "test_assets"
+            / "scotus_subscription"
+        )
         self.responses: list[requests.Response] = [
-            load_pickle(
-                test_dir / "1_get.pickle"
-            ),
-            load_pickle(
-                test_dir / "2_post.pickle"
-            ),
-            load_pickle(
-                test_dir / "3_get.pickle"
-            ),
-            load_pickle(
-                test_dir / "4_post.pickle"
-            ),
-            load_pickle(
-                test_dir / "5_post.pickle"
-            ),
+            load_pickle(test_dir / "1_get.pickle"),
+            load_pickle(test_dir / "2_post.pickle"),
+            load_pickle(test_dir / "3_get.pickle"),
+            load_pickle(test_dir / "4_post.pickle"),
+            load_pickle(test_dir / "5_post.pickle"),
         ]
 
     def test_transcription_cleaning(self):
