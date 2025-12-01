@@ -1885,27 +1885,28 @@ def load_pickle(path):
 class SubscribeToSCOTUSTest(TestCase):
     def setUp(self):
         self.scotus = CourtFactory.create(id="scotus")
-        self.docket_number = "25a261"
+        self.docket_number = "25-260"
         self.docket_scotus = DocketFactory.create(
             court=self.scotus, docket_number=self.docket_number
         )
         self.docket_pk = self.docket_scotus.pk
         self.requests: list[requests.PreparedRequest] = []
+        test_dir = Path(settings.INSTALL_ROOT) / "cl" / "scrapers" / "test_assets" / "scotus_subscription"
         self.responses: list[requests.Response] = [
             load_pickle(
-                "cl/scrapers/test_assets/scotus_subscription/1_get.pickle"
+                test_dir / "1_get.pickle"
             ),
             load_pickle(
-                "cl/scrapers/test_assets/scotus_subscription/2_post.pickle"
+                test_dir / "2_post.pickle"
             ),
             load_pickle(
-                "cl/scrapers/test_assets/scotus_subscription/3_get.pickle"
+                test_dir / "3_get.pickle"
             ),
             load_pickle(
-                "cl/scrapers/test_assets/scotus_subscription/4_post.pickle"
+                test_dir / "4_post.pickle"
             ),
             load_pickle(
-                "cl/scrapers/test_assets/scotus_subscription/5_post.pickle"
+                test_dir / "5_post.pickle"
             ),
         ]
 
@@ -1930,8 +1931,8 @@ class SubscribeToSCOTUSTest(TestCase):
             subscribe_to_scotus_updates.delay(self.docket_pk).get()
 
         form_url = f"https://file.supremecourt.gov/casenotification?caseNumber={self.docket_number}"
-        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmcsiY6yxS91Hh4V2YQfpnhRyQc6duZzowbK_Sh5raEMZ7eNYVPnmJbsx8s5npCanzu1_hQCoUmrQy6wcvKc2PQgvp2H1OIF6ZLcT7YtWxkGAS2yJJXOY0APEmgUjQ7Q_UA"
-        captcha_id = "00d43cb9-8476-41f6-906c-482d5cb44005"
+        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"
+        captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
         captcha_solution = "mo9su"
         subscription_email = "scotus@recap.email"
 
