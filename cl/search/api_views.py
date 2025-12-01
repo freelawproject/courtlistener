@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from cl.api.api_permissions import V3APIPermission
-from cl.api.pagination import ESCursorPagination
+from cl.api.pagination import ESCursorPagination, LargePagePagination
 from cl.api.utils import (
     DeferredFieldsMixin,
     LoggingMixin,
@@ -27,6 +27,7 @@ from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
     CourtSerializer,
+    DocketEntryLiteSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
     DocketSerializer,
@@ -39,6 +40,7 @@ from cl.search.api_serializers import (
     OriginalCourtInformationSerializer,
     PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
+    RECAPDocumentLiteSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
     TagSerializer,
@@ -148,6 +150,7 @@ class DocketEntryViewSet(
 ):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
+    pagination_class = LargePagePagination
     filterset_class = DocketEntryFilter
     ordering_fields = (
         "id",
@@ -165,17 +168,37 @@ class DocketEntryViewSet(
         "date_created",
         "date_modified",
     ]
-    queryset = (
-        DocketEntry.objects.select_related(
-            "docket",  # For links back to dockets
+    queryset = DocketEntry.objects.select_related("docket").order_by("-id")
+
+    def get_queryset(self):
+        qs = super().get_queryset().prefetch_related("tags")
+        include_plain = (
+            self.request.query_params.get("include_plain_text", "true").lower()
+            == "true"
         )
-        .prefetch_related(
-            "recap_documents",  # Sub items
-            "recap_documents__tags",  # Sub-sub items
-            "tags",  # Tags on docket entries
+        if include_plain:
+            return qs.prefetch_related(
+                "recap_documents", "recap_documents__tags"
+            )
+        return qs.prefetch_related(
+            Prefetch(
+                "recap_documents",
+                queryset=RECAPDocument.objects.defer(
+                    "plain_text"
+                ).prefetch_related("tags"),
+            )
         )
-        .order_by("-id")
-    )
+
+    def get_serializer_class(self):
+        include_plain = (
+            self.request.query_params.get("include_plain_text", "true").lower()
+            == "true"
+        )
+        return (
+            DocketEntrySerializer
+            if include_plain
+            else DocketEntryLiteSerializer
+        )
 
 
 class RECAPDocumentViewSet(
@@ -186,6 +209,7 @@ class RECAPDocumentViewSet(
 ):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = RECAPDocumentSerializer
+    pagination_class = LargePagePagination
     filterset_class = RECAPDocumentFilter
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
     # Default cursor ordering key
@@ -196,13 +220,30 @@ class RECAPDocumentViewSet(
         "date_created",
         "date_modified",
     ]
-    queryset = (
-        RECAPDocument.objects.select_related(
-            "docket_entry", "docket_entry__docket"
+    queryset = RECAPDocument.objects.select_related(
+        "docket_entry", "docket_entry__docket"
+    ).order_by("-id")
+
+    def get_queryset(self):
+        qs = super().get_queryset().prefetch_related("tags")
+        include_plain = (
+            self.request.query_params.get("include_plain_text", "true").lower()
+            == "true"
         )
-        .prefetch_related("tags")
-        .order_by("-id")
-    )
+        if include_plain:
+            return qs
+        return qs.defer("plain_text")
+
+    def get_serializer_class(self):
+        include_plain = (
+            self.request.query_params.get("include_plain_text", "true").lower()
+            == "true"
+        )
+        return (
+            RECAPDocumentSerializer
+            if include_plain
+            else RECAPDocumentLiteSerializer
+        )
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
