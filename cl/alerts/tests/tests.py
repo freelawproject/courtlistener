@@ -860,6 +860,7 @@ class DocketAlertTest(TestCase):
             court_id="scotus",
             pacer_case_id="asdf",
             docket_number="12-cv-02354",
+            docket_number_raw="12-cv-02354",
             case_name="Vargas v. Wilkins",
         )
 
