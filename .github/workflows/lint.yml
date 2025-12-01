@@ -23,7 +23,7 @@ jobs:
           enable-cache: true
           version: "0.7.x"
 
-      - uses: pre-commit/action@v3.0.0
+      - uses: pre-commit/action@v3.0.1
 
       - name: Install dependencies
         run: uv sync
