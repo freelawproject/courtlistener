@@ -7,7 +7,7 @@ ci:
   autoupdate_schedule: quarterly
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
      - id: check-added-large-files
      - id: check-ast
@@ -27,7 +27,7 @@ repos:
        exclude: '^cl/recap/test_assets/.*\.html$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.8
+    rev: v0.13.3
     hooks:
       - id: ruff
         args: [ --fix ]
