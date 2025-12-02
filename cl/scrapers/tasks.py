@@ -729,7 +729,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     )
 
     base_url = "https://file.supremecourt.gov"
-    form_url = f"{base_url}/casenotification?caseNumber={docket_number}"
+    form_url = f"{base_url}/CaseNotification?caseNumber={docket_number}"
     try:
         logger.info("Fetching subscription page for case %s", docket_number)
         response = session.get(form_url, timeout=10)

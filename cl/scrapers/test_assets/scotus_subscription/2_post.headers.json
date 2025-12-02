@@ -1,0 +1,15 @@
+{
+  "Alt-Svc": "h3=\":443\"; ma=93600",
+  "Cache-Control": "no-cache,no-store",
+  "Connection": "keep-alive",
+  "Content-Length": "126",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Mon, 01 Dec 2025 22:09:23 GMT",
+  "Expires": "-1",
+  "Pragma": "no-cache",
+  "Server": "Microsoft-IIS/10.0",
+  "Server-Timing": "cdn-cache; desc=MISS, edge; dur=71, origin; dur=14, ak_p; desc=\"1764626962930_399642258_3642714728_8713_4334_38_0_-\";dur=1",
+  "Set-Cookie": ".AspNetCore.Session=CfDJ8LWjh78o%2BU5EigyPTWy9BmcS9Vw5dEzG7yfeRAJaKB5NjloV4bvOGwQsWN0tz0xP7alyeN0rXsl3j7Yb%2FnCwhFhGQ87yD56ReSTEv1wH%2Bd6VyfkKq3lum%2BICMl94s74z8iJui1YAyhIZ5vETaqJZbmmEROY7vwhNl7KYzhcVOxXm; path=/; secure; samesite=lax; httponly, US-SUPREME-COURT=335915200.20480.0000; expires=Mon, 01-Dec-2025 22:39:22 GMT; path=/; Httponly; Secure",
+  "Strict-Transport-Security": "max-age=31536000",
+  "X-Powered-By": "ASP.NET"
+}

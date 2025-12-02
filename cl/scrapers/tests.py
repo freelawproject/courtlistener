@@ -1,6 +1,5 @@
+import json
 import os
-import pickle
-import urllib
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
@@ -8,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
 
-import requests
+import responses
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -17,6 +16,7 @@ from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
+from responses import matchers
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -1877,11 +1877,6 @@ class DeleteDuplicatesTest(TestCase):
             pass
 
 
-def load_pickle(path):
-    with open(path, "rb") as f:
-        return pickle.load(f)
-
-
 class SubscribeToSCOTUSTest(TestCase):
     def setUp(self):
         self.scotus = CourtFactory.create(id="scotus")
@@ -1890,144 +1885,158 @@ class SubscribeToSCOTUSTest(TestCase):
             court=self.scotus, docket_number=self.docket_number
         )
         self.docket_pk = self.docket_scotus.pk
-        self.requests: list[requests.PreparedRequest] = []
-        test_dir = (
+
+        self.test_asset_dir = (
             Path(settings.INSTALL_ROOT)
             / "cl"
             / "scrapers"
             / "test_assets"
             / "scotus_subscription"
         )
-        self.responses: list[requests.Response] = [
-            load_pickle(test_dir / "1_get.pickle"),
-            load_pickle(test_dir / "2_post.pickle"),
-            load_pickle(test_dir / "3_get.pickle"),
-            load_pickle(test_dir / "4_post.pickle"),
-            load_pickle(test_dir / "5_post.pickle"),
-        ]
+
+    def add_response(self, file_name: str, **kwargs):
+        with open(
+            self.test_asset_dir / f"{file_name}.headers.json", "rb"
+        ) as f:
+            headers = json.load(f)
+
+        content_type = headers["Content-Type"]
+        body_extension = content_type.split(";")[0].split("/")[-1]
+        if (
+            "Content-Encoding" in headers
+            and headers["Content-Encoding"] == "gzip"
+        ):
+            body_extension = f"{body_extension}.gz"
+
+        with open(
+            self.test_asset_dir / f"{file_name}.body.{body_extension}", "rb"
+        ) as f:
+            body = f.read()
+
+        response = responses.Response(headers=headers, body=body, **kwargs)
+        responses.add(response)
+        return response
 
     def test_transcription_cleaning(self):
         messy = "RoMeo Juleett.; 5 Seven- .Three"
         clean = process_scotus_captcha_transcription(messy)
         self.assertEqual(clean, "rj573")
 
-    def mock_send(self, request: requests.PreparedRequest, **kwargs):
-        self.requests.append(request)
-        return self.responses.pop(0)
-
+    @responses.activate
     @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")
     @mock.patch("cl.scrapers.tasks.call_llm_transcription")
     @mock.patch("cl.lib.celery_utils.get_task_wait")
     def test_subscription_task(
         self, mock_wait: MagicMock, mock_transcription: MagicMock
     ):
-        mock_wait.return_value = 0
-        mock_transcription.return_value = "m o 9 s u"
-        with mock.patch("requests.Session.send", side_effect=self.mock_send):
-            subscribe_to_scotus_updates.delay(self.docket_pk).get()
-
-        form_url = f"https://file.supremecourt.gov/casenotification?caseNumber={self.docket_number}"
-        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"
-        captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
-        captcha_solution = "mo9su"
+        scotus_root = "https://file.supremecourt.gov"
+        form_url = (
+            f"{scotus_root}/CaseNotification?caseNumber={self.docket_number}"
+        )
         subscription_email = "scotus@recap.email"
+        captcha_solution = "mo9su"
+        captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
+        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"
+        mock_wait.return_value = 0
+        mock_transcription.return_value = " ".join(
+            [c for c in captcha_solution]
+        )
 
-        self.assertEqual(len(self.requests), 5, "Should have sent 5 requests")
+        self.add_response(
+            "1_get",
+            url=form_url,
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "2_post",
+            url=f"{scotus_root}/Captcha/Reset",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "3_get",
+            url=f"{scotus_root}/Captcha/audio?captchaId={captcha_id}",
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "4_post",
+            url=f"{scotus_root}/Captcha/validate",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                        "captchaId": captcha_id,
+                        "captcha": captcha_solution,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "5_post",
+            url=f"{scotus_root}/CaseNotification/Subscribe",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "CaseNumber": self.docket_number,
+                        "Email": subscription_email,
+                        "btnRestart": "Enter another email",
+                        "btnSearch": "Return to Search",
+                        "WebDocketUrl": f"https://www.supremecourt.gov/search.aspx?filename=/docket/DocketFiles/html/Public/{self.docket_number}.html",
+                        "captcha": captcha_solution,
+                        "SubscribeButton": "Subscribe",
+                        "btnCancel": "Cancel",
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+
+        subscribe_to_scotus_updates.delay(self.docket_pk).get()
         self.assertEqual(
             len(mock_transcription.mock_calls),
             1,
             "Should have requested exactly 1 transcription",
-        )
-
-        # Get subscription form
-        self.assertEqual(
-            self.requests[0].method, "GET", "Request 1 verb should be GET"
-        )
-        self.assertEqual(
-            self.requests[0].url, form_url, "Incorrect URL for request 1"
-        )
-
-        # Generate new CAPTCHA
-        self.assertEqual(
-            self.requests[1].method, "POST", "Request 2 verb should be POST"
-        )
-        self.assertEqual(
-            self.requests[1].url,
-            "https://file.supremecourt.gov/Captcha/Reset",
-            "Incorrect URL for request 2",
-        )
-        self.assertEqual(
-            self.requests[1].body,
-            f"__RequestVerificationToken={verification_token}",
-            "Request 1 body should include correct verification token",
-        )
-        self.assertEqual(
-            self.requests[1].headers["Referer"],
-            form_url,
-            "Request 2 should have correct Referer header",
-        )
-        self.assertEqual(
-            self.requests[1].headers["X-Requested-With"],
-            "XMLHttpRequest",
-            "Request 2 should have correct X-Requested-With header",
-        )
-
-        # Get CAPTCHA audio file
-        self.assertEqual(
-            self.requests[2].method, "GET", "Request 3 verb should be GET"
-        )
-        self.assertEqual(
-            self.requests[2].url,
-            f"https://file.supremecourt.gov/Captcha/audio?captchaId={captcha_id}",
-            "Incorrect URL for request 3",
-        )
-        self.assertEqual(
-            self.requests[2].headers["Referer"],
-            form_url,
-            "Request 3 should have correct Referer header",
-        )
-
-        # Validate CAPTCHA solution
-        self.assertEqual(
-            self.requests[3].method, "POST", "Request 4 verb should be POST"
-        )
-        self.assertEqual(
-            self.requests[3].url,
-            "https://file.supremecourt.gov/Captcha/validate",
-            "Incorrect URL for request 4",
-        )
-        self.assertEqual(
-            self.requests[3].headers["Referer"],
-            form_url,
-            "Request 4 should have correct Referer header",
-        )
-        self.assertEqual(
-            self.requests[3].headers["X-Requested-With"],
-            "XMLHttpRequest",
-            "Request 4 should have correct X-Requested-With header",
-        )
-        self.assertEqual(
-            self.requests[3].headers["Content-Type"],
-            "application/x-www-form-urlencoded; charset=UTF-8",
-            "Request 4 should have correct Content-Type header",
-        )
-        self.assertEqual(
-            self.requests[3].body,
-            f"captchaId={captcha_id}&captcha={captcha_solution}&__RequestVerificationToken={verification_token}",
-            "Request 4 body should include correct verification token, CAPTCHA ID, and CAPTCHA solution",
-        )
-
-        # Submit subscription form
-        self.assertEqual(
-            self.requests[4].method, "POST", "Request 5 verb should be POST"
-        )
-        self.assertEqual(
-            self.requests[4].url,
-            "https://file.supremecourt.gov/CaseNotification/Subscribe",
-            "Incorrect URL for request 5",
-        )
-        self.assertEqual(
-            self.requests[4].body,
-            f"CaseNumber={self.docket_number}&Email={urllib.parse.quote_plus(subscription_email)}&btnRestart=Enter+another+email&btnSearch=Return+to+Search&WebDocketUrl=https%3A%2F%2Fwww.supremecourt.gov%2Fsearch.aspx%3Ffilename%3D%2Fdocket%2FDocketFiles%2Fhtml%2FPublic%2F{self.docket_number}.html&captcha={captcha_solution}&SubscribeButton=Subscribe&btnCancel=Cancel&__RequestVerificationToken={verification_token}",
-            "Incorrect body for request 5",
         )

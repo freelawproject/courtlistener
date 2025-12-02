@@ -1,0 +1,12 @@
+{
+  "Alt-Svc": "h3=\":443\"; ma=93600",
+  "Connection": "keep-alive",
+  "Content-Length": "4",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Mon, 01 Dec 2025 22:09:26 GMT",
+  "Server": "Microsoft-IIS/10.0",
+  "Server-Timing": "cdn-cache; desc=MISS, edge; dur=73, origin; dur=20, ak_p; desc=\"1764626966134_399642258_3642724547_9278_4196_37_0_-\";dur=1",
+  "Set-Cookie": "US-SUPREME-COURT=335915200.20480.0000; expires=Mon, 01-Dec-2025 22:39:26 GMT; path=/; Httponly; Secure",
+  "Strict-Transport-Security": "max-age=31536000",
+  "X-Powered-By": "ASP.NET"
+}
