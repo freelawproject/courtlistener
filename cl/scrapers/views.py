@@ -5,7 +5,7 @@ from cl.api.utils import EmailProcessingQueueAPIUsers, LoggingMixin
 from cl.recap.api_serializers import ProcessingQueueSerializer
 from cl.recap.filters import ProcessingQueueFilter
 from cl.recap.models import EmailProcessingQueue
-from cl.scrapers.tasks import process_scotus_email
+from cl.recap.tasks import process_scotus_email
 
 
 class ScraperSCOTUSEmailEndpoint(LoggingMixin, ModelViewSet):

@@ -4,9 +4,6 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template import loader
 
-from cl.lib.storage import RecapEmailSESStorage
-from cl.recap.models import EmailProcessingQueue
-
 
 def make_multipart_email(
     subject: str,
@@ -41,18 +38,3 @@ def make_multipart_email(
     )
     msg.attach_alternative(html, "text/html")
     return msg
-
-
-def retrieve_email_from_queue(epq: EmailProcessingQueue):
-    message_id = epq.message_id
-    bucket = RecapEmailSESStorage
-    # Try to read the file using utf-8.
-    # If it fails fallback on iso-8859-1()
-    try:
-        with bucket.open(message_id, "rb") as f:
-            return f.read().decode("utf-8")
-    except UnicodeDecodeError:
-        with bucket.open(message_id, "rb") as f:
-            return f.read().decode("iso-8859-1")
-    except FileNotFoundError as exc:
-        raise exc
