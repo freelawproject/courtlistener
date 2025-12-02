@@ -1,8 +1,12 @@
+import logging
 from dataclasses import dataclass
 
+from courts_db import find_court
 from django.core.cache import cache
 
 from cl.search.models import Court
+
+logger = logging.getLogger(__name__)
 
 
 def get_cache_key_for_court_list() -> str:
@@ -119,3 +123,40 @@ def lookup_child_courts_cache(court_ids: list[str]) -> set[str]:
         step = new_ids
 
     return courts
+
+
+def find_court_object_by_name(lower_court_name: str) -> Court | None:
+    """Find a court by name using courts-db and return a Court object if it’s
+    found and unique. Log an error if it is not found or if it is ambiguous.
+
+    :param lower_court_name: The name of the lower court to look for.
+    :return: The lower court if found, else None.
+    """
+    if not lower_court_name:
+        return None
+
+    court_ids = find_court(lower_court_name)
+    if not court_ids:
+        logger.error(
+            "Could not find court IDs from name '%s'.",
+            lower_court_name,
+        )
+        return None
+
+    if len(court_ids) > 1:
+        logger.error(
+            "Ambiguous court name '%s' in courts-db: %s",
+            lower_court_name,
+            court_ids,
+        )
+        return None
+
+    try:
+        return Court.objects.get(pk=court_ids[0])
+    except Court.DoesNotExist:
+        logger.error(
+            "Court object does not exist in DB for id '%s' (name: '%s').",
+            court_ids[0],
+            lower_court_name,
+        )
+        return None
