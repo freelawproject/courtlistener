@@ -41,7 +41,7 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
-from juriscraper.scotus import SCOTUSEmail, SCOTUSDocketReportHTML
+from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import EmailType
 from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
@@ -144,6 +144,7 @@ def retrieve_email_from_queue(epq: EmailProcessingQueue):
             return f.read().decode("iso-8859-1")
     except FileNotFoundError as exc:
         raise exc
+
 
 async def process_recap_upload(pq: ProcessingQueue) -> None:
     """Process an item uploaded from an extension or API user.
