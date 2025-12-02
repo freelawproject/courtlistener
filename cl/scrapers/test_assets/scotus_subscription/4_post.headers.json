@@ -1,7 +1,6 @@
 {
   "Alt-Svc": "h3=\":443\"; ma=93600",
   "Connection": "keep-alive",
-  "Content-Length": "4",
   "Content-Type": "application/json; charset=utf-8",
   "Date": "Mon, 01 Dec 2025 22:09:26 GMT",
   "Server": "Microsoft-IIS/10.0",

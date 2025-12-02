@@ -1,7 +1,6 @@
 {
   "Alt-Svc": "h3=\":443\"; ma=93600",
   "Connection": "keep-alive",
-  "Content-Length": "471778",
   "Content-Type": "audio/wav",
   "Date": "Mon, 01 Dec 2025 22:09:23 GMT",
   "Server": "Microsoft-IIS/10.0",
