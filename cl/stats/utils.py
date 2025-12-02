@@ -60,18 +60,12 @@ async def tally_stat(name, inc=1, date_logged=None):
     """
     if date_logged is None:
         date_logged = now()
-    stat, created = await Stat.objects.aget_or_create(
-        name=name, date_logged=date_logged, defaults={"count": inc}
+    return await Stat.objects.aupdate_or_create(
+        name=name,
+        date_logged=date_logged,
+        defaults={"count": F("count") + inc},
+        create_defaults={"count": inc},
     )
-    if created:
-        return stat.count
-    else:
-        count_cache = stat.count
-        stat.count = F("count") + inc
-        await stat.asave()
-        # stat doesn't have the new value when it's updated with a F object, so
-        # we fake the return value instead of looking it up again for the user.
-        return count_cache + inc
 
 
 def check_redis() -> bool:
