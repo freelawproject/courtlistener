@@ -269,7 +269,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     if search_type == SEARCH_TYPES.RECAP:
         search_results = do_es_search(
-            request.GET.copy(), courts=Court.objects.recap_courts()
+            request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
         )
     else:
         search_results = do_es_search(request.GET.copy())
@@ -323,7 +323,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         courts = courts_in_use = Court.objects.filter(in_use=True)
         if request.path == reverse("advanced_r"):
             obj_type = SEARCH_TYPES.RECAP
-            courts_in_use = courts.recap_courts()
+            courts_in_use = Court.federal_courts.all_pacer_courts()
         elif request.path == reverse("advanced_oa"):
             obj_type = SEARCH_TYPES.ORAL_ARGUMENT
         elif request.path == reverse("advanced_p"):

@@ -1923,6 +1923,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             )
             | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
             end_date__isnull=True,
+            in_use=True,
         ).exclude(pk="scotus")
 
     def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
@@ -1968,14 +1969,6 @@ class FederalCourtsQuerySet(models.QuerySet):
 
     def military_courts(self) -> models.QuerySet:
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
-
-
-class CourtQuerySet(models.QuerySet):
-    def recap_courts(self):
-        """QuerySet of valid PACER courts."""
-        return self.filter(
-            pacer_court_id__isnull=False, end_date__isnull=True
-        ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
 
 
 @pghistory.track()
@@ -2202,7 +2195,7 @@ class Court(models.Model):
         blank=True,
     )
 
-    objects = CourtQuerySet.as_manager()
+    objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
 
     def __str__(self) -> str:
