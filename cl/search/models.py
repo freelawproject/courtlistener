@@ -3935,8 +3935,8 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         help_text="Whether this SCOTUS case is a capital case.",
         default=False,
     )
-    discretionary_court_decision = models.DateField(
-        help_text=("The date of the Court's discretionary decision."),
+    date_discretionary_court_decision = models.DateField(
+        help_text="The date of the Court's discretionary decision.",
         blank=True,
         null=True,
     )

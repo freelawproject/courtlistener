@@ -51,7 +51,7 @@ class ScotusDocketMergeTest(TestCase):
         metadata = docket.scotus_metadata
         self.assertFalse(metadata.capital_case)
         self.assertEqual(
-            metadata.discretionary_court_decision,
+            metadata.date_discretionary_court_decision,
             data["discretionary_court_decision"],
         )
         self.assertEqual(metadata.linked_with, data["links"])
@@ -111,7 +111,7 @@ class ScotusDocketMergeTest(TestCase):
         metadata = updated_docket.scotus_metadata
         self.assertTrue(metadata.capital_case)
         self.assertEqual(
-            metadata.discretionary_court_decision,
+            metadata.date_discretionary_court_decision,
             data["discretionary_court_decision"],
         )
         self.assertEqual(metadata.linked_with, data["links"])

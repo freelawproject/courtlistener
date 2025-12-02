@@ -2224,7 +2224,7 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
         ScotusDocketMetadata(docket=d) if scotus_data is None else scotus_data
     )
     scotus_data.capital_case = bool(report_data.get("capital_case") or False)
-    scotus_data.discretionary_court_decision = report_data.get(
+    scotus_data.date_discretionary_court_decision = report_data.get(
         "discretionary_court_decision"
     )
     links = report_data.get("links")
