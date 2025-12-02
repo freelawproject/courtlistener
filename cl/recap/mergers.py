@@ -2170,7 +2170,9 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
         lower_court_name if lower_court_name else d.appeal_from_str
     )
     if lower_court_name:
-        lower_court = find_court_object_by_name(lower_court_name)
+        lower_court = find_court_object_by_name(
+            lower_court_name, bankruptcy=False
+        )
         d.appeal_from = (
             lower_court if lower_court is not None else d.appeal_from
         )

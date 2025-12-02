@@ -202,7 +202,7 @@ class ScotusDocketMergeTest(TestCase):
             docket.id,
         )
 
-    @mock.patch("cl.recap.mergers.logger")
+    @mock.patch("cl.lib.courts.logger")
     def test_logs_error_when_lower_court_not_found(self, mock_logger) -> None:
         """Confirm merge logs error when lower court is not found in courts-db."""
         data = ScotusDocketDataFactory(
@@ -218,12 +218,12 @@ class ScotusDocketMergeTest(TestCase):
         self.assertIsNone(docket.appeal_from)
 
         mock_logger.error.assert_called_with(
-            "Could not map lower court from name '%s' for SCOTUS docket.",
+            "Could not find court IDs from name '%s'.",
             "Imaginary Court of The Dragons",
         )
 
-    @mock.patch("cl.recap.mergers.find_court")
-    @mock.patch("cl.recap.mergers.logger")
+    @mock.patch("cl.lib.courts.find_court")
+    @mock.patch("cl.lib.courts.logger")
     def test_logs_error_when_lower_court_ambiguous(
         self,
         mock_logger,
@@ -245,13 +245,13 @@ class ScotusDocketMergeTest(TestCase):
         self.assertIsNone(docket.appeal_from)
 
         mock_logger.error.assert_called_with(
-            "Ambiguous lower court name '%s' in courts-db: %s",
+            "Ambiguous court name '%s' in courts-db: %s",
             "District of Massachusetts",
             ["mab", "mad"],
         )
 
-    @mock.patch("cl.recap.mergers.find_court")
-    @mock.patch("cl.recap.mergers.logger")
+    @mock.patch("cl.lib.courts.find_court")
+    @mock.patch("cl.lib.courts.logger")
     def test_logs_error_when_lower_court_id_missing_in_db(
         self,
         mock_logger,

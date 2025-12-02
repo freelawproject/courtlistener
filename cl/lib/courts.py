@@ -125,17 +125,20 @@ def lookup_child_courts_cache(court_ids: list[str]) -> set[str]:
     return courts
 
 
-def find_court_object_by_name(lower_court_name: str) -> Court | None:
+def find_court_object_by_name(
+    lower_court_name: str, bankruptcy: bool | None = None
+) -> Court | None:
     """Find a court by name using courts-db and return a Court object if it’s
     found and unique. Log an error if it is not found or if it is ambiguous.
 
     :param lower_court_name: The name of the lower court to look for.
+    :param bankruptcy: Are we looking for a bankruptcy court?
     :return: The lower court if found, else None.
     """
     if not lower_court_name:
         return None
 
-    court_ids = find_court(lower_court_name)
+    court_ids = find_court(lower_court_name, bankruptcy=bankruptcy)
     if not court_ids:
         logger.error(
             "Could not find court IDs from name '%s'.",
