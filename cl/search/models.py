@@ -3424,6 +3424,90 @@ class OpinionJoinedBy(Opinion.joined_by.through):
         proxy = True
 
 
+class OpinionContent(AbstractDateTimeModel):
+    SCRAPERS = 1
+    XML_HARVARD = 2
+    HTML_ANON_2020 = 3
+    COLUMBIA_ARCHIVE = 4
+    LAWBOX = 5
+    RECAP = 6
+    SCANNING = 7
+    SOURCES = (
+        (SCRAPERS, "Got from juriscraper"),
+        (XML_HARVARD, "Got from CAP"),
+        (HTML_ANON_2020, "Got from 2020 Anon archive"),
+        (COLUMBIA_ARCHIVE, "Got from Columbia import"),
+        (LAWBOX, "Got from Lawbox"),
+        (RECAP, "Free opinions on RECAP"),
+        (SCANNING, "Got from scanning project"),
+    )
+
+    DEFAULT = 0
+    OCR = 1
+    LLM_GOOGLE = 2
+    EXTRACTION_METHOD = (
+        (DEFAULT, "Extracted by opening the document and getting the text"),
+        (OCR, "Extracted via OCR"),
+        (
+            LLM_GOOGLE,
+            "Extracted via LLM",
+        ),
+    )
+    opinion = models.ForeignKey(Opinion, on_delete=models.CASCADE)
+    content = models.TextField(help_text="The extracted opinion content")
+    source = models.SmallIntegerField(
+        help_text="Source of the opinions content",
+        choices=SOURCES,
+    )
+    extraction_type = models.SmallIntegerField(
+        help_text="Source of the opinions content",
+        choices=EXTRACTION_METHOD,
+    )
+    is_main_version = models.BooleanField(
+        help_text="True if this is the most up to date or official version of the Opinion's content"
+    )
+    page_count = models.IntegerField()
+    sha1 = models.CharField(
+        help_text=(
+            "unique ID for the document, as generated via SHA1 of the "
+            "binary file or text data"
+        ),
+        max_length=40,
+        db_index=True,
+        blank=True,
+    )
+    page_count = models.IntegerField(
+        help_text="The number of pages in the document, if known",
+        blank=True,
+        null=True,
+    )
+    download_url = models.URLField(
+        help_text=(
+            "The URL where the item was originally scraped. Note that "
+            "these URLs may often be dead due to the court or the bulk "
+            "provider changing their website. We keep the original link "
+            "here given that it often contains valuable metadata."
+        ),
+        max_length=500,
+        db_index=True,
+        null=True,
+        blank=True,
+    )
+    local_path = models.FileField(
+        help_text=(
+            "The location in AWS S3 where the original opinion file is "
+            f"stored. {s3_warning_note}"
+        ),
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+        db_index=True,
+    )
+
+    # TODO future work: add es_pa_field_tracker and es_o_field_tracker
+    # TODO future work: add custom manager
+
+
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
