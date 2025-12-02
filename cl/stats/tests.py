@@ -2,7 +2,6 @@ from datetime import datetime
 
 import pytest
 import time_machine
-from asgiref.sync import async_to_sync
 from django.core import mail
 from django.core.management import call_command
 
@@ -81,18 +80,26 @@ class StatTests(TestCase):
     def tearDown(self) -> None:
         Stat.objects.all().delete()
 
-    def test_tally_a_stat(self) -> None:
-        count = async_to_sync(tally_stat)("test")
+    async def _tally_stat(self, name, inc=1, date_logged=None):
+        stat, created = await tally_stat(
+            name, inc=inc, date_logged=date_logged
+        )
+        if not created:
+            await stat.arefresh_from_db(fields=["count"])
+        return stat.count
+
+    async def test_tally_a_stat(self) -> None:
+        count = await self._tally_stat("test")
         self.assertEqual(count, 1)
 
-    def test_increment_a_stat(self) -> None:
-        count = async_to_sync(tally_stat)("test2")
+    async def test_increment_a_stat(self) -> None:
+        count = await self._tally_stat("test2")
         self.assertEqual(count, 1)
-        count = async_to_sync(tally_stat)("test2")
+        count = await self._tally_stat("test2")
         self.assertEqual(count, 2)
 
-    def test_increment_by_two(self) -> None:
-        count = async_to_sync(tally_stat)("test3", inc=2)
+    async def test_increment_by_two(self) -> None:
+        count = await self._tally_stat("test3", inc=2)
         self.assertEqual(count, 2)
-        count = async_to_sync(tally_stat)("test3", inc=2)
+        count = await self._tally_stat("test3", inc=2)
         self.assertEqual(count, 4)
