@@ -4,6 +4,7 @@ import pytest
 import time_machine
 from django.core import mail
 from django.core.management import call_command
+from waffle.testutils import override_switch
 
 from cl.stats.models import Event, Stat
 from cl.stats.utils import get_milestone_range, tally_stat
@@ -73,6 +74,7 @@ class PartnershipEmailTests(TestCase):
 
 
 @pytest.mark.django_db
+@override_switch("increment-stats", active=True)
 class StatTests(TestCase):
     def setUp(self) -> None:
         Stat.objects.all().delete()

@@ -170,9 +170,8 @@ def show_results(request: HttpRequest) -> HttpResponse:
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
         # No parameters --> Homepage.
-        if flag_is_active(request, "increment-stats"):
-            if not is_bot(request):
-                async_to_sync(tally_stat)("search.homepage_loaded")
+        if not is_bot(request):
+            async_to_sync(tally_stat)("search.homepage_loaded")
 
         # Ensure we get nothing from the future.
         mutable_GET = request.GET.copy()  # Makes it mutable
@@ -250,9 +249,8 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
     else:
         # Just a regular search
-        if flag_is_active(request, "increment-stats"):
-            if not is_bot(request):
-                async_to_sync(tally_stat)("search.results")
+        if not is_bot(request):
+            async_to_sync(tally_stat)("search.results")
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(

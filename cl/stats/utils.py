@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
 import redis
+from asgiref.sync import sync_to_async
 from django.db import OperationalError, connections
 from django.db.models import F
 from django.utils.timezone import now
@@ -10,6 +11,7 @@ from elasticsearch.exceptions import (
     RequestError,
 )
 from elasticsearch_dsl import connections as es_connections
+from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import get_redis_interface
@@ -58,6 +60,9 @@ async def tally_stat(name, inc=1, date_logged=None):
        - the event happened today.
        - the event happened once.
     """
+    if not await sync_to_async(switch_is_active)("increment-stats"):
+        return
+
     if date_logged is None:
         date_logged = now()
     return await Stat.objects.aupdate_or_create(
