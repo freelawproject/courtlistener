@@ -27,6 +27,7 @@ from cl.lib.elasticsearch_utils import (
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     get_facet_dict_for_search_query,
+    has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
@@ -260,6 +261,7 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :return None
     """
     is_error = search_results.get("error")
+    is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -268,6 +270,9 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         hit_cache=False,
         source=SearchQuery.WEBSITE,
         engine=SearchQuery.ELASTICSEARCH,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
     if is_error:
         # Leave `query_time_ms` as None if there is an error
@@ -293,6 +298,7 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
+    is_semantic = has_semantic_params(request.GET)
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -301,6 +307,9 @@ def store_search_api_query(
         hit_cache=False,
         source=SearchQuery.API,
         engine=engine,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
 
 

@@ -2,7 +2,6 @@ from datetime import date
 from urllib.parse import quote
 
 from asgiref.sync import async_to_sync
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -55,7 +54,7 @@ def home_router(request: HttpRequest) -> HttpResponse:
     - When the flag is inactive, we use the legacy `show_results` view as-is.
     - When the flag is active, we determine the view based on request params/method.
     """
-    if settings.TESTING or not flag_is_active(request, "use_new_design"):
+    if not flag_is_active(request, "use_new_design"):
         return show_results(request)
 
     if request.method == "GET" and len(request.GET) == 0:
@@ -171,8 +170,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
         # No parameters --> Homepage.
-        if not is_bot(request):
-            async_to_sync(tally_stat)("search.homepage_loaded")
+        if flag_is_active(request, "increment-stats"):
+            if not is_bot(request):
+                async_to_sync(tally_stat)("search.homepage_loaded")
 
         # Ensure we get nothing from the future.
         mutable_GET = request.GET.copy()  # Makes it mutable
@@ -251,8 +251,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
     else:
         # Just a regular search
-        if not is_bot(request):
-            async_to_sync(tally_stat)("search.results")
+        if flag_is_active(request, "increment-stats"):
+            if not is_bot(request):
+                async_to_sync(tally_stat)("search.results")
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(

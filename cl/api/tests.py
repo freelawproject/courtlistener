@@ -103,6 +103,7 @@ from cl.search.api_views import (
     TagViewSet,
 )
 from cl.search.factories import (
+    BankruptcyInformationFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
@@ -446,6 +447,12 @@ class ApiQueryCountTests(TestCase):
             path = reverse("opinion-list", kwargs={"version": "v3"})
             self.client.get(path)
 
+        with self.assertNumQueries(2):
+            path = reverse(
+                "bankruptcyinformation-list", kwargs={"version": "v3"}
+            )
+            self.client.get(path)
+
     def test_party_endpoint_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(9):
             path = reverse("party-list", kwargs={"version": "v3"})
@@ -557,13 +564,14 @@ class ApiEventCreationTestCase(TestCase):
         request.user = self.user
         await sync_to_async(view)(request, **{"version": f"{api_version}"})
 
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         return_value="api:Test",
     )
     @mock.patch.object(LoggingMixin, "milestones", new=[1])
     async def test_are_v3_events_created_properly(
-        self, mock_logging_prefix
+        self, mock_logging_prefix, mock_zoho_task
     ) -> None:
         """Are event objects created as v3 API requests are made?"""
         await self.hit_the_api("v3")
@@ -579,14 +587,16 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v3 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
+        mock_zoho_task.delay.assert_not_called()
 
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         return_value="api:Test",
     )
     @mock.patch.object(LoggingMixin, "milestones", new=[1])
     async def test_are_v4_events_created_properly(
-        self, mock_logging_prefix
+        self, mock_logging_prefix, mock_zoho_task
     ) -> None:
         """Are event objects created as V4 API requests are made?"""
         await self.hit_the_api("v4")
@@ -602,6 +612,7 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v4 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
+        mock_zoho_task.delay.assert_called_once_with(self.user.pk, 1)
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
@@ -637,12 +648,15 @@ class ApiEventCreationTestCase(TestCase):
             int(self.r.get("api:v3-Test.timing")), 10, delta=2000
         )
 
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         side_effect=lambda *args,
         **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
-    async def test_api_logged_correctly_v4(self, mock_logging_prefix) -> None:
+    async def test_api_logged_correctly_v4(
+        self, mock_logging_prefix, mock_zoho_task
+    ) -> None:
         # Global stats
         self.assertEqual(mock_logging_prefix.called, 0)
         await self.hit_the_api("v4")
@@ -4208,3 +4222,183 @@ class TestOpinionViewsetXMLRendering(TestCase):
         # int ids were converted to strings
         self.assertTrue(str(self.op_id) in problematic_set)
         self.assertFalse(str(self.good_xml_op_id) in problematic_set)
+
+
+class BankruptcyInformationAPITests(TestCase):
+    """Tests for the bankruptcy-information endpoint and the
+    bankruptcy_information field on the docket endpoint.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        ps = Permission.objects.filter(codename="has_recap_api_access")
+        ps_upload = Permission.objects.filter(
+            codename="has_recap_upload_access"
+        )
+        cls.user_1.user.user_permissions.add(*ps)
+        cls.user_1.user.user_permissions.add(*ps_upload)
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+
+        # Create a docket with bankruptcy information
+        cls.docket = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.court,
+            docket_number="23-4567",
+            pacer_case_id="104490",
+        )
+
+        # Create bankruptcy information linked to the docket
+        cls.bankruptcy_info = BankruptcyInformationFactory(
+            docket=cls.docket,
+            chapter="7",
+            trustee_str="John Doe",
+        )
+
+        # Create another docket without bankruptcy information for comparison
+        cls.docket_no_bankruptcy = DocketFactory(
+            source=Docket.RECAP,
+            court=cls.court,
+            docket_number="23-9999",
+            pacer_case_id="999999",
+        )
+
+    async def _api_v4_request(self, endpoint, params=None):
+        url = reverse(endpoint, kwargs={"version": "v4"})
+        api_client = await sync_to_async(make_client)(self.user_1.user.pk)
+        return await api_client.get(url, params or {})
+
+    async def test_bankruptcy_information_field_appears_in_docket_list(
+        self,
+    ) -> None:
+        """Confirm that the bankruptcy_information field appears in the
+        docket-list endpoint response when a docket has bankruptcy info.
+        """
+        response = await self._api_v4_request("docket-list")
+        results = response.json()["results"]
+
+        # Find the docket with bankruptcy information
+        docket_with_bankruptcy = next(
+            (d for d in results if d["id"] == self.docket.id), None
+        )
+        self.assertIsNotNone(docket_with_bankruptcy)
+        assert docket_with_bankruptcy is not None  # for mypy
+
+        # Confirm the bankruptcy_information field is present and is a URL
+        self.assertIn("bankruptcy_information", docket_with_bankruptcy)
+        self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
+        self.assertIn(
+            "/api/rest/v4/bankruptcy-information/",
+            docket_with_bankruptcy["bankruptcy_information"],
+        )
+
+        # Find the docket without bankruptcy information
+        docket_without_bankruptcy = next(
+            (d for d in results if d["id"] == self.docket_no_bankruptcy.id),
+            None,
+        )
+        self.assertIsNotNone(docket_without_bankruptcy)
+        assert docket_without_bankruptcy is not None  # for mypy
+
+        # Confirm the bankruptcy_information field is None for dockets without it
+        self.assertIn("bankruptcy_information", docket_without_bankruptcy)
+        self.assertIsNone(docket_without_bankruptcy["bankruptcy_information"])
+
+    async def test_bankruptcy_information_endpoint_returns_data(self) -> None:
+        """Confirm that the bankruptcy-information endpoint returns the
+        expected data.
+        """
+        response = await self._api_v4_request("bankruptcyinformation-list")
+        self.assertEqual(response.status_code, 200)
+
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        bankruptcy_data = results[0]
+        self.assertEqual(bankruptcy_data["chapter"], "7")
+        self.assertEqual(bankruptcy_data["trustee_str"], "John Doe")
+        self.assertIn("docket", bankruptcy_data)
+        self.assertIn("/api/rest/v4/dockets/", bankruptcy_data["docket"])
+
+    async def test_bankruptcy_information_detail_endpoint(self) -> None:
+        """Confirm that the bankruptcy-information detail endpoint works
+        correctly.
+        """
+        url = reverse(
+            "bankruptcyinformation-detail",
+            kwargs={"version": "v4", "pk": self.bankruptcy_info.id},
+        )
+        api_client = await sync_to_async(make_client)(self.user_1.user.pk)
+        response = await api_client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+
+        bankruptcy_data = response.json()
+        self.assertEqual(bankruptcy_data["id"], self.bankruptcy_info.id)
+        self.assertEqual(bankruptcy_data["chapter"], "7")
+        self.assertEqual(bankruptcy_data["trustee_str"], "John Doe")
+
+    async def test_omit_bankruptcy_information_field_from_docket(
+        self,
+    ) -> None:
+        """Confirm that the bankruptcy_information field can be omitted
+        from the docket-list endpoint using the omit parameter.
+        """
+        response = await self._api_v4_request(
+            "docket-list", {"omit": "bankruptcy_information"}
+        )
+        results = response.json()["results"]
+
+        # Find the docket with bankruptcy information
+        docket_with_bankruptcy = next(
+            (d for d in results if d["id"] == self.docket.id), None
+        )
+        self.assertIsNotNone(docket_with_bankruptcy)
+        assert docket_with_bankruptcy is not None  # for mypy
+
+        # Confirm the bankruptcy_information field is NOT present
+        self.assertNotIn("bankruptcy_information", docket_with_bankruptcy)
+
+    async def test_filter_bankruptcy_information_fields(self) -> None:
+        """Confirm that specific fields can be requested from the
+        bankruptcy-information endpoint using the fields parameter.
+        """
+        response = await self._api_v4_request(
+            "bankruptcyinformation-list", {"fields": "id,chapter"}
+        )
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        bankruptcy_data = results[0]
+        # Should only have the requested fields
+        self.assertEqual(set(bankruptcy_data.keys()), {"id", "chapter"})
+        self.assertEqual(bankruptcy_data["chapter"], "7")
+
+    async def test_docket_list_with_bankruptcy_information_in_fields(
+        self,
+    ) -> None:
+        """Confirm that when requesting specific fields on docket-list,
+        the bankruptcy_information field can be included.
+        """
+        response = await self._api_v4_request(
+            "docket-list",
+            {"fields": "id,docket_number,bankruptcy_information"},
+        )
+        results = response.json()["results"]
+
+        # Find the docket with bankruptcy information
+        docket_with_bankruptcy = next(
+            (d for d in results if d["id"] == self.docket.id), None
+        )
+        self.assertIsNotNone(docket_with_bankruptcy)
+        assert docket_with_bankruptcy is not None  # for mypy
+
+        # Should only have the requested fields
+        self.assertEqual(
+            set(docket_with_bankruptcy.keys()),
+            {"id", "docket_number", "bankruptcy_information"},
+        )
+        self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
