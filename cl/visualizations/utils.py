@@ -4,7 +4,6 @@ from django.conf import settings
 from django.contrib import messages
 
 from cl.lib.types import EmailType
-from cl.stats.utils import tally_stat
 from cl.visualizations.exceptions import TooManyNodes
 from cl.visualizations.models import JSONVersion
 
@@ -31,11 +30,9 @@ async def build_visualization(viz):
             g = await viz.build_nx_digraph(**build_kwargs)
         except TooManyNodes:
             # Still too many hops. Abort.
-            await tally_stat("visualization.too_many_nodes_failure")
             return "too_many_nodes", viz
 
     if len(g.edges()) == 0:
-        await tally_stat("visualization.too_few_nodes_failure")
         return "too_few_nodes", viz
 
     t2 = time.time()
