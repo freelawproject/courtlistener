@@ -3254,7 +3254,9 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                     if chunk:
                         tmp.write(chunk)
 
+                # Ensure the buffer is flushed to disk before reading the file
                 tmp.flush()
+                # Move the file pointer to the beginning so it reads the whole file
                 tmp.seek(0)
 
                 filename = f"{docket_id}-qp.pdf"
@@ -3274,7 +3276,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                 "Exception was: %s",
                 qp_url,
                 docket_id,
-                exc,
+                str(exc),
             )
             return None
         logger.info(
