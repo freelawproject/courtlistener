@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.timezone import now
 from elasticsearch_dsl import Q, connections
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
@@ -69,7 +70,6 @@ from cl.search.models import Docket, RECAPDocument
 from cl.search.tasks import (
     index_docket_parties_in_es,
 )
-from cl.stats.models import Stat
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
@@ -79,6 +79,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_sweep",
 )
+@override_switch("increment-stats", active=True)
 class RECAPAlertsSweepIndexTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
@@ -126,10 +127,15 @@ class RECAPAlertsSweepIndexTest(
 
     def setUp(self):
         self.r = get_redis_interface("CACHE")
+        self.r_stats = get_redis_interface("STATS")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
             self.r.delete(*keys)
+
+        stat_keys = self.r_stats.keys("alerts.sent.*")
+        if stat_keys:
+            self.r_stats.delete(*stat_keys)
 
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
@@ -2151,14 +2157,9 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(
-            stats_objects.count(), 1, "Wrong number of stats objects."
-        )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 1, "Wrong number of stats alerts sent."
-        )
+        key = f"alerts.sent.{now().date().isoformat()}"
+        count = int(self.r_stats.get(key) or 0)
+        self.assertEqual(count, 1, "Wrong number of stats alerts sent.")
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -2310,18 +2311,8 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly updated.
-        self.assertEqual(
-            stats_objects.count(), 2, "Wrong number of stats objects."
-        )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 2, "Wrong number of stats alerts sent."
-        )
-        self.assertEqual(stats_objects[1].name, "alerts.sent.dly")
-        self.assertEqual(
-            stats_objects[1].count, 0, "Wrong number of stats alerts sent."
-        )
-
+        count = int(self.r_stats.get(key) or 0)
+        self.assertEqual(count, 2, "Wrong number of stats objects.")
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:
