@@ -1,7 +1,6 @@
 from datetime import date
 from urllib.parse import quote
 
-from asgiref.sync import async_to_sync
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -247,7 +246,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     else:
         # Just a regular search
         if not is_bot(request):
-            async_to_sync(tally_stat)("search.results")
+            tally_stat("search.results")
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(
