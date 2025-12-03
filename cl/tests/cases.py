@@ -1,7 +1,5 @@
 import re
-from datetime import datetime
 from typing import cast
-from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
 from django import test
@@ -18,9 +16,6 @@ from lxml.html import HtmlElement
 from rest_framework.test import APITestCase as DRFTestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
-from cl.alerts.management.commands.cl_send_scheduled_alerts import (
-    get_cut_off_date,
-)
 from cl.alerts.models import Alert
 from cl.alerts.utils import (
     build_plain_percolator_query,
@@ -697,25 +692,6 @@ class SearchAlertsAssertions:
                         parent_field_content,
                         msg=f"Did not get the HL content in field: {field_name}. ",
                     )
-
-    def _assert_timestamp_filter(
-        self, html_content, rate, date, sweep_index=False
-    ):
-        """Confirm that timestamp filter is properly set in the
-        'View Full Results' URL.
-        """
-        view_results_url = html.fromstring(str(html_content)).xpath(
-            '//a[text()="View Full Results / Edit this Alert"]/@href'
-        )
-        parsed_url = urlparse(view_results_url[0])
-        params = parse_qs(parsed_url.query)
-        cut_off_date = get_cut_off_date(rate, date, sweep_index)
-        iso_datetime = (
-            cut_off_date.strftime("%Y-%m-%dT%H:%M:%S")
-            if isinstance(cut_off_date, datetime)
-            else cut_off_date.strftime("%Y-%m-%d")
-        )
-        self.assertIn(f"timestamp:[{iso_datetime} TO *]", params["q"][0])
 
     def _assert_date_updated(self, date_to_compare, html_content, txt_content):
         """Confirm that date_updated is properly set in the alert email."""
