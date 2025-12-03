@@ -17,6 +17,7 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
+from waffle import flag_is_active
 
 from cl.citations.match_citations_queries import es_get_query_citation
 from cl.citations.utils import get_citation_depth_between_clusters
@@ -261,6 +262,10 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :param search_results: the dict returned by `do_es_search` function
     :return None
     """
+    if not flag_is_active(request, "store-search-queries"):
+        # Do not store search queries
+        return
+
     if is_bot(request):
         return
     is_error = search_results.get("error")
@@ -301,6 +306,10 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
+    if not flag_is_active(request, "store-search-api-queries"):
+        # Do not store search queries
+        return
+
     if is_bot(request):
         return
     is_semantic = has_semantic_params(request.GET)
