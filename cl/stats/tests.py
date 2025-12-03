@@ -6,7 +6,8 @@ from django.core import mail
 from django.core.management import call_command
 from waffle.testutils import override_switch
 
-from cl.stats.models import Event, Stat
+from cl.lib.redis_utils import get_redis_interface
+from cl.stats.models import Event
 from cl.stats.utils import get_milestone_range, tally_stat
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
@@ -76,32 +77,24 @@ class PartnershipEmailTests(TestCase):
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
 class StatTests(TestCase):
-    def setUp(self) -> None:
-        Stat.objects.all().delete()
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        key = self.r.keys("test*")
+        if key:
+            self.r.delete(*key)
 
-    def tearDown(self) -> None:
-        Stat.objects.all().delete()
-
-    async def _tally_stat(self, name, inc=1, date_logged=None):
-        stat, created = await tally_stat(
-            name, inc=inc, date_logged=date_logged
-        )
-        if not created:
-            await stat.arefresh_from_db(fields=["count"])
-        return stat.count
-
-    async def test_tally_a_stat(self) -> None:
-        count = await self._tally_stat("test")
+    def test_tally_a_stat(self) -> None:
+        count = tally_stat("test")
         self.assertEqual(count, 1)
 
-    async def test_increment_a_stat(self) -> None:
-        count = await self._tally_stat("test2")
+    def test_increment_a_stat(self) -> None:
+        count = tally_stat("test2")
         self.assertEqual(count, 1)
-        count = await self._tally_stat("test2")
+        count = tally_stat("test2")
         self.assertEqual(count, 2)
 
-    async def test_increment_by_two(self) -> None:
-        count = await self._tally_stat("test3", inc=2)
+    def test_increment_by_two(self) -> None:
+        count = tally_stat("test3", inc=2)
         self.assertEqual(count, 2)
-        count = await self._tally_stat("test3", inc=2)
+        count = tally_stat("test3", inc=2)
         self.assertEqual(count, 4)

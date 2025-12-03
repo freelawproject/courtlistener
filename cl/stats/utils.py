@@ -1,9 +1,7 @@
 from collections import OrderedDict
 
 import redis
-from asgiref.sync import sync_to_async
 from django.db import OperationalError, connections
-from django.db.models import F
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConnectionError,
@@ -15,7 +13,6 @@ from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import get_redis_interface
-from cl.stats.models import Stat
 
 MILESTONES = OrderedDict(
     (
@@ -53,24 +50,27 @@ def get_milestone_range(start, end):
     return out
 
 
-async def tally_stat(name, inc=1, date_logged=None):
+def tally_stat(name, inc=1, date_logged=None) -> int:
     """Tally an event's occurrence to the database.
 
     Will assume the following overridable values:
        - the event happened today.
        - the event happened once.
     """
-    if not await sync_to_async(switch_is_active)("increment-stats"):
+    if not switch_is_active("increment-stats"):
         return
 
+    r = get_redis_interface("STATS")
     if date_logged is None:
-        date_logged = now()
-    return await Stat.objects.aupdate_or_create(
-        name=name,
-        date_logged=date_logged,
-        defaults={"count": F("count") + inc},
-        create_defaults={"count": inc},
-    )
+        date_logged = now().date()
+
+    key = f"{name}.{date_logged.isoformat()}"
+    pipe = r.pipeline()
+    pipe.incrby(key, inc)
+    pipe.expire(key, 60 * 60 * 24 * 10)  # 10 days
+    value, _ = pipe.execute()
+
+    return value
 
 
 def check_redis() -> bool:
