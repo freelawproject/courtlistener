@@ -38,9 +38,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
                     AudioPercolator.__name__,
                 )
             )
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
-            settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
-        ):
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             transaction.on_commit(
                 partial(
                     es_save_alert_document.delay,
@@ -49,9 +47,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
                 )
             )
 
-        case SEARCH_TYPES.OPINION if (
-            settings.INDEXING_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        ):
+        case SEARCH_TYPES.OPINION:
             transaction.on_commit(
                 partial(
                     es_save_alert_document.delay,
@@ -83,9 +79,7 @@ def remove_alert_from_es_index(sender, instance=None, **kwargs):
             remove_document_from_es_index.delay(
                 RECAPPercolator.__name__, instance.pk, None
             )
-        case SEARCH_TYPES.OPINION if (
-            settings.INDEXING_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        ):
+        case SEARCH_TYPES.OPINION:
             remove_document_from_es_index.delay(
                 OpinionPercolator.__name__, instance.pk, None
             )
