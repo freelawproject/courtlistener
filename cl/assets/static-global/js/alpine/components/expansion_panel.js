@@ -7,5 +7,11 @@ document.addEventListener('alpine:init', () => {
     toggleExpansion() {
       this.isExpanded = !this.isExpanded;
     },
+    get dropdownButtonIdGroup() {
+      return ['dropdown-button-menu'];
+    },
+    get dropdownButtonMenuId() {
+      return this.$id('dropdown-button-menu');
+    },
   }));
 });

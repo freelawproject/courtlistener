@@ -20,6 +20,7 @@
          {% for b in buttons %}
             {% if b.dropdown %}
                 <button
+                    x-id="dropdownButtonIdGroup"
                     type="button"
                     class="flex-row z-10 hover:shadow-md {{b.style}}"
                     x-on:click="toggleExpansion"
@@ -39,7 +40,7 @@
                 </button>
 
                 <menu
-                    id="banner-button-menu"
+                    x-bind:id="dropdownButtonMenuId"
                     class="top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
                     role="menu"
                     x-show="isExpanded"
