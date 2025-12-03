@@ -26,6 +26,7 @@ from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
+from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
@@ -1226,6 +1227,7 @@ class OpinionV4APISearchTest(
                 self.assertEqual(r.data["results"][0][field], [])
 
 
+@override_flag("store-search-queries", active=True)
 class OpinionsESSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
