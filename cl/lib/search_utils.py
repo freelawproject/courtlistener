@@ -20,6 +20,7 @@ from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.citations.match_citations_queries import es_get_query_citation
 from cl.citations.utils import get_citation_depth_between_clusters
+from cl.lib.bot_detector import is_bot
 from cl.lib.crypto import sha256
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
@@ -260,6 +261,8 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :param search_results: the dict returned by `do_es_search` function
     :return None
     """
+    if is_bot(request):
+        return
     is_error = search_results.get("error")
     is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
@@ -298,6 +301,8 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
+    if is_bot(request):
+        return
     is_semantic = has_semantic_params(request.GET)
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
