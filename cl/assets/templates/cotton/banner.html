@@ -16,7 +16,7 @@
       <p class="text-gray-700 m-2">{{ paragraph_text }}</p>
 
       <!-- Buttons -->
-      <div class="inline-flex gap-x-1">
+      <div class="relative inline-flex gap-x-1">
          {% for b in buttons %}
             {% if b.dropdown %}
                 <button
@@ -38,10 +38,9 @@
                     >{% svg 'chevron' class="w-full h-full text-white" %}
                     </span>
                 </button>
-
                 <menu
                     x-bind:id="dropdownButtonMenuId"
-                    class="top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+                    class="absolute top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
                     role="menu"
                     x-show="isExpanded"
                     x-cloak
@@ -57,7 +56,7 @@
                             </a>
                         </li>
                     {% endfor %}
-                    </menu>
+                </menu>
             {% else %}
                 <a class="{{b.style}}" href={{ b.href }}>
                     {{ b.name }}
