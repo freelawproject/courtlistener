@@ -170,9 +170,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
         # No parameters --> Homepage.
-        if not is_bot(request):
-            async_to_sync(tally_stat)("search.homepage_loaded")
-
         # Ensure we get nothing from the future.
         mutable_GET = request.GET.copy()  # Makes it mutable
         mutable_GET["filed_before"] = date.today()
