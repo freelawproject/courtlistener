@@ -29,9 +29,7 @@ def get_redis_stat_sum(stat_name: str, days: int = 10) -> int:
     for x in range(0, days):
         d = (now().date() - timedelta(days=x)).isoformat()
         keys.append(f"{stat_name}.{d}")
-    return sum(
-        int(result) for result in r.mget(*keys) if result is not None
-    )
+    return sum(int(result) for result in r.mget(*keys) if result is not None)
 
 
 @cache_memoize(5 * 60)
