@@ -4,7 +4,7 @@ from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.db.models import Count, Sum, Value
 from django.db.models.functions import Coalesce, Floor
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, now
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
@@ -26,21 +26,23 @@ def get_v2_homepage_stats():
         for x in range(0, 10)
     ]
 
-    alerts_in_last_ten = (
-        Stat.objects.filter(
-            name__contains="alerts.sent", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"]
-        or 0
-    )
-
-    queries_in_last_ten = (
-        Stat.objects.filter(
-            name="search.results", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"]
-        or 0
-    )
-
+    # Get stats from Redis (new system)
     r = get_redis_interface("STATS")
+
+    # Build Redis keys for last 10 days using timezone-aware dates
+    alert_keys = []
+    query_keys = []
+    for x in range(0, 10):
+        d = (now().date() - timedelta(days=x)).isoformat()
+        alert_keys.append(f"alerts.sent.{d}")
+        query_keys.append(f"search.results.{d}")
+
+    alerts_in_last_ten = sum(
+        int(result) for result in r.mget(*alert_keys) if result is not None
+    )
+    queries_in_last_ten = sum(
+        int(result) for result in r.mget(*query_keys) if result is not None
+    )
     api_in_last_ten = sum(
         [
             int(result)
@@ -77,13 +79,22 @@ def get_homepage_stats():
         f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
         for x in range(0, 10)
     ]
+
+    # Build Redis keys for last 10 days using timezone-aware dates
+    alert_keys = []
+    query_keys = []
+    for x in range(0, 10):
+        d = (now().date() - timedelta(days=x)).isoformat()
+        alert_keys.append(f"alerts.sent.{d}")
+        query_keys.append(f"search.results.{d}")
+
     homepage_data = {
-        "alerts_in_last_ten": Stat.objects.filter(
-            name__contains="alerts.sent", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
-        "queries_in_last_ten": Stat.objects.filter(
-            name="search.results", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
+        "alerts_in_last_ten": sum(
+            int(result) for result in r.mget(*alert_keys) if result is not None
+        ),
+        "queries_in_last_ten": sum(
+            int(result) for result in r.mget(*query_keys) if result is not None
+        ),
         "opinions_in_last_ten": Opinion.objects.filter(
             date_created__gte=ten_days_ago
         ).count(),
