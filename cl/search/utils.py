@@ -14,6 +14,26 @@ from cl.search.selectors import get_total_estimate_count
 from cl.visualizations.models import SCOTUSMap
 
 
+def get_redis_stat_sum(stat_name: str, days: int = 10) -> int:
+    """Get sum of a stat from Redis for the last N days.
+
+    Args:
+        stat_name: The name of the stat (e.g., "alerts.sent", "search.results")
+        days: Number of days to look back (default: 10)
+
+    Returns:
+        Sum of the stat values across all days
+    """
+    r = get_redis_interface("STATS")
+    keys = []
+    for x in range(0, days):
+        d = (now().date() - timedelta(days=x)).isoformat()
+        keys.append(f"{stat_name}.{d}")
+    return sum(
+        int(result) for result in r.mget(*keys) if result is not None
+    )
+
+
 @cache_memoize(5 * 60)
 def get_v2_homepage_stats():
     """
@@ -27,21 +47,9 @@ def get_v2_homepage_stats():
 
     # Get stats from Redis (new system)
     r = get_redis_interface("STATS")
+    alerts_in_last_ten = get_redis_stat_sum("alerts.sent")
+    queries_in_last_ten = get_redis_stat_sum("search.results")
 
-    # Build Redis keys for last 10 days using timezone-aware dates
-    alert_keys = []
-    query_keys = []
-    for x in range(0, 10):
-        d = (now().date() - timedelta(days=x)).isoformat()
-        alert_keys.append(f"alerts.sent.{d}")
-        query_keys.append(f"search.results.{d}")
-
-    alerts_in_last_ten = sum(
-        int(result) for result in r.mget(*alert_keys) if result is not None
-    )
-    queries_in_last_ten = sum(
-        int(result) for result in r.mget(*query_keys) if result is not None
-    )
     api_in_last_ten = sum(
         [
             int(result)
@@ -79,21 +87,9 @@ def get_homepage_stats():
         for x in range(0, 10)
     ]
 
-    # Build Redis keys for last 10 days using timezone-aware dates
-    alert_keys = []
-    query_keys = []
-    for x in range(0, 10):
-        d = (now().date() - timedelta(days=x)).isoformat()
-        alert_keys.append(f"alerts.sent.{d}")
-        query_keys.append(f"search.results.{d}")
-
     homepage_data = {
-        "alerts_in_last_ten": sum(
-            int(result) for result in r.mget(*alert_keys) if result is not None
-        ),
-        "queries_in_last_ten": sum(
-            int(result) for result in r.mget(*query_keys) if result is not None
-        ),
+        "alerts_in_last_ten": get_redis_stat_sum("alerts.sent"),
+        "queries_in_last_ten": get_redis_stat_sum("search.results"),
         "opinions_in_last_ten": Opinion.objects.filter(
             date_created__gte=ten_days_ago
         ).count(),
