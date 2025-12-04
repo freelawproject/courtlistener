@@ -143,6 +143,7 @@ class DocketSources:
         126
     )
     RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 127
+    SCANNING_PROJECT = 128
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -541,6 +542,10 @@ class DocketSources:
         (
             RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
             "RECAP, Scraper, Columbia, IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCANNING_PROJECT,
+            "Scanning project",
         ),
     )
 

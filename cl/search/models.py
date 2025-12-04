@@ -133,6 +133,7 @@ class SOURCES:
     COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
     RECAP = "G"
+    SCANNING_PROJECT = "S"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -236,6 +237,10 @@ class SOURCES:
         (
             RECAP,
             "recap",
+        ),
+        (
+            SCANNING_PROJECT,
+            "scanning project",
         ),
     )
 
@@ -2574,6 +2579,12 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     filepath_pdf_harvard = models.FileField(
         help_text="The case PDF from the Caselaw Access Project for this cluster",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
+    filepath_pdf_scan = models.FileField(
+        help_text="The case PDF from the Scanning Project",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
         blank=True,
