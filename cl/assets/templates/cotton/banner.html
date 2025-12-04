@@ -5,7 +5,7 @@
 <c-vars eyebrow_text title_text paragraph_text buttons image_source image_alt></c-vars>
 
 <div class="bg-greyscale-100 border-greyscale-100 p-8 rounded-lg" x-data="expansionPanel">
-  <div class="pb-8">
+  <div class="md:pb-8">
       <!-- Eyebrow -->
       <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>
 
@@ -58,7 +58,7 @@
                     {% endfor %}
                 </menu>
             {% else %}
-                <a class="{{b.style}}" href={{ b.href }}>
+                <a class="ms-2 {{b.style}}" href={{ b.href }}>
                     {{ b.name }}
                 </a>
             {% endif %}
