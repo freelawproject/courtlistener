@@ -351,7 +351,6 @@ dependencies = [
     { name = "gunicorn" },
     { name = "httplib2" },
     { name = "httpx", extra = ["http2"] },
-    { name = "hyperscan" },
     { name = "instructor" },
     { name = "internetarchive" },
     { name = "ipaddress" },
@@ -412,6 +411,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-django" },
+    { name = "responses" },
     { name = "tblib" },
     { name = "types-python-dateutil" },
     { name = "types-redis" },
@@ -465,7 +465,6 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "httplib2", specifier = ">=0.22.0" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
-    { name = "hyperscan", specifier = ">=0.7.8" },
     { name = "instructor", specifier = ">=1.11.3" },
     { name = "internetarchive", specifier = ">=5.3.1" },
     { name = "ipaddress", specifier = ">=1.0.16" },
@@ -526,6 +525,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-django", specifier = ">=4.10.0" },
+    { name = "responses", specifier = ">=0.25.8" },
     { name = "tblib", specifier = ">=3.0.0" },
     { name = "types-python-dateutil", specifier = ">=2.9.0.20241206" },
     { name = "types-redis", specifier = ">=4.6.0.20241004" },
@@ -1505,20 +1505,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3a/51/1947bd81d75af87e3bb9e34593a4cf118115a8feb451ce7a69044ef1412e/hyperlink-21.0.0.tar.gz", hash = "sha256:427af957daa58bc909471c6c40f74c5450fa123dd093fc53efd2e91d2705a56b", size = 140743, upload-time = "2021-01-08T05:51:20.972Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6e/aa/8caf6a0a3e62863cbb9dab27135660acba46903b703e224f14f447e57934/hyperlink-21.0.0-py2.py3-none-any.whl", hash = "sha256:e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4", size = 74638, upload-time = "2021-01-08T05:51:22.906Z" },
-]
-
-[[package]]
-name = "hyperscan"
-version = "0.7.8"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a6/98/b0943c02f1c1886f61aae3203163c08d1b707136c4cee7b216cf7d730457/hyperscan-0.7.8.tar.gz", hash = "sha256:1ed6c87eaf32f77c89fec8c102f20bc677e44c4ce80bde903620f274ea4b8ed7", size = 74532, upload-time = "2024-11-18T06:00:13.099Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/39/b87ebed983a1cc32c4454254cb2c8b236bf8562cc9fad92629ef995635fe/hyperscan-0.7.8-cp313-cp313-macosx_10_14_x86_64.whl", hash = "sha256:3cf636a32bce0ac42f9ce398a9a44f8ff94268168588618c02a77e0090edb1ad", size = 1720936, upload-time = "2024-10-12T21:03:13.336Z" },
-    { url = "https://files.pythonhosted.org/packages/44/45/dd16f9495e4f0dd19ecf7b0ddf5243c2ce4f48b445bdec12e707eb93fa4d/hyperscan-0.7.8-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:0637b35fc04e918c69ea7f38b12cfe92d8c3dbce52558bbcb3eb12a65555cff1", size = 1705757, upload-time = "2024-10-12T21:03:15.082Z" },
-    { url = "https://files.pythonhosted.org/packages/88/f1/bb597849a98885eac1dcc531295787e50144d32bf240e51bc34e46fdc9d4/hyperscan-0.7.8-cp313-cp313-manylinux_2_28_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:ef590d9a3d0aef435e1892e9b3941e0aac571e4632531e237d95c77fd87cad31", size = 1731805, upload-time = "2024-10-12T21:03:17.093Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/eb/f6ad66f37807d2745f0b8a878fb692fd31bb54f64f4ef97733ab867d8fb7/hyperscan-0.7.8-cp313-cp313-manylinux_2_28_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:2d167f7debc1bd4a1df1467eb143ef350541f8b1613e03f7c2f62a46a4b7f4e2", size = 1751714, upload-time = "2024-10-12T21:03:18.38Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/e0/7426a328515d91e727862c31dfba33a4203fd667884f10ebac9225b9fa42/hyperscan-0.7.8-cp313-cp313-musllinux_1_1_aarch64.whl", hash = "sha256:60c600c11d34c4036850e0cf2e3e3aff437c53d6c53806d7ce477c2455800c86", size = 2294759, upload-time = "2024-10-12T21:03:19.941Z" },
-    { url = "https://files.pythonhosted.org/packages/e7/4f/9b6b8de4a026d058c9836439a42098b94c9481e25168a989a3a5e428f440/hyperscan-0.7.8-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:9bac1a9c407111243d0cd0e597729ac1ccbb3ffa16985bfb9c2becd72cb0caec", size = 2288603, upload-time = "2024-10-12T21:03:21.478Z" },
 ]
 
 [[package]]
@@ -2740,6 +2726,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/72/97/bf44e6c6bd8ddbb99943baf7ba8b1a8485bcd2fe0e55e5708d7fee4ff1ae/requests_file-2.1.0.tar.gz", hash = "sha256:0f549a3f3b0699415ac04d167e9cb39bccfb730cb832b4d20be3d9867356e658", size = 6891, upload-time = "2024-05-21T16:28:00.24Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/25/dd878a121fcfdf38f52850f11c512e13ec87c2ea72385933818e5b6c15ce/requests_file-2.1.0-py2.py3-none-any.whl", hash = "sha256:cf270de5a4c5874e84599fc5778303d496c10ae5e870bfa378818f35d21bda5c", size = 4244, upload-time = "2024-05-21T16:27:57.733Z" },
+]
+
+[[package]]
+name = "responses"
+version = "0.25.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/95/89c054ad70bfef6da605338b009b2e283485835351a9935c7bfbfaca7ffc/responses-0.25.8.tar.gz", hash = "sha256:9374d047a575c8f781b94454db5cab590b6029505f488d12899ddb10a4af1cf4", size = 79320, upload-time = "2025-08-08T19:01:46.709Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/4c/cc276ce57e572c102d9542d383b2cfd551276581dc60004cb94fe8774c11/responses-0.25.8-py3-none-any.whl", hash = "sha256:0c710af92def29c8352ceadff0c3fe340ace27cf5af1bbe46fb71275bcd2831c", size = 34769, upload-time = "2025-08-08T19:01:45.018Z" },
 ]
 
 [[package]]
