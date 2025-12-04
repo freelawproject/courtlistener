@@ -4,7 +4,7 @@
 
 <c-vars eyebrow_text title_text paragraph_text buttons image_source image_alt></c-vars>
 
-<div class="bg-greyscale-100 border-greyscale-100 p-8 m-8 rounded-lg" x-data="expansionPanel">
+<div class="bg-greyscale-100 border-greyscale-100 p-8 rounded-lg" x-data="expansionPanel">
   <div class="pb-8">
       <!-- Eyebrow -->
       <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>
@@ -13,7 +13,7 @@
       <h2 class="font-semibold m-2">{{ title_text }}</h2>
 
       <!-- Paragraph -->
-      <p class="text-gray-700 m-2">{{ paragraph_text }}</p>
+      <p class="text-gray-700 m-2 pb-4">{{ paragraph_text }}</p>
 
       <!-- Buttons -->
       <div class="relative inline-flex gap-x-1">
@@ -22,7 +22,7 @@
                 <button
                     x-id="dropdownButtonIdGroup"
                     type="button"
-                    class="flex-row z-10 hover:shadow-md {{b.style}}"
+                    class="flex-row z-10 hover:shadow-md ms-2 {{b.style}}"
                     x-on:click="toggleExpansion"
                     x-bind:aria-expanded="isExpanded"
                     aria-controls="banner-button-menu"
