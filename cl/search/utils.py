@@ -11,7 +11,6 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Opinion
 from cl.search.selectors import get_total_estimate_count
-from cl.stats.models import Stat
 from cl.visualizations.models import SCOTUSMap
 
 
