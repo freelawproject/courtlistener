@@ -546,17 +546,6 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         if not alert_triggered:
             continue
 
-        # Logic to roll out opinion alerts according to their sending rate.
-        is_opinion_alert = alert_triggered.alert_type == SEARCH_TYPES.OPINION
-        if is_opinion_alert and alert_triggered.rate == Alert.REAL_TIME:
-            continue
-        if is_opinion_alert and alert_triggered.rate == Alert.DAILY:
-            continue
-        if is_opinion_alert and alert_triggered.rate == Alert.WEEKLY:
-            continue
-        if is_opinion_alert and alert_triggered.rate == Alert.MONTHLY:
-            continue
-
         alert_triggered_id = alert_triggered.pk
         case_only_alert = (
             True
