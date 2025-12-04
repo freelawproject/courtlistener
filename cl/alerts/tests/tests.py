@@ -64,6 +64,7 @@ from cl.donate.models import (
 )
 from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
 from cl.favorites.models import Prayer
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
@@ -84,7 +85,6 @@ from cl.search.models import (
     DocketEntry,
     RECAPDocument,
 )
-from cl.stats.models import Stat
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -3178,6 +3178,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         Audio.objects.all().delete()
         super().tearDownClass()
 
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        keys = self.r.keys("alerts.sent*")
+        if keys:
+            self.r.delete(*keys)
+        return super().setUp()
+
     def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
 
@@ -3562,9 +3569,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 call_command("cl_send_scheduled_alerts", rate=rate)
 
         # Confirm Stat object is properly updated.
-        stat_object = Stat.objects.filter(date_logged=mock_date)
-        self.assertEqual(stat_object[0].name, f"alerts.sent.{rate}")
-        self.assertEqual(stat_object[0].count, stat_count)
+        key = f"alerts.sent.{mock_date.date().isoformat()}"
+        count = int(self.r.get(key) or 0)
+        self.assertEqual(count, stat_count)
 
         # Confirm Alert date_last_hit is updated.
         search_alert.refresh_from_db()
@@ -3762,7 +3769,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             )
 
         # Send RT alerts
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        mock_date = now() - timedelta(days=10)
+        with time_machine.travel(mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         # 1 email should be sent for the rt_oa_search_alert and rt_oa_search_alert_2
         self.assertEqual(
@@ -3837,11 +3846,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             else:
                 self.assertTrue(False, "Search Alert webhooks failed.")
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
+            time_machine.travel(mock_date, tick=False),
         ):
             # Call command dly
             call_command("cl_send_scheduled_alerts", rate="dly")
@@ -3901,12 +3913,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         rt_oral_argument_3.delete()
 
         # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 2)
-        stat_names = set([stat.name for stat in stats_objects])
-        self.assertEqual(stat_names, {"alerts.sent.rt", "alerts.sent.dly"})
-        self.assertEqual(stats_objects[0].count, 1)
-        self.assertEqual(stats_objects[1].count, 1)
+        key = f"alerts.sent.{mock_date.date().isoformat()}"
+        count = int(self.r.get(key) or 0)
+        self.assertEqual(count, 2)
 
         # Remove test instances.
         rt_oa_search_alert.delete()
@@ -3982,7 +3991,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             )
 
         # Send RT alerts
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        mock_date = now() - timedelta(days=2)
+        with time_machine.travel(mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         # 11 OA search alert emails should be sent, one for each user that
         # had donated enough.
@@ -4000,10 +4011,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertEqual(len(content["results"]), 1)
 
         # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 1)
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(stats_objects[0].count, 11)
+        count = int(
+            self.r.get(f"alerts.sent.{mock_date.date().isoformat()}") or 0
+        )
+        self.assertEqual(count, 11)
 
         # Remove test instances.
         rt_oral_argument.delete()

@@ -4,7 +4,6 @@ from datetime import datetime
 from importlib import import_module
 from urllib.parse import urlencode
 
-from asgiref.sync import async_to_sync
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -360,7 +359,7 @@ def send_alert_and_webhook(
     connection.send_messages(messages)
 
     # Work completed. Tally, log, and clean up
-    async_to_sync(tally_stat)("alerts.docket.alerts.sent", inc=len(messages))
+    tally_stat("alerts.sent", inc=len(messages))
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook
