@@ -11,6 +11,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Document
+from waffle.testutils import override_flag
 
 from cl.lib.search_index_utils import index_documents_in_bulk
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
@@ -397,6 +398,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         )
         return r
 
+    @override_flag("store-search-api-queries", active=True)
     def test_can_perform_a_regular_semantic_query(
         self, inception_mock
     ) -> None:
