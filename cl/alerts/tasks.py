@@ -30,6 +30,11 @@ from cl.alerts.utils import (
     scheduled_alert_hits_limit_reached,
     transform_percolator_child_document,
 )
+from cl.api.models import WebhookEventType
+from cl.api.tasks import (
+    send_docket_alert_webhook_events,
+    send_search_alert_webhook_es,
+)
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
@@ -440,6 +445,28 @@ def send_recap_email_user_not_found(recap_email_recipients: list[str]) -> None:
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[a[1] for a in settings.MANAGERS],
     )
+
+
+def send_webhook_alert_hits(
+    alert_user: UserProfile.user, hits: list[SearchAlertHitType]
+) -> None:
+    """Send webhook alerts for search hits.
+    :param alert_user: The user profile object associated with the webhooks.
+    :param hits: A list of tuples, each containing information about an alert,
+    its associated search type, documents found, and the number of documents.
+    :return: None
+    """
+
+    for alert, search_type, documents, num_docs in hits:
+        user_webhooks = alert_user.webhooks.filter(
+            event_type=WebhookEventType.SEARCH_ALERT, enabled=True
+        )
+        for user_webhook in user_webhooks:
+            send_search_alert_webhook_es.delay(
+                documents,
+                user_webhook.pk,
+                alert.pk,
+            )
 
 
 @app.task(ignore_result=True)
