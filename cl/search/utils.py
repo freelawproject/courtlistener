@@ -14,11 +14,12 @@ from cl.search.selectors import get_total_estimate_count
 from cl.visualizations.models import SCOTUSMap
 
 
-def get_redis_stat_sum(stat_name: str, days: int = 10) -> int:
+def get_redis_stat_sum(key_pattern: str, days: int = 10) -> int:
     """Get sum of a stat from Redis for the last N days.
 
     Args:
-        stat_name: The name of the stat (e.g., "alerts.sent", "search.results")
+        key_pattern: Redis key pattern with {date} placeholder
+                    (e.g., "alerts.sent.{date}", "api:v4.d:{date}.count")
         days: Number of days to look back (default: 10)
 
     Returns:
@@ -28,8 +29,10 @@ def get_redis_stat_sum(stat_name: str, days: int = 10) -> int:
     keys = []
     for x in range(0, days):
         d = (now().date() - timedelta(days=x)).isoformat()
-        keys.append(f"{stat_name}.{d}")
-    return sum(int(result) for result in r.mget(*keys) if result is not None)
+        keys.append(key_pattern.format(date=d))
+    return sum(
+        int(result) for result in r.mget(*keys) if result is not None
+    )
 
 
 @cache_memoize(5 * 60)
@@ -38,23 +41,11 @@ def get_v2_homepage_stats():
     Get all stats displayed in the new homepage and return them as a dict.
     """
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
-    last_ten_days = [
-        f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
-        for x in range(0, 10)
-    ]
 
     # Get stats from Redis (new system)
-    r = get_redis_interface("STATS")
-    alerts_in_last_ten = get_redis_stat_sum("alerts.sent")
-    queries_in_last_ten = get_redis_stat_sum("search.results")
-
-    api_in_last_ten = sum(
-        [
-            int(result)
-            for result in r.mget(*last_ten_days)
-            if result is not None
-        ]
-    )
+    alerts_in_last_ten = get_redis_stat_sum("alerts.sent.{date}")
+    queries_in_last_ten = get_redis_stat_sum("search.results.{date}")
+    api_in_last_ten = get_redis_stat_sum("api:v4.d:{date}.count")
 
     # Let the DB calculate total minutes and default to 0 if no rows exist
     minutes_of_oa = Audio.objects.aggregate(
@@ -78,29 +69,27 @@ def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
     """
-    r = get_redis_interface("STATS")
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
-    last_ten_days = [
-        f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
-        for x in range(0, 10)
-    ]
+
+    # Get stats from Redis
+    alerts_in_last_ten = get_redis_stat_sum("alerts.sent.{date}")
+    queries_in_last_ten = get_redis_stat_sum("search.results.{date}")
+    api_in_last_ten = get_redis_stat_sum("api:v4.d:{date}.count")
+
+    # Get stats from database
+    opinions_in_last_ten = Opinion.objects.filter(
+        date_created__gte=ten_days_ago
+    ).count()
+    oral_arguments_in_last_ten = Audio.objects.filter(
+        date_created__gte=ten_days_ago
+    ).count()
 
     homepage_data = {
-        "alerts_in_last_ten": get_redis_stat_sum("alerts.sent"),
-        "queries_in_last_ten": get_redis_stat_sum("search.results"),
-        "opinions_in_last_ten": Opinion.objects.filter(
-            date_created__gte=ten_days_ago
-        ).count(),
-        "oral_arguments_in_last_ten": Audio.objects.filter(
-            date_created__gte=ten_days_ago
-        ).count(),
-        "api_in_last_ten": sum(
-            [
-                int(result)
-                for result in r.mget(*last_ten_days)
-                if result is not None
-            ]
-        ),
+        "alerts_in_last_ten": alerts_in_last_ten,
+        "queries_in_last_ten": queries_in_last_ten,
+        "api_in_last_ten": api_in_last_ten,
+        "opinions_in_last_ten": opinions_in_last_ten,
+        "oral_arguments_in_last_ten": oral_arguments_in_last_ten,
         "users_in_last_ten": User.objects.filter(
             date_joined__gte=ten_days_ago
         ).count(),
