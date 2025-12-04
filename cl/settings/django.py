@@ -123,6 +123,7 @@ TEMPLATES = [
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -138,6 +139,7 @@ MIDDLEWARE = [
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
     "pghistory.middleware.HistoryMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "cl.urls"
@@ -162,6 +164,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
+    "django_prometheus",
     "storages",
     "waffle",
     "admin_cursor_paginator",
@@ -257,3 +260,5 @@ SILENCED_SYSTEM_CHECKS = [
     # Don't warn about HSTS being used
     "security.W004",
 ]
+
+PROMETHEUS_METRIC_NAMESPACE = "courtlistener"
