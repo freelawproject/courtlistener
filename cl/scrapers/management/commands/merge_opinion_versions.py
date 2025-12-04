@@ -758,6 +758,11 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     """
     Make sure that the dockets have at least the same court_id and docket number
 
+    Special case: For New York courts, skip the docket number check since newer
+    versions may not have a docket number in the opinion text, which would
+    otherwise prevent versioning from working.
+
+
     :param docket: the main docket
     :param version_docket: the version docket
     :return: True if dockets have the same court_id and docket number
@@ -771,6 +776,11 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     if docket.court_id != version_docket.court_id:
         logger.error(log_template, "court_id", docket.id, version_docket.id)
         return False
+
+    # Special case for NY courts: allow versioning without matching docket numbers
+    # See issue #6521
+    if docket.court_id.startswith("ny"):
+        return True
 
     if docket.docket_number != version_docket.docket_number:
         logger.error(
