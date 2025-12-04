@@ -134,6 +134,49 @@ class SOURCES:
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
     RECAP = "G"
     SCANNING_PROJECT = "S"
+    COURT_M_SCANNING_PROJECT = "CS"
+    PUBLIC_RESOURCE_M_SCANNING_PROJECT = "RS"
+    LAWBOX_M_SCANNING_PROJECT = "LS"
+    MANUAL_INPUT_M_SCANNING_PROJECT = "MS"
+    INTERNET_ARCHIVE_M_SCANNING_PROJECT = "AS"
+    BRAD_HEATH_ARCHIVE_M_SCANNING_PROJECT = "HS"
+    COLUMBIA_ARCHIVE_M_SCANNING_PROJECT = "ZS"
+    ANON_2020_M_SCANNING_PROJECT = "QS"
+    HARVARD_M_SCANNING_PROJECT = "US"
+    COURT_M_RESOURCE_M_SCANNING_PROJECT = "CRS"
+    LAWBOX_M_COURT_M_SCANNING_PROJECT = "LCS"
+    LAWBOX_M_RESOURCE_M_SCANNING_PROJECT = "LRS"
+    LAWBOX_M_COURT_RESOURCE_M_SCANNING_PROJECT = "LCRS"
+    COLUMBIA_M_INTERNET_ARCHIVE_M_SCANNING_PROJECT = "ZAS"
+    COLUMBIA_M_DIRECT_COURT_INPUT_M_SCANNING_PROJECT = "ZDS"
+    COLUMBIA_M_COURT_M_SCANNING_PROJECT = "ZCS"
+    COLUMBIA_M_LAWBOX_COURT_M_SCANNING_PROJECT = "ZLCS"
+    COLUMBIA_M_LAWBOX_RESOURCE_M_SCANNING_PROJECT = "ZLRS"
+    COLUMBIA_M_LAWBOX_COURT_RESOURCE_M_SCANNING_PROJECT = "ZLCRS"
+    COLUMBIA_M_RESOURCE_M_SCANNING_PROJECT = "ZRS"
+    COLUMBIA_M_COURT_RESOURCE_M_SCANNING_PROJECT = "ZCRS"
+    COLUMBIA_M_LAWBOX_M_SCANNING_PROJECT = "ZLS"
+    COLUMBIA_M_MANUAL_M_SCANNING_PROJECT = "ZMS"
+    COLUMBIA_M_ANON_2020_M_SCANNING_PROJECT = "ZQS"
+    COLUMBIA_ARCHIVE_M_HARVARD_M_SCANNING_PROJECT = "ZUS"
+    COLUMBIA_M_LAWBOX_M_HARVARD_M_SCANNING_PROJECT = "ZLUS"
+    COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD_M_SCANNING_PROJECT = "ZDUS"
+    COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD_M_SCANNING_PROJECT = "ZLRUS"
+    COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD_M_SCANNING_PROJECT = "ZLCRUS"
+    COLUMBIA_M_COURT_M_HARVARD_M_SCANNING_PROJECT = "ZCUS"
+    COLUMBIA_M_MANUAL_INPUT_M_HARVARD_M_SCANNING_PROJECT = "ZMUS"
+    COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD_M_SCANNING_PROJECT = "ZRUS"
+    COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD_M_SCANNING_PROJECT = "ZLCUS"
+    COURT_M_HARVARD_M_SCANNING_PROJECT = "CUS"
+    COURT_M_RESOURCE_M_HARVARD_M_SCANNING_PROJECT = "CRUS"
+    DIRECT_COURT_INPUT_M_HARVARD_M_SCANNING_PROJECT = "DUS"
+    LAWBOX_M_HARVARD_M_SCANNING_PROJECT = "LUS"
+    LAWBOX_M_COURT_M_HARVARD_M_SCANNING_PROJECT = "LCUS"
+    LAWBOX_M_RESOURCE_M_HARVARD_M_SCANNING_PROJECT = "LRUS"
+    LAWBOX_M_COURT_RESOURCE_M_HARVARD_M_SCANNING_PROJECT = "LCRUS"
+    MANUAL_INPUT_M_HARVARD_M_SCANNING_PROJECT = "MUS"
+    PUBLIC_RESOURCE_M_HARVARD_M_SCANNING_PROJECT = "RUS"
+
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -241,6 +284,168 @@ class SOURCES:
         (
             SCANNING_PROJECT,
             "scanning project",
+        ),
+        (
+            COURT_M_SCANNING_PROJECT,
+            "court website merged with scanning project",
+        ),
+        (
+            PUBLIC_RESOURCE_M_SCANNING_PROJECT,
+            "public.resource.org merged with scanning project",
+        ),
+        (LAWBOX_M_SCANNING_PROJECT, "lawbox merged with scanning project"),
+        (
+            MANUAL_INPUT_M_SCANNING_PROJECT,
+            "manual input merged with scanning project",
+        ),
+        (
+            INTERNET_ARCHIVE_M_SCANNING_PROJECT,
+            "internet archive merged with scanning project",
+        ),
+        (
+            BRAD_HEATH_ARCHIVE_M_SCANNING_PROJECT,
+            "brad heath archive merged with scanning project",
+        ),
+        (
+            COLUMBIA_ARCHIVE_M_SCANNING_PROJECT,
+            "columbia archive merged with scanning project",
+        ),
+        (
+            ANON_2020_M_SCANNING_PROJECT,
+            "2020 anonymous database merged with scanning project",
+        ),
+        (HARVARD_M_SCANNING_PROJECT, "Harvard merged with scanning project"),
+        (
+            COURT_M_RESOURCE_M_SCANNING_PROJECT,
+            "court website merged with public.resource.org and scanning project",
+        ),
+        (
+            LAWBOX_M_COURT_M_SCANNING_PROJECT,
+            "lawbox merged with court website and scanning project",
+        ),
+        (
+            LAWBOX_M_RESOURCE_M_SCANNING_PROJECT,
+            "lawbox merged with public.resource.org and scanning project",
+        ),
+        (
+            LAWBOX_M_COURT_RESOURCE_M_SCANNING_PROJECT,
+            "lawbox merged with court, public.resource.org and scanning project",
+        ),
+        (
+            COLUMBIA_M_INTERNET_ARCHIVE_M_SCANNING_PROJECT,
+            "columbia merged with internet archive and scanning project",
+        ),
+        (
+            COLUMBIA_M_DIRECT_COURT_INPUT_M_SCANNING_PROJECT,
+            "columbia merged with direct court input and scanning project",
+        ),
+        (
+            COLUMBIA_M_COURT_M_SCANNING_PROJECT,
+            "columbia merged with court and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_COURT_M_SCANNING_PROJECT,
+            "columbia merged with lawbox, court and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_RESOURCE_M_SCANNING_PROJECT,
+            "columbia merged with lawbox, public.resource.org and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_COURT_RESOURCE_M_SCANNING_PROJECT,
+            "columbia merged with lawbox, court, public.resource.org and scanning project",
+        ),
+        (
+            COLUMBIA_M_RESOURCE_M_SCANNING_PROJECT,
+            "columbia merged with public.resource.org and scanning project",
+        ),
+        (
+            COLUMBIA_M_COURT_RESOURCE_M_SCANNING_PROJECT,
+            "columbia merged with court, public.resource.org and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_SCANNING_PROJECT,
+            "columbia merged with lawbox and scanning project",
+        ),
+        (
+            COLUMBIA_M_MANUAL_M_SCANNING_PROJECT,
+            "columbia merged with manual input and scanning project",
+        ),
+        (
+            COLUMBIA_M_ANON_2020_M_SCANNING_PROJECT,
+            "columbia merged with 2020 anonymous database and scanning project",
+        ),
+        (
+            COLUMBIA_ARCHIVE_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia archive merged with Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with lawbox and Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with direct court input, Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with lawbox, public.resource.org and Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with lawbox, court, public.resource.org and Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_COURT_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with court, Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_MANUAL_INPUT_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with manual input, Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with public.resource.org, Harvard and scanning project",
+        ),
+        (
+            COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD_M_SCANNING_PROJECT,
+            "columbia merged with lawbox, court and Harvard and scanning project",
+        ),
+        (
+            COURT_M_HARVARD_M_SCANNING_PROJECT,
+            "court website merged with Harvard and scanning project",
+        ),
+        (
+            COURT_M_RESOURCE_M_HARVARD_M_SCANNING_PROJECT,
+            "court website merged with public.resource.org, Harvard and scanning project",
+        ),
+        (
+            DIRECT_COURT_INPUT_M_HARVARD_M_SCANNING_PROJECT,
+            "direct court input merged with Harvard and scanning project",
+        ),
+        (
+            LAWBOX_M_HARVARD_M_SCANNING_PROJECT,
+            "lawbox merged with Harvard and scanning project",
+        ),
+        (
+            LAWBOX_M_COURT_M_HARVARD_M_SCANNING_PROJECT,
+            "lawbox merged with court, Harvard and scanning project",
+        ),
+        (
+            LAWBOX_M_RESOURCE_M_HARVARD_M_SCANNING_PROJECT,
+            "lawbox merged with public.resource.org, Harvard and scanning project",
+        ),
+        (
+            LAWBOX_M_COURT_RESOURCE_M_HARVARD_M_SCANNING_PROJECT,
+            "lawbox merged with court, public.resource.org, Harvard and scanning project",
+        ),
+        (
+            MANUAL_INPUT_M_HARVARD_M_SCANNING_PROJECT,
+            "manual input merged with Harvard and scanning project",
+        ),
+        (
+            PUBLIC_RESOURCE_M_HARVARD_M_SCANNING_PROJECT,
+            "public.resource.org merged with Harvard and scanning project",
         ),
     )
 
