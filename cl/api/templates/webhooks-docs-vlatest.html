@@ -414,6 +414,8 @@ xargs -I % curl -X POST \
   <h3 id="pray-and-pay">Pray And Pay Events</h3>
   <p>The <a href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> allows users to request PACER documents that are not yet available in CourtListener's RECAP Archive. When a requested document becomes available, users who requested it are notified via email.
   </p>
+  <p>To programmatically create and manage prayers, see the <a href="{% url 'recap_api_help' %}#pray-and-pay-api">Pray and Pay API documentation</a>.
+  </p>
   <p>By subscribing to this webhook endpoint, your server can be notified when a Pray and Pay request you made has been granted and the document is now available.
   </p>
   <p>As with our other events, this webhook event is a JSON hash with two keys, <code>webhook</code> and <code>payload</code>.</p>
@@ -456,7 +458,7 @@ xargs -I % curl -X POST \
       <p>You can now select the webhook version when configuring an endpoint. For most webhook event types, there are no differences between <code>v1</code> and <code>v2</code>, as the payload remains unchanged.
       </p>
       <p>In the Search Alert webhook event type, the Oral Arguments search response remains identical between <code>v1</code> and <code>v2</code>.</p>
-      <p>For Case Law {% flag "recap-alerts-active" %}and RECAP{% endflag %} <code>v2</code> now includes nested results, which are based on the new changes introduced in <code>v4</code> of the <a href="{% url "search_api_help" version="v4" %}">Search API.</a></p>
+      <p>For Case Law and RECAP <code>v2</code> now includes nested results, which are based on the new changes introduced in <code>v4</code> of the <a href="{% url "search_api_help" version="v4" %}">Search API.</a></p>
     </li>
   </ul>
 </div>

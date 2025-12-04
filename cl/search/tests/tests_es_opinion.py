@@ -26,6 +26,7 @@ from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
+from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
@@ -70,6 +71,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    SearchQuery,
 )
 from cl.search.tasks import (
     es_save_document,
@@ -1225,6 +1227,7 @@ class OpinionV4APISearchTest(
                 self.assertEqual(r.data["results"][0][field], [])
 
 
+@override_flag("store-search-queries", active=True)
 class OpinionsESSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -1367,6 +1370,10 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "text_query")
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
+
+        # Ensure a SearchQuery row was logged with KEYWORD querymode
+        last_query = await SearchQuery.objects.alast()
+        self.assertEqual(last_query.query_mode, SearchQuery.KEYWORD)
 
         # Search by court_id
         search_params = {"q": "ca1"}
