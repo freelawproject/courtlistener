@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 import time_machine
 from django.core import mail
 from django.core.management import call_command
+from django.utils.timezone import now
 from waffle.testutils import override_switch
 
 from cl.lib.redis_utils import get_redis_interface
@@ -98,3 +99,22 @@ class StatTests(TestCase):
         self.assertEqual(count, 2)
         count = tally_stat("test3", inc=2)
         self.assertEqual(count, 4)
+
+    def test_stat_expires_in_10_days(self) -> None:
+        mock_date = datetime.combine(
+            now().date(), datetime.min.time()
+        ) - timedelta(days=10)
+        # Create the stat 10 days in the past
+        with time_machine.travel(mock_date, tick=False):
+            tally_stat("test4")
+
+        # Compute the expiration timestamp
+        key_ttl = self.r.ttl("test4." + mock_date.date().isoformat())
+        expired_at = mock_date + timedelta(seconds=key_ttl)
+
+        # The key should still be valid today
+        self.assertGreater(expired_at.date(), now().date())
+
+        # But it must expire no later than tomorrow
+        tomorrow = now() + timedelta(days=1)
+        self.assertLessEqual(expired_at.date(), tomorrow.date())

@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from datetime import datetime, timedelta
 
 import redis
 from django.db import OperationalError, connections
@@ -61,13 +62,27 @@ def tally_stat(name, inc=1, date_logged=None) -> int:
         return
 
     r = get_redis_interface("STATS")
+    current_dt = now()
     if date_logged is None:
-        date_logged = now().date()
+        date_logged = current_dt.date()
 
     key = f"{name}.{date_logged.isoformat()}"
+
+    # Compute expiration:
+    # Keys live for 10 full days after the date they represent. For example,
+    # a key for June 1 will expire at June 12 at 00:00:00.
+    midnight_today = datetime.combine(
+        date_logged, datetime.min.time(), tzinfo=now().tzinfo
+    )
+    expire_at_date = midnight_today + timedelta(days=11)
+
+    # Convert to seconds-from-now for Redis EXPIRE
+    ttl_seconds = int((expire_at_date - now()).total_seconds())
+
+    # Increment and apply expiration atomically
     pipe = r.pipeline()
     pipe.incrby(key, inc)
-    pipe.expire(key, 60 * 60 * 24 * 10)  # 10 days
+    pipe.expire(key, ttl_seconds)
     value, _ = pipe.execute()
 
     return value
