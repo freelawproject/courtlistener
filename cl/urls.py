@@ -43,6 +43,7 @@ urlpatterns = [
         RedirectView.as_view(url="/sign-in/", permanent=False),
     ),
     path("admin/", admin.site.urls),
+    path("prometheus/", include("django_prometheus.urls")),
     # App includes
     path("", include("cl.audio.urls")),
     path("", include("cl.corpus_importer.urls")),

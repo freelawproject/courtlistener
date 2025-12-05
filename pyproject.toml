@@ -116,6 +116,7 @@ dependencies = [
   "instructor>=1.11.3",
   "django-s3-express-cache>=0.1.0",
   "zohocrmsdk8-0==4.0.0",
+  "django-prometheus>=2.4.1",
 ]
 
 [dependency-groups]

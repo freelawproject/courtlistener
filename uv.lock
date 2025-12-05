@@ -336,6 +336,7 @@ dependencies = [
     { name = "django-override-storage" },
     { name = "django-permissions-policy" },
     { name = "django-pghistory" },
+    { name = "django-prometheus" },
     { name = "django-ratelimit" },
     { name = "django-s3-express-cache" },
     { name = "django-ses", extra = ["events"] },
@@ -450,6 +451,7 @@ requires-dist = [
     { name = "django-override-storage", specifier = ">=0.3.2" },
     { name = "django-permissions-policy", specifier = ">=4.25.0" },
     { name = "django-pghistory", specifier = ">=3.5.4" },
+    { name = "django-prometheus", specifier = ">=2.4.1" },
     { name = "django-ratelimit", specifier = ">=4.1.0" },
     { name = "django-s3-express-cache", specifier = ">=0.1.0" },
     { name = "django-ses", extras = ["events"], specifier = ">=0.44.0" },
@@ -1009,6 +1011,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c7/98/d93f658316901c54a00ec0caefc3e73796b2f7ffcc1fd11188da22c45027/django_pgtrigger-4.13.3.tar.gz", hash = "sha256:c525f9e81f120d166c4bd5fe8c3770640356f0644edf0fc2b7f6426008e52f77", size = 30723, upload-time = "2024-12-16T01:56:44.466Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/cb/3bb87d45b1b46ef36f3786fbfcda0a43f80c8fa4e742a350a2cd1512557e/django_pgtrigger-4.13.3-py3-none-any.whl", hash = "sha256:d6e4d17021bbd5e425a308f07414b237b9b34423275d86ad756b90c307df3ca4", size = 34059, upload-time = "2024-12-16T01:56:39.643Z" },
+]
+
+[[package]]
+name = "django-prometheus"
+version = "2.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "prometheus-client" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/f4/cb39ddd2a41e07a274c4e162c076e906ae232d63b66bbabdea0300878877/django_prometheus-2.4.1.tar.gz", hash = "sha256:073628243d2a6de6a8a8c20e5b512872dfb85d66e1b60b28bcf1eca0155dad95", size = 24464, upload-time = "2025-06-25T15:45:37.149Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/50/9c5e022fa92574e5d20606687f15a2aa255e10512a17d11a8216fa117f72/django_prometheus-2.4.1-py2.py3-none-any.whl", hash = "sha256:7fe5af7f7c9ad9cd8a429fe0f3f1bf651f0e244f77162147869eab7ec09cc5e7", size = 29541, upload-time = "2025-06-25T15:45:35.433Z" },
 ]
 
 [[package]]
@@ -2277,6 +2292,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8b/26/5a86ac418ee4cecb127a4a6f98d6b202216b5ac4f6b519328ae81d07ba9e/probableparsing-0.0.1.tar.gz", hash = "sha256:8114bbf889e1f9456fe35946454c96e42a6ee2673a90d4f1f9c46a406f543767", size = 1722, upload-time = "2016-03-28T23:39:54.972Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/6b/91255cbf739a835df41af530a36798397d70342d152b773b5b0fe3001843/probableparsing-0.0.1-py2.py3-none-any.whl", hash = "sha256:509df25fdda4fd7c0b2a100f58cc971bd23daf26f3b3320aebf2616d2e10c69e", size = 3056, upload-time = "2016-12-19T15:04:32.102Z" },
+]
+
+[[package]]
+name = "prometheus-client"
+version = "0.23.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/53/3edb5d68ecf6b38fcbcc1ad28391117d2a322d9a1a3eff04bfdb184d8c3b/prometheus_client-0.23.1.tar.gz", hash = "sha256:6ae8f9081eaaaf153a2e959d2e6c4f4fb57b12ef76c8c7980202f1e57b48b2ce", size = 80481, upload-time = "2025-09-18T20:47:25.043Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/db/14bafcb4af2139e046d03fd00dea7873e48eafe18b7d2797e73d6681f210/prometheus_client-0.23.1-py3-none-any.whl", hash = "sha256:dd1913e6e76b59cfe44e7a4b83e01afc9873c1bdfd2ed8739f1e76aeca115f99", size = 61145, upload-time = "2025-09-18T20:47:23.875Z" },
 ]
 
 [[package]]
