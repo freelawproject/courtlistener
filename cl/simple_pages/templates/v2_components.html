@@ -190,9 +190,32 @@ Sample code here.
     <h2 class="mt-6 mb-3">Banner</h2>
     <h4 class="mt-3">Demo</h4>
     <c-banner
+      size="basis-1/2"
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
+      :buttons="[
+          {
+            'style': 'btn-primary',
+            'name': 'Install now',
+            'options': [
+              {
+                'name': 'Add to Chrome',
+                'href': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
+                'icon': 'logos/chrome'
+              }, {
+                'name': 'Add to Edge',
+                'href': '/recap/edge',
+                'icon': 'logos/edge'
+              }
+            ]
+          }, {
+              'style': 'btn-outline',
+              'name': 'Learn more'
+          }
+        ]"
+        image_source="{%  static 'png/recap_search_container.png' %}"
+        image_alt=""
     ></c-banner>
 
     <c-library.list title="Props" only>
