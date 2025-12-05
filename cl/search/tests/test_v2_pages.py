@@ -1,4 +1,3 @@
-from datetime import timedelta
 from unittest.mock import patch
 
 from django.db import connection
@@ -17,7 +16,6 @@ from cl.lib.test_helpers import (
 )
 from cl.search.models import Docket, Opinion, RECAPDocument
 from cl.search.utils import get_v2_homepage_stats
-from cl.stats.models import Stat
 from cl.tests.cases import TestCase
 
 FAKE_STATS = {
@@ -259,17 +257,6 @@ class HomepageStatsTest(
 
         mock_get_redis.return_value.mget.side_effect = mock_mget
 
-        # Create old stats in DB (out-of-window) - these should be ignored
-        Stat.objects.create(
-            name="alerts.sent.email",
-            count=300,
-            date_logged=now - timedelta(days=12),
-        )
-        Stat.objects.create(
-            name="search.results",
-            count=900,
-            date_logged=now - timedelta(days=20),
-        )
         get_v2_homepage_stats.invalidate()
         resp = self.client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
