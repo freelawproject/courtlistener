@@ -51,22 +51,8 @@ def get_milestone_range(start, end):
     return out
 
 
-def tally_stat(name, inc=1, date_logged=None) -> int:
-    """Tally an event's occurrence to the database.
-
-    Will assume the following overridable values:
-       - the event happened today.
-       - the event happened once.
-    """
-    if not switch_is_active("increment-stats"):
-        return
-
+def _update_cached_stat(key, inc, date_logged):
     r = get_redis_interface("STATS")
-    current_dt = now()
-    if date_logged is None:
-        date_logged = current_dt.date()
-
-    key = f"{name}.{date_logged.isoformat()}"
 
     # Compute expiration:
     # Keys live for 10 full days after the date they represent. For example,
@@ -86,6 +72,30 @@ def tally_stat(name, inc=1, date_logged=None) -> int:
     value, _ = pipe.execute()
 
     return value
+
+
+def tally_stat(
+    name,
+    inc=1,
+    date_logged=None,
+    prometheus_handler_key="",
+) -> int:
+    """Tally an event's occurrence to Redis.
+
+    Will assume the following overridable values:
+       - the event happened today.
+       - the event happened once.
+    """
+    if not switch_is_active("increment-stats"):
+        return
+
+    current_dt = now()
+    if date_logged is None:
+        date_logged = current_dt.date()
+
+    key = f"{name}.{date_logged.isoformat()}"
+
+    return _update_cached_stat(key, inc, date_logged)
 
 
 def check_redis() -> bool:
