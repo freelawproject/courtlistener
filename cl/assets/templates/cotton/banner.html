@@ -2,9 +2,9 @@
 {% require_script "js/alpine/components/expansion_panel.js" %}
 {% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
 
-<c-vars eyebrow_text title_text paragraph_text buttons image_source image_alt></c-vars>
+<c-vars size eyebrow_text title_text paragraph_text buttons image_source image_alt></c-vars>
 
-<div class="bg-greyscale-100 border-greyscale-100 p-8 rounded-lg" x-data="expansionPanel">
+<div class="bg-greyscale-100 border-greyscale-100 p-8 rounded-lg {{ size }}" x-data="expansionPanel">
   <div class="md:pb-8">
       <!-- Eyebrow -->
       <c-eyebrow class="normal-case m-2">{{ eyebrow_text }}</c-eyebrow>

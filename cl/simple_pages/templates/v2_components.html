@@ -197,6 +197,10 @@ Sample code here.
 
     <c-library.list title="Props" only>
       <c-library.item only>
+        <c-slot name="label"><code>size</code></c-slot>
+        <c-slot name="description">Tailwind style determining fraction of banner space to use</c-slot>
+      </c-library.item>
+      <c-library.item only>
         <c-slot name="label"><code>eyebrow_text</code></c-slot>
         <c-slot name="description">Eyebrow content</c-slot>
       </c-library.item>
@@ -229,6 +233,7 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-banner
+      size="basis-1/2"
       eyebrow_text="RECAP Suite"
       title_text="Turning PACER Around Since 2009"
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."

@@ -269,62 +269,60 @@
   </section>
 {# BANNER #}
   <div class="md:capped-width flex flex-col gap-y-5 mt-6 mb-6 ml-4 mr-4 md:flex-row md:gap-x-3 md:gap-y-0">
-    <div class="basis-1/2">
       <c-banner
-            eyebrow_text="RECAP Suite"
-            title_text="Turning PACER Around Since 2009"
-            paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
-            :buttons="[
-              {
+          size="basis-1/2"
+          eyebrow_text="RECAP Suite"
+          title_text="Turning PACER Around Since 2009"
+          paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
+          :buttons="[
+            {
+              'style': 'btn-primary',
+              'name': 'Install now',
+              'options': [
+                {
+                'name': 'Add to Chrome',
+                'href': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
+                'icon': 'logos/chrome'
+                }, {
+                'name': 'Add to Edge',
+                'href': '/recap/edge',
+                'icon': 'logos/edge'
+                }, {
+                'name': 'Add to Safari',
+                'href': 'https://apps.apple.com/us/app/recap/id1600281788',
+                'icon': 'logos/safari'
+                }, {
+                'name': 'Add to Firefox',
+                'href': 'https://addons.mozilla.org/en-US/firefox/addon/recap-195534/',
+                'icon': 'logos/firefox'
+                }
+              ]
+            }, {
+                'style': 'btn-white',
+                'name': 'Learn more',
+                'href': 'https://free.law/recap'
+            }
+          ]"
+          image_source="{%  static 'png/recap_search_container.png' %}"
+          image_alt="Screenshot of the free.law homepage showing a popup that reads: RECAP Archive. Donate. Search millions of PACER documents and dockets. There is a search box, a toggle switch set to Enable Uploads, an advanced search button, and a help button."
+        >
+      </c-banner>
+      <c-banner
+          size="basis-1/2"
+          eyebrow_text="REST API"
+          title_text="Legal Data for Developers and Researchers That Need Granular information"
+          paragraph_text="After more than a decade of development, these APIs are powerful. Our case law API was the first. Our PACER and oral arguments APIs are the biggest. Our webhooks push data to you. Our citation lookup tool can fight hallucinations in AI tools."
+          :buttons="[
+            {
                 'style': 'btn-primary',
-                'name': 'Install now',
-                'options': [
-                  {
-                  'name': 'Add to Chrome',
-                  'href': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
-                  'icon': 'logos/chrome'
-                  }, {
-                  'name': 'Add to Edge',
-                  'href': '/recap/edge',
-                  'icon': 'logos/edge'
-                  }, {
-                  'name': 'Add to Safari',
-                  'href': 'https://apps.apple.com/us/app/recap/id1600281788',
-                  'icon': 'logos/safari'
-                  }, {
-                  'name': 'Add to Firefox',
-                  'href': 'https://addons.mozilla.org/en-US/firefox/addon/recap-195534/',
-                  'icon': 'logos/firefox'
-                  }
-                ]
-              }, {
-                  'style': 'btn-white',
-                  'name': 'Learn more',
-                  'href': 'https://free.law/recap'
-              }
-            ]"
-            image_source="{%  static 'png/recap_search_container.png' %}"
-            image_alt="Screenshot of the free.law homepage showing a popup that reads: RECAP Archive. Donate. Search millions of PACER documents and dockets. There is a search box, a toggle switch set to Enable Uploads, an advanced search button, and a help button."
-          >
+                'name': 'Learn more',
+                'href': 'https://www.courtlistener.com/help/api/'
+            }
+          ]"
+          image_source="{%  static 'png/api_setup_container.png' %}"
+          image_alt="REST API -- v4.0. Header: Getting Started. APIs for developers and researchers that need granular legal data. Bulleted list: Set up your API. Data Models. API Overview. APIs. Available Jurisdictions. Upgrades & Fixes. Maintenance Schedule."
+      >
       </c-banner>
-    </div>
-    <div class="basis-1/2">
-      <c-banner
-            eyebrow_text="REST API"
-            title_text="Legal Data for Developers and Researchers That Need Granular information"
-            paragraph_text="After more than a decade of development, these APIs are powerful. Our case law API was the first. Our PACER and oral arguments APIs are the biggest. Our webhooks push data to you. Our citation lookup tool can fight hallucinations in AI tools."
-            :buttons="[
-              {
-                  'style': 'btn-primary',
-                  'name': 'Learn more',
-                  'href': 'https://www.courtlistener.com/help/api/'
-              }
-            ]"
-            image_source="{%  static 'png/api_setup_container.png' %}"
-            image_alt="REST API -- v4.0. Header: Getting Started. APIs for developers and researchers that need granular legal data. Bulleted list: Set up your API. Data Models. API Overview. APIs. Available Jurisdictions. Upgrades & Fixes. Maintenance Schedule."
-          >
-      </c-banner>
-    </div>
   </div>
 </div>
 {% endblock %}
