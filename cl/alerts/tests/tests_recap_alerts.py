@@ -91,6 +91,9 @@ class RECAPAlertsSweepIndexTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
         # runs early each day. Use minus two hours to prevent errors caused by
         # Daylight Saving Time transitions.
         date_now = midnight_pt(now().date()) - datetime.timedelta(hours=2)
@@ -2673,6 +2676,7 @@ class RECAPAlertsPercolatorTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+
         date_now = midnight_pt(now().date())
         cls.mock_date = date_now.replace(
             hour=20, minute=0, second=0, microsecond=0
