@@ -87,12 +87,17 @@ class RECAPAlertsSweepIndexTest(
     RECAP Alerts Sweep Index Tests
     """
 
+    @staticmethod
+    def rebuild_percolator_index():
+        RECAPPercolator._index._name = "recap_percolator_sweep"
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        cls.rebuild_percolator_index()
 
         # runs early each day. Use minus two hours to prevent errors caused by
         # Daylight Saving Time transitions.
@@ -2085,9 +2090,7 @@ class RECAPAlertsSweepIndexTest(
         are properly send by the sweep index without duplicating alerts.
         """
         # Rename percolator index for this test to avoid collisions.
-        RECAPPercolator._index._name = "recap_percolator_sweep"
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        self.rebuild_percolator_index()
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
