@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block content_wrapper %}
-<div x-data="homepage">
+<div x-data="homepage" class="pb-20">
   <div class="w-full flex flex-col bg-greyscale-100">
     {#  HERO  #}
     <div class="flex flex-col justify-center items-center gap-6 p-5">
@@ -209,7 +209,7 @@
   {# PRODUCT STATS #}
   <section
     aria-labelledby="stats-title"
-    class="flex flex-row flex-wrap gap-5 capped-width px-4 py-11 justify-center"
+    class="flex flex-row flex-wrap gap-5 capped-width py-11 justify-center"
   >
     <h2 id="stats-title" class="sr-only">CourtListener Statistics</h2>
     <dl class="flex flex-col md:gap-5 gap-2.5 md:flex-row">
@@ -268,7 +268,7 @@
     </dl>
   </section>
 {# BANNER #}
-  <div class="md:capped-width flex flex-col gap-y-5 mt-6 mb-6 ml-4 mr-4 md:flex-row md:gap-x-3 md:gap-y-0">
+  <section class="capped-width flex flex-col gap-y-5 md:flex-row gap-x-5">
       <c-banner
           size="basis-1/2"
           eyebrow_text="RECAP Suite"
@@ -323,6 +323,6 @@
           image_alt="REST API -- v4.0. Header: Getting Started. APIs for developers and researchers that need granular legal data. Bulleted list: Set up your API. Data Models. API Overview. APIs. Available Jurisdictions. Upgrades & Fixes. Maintenance Schedule."
       >
       </c-banner>
-  </div>
+  </section>
 </div>
 {% endblock %}
