@@ -56,6 +56,7 @@ from cl.scrapers.utils import (
     get_extension,
     update_or_create_docket,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import (
     ES_CHILD_ID,
     DocketDocument,
@@ -74,7 +75,6 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
-    SOURCES,
     Citation,
     ClusterRedirection,
     Court,
@@ -975,7 +975,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="12"),
                 date_filed=date(2020, 6, 1),
                 precedential_status="Published",
-                source=SOURCES.COURT_M_HARVARD,
+                source=ClusterSources.COURT_M_HARVARD,
             ),
             plain_text="""Docket Number: 2020-12
             Disposition: Affirmed
@@ -988,7 +988,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="13"),
                 date_filed=date(2020, 7, 1),
                 precedential_status="Unpublished",
-                source=SOURCES.COURT_WEBSITE,
+                source=ClusterSources.COURT_WEBSITE,
             ),
             plain_text="Docket Number: 2020-13\nDisposition: Affirmed",
         )
@@ -998,7 +998,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=self.docket_sc,
                 date_filed=date(2021, 6, 1),
                 precedential_status="Published",
-                source=SOURCES.COURT_WEBSITE,
+                source=ClusterSources.COURT_WEBSITE,
             ),
             plain_text="Some text with no matches",
             id=101,
@@ -1009,7 +1009,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="13"),
                 date_filed=date(2022, 6, 1),
                 precedential_status="Unpublished",
-                source=SOURCES.COURT_WEBSITE,
+                source=ClusterSources.COURT_WEBSITE,
             ),
             id=100,
             plain_text="Docket Number: 2022-13\n2022 VT 11",
@@ -1148,7 +1148,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         # Create related objects to the version docket so we can update their
         # references on merging
         version_docket_another_cluster = OpinionClusterFactory.create(
-            docket=version_docket, source=SOURCES.COURT_WEBSITE
+            docket=version_docket, source=ClusterSources.COURT_WEBSITE
         )
         version_audio = AudioWithParentsFactory.create(docket=version_docket)
 
@@ -1163,27 +1163,27 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             docket=main_docket,
             other_dates="",
             summary="",
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
         )
         cluster2 = OpinionClusterFactory.create(
             docket=main_docket,
             # other_dates should overwrite the empty field in the main cluster
             other_dates=other_dates,
             summary="",
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
         )
         cluster2_id = cluster2.id
         cluster3 = OpinionClusterFactory.create(
             docket=version_docket,
             other_dates="",
             summary=summary,
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
         )
         cluster4 = OpinionClusterFactory.create(
-            docket=DocketFactory.create(), source=SOURCES.COURT_WEBSITE
+            docket=DocketFactory.create(), source=ClusterSources.COURT_WEBSITE
         )
         cluster5 = OpinionClusterFactory.create(
-            docket=not_comparable_docket, source=SOURCES.COURT_WEBSITE
+            docket=not_comparable_docket, source=ClusterSources.COURT_WEBSITE
         )
 
         main_citation = CitationWithParentsFactory.create(
@@ -1219,7 +1219,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         should_ignore_version = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=version_docket, source=SOURCES.COURT_M_HARVARD
+                docket=version_docket, source=ClusterSources.COURT_M_HARVARD
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1491,7 +1491,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         should_ignore = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_M_HARVARD
+                docket=docket, source=ClusterSources.COURT_M_HARVARD
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1499,7 +1499,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
         previous_main = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_WEBSITE
+                docket=docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1507,7 +1507,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
         a_version = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_WEBSITE
+                docket=docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1515,7 +1515,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
         main = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_WEBSITE
+                docket=docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1546,29 +1546,29 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.COURT_WEBSITE, SOURCES.COURT_WEBSITE
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE, ClusterSources.COURT_WEBSITE
             ),
-            SOURCES.COURT_WEBSITE,
+            ClusterSources.COURT_WEBSITE,
         )
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.COURT_WEBSITE,
-                SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             ),
-            SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
         )
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.COURT_WEBSITE, SOURCES.PUBLIC_RESOURCE
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE, ClusterSources.PUBLIC_RESOURCE
             ),
-            SOURCES.COURT_M_RESOURCE,
+            ClusterSources.COURT_M_RESOURCE,
         )
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.HARVARD_CASELAW, SOURCES.COLUMBIA_M_COURT
+            ClusterSources.merge_sources(
+                ClusterSources.HARVARD_CASELAW, ClusterSources.COLUMBIA_M_COURT
             ),
-            SOURCES.COLUMBIA_M_COURT_M_HARVARD,
+            ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
         )
 
     def test_string_merging(self):
@@ -1639,7 +1639,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         version_candidate = OpinionFactory.create(
             cluster=OpinionClusterFactory(
-                docket=main_docket, source=SOURCES.COURT_WEBSITE
+                docket=main_docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text="something else...",
@@ -1650,7 +1650,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         opinion = OpinionFactory.create(
             cluster=OpinionClusterFactory(
-                docket=main_docket, source=SOURCES.COURT_WEBSITE
+                docket=main_docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text="something...",
@@ -1689,7 +1689,7 @@ class DeleteDuplicatesTest(TestCase):
         docket2 = DocketFactory.create(court=nev, docket_number=docket_number)
         same_cluster_fields = {
             "docket": docket,
-            "source": SOURCES.COURT_WEBSITE,
+            "source": ClusterSources.COURT_WEBSITE,
             "case_name": "something",
             "case_name_full": "something full",
             "precedential_status": "Precedential",
@@ -1717,7 +1717,7 @@ class DeleteDuplicatesTest(TestCase):
         # the factories will create different values which will stop the merge
         cls.should_not_merge = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket2, source=SOURCES.COURT_WEBSITE
+                docket=docket2, source=ClusterSources.COURT_WEBSITE
             ),
             **same_opinion_fields,
         )
@@ -1781,7 +1781,7 @@ class DeleteDuplicatesTest(TestCase):
         """
         stats = defaultdict(lambda: 0)
         delete_duplicates.delete_same_hash_duplicates(
-            stats, [SOURCES.COURT_WEBSITE]
+            stats, [ClusterSources.COURT_WEBSITE]
         )
 
         try:

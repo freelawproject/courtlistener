@@ -102,6 +102,7 @@ from cl.search.api_views import (
     RECAPDocumentViewSet,
     TagViewSet,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -114,7 +115,6 @@ from cl.search.factories import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
-    SOURCES,
     ClusterRedirection,
     Court,
     Docket,
@@ -1856,10 +1856,10 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
         # Multiple choice filter
 
-        sources = [SOURCES.COURT_WEBSITE]
+        sources = [ClusterSources.COURT_WEBSITE]
         self.q = {"source": sources}
         await self.assertCountInResults(2)
-        sources.append(SOURCES.COURT_M_RESOURCE)
+        sources.append(ClusterSources.COURT_M_RESOURCE)
         await self.assertCountInResults(3)
 
     async def test_opinion_cited_filters(self) -> None:

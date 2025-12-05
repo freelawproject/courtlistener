@@ -8,7 +8,8 @@ from django.db import transaction
 from django.db.models import Count
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import SOURCES, Opinion, OpinionCluster
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Opinion, OpinionCluster
 
 
 def sort_harvard_opinions(options: dict) -> None:
@@ -32,8 +33,11 @@ def sort_harvard_opinions(options: dict) -> None:
     harvard_clusters = (
         OpinionCluster.objects.exclude(filepath_json_harvard="")
         .annotate(opinions_count=Count("sub_opinions"))
-        .filter(opinions_count__gt=1, source__contains=SOURCES.HARVARD_CASELAW)
-        .exclude(source__contains=SOURCES.COLUMBIA_ARCHIVE)
+        .filter(
+            opinions_count__gt=1,
+            source__contains=ClusterSources.HARVARD_CASELAW,
+        )
+        .exclude(source__contains=ClusterSources.COLUMBIA_ARCHIVE)
         .order_by("id")
         .values_list("id", flat=True)
     )
@@ -165,7 +169,7 @@ def sort_columbia_opinions(options: dict) -> None:
 
     clusters = (
         OpinionCluster.objects.filter(
-            source__contains=SOURCES.COLUMBIA_ARCHIVE
+            source__contains=ClusterSources.COLUMBIA_ARCHIVE
         )
         .order_by("id")
         .values_list("id", flat=True)

@@ -57,12 +57,13 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
-from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Docket, Opinion, OpinionCluster
 
 VALID_MERGED_SOURCES = [
     key
-    for key in dict(SOURCES.NAMES).keys()
-    if SOURCES.COLUMBIA_ARCHIVE in key
+    for key in dict(ClusterSources.NAMES).keys()
+    if ClusterSources.COLUMBIA_ARCHIVE in key
 ]
 
 
@@ -292,7 +293,7 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
     :param cluster: cluster object
     :return: None
     """
-    cluster.source = SOURCES.COLUMBIA_ARCHIVE + cluster.source
+    cluster.source = ClusterSources.COLUMBIA_ARCHIVE + cluster.source
     cluster.save()
 
 
