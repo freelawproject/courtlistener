@@ -1,11 +1,6 @@
 from django.contrib import admin
 
-from cl.stats.models import Event, Stat
-
-
-@admin.register(Stat)
-class StatAdmin(admin.ModelAdmin):
-    fields = ("name", "date_logged", "count")
+from cl.stats.models import Event
 
 
 @admin.register(Event)
