@@ -244,6 +244,14 @@ ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 # The maximum number of scheduled hits per alert.
 SCHEDULED_ALERT_HITS_LIMIT = 20
 
+PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED = env(
+    "PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED", default=False
+)
+
+PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED = env(
+    "PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED", default=False
+)
+
 ################################
 # ES bulk indexing batch size #
 ################################

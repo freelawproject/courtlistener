@@ -38,7 +38,9 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
                     AudioPercolator.__name__,
                 )
             )
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if (
+            settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
+        ):
             transaction.on_commit(
                 partial(
                     es_save_alert_document.delay,
@@ -47,7 +49,9 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
                 )
             )
 
-        case SEARCH_TYPES.OPINION:
+        case SEARCH_TYPES.OPINION if (
+            settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        ):
             transaction.on_commit(
                 partial(
                     es_save_alert_document.delay,

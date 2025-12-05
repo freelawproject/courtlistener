@@ -97,7 +97,6 @@ class RECAPAlertsSweepIndexTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        cls.rebuild_percolator_index()
 
         # runs early each day. Use minus two hours to prevent errors caused by
         # Daylight Saving Time transitions.
@@ -2083,6 +2082,7 @@ class RECAPAlertsSweepIndexTest(
         alert_de.docket.delete()
         alert_de_2.docket.delete()
 
+    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_percolator_plus_sweep_alerts_integration(
         self, mock_prefix
     ) -> None:
@@ -2663,6 +2663,7 @@ class RECAPAlertsSweepIndexTest(
         docket_2.delete()
 
 
+@override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
 @mock.patch(
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_percolator",
