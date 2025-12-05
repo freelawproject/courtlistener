@@ -174,7 +174,7 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 
 
 @override_flag("use_new_design", True)
-@patch("cl.lib.redis_utils.get_redis_interface")
+@patch("cl.search.utils.get_redis_interface")
 @override_settings(WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle")
 class HomepageStatsTest(
     RECAPSearchTestCase,
@@ -257,7 +257,7 @@ class HomepageStatsTest(
                     results.append(None)  # Out-of-window dates return None
             return results
 
-        mock_get_redis.return_value.mget = mock_mget
+        mock_get_redis.return_value.mget.side_effect = mock_mget
 
         # Create old stats in DB (out-of-window) - these should be ignored
         Stat.objects.create(
