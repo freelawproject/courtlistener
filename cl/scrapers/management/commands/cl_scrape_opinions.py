@@ -37,9 +37,9 @@ from cl.scrapers.utils import (
     update_or_create_docket,
     update_or_create_originating_court_information,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     SEARCH_TYPES,
-    SOURCES,
     Citation,
     Court,
     Docket,
@@ -118,7 +118,7 @@ def make_objects(
         date_filed_is_approximate=item["date_filed_is_approximate"],
         case_name=item["case_names"],
         case_name_short=case_name_short,
-        source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
+        source=item.get("cluster_source") or ClusterSources.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
         blocked=blocked,
         date_blocked=date_blocked,
