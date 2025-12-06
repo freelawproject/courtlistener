@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
-from django.db.models import F, Model, Prefetch, QuerySet
+from django.db.models import F, ManyToManyField, Model, Prefetch, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
@@ -1433,7 +1433,10 @@ class RetrieveFilteredFieldsMixin:
         return [
             f.name
             for f in model._meta.get_fields()
-            if getattr(f, "concrete", False)
+            if (
+                getattr(f, "concrete", False) or isinstance(f, ManyToManyField)
+            )
+            and not getattr(f, "auto_created", False)
         ]
 
     def _filter_top_level_fields_to_defer(

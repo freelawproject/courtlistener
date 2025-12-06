@@ -122,8 +122,7 @@ class VersionBasedPagination(PageNumberPagination):
             # Build and include the count URL:
             count_url = self.request.build_absolute_uri()
             count_url = replace_query_param(count_url, "count", "on")
-            response.data["count"] = count_url
-            response.data.move_to_end("count", last=False)
+            response.data = {"count": count_url, **response.data}
             return response
 
         # Get paginated response for PageNumberPagination

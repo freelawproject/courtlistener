@@ -58,14 +58,13 @@ class InvestmentAdmin(CursorPaginatorAdmin):
             return obj.description
         return "[Blank]"
 
+    @admin.display(description="Page link")
     def page_link(self, obj):
         return mark_safe(
             f'<a href="https://{settings.AWS_S3_CUSTOM_DOMAIN}/'
             f"{obj.financial_disclosure.filepath}"
             f'#page={obj.page_number}">Link to PDF page</a>'
         )
-
-    page_link.short_description = "Page link"
 
 
 @admin.register(Position)

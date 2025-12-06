@@ -54,7 +54,7 @@ async def render_visualization_page(
     if embed:
         if all([viz.published is True, viz.deleted is False]):
             # Log the referer if it's set, and the item is live.
-            referer_url = request.META.get("HTTP_REFERER")
+            referer_url = request.headers.get("referer")
             if referer_url is not None:
                 referer, created = await Referer.objects.aget_or_create(
                     url=referer_url, map_id=viz.pk
