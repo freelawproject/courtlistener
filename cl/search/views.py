@@ -1,7 +1,6 @@
 from datetime import date
 from urllib.parse import quote
 
-from asgiref.sync import async_to_sync
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -170,10 +169,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
         # No parameters --> Homepage.
-        if flag_is_active(request, "increment-stats"):
-            if not is_bot(request):
-                async_to_sync(tally_stat)("search.homepage_loaded")
-
         # Ensure we get nothing from the future.
         mutable_GET = request.GET.copy()  # Makes it mutable
         mutable_GET["filed_before"] = date.today()
@@ -225,6 +220,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
         return TemplateResponse(request, "homepage.html", render_dict)
 
+    search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
     # This is a GET with parameters
     # User placed a search or is trying to edit an alert
     if edit_alert:
@@ -250,16 +246,15 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
     else:
         # Just a regular search
-        if flag_is_active(request, "increment-stats"):
-            if not is_bot(request):
-                async_to_sync(tally_stat)("search.results")
+        if not is_bot(request):
+            tally_stat("search.results")
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(
             initial={
                 "query": get_string,
                 "rate": "dly",
-                "alert_type": request.GET.get("type", SEARCH_TYPES.OPINION),
+                "alert_type": search_type,
                 "original_alert_type": request.GET.get(
                     "type", SEARCH_TYPES.OPINION
                 ),
@@ -267,7 +262,13 @@ def show_results(request: HttpRequest) -> HttpResponse:
             user=request.user,
         )
 
-    search_results = do_es_search(request.GET.copy())
+    if search_type == SEARCH_TYPES.RECAP:
+        search_results = do_es_search(
+            request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
+        )
+    else:
+        search_results = do_es_search(request.GET.copy())
+
     render_dict.update(search_results)
     store_search_query(request, search_results)
 
@@ -317,9 +318,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         courts = courts_in_use = Court.objects.filter(in_use=True)
         if request.path == reverse("advanced_r"):
             obj_type = SEARCH_TYPES.RECAP
-            courts_in_use = courts.filter(
-                pacer_court_id__isnull=False, end_date__isnull=True
-            ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
+            courts_in_use = Court.federal_courts.all_pacer_courts()
         elif request.path == reverse("advanced_oa"):
             obj_type = SEARCH_TYPES.ORAL_ARGUMENT
         elif request.path == reverse("advanced_p"):

@@ -20,9 +20,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
 
-from cl.lib.bot_detector import is_bot
 from cl.lib.http import is_ajax
-from cl.stats.utils import tally_stat
 from cl.visualizations.forms import VizEditForm, VizForm
 from cl.visualizations.models import Referer, SCOTUSMap
 from cl.visualizations.network_utils import reverse_endpoints_if_needed
@@ -254,9 +252,6 @@ async def privatize_visualization(request: HttpRequest) -> HttpResponse:
 
 
 async def mapper_homepage(request: HttpRequest) -> HttpResponse:
-    if not is_bot(request):
-        await tally_stat("visualization.scotus_homepage_loaded")
-
     visualizations = (
         SCOTUSMap.objects.filter(published=True, deleted=False)
         .annotate(Count("clusters"))
