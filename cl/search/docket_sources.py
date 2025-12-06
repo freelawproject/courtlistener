@@ -144,6 +144,141 @@ class DocketSources:
     )
     RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 127
     SCANNING_PROJECT = 128
+    RECAP_AND_SCANNING_PROJECT = 129
+    SCRAPER_AND_SCANNING_PROJECT = 130
+    RECAP_AND_SCRAPER_AND_SCANNING_PROJECT = 131
+    COLUMBIA_AND_SCANNING_PROJECT = 132
+    COLUMBIA_AND_RECAP_AND_SCANNING_PROJECT = 133
+    COLUMBIA_AND_SCRAPER_AND_SCANNING_PROJECT = 134
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_SCANNING_PROJECT = 135
+    IDB_AND_SCANNING_PROJECT = 136
+    RECAP_AND_IDB_AND_SCANNING_PROJECT = 137
+    SCRAPER_AND_IDB_AND_SCANNING_PROJECT = 138
+    RECAP_AND_SCRAPER_AND_IDB_AND_SCANNING_PROJECT = 139
+    COLUMBIA_AND_IDB_AND_SCANNING_PROJECT = 140
+    COLUMBIA_AND_RECAP_AND_IDB_AND_SCANNING_PROJECT = 141
+    COLUMBIA_AND_SCRAPER_AND_IDB_AND_SCANNING_PROJECT = 142
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_SCANNING_PROJECT = 143
+    HARVARD_AND_SCANNING_PROJECT = 144
+    HARVARD_AND_RECAP_AND_SCANNING_PROJECT = 145
+    SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT = 146
+    RECAP_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT = 147
+    HARVARD_AND_COLUMBIA_AND_SCANNING_PROJECT = 148
+    COLUMBIA_AND_RECAP_AND_HARVARD_AND_SCANNING_PROJECT = 149
+    COLUMBIA_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT = 150
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT = 151
+    IDB_AND_HARVARD_AND_SCANNING_PROJECT = 152
+    RECAP_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT = 153
+    SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT = 154
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT = 155
+    COLUMBIA_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT = 156
+    COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT = 157
+    COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT = 158
+    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT = (
+        159
+    )
+    DIRECT_INPUT_AND_SCANNING_PROJECT = 160
+    RECAP_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 161
+    SCRAPER_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 162
+    RECAP_AND_SCRAPER_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 163
+    COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 164
+    RECAP_AND_COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 165
+    SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 166
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 167
+    IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 168
+    RECAP_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 169
+    SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 170
+    RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 171
+    COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 172
+    RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 173
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 174
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 175
+    DIRECT_INPUT_AND_HARVARD_AND_SCANNING_PROJECT = 176
+    RECAP_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 177
+    SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 178
+    RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 179
+    COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 180
+    RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 181
+    SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = (
+        182
+    )
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 183
+    IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 184
+    RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 185
+    SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 186
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 187
+    COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 188
+    RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 189
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 190
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT = 191
+    ANON_2020_AND_SCANNING_PROJECT = 192
+    RECAP_AND_ANON_2020_AND_SCANNING_PROJECT = 193
+    ANON_2020_AND_SCRAPER_AND_SCANNING_PROJECT = 194
+    RECAP_AND_SCRAPER_AND_ANON_2020_AND_SCANNING_PROJECT = 195
+    COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT = 196
+    RECAP_AND_COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT = 197
+    SCRAPER_AND_COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT = 198
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT = 199
+    IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 200
+    RECAP_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 201
+    SCRAPER_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 202
+    RECAP_AND_SCRAPER_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 203
+    COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 204
+    RECAP_AND_COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 205
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 206
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT = 207
+    ANON_2020_AND_HARVARD_AND_SCANNING_PROJECT = 208
+    RECAP_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 209
+    ANON_2020_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT = 210
+    RECAP_AND_SCRAPER_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 211
+    COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 212
+    RECAP_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 213
+    SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 214
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 215
+    IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 216
+    RECAP_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 217
+    SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 218
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 219
+    COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 220
+    RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 221
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 222
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT = 223
+    DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 224
+    RECAP_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 225
+    SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 226
+    RECAP_AND_SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 227
+    COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 228
+    RECAP_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = (
+        229
+    )
+    SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 230
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 231
+    IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 232
+    RECAP_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 233
+    SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 234
+    RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 235
+    COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 236
+    RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 237
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 238
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 239
+    HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 240
+    RECAP_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 241
+    SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = (
+        242
+    )
+    RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 243
+    COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 244
+    RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 245
+    SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 246
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 247
+    IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 248
+    RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 249
+    SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 250
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 251
+    COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 252
+    RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 253
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 254
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT = 255
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -546,6 +681,499 @@ class DocketSources:
         (
             SCANNING_PROJECT,
             "Scanning project",
+        ),
+        (RECAP_AND_SCANNING_PROJECT, "RECAP and scanning project"),
+        (SCRAPER_AND_SCANNING_PROJECT, "Scraper and scanning project"),
+        (
+            RECAP_AND_SCRAPER_AND_SCANNING_PROJECT,
+            "RECAP, scraper, and scanning project",
+        ),
+        (COLUMBIA_AND_SCANNING_PROJECT, "Columbia and scanning project"),
+        (
+            COLUMBIA_AND_RECAP_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_SCANNING_PROJECT,
+            "Columbia, scraper, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, scraper, and scanning project",
+        ),
+        (IDB_AND_SCANNING_PROJECT, "IDB and scanning project"),
+        (
+            RECAP_AND_IDB_AND_SCANNING_PROJECT,
+            "RECAP, IDB, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_SCANNING_PROJECT,
+            "Scraper, IDB, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_SCANNING_PROJECT,
+            "Columbia, IDB, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_IDB_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, IDB, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_IDB_AND_SCANNING_PROJECT,
+            "Columbia, scraper, IDB, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, scraper, IDB, and scanning project",
+        ),
+        (HARVARD_AND_SCANNING_PROJECT, "Harvard and scanning project"),
+        (
+            HARVARD_AND_RECAP_AND_SCANNING_PROJECT,
+            "Harvard, RECAP, and scanning project",
+        ),
+        (
+            SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Scraper, Harvard, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Harvard, and scanning project",
+        ),
+        (
+            HARVARD_AND_COLUMBIA_AND_SCANNING_PROJECT,
+            "Harvard, Columbia, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, Harvard, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Columbia, scraper, Harvard, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, scraper, Harvard, and scanning project",
+        ),
+        (
+            IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "IDB, Harvard, and scanning project",
+        ),
+        (
+            RECAP_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "RECAP, IDB, Harvard, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Scraper, IDB, Harvard, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, Harvard, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Columbia, IDB, Harvard, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, IDB, Harvard, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Columbia, scraper, IDB, Harvard, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Columbia, RECAP, scraper, IDB, Harvard, and scanning project",
+        ),
+        (
+            DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Direct court input and scanning project",
+        ),
+        (
+            RECAP_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, direct court input, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Columbia, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, direct court input, and scanning project",
+        ),
+        (
+            IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "IDB, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, IDB, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, IDB, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, direct court input, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Columbia, IDB, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, IDB, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, IDB, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, IDB, direct court input, and scanning project",
+        ),
+        (
+            DIRECT_INPUT_AND_HARVARD_AND_SCANNING_PROJECT,
+            "Direct court input, Harvard, and scanning project",
+        ),
+        (
+            RECAP_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, Harvard, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, Harvard, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Harvard, direct court input, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Columbia, Harvard, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, Harvard, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, Harvard, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, Harvard, direct court input, and scanning project",
+        ),
+        (
+            IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Columbia, IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, IDB, Harvard, direct court input, and scanning project",
+        ),
+        (
+            ANON_2020_AND_SCANNING_PROJECT,
+            "2020 anonymous database and scanning project",
+        ),
+        (
+            RECAP_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, 2020 anonymous database, and scanning project",
+        ),
+        (
+            ANON_2020_AND_SCRAPER_AND_SCANNING_PROJECT,
+            "2020 anonymous database, scraper, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, 2020 anonymous database, and scanning project",
+        ),
+        (
+            IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, IDB, 2020 anonymous database, and scanning project",
+        ),
+        (
+            ANON_2020_AND_HARVARD_AND_SCANNING_PROJECT,
+            "2020 anonymous database, Harvard, and scanning project",
+        ),
+        (
+            RECAP_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            ANON_2020_AND_SCRAPER_AND_HARVARD_AND_SCANNING_PROJECT,
+            "2020 anonymous database, scraper, Harvard, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, IDB, Harvard, 2020 anonymous database, and scanning project",
+        ),
+        (
+            DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, IDB, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Columbia, IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, Columbia, IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "Scraper, Columbia, IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020_AND_SCANNING_PROJECT,
+            "RECAP, scraper, Columbia, IDB, Harvard, direct court input, 2020 anonymous database, and scanning project",
         ),
     )
 
