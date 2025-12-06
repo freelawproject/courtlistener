@@ -1,8 +1,8 @@
 from collections import OrderedDict
+from datetime import datetime, timedelta
 
 import redis
 from django.db import OperationalError, connections
-from django.db.models import F
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConnectionError,
@@ -10,10 +10,10 @@ from elasticsearch.exceptions import (
     RequestError,
 )
 from elasticsearch_dsl import connections as es_connections
+from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import get_redis_interface
-from cl.stats.models import Stat
 
 MILESTONES = OrderedDict(
     (
@@ -51,21 +51,41 @@ def get_milestone_range(start, end):
     return out
 
 
-async def tally_stat(name, inc=1, date_logged=None):
+def tally_stat(name, inc=1, date_logged=None) -> int:
     """Tally an event's occurrence to the database.
 
     Will assume the following overridable values:
        - the event happened today.
        - the event happened once.
     """
+    if not switch_is_active("increment-stats"):
+        return
+
+    r = get_redis_interface("STATS")
+    current_dt = now()
     if date_logged is None:
-        date_logged = now()
-    return await Stat.objects.aupdate_or_create(
-        name=name,
-        date_logged=date_logged,
-        defaults={"count": F("count") + inc},
-        create_defaults={"count": inc},
+        date_logged = current_dt.date()
+
+    key = f"{name}.{date_logged.isoformat()}"
+
+    # Compute expiration:
+    # Keys live for 10 full days after the date they represent. For example,
+    # a key for June 1 will expire at June 12 at 00:00:00.
+    midnight_today = datetime.combine(
+        date_logged, datetime.min.time(), tzinfo=now().tzinfo
     )
+    expire_at_date = midnight_today + timedelta(days=11)
+
+    # Convert to seconds-from-now for Redis EXPIRE
+    ttl_seconds = int((expire_at_date - now()).total_seconds())
+
+    # Increment and apply expiration atomically
+    pipe = r.pipeline()
+    pipe.incrby(key, inc)
+    pipe.expire(key, ttl_seconds)
+    value, _ = pipe.execute()
+
+    return value
 
 
 def check_redis() -> bool:
