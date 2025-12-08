@@ -14,7 +14,7 @@ from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import get_redis_interface
-from cl.stats.metrics import prometheus_handler
+from cl.stats.metrics import record_prometheus_metric
 
 MILESTONES = OrderedDict(
     (
@@ -97,7 +97,7 @@ def tally_stat(
     key = f"{name}.{date_logged.isoformat()}"
 
     if prometheus_handler_key:
-        prometheus_handler(prometheus_handler_key, inc)
+        record_prometheus_metric(prometheus_handler_key, inc)
 
     return _update_cached_stat(key, inc, date_logged)
 

@@ -66,7 +66,7 @@ from cl.search.models import (
     OpinionCluster,
     SearchQuery,
 )
-from cl.stats.metrics import prometheus_handler
+from cl.stats.metrics import record_prometheus_metric
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -329,7 +329,7 @@ def store_search_api_query(
     prometheus_key = (
         f"search.queries.{'semantic' if is_semantic else 'keyword'}.api"
     )
-    prometheus_handler(prometheus_key, 1)
+    record_prometheus_metric(prometheus_key, 1)
 
 
 class CachedESSearchResults(TypedDict):

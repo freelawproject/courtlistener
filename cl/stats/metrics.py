@@ -13,9 +13,8 @@ def _inc(metric: Counter, inc: int, **kwargs):
     metric.labels(**kwargs).inc(inc)
 
 
-def prometheus_handler(key, *args):
-    if PROMETHEUS_STAT_HANDLERS.get(key) is not None:
-        PROMETHEUS_STAT_HANDLERS[key](*args)
+def record_prometheus_metric(key, *args):
+    PROMETHEUS_STAT_HANDLERS[key](*args)
 
 
 PROMETHEUS_STAT_HANDLERS: dict[str, Callable[[int], None]] = {
