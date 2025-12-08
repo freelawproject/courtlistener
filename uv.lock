@@ -351,6 +351,7 @@ dependencies = [
     { name = "gunicorn" },
     { name = "httplib2" },
     { name = "httpx", extra = ["http2"] },
+    { name = "hyperscan" },
     { name = "instructor" },
     { name = "internetarchive" },
     { name = "ipaddress" },
