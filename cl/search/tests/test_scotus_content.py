@@ -1,3 +1,4 @@
+import datetime
 from unittest import mock
 
 from django.core.files.base import ContentFile
@@ -8,9 +9,16 @@ from cl.recap.mergers import merge_scotus_docket
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
+    SCOTUSAttachmentFactory,
     ScotusDocketDataFactory,
+    SCOTUSDocketEntryFactory,
 )
-from cl.search.models import Docket, ScotusDocketMetadata
+from cl.search.models import (
+    Docket,
+    DocketEntry,
+    RECAPDocument,
+    ScotusDocketMetadata,
+)
 
 
 class ScotusDocketMergeTest(TestCase):
@@ -26,12 +34,51 @@ class ScotusDocketMergeTest(TestCase):
     def test_merge_scotus_docket_creates_docket_and_metadata(self) -> None:
         """Confirm SCOTUS data is merged into Docket and metadata."""
 
+        de_1 = SCOTUSDocketEntryFactory(
+            description="lorem ipsum 1",
+            date_filed=datetime.date(2015, 8, 19),
+            document_number=23453,
+            attachments=[
+                SCOTUSAttachmentFactory(
+                    description="Main 1", document_number=23453
+                ),
+                SCOTUSAttachmentFactory(
+                    description="Attachment 2", document_number=23453
+                ),
+            ],
+        )
+        de_2 = SCOTUSDocketEntryFactory(
+            description="lorem ipsum 2",
+            date_filed=datetime.date(2015, 8, 21),
+            document_number=23455,
+            attachments=[
+                SCOTUSAttachmentFactory(
+                    description="Main 1.1 ", document_number=23455
+                ),
+                SCOTUSAttachmentFactory(
+                    description="Attachment 2.1 ", document_number=23455
+                ),
+            ],
+        )
+        de_3 = SCOTUSDocketEntryFactory(
+            description="Low after process.",
+            date_filed=datetime.date(2015, 8, 22),
+            document_number=None,
+            attachments=[],
+        )
+        de_4 = SCOTUSDocketEntryFactory(
+            description="Key street surface",
+            date_filed=datetime.date(2015, 8, 22),
+            document_number=None,
+            attachments=[],
+        )
         data = ScotusDocketDataFactory(
             docket_number="23-1434",
             capital_case=False,
             lower_court="United States Court of Appeals for the Second Circuit",
             lower_court_case_numbers=["22-16375", "22-16622"],
             lower_court_case_numbers_raw="Docket Num. 22-16375, Docket Num. 22-16622",
+            docket_entries=[de_1, de_2, de_3, de_4],
         )
         docket = merge_scotus_docket(data)
         docket.refresh_from_db()
@@ -46,6 +93,35 @@ class ScotusDocketMergeTest(TestCase):
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
         self.assertEqual(docket.appeal_from_id, self.lower_court.pk)
+
+        # Docket entries
+        des = DocketEntry.objects.filter(docket=docket)
+        self.assertEqual(des.count(), 4, "Wrong number of Docket entries.")
+
+        des_tests = [de_1, de_2, de_3, de_4]
+        for de in des_tests:
+            de_db = DocketEntry.objects.filter(
+                docket=docket, description=de["description"]
+            ).first()
+            self.assertEqual(de["document_number"], de_db.entry_number)
+
+        rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
+        self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
+
+        main_rds = RECAPDocument.objects.filter(
+            docket_entry__docket=docket,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        self.assertEqual(
+            main_rds.count(), 2, "Wrong number of Main documents."
+        )
+
+        atts_rds = RECAPDocument.objects.filter(
+            docket_entry__docket=docket, document_type=RECAPDocument.ATTACHMENT
+        )
+        self.assertEqual(
+            atts_rds.count(), 4, "Wrong number of Attachment documents."
+        )
 
         # ScotusDocketMetadata fields
         metadata = docket.scotus_metadata
@@ -74,6 +150,17 @@ class ScotusDocketMergeTest(TestCase):
             oci.date_rehearing_denied,
             data["lower_court_rehearing_denied_date"],
         )
+
+        # Merge again. Confirm objects are not duplicated.
+        docket = merge_scotus_docket(data)
+        docket.refresh_from_db()
+
+        # Docket entries
+        des = DocketEntry.objects.filter(docket=docket)
+        self.assertEqual(des.count(), 4, "Wrong number of Docket entries.")
+
+        rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
+        self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""

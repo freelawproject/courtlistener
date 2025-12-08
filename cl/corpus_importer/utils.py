@@ -134,7 +134,7 @@ def is_appellate_court(court_id: str) -> bool:
     :return: True if the court_id corresponds to an appellate court,
         False otherwise.
     """
-    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    appellate_court_ids = Court.federal_courts.appellate_courts()
     return appellate_court_ids.filter(pk=court_id).exists()
 
 
@@ -146,7 +146,7 @@ async def ais_appellate_court(court_id: str) -> bool:
     :return: True if the court_id corresponds to an appellate court,
         False otherwise.
     """
-    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    appellate_court_ids = Court.federal_courts.appellate_courts()
     return await appellate_court_ids.filter(pk=court_id).aexists()
 
 
