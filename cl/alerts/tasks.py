@@ -450,7 +450,6 @@ def send_webhook_alert_hits(
     alert_user: UserProfile.user, hits: list[SearchAlertHitType]
 ) -> None:
     """Send webhook alerts for search hits.
-
     :param alert_user: The user profile object associated with the webhooks.
     :param hits: A list of tuples, each containing information about an alert,
     its associated search type, documents found, and the number of documents.
@@ -571,33 +570,6 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             Alert.objects.filter(pk=hit.meta.id).select_related("user").first()
         )
         if not alert_triggered:
-            continue
-
-        # Logic to roll out opinion alerts according to their sending rate.
-        is_opinion_alert = alert_triggered.alert_type == SEARCH_TYPES.OPINION
-        if (
-            is_opinion_alert
-            and alert_triggered.rate == Alert.REAL_TIME
-            and not settings.RT_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        ):
-            continue
-        if (
-            is_opinion_alert
-            and alert_triggered.rate == Alert.DAILY
-            and not settings.DLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        ):
-            continue
-        if (
-            is_opinion_alert
-            and alert_triggered.rate == Alert.WEEKLY
-            and not settings.WLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        ):
-            continue
-        if (
-            is_opinion_alert
-            and alert_triggered.rate == Alert.MONTHLY
-            and not settings.MLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        ):
             continue
 
         alert_triggered_id = alert_triggered.pk
@@ -777,12 +749,12 @@ def send_or_schedule_search_alerts(
         not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
         and response.app_label in ["search.RECAPDocument", "search.Docket"]
     ) or (
-        not settings.RT_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        not settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
         and response.app_label in ["search.Opinion"]
     ):
         # Disable percolation for RECAP Or Opinions search alerts until
-        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or RT_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
-        # is set to True.
+        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        # is set to True. Useful to prevent conflicts in tests.
         self.request.chain = None
         return None
 
