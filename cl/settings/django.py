@@ -261,4 +261,4 @@ SILENCED_SYSTEM_CHECKS = [
     "security.W004",
 ]
 
-PROMETHEUS_METRIC_NAMESPACE = "courtlistener"
+PROMETHEUS_METRIC_NAMESPACE = "cl_django"
