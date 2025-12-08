@@ -18,6 +18,9 @@ def record_prometheus_metric(key, *args):
 
 
 PROMETHEUS_STAT_HANDLERS: dict[str, Callable[[int], None]] = {
+    "search.queries.semantic.web": lambda inc: _inc(
+        search_queries_total, inc, query_type="semantic", method="web"
+    ),
     "search.queries.keyword.web": lambda inc: _inc(
         search_queries_total, inc, query_type="keyword", method="web"
     ),
