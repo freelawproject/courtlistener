@@ -100,10 +100,12 @@ class OriginatingCourtInformationViewSet(
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
 
 
-class BankruptcyInformationViewSet(DeferredFieldsMixin, viewsets.ModelViewSet):
+class BankruptcyInformationViewSet(
+    NoFilterCacheListMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     serializer_class = BankruptcyInformationSerializer
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     # Default cursor ordering key
