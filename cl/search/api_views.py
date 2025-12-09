@@ -13,7 +13,6 @@ from rest_framework.permissions import (
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
-from waffle import flag_is_active
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
@@ -27,6 +26,7 @@ from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
+    BankruptcyInformationSerializer,
     CourtSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
@@ -67,6 +67,7 @@ from cl.search.filters import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
+    BankruptcyInformation,
     ClusterRedirection,
     Court,
     Docket,
@@ -97,6 +98,40 @@ class OriginatingCourtInformationViewSet(
         "date_modified",
     ]
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
+
+
+class BankruptcyInformationViewSet(
+    NoFilterCacheListMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
+    serializer_class = BankruptcyInformationSerializer
+    permission_classes = [
+        DjangoModelPermissions,
+        V3APIPermission,
+    ]
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
+    queryset = (
+        BankruptcyInformation.objects.select_related("docket")
+        .only(
+            "id",
+            "date_created",
+            "date_modified",
+            "date_converted",
+            "date_last_to_file_claims",
+            "date_last_to_file_govt",
+            "date_debtor_dismissed",
+            "chapter",
+            "trustee_str",
+            "docket__id",
+        )
+        .order_by("-id")
+    )
 
 
 class DocketViewSet(
@@ -135,6 +170,7 @@ class DocketViewSet(
             "referred_to",
             "originating_court_information",
             "idb_data",
+            "bankruptcy_information",
         )
         .prefetch_related("panel", "clusters", "audio_files", "tags")
         .order_by("-id")
@@ -506,16 +542,6 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         )
 
     def create(self, request, *args, **kwargs):
-        # Check if waffle flag is enabled for this account
-        if not flag_is_active(request, "enable_semantic_search"):
-            raise ValidationError(
-                {
-                    "non_field_errors": [
-                        "This feature is currently disabled for your account."
-                    ]
-                }
-            )
-
         # Validate query parameters (from URL) and request body (JSON)
         query_params = SearchForm(request.GET, request=request)
         request_body = VectorSerializer(data=request.data)

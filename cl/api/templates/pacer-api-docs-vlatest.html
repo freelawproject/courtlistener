@@ -54,6 +54,7 @@
         <li><a href="#party-endpoint">Parties</a></li>
         <li><a href="#attorney-endpoint">Attorneys</a></li>
         <li><a href="#og-court-info-endpoint">Originating Court Info</a></li>
+        <li><a href="#bankruptcy-information-endpoint">Bankruptcy Info</a></li>
         <li><a href="#idb-data-endpoint">Integrated Database</a></li>
       </ul>
       <li><a href="#recap-query">Fast Document Lookup</a></li>
@@ -335,12 +336,19 @@
   {% endif %}
 
 
-  <h2 id="og-court-info-endpoint">Originating Court <small> — <code><nobr>{% url 'originatingcourtinformation-list' version=version %}</nobr></code></small></h2>
+  <h2 id="og-court-info-endpoint">Originating Court Information<small> — <code><nobr>{% url 'originatingcourtinformation-list' version=version %}</nobr></code></small></h2>
   <p><code>Originating Court Information</code> represents the information gathered at an appellate court about a case when it was in a lower court or administrative body.
   </p>
   <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.
   </p>
   <p>Cross-walking from the upper court docket to the lower is possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.
+  </p>
+
+
+    <h2 id="bankruptcy-information-endpoint">Bankruptcy Information <small> — <code><nobr>{% url 'bankruptcyinformation-list' version=version %}</nobr></code></small></h2>
+  <p><code>Bankruptcy Information</code> represents metadata specific to PACER bankruptcy dockets, such as details about the bankruptcy case, including the chapter, trustee information, and key dates.
+  </p>
+  <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, it is only populated for dockets acquired from bankruptcy courts via PACER, so it does not apply to other types of cases.
   </p>
 
 
