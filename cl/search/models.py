@@ -3897,3 +3897,148 @@ class ClusterRedirection(models.Model):
                 cluster=cluster_to_keep,
                 reason=reason,
             )
+
+
+# ---------- New model for documents coming from California Supreme Court ----------
+
+
+class CaseIdentifier(models.Model):
+    """Model to store alternate/legacy identifiers for cases."""
+
+    docket = models.ForeignKey(
+        "Docket", on_delete=models.CASCADE, related_name="identifiers"
+    )
+    id_type = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="Type of identifier (e.g., 'S', 'LA', 'Crim', 'CalReporter')",
+    )
+    identifier = models.CharField(max_length=128, db_index=True)
+    note = models.CharField(max_length=255, null=True, blank=True)
+    first_seen = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (("id_type", "identifier"),)
+        indexes = [
+            models.Index(fields=["id_type", "identifier"]),
+        ]
+
+
+class StateCourtDocument(AbstractPDF, AbstractDateTimeModel, CSVExportMixin):
+    """Documents and attachments from state court dockets."""
+
+    DOCUMENT_TYPES = (
+        (1, "Opinion"),
+        (2, "Order"),
+        (3, "Petition"),
+        (4, "Brief"),
+        (5, "Motion"),
+        (6, "Transcript"),
+        (7, "Miscellaneous"),
+    )
+
+    docket_entry = models.ForeignKey(
+        DocketEntry,
+        help_text=(
+            "Foreign Key to the DocketEntry object to which it belongs. "
+            "Multiple documents can belong to a DocketEntry. "
+            "(Attachments and Documents together)"
+        ),
+        related_name="state_court_documents",
+        on_delete=models.CASCADE,
+    )
+    document_number = models.CharField(
+        help_text=(
+            "If the file is a document, the number is the "
+            "document_number in RECAP docket."
+        ),
+        max_length=32,
+        db_index=True,
+        blank=True,  # To support unnumbered minute entries
+    )
+    tags = models.ManyToManyField(
+        "search.Tag",
+        help_text="The tags associated with the document.",
+        related_name="recap_documents",
+        blank=True,
+    )
+    document_type = models.IntegerField(
+        help_text="Whether this is a regular document or an attachment.",
+        choices=DOCUMENT_TYPES,
+    )
+    description = models.TextField(
+        help_text=(
+            "The short description of the docket entry that appears on "
+            "the attachments page."
+        ),
+        blank=True,
+    )
+    source = models.CharField(
+        max_length=64,
+        default="acis",
+        db_index=True,
+        help_text="Source system name, e.g., 'acis', 'findlaw'",
+    )
+    source_url = models.TextField(
+        null=True, blank=True, help_text="Original public URL to the document"
+    )
+    is_available = models.BooleanField(
+        help_text="True if the item is available in RECAP",
+        blank=True,
+        null=True,
+        default=False,
+    )
+    is_sealed = models.BooleanField(
+        help_text="Is this item sealed or otherwise unavailable on PACER?",
+        null=True,
+    )
+
+    class Meta:
+        unique_together = (
+            "docket_entry",
+            "document_number",
+            "source_url",
+        )
+        ordering = ("document_type", "document_number", "source_url")
+        indexes = [
+            models.Index(
+                fields=[
+                    "document_type",
+                    "document_number",
+                    "source_url",
+                ],
+                name="search_statecourtdocument_document_type_idx",
+            ),
+            models.Index(
+                fields=["filepath_local"],
+                name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
+            ),
+            models.Index(
+                fields=["source", "source_url"],
+                name="search_statecourtdocument_source_url_idx",
+            ),
+        ]
+
+
+class OpinionsCitedByStateCourtDocument(models.Model):
+    citing_document = models.ForeignKey(
+        StateCourtDocument,
+        related_name="cited_opinions",
+        on_delete=models.CASCADE,
+    )
+    cited_opinion = models.ForeignKey(
+        Opinion, related_name="citing_documents", on_delete=models.CASCADE
+    )
+    depth = models.IntegerField(
+        help_text="The number of times the cited opinion was cited "
+        "in the citing document",
+        default=1,
+    )
+
+    def __str__(self) -> str:
+        return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
+
+    class Meta:
+        verbose_name_plural = "Opinions cited by State Court document"
+        unique_together = ("citing_document", "cited_opinion")
+        indexes = [models.Index(fields=["depth"])]
