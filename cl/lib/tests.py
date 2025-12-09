@@ -496,46 +496,28 @@ class TestModelHelpers(TestCase):
         docket number core for scotus dockets.
         """
 
-        self.assertEqual(make_scotus_docket_number_core(None), "")
-        self.assertEqual(make_scotus_docket_number_core(""), "")
+        test_cases = [
+            # None or empty inputs
+            (None, ""),
+            ("", ""),
+            # SCOTUS A dockets
+            ("16A985", "16A00985"),
+            ("16a985", "16A00985"),
+            ("22A1", "22A00001"),
+            ("22A12345", "22A12345"),
+            # SCOTUS appellate style docket numbers (YY-NNNNNN)
+            ("12-33112", "12033112"),
+            ("12-000001", "12000001"),
+            ("06-10672", "06010672"),
+            # Non-matching SCOTUS docket numbers
+            ("23-cv-001", ""),
+        ]
 
-        # SCOTUS A dockets
-        self.assertEqual(
-            make_scotus_docket_number_core("16A985"),
-            "16A00985",
-        )
-        self.assertEqual(
-            make_scotus_docket_number_core("16a985"),
-            "16A00985",
-        )
-        self.assertEqual(
-            make_scotus_docket_number_core("22A1"),
-            "22A00001",
-        )
-        self.assertEqual(
-            make_scotus_docket_number_core("22A12345"),
-            "22A12345",
-        )
-
-        # Appellate style docket numbers (YY-NNNNNN)
-        self.assertEqual(
-            make_scotus_docket_number_core("12-33112"),
-            "12033112",
-        )
-        self.assertEqual(
-            make_scotus_docket_number_core("12-000001"),
-            "12000001",
-        )
-        self.assertEqual(
-            make_scotus_docket_number_core("06-10672"),
-            "06010672",
-        )
-
-        # Non-matching docket numbers should return empty string.
-        self.assertEqual(
-            make_scotus_docket_number_core("23-cv-001"),
-            "",
-        )
+        for input_value, expected in test_cases:
+            with self.subTest(input=input_value, expected=expected):
+                self.assertEqual(
+                    make_scotus_docket_number_core(input_value), expected
+                )
 
 
 class S3PrivateUUIDStorageTest(TestCase):
