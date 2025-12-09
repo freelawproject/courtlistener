@@ -3,7 +3,6 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import pytz
-from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.utils.timezone import get_default_timezone, make_aware
 
@@ -199,7 +198,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             f"Removed {scheduled_alerts_deleted} Scheduled Alert Hits."
         )
 
-    async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
+    tally_stat("alerts.sent", inc=alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
 

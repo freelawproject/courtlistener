@@ -12,7 +12,6 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
-from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
@@ -293,7 +292,6 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                             msg="The source does not match.",
                         )
 
-    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
