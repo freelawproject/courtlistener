@@ -2157,15 +2157,20 @@ def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
     """
 
     for entry in docket_entries:
+        main_doc_short_desc = ""
         attachments = entry.get("attachments") or []
         entry["pacer_doc_id"] = ""
 
         for idx, attachment in enumerate(attachments, start=1):
+            if idx == 1:
+                main_doc_short_desc = attachment["description"]
             attachment["attachment_number"] = idx
             attachment["pacer_doc_id"] = ""
 
         if not attachments:
             entry["attachments"] = None
+
+        entry["short_description"] = main_doc_short_desc
 
 
 def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:

@@ -2533,14 +2533,15 @@ class RecapDocketFetchApiTest(TestCase):
     and API tests from the processing logic tests.
     """
 
-    COURT = "scotus"
-
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.district_court = CourtFactory(
+            id="cacd", jurisdiction=Court.FEDERAL_DISTRICT
+        )
         cls.user_profile = UserProfileWithParentsFactory()
         cls.docket = DocketFactory(
             source=Docket.RECAP,
-            court_id=cls.COURT,
+            court_id=cls.district_court.pk,
             pacer_case_id="104490",
             docket_number=fakes.DOCKET_NUMBER,
             case_name=fakes.CASE_NAME,
@@ -2580,7 +2581,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             docket_number=fakes.DOCKET_NUMBER,
         )
         result = do_pacer_fetch(fq)
@@ -2599,7 +2600,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             pacer_case_id="104490",
         )
         result = do_pacer_fetch(fq)
@@ -2883,7 +2884,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             docket_number=fakes.DOCKET_NUMBER,
         )
         result = do_pacer_fetch(fq)
