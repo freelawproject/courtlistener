@@ -2,7 +2,6 @@ import datetime
 import re
 from collections import OrderedDict
 
-import waffle
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -696,11 +695,7 @@ class SearchForm(forms.Form):
                 cleaned_data[k] = v.strip()
 
         should_disable_knn_search = (
-            not settings.KNN_SEARCH_ENABLED
-            or not self.request
-            or not waffle.flag_is_active(
-                self.request, "enable_semantic_search"
-            )
+            not settings.KNN_SEARCH_ENABLED or not self.request
         )
         if should_disable_knn_search:
             cleaned_data["semantic"] = False

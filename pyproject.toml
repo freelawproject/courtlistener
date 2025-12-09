@@ -105,7 +105,7 @@ dependencies = [
   "openai>=1.70.0",
   "seal-rookery>=2.3.1",
   "types-pytz>=2025.2.0.20250326",
-  "psycopg[binary,pool]>=3.2.6",
+  "psycopg[binary,pool]>=3.3.0",
   "boto3>=1.37.20",
   "django-tailwind>=3.8.0",
   "django-ses[events]>=0.44.0",
@@ -116,6 +116,7 @@ dependencies = [
   "instructor>=1.11.3",
   "django-s3-express-cache>=0.1.0",
   "zohocrmsdk8-0==4.0.0",
+  "django-prometheus>=2.4.1",
 ]
 
 [dependency-groups]

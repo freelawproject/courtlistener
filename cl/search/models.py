@@ -1923,6 +1923,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             )
             | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
             end_date__isnull=True,
+            in_use=True,
         ).exclude(pk="scotus")
 
     def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
