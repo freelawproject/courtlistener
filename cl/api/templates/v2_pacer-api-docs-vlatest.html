@@ -1,4 +1,5 @@
 {% extends 'new_base.html' %}
+{% load extras %}
 
 {% block title %}PACER Data API Help{% endblock %}
 
@@ -10,13 +11,13 @@
     {'href': '#the-apis', 'text': 'The APIs', 'children': [
       {'href': '#dockets', 'text': 'Dockets'},
       {'href': '#courts', 'text': 'Courts'},
-      {'href': '#docker-entries', 'text': 'Docker Entries},
+      {'href': '#docker-entries', 'text': 'Docker Entries'},
       {'href': '#documents', 'text': 'Documents'},
       {'href': '#parties', 'text': 'Parties'},
       {'href': '#attorneys', 'text': 'Attorneys'},
       {'href': '#orig-court-info', 'text': 'Originating Court Info'},
       {'href': '#integrated-db', 'text': 'Integrated Database'},
-    ]},
+      ]},
     {'href': '#fast-doc-lookup', 'text': 'Fast Document Lookup'},
   ]"
 >
