@@ -107,6 +107,16 @@ class ScotusDocketMergeTest(TestCase):
 
         rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
         self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
+        rds_pks = set(rds.values_list("pk", flat=True))
+
+        rd_att_1 = RECAPDocument.objects.filter(
+            docket_entry__docket=docket, description="Main 1"
+        ).first()
+        self.assertEqual(rd_att_1.document_type, RECAPDocument.ATTACHMENT)
+        rd_att_2 = RECAPDocument.objects.filter(
+            docket_entry__docket=docket, description="Attachment 2"
+        ).first()
+        self.assertEqual(rd_att_2.document_type, RECAPDocument.ATTACHMENT)
 
         main_rds = RECAPDocument.objects.filter(
             docket_entry__docket=docket,
@@ -161,6 +171,19 @@ class ScotusDocketMergeTest(TestCase):
 
         rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
         self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
+        rds_pks_new = set(rds.values_list("pk", flat=True))
+        self.assertEqual(rds_pks, rds_pks_new)
+
+        rd_att_1_1 = RECAPDocument.objects.filter(
+            docket_entry__docket=docket, description="Main 1"
+        ).first()
+        self.assertEqual(rd_att_1_1.document_type, RECAPDocument.ATTACHMENT)
+        rd_att_2_1 = RECAPDocument.objects.filter(
+            docket_entry__docket=docket, description="Attachment 2"
+        ).first()
+        self.assertEqual(rd_att_2_1.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(rd_att_1.pk, rd_att_1_1.pk)
+        self.assertEqual(rd_att_2.pk, rd_att_2_1.pk)
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""

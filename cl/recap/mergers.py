@@ -949,9 +949,15 @@ async def add_docket_entries(
         # or throw an error.
         params = {"docket_entry": de}
         if is_scotus:
-            params["document_number"] = docket_entry.get("document_number")
-        if not docket_entry["document_number"] and docket_entry.get(
-            "short_description"
+            doc_number = docket_entry.get("document_number")
+            params["document_number"] = doc_number if doc_number else ""
+
+        short_description = docket_entry.get("short_description")
+        if (
+            not docket_entry["document_number"]
+            and short_description
+            or is_scotus
+            and short_description
         ):
             params["description"] = docket_entry["short_description"]
 
@@ -1069,6 +1075,10 @@ async def add_docket_entries(
                 None,
                 attachments,
                 False,
+                False,
+                False,
+                d.docket_number_core,
+                rd.description,
             )
 
     known_filing_dates = set(filter(None, known_filing_dates))
@@ -1695,6 +1705,8 @@ async def merge_attachment_page_data(
     debug: bool = False,
     is_acms_attachment: bool = False,
     subdocket_replication: bool = False,
+    docket_number_core: int | None = None,
+    description: str | None = None,
 ) -> tuple[list[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
 
@@ -1708,6 +1720,10 @@ async def merge_attachment_page_data(
     :param debug: Whether to do saves during this process.
     :param is_acms_attachment: Whether the attachments come from ACMS.
     :param subdocket_replication: Whether this process is related to subdocket replication.
+    :param docket_number_core: Optional. Used as a unique identifier to match
+    SCOTUS dockets that do not have a pacer_case_id.
+    :param description: Optional. The main document description used to match
+    SCOTUS documents that do not have a pacer_doc_id.
     :return: A list of RECAPDocuments modified or created during the process,
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
@@ -1722,6 +1738,8 @@ async def merge_attachment_page_data(
     is_scotus = court.pk == "scotus"
     if is_scotus:
         params["document_number"] = document_number
+        params["docket_entry__docket__docket_number_core"] = docket_number_core
+        params["description"] = description
     if pacer_case_id:
         params["docket_entry__docket__pacer_case_id"] = pacer_case_id
     try:
