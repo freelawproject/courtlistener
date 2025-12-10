@@ -5900,6 +5900,10 @@ class RecapCriminalDataUploadTaskTest(TestCase):
 
 
 class RecapAttachmentPageTaskTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
+
     def setUp(self) -> None:
         user = User.objects.get(username="recap")
         self.filename = "cand.html"
@@ -5911,7 +5915,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         with open(att_path, "rb") as f:
             self.att = SimpleUploadedFile(self.att_filename, f.read())
         self.d = Docket.objects.create(
-            source=0, court_id="scotus", pacer_case_id="asdf"
+            source=0, court=self.court, pacer_case_id="asdf"
         )
         self.de = DocketEntry.objects.create(docket=self.d, entry_number=1)
         RECAPDocument.objects.create(
@@ -5921,7 +5925,7 @@ class RecapAttachmentPageTaskTest(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
         self.pq = ProcessingQueue.objects.create(
-            court_id="scotus",
+            court=self.court,
             uploader=user,
             upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
             filepath_local=self.att,

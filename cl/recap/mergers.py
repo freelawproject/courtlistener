@@ -948,10 +948,6 @@ async def add_docket_entries(
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
         params = {"docket_entry": de}
-        if is_scotus:
-            doc_number = docket_entry.get("document_number")
-            params["document_number"] = doc_number if doc_number else ""
-
         short_description = docket_entry.get("short_description")
         if (
             not docket_entry["document_number"]
@@ -993,6 +989,13 @@ async def add_docket_entries(
             get_params = deepcopy(params)
             if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
+            if is_scotus:
+                # SCOTUS documents don't have a pacer_doc_id, so use the
+                # document_number instead to match the document.
+                doc_number = docket_entry.get("document_number")
+                get_params["document_number"] = (
+                    doc_number if doc_number else ""
+                )
             if de_created is False:
                 # Try to match the RD regardless of the document_type.
                 del get_params["document_type"]
@@ -1012,8 +1015,6 @@ async def add_docket_entries(
             if rd is None:
                 try:
                     params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
-                    if is_scotus:
-                        del params["document_number"]
                     rd = await RECAPDocument.objects.acreate(
                         document_number=docket_entry["document_number"] or "",
                         is_available=False,
