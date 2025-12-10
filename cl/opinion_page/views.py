@@ -979,7 +979,7 @@ async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
             ),
         )
     else:
-        prefetch = Prefetch(sub_opinions_prefetch)
+        prefetch = Prefetch(sub_opinions_prefetch)  # type: ignore[arg-type]
 
     return OpinionCluster.objects.prefetch_related(
         prefetch, "citations"
