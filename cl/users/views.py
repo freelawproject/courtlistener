@@ -517,7 +517,7 @@ def register(request: HttpRequest) -> HttpResponse:
             consent_form = OptInConsentForm(request.POST)
             if form.is_valid() and consent_form.is_valid():
                 cd = form.cleaned_data
-                try: 
+                try:
                     if not stub_account:
                         # make a new user that is active, but has not confirmed
                         # their email address
@@ -551,14 +551,16 @@ def register(request: HttpRequest) -> HttpResponse:
                         "IntegrityError during registration for username=%s: %s",
                         cd["username"],
                         str(e),
-                        exc_info=True
+                        exc_info=True,
                     )
-                    # Redirect to success if user already exists 
+                    # Redirect to success if user already exists
                     try:
                         user = User.objects.get(username=cd["username"])
                         get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
-                        return HttpResponseRedirect(reverse("register_success") + get_str)
-                    
+                        return HttpResponseRedirect(
+                            reverse("register_success") + get_str
+                        )
+
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
                         logger.error(
@@ -566,11 +568,18 @@ def register(request: HttpRequest) -> HttpResponse:
                             "This may indicate a constraint violation on a different field.",
                             cd["username"],
                         )
-                        form.add_error(None, "An error occurred during registration. Please try again.")
+                        form.add_error(
+                            None,
+                            "An error occurred during registration. Please try again.",
+                        )
                         return TemplateResponse(
                             request,
                             "register/register.html",
-                            {"form": form, "consent_form": consent_form, "private": False},
+                            {
+                                "form": form,
+                                "consent_form": consent_form,
+                                "private": False,
+                            },
                         )
 
                 # Only reached if user creation succeeded
