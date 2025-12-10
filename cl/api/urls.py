@@ -19,6 +19,11 @@ router = DefaultRouter()
 # Search & Audio
 router.register(r"dockets", search_views.DocketViewSet, basename="docket")
 router.register(
+    r"bankruptcy-information",
+    search_views.BankruptcyInformationViewSet,
+    basename="bankruptcyinformation",
+)
+router.register(
     r"originating-court-information",
     search_views.OriginatingCourtInformationViewSet,
     basename="originatingcourtinformation",

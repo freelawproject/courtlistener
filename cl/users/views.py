@@ -3,7 +3,6 @@ from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
 
-from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
@@ -48,7 +47,6 @@ from cl.lib.ratelimiter import (
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
-from cl.stats.utils import tally_stat
 from cl.users.forms import (
     AccountDeleteForm,
     CustomPasswordChangeForm,
@@ -563,7 +561,6 @@ def register(request: HttpRequest) -> HttpResponse:
                     email["from_email"],
                     email["to"],
                 )
-                async_to_sync(tally_stat)("user.created")
                 get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
                 return HttpResponseRedirect(
                     reverse("register_success") + get_str
