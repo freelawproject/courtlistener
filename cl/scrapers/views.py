@@ -2,8 +2,8 @@ from django.contrib.auth.models import User
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import EmailProcessingQueueAPIUsers, LoggingMixin
-from cl.recap.api_serializers import ProcessingQueueSerializer
-from cl.recap.filters import ProcessingQueueFilter
+from cl.recap.api_serializers import EmailProcessingQueueSerializer
+from cl.recap.filters import EmailProcessingQueueFilter
 from cl.recap.models import EmailProcessingQueue
 from cl.recap.tasks import process_scotus_email
 
@@ -11,8 +11,8 @@ from cl.recap.tasks import process_scotus_email
 class ScraperSCOTUSEmailEndpoint(LoggingMixin, ModelViewSet):
     permission_classes = (EmailProcessingQueueAPIUsers,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
-    serializer_class = ProcessingQueueSerializer
-    filterset_class = ProcessingQueueFilter
+    serializer_class = EmailProcessingQueueSerializer
+    filterset_class = EmailProcessingQueueFilter
     ordering_fields = ("id", "date_created", "date_modified")
     ordering = "-id"
     cursor_ordering_fields = ["id", "date_created", "date_modified"]
