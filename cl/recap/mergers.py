@@ -26,7 +26,11 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
+from cl.lib.model_helpers import (
+    clean_docket_number,
+    make_docket_number_core,
+    make_scotus_docket_number_core,
+)
 from cl.lib.pacer import (
     get_blocked_status,
     map_cl_to_pacer_id,
@@ -64,6 +68,7 @@ from cl.search.models import (
     DocketEntry,
     OriginatingCourtInformation,
     RECAPDocument,
+    ScotusDocketMetadata,
     Tag,
 )
 from cl.search.tasks import index_docket_parties_in_es
@@ -147,7 +152,11 @@ async def find_docket_object(
     # Attempt several lookups of decreasing specificity. Note that
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
-    docket_number_core = make_docket_number_core(docket_number)
+    docket_number_core = (
+        make_scotus_docket_number_core(docket_number)
+        if court_id == "scotus"
+        else make_docket_number_core(docket_number)
+    )
     lookups = []
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
@@ -2121,3 +2130,56 @@ def process_case_query_report(
         ContentFile(report_text.encode()),
     )
     return None
+
+
+@transaction.atomic
+def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
+    """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
+
+    This will create or update the Docket row for the SCOTUS and
+    then create or update the related ScotusDocketMetadata instance.
+
+    :param report_data: A dictionary containing parsed SCOTUS docket data.
+    :return: The created or updated Docket instance.
+    """
+    court = Court.objects.get(pk="scotus")
+    docket_number = report_data["docket_number"]
+    if not docket_number:
+        raise ValueError("Docket number can't be missing in SCOTUS dockets.")
+
+    case_name = report_data.get("case_name") or ""
+    date_filed = report_data.get("date_filed")
+    lower_court = report_data.get("lower_court")
+
+    d = async_to_sync(find_docket_object)(
+        court.pk,
+        None,
+        docket_number,
+        None,
+        None,
+        None,
+    )
+
+    d.source = Docket.SCRAPER
+    d.docket_number = docket_number
+    d.docket_number_raw = docket_number
+    d.case_name = case_name if case_name else d.case_name
+    d.date_filed = date_filed if date_filed else d.date_filed
+    d.appeal_from_str = lower_court if lower_court else d.appeal_from_str
+    d.save()
+
+    # Merge ScotusDocketMetadata
+    scotus_data, _ = ScotusDocketMetadata.objects.get_or_create(docket=d)
+    scotus_data.capital_case = bool(report_data.get("capital_case") or False)
+    scotus_data.date_discretionary_court_decision = report_data.get(
+        "discretionary_court_decision"
+    )
+    links = report_data.get("links")
+    scotus_data.linked_with = links if links else scotus_data.linked_with
+    qp_url = report_data.get("questions_presented")
+    scotus_data.questions_presented_url = (
+        qp_url if qp_url else scotus_data.questions_presented_url
+    )
+    scotus_data.save()
+
+    return d
