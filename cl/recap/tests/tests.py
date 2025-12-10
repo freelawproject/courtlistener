@@ -2533,14 +2533,15 @@ class RecapDocketFetchApiTest(TestCase):
     and API tests from the processing logic tests.
     """
 
-    COURT = "scotus"
-
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.district_court = CourtFactory(
+            id="cacd", jurisdiction=Court.FEDERAL_DISTRICT
+        )
         cls.user_profile = UserProfileWithParentsFactory()
         cls.docket = DocketFactory(
             source=Docket.RECAP,
-            court_id=cls.COURT,
+            court_id=cls.district_court.pk,
             pacer_case_id="104490",
             docket_number=fakes.DOCKET_NUMBER,
             case_name=fakes.CASE_NAME,
@@ -2580,7 +2581,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             docket_number=fakes.DOCKET_NUMBER,
         )
         result = do_pacer_fetch(fq)
@@ -2599,7 +2600,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             pacer_case_id="104490",
         )
         result = do_pacer_fetch(fq)
@@ -2883,7 +2884,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             docket_number=fakes.DOCKET_NUMBER,
         )
         result = do_pacer_fetch(fq)
@@ -5899,6 +5900,10 @@ class RecapCriminalDataUploadTaskTest(TestCase):
 
 
 class RecapAttachmentPageTaskTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
+
     def setUp(self) -> None:
         user = User.objects.get(username="recap")
         self.filename = "cand.html"
@@ -5910,7 +5915,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         with open(att_path, "rb") as f:
             self.att = SimpleUploadedFile(self.att_filename, f.read())
         self.d = Docket.objects.create(
-            source=0, court_id="scotus", pacer_case_id="asdf"
+            source=0, court=self.court, pacer_case_id="asdf"
         )
         self.de = DocketEntry.objects.create(docket=self.d, entry_number=1)
         RECAPDocument.objects.create(
@@ -5920,7 +5925,7 @@ class RecapAttachmentPageTaskTest(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
         self.pq = ProcessingQueue.objects.create(
-            court_id="scotus",
+            court=self.court,
             uploader=user,
             upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
             filepath_local=self.att,
