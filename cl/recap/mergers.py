@@ -24,6 +24,7 @@ from cl.corpus_importer.utils import (
     is_long_appellate_document_number,
     mark_ia_upload_needed,
 )
+from cl.lib.courts import find_court_object_by_name
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import (
@@ -2149,7 +2150,7 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
 
     case_name = report_data.get("case_name") or ""
     date_filed = report_data.get("date_filed")
-    lower_court = report_data.get("lower_court")
+    lower_court_name = report_data.get("lower_court")
 
     d = async_to_sync(find_docket_object)(
         court.pk,
@@ -2165,11 +2166,63 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
     d.docket_number_raw = docket_number
     d.case_name = case_name if case_name else d.case_name
     d.date_filed = date_filed if date_filed else d.date_filed
-    d.appeal_from_str = lower_court if lower_court else d.appeal_from_str
+    d.appeal_from_str = (
+        lower_court_name if lower_court_name else d.appeal_from_str
+    )
+    if lower_court_name:
+        lower_court = find_court_object_by_name(
+            lower_court_name, bankruptcy=False
+        )
+        d.appeal_from = (
+            lower_court if lower_court is not None else d.appeal_from
+        )
+
+    lower_court_case_numbers = report_data.get("lower_court_case_numbers")
+    lower_court_case_numbers_raw = report_data.get(
+        "lower_court_case_numbers_raw"
+    )
+    lower_court_decision_date = report_data.get("lower_court_decision_date")
+    lower_court_rehearing_denied_date = report_data.get(
+        "lower_court_rehearing_denied_date"
+    )
+    if (
+        lower_court_case_numbers
+        or lower_court_decision_date
+        or lower_court_rehearing_denied_date
+    ):
+        oci = d.originating_court_information
+        # Create originating_court_information if missing
+        oci = OriginatingCourtInformation() if not oci else oci
+
+        oci.docket_number = (
+            ", ".join(lower_court_case_numbers)
+            if lower_court_case_numbers
+            else oci.docket_number
+        )
+        oci.docket_number_raw = (
+            lower_court_case_numbers_raw
+            if lower_court_case_numbers_raw
+            else oci.docket_number_raw
+        )
+        oci.date_judgment = (
+            lower_court_decision_date
+            if lower_court_decision_date
+            else oci.date_judgment
+        )
+        oci.date_rehearing_denied = (
+            lower_court_rehearing_denied_date
+            if lower_court_rehearing_denied_date
+            else oci.date_rehearing_denied
+        )
+        oci.save()
+        d.originating_court_information = oci
     d.save()
 
     # Merge ScotusDocketMetadata
-    scotus_data, _ = ScotusDocketMetadata.objects.get_or_create(docket=d)
+    scotus_data = ScotusDocketMetadata.objects.filter(docket=d).first()
+    scotus_data = (
+        ScotusDocketMetadata(docket=d) if scotus_data is None else scotus_data
+    )
     scotus_data.capital_case = bool(report_data.get("capital_case") or False)
     scotus_data.date_discretionary_court_decision = report_data.get(
         "discretionary_court_decision"
