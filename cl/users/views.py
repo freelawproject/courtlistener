@@ -559,10 +559,15 @@ def register(request: HttpRequest) -> HttpResponse:
                         get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
                         return HttpResponseRedirect(reverse("register_success") + get_str)
                     
-                    # Else, display error message and rerender form
+                    # Else, display generic error message and rerender form
                     except User.DoesNotExist:
+                        logger.error(
+                            "Unexpected IntegrityError during registration: user %s does not exist after IntegrityError. "
+                            "This may indicate a constraint violation on a different field.",
+                            cd["username"],
+                        )
                         form.add_error(None, "An error occurred during registration. Please try again.")
-                        return TemplateResponse(  
+                        return TemplateResponse(
                             request,
                             "register/register.html",
                             {"form": form, "consent_form": consent_form, "private": False},
