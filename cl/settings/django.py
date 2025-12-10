@@ -169,6 +169,7 @@ INSTALLED_APPS = [
     "pghistory",
     "pgtrigger",
     # CourtListener Apps
+    "cl.ai",
     "cl.alerts",
     "cl.audio",
     "cl.api",
