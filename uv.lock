@@ -992,27 +992,27 @@ wheels = [
 
 [[package]]
 name = "django-pghistory"
-version = "3.5.4"
+version = "3.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-pgtrigger" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/32/44/8685dffb6a2241d8259ff86e8a6e379268aa98457e8d958aea933dcce910/django_pghistory-3.5.4.tar.gz", hash = "sha256:2fec5b7e0c927b00959f8d9807adc3a72f76e920fdf0c4da83db9a524de40305", size = 31223, upload-time = "2025-03-12T20:47:32.886Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/61/06119cef2cb88e2314d00e27fc581c77a97baf90dfa638e03db3d87c2b10/django_pghistory-3.9.0.tar.gz", hash = "sha256:36f883ce91ac27bd3f6841494224c7579dc41243c217db2cdd2caf4c4a13400d", size = 31341, upload-time = "2025-11-30T23:50:01.679Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/76/df702b2c2b9597f2a6ebc11a5b7c836ba304352250e5d345956884577373/django_pghistory-3.5.4-py3-none-any.whl", hash = "sha256:5bde1fda387801aa05c4eee84a90b7d5db3a13d585b7bc0ffa6a3d4b51f2f6da", size = 38358, upload-time = "2025-03-12T20:47:31.731Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/4c/cfbccf04a9aa22e360449be6ec5965ce7a5dbb508733c835ef2643b6a876/django_pghistory-3.9.0-py3-none-any.whl", hash = "sha256:4506aedb59fc0b1061911293170b15e617eb0db72924cee7edc7e30725b3e995", size = 39871, upload-time = "2025-11-30T23:50:00.687Z" },
 ]
 
 [[package]]
 name = "django-pgtrigger"
-version = "4.13.3"
+version = "4.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/98/d93f658316901c54a00ec0caefc3e73796b2f7ffcc1fd11188da22c45027/django_pgtrigger-4.13.3.tar.gz", hash = "sha256:c525f9e81f120d166c4bd5fe8c3770640356f0644edf0fc2b7f6426008e52f77", size = 30723, upload-time = "2024-12-16T01:56:44.466Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/45/3d/ea55015e2e2a8e2230c6a056768512a9660573f8926f87671f166d455936/django_pgtrigger-4.17.0.tar.gz", hash = "sha256:55d297a756b5b6a8e0c533d3323fda1589c699e7d14aa3fff7fa7d774c46363c", size = 32200, upload-time = "2025-12-04T15:46:06.587Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/cb/3bb87d45b1b46ef36f3786fbfcda0a43f80c8fa4e742a350a2cd1512557e/django_pgtrigger-4.13.3-py3-none-any.whl", hash = "sha256:d6e4d17021bbd5e425a308f07414b237b9b34423275d86ad756b90c307df3ca4", size = 34059, upload-time = "2024-12-16T01:56:39.643Z" },
+    { url = "https://files.pythonhosted.org/packages/91/47/13c0c23c134cd0f0b0addfbc3ef1477f90d891184d21689f9074b794b00c/django_pgtrigger-4.17.0-py3-none-any.whl", hash = "sha256:06048cdeb57e20987fd0bf7dd673512a1413a08868eea248d70dbb970e967175", size = 36326, upload-time = "2025-12-04T15:46:05.427Z" },
 ]
 
 [[package]]
@@ -1772,7 +1772,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.98"
+version = "2.6.99"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1790,9 +1790,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b3/49/e7d83793d4353f18b46bbe7583c739a899d34ef6818c89e4011351ca1a84/juriscraper-2.6.98.tar.gz", hash = "sha256:69a3bb6f697749cc5dc3981fecb3c3f50f303850a5180bd2b0b2e3bc7c92f419", size = 342373, upload-time = "2025-12-05T19:13:53.129Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/fc/d337f81c8be84a96f2c70c97d11c02af3217d2269fa16bc5ed4442fbb940/juriscraper-2.6.99.tar.gz", hash = "sha256:20774ed47d3e854fcaf5de2fdb40f49728602a25a7d6eabf60733f80aff3fb01", size = 342853, upload-time = "2025-12-10T17:21:51.615Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/86/8e5c3e90c4a12b282f563280dbaef189d833d61be2913fe6e24a4d9ecfe5/juriscraper-2.6.98-py3-none-any.whl", hash = "sha256:2727e95af3371deb3bdf557304ae5d2b4703f35153e009b20b57fb01b0d6e943", size = 558655, upload-time = "2025-12-05T19:13:51.504Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/e7/c4da0a8e1baa777389ee9aae633e56305d70650d6674fd8dc582b1db1d4a/juriscraper-2.6.99-py3-none-any.whl", hash = "sha256:bf1466f2ddb22994da2251f4612a297d40f05dcf8803c674f2ab1074c23cb751", size = 559208, upload-time = "2025-12-10T17:21:49.616Z" },
 ]
 
 [[package]]
