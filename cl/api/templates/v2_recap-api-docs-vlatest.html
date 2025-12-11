@@ -45,6 +45,26 @@
     </ul>
   </c-layout-with-navigation.section>
 
+  <c-layout-with-navigation.section id="pacer-fetch">
+    <h2>PACER Fetch <small> — <code>{% url "pacerfetchqueue-list" version=version %}</code></small></h2>
+    <p>Use this API to buy PACER content and add it to CourtListener so that it is available via our website, APIs, <a href="{% url "webhooks_docs" %}">webhooks</a>, and <a href="{% url "replication_docs" %}">replicated database</a>. This is <a href="https://free.law/2019/11/05/pacer-fetch-api">a free API</a>, but it uses your PACER credentials to purchase and download PACER content. You'll still have to pay your PACER bill when it comes.</p>
+    <p>Because downloading content from PACER takes time, this API is asynchronous. After you send an HTTP <code>POST</code>, it immediately responds with an ID for the request and places the request in a queue to be downloaded by our scrapers. Most requests are completed within seconds.</p>
+    <p>As the request is processed, it will have a status code:</p>
+    <c-data-table
+      safe
+      caption="TBD"
+      :columns="[
+        {'label': 'Code', 'field': 'code'},
+        {'label': 'Description', 'field': 'description'},
+        ]"
+      :rows="[
+        {'code': '1', 'description': 'Awaiting procesing in queue'},
+      ]"
+    >
+
+    </c-data-table>
+  </c-layout-with-navigation.section>
+
   <c-layout-with-navigation.section id="monitoring">
   </c-layout-with-navigation.section>
 
