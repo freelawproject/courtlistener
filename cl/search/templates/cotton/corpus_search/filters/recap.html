@@ -1,37 +1,17 @@
-{% load svg_tags %}
+{% load svg_tags extras %}
 
-<c-vars request search_form/>
+<c-vars request search_form form_prefix/>
 
-<fieldset x-bind:id="fieldsetIds.recap" class="contents" x-show="isActiveScope" data-scope="RECAP Archive">
+<fieldset x-bind:id="fieldsetIds.recap" class="contents" x-show="isActiveScope" x-cloak data-scope="RECAP Archive">
   <legend class="sr-only">RECAP Archive filters</legend>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.case_name.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.case_name }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="case_name" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.docket_number.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.docket_number }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="docket_number" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.nature_of_suit.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.nature_of_suit }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="nature_of_suit" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.cause.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.cause }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="cause" namespace="recap" :form_prefix="form_prefix" only/>
 
   <c-corpus-search.date-selector
     label="Docket Date"
@@ -51,57 +31,24 @@
     only
   />
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.assigned_to.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.assigned_to }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="assigned_to" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.referred_to.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.referred_to }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="referred_to" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.description.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.description }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="description" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.document_number.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.document_number }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="document_number" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.attachment_number.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.attachment_number }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="attachment_number" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.party_name.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.party_name }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="party_name" namespace="recap" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.atty_name.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.atty_name }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="atty_name" namespace="recap" :form_prefix="form_prefix" only/>
 
+  {% with field_id=form_prefix|add:"_recap_available_only" %}
   <div class="h-full flex items-center gap-2 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.available_only }}
-    {{ search_form.available_only.label_tag }}
+    {% render_field_with_id search_form.available_only field_id %}
+    <label for="{{ field_id }}">{{ search_form.available_only.label }}</label>
   </div>
+  {% endwith %}
 </fieldset>

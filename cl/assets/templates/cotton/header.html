@@ -132,7 +132,7 @@
       >
         <div class="capped-width">
           <h2 id="advanced-filters-title" class="sr-only">Advanced filters</h2>
-          <c-corpus-search.filters :request="request" :search_form="search_form" only/>
+          <c-corpus-search.filters :request="request" :search_form="search_form" form_prefix="desktop" only/>
         </div>
       </div>
     </div>
@@ -145,7 +145,7 @@
     {# MOBILE SEARCH TRIGGER + DIALOG #}
     {% if variant != "homepage" %}
       <c-corpus-search class="md:hidden" only>
-        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" only>
+        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" form_prefix="mobile" only>
           <c-slot name="trigger_button">
             <c-dialog.trigger-button>
               {% svg "magnifier" class="text-greyscale-400 w-5 h-5" %}
