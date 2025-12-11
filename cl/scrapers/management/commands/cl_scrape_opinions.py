@@ -18,7 +18,7 @@ from sentry_sdk import capture_exception
 from cl import settings
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
-from cl.lib.string_utils import trunc
+from cl.lib.string_utils import make_safe_filename
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
@@ -150,7 +150,7 @@ def make_objects(
 
     cf = ContentFile(content)
     extension = get_extension(content)
-    file_name = trunc(item["case_names"].lower(), 75) + extension
+    file_name = make_safe_filename(item["case_names"]) + extension
     opinion.file_with_date = cluster.date_filed
     opinion.local_path.save(file_name, cf, save=False)
     check_duplicate_ingestion(opinion.local_path.name)
