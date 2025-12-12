@@ -4,6 +4,7 @@
 {% block title %}Tag APIs – CourtListener.com{% endblock %}
 {% block og_title %}Tag APIs – CourtListener.com{% endblock %}
 {% block description %}Use these APIs to create, organize, and manage tags on dockets.{% endblock %}
+{% block og_description %}Use these APIs to create, organize, and manage tags on dockets.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 {% block footer-scripts %}{% include "includes/anchors.html" %}{% endblock %}
@@ -48,7 +49,8 @@
 <div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">Tag APIs</h1>
   <p class="lead">Use these APIs to create, organize, and manage tags on dockets in our system.</p>
-  <p>Tags help you organize and share collections of cases. You can create public tags that others can view or keep them private for your own use.</p>
+  <p>Tags help you organize and share collections of cases. You can create public tags that others can view or keep them private for your own use. Tags can be described using markdown to create sharable collections.
+  </p>
   <p>This page focuses on the tags API itself. To learn more about tags generally and how to use them in the web interface, read the tags documentation.</p>
   <p>
     <a href="{% url "tag_notes_help" %}" class="btn btn-lg btn-primary">Learn About Tags</a>
@@ -154,16 +156,16 @@
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "DocketTag-list" version=version %}?tag=123"</pre>
 
-  <h4>Removing a Tag from a Docket</h4>
-  <p>Remove a tag from a docket with a DELETE request:</p>
+  <h4>Untagging a Docket</h4>
+  <p>To untag a docket, delete the Docket Tag object:</p>
   <pre class="pre-scrollable">curl -X DELETE \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "DocketTag-detail" version=version pk="789" %}"</pre>
 
 
   <h2 id="related-apis">Related APIs</h2>
-  <p>Tags are related to the Pray and Pay program, which allows you to request PACER content for cases you're tracking. When using Pray and Pay, you can organize the cases you're monitoring using tags, making it easy to manage large collections of cases.</p>
-  <p>Learn more about the Pray and Pay program on our <a href="{% url "coverage" %}">coverage page</a>.</p>
+  <p>Tags are related to the Pray and Pay program, which allows you to request PACER documents for cases you're tracking. When using Pray and Pay, you can organize the cases you're monitoring using tags, making it easy to manage large collections of cases.</p>
+  <p><a class="btn btn-primary btn-lg" href="{% url "pray_and_pay_help" %}">Learn About Pray and Pay</a></p>
 
   {% include "includes/donate_footer_plea.html" %}
 </div>
