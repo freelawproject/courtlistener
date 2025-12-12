@@ -1,8 +1,7 @@
-import re
-
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.utils.text import slugify
 
 from cl.lib.models import AbstractDateTimeModel
 
@@ -16,22 +15,27 @@ class Prompt(AbstractDateTimeModel):
         (SYSTEM, "System"),
         (USER, "User"),
     )
-
+    prompt_name = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="Unique identifier name for prompt (e.g. 'ocr-p3d-sys-v1'). It will be slugified if it is not in this format.",
+    )
     role = models.SmallIntegerField(
         choices=ROLES,
         default=USER,
         help_text="The identifier used by the LLM API to distinguish the type of message (e.g., system instructions vs. user input)",
     )
     text = models.TextField(help_text="The actual text of the prompt used")
-
     position = models.PositiveSmallIntegerField(
         help_text="The sequence order for this prompt within a prompt set (e.g., 1 for System, 2 for User, etc)"
     )
 
+    def save(self, *args, **kwargs):
+        self.prompt_name = slugify(self.prompt_name)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return (
-            f"[{self.position}] {self.get_role_display()}: {self.text[:50]}..."
-        )
+        return f"{self.prompt_name} | {self.get_role_display()}: {self.text[:50]}..."
 
 
 class LLMConfig(AbstractDateTimeModel):
@@ -45,7 +49,7 @@ class LLMConfig(AbstractDateTimeModel):
     config_name = models.CharField(
         max_length=255,
         unique=True,  # Critical for quick lookup and preventing duplicates
-        help_text="Unique identifier for this configuration (e.g., 'gemini2_5_high_temp')",
+        help_text="Unique identifier for this configuration (e.g., 'gemini2-5-high-temp'). It will be slugified if it is not in this format.",
     )
     description = models.TextField(
         blank=True,
@@ -57,11 +61,9 @@ class LLMConfig(AbstractDateTimeModel):
         default="openai",
         help_text="The LLM provider to use",
     )
-    model_name = (
-        models.CharField(
-            max_length=100,
-            help_text="The specific model ID expected by the API (e.g., 'gpt-4o', 'claude-3-opus')",
-        ),
+    model_name = models.CharField(
+        max_length=255,
+        help_text="The specific model ID expected by the API (e.g., 'gpt-4o', 'claude-3-opus')",
     )
     parameters = models.JSONField(
         default=dict,
@@ -69,26 +71,21 @@ class LLMConfig(AbstractDateTimeModel):
         help_text="JSON dictionary for specific model settings like {'temperature': 0.5, 'max_tokens': 1000}",
     )
 
-    class Meta:
-        constraints = []  # TODO: Maybe add a constrait avoiding repeated configurations?
-
     def __str__(self):
-        return f"{self.provider} / {self.model_name}"
+        return f"{self.config_name} | {self.provider} : {self.model_name}"
 
     def save(self, *args, **kwargs):
-        # Convert the entire name to lowercase
-        self.name = self.config_name.lower()
-        self.name = re.sub(r"[_\s-]+", "_", self.name).strip("_")
+        self.config_name = slugify(self.config_name)
         super().save(*args, **kwargs)
 
 
 class LLMPromptSet(AbstractDateTimeModel):
-    """Groups specific Prompt objects into a versioned instruction set for a specific task (e.g., 'ocr_extraction_v1')."""
+    """Groups specific Prompt objects into a versioned instruction set for a specific task (e.g., 'ocr_scan_p3d')."""
 
-    name = models.CharField(
+    prompt_set_name = models.CharField(
         max_length=255,
         db_index=True,
-        help_text="Unique identifier for the task, must be lowercase and use underscores",
+        help_text="Identifier for the task (e.g., 'ocr-scan-p3d'). It will be slugified if it is not in this format. This name must be repeated across versions to use the latest active one.",
     )
     description = models.TextField(
         blank=True,
@@ -106,18 +103,21 @@ class LLMPromptSet(AbstractDateTimeModel):
         default=True,
         help_text="Designates if this is the currently active version for the task",
     )
+    notes = models.TextField(
+        blank=True,
+        help_text="Internal comments, known limitations, or reasons for changes (e.g., 'v1 failed on handwritten text; v2 adds examples to fix this')",
+    )
 
     def save(self, *args, **kwargs):
-        self.name = self.name.lower()
-        self.name = re.sub(r"[_\s-]+", "_", self.name).strip("_")
+        self.prompt_set_name = slugify(self.prompt_set_name)
         super().save(*args, **kwargs)
 
     class Meta:
         # Ensure only one set is the active version for a given task name
-        unique_together = ("name", "version")
+        unique_together = ("prompt_set_name", "version")
 
     def __str__(self):
-        return f"{self.name} / {self.version}"
+        return f"{self.prompt_set_name} | Version: {self.version}"
 
 
 class LLMRun(AbstractDateTimeModel):
@@ -145,8 +145,8 @@ class LLMRun(AbstractDateTimeModel):
         blank=True,
         help_text="The raw text response returned by the LLM, useful for debugging parsing errors",
     )
-    failed = models.BooleanField(
-        default=False, help_text="Flag if the output was successfully obtained"
+    success = models.BooleanField(
+        default=True, help_text="True if the output was successfully obtained"
     )
 
     def __str__(self):
