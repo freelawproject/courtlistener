@@ -64,7 +64,7 @@ class Migration(migrations.Migration):
                 ('date_modified', models.DateTimeField(auto_now=True, db_index=True, help_text='The last moment when the item was modified. A value in year 1750 indicates the value is unknown')),
                 ('object_id', models.PositiveIntegerField(db_index=True)),
                 ('output', models.TextField(blank=True, help_text='The raw text response returned by the LLM, useful for debugging parsing errors')),
-                ('success', models.BooleanField(default=False, help_text='True if the output was successfully obtained')),
+                ('success', models.BooleanField(default=True, help_text='True if the output was successfully obtained')),
                 ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
                 ('llm_config', models.ForeignKey(help_text='The configuration (provider/model/params) used for this run', on_delete=django.db.models.deletion.CASCADE, to='ai.llmconfig')),
                 ('prompt_set', models.ForeignKey(help_text='The specific version of prompts used', on_delete=django.db.models.deletion.CASCADE, to='ai.llmpromptset')),
