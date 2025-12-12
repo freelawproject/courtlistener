@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('date_created', models.DateTimeField(auto_now_add=True, db_index=True, help_text='The moment when the item was created.')),
                 ('date_modified', models.DateTimeField(auto_now=True, db_index=True, help_text='The last moment when the item was modified. A value in year 1750 indicates the value is unknown')),
-                ('prompt_set_name', models.CharField(db_index=True, help_text="Identifier for the task, must be lowercase and use underscores (e.g., 'ocr-scan-p3d'). This name must be repeated across versions to use the latest active one.", max_length=255)),
+                ('prompt_set_name', models.CharField(db_index=True, help_text="Identifier for the task (e.g., 'ocr-scan-p3d'). It will be slugified if it is not in this format. This name must be repeated across versions to use the latest active one.", max_length=255)),
                 ('description', models.TextField(blank=True, help_text='Description of what this version of the prompt set attempts to achieve')),
                 ('version', models.PositiveIntegerField(default=1, help_text='Incremental version number for this specific task name')),
                 ('is_active', models.BooleanField(default=True, help_text='Designates if this is the currently active version for the task')),
