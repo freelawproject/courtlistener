@@ -247,7 +247,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
     else:
         # Just a regular search
         if not is_bot(request):
-            tally_stat("search.results")
+            tally_stat(
+                "search.results",
+                prometheus_handler_key="search.queries.keyword.web",
+            )
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(

@@ -6,7 +6,9 @@ from itertools import chain, islice, tee
 from re import Match
 from typing import Any
 
+from django.conf import settings
 from django.core.cache import cache
+from selenium import webdriver
 
 from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.model_helpers import clean_docket_number, is_docket_number
@@ -582,3 +584,24 @@ def parse_string_date(date_value: datetime.date | str) -> str | None:
         return convert_to_es_date_match(date_value)
     except ValueError:
         raise InvalidRelativeDateSyntax(QueryType.FILTER)
+
+
+def create_selenium_driver(keep_alive=True) -> webdriver.Chrome:
+    options = webdriver.ChromeOptions()
+    if settings.SELENIUM_HEADLESS is True:
+        options.add_argument("headless")
+    options.add_argument("silent")
+
+    # Workaround for
+    # https://bugs.chromium.org/p/chromium/issues/detail?id=1033941
+    options.add_argument(
+        "--disable-features=AvoidFlashBetweenNavigation,PaintHolding"
+    )
+
+    if settings.DOCKER_SELENIUM_HOST:
+        return webdriver.Remote(
+            settings.DOCKER_SELENIUM_HOST,
+            options=options,
+            keep_alive=keep_alive,
+        )
+    return webdriver.Chrome(options=options, keep_alive=keep_alive)

@@ -16,7 +16,6 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
 from cl import settings
-from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
@@ -38,7 +37,6 @@ from cl.scrapers.utils import (
     update_or_create_originating_court_information,
 )
 from cl.search.models import (
-    SEARCH_TYPES,
     SOURCES,
     Citation,
     Court,
@@ -204,10 +202,6 @@ def save_everything(
 
     opinion.cluster = cluster
     opinion.save()
-    if not backscrape:
-        RealTimeQueue.objects.create(
-            item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
-        )
 
 
 class Command(ScraperCommand):

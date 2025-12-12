@@ -1,0 +1,11 @@
+{
+  "Alt-Svc": "h3=\":443\"; ma=93600",
+  "Connection": "keep-alive",
+  "Content-Type": "audio/wav",
+  "Date": "Mon, 01 Dec 2025 22:09:23 GMT",
+  "Server": "Microsoft-IIS/10.0",
+  "Server-Timing": "cdn-cache; desc=MISS, edge; dur=63, origin; dur=505, ak_p; desc=\"1764626963069_399642258_3642715974_56692_5918_39_0_-\";dur=1",
+  "Set-Cookie": "US-SUPREME-COURT=335915200.20480.0000; expires=Mon, 01-Dec-2025 22:39:23 GMT; path=/; Httponly; Secure",
+  "Strict-Transport-Security": "max-age=31536000",
+  "X-Powered-By": "ASP.NET"
+}
