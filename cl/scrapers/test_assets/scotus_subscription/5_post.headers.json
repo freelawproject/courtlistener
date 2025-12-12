@@ -1,0 +1,16 @@
+{
+  "Alt-Svc": "h3=\":443\"; ma=93600",
+  "Cache-Control": "no-cache, no-store",
+  "Connection": "keep-alive",
+  "Content-Encoding": "gzip",
+  "Content-Type": "text/html; charset=utf-8",
+  "Date": "Mon, 01 Dec 2025 22:09:27 GMT",
+  "Pragma": "no-cache",
+  "Server": "Microsoft-IIS/10.0",
+  "Server-Timing": "cdn-cache; desc=MISS, edge; dur=80, origin; dur=657, ak_p; desc=\"1764626966273_399642258_3642748516_73509_4270_37_0_-\";dur=1",
+  "Set-Cookie": ".AspNetCore.Mvc.CookieTempDataProvider=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; secure; samesite=lax; httponly, US-SUPREME-COURT=335915200.20480.0000; expires=Mon, 01-Dec-2025 22:39:26 GMT; path=/; Httponly; Secure",
+  "Strict-Transport-Security": "max-age=31536000",
+  "Vary": "Accept-Encoding",
+  "X-Akamai-Transformed": "9 9681 0 pmb=mRUM,1",
+  "X-Powered-By": "ASP.NET"
+}
