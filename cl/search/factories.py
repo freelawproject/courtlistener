@@ -397,3 +397,20 @@ class EmbeddingDataFactory(DictFactory):
 class EmbeddingsDataFactory(DictFactory):
     id = Faker("pyint", min_value=1, max_value=100)
     embeddings = List([SubFactory(EmbeddingDataFactory)])
+
+
+class ScotusDocketDataFactory(DictFactory):
+    capital_case = Faker("boolean")
+    case_name = Faker("case_name")
+    date_filed = Faker("date_object")
+    discretionary_court_decision = Faker("date_object")
+    docket_number = Faker("federal_district_docket_number")
+    links = Faker("federal_district_docket_number")
+    lower_court = Faker("court_name")
+    lower_court_case_numbers = [Faker("federal_district_docket_number")]
+    lower_court_case_numbers_raw = Faker("federal_district_docket_number")
+    lower_court_decision_date = Faker("date_object")
+    lower_court_rehearing_denied_date = Faker("date_object")
+    questions_presented = Faker("url")
+    docket_entries = []
+    parties = []

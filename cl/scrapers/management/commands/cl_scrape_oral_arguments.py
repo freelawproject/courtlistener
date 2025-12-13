@@ -9,7 +9,6 @@ from django.utils.encoding import force_bytes
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl import settings
-from cl.alerts.models import RealTimeQueue
 from cl.audio.models import Audio
 from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import logger
@@ -26,7 +25,7 @@ from cl.scrapers.utils import (
     update_or_create_docket,
 )
 from cl.search.cluster_sources import ClusterSources
-from cl.search.models import SEARCH_TYPES, Court, Docket
+from cl.search.models import Court, Docket
 
 cnt = CaseNameTweaker()
 
@@ -51,10 +50,6 @@ def save_everything(
 
     for candidate in candidate_judges:
         af.panel.add(candidate)
-    if not backscrape:
-        RealTimeQueue.objects.create(
-            item_type=SEARCH_TYPES.ORAL_ARGUMENT, item_pk=af.pk
-        )
 
 
 @transaction.atomic
