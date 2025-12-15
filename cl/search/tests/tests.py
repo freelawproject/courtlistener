@@ -298,30 +298,13 @@ class ModelTest(TestCase):
         )
 
         op_content = """
-                <document firstpage="1214" lastpage="1215">
-                  <casebody firstpage="1214" lastpage="1214">
-                    <headmatter>
-                      <citation case_name="People v. Curry" volume="314" reporter="Cal.Rptr.3d" page="367" court="Cal." year="2023">314 Cal.Rptr.3d 367</citation>
-                      <parties>
-                        <party role="plaintiff">PEOPLE</party>
-                        <separator>v.</separator>
-                        <party role="defendant">CURRY</party>
-                      </parties>
-                      <docketnumber>S267394</docketnumber>
-                      <court>Supreme Court of California.</court>
-                      <decisiondate>October 25, 2023</decisiondate>
-                      <history>Third Appellate District, C090409</history>
-                    </headmatter>
-                    <pagenumber pgmap="1214">*1214</pagenumber>
-                    <opinion type="majority">
-                      <p id="p1214-1" pgmap="1214">
-                        The above-captioned matter is transferred to the Court of Appeal, Third Appellate District, with directions to vacate its decision and reconsider the cause in light of our decision in People v. Braden (2023) <citation case_name="People v. Braden" volume="14" reporter="Cal.5th" page="791" court="Cal." year="2023">14 Cal.5th 791</citation>, <citation volume="308" reporter="Cal.Rptr.3d" page="846">308 Cal.Rptr.3d 846</citation>, <citation volume="529" reporter="P.3d" page="1116">529 P.3d 1116</citation>, and to provide any other relief to which defendant is entitled. (Cal. Rules of Court, rule 8.528(d).) As explained in Standing Order Exercising Authority Under California Rules of Court, Rule 8.1115(e)(3), Upon Grant of Review or Transfer of a Matter with an Underlying Published Court of Appeal Opinion, Administrative Order 2021-04-21, and California Rules of Court, rule 8.1115(e)(3), corresponding comment, par. 3, the opinion is hereby rendered either “depublished” or “not citable.”
-                      </p>
-                      <p id="p1214-2" pgmap="1214">Votes: Guerrero, C.J., Corrigan, Liu, Kruger, Groban, Jenkins and Evans, JJ.</p>
-                    </opinion>
-                  </casebody>
-                </document>
-                """
+            <opinion type="majority">
+              <p id="p1214-1" pgmap="1214">
+                The above-captioned matter is transferred to the Court of Appeal, Third Appellate District, with directions to vacate its decision and reconsider the cause in light of our decision in People v. Braden (2023) <citation case_name="People v. Braden" volume="14" reporter="Cal.5th" page="791" court="Cal." year="2023">14 Cal.5th 791</citation>, <citation volume="308" reporter="Cal.Rptr.3d" page="846">308 Cal.Rptr.3d 846</citation>, <citation volume="529" reporter="P.3d" page="1116">529 P.3d 1116</citation>, and to provide any other relief to which defendant is entitled. (Cal. Rules of Court, rule 8.528(d).) As explained in Standing Order Exercising Authority Under California Rules of Court, Rule 8.1115(e)(3), Upon Grant of Review or Transfer of a Matter with an Underlying Published Court of Appeal Opinion, Administrative Order 2021-04-21, and California Rules of Court, rule 8.1115(e)(3), corresponding comment, par. 3, the opinion is hereby rendered either “depublished” or “not citable.”
+              </p>
+              <p id="p1214-2" pgmap="1214">Votes: Guerrero, C.J., Corrigan, Liu, Kruger, Groban, Jenkins and Evans, JJ.</p>
+            </opinion>
+        """
 
         self.op = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
 

@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0047_add_query_mode_to_searchquery'),
+        ('search', '0048_create_scotus_docket_metadata'),
     ]
 
     operations = [

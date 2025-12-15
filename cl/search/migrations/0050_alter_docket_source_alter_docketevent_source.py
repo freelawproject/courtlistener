@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0048_opinioncontent_remove_opinioncluster_update_update_and_more'),
+        ('search', '0049_opinioncontent_remove_opinioncluster_update_update_and_more'),
     ]
 
     operations = [
