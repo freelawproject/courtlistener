@@ -1,12 +1,16 @@
+import asyncio
 import logging
 import time
 from collections.abc import Callable
 from functools import wraps
 from hashlib import md5
+from math import ceil
 from urllib.parse import urlparse
 
-from asgiref.sync import sync_to_async
-from django.core.cache import cache
+from asgiref.sync import iscoroutinefunction, sync_to_async
+from django.conf import settings
+from django.core.cache import caches
+from django.core.cache.backends.base import InvalidCacheBackendError
 from django.utils.cache import patch_response_headers
 
 logger = logging.getLogger(__name__)
@@ -38,31 +42,52 @@ def retry(
     :type logger: logging.Logger instance
     """
 
-    def deco_retry(f: Callable) -> Callable:
-        @wraps(f)
-        def f_retry(*args, **kwargs):
-            mtries, mdelay = tries, delay
-            while mtries > 1:
-                try:
-                    return f(*args, **kwargs)
-                except ExceptionToCheck as e:
-                    msg = "%s, Retrying in %s seconds..."
-                    params = (e, mdelay)
-                    if logger:
-                        logger.warning(msg, *params)
-                    else:
-                        print(msg % params)
-                    time.sleep(mdelay)
-                    mtries -= 1
-                    mdelay *= backoff
-            return f(*args, **kwargs)
+    def _log_wait(exc: Exception, wait: float) -> None:
+        msg = "%s, Retrying in %s seconds..."
+        params = (exc, wait)
+        if logger:
+            logger.warning(msg, *params)
+        else:
+            print(msg % params)
 
-        return f_retry  # true decorator
+    def deco_retry(f: Callable) -> Callable:
+        if iscoroutinefunction(f):
+
+            @wraps(f)
+            async def f_retry(*args, **kwargs):
+                mtries, mdelay = tries, delay
+                while mtries > 1:
+                    try:
+                        return await f(*args, **kwargs)
+                    except ExceptionToCheck as e:
+                        _log_wait(e, mdelay)
+                        await asyncio.sleep(mdelay)
+                        mtries -= 1
+                        mdelay *= backoff
+                return await f(*args, **kwargs)
+
+            return f_retry  # true decorator
+        else:
+
+            @wraps(f)
+            def f_retry(*args, **kwargs):
+                mtries, mdelay = tries, delay
+                while mtries > 1:
+                    try:
+                        return f(*args, **kwargs)
+                    except ExceptionToCheck as e:
+                        _log_wait(e, mdelay)
+                        time.sleep(mdelay)
+                        mtries -= 1
+                        mdelay *= backoff
+                return f(*args, **kwargs)
+
+            return f_retry  # true decorator
 
     return deco_retry
 
 
-def cache_page_ignore_params(timeout: int):
+def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
     """Cache the result of a view while ignoring URL query parameters.
     Ensuring that the cache is consistent for different requests with varying
     query strings.
@@ -75,6 +100,7 @@ def cache_page_ignore_params(timeout: int):
     exposing confidential information.
 
     :param timeout: Cache duration (seconds).
+    :param cache_alias: The cache alias to use.
     :return: The decorated view function, caching its response.
     """
 
@@ -83,7 +109,32 @@ def cache_page_ignore_params(timeout: int):
         async def _wrapped_view(request, *args, **kwargs):
             url_path = urlparse(request.build_absolute_uri()).path
             hash_key = md5(url_path.encode("ascii"), usedforsecurity=False)
+
+            is_dev_or_test = settings.DEVELOPMENT or settings.TESTING
+            should_use_time_based_prefix = (
+                cache_alias == "s3" and not is_dev_or_test
+            )
             cache_key = f"custom.views.decorator.cache:{hash_key.hexdigest()}"
+            if should_use_time_based_prefix:
+                days = int(ceil(timeout / (60 * 60 * 24)))
+                cache_key = f"{days}-days:{cache_key}"
+
+            try:
+                # If the cache alias is "s3" but we're in DEVELOPMENT or TESTING
+                # mode, use the default cache instead of S3. Otherwise, use the
+                # cache specified by cache_alias.
+                if cache_alias == "s3" and is_dev_or_test:
+                    cache = caches["default"]
+                else:
+                    cache = caches[cache_alias]
+            except InvalidCacheBackendError as e:
+                logger.error(
+                    "Cache alias '%s' not found. Error: %s",
+                    cache_alias,
+                    str(e),
+                )
+                raise e
+
             response = cache.get(cache_key)
             if response is not None:
                 return response

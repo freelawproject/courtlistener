@@ -25,11 +25,13 @@ from cl.donate.models import (
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import (
     DocketTag,
+    GenericCount,
     Note,
     Prayer,
     PrayerAvailability,
     UserTag,
 )
+from cl.favorites.selectors import prayer_eligible
 from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
     compute_prayer_total_cost,
@@ -41,7 +43,6 @@ from cl.favorites.utils import (
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
-    prayer_eligible,
     prayer_unavailable,
 )
 from cl.lib.test_helpers import (
@@ -794,13 +795,15 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the get_top_prayers method work properly?"""
 
         # Test top documents based on docket views.
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 12
-        self.rd_4.docket_entry.docket.view_count = 6
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=12
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
 
         await create_prayer(self.user, self.rd_4)
         await create_prayer(self.user, self.rd_2)
@@ -820,17 +823,19 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
     async def test_get_top_prayers_by_number_and_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
 
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 1
-        self.rd_4.docket_entry.docket.view_count = 6
-        self.rd_5.docket_entry.docket.view_count = 8
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
-        await self.rd_5.docket_entry.docket.asave()
-
         # Create prayers with different counts and views
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=1
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_5.docket_entry.docket_id}:view", value=8
+        )
 
         await create_prayer(self.user, self.rd_5)
         await create_prayer(self.user, self.rd_2)
@@ -936,17 +941,21 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             recap_document=self.rd_4, last_checked=dt_3
         )
 
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 1
-        self.rd_4.docket_entry.docket.view_count = 6
-        self.rd_5.docket_entry.docket.view_count = 8
-        self.rd_6.docket_entry.docket.view_count = 15
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
-        await self.rd_5.docket_entry.docket.asave()
-        await self.rd_6.docket_entry.docket.asave()
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=1
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_5.docket_entry.docket_id}:view", value=8
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_6.docket_entry.docket_id}:view", value=15
+        )
 
         await create_prayer(self.user, self.rd_3)
         await create_prayer(self.user, self.rd_2)

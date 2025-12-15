@@ -26,6 +26,7 @@ from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
+from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
@@ -70,6 +71,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    SearchQuery,
 )
 from cl.search.tasks import (
     es_save_document,
@@ -1175,7 +1177,7 @@ class OpinionV4APISearchTest(
             )
             opinion_cluster.panel.add(person)
             citation_1 = CitationWithParentsFactory.create(
-                volume=33,
+                volume="33",
                 reporter="state",
                 page="1",
                 type=1,
@@ -1225,6 +1227,7 @@ class OpinionV4APISearchTest(
                 self.assertEqual(r.data["results"][0][field], [])
 
 
+@override_flag("store-search-queries", active=True)
 class OpinionsESSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -1367,6 +1370,10 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "text_query")
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
+
+        # Ensure a SearchQuery row was logged with KEYWORD querymode
+        last_query = await SearchQuery.objects.alast()
+        self.assertEqual(last_query.query_mode, SearchQuery.KEYWORD)
 
         # Search by court_id
         search_params = {"q": "ca1"}
@@ -2163,7 +2170,7 @@ class OpinionsESSearchTest(
             OpinionFactory.create(cluster=cluster, plain_text="")
             OpinionFactory.create(cluster=cluster, plain_text="")
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -2194,7 +2201,7 @@ class OpinionsESSearchTest(
             )
             OpinionFactory.create(cluster=cluster_2, plain_text="")
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -2232,7 +2239,7 @@ class OpinionsESSearchTest(
                 date_filed=datetime.date(2024, 8, 23),
             )
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -4277,7 +4284,7 @@ class EsOpinionsIndexingTest(
 
         # Add lexis citation to the cluster
         lexis_citation = CitationWithParentsFactory.create(
-            volume=10,
+            volume="10",
             reporter="Yeates",
             page="4",
             type=6,
@@ -4300,7 +4307,7 @@ class EsOpinionsIndexingTest(
 
         # Add neutral citation to the cluster
         neutral_citation = CitationWithParentsFactory.create(
-            volume=16,
+            volume="16",
             reporter="Yeates",
             page="58",
             type=8,

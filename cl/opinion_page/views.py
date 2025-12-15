@@ -2,18 +2,16 @@ import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import eyecite
-import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Exists, IntegerField, OuterRef, Prefetch, QuerySet
-from django.db.models.functions import Cast
+from django.db.models import Exists, OuterRef, Prefetch, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponseRedirect,
@@ -68,6 +66,7 @@ from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
+from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
@@ -411,7 +410,7 @@ async def view_docket(
     return TemplateResponse(request, "docket.html", context)
 
 
-@cache_page_ignore_params(300)
+@cache_page_ignore_params(300, cache_alias="s3")
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
@@ -1038,24 +1037,14 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     authorities_count = await cluster.aauthority_count()
     summaries_count = await cluster.parentheticals.acount()
 
-    ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o_es"
+    sub_opinion_pks = [
+        str(opinion.pk)
+        async for opinion in cluster.sub_opinions.all().only("pk")
+    ]
+    cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
+    related_cases_count = await es_related_case_count(
+        cluster.id, sub_opinion_pks
     )
-
-    # Default count when flag is disabled
-    cited_by_count = 0
-    related_cases_count = 0
-
-    if ui_flag_for_o_es:
-        # Flag enabled, query ES to get counts
-        sub_opinion_pks = [
-            str(opinion.pk)
-            async for opinion in cluster.sub_opinions.all().only("pk")
-        ]
-        cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
-        related_cases_count = await es_related_case_count(
-            cluster.id, sub_opinion_pks
-        )
 
     # Get `tab` from request parameters (fallback to 'opinions')
     tab = request.GET.get("tab", "opinions")
@@ -1068,7 +1057,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         "related_cases_count": related_cases_count,
         "tab": tab,
         "is_htmx": "HX-Request" in request.headers,
-        "es_enabled": ui_flag_for_o_es,
     }
 
     download_context = await get_downloads_context(cluster)
@@ -1240,7 +1228,7 @@ async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
 
 async def get_prev_next_volumes(
     reporter: str, volume: str
-) -> tuple[int | None, int | None]:
+) -> tuple[str | None, str | None]:
     """Get the volume before and after the current one.
 
     :param reporter: The reporter where the volume is found
@@ -1248,17 +1236,20 @@ async def get_prev_next_volumes(
     :return Tuple of the volume number we have prior to the selected one, and
     of the volume number after it.
     """
-    volumes = [
+    raw_volumes = [
         vol
         async for vol in Citation.objects.filter(reporter=reporter)
-        .annotate(as_integer=Cast("volume", IntegerField()))
-        .values_list("as_integer", flat=True)
+        .values_list("volume", flat=True)
         .distinct()
-        .order_by("as_integer")
     ]
-    index = volumes.index(int(volume))
-    volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+
+    # Use human sort for volume strings, e.g. 77, 78, 78a, 78b, 79
+    sorted_volumes = cast(list[str], human_sort(raw_volumes))
+    index = sorted_volumes.index(volume)
+    volume_previous = sorted_volumes[index - 1] if index > 0 else None
+    volume_next = (
+        sorted_volumes[index + 1] if index + 1 < len(sorted_volumes) else None
+    )
     return volume_next, volume_previous
 
 
@@ -1291,14 +1282,17 @@ async def reporter_or_volume_handler(
 
     if volume is None:
         # Show all the volumes for the case
-        volumes_in_reporter = (
-            Citation.objects.filter(reporter=reporter)
-            .order_by("reporter", "volume")
+        raw_volumes = [
+            vol
+            async for vol in Citation.objects.filter(reporter=reporter)
             .values_list("volume", flat=True)
             .distinct()
-        )
+        ]
 
-        if not await volumes_in_reporter.aexists():
+        # Human sort the volumes found for a given reporter
+        volumes_in_reporter = human_sort(raw_volumes)
+
+        if not volumes_in_reporter:
             return await throw_404(
                 request,
                 {

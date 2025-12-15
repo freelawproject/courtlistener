@@ -79,6 +79,7 @@ from cl.search.constants import (
     cardinality_query_unique_ids,
     date_decay_relevance_types,
     jurisdiction_relevance_multipliers,
+    opinion_boosts_es,
     recap_boosts_es,
 )
 from cl.search.exception import (
@@ -1446,12 +1447,7 @@ def build_es_base_query(
             child_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "type",
-                        "text",
-                        "caseName.exact",
-                        "docketNumber",
-                    ],
+                    list(opinion_boosts_es.keys()),
                 ),
             )
             child_query_fields = {"opinion": child_fields}
@@ -2878,6 +2874,23 @@ def build_semantic_query(
     return keyword_query, semantic_query
 
 
+def has_semantic_params(get_params: QueryDict | CleanData) -> bool:
+    """Check if parameters represent a valid semantic search query.
+
+    :param get_params: A QueryDict or CleanData object containing the
+    search parameters.
+    :return: True if the user enabled semantic search, the search type supports
+    it, and the query has content to generate an embedding or an embedding
+    is provided.
+    """
+    return bool(
+        get_params.get("semantic", False)
+        and (get_params.get("q", "") or get_params.get("embedding", None))
+        and get_params.get("type", SEARCH_TYPES.OPINION)
+        in [SEARCH_TYPES.OPINION]
+    )
+
+
 def build_full_join_es_queries(
     cd: CleanData,
     child_query_fields: dict[str, list[str]],
@@ -2903,17 +2916,7 @@ def build_full_join_es_queries(
 
     q_should = []
     has_text_query = False
-    # True if the user explicitly enabled semantic search and the search type
-    # supports it
-    semantic_search_enabled = cd.get("semantic", False) and cd["type"] in [
-        SEARCH_TYPES.OPINION
-    ]
-
-    # True if semantic search is enabled and the query has content to generate
-    # an embedding or embedding is provided,
-    has_valid_semantic_query = semantic_search_enabled and (
-        cd.get("q", "") or cd.get("embedding", None)
-    )
+    has_valid_semantic_query = has_semantic_params(cd)
     keyword_text_query = ""
     match cd["type"]:
         case (

@@ -71,10 +71,27 @@ KNN_SEARCH_K = env("KNN_SEARCH_K", default=5)
 KNN_SIMILARITY = env("KNN_SIMILARITY", default=0.8)
 KNN_OVERSAMPLE = env.float("KNN_OVERSAMPLE", default=3.0)
 
+#######################
+# CLEAN DOCKET NUMBER #
+#######################
+DOCKET_NUMBER_CLEANING_ENABLED = env.bool(
+    "DOCKET_NUMBER_CLEANING_ENABLED", default=False
+)
+DOCKET_NUMBER_CLEANING_WAIT_TIME = env.int(
+    "DOCKET_NUMBER_CLEANING_WAIT_TIME", default=300
+)
+DOCKET_NUMBER_CLEANING_MAX_WORKERS = env.int(
+    "DOCKET_NUMBER_CLEANING_MAX_WORKERS", default=4
+)
+DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE = env.int(
+    "DOCKET_NUMBER_CLEANING_LLM_BATCH_SIZE", default=10
+)
+DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES = env.int(
+    "DOCKET_NUMBER_CLEANING_LLM_MAX_RETRIES", default=3
+)
 
 ############################
 # CUSTOM RELEVANCE FACTORS #
 ############################
-
 DATE_DECAY_BOOST = env.float("DATE_DECAY_FACTOR", default=1.0)
 JURISDICTION_BOOST = env.float("JURISDICTION_FACTOR", default=1.0)

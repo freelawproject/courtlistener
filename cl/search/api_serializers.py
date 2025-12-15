@@ -1,9 +1,10 @@
 from datetime import UTC
+from typing import Any
 
 from django.conf import settings
+from elasticsearch_dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
-from waffle import flag_is_active
 
 from cl.api.utils import (
     DynamicFieldsMixin,
@@ -12,13 +13,18 @@ from cl.api.utils import (
     RetrieveFilteredFieldsMixin,
 )
 from cl.audio.models import Audio
-from cl.custom_filters.templatetags.extras import get_highlight
+from cl.custom_filters.templatetags.extras import (
+    get_highlight,
+    render_string_or_list,
+)
 from cl.lib.document_serializer import (
     CoerceDateField,
+    CoerceDateTimeField,
     DocumentSerializer,
     HighlightedField,
     NoneToListField,
     NullableListField,
+    SuppressHighlightsField,
     TimeStampField,
 )
 from cl.people_db.models import PartyType, Person
@@ -35,6 +41,7 @@ from cl.search.documents import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -46,10 +53,23 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
+from cl.search.types import ESDictDocument
 
 inverted_o_type_index_map = {
     value: key for key, value in o_type_index_map.items()
 }
+
+
+def get_value_from_es_obj(obj: dict | ESDictDocument | Hit, field: str) -> Any:
+    """Retrieve a value field from an ES object or dict.
+
+    :param obj: The object or dict to access.
+    :param field: The field name to retrieve.
+    :return: The value of the field, or None if not present.
+    """
+    if isinstance(obj, dict):
+        return obj.get(field, None)
+    return getattr(obj, field, None)
 
 
 class PartyTypeSerializer(
@@ -72,6 +92,16 @@ class OriginalCourtInformationSerializer(
 ):
     class Meta:
         model = OriginatingCourtInformation
+        fields = "__all__"
+
+
+class BankruptcyInformationSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    class Meta:
+        model = BankruptcyInformation
         fields = "__all__"
 
 
@@ -113,6 +143,10 @@ class DocketSerializer(
         view_name="person-detail",
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
+    )
+    bankruptcy_information = serializers.HyperlinkedRelatedField(
+        read_only=True,
+        view_name="bankruptcyinformation-detail",
     )
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
@@ -387,15 +421,30 @@ class V3OpinionESResultSerializer(DocumentSerializer):
     timestamp = TimeStampField(read_only=True)
     status = serializers.SerializerMethodField(read_only=True)
 
+    # Datetime fields for V3
+    dateFiled = CoerceDateTimeField(read_only=True)
+    dateArgued = CoerceDateTimeField(read_only=True)
+    dateReargued = CoerceDateTimeField(read_only=True)
+    dateReargumentDenied = CoerceDateTimeField(read_only=True)
+
+    caseName = SuppressHighlightsField(read_only=True)
+    court_citation_string = SuppressHighlightsField(read_only=True)
+    docketNumber = SuppressHighlightsField(read_only=True)
+    suitNature = SuppressHighlightsField(read_only=True)
+
     def get_type(self, obj):
-        return inverted_o_type_index_map.get(obj.type)
+        return inverted_o_type_index_map.get(
+            get_value_from_es_obj(obj, "type")
+        )
 
     def get_status(self, obj):
-        return PRECEDENTIAL_STATUS.get_status_value_reverse(obj.status)
+        return PRECEDENTIAL_STATUS.get_status_value_reverse(
+            get_value_from_es_obj(obj, "status")
+        )
 
     def get_snippet(self, obj):
         # If the snippet has not yet been set upstream, set it here.
-        return get_highlight(obj, "text")
+        return get_highlight(render_string_or_list(obj), "text")
 
     class Meta:
         document = OpinionDocument
@@ -442,9 +491,9 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
         """
         Returns the appropriate score serialization for a given result object.
 
-        If the `enable_semantic_search` flag is active, this method uses
-        `SemanticSearchScoreSerializer`, which includes both semantic and BM25
-        scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
+        If the `semantic` keyword is included in the query string with a truthy value,
+        this method uses `SemanticSearchScoreSerializer`, which includes both semantic
+        and BM25 scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
         context is not available, it also falls back to `ScoreDataSerializer`.
         """
         request = self.context.get("request", None)
@@ -453,9 +502,7 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
 
         semantic = request.GET.get("semantic", False)
         serializer_class = (
-            SemanticSearchScoreSerializer
-            if flag_is_active(request, "enable_semantic_search") and semantic
-            else ScoreDataSerializer
+            SemanticSearchScoreSerializer if semantic else ScoreDataSerializer
         )
         return serializer_class(obj).data
 

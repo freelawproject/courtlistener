@@ -1,4 +1,5 @@
 import importlib
+import re
 from collections import defaultdict
 
 from django.db import transaction
@@ -11,7 +12,8 @@ from cl.lib.crypto import sha1
 from cl.scrapers.exceptions import MergingError
 from cl.scrapers.management.commands.merge_opinion_versions import (
     comparable_dockets,
-    get_query_from_url,
+    get_same_url_opinions,
+    group_opinions_by_url,
     merge_metadata,
     update_referencing_objects,
 )
@@ -144,37 +146,47 @@ def delete_same_hash_duplicates(
     )
     logger.info("Groups to process %s for sources %s", qs.count(), sources)
 
-    # for each group, we will keep a single opinion; let's prefer the latest
     for group in qs:
         logger.info("Processing group %s", group)
 
-        op_to_keep, *to_delete = (
+        duplicate_candidates = list(
             Opinion.objects.filter(sha1=group["sha1"])
             .filter(**source_filter)
             .order_by("-date_created")
             .select_related("cluster", "cluster__docket")
         )
 
-        for op_to_delete in to_delete:
-            # check that they have the me docket
-            if not comparable_dockets(
-                op_to_keep.cluster.docket, op_to_delete.cluster.docket
-            ):
-                logger.info(
-                    "Not the same docket. Docket to keep: %s. Docket to delete: %s",
-                    op_to_keep.cluster.docket.id,
-                    op_to_delete.cluster.docket.id,
-                )
-                stats["not comparable docket"] += 1
-                continue
+        # for each hash group, try to compare all opinions with the latest
+        # opinion. If they are duplicates, delete them. If not, put them apart
+        # so they are compared amongst them
+        while duplicate_candidates:
+            op_to_keep = duplicate_candidates[0]
+            candidates_left = []
 
-            try:
-                with transaction.atomic():
-                    delete_duplicate_opinion(
-                        op_to_keep, op_to_delete, True, stats
+            for op_to_delete in duplicate_candidates[1:]:
+                if not comparable_dockets(
+                    op_to_keep.cluster.docket, op_to_delete.cluster.docket
+                ):
+                    logger.info(
+                        "Not the same docket. Docket to keep: %s. Docket to delete: %s",
+                        op_to_keep.cluster.docket.id,
+                        op_to_delete.cluster.docket.id,
                     )
-            except MergingError:
-                stats["merging error"] += 1
+                    stats["not comparable docket"] += 1
+                    candidates_left.append(op_to_delete)
+                    continue
+
+                try:
+                    with transaction.atomic():
+                        delete_duplicate_opinion(
+                            op_to_keep, op_to_delete, True, stats
+                        )
+                except MergingError:
+                    stats["merging error"] += 1
+                    candidates_left.append(op_to_delete)
+
+            # if nothing was put into `candidates_left`, while loop will exit
+            duplicate_candidates = candidates_left
 
 
 def get_cleaned_content_hash(opinion: Opinion, site: OpinionSite) -> str:
@@ -207,64 +219,112 @@ def delete_cleaned_up_content_duplicates(
     :param court_id: a court id to group opinions by
     :param site: a juriscraper Site with a `cleanup_content` method
     """
-    qs = (
-        Opinion.objects.filter(
-            cluster__docket__court_id=court_id,
-            cluster__source=SOURCES.COURT_WEBSITE,
-        )
-        .exclude(Q(download_url="") | Q(download_url__isnull=True))
-        .values("download_url")
-        .annotate(
-            number_of_rows=Count("download_url"),
-            number_of_hashes=Count("sha1", distinct=True),
-        )
-        .order_by()
-        .filter(number_of_rows__gte=2, number_of_hashes__gte=2)
+    query = Q(
+        cluster__docket__court_id=court_id,
+        cluster__source=SOURCES.COURT_WEBSITE,
     )
-
+    qs = group_opinions_by_url(query)
     seen_urls = set()
 
     for group in qs:
-        standard_url = group["download_url"].replace("https", "http")
-        if standard_url in seen_urls:
+        duplicate_candidates = get_same_url_opinions(group, seen_urls)
+        if duplicate_candidates is None:
             continue
-        seen_urls.add(standard_url)
 
         logger.info("Processing group %s", group)
+        # iteration is ordered by descending date; the first element in each
+        # hash group is the most recent opinion and duplicates should be
+        # collapsed into it
+        hash_groups = defaultdict(lambda: [])
+        file_errors = 0
+        for opinion in duplicate_candidates:
+            try:
+                sha1 = get_cleaned_content_hash(opinion, site)
+                hash_groups[sha1].append(opinion)
+            except FileNotFoundError:
+                # See #6400
+                logger.error(
+                    "Opinion file not found %s '%s'",
+                    opinion.id,
+                    opinion.local_path,
+                    exc_info=True,
+                )
+                file_errors += 1
 
-        download_url_query = get_query_from_url(group["download_url"], "exact")
+        logger.info("%s hash groups", len(hash_groups))
+        # log the whole group for debugging different hashes after cleanup
+        logger.debug(hash_groups)
 
-        # keep the latest opinion and delete the older ones as duplicates
-        main_opinion, *duplicate_candidates = (
-            Opinion.objects.filter(download_url_query)
-            .filter(cluster__source=SOURCES.COURT_WEBSITE)
-            .select_related("cluster", "cluster__docket")
-            .order_by("-date_created")
+        if file_errors:
+            logger.info("%s file errors", file_errors)
+
+        for main_opinion, *duplicate_opinions in hash_groups.values():
+            for duplicate in duplicate_opinions:
+                try:
+                    with transaction.atomic():
+                        delete_duplicate_opinion(
+                            main_opinion, duplicate, True, stats
+                        )
+                except MergingError:
+                    stats["merging error"] += 1
+
+
+def delete_by_text_comparison(stats: defaultdict, court_id: str) -> None:
+    """Get duplicate candidate groups and check if their content is the same
+    after hardcoded cleanups by court
+
+    :param stats: stats dictionary for reporting
+    :param court_id: a court id to group opinions by
+    """
+    if court_id not in ["neb", "nebctapp", "coloctapp"]:
+        raise ValueError(
+            f"{court_id} not supported in `delete_by_identical_text`"
         )
 
-        main_hash = get_cleaned_content_hash(main_opinion, site)
+    query = Q(
+        cluster__docket__court_id=court_id,
+        cluster__source=SOURCES.COURT_WEBSITE,
+    )
+    qs = group_opinions_by_url(query)
+    seen_urls = set()
 
-        for duplicate_candidate in duplicate_candidates:
-            duplicate_candidate_hash = get_cleaned_content_hash(
-                duplicate_candidate, site
-            )
+    # delete timestamps
+    if court_id in ["neb", "nebctapp"]:
+        regex = re.compile(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2} [APM] [A-Z]{3}")
+    elif court_id == "coloctapp":
+        regex = re.compile(r"\d{1,2} \w+ \d{4} \d{2}:\d{2}:\d{2}")
 
-            if main_hash != duplicate_candidate_hash:
-                stats["different hash after cleanup"] += 1
-                logger.info(
-                    "Different hash after cleanup %s %s",
-                    main_opinion.id,
-                    duplicate_candidate.id,
-                )
-                continue
+    for group in qs:
+        duplicate_candidates = get_same_url_opinions(group, seen_urls)
+        if duplicate_candidates is None:
+            return
+        logger.info("Processing group %s", group)
 
-            try:
-                with transaction.atomic():
-                    delete_duplicate_opinion(
-                        main_opinion, duplicate_candidate, True, stats
-                    )
-            except MergingError:
-                stats["merging error"] += 1
+        hash_groups = defaultdict(lambda: [])
+        for candidate in duplicate_candidates:
+            if candidate.plain_text:
+                extracted_content = candidate.plain_text
+            else:
+                extracted_content = candidate.html
+
+            cleaned_content = re.sub(
+                r"[\s\n+]", " ", regex.sub(" ", extracted_content)
+            ).strip()
+            sha1_hash = sha1(force_bytes(cleaned_content))
+            hash_groups[sha1_hash].append(candidate)
+
+        if len(hash_groups) > 1:
+            logger.info(hash_groups)
+
+        for main_opinion, *duplicate_opinions in hash_groups.values():
+            for duplicate in duplicate_opinions:
+                try:
+                    with transaction.atomic():
+                        delete_duplicate_opinion(
+                            main_opinion, duplicate, True, stats
+                        )
+                except MergingError:
+                    stats["merging error"] += 1
 
 
 class Command(VerboseCommand):
@@ -274,13 +334,18 @@ class Command(VerboseCommand):
         super().add_arguments(parser)
         parser.add_argument(
             "method",
-            choices=["same_hash", "cleanup_content"],
+            choices=["same_hash", "cleanup_content", "compare_text"],
             help="""Supported duplicate finding methods:
             - 'same_hash' will look for opinions with the exact same hash.
+
             - 'cleanup_content' will group opinions by `court_id` and `download_url`
             and use the `Site.cleanup_content` in the `juriscraper_module` to
             cleanup the raw content and recompute the hash. If they are the same
             and other checks are OK, it will delete the duplicates.
+
+            - `compare_text` will group opinions by `court_id` and `download_url`,
+            cleanup the extracted text (not the raw content), and see if the
+            extracted text is identical after the cleanup
             """,
         )
         parser.add_argument(
@@ -313,7 +378,12 @@ class Command(VerboseCommand):
                 delete_same_hash_duplicates(stats, options["cluster_sources"])
             finally:
                 logger.info(stats)
-
+        elif method == "compare_text":
+            court_id = options["court_id"]
+            try:
+                delete_by_text_comparison(stats, court_id)
+            finally:
+                logger.info(stats)
         elif method == "cleanup_content":
             juriscraper_module = options["juriscraper_module"]
             court_id = options["court_id"]

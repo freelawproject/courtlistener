@@ -1,9 +1,8 @@
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import cast
 from unittest import mock
-from urllib.parse import urlencode
 
 import pytz
 import time_machine
@@ -25,13 +24,8 @@ from timeout_decorator import timeout_decorator
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
-from cl.alerts.management.commands.cl_send_alerts import (
-    get_cut_off_end_date,
-    get_cut_off_start_date,
-)
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
-    get_cut_off_date,
 )
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
@@ -41,7 +35,6 @@ from cl.alerts.models import (
     SEARCH_TYPES,
     Alert,
     DocketAlert,
-    RealTimeQueue,
     ScheduledAlertHit,
 )
 from cl.alerts.tasks import (
@@ -60,7 +53,6 @@ from cl.api.models import (
     Webhook,
     WebhookEvent,
     WebhookEventType,
-    WebhookVersions,
 )
 from cl.api.utils import get_webhook_deprecation_date
 from cl.audio.factories import AudioWithParentsFactory
@@ -70,33 +62,29 @@ from cl.donate.models import (
     NeonMembership,
     NeonMembershipLevel,
 )
-from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
+from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
+from cl.favorites.models import Prayer
+from cl.lib.redis_utils import get_redis_interface
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
-    ES_CHILD_ID,
     AudioDocument,
     AudioPercolator,
-    OpinionDocument,
 )
 from cl.search.factories import (
-    CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
-    OpinionFactory,
-    OpinionsCitedWithParentsFactory,
     OpinionWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    Citation,
     Court,
     Docket,
     DocketEntry,
-    Opinion,
     RECAPDocument,
 )
-from cl.stats.models import Stat
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -1608,27 +1596,6 @@ class SearchAlertsWebhooksTest(
         )
         unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
         with cls.captureOnCommitCallbacks(execute=True):
-            cls.search_alert = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.DAILY,
-                name="Test Alert O",
-                query=f"q=California&type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_rt = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert O rt",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_rt_1 = AlertFactory(
-                user=cls.user_profile_1.user,
-                rate=Alert.REAL_TIME,
-                name="Test Alert O rt",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
             cls.search_alert_oa = AlertFactory(
                 user=cls.user_profile.user,
                 rate=Alert.DAILY,
@@ -1636,41 +1603,12 @@ class SearchAlertsWebhooksTest(
                 query="type=oa",
                 alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
-            cls.search_alert_o_wly = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.WEEKLY,
-                name="Test Alert O wly",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_o_mly = AlertFactory(
-                user=cls.user_profile.user,
-                rate=Alert.MONTHLY,
-                name="Test Alert O mly",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-
             cls.user_profile_2 = UserProfileWithParentsFactory()
             cls.webhook_disabled = WebhookFactory(
                 user=cls.user_profile_2.user,
                 event_type=WebhookEventType.SEARCH_ALERT,
                 url="https://example.com/",
                 enabled=False,
-            )
-            cls.search_alert_2 = AlertFactory(
-                user=cls.user_profile_2.user,
-                rate=Alert.DAILY,
-                name="Test Alert O Disabled",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
-            cls.search_alert_2_1 = AlertFactory(
-                user=cls.user_profile_2.user,
-                rate=Alert.DAILY,
-                name="Test Alert O Copy",
-                query=f"type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
             )
             cls.user_profile_3 = UserProfileWithParentsFactory(
                 user__email="test_3@email.com"
@@ -1682,13 +1620,7 @@ class SearchAlertsWebhooksTest(
                 enabled=True,
                 version=1,
             )
-            cls.search_alert_3 = AlertFactory(
-                user=cls.user_profile_3.user,
-                rate=Alert.DAILY,
-                name="Test Alert 2 O Enabled",
-                query=f"q=California hearing&type=o&stat_{unpublished_status}=on",
-                alert_type=SEARCH_TYPES.OPINION,
-            )
+
         cls.c1 = CourtFactory(
             id="canb", jurisdiction="I", citation_string="Bankr. C.D. Cal."
         )
@@ -1716,557 +1648,19 @@ class SearchAlertsWebhooksTest(
             ),
             time_machine.travel(cls.mock_date, tick=False),
             cls.captureOnCommitCallbacks(execute=True),
-        ):
-            cls.dly_opinion = OpinionWithParentsFactory.create(
-                cluster__case_name="California vs Lorem",
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=cls.day_before_date_filed.date(),
-                cluster__attorneys="Attorney General of North Carolina",
-                cluster__judges="Lorem Judge",
-                cluster__citation_count=1,
-                cluster__docket=DocketFactory(
-                    court=cls.c1,
-                    date_reargued=cls.day_before_date_filed.date(),
-                    date_reargument_denied=cls.day_before_date_filed.date(),
-                ),
-                plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
-                type=Opinion.LEAD,
-            )
-
-            cls.dly_opinion.joined_by.add(cls.person_1)
-            cls.dly_opinion.cluster.panel.add(cls.person_1)
-            cls.lexis_citation = CitationWithParentsFactory.create(
-                volume=10,
-                reporter="Yeates",
-                page="4",
-                type=Citation.LEXIS,
-                cluster=cls.dly_opinion.cluster,
-            )
-            cls.neutra_citation = CitationWithParentsFactory.create(
-                volume=10,
-                reporter="Neutral",
-                page="4",
-                type=Citation.NEUTRAL,
-                cluster=cls.dly_opinion.cluster,
-            )
-            cls.citation_1 = CitationWithParentsFactory.create(
-                volume=33,
-                reporter="state",
-                page="1",
-                type=Citation.FEDERAL,
-                cluster=cls.dly_opinion.cluster,
-            )
-            cls.dly_opinion_2 = OpinionFactory(
-                cluster=cls.dly_opinion.cluster,
-                type=Opinion.COMBINED,
-                plain_text="Lorem dolor california sit amet, consectetur adipiscing elit.",
-                download_url="https://ca.flcourts.gov/",
-                local_path="test/search/opinion_html.html",
-            )
-            cls.opinion_cited_1 = OpinionsCitedWithParentsFactory.create(
-                cited_opinion=cls.dly_opinion,
-                citing_opinion=cls.dly_opinion_2,
-            )
-
-            cls.dly_opinion_current_day = OpinionWithParentsFactory.create(
-                cluster__case_name="California vs Lorem Current Day",
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=cls.current_day_date_filed.date(),
-                cluster__attorneys="Attorney General of North Carolina",
-                cluster__judges="Lorem Judge",
-                cluster__citation_count=1,
-                cluster__docket=DocketFactory(
-                    court=cls.c1,
-                    date_reargued=cls.current_day_date_filed.date(),
-                    date_reargument_denied=cls.current_day_date_filed.date(),
-                ),
-                plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
-                type=Opinion.LEAD,
-            )
-
-            with (
-                mock.patch(
-                    "cl.scrapers.tasks.microservice",
-                    side_effect=lambda *args, **kwargs: MockResponse(
-                        200, b"10"
-                    ),
-                ),
-                mock.patch(
-                    "cl.lib.es_signal_processor.allow_es_audio_indexing",
-                    side_effect=lambda x, y: True,
-                ),
-            ):
-                cls.dly_oral_argument = AudioWithParentsFactory.create(
-                    case_name="Dly Test OA",
-                    docket__date_argued=now() - timedelta(hours=5),
-                )
-
-            cls.wly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Week",
-                cluster__date_filed=now() - timedelta(days=2),
-                plain_text="Lorem dolor Ipsum",
-            )
-            cls.wly_opinion_current_date = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Week Current Day",
-                cluster__date_filed=cls.current_day_date_filed.date(),
-                plain_text="Lorem dolor Ipsum",
-            )
-            cls.mly_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Month",
-                cluster__date_filed=now() - timedelta(days=25),
-                plain_text="Lorem dolor Ipsum",
-            )
-            cls.mly_opinion_current_date = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs Month Current Day",
-                cluster__date_filed=cls.current_day_date_filed.date(),
-                plain_text="Lorem dolor Ipsum",
-            )
-
-    def test_send_search_alert_webhooks(self):
-        """Can we send search alert webhooks for Opinions and Oral Arguments
-        independently?
-        """
-
-        webhooks_enabled = Webhook.objects.filter(enabled=True)
-        self.assertEqual(
-            len(webhooks_enabled), 3, msg="Webhooks enabled doesn't match."
-        )
-        search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 9, msg="Alerts doesn't match.")
-
-        with (
             mock.patch(
-                "cl.api.webhooks.requests.post",
-                side_effect=lambda *args, **kwargs: MockResponse(
-                    200, mock_raw=True
-                ),
+                "cl.scrapers.tasks.microservice",
+                side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
             ),
-            time_machine.travel(self.mock_date, tick=False),
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
         ):
-            # Send Opinion Alerts
-            call_command("cl_send_alerts", rate="dly")
-            # Send ES Alerts (Only OA for now)
-            call_command("cl_send_scheduled_alerts", rate="dly")
-
-        # 4 search alerts should be sent:
-        # Two opinion alerts to user_profile, one to user_profile_2, and one to
-        # user_profile_3
-        # One oral argument alert to user_profile (ES)
-        self.assertEqual(
-            len(mail.outbox), 4, msg="Outgoing emails don't match."
-        )
-
-        # First Opinion email alert assertions search_alert
-        self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
-        self.assertEqual(
-            mail.outbox[0].subject,
-            f"1 Alert has hits: {self.search_alert.name}",
-        )
-
-        # Plain text assertions
-        opinion_alert_content = mail.outbox[0].body
-        self.assertIn("daily opinion alert", opinion_alert_content)
-
-        self.assertIn("had 1 hit", opinion_alert_content)
-        self.assertIn(
-            self.dly_opinion_2.cluster.docket.court.citation_string,
-            opinion_alert_content,
-        )
-        self.assertIn("California vs Lorem", opinion_alert_content)
-        self.assertIn(
-            "california sit amet",
-            opinion_alert_content,
-            msg="Alert content didn't match",
-        )
-        self.assertIn(self.dly_opinion_2.download_url, opinion_alert_content)
-        self.assertIn(
-            str(self.dly_opinion_2.local_path), opinion_alert_content
-        )
-
-        html_content = self.get_html_content_from_email(mail.outbox[0])
-        # HTML assertions
-        self._count_alert_hits_and_child_hits(
-            html_content,
-            self.search_alert.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            2,
-        )
-
-        self._assert_child_hits_content(
-            html_content,
-            self.search_alert.name,
-            self.dly_opinion.cluster.case_name,
-            [
-                self.dly_opinion.get_type_display(),
-                self.dly_opinion_2.get_type_display(),
-            ],
-        )
-
-        self.assertIn("had 1 hit", html_content)
-        self.assertIn(
-            self.dly_opinion_2.cluster.docket.court.citation_string.replace(
-                " ", "&nbsp;"
-            ),
-            html_content,
-        )
-        self.assertIn(self.dly_opinion_2.download_url, html_content)
-        self.assertIn(str(self.dly_opinion_2.local_path), html_content)
-        self.assertIn("<strong>California</strong> vs Lorem", html_content)
-        self.assertIn("<strong>california</strong> sit amet", html_content)
-
-        # Unsubscribe headers assertions.
-        self.assertEqual(
-            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
-            "List-Unsubscribe=One-Click",
-        )
-        unsubscribe_url = reverse(
-            "one_click_disable_alert", args=[self.search_alert.secret_key]
-        )
-        self.assertIn(
-            unsubscribe_url,
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
-        )
-
-        # Second Opinion alert search_alert_2
-        html_content = self.get_html_content_from_email(mail.outbox[1])
-        # HTML assertions
-        self._count_alert_hits_and_child_hits(
-            html_content,
-            self.search_alert.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            2,
-        )
-
-        self._assert_child_hits_content(
-            html_content,
-            self.search_alert.name,
-            self.dly_opinion.cluster.case_name,
-            [
-                self.dly_opinion.get_type_display(),
-                self.dly_opinion_2.get_type_display(),
-            ],
-        )
-
-        self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
-        subject = mail.outbox[1].subject
-        self.assertIn("2 Alerts have hits:", subject)
-        self.assertIn(self.search_alert_2.name, subject)
-        self.assertIn(self.search_alert_2_1.name, subject)
-        self.assertIn("daily opinion alert", mail.outbox[1].body)
-
-        params = {
-            "keys": [
-                self.search_alert_2.secret_key,
-                self.search_alert_2_1.secret_key,
-            ]
-        }
-        query_string = urlencode(params, doseq=True)
-        unsubscribe_path = reverse("disable_alert_list")
-        self.assertIn(
-            f"{unsubscribe_path}{'?' if query_string else ''}{query_string}",
-            mail.outbox[1].extra_headers["List-Unsubscribe"],
-        )
-
-        # Third Opinion alert search_alert_3
-        html_content = self.get_html_content_from_email(mail.outbox[2])
-        # HTML assertions
-        self._count_alert_hits_and_child_hits(
-            html_content,
-            self.search_alert_3.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            1,
-        )
-
-        self._assert_child_hits_content(
-            html_content,
-            self.search_alert_3.name,
-            self.dly_opinion.cluster.case_name,
-            [self.dly_opinion.get_type_display()],
-        )
-
-        # Oral Argument Alert
-        self.assertEqual(mail.outbox[3].to[0], self.user_profile.user.email)
-        self.assertIn("daily oral argument alert ", mail.outbox[3].body)
-        self.assertEqual(
-            mail.outbox[3].extra_headers["List-Unsubscribe-Post"],
-            "List-Unsubscribe=One-Click",
-        )
-        unsubscribe_url = reverse(
-            "one_click_disable_alert", args=[self.search_alert_oa.secret_key]
-        )
-        self.assertIn(
-            unsubscribe_url,
-            mail.outbox[3].extra_headers["List-Unsubscribe"],
-        )
-
-        # 3 webhook events should be sent, 2 user_profile user and 1 user_profile_3
-        webhook_events = WebhookEvent.objects.filter().values_list(
-            "content", flat=True
-        )
-
-        self.assertEqual(
-            len(webhook_events), 3, msg="Webhook events don't match."
-        )
-
-        alert_data = {
-            self.search_alert.pk: {
-                "alert": self.search_alert,
-                "result": self.dly_opinion_2,
-                "snippet": "Lorem dolor <strong>california</strong> sit amet, consectetur adipiscing elit.",
-            },
-            self.search_alert_oa.pk: {
-                "alert": self.search_alert_oa,
-                "result": self.dly_oral_argument,
-                "snippet": "",
-            },
-            self.search_alert_3.pk: {
-                "alert": self.search_alert_3,
-                "result": self.dly_opinion,
-                "snippet": "Lorem dolor sit amet, consectetur adipiscing elit <strong>hearing</strong>.",
-            },
-        }
-
-        # Assert V2 Opinion Search Alerts Webhook
-        self._count_webhook_hits_and_child_hits(
-            list(webhook_events),
-            self.search_alert.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            2,
-            "opinions",
-        )
-
-        # Assert HL content in V2 webhooks.
-        self._assert_webhook_hit_hl(
-            webhook_events,
-            self.search_alert.name,
-            "caseName",
-            "<strong>California</strong> vs Lorem",
-            child_field=False,
-            nested_field="opinions",
-        )
-        self._assert_webhook_hit_hl(
-            webhook_events,
-            self.search_alert.name,
-            "snippet",
-            "Lorem dolor <strong>california</strong> sit amet, consectetur adipiscing elit.",
-            child_field=True,
-            nested_field="opinions",
-        )
-
-        # Assert V1 Opinion Search Alerts Webhook
-        self._count_webhook_hits_and_child_hits(
-            list(webhook_events),
-            self.search_alert_3.name,
-            1,
-            self.dly_opinion.cluster.case_name,
-            0,
-            None,
-        )
-
-        webhook_events_instances = WebhookEvent.objects.all()
-        for webhook_sent in webhook_events_instances:
-            with self.subTest(webhook_sent=webhook_sent):
-                self.assertEqual(
-                    webhook_sent.event_status,
-                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
-                    msg="The event status doesn't match.",
-                )
-                content = webhook_sent.content
-
-                alert_data_compare = alert_data[
-                    content["payload"]["alert"]["id"]
-                ]
-                self.assertEqual(
-                    webhook_sent.webhook.user,
-                    alert_data_compare["alert"].user,
-                    msg="The user doesn't match.",
-                )
-
-                # Check if the webhook event payload is correct.
-                self.assertEqual(
-                    content["webhook"]["event_type"],
-                    WebhookEventType.SEARCH_ALERT,
-                    msg="The event type doesn't match.",
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["name"],
-                    alert_data_compare["alert"].name,
-                    msg="The alert name doesn't match.",
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["query"],
-                    alert_data_compare["alert"].query,
-                    msg="The alert query doesn't match.",
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["rate"],
-                    alert_data_compare["alert"].rate,
-                    msg="The alert rate doesn't match.",
-                )
-                if (
-                    content["payload"]["alert"]["alert_type"]
-                    == SEARCH_TYPES.OPINION
-                ) and webhook_sent.webhook.version == WebhookVersions.v1:
-                    # Assert the number of keys in the Opinions Search Webhook
-                    # payload
-                    keys_count = len(content["payload"]["results"][0])
-                    self.assertEqual(
-                        keys_count, len(opinion_v3_search_api_keys)
-                    )
-                    # Iterate through all the opinion fields and compare them.
-                    for (
-                        field,
-                        get_expected_value,
-                    ) in opinion_v3_search_api_keys.items():
-                        with self.subTest(field=field):
-                            expected_value = get_expected_value(
-                                alert_data_compare
-                            )
-                            actual_value = content["payload"]["results"][
-                                0
-                            ].get(field)
-                            self.assertEqual(
-                                actual_value,
-                                expected_value,
-                                f"Field '{field}' does not match.",
-                            )
-                elif (
-                    content["payload"]["alert"]["alert_type"]
-                    == SEARCH_TYPES.ORAL_ARGUMENT
-                ):
-                    # Assertions for OA webhook payload.
-                    self.assertEqual(
-                        content["payload"]["results"][0]["caseName"],
-                        alert_data_compare["result"].case_name,
-                    )
-
-    def test_send_search_alert_webhooks_rates(self):
-        """Can we send search alert webhooks for different alert rates?"""
-
-        self.assertTrue(
-            OpinionDocument.exists(
-                id=ES_CHILD_ID(self.wly_opinion.pk).OPINION
-            ),
-            msg="wly error",
-        )
-        self.assertTrue(
-            OpinionDocument.exists(
-                id=ES_CHILD_ID(self.mly_opinion.pk).OPINION
-            ),
-            msg="mly error",
-        )
-
-        with (
-            time_machine.travel(self.mock_date, tick=False),
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            # Get ready the RT opinion for the test.
-            rt_opinion = OpinionWithParentsFactory.create(
-                cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__case_name="California vs RT",
-                cluster__date_filed=self.day_before_date_filed.date(),
-                plain_text="Lorem dolor hearing Ipsum",
+            cls.dly_oral_argument = AudioWithParentsFactory.create(
+                case_name="Dly Test OA",
+                docket__date_argued=now() - timedelta(hours=5),
             )
-            RealTimeQueue.objects.create(
-                item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
-            )
-
-        webhooks_enabled = Webhook.objects.filter(enabled=True)
-        self.assertEqual(len(webhooks_enabled), 3)
-        search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 9)
-        # (rate, events expected, number of search results expected per event)
-        # The number of expected results increases with every iteration since
-        # daily events include results created for the RT test, weekly results
-        # include results from RT and Daily tests, and so on...
-        rates = [
-            (Alert.REAL_TIME, 2, 1),  # 2 expected webhook events, 1 Opinion RT
-            # Alert (search_alert_rt) + 1 OA Daily Alert, triggered by ES.
-            (Alert.DAILY, 2, 2),
-            (Alert.WEEKLY, 1, 3),
-            (Alert.MONTHLY, 1, 4),
-        ]
-        for rate, events, results in rates:
-            with mock.patch(
-                "cl.api.webhooks.requests.post",
-                side_effect=lambda *args, **kwargs: MockResponse(
-                    200, mock_raw=True
-                ),
-            ):
-                # Monthly alerts cannot be run on the 29th, 30th or 31st.
-                with time_machine.travel(self.mock_date, tick=False):
-                    # Send Alerts (Except OA)
-                    call_command("cl_send_alerts", rate=rate)
-                    # Send ES Alerts (Only OA for now)
-                    call_command("cl_send_scheduled_alerts", rate=rate)
-
-            with self.subTest(rate=rate):
-                webhook_events = WebhookEvent.objects.all()
-                self.assertEqual(
-                    len(webhook_events), events, msg="Wrong number of Events"
-                )
-
-                for webhook_sent in webhook_events:
-                    self.assertEqual(
-                        webhook_sent.event_status,
-                        WEBHOOK_EVENT_STATUS.SUCCESSFUL,
-                        msg="Wrong number of webhooks sent.",
-                    )
-                    self.assertIn(
-                        webhook_sent.webhook.user,
-                        [self.user_profile.user, self.user_profile_3.user],
-                    )
-                    content = webhook_sent.content
-                    # Check if the webhook event payload is correct.
-                    self.assertEqual(
-                        content["webhook"]["event_type"],
-                        WebhookEventType.SEARCH_ALERT,
-                    )
-                    alert_to_compare = Alert.objects.get(
-                        pk=content["payload"]["alert"]["id"]
-                    )
-                    self.assertEqual(
-                        content["payload"]["alert"]["name"],
-                        alert_to_compare.name,
-                    )
-                    self.assertEqual(
-                        content["payload"]["alert"]["query"],
-                        alert_to_compare.query,
-                    )
-
-                    # The oral argument webhook is sent independently not grouped
-                    # with opinions webhooks results.
-                    if content["payload"]["alert"]["query"] == "type=oa":
-                        self.assertEqual(
-                            len(content["payload"]["results"]),
-                            1,
-                            msg="Wrong number of results OA.",
-                        )
-                        self.assertEqual(
-                            content["payload"]["alert"]["rate"],
-                            Alert.DAILY,
-                        )
-                    else:
-                        self.assertEqual(
-                            len(content["payload"]["results"]),
-                            results,
-                            msg="Wrong number of results O.",
-                        )
-                        self.assertEqual(
-                            content["payload"]["alert"]["rate"],
-                            rate,
-                        )
-            webhook_events.delete()
-
-        rt_opinion.cluster.delete()
 
     def test_alert_frequency_estimation(self):
         """Test alert frequency ES API endpoint for Opinion Alerts."""
@@ -2319,325 +1713,276 @@ class SearchAlertsWebhooksTest(
         self.assertIn("...", subject)
 
 
-class SearchAlertsUtilsTest(TestCase):
-    def test_get_cut_off_dates(self):
-        """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
-        values according to the input date.
+class PrayAndPayAlertsWebhooksTest(TestCase):
+    """Test Pray and Pay Webhooks
+
+    Integration tests for pray-and-pay webhook functionality. These tests
+    verify the complete signal flow:
+    1. Create prayers for a RECAP document (is_available=False)
+    2. Set RECAPDocument.is_available = True (triggers signal)
+    3. Signal calls send_prayer_emails()
+    4. send_prayer_emails() updates prayers to GRANTED and sends webhooks
+
+    The webhook payload structure:
+    {
+      "webhook": {...},
+      "payload": {
+        "id": 1234,                    // Prayer ID
+        "date_created": "2025-04-16T21:24:18.879312-07:00",
+        "status": 2,                   // Prayer.GRANTED
+        "recap_document": 436149610,   // RECAPDocument ID
+        "user": 456                    // User ID
+      }
+    }
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.user_profile = UserProfileWithParentsFactory()
+
+        # Create webhook for PRAY_AND_PAY event type (v1)
+        cls.webhook_v1_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.PRAY_AND_PAY,
+            url="https://example.com/",
+            enabled=True,
+            version=1,
+        )
+
+        # Create user with v2 webhook
+        cls.user_profile_2 = UserProfileWithParentsFactory()
+        cls.webhook_v2_enabled = WebhookFactory(
+            user=cls.user_profile_2.user,
+            event_type=WebhookEventType.PRAY_AND_PAY,
+            url="https://example.com/",
+            enabled=True,
+            version=2,
+        )
+
+        # Create user with disabled webhook
+        cls.user_profile_3 = UserProfileWithParentsFactory()
+        cls.webhook_disabled = WebhookFactory(
+            user=cls.user_profile_3.user,
+            event_type=WebhookEventType.PRAY_AND_PAY,
+            url="https://example.com/",
+            enabled=False,
+        )
+
+    def test_send_pray_and_pay_webhooks_v1_and_v2(self):
+        """Can we send pray-and-pay webhooks when a document becomes available?
+
+        Integration test that verifies the complete flow:
+        1. Create prayers for unavailable document
+        2. Make document available (triggers signal)
+        3. Prayers are granted and webhooks sent
         """
 
-        test_cases = {
-            Alert.MONTHLY: [
-                {
-                    "month_to_run": 1,
-                    "day_to_run": 1,
-                    "cut_off_month": 12,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2024,
-                },
-                {
-                    "month_to_run": 2,
-                    "day_to_run": 1,
-                    "cut_off_month": 1,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 3,
-                    "day_to_run": 1,
-                    "cut_off_month": 2,
-                    "day_start": 1,
-                    "day_end": 28,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 4,
-                    "day_to_run": 1,
-                    "cut_off_month": 3,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 5,
-                    "day_to_run": 1,
-                    "cut_off_month": 4,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 6,
-                    "day_to_run": 1,
-                    "cut_off_month": 5,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 7,
-                    "day_to_run": 1,
-                    "cut_off_month": 6,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 8,
-                    "day_to_run": 1,
-                    "cut_off_month": 7,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 9,
-                    "day_to_run": 1,
-                    "cut_off_month": 8,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 10,
-                    "day_to_run": 1,
-                    "cut_off_month": 9,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 11,
-                    "day_to_run": 1,
-                    "cut_off_month": 10,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 12,
-                    "day_to_run": 1,
-                    "cut_off_month": 11,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-            ],
-            Alert.WEEKLY: [
-                {
-                    "month_to_run": 2,
-                    "day_to_run": 1,
-                    "cut_off_month": 1,
-                    "day_start": 25,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 2,
-                    "day_to_run": 8,
-                    "cut_off_month": 2,
-                    "day_start": 1,
-                    "day_end": 7,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 2,
-                    "day_to_run": 15,
-                    "cut_off_month": 2,
-                    "day_start": 8,
-                    "day_end": 14,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 2,
-                    "day_to_run": 22,
-                    "cut_off_month": 2,
-                    "day_start": 15,
-                    "day_end": 21,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 3,
-                    "day_to_run": 1,
-                    "cut_off_month": 2,
-                    "day_start": 22,
-                    "day_end": 28,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 3,
-                    "day_to_run": 8,
-                    "cut_off_month": 3,
-                    "day_start": 1,
-                    "day_end": 7,
-                    "year": 2025,
-                },
-            ],
-            Alert.DAILY: [
-                {
-                    "month_to_run": 2,
-                    "day_to_run": 28,
-                    "cut_off_month": 2,
-                    "day_start": 27,
-                    "day_end": 27,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 3,
-                    "day_to_run": 1,
-                    "cut_off_month": 2,
-                    "day_start": 28,
-                    "day_end": 28,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 3,
-                    "day_to_run": 2,
-                    "cut_off_month": 3,
-                    "day_start": 1,
-                    "day_end": 1,
-                    "year": 2025,
-                },
-            ],
+        # Create unavailable RECAP document
+        de = DocketEntryFactory(docket__court=self.court, entry_number=1)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=1,
+            is_available=False,
+        )
+
+        # Create WAITING prayers for both users
+        prayer_v1 = PrayerFactory(
+            user=self.user_profile.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+        prayer_v2 = PrayerFactory(
+            user=self.user_profile_2.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+
+        # Verify prayers start as WAITING
+        self.assertEqual(prayer_v1.status, Prayer.WAITING)
+        self.assertEqual(prayer_v2.status, Prayer.WAITING)
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Trigger the signal by making document available
+            rd.is_available = True
+            rd.save()
+
+        # Refresh prayers from database
+        prayer_v1.refresh_from_db()
+        prayer_v2.refresh_from_db()
+
+        # Verify prayers are now GRANTED
+        self.assertEqual(prayer_v1.status, Prayer.GRANTED)
+        self.assertEqual(prayer_v2.status, Prayer.GRANTED)
+
+        # Two webhook events (v1, v2) should be triggered
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 2)
+
+        # Verify both users received webhooks
+        webhook_users = {event.webhook.user for event in webhook_events}
+        self.assertEqual(
+            webhook_users,
+            {self.user_profile.user, self.user_profile_2.user},
+        )
+
+        # Validate payload structure
+        for event in webhook_events:
+            content = event.content
+            self.assertEqual(
+                content["webhook"]["event_type"],
+                WebhookEventType.PRAY_AND_PAY,
+            )
+            self.assertEqual(content["payload"]["status"], Prayer.GRANTED)
+            self.assertEqual(content["payload"]["recap_document"], rd.id)
+            self.assertIn(
+                content["payload"]["id"], [prayer_v1.id, prayer_v2.id]
+            )
+
+        # Confirm webhooks for V1 and V2 are properly triggered
+        webhook_versions = {
+            event.content["webhook"]["version"] for event in webhook_events
         }
-        mock_date = now().replace(day=27, hour=5)
-        for rate, test_cases in test_cases.items():
-            for test_case in test_cases:
-                with (
-                    self.subTest(rate=rate, test_case=test_case),
-                    time_machine.travel(mock_date, tick=False),
-                ):
-                    expected_date_start = date(
-                        test_case["year"],
-                        test_case["cut_off_month"],
-                        test_case["day_start"],
-                    )
-                    expected_date_end = date(
-                        test_case["year"],
-                        test_case["cut_off_month"],
-                        test_case["day_end"],
-                    )
+        self.assertEqual(webhook_versions, {1, 2})
 
-                    day_to_run = date(
-                        2025,
-                        test_case["month_to_run"],
-                        test_case["day_to_run"],
-                    )
-                    date_start = get_cut_off_start_date(rate, day_to_run)
-                    date_end = get_cut_off_end_date(rate, date_start)
+    def test_pray_and_pay_webhook_payload_fields(self):
+        """Test detailed field validation for pray-and-pay webhooks.
 
-                    self.assertEqual(date_start, expected_date_start)
-                    self.assertEqual(date_end, expected_date_end)
-
-    @override_settings(REAL_TIME_ALERTS_SENDING_RATE=60)
-    def test_cut_off_date_for_scheduled_alerts(self):
-        """Confirm get_cut_off_date return the right
-        values according to the input date.
+        Verifies the payload matches the expected structure through the
+        complete signal flow.
         """
-        test_cases = {
-            Alert.DAILY: [
-                {
-                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
-                    "expected": date(2025, 4, 30),
-                    "custom_date": False,
-                },
-                {
-                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
-                    "expected": date(2025, 2, 28),
-                    "custom_date": False,
-                },
-                {
-                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
-                    "expected": date(2025, 5, 1),
-                    "custom_date": True,
-                },
-                {
-                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
-                    "expected": date(2025, 3, 1),
-                    "custom_date": True,
-                },
-            ],
-            Alert.WEEKLY: [
-                {
-                    "input_dt": datetime(2025, 5, 8, 9, 30, 0),
-                    "expected": date(2025, 5, 1),
-                },
-                {
-                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
-                    "expected": date(2025, 2, 22),
-                },
-            ],
-            Alert.MONTHLY: [
-                {
-                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
-                    "expected": date(2025, 4, 1),
-                },
-                {
-                    "input_dt": datetime(2025, 1, 1, 0, 0, 0),
-                    "expected": date(2024, 12, 1),
-                },
-            ],
-            Alert.REAL_TIME: [
-                # Consider multiple test cases for timezone differences
-                # and daylight saving time.
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": datetime(
-                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 3, 2, 5, 2, 1),
-                    "expected": datetime(
-                        2025, 3, 2, 13, 1, 0, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
-                    "expected": datetime(
-                        2025, 5, 1, 6, 58, 59, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 4, 30, 18, 0, 0),
-                    "expected": datetime(
-                        2025, 5, 1, 0, 58, 59, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": date(2025, 5, 1),
-                    "sweep_index": True,
-                    "custom_date": False,
-                },
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": date(2025, 5, 2),
-                    "sweep_index": True,
-                    "custom_date": True,
-                },
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": datetime(
-                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
-                    ),
-                    "sweep_index": False,
-                    "custom_date": True,
-                },
-            ],
-        }
-        for rate, cases in test_cases.items():
-            for case in cases:
-                with self.subTest(rate=rate, case=case):
-                    dt = case["input_dt"]
-                    custom_date = case.get("custom_date", False)
-                    sweep_index = case.get("sweep_index", False)
-                    result = get_cut_off_date(
-                        rate, dt, sweep_index, custom_date
-                    )
-                    expected = case["expected"]
-                    self.assertEqual(result, expected)
+
+        # Create unavailable document and waiting prayer
+        de = DocketEntryFactory(docket__court=self.court, entry_number=2)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=2,
+            is_available=False,
+        )
+
+        prayer = PrayerFactory(
+            user=self.user_profile.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Trigger signal by making document available
+            rd.is_available = True
+            rd.save()
+
+        webhook_event = WebhookEvent.objects.first()
+        content = webhook_event.content
+        payload = content["payload"]
+
+        # Validate all required fields are present
+        self.assertIn("id", payload)
+        self.assertIn("date_created", payload)
+        self.assertIn("status", payload)
+        self.assertIn("recap_document", payload)
+
+        # Validate field values
+        self.assertEqual(payload["id"], prayer.id)
+        self.assertEqual(payload["status"], Prayer.GRANTED)
+        self.assertEqual(payload["recap_document"], rd.id)
+
+        # Validate webhook metadata
+        self.assertEqual(
+            content["webhook"]["event_type"],
+            WebhookEventType.PRAY_AND_PAY,
+        )
+
+    def test_pray_and_pay_webhook_only_granted_status(self):
+        """Test that webhooks are only sent when prayers are granted.
+
+        Documents that are already available should not trigger webhooks
+        when prayers are created.
+        """
+
+        # Create document that's already available
+        de = DocketEntryFactory(docket__court=self.court, entry_number=3)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=3,
+            is_available=True,  # Already available
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Create a WAITING prayer (shouldn't create webhook)
+            prayer = PrayerFactory(
+                user=self.user_profile.user,
+                recap_document=rd,
+                status=Prayer.WAITING,
+            )
+
+            # Update same document again (should not trigger since already available)
+            rd.description = "Updated description"
+            rd.save()
+
+        # No webhook events should be created
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 0)
+
+    def test_pray_and_pay_webhook_disabled(self):
+        """Verify that webhooks are not sent to disabled webhook endpoints."""
+
+        # Create unavailable document
+        de = DocketEntryFactory(docket__court=self.court, entry_number=4)
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_number=4,
+            is_available=False,
+        )
+
+        # Create prayer for user with disabled webhook
+        prayer = PrayerFactory(
+            user=self.user_profile_3.user,
+            recap_document=rd,
+            status=Prayer.WAITING,
+        )
+
+        initial_count = WebhookEvent.objects.filter(
+            webhook=self.webhook_disabled
+        ).count()
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            # Trigger signal by making document available
+            rd.is_available = True
+            rd.save()
+
+        # Verify prayer was granted (email sent)
+        prayer.refresh_from_db()
+        self.assertEqual(prayer.status, Prayer.GRANTED)
+
+        # No webhook event should be created for disabled webhook
+        final_count = WebhookEvent.objects.filter(
+            webhook=self.webhook_disabled
+        ).count()
+        self.assertEqual(
+            final_count,
+            initial_count,
+            msg="Webhook event should not be created for disabled webhook.",
+        )
 
     def test_is_match_all_query(self):
         """Confirm is_match_all_query correctly detects match-all
@@ -3552,6 +2897,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         Audio.objects.all().delete()
         super().tearDownClass()
 
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        keys = self.r.keys("alerts.sent*")
+        if keys:
+            self.r.delete(*keys)
+        return super().setUp()
+
     def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
 
@@ -3936,9 +3288,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 call_command("cl_send_scheduled_alerts", rate=rate)
 
         # Confirm Stat object is properly updated.
-        stat_object = Stat.objects.filter(date_logged=mock_date)
-        self.assertEqual(stat_object[0].name, f"alerts.sent.{rate}")
-        self.assertEqual(stat_object[0].count, stat_count)
+        key = f"alerts.sent.{mock_date.date().isoformat()}"
+        count = int(self.r.get(key) or 0)
+        self.assertEqual(count, stat_count)
 
         # Confirm Alert date_last_hit is updated.
         search_alert.refresh_from_db()
@@ -4136,7 +3488,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             )
 
         # Send RT alerts
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        mock_date = now() - timedelta(days=10)
+        with time_machine.travel(mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         # 1 email should be sent for the rt_oa_search_alert and rt_oa_search_alert_2
         self.assertEqual(
@@ -4211,11 +3565,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             else:
                 self.assertTrue(False, "Search Alert webhooks failed.")
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
+            time_machine.travel(mock_date, tick=False),
         ):
             # Call command dly
             call_command("cl_send_scheduled_alerts", rate="dly")
@@ -4275,12 +3632,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         rt_oral_argument_3.delete()
 
         # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 2)
-        stat_names = set([stat.name for stat in stats_objects])
-        self.assertEqual(stat_names, {"alerts.sent.rt", "alerts.sent.dly"})
-        self.assertEqual(stats_objects[0].count, 1)
-        self.assertEqual(stats_objects[1].count, 1)
+        key = f"alerts.sent.{mock_date.date().isoformat()}"
+        count = int(self.r.get(key) or 0)
+        self.assertEqual(count, 2)
 
         # Remove test instances.
         rt_oa_search_alert.delete()
@@ -4356,7 +3710,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             )
 
         # Send RT alerts
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        mock_date = now() - timedelta(days=2)
+        with time_machine.travel(mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         # 11 OA search alert emails should be sent, one for each user that
         # had donated enough.
@@ -4374,10 +3730,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertEqual(len(content["results"]), 1)
 
         # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 1)
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(stats_objects[0].count, 11)
+        count = int(
+            self.r.get(f"alerts.sent.{mock_date.date().isoformat()}") or 0
+        )
+        self.assertEqual(count, 11)
 
         # Remove test instances.
         rt_oral_argument.delete()
@@ -4933,7 +4289,8 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         )
 
         mock_logger.info.assert_called_with(
-            f"'{SEARCH_TYPES.PEOPLE}' Alert type indexing is not supported yet."
+            "'%s' Alert type indexing is not supported yet.",
+            SEARCH_TYPES.PEOPLE,
         )
 
     @mock.patch("cl.alerts.management.commands.cl_index_search_alerts.logger")

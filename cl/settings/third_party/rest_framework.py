@@ -87,6 +87,22 @@ REST_FRAMEWORK = {
         "shishir": "10/hour",
         "shishir.kumar": "10/hour",
         # Unresponsive
+        "Cephalgov3": "1/hour",
+        "gabyy": "1/hour",
+        "gaby": "1/hour",
+        "williamszostak": "1/hour",
+        "william.szostak@libertymutual.com": "1/hour",
+        "clzhouxinyu1": "1/hour",
+        "blpolmann@gmail.com": "1/hour",
+        "pondfiller": "1/hour",
+        "firmpilot": "1/hour",
+        "ndarr002@odu.edu": "1/hour",
+        "Enochas89": "1/hour",
+        "cyrusdh": "1/hour",
+        "lucas.begnini": "1/hour",
+        "w": "1/hour",
+        "wy": "1/hour",
+        "zlf": "1/hour",
         "wg": "1/hour",
         "greatbanach@heywhatsoup.com": "1/hour",
         "faret38643": "1/hour",
@@ -132,6 +148,9 @@ REST_FRAMEWORK = {
         "cadebe2258": "1/hour",
         "NicolasMadan": "10/hour",
         # Running bad queries
+        # Mega queries on the docket endpoint causing issues
+        "ashabana85": "1/hour",
+        "Luris.ai": "1/hour",
         "tannero20": "1/hour",
         # Too difficult
         "aanshshah": "1/hour",

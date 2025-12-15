@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.timezone import now
 from elasticsearch_dsl import Q, connections
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
@@ -23,7 +24,6 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.alerts.utils import (
-    build_plain_percolator_query,
     has_document_alert_hit_been_triggered,
     percolate_es_document,
     prepare_percolator_content,
@@ -70,7 +70,6 @@ from cl.search.models import Docket, RECAPDocument
 from cl.search.tasks import (
     index_docket_parties_in_es,
 )
-from cl.stats.models import Stat
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
@@ -80,6 +79,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_sweep",
 )
+@override_switch("increment-stats", active=True)
 class RECAPAlertsSweepIndexTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
@@ -87,13 +87,20 @@ class RECAPAlertsSweepIndexTest(
     RECAP Alerts Sweep Index Tests
     """
 
+    @staticmethod
+    def rebuild_percolator_index():
+        RECAPPercolator._index._name = "recap_percolator_sweep"
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        # Mock indexing date to the previous day since the command currently
-        # runs early each day.
-        date_now = midnight_pt(now().date())
+
+        # runs early each day. Use minus two hours to prevent errors caused by
+        # Daylight Saving Time transitions.
+        date_now = midnight_pt(now().date()) - datetime.timedelta(hours=2)
         cls.mock_date_indexing = date_now - datetime.timedelta(days=1)
         cls.mock_date = date_now
         with (
@@ -127,10 +134,15 @@ class RECAPAlertsSweepIndexTest(
 
     def setUp(self):
         self.r = get_redis_interface("CACHE")
+        self.r_stats = get_redis_interface("STATS")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
             self.r.delete(*keys)
+
+        stat_keys = self.r_stats.keys("alerts.sent.*")
+        if stat_keys:
+            self.r_stats.delete(*stat_keys)
 
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
@@ -2078,9 +2090,7 @@ class RECAPAlertsSweepIndexTest(
         are properly send by the sweep index without duplicating alerts.
         """
         # Rename percolator index for this test to avoid collisions.
-        RECAPPercolator._index._name = "recap_percolator_sweep"
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        self.rebuild_percolator_index()
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
@@ -2152,14 +2162,9 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(
-            stats_objects.count(), 1, "Wrong number of stats objects."
-        )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 1, "Wrong number of stats alerts sent."
-        )
+        key = f"alerts.sent.{now().date().isoformat()}"
+        count = int(self.r_stats.get(key) or 0)
+        self.assertEqual(count, 1, "Wrong number of stats alerts sent.")
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -2311,18 +2316,8 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly updated.
-        self.assertEqual(
-            stats_objects.count(), 2, "Wrong number of stats objects."
-        )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 2, "Wrong number of stats alerts sent."
-        )
-        self.assertEqual(stats_objects[1].name, "alerts.sent.dly")
-        self.assertEqual(
-            stats_objects[1].count, 0, "Wrong number of stats alerts sent."
-        )
-
+        count = int(self.r_stats.get(key) or 0)
+        self.assertEqual(count, 2, "Wrong number of stats objects.")
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:
@@ -2685,6 +2680,7 @@ class RECAPAlertsPercolatorTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+
         date_now = midnight_pt(now().date())
         cls.mock_date = date_now.replace(
             hour=20, minute=0, second=0, microsecond=0
@@ -2765,43 +2761,6 @@ class RECAPAlertsPercolatorTest(
         )
         self.percolator_call_count = 0
 
-    @staticmethod
-    def confirm_query_matched(response, query_id) -> bool:
-        """Confirm if a percolator query matched."""
-
-        matched = False
-        for hit in response:
-            if hit.meta.id == query_id:
-                matched = True
-        return matched
-
-    @staticmethod
-    def save_percolator_query(cd):
-        query = build_plain_percolator_query(cd)
-        query_dict = query.to_dict()
-        percolator_query = RECAPPercolator(
-            percolator_query=query_dict,
-            rate=Alert.REAL_TIME,
-            date_created=now(),
-        )
-        percolator_query.save(refresh=True)
-
-        return percolator_query.meta.id
-
-    @staticmethod
-    def prepare_and_percolate_document(app_label, document_id):
-        percolator_index, es_document_index, documents_to_percolate = (
-            prepare_percolator_content(app_label, document_id)
-        )
-        responses = percolate_es_document(
-            str(document_id),
-            percolator_index,
-            es_document_index,
-            documents_to_percolate,
-            app_label=app_label,
-        )
-        return responses
-
     @classmethod
     def delete_documents_from_index(cls, index_alias, queries):
         es_conn = connections.get_connection()
@@ -2825,7 +2784,7 @@ class RECAPAlertsPercolatorTest(
             "party": "Defendant Jane Roe",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         app_label = "search.RECAPDocument"
         responses = self.prepare_and_percolate_document(
@@ -2845,7 +2804,7 @@ class RECAPAlertsPercolatorTest(
             "document_number": "1",
             "order_by": "score desc",
         }
-        query_id_1 = self.save_percolator_query(cd)
+        query_id_1 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_1)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2864,7 +2823,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) AND (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_2 = self.save_percolator_query(cd)
+        query_id_2 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_2)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2887,7 +2846,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) OR (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_3 = self.save_percolator_query(cd)
+        query_id_3 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_3)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2925,7 +2884,7 @@ class RECAPAlertsPercolatorTest(
             "description": "Leave to File",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         app_label = "search.RECAPDocument"
         responses = self.prepare_and_percolate_document(
@@ -2949,7 +2908,7 @@ class RECAPAlertsPercolatorTest(
             "description": "Amicus Curiae",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd_att.pk)
@@ -2972,7 +2931,7 @@ class RECAPAlertsPercolatorTest(
             "document_number": "1",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2993,7 +2952,7 @@ class RECAPAlertsPercolatorTest(
             "q": "Leave to File",
             "order_by": "score desc",
         }
-        query_id_2 = self.save_percolator_query(cd)
+        query_id_2 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_2)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -3026,7 +2985,7 @@ class RECAPAlertsPercolatorTest(
             "document_number": "1",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3044,7 +3003,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) AND (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_1 = self.save_percolator_query(cd)
+        query_id_1 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_1)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3062,7 +3021,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) OR (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_2 = self.save_percolator_query(cd)
+        query_id_2 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_2)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3088,7 +3047,7 @@ class RECAPAlertsPercolatorTest(
             "filed_after": datetime.date(2015, 8, 16),
             "order_by": "score desc",
         }
-        query_id_3 = self.save_percolator_query(cd)
+        query_id_3 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_3)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3114,7 +3073,7 @@ class RECAPAlertsPercolatorTest(
             "case_name": "SUBPOENAS SERVED OFF",
             "order_by": "score desc",
         }
-        query_id_4 = self.save_percolator_query(cd)
+        query_id_4 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_4)
         responses = percolate_es_document(
             str(self.docket_3.pk),
@@ -3135,7 +3094,7 @@ class RECAPAlertsPercolatorTest(
             "case_name": "SUBPOENAS SERVED OFF",
             "order_by": "score desc",
         }
-        query_id_5 = self.save_percolator_query(cd)
+        query_id_5 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_5)
         responses = percolate_es_document(
             str(self.de_1.docket.pk),
@@ -3156,7 +3115,7 @@ class RECAPAlertsPercolatorTest(
             "q": "SUBPOENAS SERVED ON",
             "order_by": "score desc",
         }
-        query_id_6 = self.save_percolator_query(cd)
+        query_id_6 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_6)
         responses = percolate_es_document(
             str(self.de.docket.pk),

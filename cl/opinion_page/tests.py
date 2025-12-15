@@ -26,6 +26,7 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import RelatedFactory
+from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -121,6 +122,7 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
+@override_flag("citing_and_related_enabled", True)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -798,8 +800,8 @@ class CitationRedirectorTest(TestCase):
         volume_next, volume_previous = await get_prev_next_volumes(
             "COA", "2017"
         )
-        self.assertEqual(volume_previous, 2016)
-        self.assertEqual(volume_next, 2018)
+        self.assertEqual(volume_previous, "2016")
+        self.assertEqual(volume_next, "2018")
 
         # Delete previous
         await test_obj.adelete()
@@ -809,7 +811,7 @@ class CitationRedirectorTest(TestCase):
             "COA", "2017"
         )
         self.assertEqual(volume_previous, None)
-        self.assertEqual(volume_next, 2018)
+        self.assertEqual(volume_next, "2018")
 
         # Create new test data
         await sync_to_async(CitationWithParentsFactory.create)(
@@ -833,6 +835,58 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
+
+        # Create new test data
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="71",
+            reporter="A.F.T.R.2d (RIA)",
+            page="4114",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Jane v. Doe",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="71A",
+            reporter="A.F.T.R.2d (RIA)",
+            page="3011",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Foo v. Bar",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="72",
+            reporter="A.F.T.R.2d (RIA)",
+            page="6029",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Bar v. Foo",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "A.F.T.R.2d (RIA)", "71A"
+        )
+        self.assertEqual(volume_previous, "71")
+        self.assertEqual(volume_next, "72")
 
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
@@ -911,7 +965,7 @@ class CitationRedirectorTest(TestCase):
 
     async def test_can_filter_out_non_case_law_citation(self):
         chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=22, reporter="U.S.", page="444", type=1
+            volume="22", reporter="U.S.", page="444", type=1
         )
         r = await self.async_client.post(
             reverse("citation_homepage"),

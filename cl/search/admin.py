@@ -32,6 +32,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    ScotusDocketMetadata,
     SearchQuery,
 )
 from cl.visualizations.models import SCOTUSMap
@@ -558,8 +559,8 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
 @admin.register(SearchQuery)
 class SearchQueryAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("user",)
-    list_display = ("__str__", "engine", "source")
-    list_filter = ("engine", "source")
+    list_display = ("__str__", "engine", "source", "query_mode")
+    list_filter = ("engine", "source", "query_mode")
     search_fields = ("user__username",)
 
 
@@ -572,3 +573,9 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
         "cluster",
     )
     list_filter = ("reason",)
+
+
+@admin.register(ScotusDocketMetadata)
+class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("docket",)
+    list_display = ("__str__",)

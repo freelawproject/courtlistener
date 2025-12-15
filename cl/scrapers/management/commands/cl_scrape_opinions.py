@@ -16,7 +16,6 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
 from cl import settings
-from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
@@ -26,7 +25,7 @@ from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
 )
-from cl.scrapers.tasks import extract_doc_content
+from cl.scrapers.tasks import extract_opinion_content
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
     get_child_court,
@@ -38,7 +37,6 @@ from cl.scrapers.utils import (
     update_or_create_originating_court_information,
 )
 from cl.search.models import (
-    SEARCH_TYPES,
     SOURCES,
     Citation,
     Court,
@@ -204,10 +202,6 @@ def save_everything(
 
     opinion.cluster = cluster
     opinion.save()
-    if not backscrape:
-        RealTimeQueue.objects.create(
-            item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
-        )
 
 
 class Command(ScraperCommand):
@@ -372,11 +366,11 @@ class Command(ScraperCommand):
                 "originating_court_information": originating_court_info,
             }
         )
-        extract_doc_content.delay(
+        extract_opinion_content.delay(
             opinion.pk,
             ocr_available=ocr_available,
-            citation_jitter=True,
             juriscraper_module=site.court_id,
+            percolate_opinion=True,
         )
 
         logger.info(
