@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from redis import Redis
 from sentry_sdk import capture_exception
 
-from cl.lib.llm import call_llm
+from cl.ai.llm import call_llm
 from cl.lib.redis_utils import (
     get_redis_interface,
 )
@@ -299,7 +299,7 @@ def extract_with_llm(
     :return: A dictionary where keys are unique docket_ids (int) and values are cleaned docket numbers (str).
     """
     try:
-        llm_response = call_llm(
+        llm_response, llm_raw_response = call_llm(
             system_prompt=system_prompt,
             user_prompt=f"{batch}",
             model=model_id,

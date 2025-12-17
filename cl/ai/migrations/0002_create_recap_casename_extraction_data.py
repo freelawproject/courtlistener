@@ -2,24 +2,27 @@
 
 from django.db import migrations
 
+TASK_NAME = "recap-into-opinions-casename-extraction"
+CONFIG_NAME = "recap-casename-extraction-4o-mini-v1"
+PROMPT_SET_NAME = "recap-into-opinions-casename-extraction"
+SYS_PROMPT_NAME = "recap-casename-sys-v1"
+
 def create_initial_data(apps, schema_editor):
     """Add the specific Recap Case Name extraction configuration"""
     LLMConfig = apps.get_model('ai', 'LLMConfig')
     Prompt = apps.get_model('ai', 'Prompt')
     LLMPromptSet = apps.get_model('ai', 'LLMPromptSet')
+    LLMTask = apps.get_model("ai", "LLMTask")
 
-    config_name = 'recap-casename-extraction-4o-mini'
-
-    if not LLMConfig.objects.filter(config_name=config_name).exists():
-        LLMConfig.objects.create(
-            config_name=config_name,
-            description='Configuration using GPT-4o-mini for extracting case names from Recap documents',
-            provider='openai',
-            model_name='gpt-4o-mini',
-            parameters={'temperature': 0, 'max_tokens': 300}
-        )
-
-    sys_prompt_name = 'recap-casename-sys-v1'
+    llm_config, created = LLMConfig.objects.get_or_create(
+        name=CONFIG_NAME,
+        defaults={
+            'description': 'Configuration using GPT-4o-mini for extracting case names from recap opinions',
+            'provider': 'openai',
+            'model_name': 'gpt-4o-mini',
+            'parameters': {'temperature': 0, 'max_tokens': 300}
+        }
+    )
 
     # System prompt text
     sys_prompt_text = """
@@ -147,7 +150,7 @@ Return format JSON with fields [`case_name_full`, `case_name`]
 """
 
     sys_prompt, created = Prompt.objects.get_or_create(
-        prompt_name=sys_prompt_name,
+        name=SYS_PROMPT_NAME,
         defaults={
             'role': 1,
             'position': 1,
@@ -155,14 +158,11 @@ Return format JSON with fields [`case_name_full`, `case_name`]
         }
     )
 
-    task_name = 'recap-casename-extraction'
-
     prompt_set, created = LLMPromptSet.objects.get_or_create(
-        prompt_set_name=task_name,
+        name=PROMPT_SET_NAME,
         version=1,
         defaults={
             'description': 'Extracts and verifies the correct case name for an opinion ingested from Recap',
-            'is_active': True,
             'notes': 'Initial version created via migration'
         }
     )
@@ -170,21 +170,28 @@ Return format JSON with fields [`case_name_full`, `case_name`]
     if created:
         prompt_set.prompts.add(sys_prompt)
 
+    LLMTask.objects.get_or_create(
+        name=TASK_NAME,
+        defaults={
+            "current_config": llm_config,
+            "current_prompt_set": prompt_set,
+            "description": "Used in classify_case_name_by_llm task"
+        }
+    )
+
 
 def remove_initial_data(apps, schema_editor):
     """Clean up the specific Recap Case Name extraction configuration"""
     LLMConfig = apps.get_model('ai', 'LLMConfig')
     Prompt = apps.get_model('ai', 'Prompt')
     LLMPromptSet = apps.get_model('ai', 'LLMPromptSet')
-
-    config_name = 'recap-casename-extraction-4o-mini'
-    task_name = 'recap-casename-extraction'
-    sys_prompt_name = 'recap-casename-sys-v1'
+    LLMTask = apps.get_model("ai", "LLMTask")
 
     # Delete data
-    LLMConfig.objects.filter(config_name=config_name).delete()
-    LLMPromptSet.objects.filter(prompt_set_name=task_name, version=1).delete()
-    Prompt.objects.filter(prompt_name=sys_prompt_name).delete()
+    LLMTask.objects.filter(name=TASK_NAME).delete()
+    LLMConfig.objects.filter(name=CONFIG_NAME).delete()
+    LLMPromptSet.objects.filter(name=PROMPT_SET_NAME, version=1).delete()
+    Prompt.objects.filter(name=SYS_PROMPT_NAME).delete()
 
 
 class Migration(migrations.Migration):

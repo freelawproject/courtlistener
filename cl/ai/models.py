@@ -15,10 +15,10 @@ class Prompt(AbstractDateTimeModel):
         (SYSTEM, "System"),
         (USER, "User"),
     )
-    prompt_name = models.CharField(
+    name = models.CharField(
         max_length=255,
         unique=True,
-        help_text="Unique identifier name for prompt (e.g. 'ocr-p3d-sys-v1'). It will be slugified if it is not in this format.",
+        help_text="Unique identifier name for the prompt (e.g. 'ocr-p3d-sys-v1'). It will be slugified if it is not in this format.",
     )
     role = models.SmallIntegerField(
         choices=ROLES,
@@ -31,11 +31,11 @@ class Prompt(AbstractDateTimeModel):
     )
 
     def save(self, *args, **kwargs):
-        self.prompt_name = slugify(self.prompt_name)
+        self.name = slugify(self.name)
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.prompt_name} | {self.get_role_display()}: {self.text[:50]}..."
+        return f"{self.name} | {self.get_role_display()}: {self.text[:50]}..."
 
 
 class LLMConfig(AbstractDateTimeModel):
@@ -46,9 +46,9 @@ class LLMConfig(AbstractDateTimeModel):
         ("anthropic", "Anthropic"),
         ("google", "Google Gemini"),
     )
-    config_name = models.CharField(
+    name = models.CharField(
         max_length=255,
-        unique=True,  # Critical for quick lookup and preventing duplicates
+        unique=True,
         help_text="Unique identifier for this configuration (e.g., 'gemini2-5-high-temp'). It will be slugified if it is not in this format.",
     )
     description = models.TextField(
@@ -72,20 +72,25 @@ class LLMConfig(AbstractDateTimeModel):
     )
 
     def __str__(self):
-        return f"{self.config_name} | {self.provider} : {self.model_name}"
+        return f"{self.name} | {self.provider} : {self.model_name}"
 
     def save(self, *args, **kwargs):
-        self.config_name = slugify(self.config_name)
+        self.name = slugify(self.name)
         super().save(*args, **kwargs)
+
+    @property
+    def full_model_name(self) -> str:
+        """Returns the provider/model string for instructor (e.g., openai/gpt-4o-mini)."""
+        return f"{self.provider}/{self.model_name}"
 
 
 class LLMPromptSet(AbstractDateTimeModel):
     """Groups specific Prompt objects into a versioned instruction set for a specific task (e.g., 'ocr_scan_p3d')."""
 
-    prompt_set_name = models.CharField(
+    name = models.CharField(
         max_length=255,
         db_index=True,
-        help_text="Identifier for the task (e.g., 'ocr-scan-p3d'). It will be slugified if it is not in this format. This name must be repeated across versions to use the latest active one.",
+        help_text="Identifier for the prompt set (e.g., 'ocr-scan-p3d-prompts'). It will be slugified if it is not in this format. This name must be repeated across versions to use the latest active one.",
     )
     description = models.TextField(
         blank=True,
@@ -99,25 +104,54 @@ class LLMPromptSet(AbstractDateTimeModel):
         default=1,
         help_text="Incremental version number for this specific task name",
     )
-    is_active = models.BooleanField(
-        default=True,
-        help_text="Designates if this is the currently active version for the task",
-    )
     notes = models.TextField(
         blank=True,
         help_text="Internal comments, known limitations, or reasons for changes (e.g., 'v1 failed on handwritten text; v2 adds examples to fix this')",
     )
 
     def save(self, *args, **kwargs):
-        self.prompt_set_name = slugify(self.prompt_set_name)
+        self.name = slugify(self.name)
         super().save(*args, **kwargs)
 
     class Meta:
-        # Ensure only one set is the active version for a given task name
-        unique_together = ("prompt_set_name", "version")
+        # Force versioning to keep history clean
+        unique_together = ("name", "version")
 
     def __str__(self):
-        return f"{self.prompt_set_name} | Version: {self.version}"
+        return f"{self.name} | Version: {self.version}"
+
+
+class LLMTask(AbstractDateTimeModel):
+    """Maps a task with a static code identifier to the currently active Configuration and PromptSet"""
+
+    name = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The static key used in Python code (e.g. 'recap-opinion-casename-extraction'). This will be hardcoded in the code so never rename it.",
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Description of the task",
+    )
+    current_config = models.ForeignKey(
+        LLMConfig,
+        on_delete=models.PROTECT,
+        help_text="The configuration currently live for this task",
+    )
+    current_prompt_set = models.ForeignKey(
+        LLMPromptSet,
+        on_delete=models.PROTECT,
+        help_text="The prompt set currently live for this task",
+    )
+
+    def __str__(self):
+        return (
+            f"{self.name} -> {self.current_config} / {self.current_prompt_set}"
+        )
+
+    def save(self, *args, **kwargs):
+        self.name = slugify(self.name)
+        super().save(*args, **kwargs)
 
 
 class LLMRun(AbstractDateTimeModel):
