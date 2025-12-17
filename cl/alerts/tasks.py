@@ -38,6 +38,7 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
     create_redis_semaphore,
     delete_redis_semaphore,
@@ -534,12 +535,22 @@ def send_search_alert_emails(
     connection.send_messages(messages)
 
 
-@app.task(
-    autoretry_for=(IntegrityError,),
-    max_retries=3,
-    interval_start=5,
-    ignore_result=True,
-)
+@retry(IntegrityError, tries=3, delay=0.5, backoff=1)
+def create_schedule_alerts_hits_in_bulk(
+    scheduled_hits: list[ScheduledAlertHit],
+) -> None:
+    """Create ScheduledAlertHit records in bulk.
+
+    Uses bulk_create to persist a list of ScheduledAlertHit instances in a
+    single database operation. Do retries upon IntegrityError.
+
+    :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
+    :return: None
+    """
+    ScheduledAlertHit.objects.bulk_create(scheduled_hits)
+
+
+@app.task(ignore_result=True)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
@@ -726,9 +737,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     ]
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
     if scheduled_hits_to_create_filtered:
-        ScheduledAlertHit.objects.bulk_create(
-            scheduled_hits_to_create_filtered
-        )
+        create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create_filtered)
 
 
 @app.task(
