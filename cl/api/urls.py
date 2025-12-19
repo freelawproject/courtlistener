@@ -52,11 +52,6 @@ router.register(r"tag", search_views.TagViewSet, basename="tag")
 # People & Entities
 router.register(r"people", people_views.PersonViewSet, basename="person")
 router.register(
-    r"disclosure-typeahead",
-    people_views.PersonDisclosureViewSet,
-    basename="disclosuretypeahead",
-)
-router.register(
     r"positions", people_views.PositionViewSet, basename="position"
 )
 router.register(

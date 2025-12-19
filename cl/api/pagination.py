@@ -236,12 +236,6 @@ class VersionBasedPagination(PageNumberPagination):
         return cursor_fields + [f"-{field}" for field in cursor_fields]
 
 
-class TinyAdjustablePagination(VersionBasedPagination):
-    page_size = 5
-    page_size_query_param = "page_size"
-    max_page_size = 20
-
-
 class MediumAdjustablePagination(VersionBasedPagination):
     page_size = 50
     page_size_query_param = "page_size"
