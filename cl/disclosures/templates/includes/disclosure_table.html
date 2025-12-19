@@ -1,0 +1,57 @@
+{% load disclosure_tags %}
+{# Generic disclosure table include #}
+{# Variables: title, api_key, admin_key, rows, headers, disclosure_id, filepath, is_investments, user #}
+
+{% if rows %}
+<div class="table-responsive v-offset-below-3">
+  <h3>
+    {{ title }}
+    <a href="/api/rest/v4/{{ api_key }}/?financial_disclosure__id={{ disclosure_id }}"
+       title="View API data">
+      <i class="fa fa-code gray pull-right"></i>
+    </a>
+  </h3>
+  <table class="table table-striped table-bordered table-hover">
+    <thead>
+      <tr>
+        <th></th>
+        {% if user.is_staff %}<th>Admin</th>{% endif %}
+        {% for header in headers %}
+          <th>{{ header }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>
+            {% if is_investments and row.page_number %}
+              <a href="{{ filepath }}#page={{ row.page_number }}" title="Go to PDF page">
+                <i class="fa fa-file-text-o gray"></i>
+              </a>
+            {% endif %}
+            {% if row.redacted %}
+              <i class="fa fa-file-excel-o black" title="Redaction present in row"></i>
+            {% endif %}
+          </td>
+          {% if user.is_staff %}
+            <td>
+              <a href="/admin/disclosures/{{ admin_key }}/{{ row.id }}/">
+                <i class="fa fa-pencil gray"></i>
+              </a>
+            </td>
+          {% endif %}
+          {% for value in row.values %}
+            <td>
+              {{ value }}
+              {% if value|is_failed_extraction %}
+                <i class="fa fa-eye-slash black" title="Failed extraction"></i>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

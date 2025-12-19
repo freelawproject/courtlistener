@@ -1,0 +1,28 @@
+{% load static %}
+{% if results %}
+<table class="table-instant-results">
+  <tbody>
+    {% for person in results %}
+    <tr class="tr-results cursor" tabindex="{{ forloop.counter|add:300 }}"
+        onclick="window.location='{{ person.url }}'">
+      <td class="col-xs-10 col-sm-10 col-lg-10 table-data-name">
+        <h4 class="text-left judge-name">{{ person.name_full }}</h4>
+        <p class="text-left gray">{{ person.position_str }}</p>
+      </td>
+      <td class="col-xs-2 col-sm-2 col-lg-2 table-data-portrait">
+        {% if person.thumbnail_path %}
+          <img src="{{ person.thumbnail_path }}"
+               alt="Portrait of {{ person.name_full }}"
+               width="100%"
+               class="img-responsive thumbnail shadow img-thumbnail judge-pic">
+        {% else %}
+          <div class="img-responsive thumbnail shadow img-thumbnail judge-pic">
+            <i class="fa fa-user fa-3x missing-judge"></i>
+          </div>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

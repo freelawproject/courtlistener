@@ -1,23 +1,11 @@
-/*Disclosure Table Viewer CSS*/
+/* Disclosure page styles */
 
+/* Disclosure Table Viewer */
 .disclosure-page .fa-exclamation-triangle {
   font-size: 100px;
 }
 
-.search-panel-table {
-  position: absolute;
-  z-index: 9;
-  background: white;
-  padding: 10px;
-  border: 1px solid lightgrey;
-  box-shadow: 3px 3px 6px #8b8b8b;
-}
-
-.table-parent {
-  position: relative;
-}
-
-/*Disclosure List Homepage CSS*/
+/* Typeahead search results styling */
 .judge-pic {
   margin-top: 10px;
   min-width: 64px;
@@ -31,6 +19,7 @@
   background: rgba(255, 255, 255, 0);
   border-bottom: 1px solid lightgrey;
   border-radius: 10px;
+  cursor: pointer;
 }
 
 .tr-results:last-child {
@@ -41,8 +30,10 @@
   position: absolute;
   z-index: 9;
   box-shadow: 3px 3px 6px #8b8b8b;
-  margin-top: 42px;
+  margin-top: 5px;
   width: 100%;
+  border-radius: 10px;
+  background: white;
 }
 
 #main-query-box .table-instant-results {
@@ -57,11 +48,6 @@
 
 #id_disclosures_search {
   border-radius: 4px;
-}
-
-.table-parent .table-instant-results {
-  border-radius: 10px;
-  background: white;
 }
 
 .table-instant-results > tbody {
@@ -84,15 +70,6 @@ tr.tr-results > td {
   color: black;
 }
 
-.table-instant-results {
-  border-radius: 10px;
-  background: white;
-}
-
-.table-instant-results > tbody {
-  background: rgba(255, 255, 255, 0);
-}
-
 td.table-data-portrait {
   max-height: 50px;
 }
@@ -109,26 +86,30 @@ td.table-data-portrait {
 }
 
 .search-input-judges {
-  width:75%;
+  width: 75%;
+  position: relative;
 }
 
-.sidebar-search > #main-query-box > form > #search-container > .search-input-judges {
+/* Sidebar search adjustments */
+.sidebar-search .search-input-judges {
   width: 100%;
 }
 
-.sidebar-search > #main-query-box > form > #search-container > .search-input-judges > table{
-  margin-top: 32px;
+.sidebar-search .table-instant-results {
+  margin-top: 5px;
 }
 
-.sidebar-search > #main-query-box {
+.sidebar-search #main-query-box {
   margin-top: 0;
 }
 
-#update_page_size {
-  padding-left: 16.6%
-}
-
+/* Loading spinner */
 #loader {
   text-align: center;
   display: block;
+}
+
+/* Cursor pointer for clickable rows */
+.cursor {
+  cursor: pointer;
 }
