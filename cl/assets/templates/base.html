@@ -83,9 +83,9 @@
   {% block header %}
   <header class="row">
     <!-- Donate Banner -->
-    {% if FUNDRAISING_MODE %}
+    {% flag "donate_banner" %}
       {% include 'includes/dismissible_nav_banner.html' with responsive=True cookie_sleep_duration=3 link="https://donate.free.law/forms/supportcl" cookie_name="2025_eoy_banner" button_text="Donate Today" text="Donate before December 31 and tell us how CourtListener helped you—your support and your story power the future of open law." title="You built today’s CourtListener. Help build what&nbsp;comes&nbsp;next." %}
-    {% endif %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
