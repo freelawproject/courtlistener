@@ -335,11 +335,15 @@ class DisclosurePageTest(BaseSeleniumTest):
             self.browser.find_element(By.CSS_SELECTOR, ".tr-results")
 
         # Type in search box and wait for HTMX response
-        search_input = self.browser.find_element(By.ID, "id_disclosures_search")
+        search_input = self.browser.find_element(
+            By.ID, "id_disclosures_search"
+        )
         search_input.send_keys("Judith")
 
         # Wait for HTMX to load results
         results = wait.until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".tr-results"))
+            EC.presence_of_all_elements_located(
+                (By.CSS_SELECTOR, ".tr-results")
+            )
         )
         self.assertEqual(len(results), 1, msg="Incorrect results displayed")
