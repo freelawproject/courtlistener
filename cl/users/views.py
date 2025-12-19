@@ -546,7 +546,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     up.save()
 
                 except IntegrityError as e:
-                    # Redirect to success if user already exists 
+                    # Redirect to success if user already exists
                     try:
                         user = User.objects.get(username=cd["username"])
                         get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
@@ -562,7 +562,10 @@ def register(request: HttpRequest) -> HttpResponse:
                             exc_info=True,
                         )
 
-                        form.add_error("username", "An error occurred during registration. Please try again.")
+                        form.add_error(
+                            "username",
+                            "An error occurred during registration. Please try again.",
+                        )
                         return TemplateResponse(
                             request,
                             "register/register.html",
