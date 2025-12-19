@@ -2282,30 +2282,27 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
         d.save()
 
         # Merge ScotusDocketMetadata
-        scotus_data = ScotusDocketMetadata.objects.filter(docket=d).first()
-        scotus_data = (
-            ScotusDocketMetadata(docket=d)
-            if scotus_data is None
-            else scotus_data
+        defaults = {
+            "capital_case": bool(report_data.get("capital_case")),
+            "date_discretionary_court_decision": report_data.get(
+                "discretionary_court_decision"
+            ),
+        }
+        if links := report_data.get("links"):
+            defaults["linked_with"] = links
+
+        if qp_url := report_data.get("questions_presented"):
+            defaults["questions_presented_url"] = qp_url
+
+        ScotusDocketMetadata.objects.update_or_create(
+            docket=d,
+            defaults=defaults,
         )
-        scotus_data.capital_case = bool(
-            report_data.get("capital_case") or False
-        )
-        scotus_data.date_discretionary_court_decision = report_data.get(
-            "discretionary_court_decision"
-        )
-        links = report_data.get("links")
-        scotus_data.linked_with = links if links else scotus_data.linked_with
-        qp_url = report_data.get("questions_presented")
-        scotus_data.questions_presented_url = (
-            qp_url if qp_url else scotus_data.questions_presented_url
-        )
-        scotus_data.save()
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
     items_returned, rds_created, content_updated = async_to_sync(
         add_docket_entries
     )(d, report_data["docket_entries"])
-
+   
     return d

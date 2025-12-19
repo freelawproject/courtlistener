@@ -47,18 +47,13 @@ from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-@override_settings(
-    INDEXING_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True,
-    RT_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True,
-    DLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True,
-    WLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True,
-    MLY_PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True,
-)
 @mock.patch(
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_percolator_opinions",
 )
-@override_settings(NO_MATCH_HL_SIZE=100)
+@override_settings(
+    NO_MATCH_HL_SIZE=100, PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED=True
+)
 class OpinionAlertsPercolatorTest(
     CourtTestCase,
     PeopleTestCase,
