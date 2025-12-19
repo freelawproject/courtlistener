@@ -3,10 +3,10 @@ from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
+from judge_pics.search import ImageSizes, portrait
 
 from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.models import Person, Position
-from judge_pics.search import ImageSizes, portrait
 
 
 async def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
@@ -18,9 +18,13 @@ async def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
      - Information about the database and coverage
     """
     disclosure_count = await FinancialDisclosure.objects.all().acount()
-    people_count = await Person.objects.filter(
-        financial_disclosures__isnull=False,
-    ).distinct().acount()
+    people_count = (
+        await Person.objects.filter(
+            financial_disclosures__isnull=False,
+        )
+        .distinct()
+        .acount()
+    )
     return TemplateResponse(
         request,
         "financial_disclosures_home.html",
@@ -102,12 +106,14 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
         if hasattr(person, "disclosures") and person.disclosures:
             url = person.disclosures[0].get_absolute_url()
 
-        results.append({
-            "name_full": person.name_full,
-            "position_str": position_str,
-            "thumbnail_path": thumbnail_path,
-            "url": url,
-        })
+        results.append(
+            {
+                "name_full": person.name_full,
+                "position_str": position_str,
+                "thumbnail_path": thumbnail_path,
+                "url": url,
+            }
+        )
 
     return TemplateResponse(
         request,
