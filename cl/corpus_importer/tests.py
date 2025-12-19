@@ -9,6 +9,7 @@ import time_machine
 from bs4 import BeautifulSoup
 from celery.exceptions import Retry
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
@@ -21,7 +22,7 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 from openai import RateLimitError
 from pydantic import ValidationError
 
-from cl.ai.models import LLMTask
+from cl.ai.models import LLMRun, LLMTask
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
@@ -3961,6 +3962,14 @@ class LlmTest(TestCase):
             case_name_full="JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
         )
         cls.llm_raw_response = mock.Mock()
+
+        mock_message = mock.Mock()
+        raw_args = '{"case_name": "Carrecter v. Herrin", "case_name_full": "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants."}'
+        mock_message.tool_calls = [
+            mock.Mock(function=mock.Mock(arguments=raw_args))
+        ]
+        cls.llm_raw_response.choices = [mock.Mock(message=mock_message)]
+
         cls.llm_raw_response.model_dump.return_value = {
             "id": "chatcmpl-123",
             "choices": [
@@ -3976,7 +3985,7 @@ class LlmTest(TestCase):
                                 "type": "function",
                                 "function": {
                                     "name": "CaseNameExtractionResponse",
-                                    "arguments": '{"case_name": "Carrecter v. Herrin", "case_name_full": "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants."}',
+                                    "arguments": raw_args,
                                 },
                             }
                         ],
@@ -4021,6 +4030,15 @@ class LlmTest(TestCase):
             self.llm_raw_response,
         )
 
+        # The API call has not yet been executed
+        run = LLMRun.objects.filter(
+            content_type=ContentType.objects.get_for_model(
+                self.opinion_cluster
+            ),
+            object_id=self.opinion_cluster.pk,
+        ).last()
+        self.assertIsNone(run)
+
         classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
 
         self.opinion_cluster.refresh_from_db()
@@ -4028,6 +4046,30 @@ class LlmTest(TestCase):
         self.assertEqual(
             self.opinion_cluster.case_name_full,
             "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+        # Verify thath LLMRun object was created
+        run = LLMRun.objects.filter(
+            content_type=ContentType.objects.get_for_model(
+                self.opinion_cluster
+            ),
+            object_id=self.opinion_cluster.pk,
+        ).last()
+        self.assertTrue(run.success)
+        self.assertEqual(run.llm_config, self.llm_config)
+        self.assertEqual(run.prompt_set, self.prompt_set)
+
+        # Verify output matches the mock's dictionary
+        actual_output_dict = json.loads(run.output)
+        expected_extraction = {
+            "case_name": "Carrecter v. Herrin",
+            "case_name_full": "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        }
+        self.assertEqual(actual_output_dict, expected_extraction)
+
+        # This contains the full dictionary: id, usage, choices, etc.
+        self.assertEqual(
+            run.output_json, self.llm_raw_response.model_dump(mode="json")
         )
 
     @mock.patch("cl.corpus_importer.tasks.call_llm")

@@ -298,15 +298,18 @@ def extract_with_llm(
     :param model_id: The identifier for the LLM model to use.
     :return: A dictionary where keys are unique docket_ids (int) and values are cleaned docket numbers (str).
     """
+    hardcoded_params = {
+        "temperature": 0.1,
+        "max_completion_tokens": 1000,
+    }
     try:
         llm_response, llm_raw_response = call_llm(
             system_prompt=system_prompt,
             user_prompt=f"{batch}",
             model=model_id,
             response_model=CleanDocketNumber,
-            temperature=0.1,
-            max_completion_tokens=1000,
             api_key=env("DOCKET_NUMBER_CLEANING_API_KEY"),
+            **hardcoded_params,
         )
     except ValidationError as e:
         logger.error(

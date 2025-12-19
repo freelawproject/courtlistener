@@ -67,6 +67,7 @@ class LLMConfig(AbstractDateTimeModel):
     )
     parameters = models.JSONField(
         default=dict,
+        null=True,
         blank=True,
         help_text="JSON dictionary for specific model settings like {'temperature': 0.5, 'max_tokens': 1000}",
     )
@@ -178,6 +179,12 @@ class LLMRun(AbstractDateTimeModel):
     output = models.TextField(
         blank=True,
         help_text="The raw text response returned by the LLM, useful for debugging parsing errors",
+    )
+    output_json = models.JSONField(
+        default=dict,
+        null=True,
+        blank=True,
+        help_text="Structured response returned by the LLM",
     )
     success = models.BooleanField(
         default=True, help_text="True if the output was successfully obtained"

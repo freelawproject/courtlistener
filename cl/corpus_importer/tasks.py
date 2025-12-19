@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import os
 import re
@@ -3152,6 +3153,8 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         success=False,
     )
 
+    params = config.parameters if isinstance(config.parameters, dict) else {}
+
     try:
         llm_response, llm_raw_response = call_llm(
             system_prompt=CASE_NAME_EXTRACT_SYSTEM,
@@ -3159,7 +3162,7 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
             response_model=CaseNameExtractionResponse,
             model=config.full_model_name,
             api_key=OPENAI_CASE_LAW_INFERENCE_KEY,
-            **config.parameters,
+            **params,
         )
     except ValidationError as e:
         logger.error(
@@ -3171,18 +3174,24 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
                 "fingerprint": ["llm-casenames-validation-error"],
             },
         )
-        llm_run.output = e.errors()
+        # Save error as plain text
+        llm_run.output = str(e)
+        # Save error as json
+        llm_run.output_json = e.json(indent=2)
         llm_run.save()
         return
     except Exception as e:
-        # Only expect to get instructor exceptions here to track them
+        # Only expect to get instructor exceptions here to track them, update and save failed run
+        llm_run.output = str(e)
+        llm_run.save()
         capture_exception(e)
         raise
 
     if not isinstance(llm_response, CaseNameExtractionResponse):
         # Added this to avoid mypy errors
         logger.error("LLM - Invalid response type: %s", type(llm_response))
-        llm_run.output = llm_raw_response.model_dump()
+        # Store parsed raw response
+        llm_run.output_json = llm_raw_response.model_dump(mode="json")
         llm_run.save()
         return
 
@@ -3208,7 +3217,20 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
             "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
             cluster.id,
         )
-        llm_run.output = llm_raw_response.model_dump()
+
+        try:
+            # grab the specific string sent by the LLM inside the tool call (see example in test)
+            raw_json_string = (
+                llm_raw_response.choices[0]
+                .message.tool_calls[0]
+                .function.arguments
+            )
+            llm_run.output = raw_json_string
+        except (AttributeError, IndexError):
+            # fallback if the structure is unexpected
+            llm_run.output = json.dumps(llm_response.model_dump())
+        # Store all metadata from response
+        llm_run.output_json = llm_raw_response.model_dump(mode="json")
         llm_run.success = True
         llm_run.save()
 
