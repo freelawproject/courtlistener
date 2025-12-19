@@ -79,7 +79,10 @@ class ScotusDocketMergeTest(TestCase):
         """Confirm merging again updates an existing SCOTUS docket."""
 
         data = ScotusDocketDataFactory(
-            docket_number="23A1434", case_name="Old Name", capital_case=False
+            docket_number="23A1434",
+            case_name="Old Name",
+            capital_case=False,
+            lower_court=self.lower_court.full_name,
         )
         docket = merge_scotus_docket(data)
         docket.refresh_from_db()
@@ -95,6 +98,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23A1434",
             capital_case=True,
             linked_with="23-6433",
+            lower_court=self.lower_court.full_name,
             lower_court_case_numbers=["23-6433"],
         )
         updated_docket = merge_scotus_docket(data)
