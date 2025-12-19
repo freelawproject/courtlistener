@@ -461,34 +461,6 @@
       </p>
     </div>
 
-    {# Search Box #}
-    <div class="sidebar-search v-offset-below-4">
-      <h3>
-        <span>Search <i class="fa fa-search gray pull-right"></i></span>
-      </h3>
-      <hr>
-      <div id="main-query-box">
-        <div id="search-container">
-          <label class="sr-only" for="id_disclosures_search">Search</label>
-          <div class="input-group search-input-judges">
-            <input class="input-md form-control"
-                   name="q"
-                   id="id_disclosures_search"
-                   autocomplete="off"
-                   autocorrect="off"
-                   autocapitalize="off"
-                   spellcheck="false"
-                   type="search"
-                   placeholder="Search for judges by name..."
-                   hx-get="{% url 'disclosure_search_typeahead' %}"
-                   hx-trigger="keyup changed delay:300ms"
-                   hx-target="#search-results">
-            <div id="search-results"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     {# Support #}
     <div id="support">
       <h3>
