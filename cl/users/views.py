@@ -546,13 +546,6 @@ def register(request: HttpRequest) -> HttpResponse:
                     up.save()
 
                 except IntegrityError as e:
-                    # Catch race condition on username (rare occurrence)
-                    logger.warning(
-                        "IntegrityError during registration for username=%s: %s",
-                        cd["username"],
-                        str(e),
-                        exc_info=True
-                    )
                     # Redirect to success if user already exists 
                     try:
                         user = User.objects.get(username=cd["username"])
@@ -562,11 +555,12 @@ def register(request: HttpRequest) -> HttpResponse:
                     # Else, display generic error message and rerender form
                     except User.DoesNotExist:
                         logger.error(
-                            "Unexpected IntegrityError during registration: user %s does not exist after IntegrityError. "
-                            "This may indicate a constraint violation on a different field.",
-                            cd["username"],
+                            "Unexpected IntegrityError during registration: user does not exist after IntegrityError. Original error: %s",
+                            str(e),
+                            exc_info=True,
                         )
-                        form.add_error(None, "An error occurred during registration. Please try again.")
+
+                        form.add_error("username", "An error occurred during registration. Please try again.")
                         return TemplateResponse(
                             request,
                             "register/register.html",
