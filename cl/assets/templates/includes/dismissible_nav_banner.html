@@ -3,6 +3,7 @@
   available and takes the keyword arguments described below:
 
   Parameters:
+    - title (optional): Title of the banner displayed in uppercase above the main text.
     - text: Text of the banner.
     - link: The URL for the button.
     - cookie_name: Name of the cookie used to remember if the user has already
@@ -38,12 +39,14 @@
 {% if cookie_name  not in request.COOKIES %}
   <div
     class="flex flex-column align-items-center{% if responsive %} flex-md-row{% endif %} alert-{% if variant %}{{ variant }}{% else %}danger{% endif %}"
-    style="border: 2px solid lightgray; padding-inline: 4rem; padding-block: 2rem; position: relative; gap: 1.5rem"
+    style="border: 2px solid lightgray; padding-left: 4rem; padding-right: 2.5rem; padding-block: 2rem; position: relative; gap: 1.5rem"
     data-dismissible-alert
   >
     {# Banner text #}
-    <p class="lead" style="margin: 0; flex-grow: 1">{{text}}</p>
-
+    <div style="flex-grow: 1">
+      <p class="text-uppercase">{{ title }}</p>
+      <p class="lead" style="margin: 0;">{{text}}</p>
+    </div>
     {# CTA Button #}
     <a
       href="{{link}}"
