@@ -134,8 +134,3 @@ td.table-data-portrait {
   text-align: center;
   display: block;
 }
-
-/* Cursor pointer for clickable rows */
-.cursor {
-  cursor: pointer;
-}
