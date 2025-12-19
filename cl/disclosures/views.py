@@ -23,7 +23,7 @@ async def financial_disclosures_home(request: HttpRequest) -> HttpResponse:
     ).distinct().acount()
     return TemplateResponse(
         request,
-        "disclosures/financial_disclosures_home.html",
+        "financial_disclosures_home.html",
         {
             "disclosure_count": disclosure_count,
             "people_count": people_count,
@@ -154,7 +154,7 @@ async def financial_disclosures_viewer(
 
     return TemplateResponse(
         request,
-        "disclosures/financial_disclosures_viewer.html",
+        "financial_disclosures_viewer.html",
         {
             "disclosure": disclosure,
             "person": person,
