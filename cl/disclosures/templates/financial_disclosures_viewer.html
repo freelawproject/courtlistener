@@ -381,7 +381,7 @@
         <article>{{ disclosure.addendum_content_raw }}</article>
         {% endif %}
 
-      {% elif disclosure.id %}
+      {% else %}
         {# Extraction failed #}
         <div class="text-center v-offset-above-4 disclosure-page">
           <i class="fa fa-exclamation-triangle gray fa-3x"></i>
@@ -389,12 +389,6 @@
           <p>
             <a href="{{ disclosure.filepath }}">Click here to view the disclosure as a PDF document</a>
           </p>
-        </div>
-      {% else %}
-        {# Loading state - shouldn't happen with server-side rendering #}
-        <div class="text-center v-offset-above-4">
-          <h1>Loading Disclosure</h1>
-          <i class="fa fa-spinner fa-spin fa-3x fa-fw"></i>
         </div>
       {% endif %}
     </div>
