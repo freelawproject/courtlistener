@@ -399,6 +399,20 @@ class EmbeddingsDataFactory(DictFactory):
     embeddings = List([SubFactory(EmbeddingDataFactory)])
 
 
+class SCOTUSAttachmentFactory(DictFactory):
+    document_url = Faker("url")
+    description = Faker("text", max_nb_chars=20)
+    document_number = Faker("pyint", min_value=1, max_value=1000)
+
+
+class SCOTUSDocketEntryFactory(DictFactory):
+    attachments = List([SubFactory(SCOTUSAttachmentFactory)])
+    date_filed = Faker("date_object")
+    description = Faker("text", max_nb_chars=20)
+    description_html = Faker("text", max_nb_chars=20)
+    document_number = Faker("pyint", min_value=1, max_value=1000)
+
+
 class ScotusDocketDataFactory(DictFactory):
     capital_case = Faker("boolean")
     case_name = Faker("case_name")
@@ -412,5 +426,5 @@ class ScotusDocketDataFactory(DictFactory):
     lower_court_decision_date = Faker("date_object")
     lower_court_rehearing_denied_date = Faker("date_object")
     questions_presented = Faker("url")
-    docket_entries = []
+    docket_entries = List([SubFactory(SCOTUSDocketEntryFactory)])
     parties = []
