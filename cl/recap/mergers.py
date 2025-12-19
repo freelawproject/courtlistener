@@ -949,11 +949,8 @@ async def add_docket_entries(
         # or throw an error.
         params = {"docket_entry": de}
         short_description = docket_entry.get("short_description")
-        if (
-            not docket_entry["document_number"]
-            and short_description
-            or is_scotus
-            and short_description
+        if short_description and (
+            not docket_entry["document_number"] or is_scotus
         ):
             params["description"] = docket_entry["short_description"]
 
@@ -992,9 +989,8 @@ async def add_docket_entries(
             if is_scotus:
                 # SCOTUS documents don't have a pacer_doc_id, so use the
                 # document_number instead to match the document.
-                doc_number = docket_entry.get("document_number")
                 get_params["document_number"] = (
-                    doc_number if doc_number else ""
+                    docket_entry.get("document_number") or ""
                 )
             if de_created is False:
                 # Try to match the RD regardless of the document_type.
@@ -2301,8 +2297,6 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    items_returned, rds_created, content_updated = async_to_sync(
-        add_docket_entries
-    )(d, report_data["docket_entries"])
-   
+    async_to_sync(add_docket_entries)(d, report_data["docket_entries"])
+
     return d
