@@ -41,20 +41,20 @@
     <p><code>Docket</code> objects sit at the top of the object hierarchy. In our PACER database, dockets link together docket entries, parties, and attorneys.</p>
     <p>In our case law database, dockets sit above <code>Opinion Clusters</code>. In our oral argument database, they sit above <code>Audio</code> objects.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request:</p>
-    <pre class="pre-scrollable"><c-code>
+    <c-code>
 curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "http://localhost:8000/api/rest/v4/dockets/"
-    </c-code></pre>
+    </c-code>
     <p>To look up a particular docket, use its ID:</p>
-    <pre class="pre-scrollable"><c-code>
+    <c-code>
 curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "http://localhost:8000/api/rest/v4/dockets/4214664/"
-    </c-code></pre>
+    </c-code>
     <p>The response you get will not list the docket entries, parties, or attorneys for the docket (doing so doesn't scale), but will have many other metadata fields:</p>
-    <pre class="pre-scrollable"><c-code>
+    <c-code>
 {
   "resource_uri": "https://www.courtlistener.com/api/rest/v4/dockets/4214664/",
   "id": 4214664,
@@ -110,7 +110,7 @@ curl -v \
   ],
   "panel": []
 }
-    </c-code></pre>
+    </c-code>
     <p>Ideally, docket entries, parties, and attorneys would be nested within the docket object you request, but this is not possible because some dockets have a vast number of these objects. Listing so many values in a single response from the server is impractical. To access docket entries, parties, or attorneys for a specific docket, use the docket entry, party, or attorney endpoints and filter by docket ID.</p>
     <p>The court fields are references to our Court API, described below.</p>
   </c-layout-with-navigation.section>
@@ -161,13 +161,13 @@ curl -v \
       To filter the nested attorney data for each party, include the <code>filter_nested_results=True</code> parameter in your API request.
     </p>
     <p>For example, this query returns the parties for docket number <code>123</code>:</p>
-    <pre class="pre-scrollable"><c-code>
+    <c-code>
 curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "party-list" version=version %}?docket=123"
-    </c-code></pre>
+    </c-code>
     <p>It returns something like:</p>
-  <pre class="pre-scrollable"><c-code>
+  <c-code>
 {
 ① "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",",
   "previous": null,
@@ -211,7 +211,7 @@ curl -v \
   "name": "Samuel Jackson",
   "extra_info": ""
 },
-...</c-code></pre>
+...</c-code>
     <p>Note that:</p>
     <ol>
       <li>
@@ -240,13 +240,13 @@ curl -v \
     </p>
     <p class="alert-warning"><strong>Listen Up:</strong> Like the parties endpoint, filters applied to this endpoint only affect the top-level data. To filter the nested data for each attorney, include the <code>filter_nested_results=True</code> parameter in your API request URL.
     </p>
-  <pre class="pre-scrollable"><c-code>
+  <c-code>
 curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "attorney-list" version=version %}?docket=4214664"
-  </c-code></pre>
+  </c-code>
     <p>Returns:</p>
-  <pre class="pre-scrollable"><c-code>
+  <c-code>
 {
   "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",
   "previous": null,
@@ -270,7 +270,7 @@ curl -v \
         "fax": "",
         "email": ""
     },
-...</c-code></pre>
+...</c-code>
     <p>Similar to the party API above, when you filter attorneys to a particular docket, the nested <code>parties_represented</code> field is not filtered and can show other parties the attorney represented in other dockets.</p>
     {% if not perms.people_db.has_recap_api_access %}
       <p>These endpoints are only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access these endpoints.
@@ -279,14 +279,14 @@ curl -v \
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="orig-court-info">
-    <h3>Originating Court Info  <small> — <code><nobr>{% url 'originatingcourtinformation-list' version=version %}</nobr></code></small></h3>
+    <h3>Originating Court Info  <small> — <code class="whitespace-nowrap">{% url 'originatingcourtinformation-list' version=version %}</code></small></h3>
     <p><code>Originating Court Information</code> represents the information gathered at an appellate court about a case when it was in a lower court or administrative body.</p>
     <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.</p>
     <p>Cross-walking from the upper court docket to the lower is possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="integrated-db">
-    <h3>Integrated Database <small> — <code><nobr>{% url 'fjcintegrateddatabase-list' version=version %}</nobr></code></small></h3>
+    <h3>Integrated Database <small> — <code class="whitespace-nowrap">{% url 'fjcintegrateddatabase-list' version=version %}</code></small></h3>
     <p><code>FJC Integrated Database</code> objects represent the information available in the <a class="underline" href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:</p>
     <ul>
       <li><a class="underline" href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
@@ -301,11 +301,13 @@ curl -v \
     <h2>Fast Document Lookup <small> — <code>{% url "fast-recapdocument-list" version=version %}</code></small></h2>
     <p>This API is used to check if documents with known IDs are available in our system.</p>
     <p>To use it, provide a court ID and a comma-separated list of <code>pacer_doc_id</code>'s:</p>
-   <pre class="pre-scrollable"><c-code>curl \
+   <c-code>
+ curl \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  '{% get_full_host %}{% url "fast-recapdocument-list" version=version %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \</c-code></pre>
+  '{% get_full_host %}{% url "fast-recapdocument-list" version=version %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
+   </c-code>
     <p>This will return one entry for each document found, up to a maximum of 300 items:</p>
-    <pre class="pre-scrollable"><c-code>
+    <c-code>
 {
   "next": null,
   "previous": null,
@@ -322,7 +324,7 @@ curl -v \
     }
   ]
 }
-    </c-code></pre>
+    </c-code>
     <c-court-id-mappings />
     <p class="alert-warning"><strong>Careful:</strong> When placing queries, the fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero, and you will need to do so in your queries.</p>
     <p>To query whether a case is in our system, use the <code>Docket</code> endpoint described above.</p>
