@@ -1,5 +1,5 @@
 from asgiref.sync import sync_to_async
-from django.db.models import Exists, OuterRef, Prefetch
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
@@ -45,6 +45,12 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
         return HttpResponse("")
 
     # Query for people with disclosures matching the search
+    # Search across name fields since name_full is a property, not a DB field
+    name_query = (
+        Q(name_first__icontains=query)
+        | Q(name_middle__icontains=query)
+        | Q(name_last__icontains=query)
+    )
     people = await sync_to_async(list)(
         Person.objects.filter(
             Exists(
@@ -54,7 +60,7 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
             ),
             is_alias_of=None,
         )
-        .filter(name_full__icontains=query)
+        .filter(name_query)
         .prefetch_related(
             Prefetch(
                 "financial_disclosures",
