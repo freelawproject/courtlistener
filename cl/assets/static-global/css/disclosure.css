@@ -70,6 +70,25 @@ tr.tr-results > td {
   color: black;
 }
 
+.disclosure-result-link,
+.disclosure-result-link:hover,
+.disclosure-result-link:focus,
+.disclosure-result-link:visited {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: black;
+}
+
+.disclosure-result-link h4,
+.disclosure-result-link i {
+  color: inherit;
+}
+
+.disclosure-result-link .gray {
+  color: gray;
+}
+
 td.table-data-portrait {
   max-height: 50px;
 }
