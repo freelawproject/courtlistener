@@ -2,6 +2,7 @@
  * Disclosure typeahead behavior
  * - Click outside closes the dropdown
  * - Escape key closes dropdown and clears input
+ * - Trim whitespace before sending requests
  */
 document.addEventListener("DOMContentLoaded", function () {
   const input = document.getElementById("id_disclosures_search");
@@ -23,6 +24,15 @@ document.addEventListener("DOMContentLoaded", function () {
       results.innerHTML = "";
       input.value = "";
       input.blur();
+    }
+  });
+
+  // Cancel HTMX request if trimmed query is too short
+  input.addEventListener("htmx:beforeRequest", function (e) {
+    const trimmed = input.value.trim();
+    if (trimmed.length < 2) {
+      e.preventDefault();
+      results.innerHTML = "";
     }
   });
 });
