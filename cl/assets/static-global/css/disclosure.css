@@ -63,11 +63,6 @@ tr.tr-results > td {
   background: rgba(255, 255, 255, 0);
 }
 
-.table-row-link {
-  text-decoration: none;
-  color: black;
-}
-
 .disclosure-result-link,
 .disclosure-result-link:hover,
 .disclosure-result-link:focus,
@@ -114,23 +109,4 @@ td.table-data-portrait {
   top: 100%;
   left: 0;
   z-index: 10;
-}
-
-/* Sidebar search adjustments */
-.sidebar-search .search-input-judges {
-  width: 100%;
-}
-
-.sidebar-search .table-instant-results {
-  margin-top: 5px;
-}
-
-.sidebar-search #main-query-box {
-  margin-top: 0;
-}
-
-/* Loading spinner */
-#loader {
-  text-align: center;
-  display: block;
 }
