@@ -110,20 +110,18 @@ class TestVisualizationRedirects(SimpleTestCase):
         """Test all deprecated visualization URLs redirect to API docs."""
         expected_redirect = reverse("visualization_api_help")
         # Raw URLs for visualization paths (catch-all handles these)
-        raw_urls = [
+        urls = [
             "/visualizations/scotus-mapper/",
             "/visualizations/scotus-mapper/new/",
             "/visualizations/gallery/",
             "/visualizations/scotus-mapper/1/test/",
             "/visualizations/scotus-mapper/1/edit/",
             "/visualizations/anything/else/",
+            # Named URLs still defined in users/urls.py
+            reverse("view_visualizations"),
+            reverse("view_deleted_visualizations"),
         ]
-        # Named URLs still defined in users/urls.py
-        named_urls = [
-            "view_visualizations",
-            "view_deleted_visualizations",
-        ]
-        for url in raw_urls:
+        for url in urls:
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertEqual(
@@ -135,19 +133,6 @@ class TestVisualizationRedirects(SimpleTestCase):
                     response.url,
                     f"{expected_redirect}#deprecation-notice",
                     msg=f"{url} should redirect to API docs",
-                )
-        for url_name in named_urls:
-            with self.subTest(url_name=url_name):
-                response = self.client.get(reverse(url_name))
-                self.assertEqual(
-                    response.status_code,
-                    HTTPStatus.MOVED_PERMANENTLY,
-                    msg=f"{url_name} should return 301",
-                )
-                self.assertEqual(
-                    response.url,
-                    f"{expected_redirect}#deprecation-notice",
-                    msg=f"{url_name} should redirect to API docs",
                 )
 
 
