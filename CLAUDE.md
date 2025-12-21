@@ -1,46 +1,141 @@
-# Developer guides
+# CourtListener Development Guidelines
 
-Read these guides as needed:
+These guidelines help AI assistants work effectively on CourtListener. Rules marked as MUST are mandatory for AI agents.
 
-1. Before starting, read our developer guide: https://github.com/freelawproject/courtlistener/wiki/Getting-Started-Developing-CourtListener/
-
-The rules for code improvement and quality MUST be strictly followed by AI agents. For example, if it says that something "should" be done, that's guidance to humans. AIs MUST do those things.
-
-1. To learn to do tests, read our testing guide: https://github.com/freelawproject/courtlistener/wiki/Automated-tests-on-CourtListener
-
-1. To learn how to migrate the DB, read our DB guide: https://github.com/freelawproject/courtlistener/wiki/Database-migrations
+Rules and guidance on our wiki is written with flexibility for humans, but MUST be strictly followed by AI agents. For example, if it says that something "should" be done, that's guidance to humans. AIs MUST do those things.
 
 
-# Coding Rules
+## Developer Guides
 
-1. NEVER write a URL into backend code. Only include them if strictly necessary in front end code. Instead, use django's tools for generating URLs.
-1. New code MUST include type hints and must pass MyPy.
-1. ALWAYS delete unused code that is created during a task.
+- **Getting Started**: https://github.com/freelawproject/courtlistener/wiki/Getting-Started-Developing-CourtListener/
 
 
-# Testing
+## Project Structure
 
-1. Try to keep the database between tests runs, for efficiency. 
-1. If you need to run more than a few tests, just run them all.
-1. Do not run the selenium tests unless necessary since they're very slow.
-1. Use subTests if possible to create fewer test methods and classes.
-
-
-# Submitting Work
-
-1. When you make a plan, use the steps you took in the plan to break the changes into smaller commits, each with a particular unit of work. Use `git add -p` to do this at sub-file level where appropriate. For example, if the goal was to functions foo1() and bar1() in file1.py and update foo2() and bar2() in file2.py, you might want to commit the changes to foo functions in one commit and the changes to the bar functions in a second. 
-1. Pull requests MUST be submitted as drafts and must use .github/PULL_REQUEST_TEMPLATE.md as their template.
-1. Before submitting work, run pre-commit and ensure it passes.
-1. Always update the branch before attempting to commit to it. Assume there are remote commits.
+```
+cl/                     # Main Django project
+├── assets/            # Static files, templates, React components
+│   ├── templates/     # Django templates (base.html, etc.)
+│   ├── react/         # React/TypeScript components
+│   └── static-global/ # Global CSS/JS
+├── lib/               # Shared utilities
+├── tests/             # Test utilities and base classes
+└── [app]/             # Individual Django apps (search, alerts, etc.)
+```
 
 
-# Available tools
+## Coding Rules
 
-The application runs inside docker. Therefore:
- - You can run django commands with: `docker exec cl-django python manage.py XXX`
+1. **URLs**: MUST use Django's `reverse()` function. NEVER hardcode URLs in backend code.
+   ```python
+   # Good
+   from django.urls import reverse
+   url = reverse("some_view_name", kwargs={"pk": 1})
 
-You have the following tools available on Linux machines:
- - grep is an alias to rg
- - gh
- - pre-commit
- - uv is available and is the only tool that should be used for dependencies
+   # Bad
+   url = "/some/hardcoded/path/1/"
+   ```
+
+2. **Type Hints**: New code MUST include type hints and pass MyPy. Upgrade lint.yml with new files as you go.
+
+3. **Unused Code**: MUST delete unused code created during a task.
+
+4. **Async Patterns**: Many views use async. Use `sync_to_async` and `async_to_sync` from `asgiref.sync` when needed.
+
+
+## Testing
+
+### Test Base Classes
+
+Read the testing guide before writing tests and follow it strictly: https://github.com/freelawproject/courtlistener/wiki/Automated-tests-on-CourtListener
+
+Use project-specific test classes from `cl.tests.cases`:
+
+```python
+from cl.tests.cases import SimpleTestCase, TestCase, APITestCase
+
+class MySimpleTest(SimpleTestCase):
+    """No database access needed"""
+    pass
+
+class MyDBTest(TestCase):
+    """Needs database access"""
+    fixtures = ["some_fixture.json"]
+
+class MyAPITest(APITestCase):
+    """For REST API tests"""
+    pass
+```
+
+### Running Tests
+
+```bash
+# Run all tests for an app
+docker exec cl-django python manage.py test cl.appname.tests
+
+# Run specific test class
+docker exec cl-django python manage.py test cl.appname.tests.TestClassName
+
+# Run specific test method
+docker exec cl-django python manage.py test cl.appname.tests.TestClassName.test_method
+```
+
+### Testing Guidelines
+
+- Keep the database between test runs for efficiency
+- Use `subTest()` to reduce test methods while testing multiple cases
+- Avoid selenium tests unless necessary (they're slow)
+- Use `time_machine` for date-dependent tests to avoid flaky failures
+- Use `FactoryBoy` to make mock data.
+- NEVER use Django fixtures. If fixtures are found, replace them with tests that use FactoryBoy and Fakes.
+
+
+## Database Migrations
+
+**Database Migrations**: https://github.com/freelawproject/courtlistener/wiki/Database-migrations
+
+When creating code that modify Django models, strictly follow the Database Migration guide: https://github.com/freelawproject/courtlistener/wiki/Database-migrations
+
+
+## Submitting Work
+
+### Commits
+
+- Break changes into logical commits (use `git add -p` for sub-file commits)
+- Follow conventional commit format: `type(scope): message`
+  ```
+  feat(alerts): Add new notification system
+  fix(search): Correct pagination bug
+  docs(readme): Update installation steps
+  refactor(api): Simplify serializer logic
+  ```
+
+### Pull Requests
+
+1. Update branch before committing.
+2. Run `pre-commit` and ensure it passes
+3. Submit as **draft** PR
+4. Use the template from `.github/PULL_REQUEST_TEMPLATE.md`
+
+
+## Available Tools
+
+### Docker Commands
+
+```bash
+# Run Django management commands
+docker exec cl-django python manage.py [command]
+
+# Run tests
+docker exec cl-django python manage.py test [test_path]
+
+# Access Django shell
+docker exec -it cl-django python manage.py shell
+```
+
+### CLI Tools
+
+- `grep` → aliased to `rg` (ripgrep)
+- `gh` → GitHub CLI for PRs, issues, actions
+- `pre-commit` → code quality checks (ruff, mypy, etc.)
+- `uv` → Python dependency management (the only tool to use for deps)
