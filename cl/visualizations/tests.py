@@ -8,6 +8,7 @@ from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
 from django.urls import reverse
+from rest_framework.response import Response
 
 from cl.search.models import OpinionCluster
 from cl.tests.cases import APITestCase, SimpleTestCase, TestCase
@@ -105,51 +106,36 @@ class TestVizModels(TestCase):
 class TestVisualizationRedirects(SimpleTestCase):
     """Test that deprecated visualization URLs redirect properly."""
 
-    def test_mapper_homepage_redirects(self) -> None:
-        """Test mapper homepage redirects to API docs."""
-        response = self.client.get(reverse("mapper_homepage"))
-        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
-        self.assertIn("visualization", response.url.lower())
-
-    def test_new_visualization_redirects(self) -> None:
-        """Test new visualization page redirects to API docs."""
-        response = self.client.get(reverse("new_visualization"))
-        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
-        self.assertIn("visualization", response.url.lower())
-
-    def test_gallery_redirects(self) -> None:
-        """Test gallery page redirects to API docs."""
-        response = self.client.get(reverse("viz_gallery"))
-        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
-        self.assertIn("visualization", response.url.lower())
-
-    def test_view_visualization_redirects(self) -> None:
-        """Test view visualization page redirects to API docs."""
-        response = self.client.get(
-            reverse("view_visualization", kwargs={"pk": 1, "slug": "test"})
-        )
-        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
-        self.assertIn("visualization", response.url.lower())
-
-    def test_edit_visualization_redirects(self) -> None:
-        """Test edit visualization page redirects to API docs."""
-        response = self.client.get(
-            reverse("edit_visualization", kwargs={"pk": 1})
-        )
-        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
-        self.assertIn("visualization", response.url.lower())
-
-    def test_profile_visualizations_redirects(self) -> None:
-        """Test profile visualizations page redirects to API docs."""
-        response = self.client.get(reverse("view_visualizations"))
-        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
-        self.assertIn("visualization", response.url.lower())
-
-    def test_profile_deleted_visualizations_redirects(self) -> None:
-        """Test profile deleted visualizations page redirects to API docs."""
-        response = self.client.get(reverse("view_deleted_visualizations"))
-        self.assertEqual(response.status_code, HTTPStatus.MOVED_PERMANENTLY)
-        self.assertIn("visualization", response.url.lower())
+    def test_deprecated_urls_redirect_to_api_docs(self) -> None:
+        """Test all deprecated visualization URLs redirect to API docs."""
+        expected_redirect = reverse("visualization_api_help")
+        test_cases = [
+            ("mapper_homepage", {}),
+            ("new_visualization", {}),
+            ("viz_gallery", {}),
+            ("view_visualization", {"pk": 1, "slug": "test"}),
+            ("edit_visualization", {"pk": 1}),
+            ("view_visualizations", {}),
+            ("view_deleted_visualizations", {}),
+        ]
+        for url_name, kwargs in test_cases:
+            with self.subTest(url_name=url_name):
+                url = (
+                    reverse(url_name, kwargs=kwargs)
+                    if kwargs
+                    else reverse(url_name)
+                )
+                response = self.client.get(url)
+                self.assertEqual(
+                    response.status_code,
+                    HTTPStatus.MOVED_PERMANENTLY,
+                    msg=f"{url_name} should return 301",
+                )
+                self.assertEqual(
+                    response.url,
+                    f"{expected_redirect}#deprecation-notice",
+                    msg=f"{url_name} should redirect to API docs",
+                )
 
 
 class APIVisualizationTestCase(APITestCase):
@@ -181,7 +167,7 @@ class APIVisualizationTestCase(APITestCase):
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
 
-    async def make_good_visualization(self, title: str):
+    async def make_good_visualization(self, title: str) -> "Response":
         data = {
             "title": title,
             "cluster_start": reverse(
