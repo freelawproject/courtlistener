@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from cl.visualizations.views import (
     VisualizationDeprecationRedirectView,
@@ -6,7 +6,13 @@ from cl.visualizations.views import (
 )
 
 urlpatterns = [
-    # Redirects for deprecated pages
+    # Keep embed functionality (must be before catch-all)
+    path(
+        "visualizations/scotus-mapper/<int:pk>/embed/",
+        view_embedded_visualization,
+        name="view_embedded_visualization",
+    ),
+    # Named redirects for backwards compatibility with reverse()
     path(
         "visualizations/scotus-mapper/",
         VisualizationDeprecationRedirectView.as_view(),
@@ -32,10 +38,9 @@ urlpatterns = [
         VisualizationDeprecationRedirectView.as_view(),
         name="viz_gallery",
     ),
-    # Keep embed functionality
-    path(
-        "visualizations/scotus-mapper/<int:pk>/embed/",
-        view_embedded_visualization,
-        name="view_embedded_visualization",
+    # Catch-all for any other visualization paths
+    re_path(
+        r"^visualizations/.*$",
+        VisualizationDeprecationRedirectView.as_view(),
     ),
 ]
