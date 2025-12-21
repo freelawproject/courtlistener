@@ -56,7 +56,7 @@ cl/                     # Main Django project
     if not some_condition:
        # Condition failed. Exit the function.
        return
-   
+
     # Bad
     if some_condition:
        do_something()
