@@ -46,6 +46,21 @@ cl/                     # Main Django project
 
 6. **Async Patterns**: Many views use async. Use `sync_to_async` and `async_to_sync` from `asgiref.sync` when needed.
 
+### Python Style Rules
+
+1. Use modern python features like the walrus operator.
+
+2. Prefer early exits to prevent deep nesting.
+    ```python
+    # Good
+    if not some_condition:
+       # Condition failed. Exit the function.
+       return
+   
+    # Bad
+    if some_condition:
+       do_something()
+    ```
 
 ## Testing
 
