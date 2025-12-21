@@ -40,7 +40,11 @@ cl/                     # Main Django project
 
 3. **Unused Code**: MUST delete unused code created during a task.
 
-4. **Async Patterns**: Many views use async. Use `sync_to_async` and `async_to_sync` from `asgiref.sync` when needed.
+4. **API Version**: Always use API v4, never v3. v3 is deprecated.
+
+5. **Management Commands**: Do not add `cl_` to the names of management commands. It's an obsolete practice.
+
+6. **Async Patterns**: Many views use async. Use `sync_to_async` and `async_to_sync` from `asgiref.sync` when needed.
 
 
 ## Testing
