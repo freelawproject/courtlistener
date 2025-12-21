@@ -316,9 +316,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         return f"{getattr(self, 'pk', None)}: {self.title}"
 
     def get_absolute_url(self) -> str:
-        return reverse(
-            "view_visualization", kwargs={"pk": self.pk, "slug": self.slug}
-        )
+        return reverse("view_embedded_visualization", kwargs={"pk": self.pk})
 
     def make_title(self):
         """Make a title for the network
