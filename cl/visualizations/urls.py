@@ -1,64 +1,41 @@
 from django.urls import path
 
 from cl.visualizations.views import (
-    delete_visualization,
-    edit_visualization,
-    gallery,
-    mapper_homepage,
-    new_visualization,
-    privatize_visualization,
-    restore_visualization,
-    share_visualization,
+    VisualizationDeprecationRedirectView,
     view_embedded_visualization,
-    view_visualization,
 )
 
 urlpatterns = [
+    # Redirects for deprecated pages
     path(
         "visualizations/scotus-mapper/",
-        mapper_homepage,
+        VisualizationDeprecationRedirectView.as_view(),
         name="mapper_homepage",
     ),
     path(
         "visualizations/scotus-mapper/new/",
-        new_visualization,
+        VisualizationDeprecationRedirectView.as_view(),
         name="new_visualization",
     ),
     path(
         "visualizations/scotus-mapper/<int:pk>/edit/",
-        edit_visualization,
+        VisualizationDeprecationRedirectView.as_view(),
         name="edit_visualization",
     ),
     path(
-        # Check JS files if changing this config.
-        "visualizations/scotus-mapper/delete/",
-        delete_visualization,
-        name="delete_visualization",
+        "visualizations/scotus-mapper/<int:pk>/<blank-slug:slug>/",
+        VisualizationDeprecationRedirectView.as_view(),
+        name="view_visualization",
     ),
     path(
-        "visualizations/scotus-mapper/restore/",
-        restore_visualization,
-        name="restore_visualization",
+        "visualizations/gallery/",
+        VisualizationDeprecationRedirectView.as_view(),
+        name="viz_gallery",
     ),
-    path(
-        "visualizations/scotus-mapper/share/",
-        share_visualization,
-        name="share_visualization",
-    ),
-    path(
-        "visualizations/scotus-mapper/privatize/",
-        privatize_visualization,
-        name="privatize_visualization",
-    ),
+    # Keep embed functionality
     path(
         "visualizations/scotus-mapper/<int:pk>/embed/",
         view_embedded_visualization,
         name="view_embedded_visualization",
     ),
-    path(
-        "visualizations/scotus-mapper/<int:pk>/<blank-slug:slug>/",
-        view_visualization,
-        name="view_visualization",
-    ),
-    path("visualizations/gallery/", gallery, name="viz_gallery"),
 ]
