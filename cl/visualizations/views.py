@@ -8,8 +8,7 @@ from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import RedirectView
 
-from cl.visualizations.models import Referer, SCOTUSMap
-from cl.visualizations.tasks import get_title
+from cl.visualizations.models import SCOTUSMap
 
 
 class VisualizationDeprecationRedirectView(RedirectView):
@@ -43,16 +42,6 @@ async def view_embedded_visualization(
             title = "Private Visualization"
         else:
             title = f"Network Graph of {viz.title}"
-            # Log the referer if it's set, and the item is live and public
-            if viz.published:
-                referer_url = request.META.get("HTTP_REFERER")
-                if referer_url is not None:
-                    referer, created = await Referer.objects.aget_or_create(
-                        url=referer_url, map_id=viz.pk
-                    )
-                    if created:
-                        # Spawn a task to try to get the title of the page
-                        get_title.delay(referer.pk)
 
     return TemplateResponse(
         request,
