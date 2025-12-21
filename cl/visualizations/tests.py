@@ -109,23 +109,36 @@ class TestVisualizationRedirects(SimpleTestCase):
     def test_deprecated_urls_redirect_to_api_docs(self) -> None:
         """Test all deprecated visualization URLs redirect to API docs."""
         expected_redirect = reverse("visualization_api_help")
-        test_cases = [
-            ("mapper_homepage", {}),
-            ("new_visualization", {}),
-            ("viz_gallery", {}),
-            ("view_visualization", {"pk": 1, "slug": "test"}),
-            ("edit_visualization", {"pk": 1}),
-            ("view_visualizations", {}),
-            ("view_deleted_visualizations", {}),
+        # Raw URLs for visualization paths (catch-all handles these)
+        raw_urls = [
+            "/visualizations/scotus-mapper/",
+            "/visualizations/scotus-mapper/new/",
+            "/visualizations/gallery/",
+            "/visualizations/scotus-mapper/1/test/",
+            "/visualizations/scotus-mapper/1/edit/",
+            "/visualizations/anything/else/",
         ]
-        for url_name, kwargs in test_cases:
-            with self.subTest(url_name=url_name):
-                url = (
-                    reverse(url_name, kwargs=kwargs)
-                    if kwargs
-                    else reverse(url_name)
-                )
+        # Named URLs still defined in users/urls.py
+        named_urls = [
+            "view_visualizations",
+            "view_deleted_visualizations",
+        ]
+        for url in raw_urls:
+            with self.subTest(url=url):
                 response = self.client.get(url)
+                self.assertEqual(
+                    response.status_code,
+                    HTTPStatus.MOVED_PERMANENTLY,
+                    msg=f"{url} should return 301",
+                )
+                self.assertEqual(
+                    response.url,
+                    f"{expected_redirect}#deprecation-notice",
+                    msg=f"{url} should redirect to API docs",
+                )
+        for url_name in named_urls:
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name))
                 self.assertEqual(
                     response.status_code,
                     HTTPStatus.MOVED_PERMANENTLY,
