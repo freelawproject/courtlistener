@@ -124,7 +124,7 @@ def import_tn_corpus(
         docket, opinions, cluster, citations, oci = make_objects(
             make_item(case),
             courts[case["court"]],
-           [(make_item(case), pdf_data, sha1_hash)],
+            [(make_item(case), pdf_data, sha1_hash)],
         )
 
         save_everything(
