@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
@@ -38,6 +38,7 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
     create_redis_semaphore,
     delete_redis_semaphore,
@@ -534,6 +535,21 @@ def send_search_alert_emails(
     connection.send_messages(messages)
 
 
+@retry(IntegrityError, tries=3, delay=0.5, backoff=1)
+def create_schedule_alerts_hits_in_bulk(
+    scheduled_hits: list[ScheduledAlertHit],
+) -> None:
+    """Create ScheduledAlertHit records in bulk.
+
+    Uses bulk_create to persist a list of ScheduledAlertHit instances in a
+    single database operation. Do retries upon IntegrityError.
+
+    :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
+    :return: None
+    """
+    ScheduledAlertHit.objects.bulk_create(scheduled_hits)
+
+
 @app.task(ignore_result=True)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
@@ -561,6 +577,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
     docket_hits = [hit.id for hit in d_alerts_triggered]
+    alerts_triggered_ids = []
     for hit in main_alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
         # independent highlighting for each alert triggered.
@@ -705,10 +722,22 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 object_id=object_id,
             )
         )
+        alerts_triggered_ids.append(alert_triggered_id)
 
+    # Filter out scheduled_hits_to_create by alerts that still exist in the
+    # database to prevent an IntegrityError caused by a race condition when
+    # an alert is deleted.
+    existing_ids = set(
+        Alert.objects.filter(pk__in=alerts_triggered_ids).values_list(
+            "pk", flat=True
+        )
+    )
+    scheduled_hits_to_create_filtered = [
+        hit for hit in scheduled_hits_to_create if hit.alert_id in existing_ids
+    ]
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
-    if scheduled_hits_to_create:
-        ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+    if scheduled_hits_to_create_filtered:
+        create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create_filtered)
 
 
 @app.task(
