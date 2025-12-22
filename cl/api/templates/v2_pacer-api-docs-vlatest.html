@@ -143,7 +143,7 @@ curl -v \
       ]"
       :rows="[
         {'field': '<code>plain_text</code>', 'notes': '<p>This field contains the extracted text of the document.</p><p>We use <a class=underline href=https://free.law/open-source-tools#doctor>Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p><p>To see whether OCR was used, check the <code>ocr_status</code> field.</p><p>If you don’t need this content, omit it via <a class=text-primary-600 href={% url "rest_docs" version=version %}#field-selection>Field Selection</a> to significantly reduce response times and payload size.</p>'},
-        {'field': '<code>filepath_local</code>', 'notes': '<p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a href={% url "field_api_help" %}#downloads>help article on this topic</a>.</p><p>The name of this field dates back to when all our files were locally stored on a single server.</p>'}
+        {'field': '<code>filepath_local</code>', 'notes': '<p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a class=text-primary-600 href={% url "field_api_help" %}#downloads>help article on this topic</a>.</p><p>The name of this field dates back to when all our files were locally stored on a single server.</p>'}
       ]"
     ></c-data-table>
 
