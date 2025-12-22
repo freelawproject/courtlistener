@@ -14,7 +14,7 @@ from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.db import IntegrityError
-from django.db.models import Count, F
+from django.db.models import F
 from django.http import (
     HttpRequest,
     HttpResponse,
