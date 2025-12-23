@@ -111,8 +111,6 @@ docker exec cl-django python manage.py test cl.appname.tests.TestClassName.test_
 
 ## Database Migrations
 
-**Database Migrations**: https://github.com/freelawproject/courtlistener/wiki/Database-migrations
-
 When creating code that modify Django models, strictly follow the Database Migration guide: https://github.com/freelawproject/courtlistener/wiki/Database-migrations
 
 
