@@ -803,6 +803,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "date_reargument_denied",
         ]
     )
+    docket_number_raw_tracker = FieldTracker(fields=["docket_number_raw"])
 
     class Meta:
         constraints = [

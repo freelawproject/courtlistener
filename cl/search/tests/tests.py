@@ -3864,3 +3864,71 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             {str(self.docket_4.id)},
             "Redis cache set should contain docket_4 only",
         )
+
+
+class DocketSignalTest(TestCase):
+    def setUp(self):
+        self.clean_docket_func_path = (
+            "cl.search.signals.clean_docket_number_raw_and_update_redis_cache"
+        )
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_on_creation(self):
+        """Verify cleaning runs when a new non-RECAP docket is created."""
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            Docket.objects.create(
+                docket_number_raw="2023-cv-00001",
+                source=Docket.SCRAPER,  # source != Docket.RECAP
+            )
+            self.assertTrue(mocked_cleaner.called)
+            self.assertEqual(mocked_cleaner.call_count, 1)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_on_field_change(self):
+        """Verify cleaning runs when docket_number_raw is updated."""
+        docket = Docket.objects.create(
+            docket_number_raw="2023-cv-00001", source=Docket.SCRAPER
+        )
+        new_docket_number = "2023-cv-13-00001"
+        self.assertNotEqual(docket.docket_number_raw, new_docket_number)
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = new_docket_number
+            docket.save()
+
+            self.assertTrue(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=False)
+    def test_signal_does_not_trigger_when_value_is_the_same(self):
+        """Verify cleaning does not run if the field did not change"""
+        dn = "2023-cv-00001"
+        docket = Docket.objects.create(
+            docket_number_raw=dn, source=Docket.SCRAPER
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = dn
+            docket.save()
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_does_not_trigger_on_other_field_change(self):
+        """Verify cleaning does not run if a different field is updated."""
+        docket = Docket.objects.create(
+            docket_number_raw="123-ABC", source=Docket.SCRAPER
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.case_name = "Changed another field"
+            docket.save()
+
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_respects_recap_source(self):
+        """Verify cleaning does not run if the source is RECAP."""
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            Docket.objects.create(
+                docket_number_raw="123-ABC", source=Docket.RECAP
+            )
+            self.assertFalse(mocked_cleaner.called)
