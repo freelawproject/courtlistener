@@ -152,7 +152,7 @@ docker exec -it cl-django python manage.py shell
 
 ### CLI Tools
 
-- `grep` → aliased to `rg` (ripgrep)
+- `rg` may be installed. Use it instead of `grep` if so.
 - `gh` → GitHub CLI for PRs, issues, actions
 - `pre-commit` → code quality checks (ruff, mypy, etc.)
 - `uv` → Python dependency management (the only tool to use for deps)
