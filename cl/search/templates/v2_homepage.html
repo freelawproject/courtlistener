@@ -38,7 +38,7 @@
       <div class="md:hidden bg-white rounded-2xl flex flex-col">
         <c-corpus-search class="p-4 pt-2 w-full !flex-col" only>
           <c-corpus-search.mobile.top-controls :request="request" only />
-          <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" only>
+          <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" form_prefix="mobile" only>
             <c-slot name="trigger_button">
               <button
                 x-on:click="open"
@@ -84,7 +84,7 @@
             </c-corpus-search.button>
           </div>
           <div class="px-4">
-            <c-corpus-search.filters/>
+            <c-corpus-search.filters :search_form="search_form" form_prefix="desktop"/>
           </div>
         </section>
       </c-corpus-search>
