@@ -805,6 +805,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "date_reargument_denied",
         ]
     )
+    docket_number_raw_tracker = FieldTracker(fields=["docket_number_raw"])
 
     class Meta:
         constraints = [
@@ -840,7 +841,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             )
 
         if self.source in self.RECAP_SOURCES():
-            for field in ["pacer_case_id", "docket_number"]:
+            for field in ["pacer_case_id", "docket_number_raw"]:
                 if (
                     field == "pacer_case_id"
                     and getattr(self, "court", None)
@@ -972,7 +973,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
             "servlet=CaseSummary.jsp&"
-            f"caseNum={self.docket_number}&"
+            f"caseNum={self.docket_number_raw}&"
             "incOrigDkt=Y&"
             "incDktEntries=Y"
         )
@@ -980,7 +981,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def pacer_acms_url(self):
         return (
             f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
-            f"{self.docket_number}"
+            f"{self.docket_number_raw}"
         )
 
     @property
