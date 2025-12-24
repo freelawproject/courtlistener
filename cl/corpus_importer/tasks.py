@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import os
 import re
@@ -73,6 +74,8 @@ from rest_framework.renderers import JSONRenderer
 from sentry_sdk import capture_exception
 from urllib3.exceptions import ReadTimeoutError
 
+from cl.ai.llm import call_llm
+from cl.ai.models import LLMRun, LLMTask, Prompt
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -96,7 +99,6 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
-from cl.lib.llm import call_llm
 from cl.lib.microservice_utils import microservice, rd_page_count_service
 from cl.lib.pacer import (
     get_blocked_status,
@@ -3127,12 +3129,40 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         return
 
     try:
-        llm_response = call_llm(
+        task_config = LLMTask.objects.get(
+            name="recap-into-opinions-casename-extraction"
+        )
+        config = task_config.current_config
+        prompt_set = task_config.current_prompt_set
+        system_prompt = prompt_set.prompts.filter(role=Prompt.SYSTEM).first()
+
+        if not system_prompt:
+            logger.error("PromptSet missing required System prompt.")
+            return
+
+    except LLMTask.DoesNotExist as e:
+        logger.error(f"LLM Configuration Error: {e}")
+        return
+
+    user_prompt_text = sub_opinion.plain_text[:2000]
+
+    llm_run = LLMRun(
+        llm_config=config,
+        prompt_set=prompt_set,
+        content_object=cluster,
+        success=False,
+    )
+
+    params = config.parameters if isinstance(config.parameters, dict) else {}
+
+    try:
+        llm_response, llm_raw_response = call_llm(
             system_prompt=CASE_NAME_EXTRACT_SYSTEM,
-            user_prompt=sub_opinion.plain_text[:2000],
+            user_prompt=user_prompt_text,
             response_model=CaseNameExtractionResponse,
-            max_completion_tokens=300,
+            model=config.full_model_name,
             api_key=OPENAI_CASE_LAW_INFERENCE_KEY,
+            **params,
         )
     except ValidationError as e:
         logger.error(
@@ -3144,15 +3174,25 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
                 "fingerprint": ["llm-casenames-validation-error"],
             },
         )
+        # Save error as plain text
+        llm_run.output = str(e)
+        # Save error as json
+        llm_run.output_json = e.json(indent=2)
+        llm_run.save()
         return
     except Exception as e:
-        # Only expect to get instructor exceptions here to track them
+        # Only expect to get instructor exceptions here to track them, update and save failed run
+        llm_run.output = str(e)
+        llm_run.save()
         capture_exception(e)
         raise
 
     if not isinstance(llm_response, CaseNameExtractionResponse):
         # Added this to avoid mypy errors
         logger.error("LLM - Invalid response type: %s", type(llm_response))
+        # Store parsed raw response
+        llm_run.output_json = llm_raw_response.model_dump(mode="json")
+        llm_run.save()
         return
 
     llm_case_name = llm_response.case_name or ""
@@ -3177,6 +3217,22 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
             "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
             cluster.id,
         )
+
+        try:
+            # grab the specific string sent by the LLM inside the tool call (see example in test)
+            raw_json_string = (
+                llm_raw_response.choices[0]
+                .message.tool_calls[0]
+                .function.arguments
+            )
+            llm_run.output = raw_json_string
+        except (AttributeError, IndexError):
+            # fallback if the structure is unexpected
+            llm_run.output = json.dumps(llm_response.model_dump())
+        # Store all metadata from response
+        llm_run.output_json = llm_raw_response.model_dump(mode="json")
+        llm_run.success = True
+        llm_run.save()
 
 
 @app.task(

@@ -18,6 +18,7 @@ from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
 
+from cl.ai.llm import call_llm_transcription
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.citations.tasks import (
@@ -27,7 +28,6 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
-from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies

@@ -9,6 +9,7 @@ import time_machine
 from bs4 import BeautifulSoup
 from celery.exceptions import Retry
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
@@ -21,6 +22,7 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 from openai import RateLimitError
 from pydantic import ValidationError
 
+from cl.ai.models import LLMRun, LLMTask
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
@@ -3935,6 +3937,7 @@ class LlmTest(TestCase):
             ),
             case_name="Carrecter v. Herrin",
             case_name_short="Carrecter",
+            case_name_full="",
             date_filed=date.today(),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
@@ -3955,14 +3958,64 @@ class LlmTest(TestCase):
         )
 
         cls.valid_response = CaseNameExtractionResponse(
-            is_opinion=True,
-            case_name_short="Carrecter",
-            case_name="'Carrecter v. Herri",
+            case_name="'Carrecter v. Herrin",
             case_name_full="JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
-            case_name_match=True,
-            needs_ocr=False,
-            error=None,
         )
+        cls.llm_raw_response = mock.Mock()
+
+        mock_message = mock.Mock()
+        raw_args = '{"case_name": "Carrecter v. Herrin", "case_name_full": "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants."}'
+        mock_message.tool_calls = [
+            mock.Mock(function=mock.Mock(arguments=raw_args))
+        ]
+        cls.llm_raw_response.choices = [mock.Mock(message=mock_message)]
+
+        cls.llm_raw_response.model_dump.return_value = {
+            "id": "chatcmpl-123",
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "index": 0,
+                    "message": {
+                        "content": None,  # In structured output, content is usually null
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "call_abc123",
+                                "type": "function",
+                                "function": {
+                                    "name": "CaseNameExtractionResponse",
+                                    "arguments": raw_args,
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 2149,
+                "completion_tokens": 55,
+                "total_tokens": 2204,
+            },
+        }
+
+        try:
+            cls.llm_task_config = LLMTask.objects.get(
+                name="recap-into-opinions-casename-extraction"
+            )
+        except LLMTask.DoesNotExist:
+            print("Doesnt exist")
+            raise ValueError(
+                "Critical Test Failure: The 'recap-into-opinions-casename-extraction' LLMTask "
+                "missing. Did the 0002 data migration run (ai app)?"
+            )
+
+        cls.llm_config = cls.llm_task_config.current_config
+        cls.prompt_set = cls.llm_task_config.current_prompt_set
+
+        # Sanity check to ensure migration ran correctly
+        if not cls.prompt_set.prompts.exists():
+            raise ValueError("Migration failed: PromptSet has no prompts!")
 
     @mock.patch.dict(
         "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
@@ -3972,7 +4025,19 @@ class LlmTest(TestCase):
         self, mock_call_llm
     ):
         """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly"""
-        mock_call_llm.return_value = self.valid_response
+        mock_call_llm.return_value = (
+            self.valid_response,
+            self.llm_raw_response,
+        )
+
+        # The API call has not yet been executed
+        run = LLMRun.objects.filter(
+            content_type=ContentType.objects.get_for_model(
+                self.opinion_cluster
+            ),
+            object_id=self.opinion_cluster.pk,
+        ).last()
+        self.assertIsNone(run)
 
         classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
 
@@ -3981,6 +4046,30 @@ class LlmTest(TestCase):
         self.assertEqual(
             self.opinion_cluster.case_name_full,
             "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+        # Verify thath LLMRun object was created
+        run = LLMRun.objects.filter(
+            content_type=ContentType.objects.get_for_model(
+                self.opinion_cluster
+            ),
+            object_id=self.opinion_cluster.pk,
+        ).last()
+        self.assertTrue(run.success)
+        self.assertEqual(run.llm_config, self.llm_config)
+        self.assertEqual(run.prompt_set, self.prompt_set)
+
+        # Verify output matches the mock's dictionary
+        actual_output_dict = json.loads(run.output)
+        expected_extraction = {
+            "case_name": "Carrecter v. Herrin",
+            "case_name_full": "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        }
+        self.assertEqual(actual_output_dict, expected_extraction)
+
+        # This contains the full dictionary: id, usage, choices, etc.
+        self.assertEqual(
+            run.output_json, self.llm_raw_response.model_dump(mode="json")
         )
 
     @mock.patch("cl.corpus_importer.tasks.call_llm")
@@ -4030,7 +4119,10 @@ class LlmTest(TestCase):
         # After retry exception, manually call the task again with successful mock response
         # to simulate the retry handling completing successfully.
         mock_call_llm.side_effect = None
-        mock_call_llm.return_value = self.valid_response
+        mock_call_llm.return_value = (
+            self.valid_response,
+            self.llm_raw_response,
+        )
 
         classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
         self.opinion_cluster.refresh_from_db()
