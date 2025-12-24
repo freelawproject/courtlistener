@@ -104,11 +104,6 @@ class SCOTUSMap(AbstractDateTimeModel):
         except IndexError:
             return None
 
-    @property
-    def referers_displayed(self):
-        """Return good referers"""
-        return self.referers.filter(display=True).order_by("date_created")
-
     async def build_nx_digraph(
         self,
         parent_authority,
@@ -316,9 +311,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         return f"{getattr(self, 'pk', None)}: {self.title}"
 
     def get_absolute_url(self) -> str:
-        return reverse(
-            "view_visualization", kwargs={"pk": self.pk, "slug": self.slug}
-        )
+        return reverse("view_embedded_visualization", kwargs={"pk": self.pk})
 
     def make_title(self):
         """Make a title for the network
@@ -362,39 +355,6 @@ class SCOTUSMap(AbstractDateTimeModel):
             update_fields = changeable_fields.union(update_fields)
         super().save(update_fields=update_fields, *args, **kwargs)
         self.__original_deleted = self.deleted
-
-
-class Referer(AbstractDateTimeModel):
-    """Holds the referer domains where embedded maps are placed"""
-
-    map = models.ForeignKey(
-        SCOTUSMap,
-        help_text="The visualization that was embedded and which generated a "
-        "referer",
-        related_name="referers",
-        on_delete=models.CASCADE,
-    )
-    url = models.URLField(
-        help_text="The URL where this item was embedded.",
-        max_length=3000,
-        db_index=True,
-    )
-    page_title = models.CharField(
-        help_text="The title of the page where the item was embedded",
-        max_length=500,
-        blank=True,
-    )
-    display = models.BooleanField(
-        help_text="Should this item be displayed?",
-        default=False,
-    )
-
-    def __str__(self) -> str:
-        return f"{getattr(self, 'pk', None)}: Refers to {self.map}"
-
-    class Meta:
-        # Ensure that we don't have dups in the DB for a given map.
-        unique_together = (("map", "url"),)
 
 
 class JSONVersion(AbstractDateTimeModel):

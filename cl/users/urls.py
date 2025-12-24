@@ -10,6 +10,7 @@ from cl.users import api_views as user_views
 from cl.users import views
 from cl.users.forms import CustomSetPasswordForm
 from cl.users.views import view_donations
+from cl.visualizations.views import VisualizationDeprecationRedirectView
 
 router = DefaultRouter()
 
@@ -105,12 +106,12 @@ urlpatterns = [
     ),
     path(
         "profile/visualizations/",
-        views.view_visualizations,
+        VisualizationDeprecationRedirectView.as_view(),
         name="view_visualizations",
     ),
     path(
         "profile/visualizations/deleted/",
-        views.view_deleted_visualizations,
+        VisualizationDeprecationRedirectView.as_view(),
         name="view_deleted_visualizations",
     ),
     path("profile/id/", views.view_user_id, name="view_user_id"),
