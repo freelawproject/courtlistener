@@ -174,7 +174,7 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 
 
 @override_flag("use_new_design", True)
-@patch("cl.lib.redis_utils.get_redis_interface")
+@patch("cl.search.utils.get_redis_interface")
 @override_settings(WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle")
 class HomepageStatsTest(
     RECAPSearchTestCase,
@@ -240,13 +240,26 @@ class HomepageStatsTest(
 
     def test_last_ten_days_aggregates(self, mock_get_redis):
         """Ensure only last 10 days stats appear in HTML."""
-        mock_get_redis.return_value.mget.return_value = [None] * 10
-
         now = timezone.now()
-        # In-window
-        Stat.objects.create(name="alerts.sent.email", count=3, date_logged=now)
-        Stat.objects.create(name="search.results", count=9, date_logged=now)
-        # Out-of-window
+        date_today = now.date().isoformat()
+
+        # Mock Redis to return stats for today only (in-window)
+        def mock_mget(*keys):
+            results = []
+            for key in keys:
+                if f"alerts.sent.{date_today}" in key:
+                    results.append(b"3")  # Redis returns bytes
+                elif f"search.results.{date_today}" in key:
+                    results.append(b"9")  # Redis returns bytes
+                elif f"api:v4.d:{date_today}.count" in key:
+                    results.append(b"0")
+                else:
+                    results.append(None)  # Out-of-window dates return None
+            return results
+
+        mock_get_redis.return_value.mget.side_effect = mock_mget
+
+        # Create old stats in DB (out-of-window) - these should be ignored
         Stat.objects.create(
             name="alerts.sent.email",
             count=300,

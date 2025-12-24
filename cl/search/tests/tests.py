@@ -26,6 +26,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.favorites.factories import NoteFactory, UserTagFactory
@@ -1837,6 +1838,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertTrue(second_count > first_count)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    @override_flag("store-search-queries", active=True)
     def test_basic_homepage_search_and_signin_and_signout(self) -> None:
         wait = WebDriverWait(self.browser, 1)
 
@@ -1999,6 +2001,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
 
+@override_flag("store-search-api-queries", active=True)
+@override_flag("store-search-queries", active=True)
 class SaveSearchQueryTest(TestCase):
     def setUp(self) -> None:
         self.client = Client()
