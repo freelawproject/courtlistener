@@ -1,11 +1,9 @@
 import html
-import operator
 import re
 from datetime import date, timedelta
-from functools import reduce
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Q, QuerySet
+from django.db.models import Q
 from django.utils.html import strip_tags
 from nameparser import HumanName
 from unidecode import unidecode
@@ -619,66 +617,3 @@ async def lookup_judges_by_messy_str(
     return await lookup_judges_by_last_name_list(
         last_names, court_id, event_date
     )
-
-
-def sort_judge_list(judges: QuerySet, search_terms: set[str]) -> QuerySet:
-    """Filter a list of judges by a set of search terms.
-
-    This method counts exact hits on first middle last suffix and returns
-    an ordered queryset of judges with the most paritial/full matches.
-
-    :param judges: Queryset of judges found with matching names
-    :param search_terms: Set of search terms for looking up judges by name
-    :return: Best queryset of judges ordered by last name
-    """
-    judge_dict = {}
-    highest_match = 0
-    for judge in judges:
-        judge_names = {
-            judge.name_first,
-            judge.name_last,
-            judge.name_middle,
-            judge.name_suffix,
-        }
-
-        count = 0
-        for term in search_terms:
-            for name in judge_names:
-                if term.lower() in name.lower():
-                    count += 1
-
-        if count > highest_match:
-            highest_match = count
-        if count == highest_match:
-            judge_dict[judge.id] = count
-
-    # Create list of Judge IDs that have the highest match count
-    judge_pks = []
-    for k, v in judge_dict.items():
-        if v == highest_match:
-            judge_pks.append(k)
-
-    # Return the filtered queryset and sort by name_last
-    return judges.filter(pk__in=judge_pks).order_by("name_last")
-
-
-def lookup_judge_by_name_components(queryset: QuerySet, s: str) -> QuerySet:
-    """Find judges by first, middle, last name or suffix.
-
-    :param queryset: Queryset to filter
-    :param s: User search terms in financial disclosures lookup by judge
-    :return: Filter Queryset
-    """
-    # Possible DOS attack. Don't hit the DB.
-    search_terms = s.split()[:7]
-    search_args = []
-    for term in search_terms:
-        for query in (
-            "name_first__istartswith",
-            "name_last__istartswith",
-            "name_middle__istartswith",
-            "name_suffix__istartswith",
-        ):
-            search_args.append(Q(**{query: term}))
-    judges = queryset.filter(reduce(operator.or_, search_args))
-    return sort_judge_list(judges, set(search_terms))
