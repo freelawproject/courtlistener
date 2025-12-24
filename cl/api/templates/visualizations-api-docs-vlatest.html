@@ -79,16 +79,23 @@
   </p>
 
   <h2 id="deprecation-notice">Deprecation Notice</h2>
-    <p>Unfortunately, our system for visualizing Supreme Court networks has not gotten much traction among users, and is partially deprecated as of early 2025.</p>
-    <p>If you are interested in creating, deleting, or updating visualizations, you can still do so through our APIs, but it is no longer possible to display visualizations on CourtListener.com itself. Moving forward, to support existing users, the only way to display visualizations is through their embed links.</p>
-    <p>To embed a visualization on a website you control, use code like the following on your site:
-    <pre><code>{% spaceless %}
-    {% filter force_escape %}
-    <iframe height="540" width="560" src="https://www.courtlistener.com/visualizations/scotus-mapper/YOUR_ID_HERE/embed/" frameborder="0" allowfullscreen></iframe>
-    {% endfilter %}
-    {% endspaceless %}</code></pre>
-    <p>Just replace YOUR_ID_HERE with the ID of your visualization and it should work on your website.</p>
-    <p>We apologize for this deprecation and hope you understand that we cannot always maintain all the features and experiments we undertake.</p>
+  <p>Unfortunately, our system for visualizing Supreme Court networks has not gotten much traction among users, and is largely deprecated as of late 2025.</p>
+  <p>If you are interested in creating, deleting, or updating visualizations, you can still do so through our APIs, but it is no longer possible to display visualizations on CourtListener.com itself. Moving forward, to support existing users, the only way to display visualizations is through their embed links.</p>
+  <p>To embed a visualization on a website you control, use code like the following on your site:
+  <pre><code>{% spaceless %}
+  {% filter force_escape %}
+  <iframe height="540" width="560" src="https://www.courtlistener.com/visualizations/scotus-mapper/YOUR_ID_HERE/embed/" frameborder="0" allowfullscreen></iframe>
+  {% endfilter %}
+  {% endspaceless %}</code></pre>
+  <p>Just replace YOUR_ID_HERE with the ID of your visualization, and it should work on your website.</p>
+  <p>The following <code>GET</code> parameters may be used to adjust the display:</p>
+  <ul>
+    <li><strong><code>type</code></strong> — Use this to set the y-axis. <code>spread</code> opens up the visualization with random locations for the nodes so they can all be seen. <code>geneology</code> makes many paths lighter to highlight the most direct paths. <code>spaeth</code> uses the Supreme Court Database's vote count and decision direction fields.</li>
+    <li><strong><code>xaxis</code></strong> — The x-axis may be set to either equal spacing (<code>cat</code>) or accurate chronological spacing (<code>time</code>)</li>
+    <li><strong><code>dos</code></strong> — Use this to set the Degree of Separation, which represents the maximum number of hops between the first and last nodes.</li>
+  </ul>
+  <p>For example, GET parameters like these will provide a clean, equally spaced chart with up to five nodes of separation: <code>?type=geneology&xaxis=cat&dos=5</code>.</p>
+  <p>We apologize for this deprecation and hope you understand that we cannot always maintain all the features and experiments we undertake.</p>
 
   <h2 id="faq">Frequently Asked Questions</h2>
 
@@ -96,7 +103,7 @@
   <p>Circles change size based on the number of citations to it by other cases in the network. The more cases that cite to <i>Case A</i>, the larger it will be. The only exception to this rule is the rightmost case on network (with the most recent date). For visual clarity, this anchor case is always represented with a large circle.</p>
 
   <h3 id="what-cases-mean">How can I find out what the cases in my network mean?</h3>
-  <p>This tool will not read the cases for you but it will make your reading more efficient. You can read opinion text directly by clicking on opinions in the visualization. You can see all the Supreme Court Database information for a case. Information will open in a separate window and includes issue area, legal provision involved, and detailed voting information. By using SCDB information and skimming opinion text, you can figure out what is going on in the case fairly quickly. Some networks also have helpful user descriptions.</p>
+  <p>This tool will not read the cases for you, but it will make your reading more efficient. You can read opinion text directly by clicking on opinions in the visualization. You can see all the Supreme Court Database information for a case. Information will open in a separate window and includes issue area, legal provision involved, and detailed voting information. By using SCDB information and skimming opinion text, you can figure out what is going on in the case fairly quickly. Some networks also have helpful user descriptions.</p>
 
   <h3 id="default-two-degree">Why did my network default to 2-degrees?</h3>
   <p>We do not generate 3-degree networks when it will contain more than 70 cases. We have found networks larger than 70 are too unwieldy and so default those networks to 2-degrees.</p>
