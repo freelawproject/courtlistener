@@ -1,10 +1,13 @@
+from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 from django.conf import settings
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
 
-def honeypot_equals(val):
+def honeypot_equals(val: str) -> bool:
     """
     Default verifier used if HONEYPOT_VERIFIER is not specified.
     Ensures val == HONEYPOT_VALUE or HONEYPOT_VALUE() if it's a callable.
@@ -15,50 +18,41 @@ def honeypot_equals(val):
     return val == expected
 
 
-def verify_honeypot_value(request, field_name):
+HONEYPOT_FIELD_NAME = "skip_me_if_alive"
+
+
+def verify_honeypot_value(request: HttpRequest) -> HttpResponse | None:
     """
-    Verify that request.POST[field_name] is a valid honeypot.
+    Verify that request.POST[HONEYPOT_FIELD_NAME] is a valid honeypot.
 
     Ensures that the field exists and passes verification according to
     HONEYPOT_VERIFIER.
     """
     verifier = getattr(settings, "HONEYPOT_VERIFIER", honeypot_equals)
     if request.method == "POST":
-        field = field_name or settings.HONEYPOT_FIELD_NAME
-        if field not in request.POST or not verifier(request.POST[field]):
+        if HONEYPOT_FIELD_NAME not in request.POST or not verifier(
+            request.POST[HONEYPOT_FIELD_NAME]
+        ):
             return render(
                 request,
                 "honeypot_error.html",
-                {"fieldname": field},
+                {"fieldname": HONEYPOT_FIELD_NAME},
                 status=400,
             )
+    return None
 
 
-def check_honeypot(func=None, field_name=None):
-    """
-    Check request.POST for valid honeypot field.
+def check_honeypot(
+    func: Callable[..., HttpResponse],
+) -> Callable[..., HttpResponse]:
+    """Decorator to check request.POST for valid honeypot field."""
 
-    Takes an optional field_name that defaults to HONEYPOT_FIELD_NAME if
-    not specified.
-    """
-    # hack to reverse arguments if called with str param
-    if isinstance(func, str):
-        func, field_name = field_name, func
+    @wraps(func)
+    def wrapper(
+        request: HttpRequest, *args: Any, **kwargs: Any
+    ) -> HttpResponse:
+        if response := verify_honeypot_value(request):
+            return response
+        return func(request, *args, **kwargs)
 
-    def decorated(func):
-        def inner(request, *args, **kwargs):
-            response = verify_honeypot_value(request, field_name)
-            if response:
-                return response
-            else:
-                return func(request, *args, **kwargs)
-
-        return wraps(func)(inner)
-
-    if func is None:
-
-        def decorator(func):
-            return decorated(func)
-
-        return decorator
-    return decorated(func)
+    return wrapper

@@ -1,17 +1,40 @@
 import datetime
 
-from django.template import Context
-from django.test import RequestFactory, SimpleTestCase
+from django import forms
+from django.contrib.auth.models import AnonymousUser
+from django.http import HttpRequest, HttpResponse
+from django.template import Context, TemplateSyntaxError
+from django.test import (
+    RequestFactory,
+    SimpleTestCase,
+    TestCase,
+    override_settings,
+)
 
+from cl.custom_filters.decorators import check_honeypot
+from cl.custom_filters.templatetags.component_tags import (
+    _coerce_defer,
+    _resolved_path,
+)
 from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
     get_full_host,
     granular_date,
     humanize_number,
 )
+from cl.custom_filters.templatetags.partition_util import columns
 from cl.custom_filters.templatetags.text_filters import (
+    compress_whitespace,
     naturalduration,
+    nbsp,
     oxford_join,
+    underscore_to_space,
+    v_wrapper,
+)
+from cl.custom_filters.templatetags.widget_tweaks import (
+    add_class,
+    append_attr,
+    set_attr,
 )
 from cl.people_db.models import (
     GRANULARITY_DAY,
@@ -104,7 +127,8 @@ class TestNaturalDuration(SimpleTestCase):
 
 
 class DummyObject:
-    pass
+    date_start: object
+    date_granularity_start: int
 
 
 class TestExtras(SimpleTestCase):
@@ -188,13 +212,13 @@ class TestExtras(SimpleTestCase):
 
         self.assertEqual(granular_date(obj, "date_start"), "Unknown")
 
-    def test_humanize_number(self):
+    def test_humanize_number(self) -> None:
         """Test multiple values for the humanize_number function
 
         Test cases includes multiple examples to see when the function rounds up or down a number, validate when a
         invalid value is passed and some edge cases.
         """
-        test_cases = [
+        test_cases: list[tuple[int | str, str]] = [
             # Input value, Expected output
             (500, "500"),
             (999, "999"),
@@ -224,3 +248,69 @@ class TestExtras(SimpleTestCase):
                     expected,
                     msg=f"Number formatted incorrectly. Input: {value} - Result: {result} - Expected: {expected}",
                 )
+
+
+@override_settings(HONEYPOT_VALUE="")
+class TestCheckHoneypot(TestCase):
+    """Tests for check_honeypot decorator."""
+
+    factory = RequestFactory()
+
+    def test_valid_honeypot_passes(self) -> None:
+        """Test that valid empty honeypot field passes."""
+
+        @check_honeypot
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        request = self.factory.post("/", {"skip_me_if_alive": ""})
+        response = view(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"OK")
+
+    def test_missing_honeypot_field_returns_400(self) -> None:
+        """Test that missing honeypot field returns 400 error."""
+
+        @check_honeypot
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        request = self.factory.post("/", {"other_field": "value"})
+        request.user = AnonymousUser()
+        response = view(request)
+        self.assertEqual(response.status_code, 400)
+
+    def test_invalid_honeypot_value_returns_400(self) -> None:
+        """Test that invalid honeypot value returns 400 error."""
+
+        @check_honeypot
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        # POST with non-empty honeypot (bots fill this in)
+        request = self.factory.post("/", {"skip_me_if_alive": "spam"})
+        request.user = AnonymousUser()
+        response = view(request)
+        self.assertEqual(response.status_code, 400)
+
+    def test_get_request_passes_through(self) -> None:
+        """Test that GET requests pass through without honeypot check."""
+
+        @check_honeypot
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        request = self.factory.get("/")
+        response = view(request)
+        self.assertEqual(response.status_code, 200)
+
+    def test_preserves_function_metadata(self) -> None:
+        """Test that decorator preserves function name and docstring."""
+
+        @check_honeypot
+        def my_view(request: HttpRequest) -> HttpResponse:
+            """My docstring."""
+            return HttpResponse("OK")
+
+        self.assertEqual(my_view.__name__, "my_view")
+        self.assertEqual(my_view.__doc__, "My docstring.")
