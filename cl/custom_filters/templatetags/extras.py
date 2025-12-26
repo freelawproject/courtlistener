@@ -77,7 +77,7 @@ def get_canonical_element(context: Context) -> SafeString:
 def granular_date(
     obj: dict[str, Any] | Any,
     field_name: str,
-    granularity: int | None = None,
+    granularity: str | None = None,
     iso: bool = False,
     default: str = "Unknown",
 ) -> str:
@@ -176,25 +176,26 @@ def citation(obj: Docket | DocketEntry) -> str:
         # docket
         docket = obj
         date_of_interest = None
-        ecf = ""
+        ecf: int | None = None
     elif isinstance(obj, DocketEntry):
         docket = obj.docket
         date_of_interest = obj.date_filed
         ecf = obj.entry_number
     else:
-        raise NotImplementedError(f"Object not recongized in {__name__}")
+        raise NotImplementedError(f"Object not recognized in {__name__}")
 
     # We want to build a citation that follows the Bluebook format as much
     # as possible.  For documents from a case that looks like:
     #   name_bb, case_bb, (court_bb date_bb) ECF No. {ecf}"
     # If this is a citation to just a docket then we leave off the ECF number
     # For opinions there is no need as the title of the block IS the citation
+    date_str = ""
     if date_of_interest:
-        date_of_interest = date_of_interest.strftime("%b %d, %Y")
+        date_str = date_of_interest.strftime("%b %d, %Y")
     result = f"{docket.case_name}, {docket.docket_number}, ("
     result = result + docket.court.citation_string
-    if date_of_interest:
-        result = f"{result} {date_of_interest}"
+    if date_str:
+        result = f"{result} {date_str}"
     result = f"{result})"
     if ecf:
         result = f"{result} ECF No. {ecf}"

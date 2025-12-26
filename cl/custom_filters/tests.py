@@ -128,7 +128,7 @@ class TestNaturalDuration(SimpleTestCase):
 
 class DummyObject:
     date_start: object
-    date_granularity_start: int
+    date_granularity_start: str
 
 
 class TestExtras(SimpleTestCase):
