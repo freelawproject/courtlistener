@@ -2,9 +2,11 @@ import random
 import re
 import urllib.parse
 from datetime import UTC, datetime
+from typing import Any
 
 from django import template
 from django.core.exceptions import ValidationError
+from django.http import QueryDict
 from django.template import Context
 from django.template.context import RequestContext
 from django.template.defaultfilters import date as date_filter
@@ -22,7 +24,11 @@ register = template.Library()
 
 
 @register.simple_tag(takes_context=True)
-def get_full_host(context, username=None, password=None):
+def get_full_host(
+    context: Context,
+    username: str | None = None,
+    password: str | None = None,
+) -> SafeString:
     """Return the current URL with the correct protocol and port.
 
     No trailing slash.
@@ -69,8 +75,12 @@ def get_canonical_element(context: Context) -> SafeString:
 
 @register.simple_tag(takes_context=False)
 def granular_date(
-    obj, field_name, granularity=None, iso=False, default="Unknown"
-):
+    obj: dict[str, Any] | Any,
+    field_name: str,
+    granularity: int | None = None,
+    iso: bool = False,
+    default: str = "Unknown",
+) -> str:
     """Return the date truncated according to its granularity.
 
     :param obj: The object to get the value from
@@ -122,7 +132,7 @@ def granular_date(
 
 
 @register.filter
-def get(mapping, key):
+def get(mapping: dict[str, Any], key: str) -> Any:
     """Emulates the dictionary get. Useful when keys have spaces or other
     punctuation."""
     return mapping.get(key, "")
@@ -135,7 +145,8 @@ def random_int(a: int, b: int) -> int:
 
 @register.filter
 def get_es_doc_content(
-    mapping: AttrDict | dict, scheduled_alert: bool = False
+    mapping: AttrDict | dict,
+    scheduled_alert: bool = False,
 ) -> AttrDict | dict | str:
     """
     Returns the ES document content placed in the "_source" field if the
@@ -158,7 +169,7 @@ def get_es_doc_content(
 
 
 @register.simple_tag
-def citation(obj) -> SafeString:
+def citation(obj: Docket | DocketEntry) -> str:
     if isinstance(obj, Docket):
         # Dockets do not have dates associated with them.  This is more
         # of a "weak citation".  It is there to allow people to find the
@@ -205,7 +216,7 @@ def contains_highlights(content: str, alert: bool = False) -> bool:
 
 
 @register.filter
-def render_string_or_list(value: any) -> any:
+def render_string_or_list(value: Any) -> Any:
     """Filter to render list of strings separated by commas or the original
     value.
 
@@ -218,7 +229,7 @@ def render_string_or_list(value: any) -> any:
 
 
 @register.filter
-def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
+def get_highlight(result: AttrDict | dict[str, Any], field: str) -> Any:
     """Returns the highlighted version of the field is present, otherwise,
     falls back to the original field value.
 
@@ -320,19 +331,16 @@ def parse_utc_date(datetime_object: str | datetime) -> datetime:
     format or a naive UTC datetime object.
     :return: A timezone-aware datetime object with UTC as the timezone.
     """
-
-    return make_aware(
-        (
-            parse_datetime(datetime_object)
-            if isinstance(datetime_object, str)
-            else datetime_object
-        ),
-        UTC,
-    )
+    if isinstance(datetime_object, str):
+        parsed = parse_datetime(datetime_object)
+        if parsed is None:
+            raise ValueError(f"Invalid datetime string: {datetime_object}")
+        return make_aware(parsed, UTC)
+    return make_aware(datetime_object, UTC)
 
 
 @register.filter
-def datetime_in_utc(date_obj) -> str:
+def datetime_in_utc(date_obj: datetime | None) -> str:
     """Formats a datetime object in UTC with timezone displayed.
     For example: 'Nov. 25, 2024, 01:28 p.m. UTC'"""
     if date_obj is None:
@@ -343,7 +351,7 @@ def datetime_in_utc(date_obj) -> str:
             "M. j, Y, h:i a T",
         )
     except (ValueError, TypeError):
-        return date_obj
+        return str(date_obj)
 
 
 @register.filter
@@ -362,7 +370,7 @@ def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
 
 
 @register.filter
-def humanize_number(value):
+def humanize_number(value: int | float | str) -> int | float | str:
     """Formats a number into a human-readable abbreviated form
 
     :param value: The number to format. Can be an integer, float, or string representation of a number.
@@ -407,18 +415,18 @@ def humanize_number(value):
 
 
 @register.filter
-def has_attr(obj, attr_name):
+def has_attr(obj: Any, attr_name: str) -> bool:
     """Return True if obj has attribute attr_name."""
     return hasattr(obj, attr_name)
 
 
 @register.filter
-def get_attr(obj, attr_name):
+def get_attr(obj: Any, attr_name: str) -> Any:
     """Return the value of the attribute attr_name."""
     return getattr(obj, attr_name, "")
 
 
 @register.simple_tag
-def get_request_value(request_get, field_name):
+def get_request_value(request_get: QueryDict, field_name: str) -> str:
     """Simple tag to get value from request.GET given a field name"""
     return request_get.get(field_name, "")

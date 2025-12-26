@@ -1,13 +1,13 @@
 from django import template
 from django.conf import settings
 from django.contrib.staticfiles.finders import find
-from django.utils.html import format_html
+from django.utils.safestring import SafeString, mark_safe
 
 register = template.Library()
 
 
 @register.simple_tag()
-def svg(name, **kwargs):
+def svg(name: str, **kwargs: str) -> str | SafeString:
     """
     Include an SVG file directly in the template.
 
