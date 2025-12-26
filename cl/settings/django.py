@@ -140,6 +140,7 @@ MIDDLEWARE = [
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
     "pghistory.middleware.HistoryMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
+    "cl.lib.sqlcommenter.SqlCommenter",
 ]
 
 ROOT_URLCONF = "cl.urls"
