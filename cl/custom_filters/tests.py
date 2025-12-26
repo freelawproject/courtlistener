@@ -250,6 +250,233 @@ class TestExtras(SimpleTestCase):
                 )
 
 
+class TestTextFilters(SimpleTestCase):
+    """Tests for text_filters.py template filters."""
+
+    def test_nbsp_basic(self) -> None:
+        """Test nbsp converts spaces to non-breaking spaces."""
+        self.assertEqual(nbsp("hello world"), "hello&nbsp;world")
+        self.assertEqual(nbsp("a b c"), "a&nbsp;b&nbsp;c")
+
+    def test_nbsp_strips_whitespace(self) -> None:
+        """Test nbsp strips leading/trailing whitespace."""
+        self.assertEqual(nbsp("  hello  "), "hello")
+
+    def test_nbsp_with_autoescape(self) -> None:
+        """Test nbsp escapes HTML when autoescape is True."""
+        result = nbsp("<script>alert('xss')</script>", autoescape=True)
+        self.assertIn("&lt;script&gt;", result)
+        self.assertNotIn("<script>", result)
+
+    def test_nbsp_without_autoescape(self) -> None:
+        """Test nbsp preserves HTML when autoescape is False."""
+        result = nbsp("<b>bold</b>", autoescape=False)
+        self.assertEqual(result, "<b>bold</b>")
+
+    def test_v_wrapper_basic(self) -> None:
+        """Test v_wrapper wraps ' v. ' with span."""
+        result = v_wrapper("Smith v. Jones")
+        self.assertIn('<span class="alt"> v. </span>', result)
+        self.assertIn("Smith", result)
+        self.assertIn("Jones", result)
+
+    def test_v_wrapper_no_match(self) -> None:
+        """Test v_wrapper with no ' v. ' pattern."""
+        result = v_wrapper("Smith versus Jones")
+        self.assertEqual(result, "Smith versus Jones")
+
+    def test_v_wrapper_with_autoescape(self) -> None:
+        """Test v_wrapper escapes HTML when autoescape is True."""
+        result = v_wrapper("<b>Smith</b> v. Jones", autoescape=True)
+        self.assertIn("&lt;b&gt;", result)
+
+    def test_underscore_to_space_basic(self) -> None:
+        """Test underscore_to_space replaces underscores."""
+        self.assertEqual(underscore_to_space("hello_world"), "hello world")
+        self.assertEqual(underscore_to_space("a_b_c"), "a b c")
+
+    def test_underscore_to_space_with_autoescape(self) -> None:
+        """Test underscore_to_space escapes HTML."""
+        result = underscore_to_space("<script>_</script>", autoescape=True)
+        self.assertIn("&lt;script&gt;", result)
+
+    def test_compress_whitespace_basic(self) -> None:
+        """Test compress_whitespace compresses multiple spaces."""
+        self.assertEqual(compress_whitespace("hello   world"), "hello world")
+        self.assertEqual(compress_whitespace("a  b  c"), "a b c")
+
+    def test_compress_whitespace_newlines(self) -> None:
+        """Test compress_whitespace handles newlines and tabs."""
+        result = compress_whitespace("hello\n\n\tworld")
+        self.assertEqual(result, "hello world")
+
+    def test_compress_whitespace_with_autoescape(self) -> None:
+        """Test compress_whitespace escapes HTML."""
+        result = compress_whitespace("<b>hello</b>  world", autoescape=True)
+        self.assertIn("&lt;b&gt;", result)
+
+
+class TestComponentTags(SimpleTestCase):
+    """Tests for component_tags.py template tags."""
+
+    def test_coerce_defer_bool_true(self) -> None:
+        """Test _coerce_defer with boolean True."""
+        self.assertTrue(_coerce_defer(True, "test.js"))
+
+    def test_coerce_defer_bool_false(self) -> None:
+        """Test _coerce_defer with boolean False."""
+        self.assertFalse(_coerce_defer(False, "test.js"))
+
+    def test_coerce_defer_string_true(self) -> None:
+        """Test _coerce_defer with string 'true'."""
+        self.assertTrue(_coerce_defer("true", "test.js"))
+        self.assertTrue(_coerce_defer("True", "test.js"))
+        self.assertTrue(_coerce_defer("TRUE", "test.js"))
+
+    def test_coerce_defer_string_false(self) -> None:
+        """Test _coerce_defer with string 'false'."""
+        self.assertFalse(_coerce_defer("false", "test.js"))
+        self.assertFalse(_coerce_defer("False", "test.js"))
+
+    def test_coerce_defer_invalid_value(self) -> None:
+        """Test _coerce_defer raises error for invalid values."""
+        with self.assertRaises(TemplateSyntaxError):
+            _coerce_defer("yes", "test.js")
+        with self.assertRaises(TemplateSyntaxError):
+            _coerce_defer("1", "test.js")
+
+    def test_resolved_path_with_extension(self) -> None:
+        """Test _resolved_path preserves .js extension."""
+        self.assertEqual(_resolved_path("test.js"), "test.js")
+        self.assertEqual(_resolved_path("path/to/file.js"), "path/to/file.js")
+
+    @override_settings(DEBUG=True)
+    def test_resolved_path_without_extension_debug(self) -> None:
+        """Test _resolved_path adds .js in debug mode."""
+        self.assertEqual(_resolved_path("test"), "test.js")
+
+    @override_settings(DEBUG=False)
+    def test_resolved_path_without_extension_production(self) -> None:
+        """Test _resolved_path adds .min.js in production mode."""
+        self.assertEqual(_resolved_path("test"), "test.min.js")
+
+
+class DummyForm(forms.Form):
+    """A simple form for testing widget_tweaks filters."""
+
+    name = forms.CharField()
+    email = forms.EmailField()
+
+
+class TestWidgetTweaks(SimpleTestCase):
+    """Tests for widget_tweaks.py template filters."""
+
+    def test_set_attr_basic(self) -> None:
+        """Test set_attr adds an attribute to a field."""
+        form = DummyForm()
+        field = set_attr(form["name"], "placeholder:Enter name")
+        html = field.as_widget()
+        self.assertIn('placeholder="Enter name"', html)
+
+    def test_set_attr_id(self) -> None:
+        """Test set_attr can set the id attribute."""
+        form = DummyForm()
+        field = set_attr(form["name"], "id:custom-id")
+        html = field.as_widget()
+        self.assertIn('id="custom-id"', html)
+
+    def test_append_attr_to_widget_attr(self) -> None:
+        """Test append_attr appends to an existing widget attribute."""
+
+        class FormWithClass(forms.Form):
+            name = forms.CharField(
+                widget=forms.TextInput(attrs={"class": "base"})
+            )
+
+        form = FormWithClass()
+        field = append_attr(form["name"], "class:added")
+        html = field.as_widget()
+        self.assertIn("base added", html)
+
+    def test_append_attr_new_attribute(self) -> None:
+        """Test append_attr creates attribute if it doesn't exist."""
+        form = DummyForm()
+        field = append_attr(form["name"], "data-test:value")
+        html = field.as_widget()
+        self.assertIn('data-test="value"', html)
+
+    def test_add_class_basic(self) -> None:
+        """Test add_class adds a CSS class."""
+        form = DummyForm()
+        field = add_class(form["name"], "form-control")
+        html = field.as_widget()
+        self.assertIn("form-control", html)
+
+    def test_add_class_multiple(self) -> None:
+        """Test add_class can be chained."""
+        form = DummyForm()
+        field = add_class(form["name"], "class1")
+        field = add_class(field, "class2")
+        html = field.as_widget()
+        self.assertIn("class1", html)
+        self.assertIn("class2", html)
+
+
+class TestPartitionUtil(SimpleTestCase):
+    """Tests for partition_util.py template filters."""
+
+    def test_columns_7_items_3_columns(self) -> None:
+        """Test columns with 7 items into 3 columns."""
+        result = columns(range(7), 3)
+        expected = [[0, 3, 6], [1, 4], [2, 5]]
+        self.assertEqual(result, expected)
+
+    def test_columns_8_items_3_columns(self) -> None:
+        """Test columns with 8 items into 3 columns."""
+        result = columns(range(8), 3)
+        expected = [[0, 3, 6], [1, 4, 7], [2, 5]]
+        self.assertEqual(result, expected)
+
+    def test_columns_9_items_3_columns(self) -> None:
+        """Test columns with 9 items into 3 columns."""
+        result = columns(range(9), 3)
+        expected = [[0, 3, 6], [1, 4, 7], [2, 5, 8]]
+        self.assertEqual(result, expected)
+
+    def test_columns_10_items_3_columns(self) -> None:
+        """Test columns with 10 items into 3 columns."""
+        result = columns(range(10), 3)
+        expected = [[0, 4, 8], [1, 5, 9], [2, 6], [3, 7]]
+        self.assertEqual(result, expected)
+
+    def test_columns_fewer_items_than_columns(self) -> None:
+        """Test columns when items fewer than requested columns."""
+        result = columns(range(4), 3)
+        expected = [[0, 2], [1, 3]]
+        self.assertEqual(result, expected)
+
+    def test_columns_empty_list(self) -> None:
+        """Test columns with empty list."""
+        result: list[list[int]] = columns([], 3)
+        self.assertEqual(result, [])
+
+    def test_columns_single_item(self) -> None:
+        """Test columns with single item."""
+        result = columns([1], 3)
+        self.assertEqual(result, [[1]])
+
+    def test_columns_string_n(self) -> None:
+        """Test columns accepts string for n parameter."""
+        result = columns(range(6), "3")
+        expected = [[0, 2, 4], [1, 3, 5]]
+        self.assertEqual(result, expected)
+
+    def test_columns_invalid_n(self) -> None:
+        """Test columns with invalid n returns single column."""
+        result = columns([1, 2, 3], "invalid")
+        self.assertEqual(result, [[1, 2, 3]])
+
+
 @override_settings(HONEYPOT_VALUE="")
 class TestCheckHoneypot(TestCase):
     """Tests for check_honeypot decorator."""
