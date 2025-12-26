@@ -48,6 +48,9 @@ def filter_by_matching_antecedent(
         return None
 
     antecedent_guess = strip_punct(antecedent_guess)
+    if not antecedent_guess:
+        return None
+
     candidates: list[Opinion] = []
 
     for o in opinion_candidates:

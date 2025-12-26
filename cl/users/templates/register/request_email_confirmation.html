@@ -22,7 +22,7 @@
         <p>Enter your email address and we will send you a confirmation email for your account.</p>
 
         <form action="" method="post">{% csrf_token %}
-            {% render_honeypot_field "skip_me_if_alive" %}
+            {% render_honeypot_field %}
             <div class="input-group">
                 <label for="id_email" class="sr-only">Email address</label>
                 {{ form.email }}

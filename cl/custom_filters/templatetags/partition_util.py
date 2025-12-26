@@ -15,12 +15,17 @@ A common use-case is for splitting a list into a table with columns::
     </table>
 """
 
+from collections.abc import Iterable
+from typing import TypeVar
+
 from django.template import Library
 
 register = Library()
 
+T = TypeVar("T")
 
-def rows(thelist, n):
+
+def rows(thelist: Iterable[T], n: int | str) -> list[list[T]]:
     """
     Break a list into ``n`` rows, filling up each row to the maximum equal
     length possible. For example::
@@ -48,18 +53,18 @@ def rows(thelist, n):
     """
     try:
         n = int(n)
-        thelist = list(thelist)
+        items = list(thelist)
     except (ValueError, TypeError):
-        return [thelist]
-    list_len = len(thelist)
+        return [list(thelist)]
+    list_len = len(items)
     split = list_len // n
 
     if list_len % n != 0:
         split += 1
-    return [thelist[split * i : split * (i + 1)] for i in range(n)]
+    return [items[split * i : split * (i + 1)] for i in range(n)]
 
 
-def rows_distributed(thelist, n):
+def rows_distributed(thelist: Iterable[T], n: int | str) -> list[list[T]]:
     """
     Break a list into ``n`` rows, distributing columns as evenly as possible
     across the rows. For example::
@@ -87,28 +92,28 @@ def rows_distributed(thelist, n):
     """
     try:
         n = int(n)
-        thelist = list(thelist)
+        items = list(thelist)
     except (ValueError, TypeError):
-        return [thelist]
-    list_len = len(thelist)
+        return [list(thelist)]
+    list_len = len(items)
     split = list_len // n
 
     remainder = list_len % n
     offset = 0
-    rows = []
+    result_rows: list[list[T]] = []
     for i in range(n):
         if remainder:
             start, end = (split + 1) * i, (split + 1) * (i + 1)
         else:
             start, end = split * i + offset, split * (i + 1) + offset
-        rows.append(thelist[start:end])
+        result_rows.append(items[start:end])
         if remainder:
             remainder -= 1
             offset += 1
-    return rows
+    return result_rows
 
 
-def columns(thelist, n):
+def columns(thelist: Iterable[T], n: int | str) -> list[list[T]]:
     """
     Break a list into ``n`` columns, filling up each column to the maximum equal
     length possible. For example::
@@ -143,14 +148,14 @@ def columns(thelist, n):
     """
     try:
         n = int(n)
-        thelist = list(thelist)
+        items = list(thelist)
     except (ValueError, TypeError):
-        return [thelist]
-    list_len = len(thelist)
+        return [list(thelist)]
+    list_len = len(items)
     split = list_len // n
     if list_len % n != 0:
         split += 1
-    return [thelist[i::split] for i in range(split)]
+    return [items[i::split] for i in range(split)]
 
 
 register.filter(rows)
@@ -158,7 +163,7 @@ register.filter(rows_distributed)
 register.filter(columns)
 
 
-def _test():
+def _test() -> None:
     import doctest
 
     doctest.testmod()

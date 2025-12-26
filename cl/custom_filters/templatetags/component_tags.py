@@ -1,30 +1,36 @@
+from typing import Any, cast
+
 from django import template
 from django.conf import settings
-from django.template import TemplateSyntaxError
+from django.http import HttpRequest
+from django.template import Context, TemplateSyntaxError
 from django.templatetags.static import static
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 
 register = template.Library()
 
+# Key used to store script registry on request objects
+_SCRIPT_REGISTRY_ATTR = "_required_component_scripts"
 
-def _script_registry_for(request):
+
+def _script_registry_for(request: HttpRequest) -> dict[str, bool]:
     """
     Gets or sets the script registry for this request.
     """
-    if not hasattr(request, "_required_component_scripts"):
-        setattr(request, "_required_component_scripts", dict())
-    return request._required_component_scripts
+    if not hasattr(request, _SCRIPT_REGISTRY_ATTR):
+        setattr(request, _SCRIPT_REGISTRY_ATTR, {})
+    return cast(dict[str, bool], getattr(request, _SCRIPT_REGISTRY_ATTR))
 
 
-def _coerce_defer(value, script_path):
+def _coerce_defer(value: bool | str, script_path: str) -> bool:
     """
     Accepts the real booleans True/False or the strings 'true'/'false'.
 
     Raises:
         TemplateSyntaxError: any other value.
     """
-    if value in {True, False}:
+    if isinstance(value, bool):
         return value
 
     val = str(value).lower()
@@ -38,7 +44,7 @@ def _coerce_defer(value, script_path):
     )
 
 
-def _resolved_path(path_stub):
+def _resolved_path(path_stub: str) -> str:
     """Append .js / .min.js when the provided path lacks an extension."""
     if path_stub.endswith(".js"):
         return path_stub
@@ -47,7 +53,7 @@ def _resolved_path(path_stub):
 
 
 @register.simple_tag(takes_context=True)
-def require_script(context, script_path, **kwargs):
+def require_script(context: Context, script_path: str, **kwargs: Any) -> str:
     """
     Register .js scripts required for a given template. To enable the use of minified files
     in production only, simply omit the extension in the script_path.
@@ -87,7 +93,7 @@ def require_script(context, script_path, **kwargs):
 
 
 @register.simple_tag(takes_context=True)
-def render_required_scripts(context):
+def render_required_scripts(context: Context) -> SafeString | str:
     """
     Renders the required scripts for this request right before the Alpine script.
     """

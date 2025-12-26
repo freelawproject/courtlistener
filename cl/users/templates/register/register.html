@@ -25,7 +25,7 @@
 
             <form action="" method="post" id="register-form">
               {% csrf_token %}
-              {% render_honeypot_field "skip_me_if_alive" %}
+              {% render_honeypot_field %}
               <div class="form-group">
                 {{ form.username.label_tag }}
                 {{ form.username }}

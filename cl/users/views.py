@@ -493,7 +493,7 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
     # Contains activation key
     "email",
 )
-@check_honeypot(field_name="skip_me_if_alive")
+@check_honeypot
 @never_cache
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
@@ -699,7 +699,7 @@ def confirm_email(request, activation_key):
     # Contains activation key
     "email",
 )
-@check_honeypot(field_name="skip_me_if_alive")
+@check_honeypot
 def request_email_confirmation(request: HttpRequest) -> HttpResponse:
     """Send an email confirmation email"""
     if request.method == "POST":
