@@ -2,6 +2,12 @@ import logging
 import random
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from email import message
+from email.contentmanager import (  # type: ignore[attr-defined]
+    raw_data_manager,
+    set_text_content,
+)
+from email.policy import SMTPUTF8
 from email.utils import parseaddr
 
 from django.conf import settings
@@ -9,8 +15,6 @@ from django.contrib.auth.models import User
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
-    SafeMIMEMultipart,
-    SafeMIMEText,
 )
 from django.db import transaction
 from django.utils.timezone import now
@@ -220,7 +224,7 @@ def handle_complaint(recipient_emails: list[str]) -> None:
 
 
 def get_email_body(
-    message: SafeMIMEText | SafeMIMEMultipart,
+    message: message.EmailMessage,
 ) -> tuple[str, str]:
     """Function to retrieve html and plain body content of an email
 
@@ -266,6 +270,32 @@ def normalize_addresses(email_list: Sequence[str]) -> list[str]:
     return normalized_addresses
 
 
+def set_surrogateescape_clean_text_content(
+    msg,
+    string,
+    subtype="plain",
+    charset="utf-8",
+    cte=None,
+    disposition=None,
+    filename=None,
+    cid=None,
+    params=None,
+    headers=None,
+):
+    set_text_content(
+        msg,
+        string.encode(charset, "surrogateescape").decode(charset),
+        subtype,
+        charset,
+        cte,
+        disposition,
+        filename,
+        cid,
+        params,
+        headers,
+    )
+
+
 def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     """Stores an email message and returns its message_id
 
@@ -280,7 +310,12 @@ def store_message(message: EmailMessage | EmailMultiAlternatives) -> str:
     cc = normalize_addresses(message.cc)
     reply_to = normalize_addresses(message.reply_to)
     headers = message.extra_headers
-    body_message = message.message()
+    content_manager = raw_data_manager
+    content_manager.add_set_handler(
+        str, set_surrogateescape_clean_text_content
+    )
+    policy = SMTPUTF8.clone(content_manager=content_manager)
+    body_message = message.message(policy=policy)  # type: ignore[call-arg]
     plain_body, html_body = get_email_body(body_message)
 
     # Look for the CL user by email address to assign it.
