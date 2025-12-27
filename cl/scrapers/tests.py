@@ -366,6 +366,10 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
 
+    def test_multiple_opinions_per_cluster(self):
+        """Test if we can ingest multiple opinions per opinion cluster"""
+        pass
+
 
 class IngestionTest(TestCase):
     fixtures = [
