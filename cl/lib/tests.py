@@ -2,12 +2,14 @@ import datetime
 import pickle
 from typing import TypedDict, cast
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from asgiref.sync import async_to_sync
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.test import SimpleTestCase, override_settings
+from django.db import connection
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
@@ -49,6 +51,7 @@ from cl.lib.redis_utils import (
     release_redis_lock,
 )
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
+from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -66,6 +69,7 @@ from cl.search.factories import (
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import TestCase
+from cl.users.factories import UserFactory
 
 
 class TestPacerUtils(TestCase):
@@ -1561,6 +1565,163 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                     expected_output,
                     f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
                 )
+
+
+class TestAddSqlComment(SimpleTestCase):
+    """Test the add_sql_comment function"""
+
+    def test_no_metadata_returns_unchanged_sql(self) -> None:
+        """Does an empty meta dict return the original SQL unchanged?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql)
+        self.assertEqual(result, sql)
+
+    def test_with_metadata_appends_comment(self) -> None:
+        """Does metadata get appended as a SQL comment?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=123, url="/test/path")
+        self.assertIn("/* ", result)
+        self.assertIn("user_id=123", result)
+        self.assertIn("url=/test/path", result)
+        self.assertIn(" */", result)
+
+    def test_sql_ending_with_semicolon(self) -> None:
+        """Is the comment inserted before the semicolon?"""
+        sql = "SELECT * FROM users;"
+        result = add_sql_comment(sql, user_id=42)
+        self.assertTrue(result.endswith(";"))
+        self.assertIn("/* user_id=42 */;", result)
+
+    def test_sql_not_ending_with_semicolon(self) -> None:
+        """Is the comment appended at the end for SQL without semicolon?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=42)
+        self.assertFalse(result.endswith(";"))
+        self.assertTrue(result.endswith("/* user_id=42 */"))
+
+    def test_none_values_filtered_out(self) -> None:
+        """Are None values filtered from the comment?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=None, url="/test")
+        self.assertNotIn("user_id", result)
+        self.assertIn("url=/test", result)
+
+    def test_all_none_values_returns_unchanged(self) -> None:
+        """Does all-None metadata return the original SQL unchanged?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=None, url=None)
+        self.assertEqual(result, sql)
+
+    def test_sql_with_trailing_whitespace(self) -> None:
+        """Is trailing whitespace handled correctly?"""
+        sql = "SELECT * FROM users   "
+        result = add_sql_comment(sql, user_id=1)
+        self.assertIn("/* user_id=1 */", result)
+        self.assertNotIn("   /*", result)
+
+
+class TestQueryWrapper(TestCase):
+    """Test the QueryWrapper class"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+
+    def test_get_context_with_authenticated_user(self) -> None:
+        """Does get_context return user_id and url for authenticated user?"""
+        factory = RequestFactory()
+        request = factory.get("/test/path/")
+        request.user = self.user
+
+        wrapper = QueryWrapper(request)
+        context = {"connection": connection}
+        result = wrapper.get_context(context)
+
+        self.assertIn("user_id", result)
+        self.assertIn("url", result)
+        self.assertEqual(result["url"], "/test/path/")
+        self.assertEqual(result["user_id"], self.user.pk)
+
+    def test_get_context_without_user(self) -> None:
+        """Does get_context return None user_id when request has no user?"""
+
+        class MockRequest:
+            path = "/test/path/"
+
+        wrapper = QueryWrapper(MockRequest())
+        mock_connection = MagicMock()
+        context = {"connection": mock_connection}
+        result = wrapper.get_context(context)
+
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/test/path/")
+
+    def test_get_context_with_anonymous_user(self) -> None:
+        """Does get_context handle anonymous user correctly?"""
+        factory = RequestFactory()
+        request = factory.get("/anonymous/path/")
+        request.user = AnonymousUser()
+
+        wrapper = QueryWrapper(request)
+        mock_connection = MagicMock()
+        context = {"connection": mock_connection}
+        result = wrapper.get_context(context)
+
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/anonymous/path/")
+
+
+class TestSqlCommenterMiddleware(TestCase):
+    """Integration tests for SqlCommenter middleware"""
+
+    def test_middleware_adds_comment_to_queries(self) -> None:
+        """Does the middleware add comments to database queries?"""
+        mock_get_response = MagicMock(return_value="response")
+
+        class MockRequest:
+            path = "/test/"
+
+        middleware = SqlCommenter(mock_get_response)
+
+        with patch("cl.lib.sqlcommenter.connections") as mock_connections:
+            mock_db = MagicMock()
+            mock_connections.__iter__ = MagicMock(
+                return_value=iter(["default"])
+            )
+            mock_connections.__getitem__ = MagicMock(return_value=mock_db)
+
+            result = middleware(MockRequest())
+
+            self.assertEqual(result, "response")
+            mock_get_response.assert_called_once()
+            mock_db.execute_wrapper.assert_called_once()
+
+    def test_query_wrapper_modifies_sql(self) -> None:
+        """Does QueryWrapper correctly modify SQL before execution?"""
+
+        class MockRequest:
+            path = "/api/test/"
+
+        wrapper = QueryWrapper(MockRequest())
+
+        mock_execute = MagicMock(return_value="result")
+        mock_connection = MagicMock()
+        context = {"connection": mock_connection}
+
+        result = wrapper(
+            mock_execute,
+            "SELECT * FROM test_table",
+            (),
+            False,
+            context,
+        )
+
+        self.assertEqual(result, "result")
+        call_args = mock_execute.call_args
+        modified_sql = call_args[0][0]
+        self.assertIn("/* ", modified_sql)
+        self.assertIn("url=/api/test/", modified_sql)
+        self.assertIn(" */", modified_sql)
 
 
 @override_settings(CHARS_THRESHOLD_OCR_PER_PAGE=50)

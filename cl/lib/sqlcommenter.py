@@ -4,7 +4,7 @@ from typing import Any
 from django.db import connections
 
 
-def add_sql_comment(sql: str, **meta: dict[str, Any]) -> str:
+def add_sql_comment(sql: str, **meta: Any) -> str:
     """
     Append a SQL comment containing key=value pairs from meta.
     """
