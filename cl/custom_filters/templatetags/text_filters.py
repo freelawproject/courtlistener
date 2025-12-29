@@ -8,7 +8,7 @@ from django.template import Library
 from django.template.defaultfilters import stringfilter
 from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
-from django.utils.safestring import SafeString, mark_safe
+from django.utils.safestring import SafeData, SafeString, mark_safe
 
 register = Library()
 
@@ -79,7 +79,10 @@ def nbsp(text: str, autoescape: bool | None = None) -> SafeString:
     spaces. It uses conditional_escape to escape any strings that are incoming
     and are not already marked as safe.
     """
-    esc: EscapeFunc = conditional_escape if autoescape else _identity
+    if isinstance(text, SafeData) or not autoescape:
+        esc: EscapeFunc = _identity
+    else:
+        esc = conditional_escape
     return mark_safe(re.sub(r"\s", "&nbsp;", esc(text.strip())))
 
 
