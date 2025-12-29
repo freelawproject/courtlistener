@@ -3917,7 +3917,7 @@ class NeonAccountUpdateTest(TestCase):
 @patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
 @patch(
     "cl.custom_filters.decorators.verify_honeypot_value",
-    new=lambda request, field_name: None,
+    new=lambda request: None,
 )
 class RegisterViewTest(TestCase):
     async def test_register_with_valid_ascii_username(self) -> None:
