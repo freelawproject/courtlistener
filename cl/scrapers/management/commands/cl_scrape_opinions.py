@@ -360,15 +360,25 @@ class Command(ScraperCommand):
                     "lookup_by": "sha1",
                 }
 
-            # TODO: handle case when one of the contents of the cluster was repeated
-
             # Duplicates will raise errors
-            dup_checker.press_on(
-                Opinion,
-                case_dict["case_dates"],
-                next_case_date,
-                **lookup_params,
-            )
+            try:
+                dup_checker.press_on(
+                    Opinion,
+                    case_dict["case_dates"],
+                    next_case_date,
+                    **lookup_params,
+                )
+            except SingleDuplicateError as exc:
+                # track clusters if they have more than 1 sub opinions but one
+                # of them is a duplicate
+                if len(opinions_content) > 1:
+                    logger.error(
+                        "Cluster had 1 of %s duplicate sub opinion %s",
+                        len(opinions_content),
+                        opinions_to_download,
+                        exc_info=True,
+                    )
+                raise exc
 
             # Not a duplicate, carry on
             logger.info(
