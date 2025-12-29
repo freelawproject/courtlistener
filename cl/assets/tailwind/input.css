@@ -89,7 +89,7 @@
   }
 
   .alert-warning {
-    @apply alert text-yellow-700 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
+    @apply alert text-greyscale-950 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
   }
 
    .alert-danger {
