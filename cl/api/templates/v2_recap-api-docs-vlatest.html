@@ -52,7 +52,7 @@
     <p>As the request is processed, it will have a status code:</p>
     <c-data-table
       safe
-      caption="TBD"
+      caption="Table displaying status codes and their descriptions"
       :columns="[
         {'label': 'Code', 'field': 'code'},
         {'label': 'Description', 'field': 'description'},
@@ -285,16 +285,16 @@ curl -X DELETE \
     <p>We describe the process for completing these uploads below, and you can see examples of them in <a class="underline" href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.</p>
     <p>When you make an upload, you create a <code>Processing Queue</code> object in the CourtListener system. This object will be returned in the HTTP response to your upload, so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:</p>
     <c-data-table
+      safe
+      caption="Table of upload field names and their descriptions"
       :columns="[
         {'label': 'Field', 'field': 'field'},
         {'label': 'Description', 'field': 'description'},
       ]"
       :rows="[
         {'field': '<code>status</code>', 'description': 'When you upload an item, it is placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.'},
-        {'field': '<code>error_message</code>', 'description': 'This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred. (It's not strictly errors.)'},
-        {'field': '<code>docket</code><br>
-          <code>docket_entry</code><br>
-          <code>recap_document</code>',
+        {'field': '<code>error_message</code>', 'description': 'This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred. (It&#39;s not strictly errors.)'},
+        {'field': '<code>docket</code><br /><code>docket_entry</code><br /><code>recap_document</code>',
           'description': 'After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.'},
        ]"
     ></c-data-table>
