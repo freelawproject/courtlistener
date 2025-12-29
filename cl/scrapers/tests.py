@@ -1,11 +1,13 @@
+import json
 import os
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
-from unittest import TestCase, mock
-from unittest.mock import patch
+from unittest import mock
+from unittest.mock import MagicMock, patch
 
+import responses
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -13,6 +15,7 @@ from django.test import SimpleTestCase
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
+from responses import matchers
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -46,6 +49,8 @@ from cl.scrapers.tasks import (
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
+    process_scotus_captcha_transcription,
+    subscribe_to_scotus_updates,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
@@ -1868,3 +1873,168 @@ class DeleteDuplicatesTest(TestCase):
             self.fail("Should raise error due to unsupported court")
         except ValueError:
             pass
+
+
+class SubscribeToSCOTUSTest(TestCase):
+    def setUp(self):
+        self.scotus = CourtFactory.create(id="scotus")
+        self.docket_number = "25-260"
+        self.docket_scotus = DocketFactory.create(
+            court=self.scotus, docket_number=self.docket_number
+        )
+        self.docket_pk = self.docket_scotus.pk
+
+        self.test_asset_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "scrapers"
+            / "test_assets"
+            / "scotus_subscription"
+        )
+
+    def add_response(self, file_name: str, **kwargs):
+        with open(
+            self.test_asset_dir / f"{file_name}.headers.json", "rb"
+        ) as f:
+            headers = json.load(f)
+
+        content_type = headers["Content-Type"]
+        body_extension = content_type.split(";")[0].split("/")[-1]
+        if (
+            "Content-Encoding" in headers
+            and headers["Content-Encoding"] == "gzip"
+        ):
+            body_extension = f"{body_extension}.gz"
+
+        with open(
+            self.test_asset_dir / f"{file_name}.body.{body_extension}", "rb"
+        ) as f:
+            body = f.read()
+
+        response = responses.Response(headers=headers, body=body, **kwargs)
+        responses.add(response)
+        return response
+
+    def test_transcription_cleaning(self):
+        messy = "RoMeo Juleett.; 5 Seven- .Three"
+        clean = process_scotus_captcha_transcription(messy)
+        self.assertEqual(clean, "rj573")
+
+    @responses.activate
+    @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")
+    @mock.patch("cl.scrapers.tasks.call_llm_transcription")
+    @mock.patch("cl.lib.celery_utils.get_task_wait")
+    def test_subscription_task(
+        self, mock_wait: MagicMock, mock_transcription: MagicMock
+    ):
+        scotus_root = "https://file.supremecourt.gov"
+        form_url = (
+            f"{scotus_root}/CaseNotification?caseNumber={self.docket_number}"
+        )
+        subscription_email = "scotus@recap.email"
+        captcha_solution = "mo9su"
+        captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
+        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"
+        mock_wait.return_value = 0
+        mock_transcription.return_value = " ".join(
+            [c for c in captcha_solution]
+        )
+
+        self.add_response(
+            "1_get",
+            url=form_url,
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "2_post",
+            url=f"{scotus_root}/Captcha/Reset",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "3_get",
+            url=f"{scotus_root}/Captcha/audio?captchaId={captcha_id}",
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "4_post",
+            url=f"{scotus_root}/Captcha/validate",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                        "captchaId": captcha_id,
+                        "captcha": captcha_solution,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "5_post",
+            url=f"{scotus_root}/CaseNotification/Subscribe",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "CaseNumber": self.docket_number,
+                        "Email": subscription_email,
+                        "btnRestart": "Enter another email",
+                        "btnSearch": "Return to Search",
+                        "WebDocketUrl": f"https://www.supremecourt.gov/search.aspx?filename=/docket/DocketFiles/html/Public/{self.docket_number}.html",
+                        "captcha": captcha_solution,
+                        "SubscribeButton": "Subscribe",
+                        "btnCancel": "Cancel",
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+
+        subscribe_to_scotus_updates.delay(self.docket_pk).get()
+        self.assertEqual(
+            len(mock_transcription.mock_calls),
+            1,
+            "Should have requested exactly 1 transcription",
+        )
