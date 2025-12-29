@@ -1,0 +1,28 @@
+{% extends 'new_base.html' %}
+{% load extras %}
+
+{% block title %}Search API Help{% endblock %}
+
+{% block content %}
+
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#usage', 'text': 'Basic Usage'},
+    {'href': '#understanding', 'text': 'Understanding', 'children': [
+      {'href': '#semantic-search', 'text': 'Semantic Search'},
+      {'href': '#type', 'text': 'Result Types'},
+      {'href': '#ordering', 'text': 'Ordering'},
+      {'href': '#filtering', 'text': 'Filtering'},
+      {'href': '#fields', 'text': 'Fields'},
+      {'href': '#highlighting', 'text': 'Highlighting'},
+      {'href': '#counts', 'text': 'Result Counts'},
+      {'href': '#notes', 'text': 'Special Notes'},
+      ]},
+    {'href': '#monitoring', 'text': 'Monitoring a Query'},
+  ]"
+>
+
+</c-layout-with-navigation>
+{% endblock %}
