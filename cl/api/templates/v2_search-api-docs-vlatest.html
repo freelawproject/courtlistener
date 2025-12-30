@@ -2,7 +2,16 @@
 {% load extras %}
 
 {% block title %}Legal Search API – CourtListener.com{% endblock %}
+{% block og_title %}Legal Search API – CourtListener.com{% endblock %}
 
+{% block description %}Use this API to search case law, federal filings and cases, judges, and oral argument audio files.{% endblock %}
+{% block og_description %}Use this API to search case law, federal filings and cases, judges, and oral argument audio files.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
 {% block content %}
 
 <c-layout-with-navigation
@@ -257,7 +266,7 @@ curl -X OPTIONS \
     <p>Because of this, we do not recommend polling as a mechanism for monitoring queries for new results. Instead, use the <a class="text-primary-600" href="{% url "search_api_help" %}">Alert API</a>, which will send emails or <a class="text-primary-600" href="{% url "webhooks_docs" %}">webhook events</a> when there are new hits.</p>
   </c-layout-with-navigation.section>
 
-  <c-donate-footer-plea />
+  <c-support-plea-banner />
 
 </c-layout-with-navigation>
 {% endblock %}
