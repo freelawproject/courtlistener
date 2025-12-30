@@ -33,6 +33,7 @@ import re
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import lru_cache
 from math import ceil
 
 from datasketch import MinHash, MinHashLSH
@@ -40,7 +41,6 @@ from Stemmer import Stemmer
 
 from cl.lib.stop_words import STOP_WORDS
 from cl.search.models import Parenthetical
-from functools import lru_cache
 
 Graph = dict[str, list[str]]
 
