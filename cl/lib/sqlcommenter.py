@@ -31,9 +31,13 @@ def add_sql_comment(sql: str, **meta: Any) -> str:
     if not meta:
         return sql
 
-    comment_parts = [
-        f"{key}={value}" for key, value in meta.items() if value is not None
-    ]
+    comment_parts = []
+    for key, value in meta.items():
+        if not value:
+            continue
+        escaped_value = escape_sql_comment_value(value)
+        comment_parts.append(f"{key}='{escaped_value}'")
+
     if not comment_parts:
         return sql
 
