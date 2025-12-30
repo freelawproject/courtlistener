@@ -59,11 +59,9 @@ class QueryWrapper:
         annotation.
         """
         user = (
-            self.request.user._meta.pk.get_db_prep_value(
-                self.request.user.pk, context["connection"]
-            )
+            self.request.user.pk
             if hasattr(self.request, "user")
-            and hasattr(self.request.user, "_meta")
+            and self.request.user.is_authenticated
             else None
         )
         return {"user_id": user, "url": self.request.path}
