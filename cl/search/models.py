@@ -301,6 +301,14 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     docket_number = models.TextField(
         help_text="The docket number in the lower court.", blank=True
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     assigned_to = models.ForeignKey(
         "people_db.Person",
         help_text="The judge the case was assigned to.",
@@ -360,6 +368,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     date_received_coa = models.DateField(
         help_text="The date the case was received at the court of appeals.",
+        blank=True,
+        null=True,
+    )
+    date_rehearing_denied = models.DateField(
+        help_text="The date the petition for rehearing was denied at the "
+        "lower court.",
         blank=True,
         null=True,
     )
@@ -1943,14 +1957,14 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         )
 
-    def appellate_pacer_courts(self) -> models.QuerySet:
+    def appellate_courts(self) -> models.QuerySet:
         return self.filter(
             Q(jurisdiction=Court.FEDERAL_APPELLATE)
             |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
-        ).exclude(pk="scotus")
+        )
 
     def bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(

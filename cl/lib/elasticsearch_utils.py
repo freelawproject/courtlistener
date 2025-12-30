@@ -2134,7 +2134,7 @@ def merge_unavailable_fields_on_parent_document(
             #    This represents document_number 1 that has been converted to an attachment.
 
             appellate_court_ids = (
-                Court.federal_courts.appellate_pacer_courts().values_list(
+                Court.federal_courts.appellate_courts().values_list(
                     "pk", flat=True
                 )
             )
