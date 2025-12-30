@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+from functools import cached_property
 from typing import Any
 
 from django.db import connections
@@ -49,7 +50,8 @@ class QueryWrapper:
     def __init__(self, request):
         self.request = request
 
-    def get_context(self, context: dict[str, Any]) -> dict[str, Any]:
+    @cached_property
+    def get_context(self) -> dict[str, Any]:
         """
         Extract relevant context information from the request for SQL comments.
 
@@ -67,6 +69,5 @@ class QueryWrapper:
         return {"user_id": user, "url": self.request.path}
 
     def __call__(self, execute, sql, params, many, context):
-        context_info = self.get_context(context)
-        sql_with_comment = add_sql_comment(sql, **context_info)
+        sql_with_comment = add_sql_comment(sql, **self.get_context)
         return execute(sql_with_comment, params, many, context)

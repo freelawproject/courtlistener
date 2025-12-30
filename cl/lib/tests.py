@@ -8,7 +8,6 @@ from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.db import connection
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from requests.cookies import RequestsCookieJar
 
@@ -1634,8 +1633,7 @@ class TestQueryWrapper(TestCase):
         request.user = self.user
 
         wrapper = QueryWrapper(request)
-        context = {"connection": connection}
-        result = wrapper.get_context(context)
+        result = wrapper.get_context
 
         self.assertIn("user_id", result)
         self.assertIn("url", result)
@@ -1649,9 +1647,7 @@ class TestQueryWrapper(TestCase):
             path = "/test/path/"
 
         wrapper = QueryWrapper(MockRequest())
-        mock_connection = MagicMock()
-        context = {"connection": mock_connection}
-        result = wrapper.get_context(context)
+        result = wrapper.get_context
 
         self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/test/path/")
@@ -1663,9 +1659,7 @@ class TestQueryWrapper(TestCase):
         request.user = AnonymousUser()
 
         wrapper = QueryWrapper(request)
-        mock_connection = MagicMock()
-        context = {"connection": mock_connection}
-        result = wrapper.get_context(context)
+        result = wrapper.get_context
 
         self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/anonymous/path/")
