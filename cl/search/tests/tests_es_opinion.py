@@ -1228,6 +1228,7 @@ class OpinionV4APISearchTest(
 
 
 @override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinions_es_search")
 class OpinionsESSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
