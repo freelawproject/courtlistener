@@ -40,6 +40,7 @@ from Stemmer import Stemmer
 
 from cl.lib.stop_words import STOP_WORDS
 from cl.search.models import Parenthetical
+from functools import lru_cache
 
 Graph = dict[str, list[str]]
 
@@ -55,7 +56,7 @@ SIMILARITY_THRESHOLD = 0.5
 _EMPTY_SIMILARITY_INDEX = MinHashLSH(
     threshold=SIMILARITY_THRESHOLD, num_perm=64
 )
-_EMPTY_MHASH = MinHash(num_perm=64)
+_EMPTY_MHASH = MinHash(num_perm=64, seed=42)
 
 # We initialize the stemmer once and reuse it because it internally caches
 # frequently seen tokens, giving us a performance benefit if we reuse it.
@@ -99,6 +100,8 @@ def compute_parenthetical_groups(
     for par in parentheticals:
         mhash = deepcopy(_EMPTY_MHASH)
         tokens = get_parenthetical_tokens(par.text)
+        if not tokens:
+            continue
         mhash.update_batch([gram.encode("utf-8") for gram in tokens])
 
         par_key = str(par.id)
@@ -251,6 +254,7 @@ def get_representative_parenthetical(
     )
 
 
+@lru_cache(maxsize=4096)
 def get_parenthetical_tokens(text: str) -> list[str]:
     """
     For a given text string, tokenize it, and filter stop words.
