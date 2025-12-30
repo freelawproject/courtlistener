@@ -18,7 +18,7 @@ def escape_sql_comment_value(value: Any) -> str | None:
     s = s.replace("\r", " ").replace("\n", " ")
 
     # URL-encode to escape special characters
-    quoted = quote(s, safe="")
+    quoted = quote(s)
 
     # Double % signs for SQL compatibility
     return quoted.replace("%", "%%")
@@ -89,7 +89,12 @@ class QueryWrapper:
             and self.request.user.is_authenticated
             else None
         )
-        return {"user_id": user, "url": self.request.path}
+        resolver_match = self.request.resolver_match
+        return {
+            "user_id": user,
+            "url": self.request.path if resolver_match else None,
+            "url-name": resolver_match.view_name if resolver_match else None,
+        }
 
     def __call__(self, execute, sql, params, many, context):
         sql_with_comment = add_sql_comment(sql, **self.get_context)

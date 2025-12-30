@@ -1580,8 +1580,8 @@ class TestAddSqlComment(SimpleTestCase):
         sql = "SELECT * FROM users"
         result = add_sql_comment(sql, user_id=123, url="/test/path")
         self.assertIn("/* ", result)
-        self.assertIn("user_id=123", result)
-        self.assertIn("url=/test/path", result)
+        self.assertIn("user_id='123'", result)
+        self.assertIn("url='/test/path'", result)
         self.assertIn(" */", result)
 
     def test_sql_ending_with_semicolon(self) -> None:
@@ -1589,21 +1589,21 @@ class TestAddSqlComment(SimpleTestCase):
         sql = "SELECT * FROM users;"
         result = add_sql_comment(sql, user_id=42)
         self.assertTrue(result.endswith(";"))
-        self.assertIn("/* user_id=42 */;", result)
+        self.assertIn("/* user_id='42' */;", result)
 
     def test_sql_not_ending_with_semicolon(self) -> None:
         """Is the comment appended at the end for SQL without semicolon?"""
         sql = "SELECT * FROM users"
         result = add_sql_comment(sql, user_id=42)
         self.assertFalse(result.endswith(";"))
-        self.assertTrue(result.endswith("/* user_id=42 */"))
+        self.assertTrue(result.endswith("/* user_id='42' */"))
 
     def test_none_values_filtered_out(self) -> None:
         """Are None values filtered from the comment?"""
         sql = "SELECT * FROM users"
         result = add_sql_comment(sql, user_id=None, url="/test")
         self.assertNotIn("user_id", result)
-        self.assertIn("url=/test", result)
+        self.assertIn("url='/test'", result)
 
     def test_all_none_values_returns_unchanged(self) -> None:
         """Does all-None metadata return the original SQL unchanged?"""
@@ -1615,8 +1615,31 @@ class TestAddSqlComment(SimpleTestCase):
         """Is trailing whitespace handled correctly?"""
         sql = "SELECT * FROM users   "
         result = add_sql_comment(sql, user_id=1)
-        self.assertIn("/* user_id=1 */", result)
+        self.assertIn("/* user_id='1' */", result)
         self.assertNotIn("   /*", result)
+
+    def test_add_sql_comment_prevents_comment_closure_injection(self) -> None:
+        sql = "SELECT * FROM users"
+        malicious_path = "/test*/;DROP TABLE users;--"
+
+        result = add_sql_comment(sql, url=malicious_path)
+
+        # The injected terminator must NOT appear
+        self.assertNotIn("*/;DROP TABLE", result)
+
+        # SQL comment must still be intact
+        self.assertEqual(result.count("/*"), 1)
+        self.assertEqual(result.count("*/"), 1)
+
+    def test_add_sql_comment_handles_newlines_safely(self) -> None:
+        sql = "SELECT 1"
+        path = "/test\n*/\nDROP TABLE users;"
+
+        result = add_sql_comment(sql, url=path)
+
+        self.assertNotIn("\nDROP TABLE", result)
+        self.assertEqual(result.count("/*"), 1)
+        self.assertEqual(result.count("*/"), 1)
 
 
 class TestQueryWrapper(TestCase):
@@ -1625,12 +1648,39 @@ class TestQueryWrapper(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
+        cls.request_factory = RequestFactory()
+
+    class MockResolverMatch:
+        def __init__(self, view_name="test-view"):
+            self.view_name = view_name
+
+    def test_get_context_without_resolver_match(self) -> None:
+        request = self.request_factory.get("/no-resolver/")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context
+
+        self.assertIsNone(result["user_id"])
+        self.assertIsNone(result["url"])
+        self.assertIsNone(result["url-name"])
+
+    def test_get_context_without_user(self) -> None:
+        """Does get_context return None user_id when request has no user?"""
+        request = self.request_factory.get("/test/path/")
+        request.resolver_match = self.MockResolverMatch("test-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context
+
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/test/path/")
+        self.assertEqual(result["url-name"], "test-view")
 
     def test_get_context_with_authenticated_user(self) -> None:
         """Does get_context return user_id and url for authenticated user?"""
-        factory = RequestFactory()
-        request = factory.get("/test/path/")
+        request = self.request_factory.get("/test/path/")
         request.user = self.user
+        request.resolver_match = self.MockResolverMatch("test-view")
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context
@@ -1639,34 +1689,28 @@ class TestQueryWrapper(TestCase):
         self.assertIn("url", result)
         self.assertEqual(result["url"], "/test/path/")
         self.assertEqual(result["user_id"], self.user.pk)
-
-    def test_get_context_without_user(self) -> None:
-        """Does get_context return None user_id when request has no user?"""
-
-        class MockRequest:
-            path = "/test/path/"
-
-        wrapper = QueryWrapper(MockRequest())
-        result = wrapper.get_context
-
-        self.assertIsNone(result["user_id"])
-        self.assertEqual(result["url"], "/test/path/")
+        self.assertEqual(result["url-name"], "test-view")
 
     def test_get_context_with_anonymous_user(self) -> None:
         """Does get_context handle anonymous user correctly?"""
-        factory = RequestFactory()
-        request = factory.get("/anonymous/path/")
+        request = self.request_factory.get("/anonymous/path/")
         request.user = AnonymousUser()
+        request.resolver_match = self.MockResolverMatch("anon-view")
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context
 
         self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/anonymous/path/")
+        self.assertEqual(result["url-name"], "anon-view")
 
 
 class TestSqlCommenterMiddleware(TestCase):
     """Integration tests for SqlCommenter middleware"""
+
+    class MockResolverMatch:
+        def __init__(self, view_name="test-view"):
+            self.view_name = view_name
 
     def test_middleware_adds_comment_to_queries(self) -> None:
         """Does the middleware add comments to database queries?"""
@@ -1674,6 +1718,7 @@ class TestSqlCommenterMiddleware(TestCase):
 
         class MockRequest:
             path = "/test/"
+            resolver_match = self.MockResolverMatch("test-view")
 
         middleware = SqlCommenter(mock_get_response)
 
@@ -1695,6 +1740,7 @@ class TestSqlCommenterMiddleware(TestCase):
 
         class MockRequest:
             path = "/api/test/"
+            resolver_match = self.MockResolverMatch("test-view")
 
         wrapper = QueryWrapper(MockRequest())
 
@@ -1714,7 +1760,7 @@ class TestSqlCommenterMiddleware(TestCase):
         call_args = mock_execute.call_args
         modified_sql = call_args[0][0]
         self.assertIn("/* ", modified_sql)
-        self.assertIn("url=/api/test/", modified_sql)
+        self.assertIn("url='/api/test/'", modified_sql)
         self.assertIn(" */", modified_sql)
 
 
