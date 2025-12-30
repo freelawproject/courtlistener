@@ -1,8 +1,27 @@
 from contextlib import ExitStack
 from functools import cached_property
 from typing import Any
+from urllib.parse import quote
 
 from django.db import connections
+
+
+def escape_sql_comment_value(value: Any) -> str | None:
+    """Safely escape a value for inclusion in SQL comments."""
+    if value is None:
+        return None
+
+    # Coerce to string early
+    s = str(value)
+
+    # Normalize and remove newlines
+    s = s.replace("\r", " ").replace("\n", " ")
+
+    # URL-encode to escape special characters
+    quoted = quote(s, safe="")
+
+    # Double % signs for SQL compatibility
+    return quoted.replace("%", "%%")
 
 
 def add_sql_comment(sql: str, **meta: Any) -> str:
