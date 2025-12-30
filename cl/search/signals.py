@@ -676,5 +676,10 @@ def handle_docket_number_raw_cleaning(
     if instance.source == Docket.RECAP:
         return
 
+    # handle explicit updates. Otherwise, `clean_docket_number_raw_and_update_redis_cache`
+    # below will create infinite recursion
+    if update_fields and "docket_number_raw" not in update_fields:
+        return
+
     if created or instance.docket_number_raw_tracker.changed():
         clean_docket_number_raw_and_update_redis_cache(instance)
