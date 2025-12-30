@@ -1,7 +1,19 @@
 {% extends 'new_base.html' %}
 {% load extras %}
 
-{% block title %}Financial Disclosures API – CourtListener.com{% endblock %}
+% block title %}Financial Disclosures API – CourtListener.com{% endblock %}
+{% block og_title %}Financial Disclosures API – CourtListener.com{% endblock %}
+
+{% block description %}We collected millions of disclosure records from thousands of federal judges. Use these APIs to query and study this immense dataset.{% endblock %}
+{% block og_description %}We collected millions of disclosure records from thousands of federal judges. Use these APIs to query and study this immense dataset.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+{% block navbar-fd %}active{% endblock %}
+
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
 
 {% block content %}
 <c-layout-with-navigation
@@ -270,7 +282,7 @@ curl "{% get_full_host %}{% url "financialdisclosure-list" version=version %}?pe
     <p>Please report any security or privacy concerns to <a class="underline" href="mailto:security@free.law">security@free.law</a>.</p>
   </c-layout-with-navigation.section>
 
-{#  <c-donate-footer-plea />#}
+  <c-support-plea-banner />
 
 </c-layout-with-navigation>
 {% endblock %}
