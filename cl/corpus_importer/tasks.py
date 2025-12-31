@@ -69,7 +69,7 @@ from requests.exceptions import (
     HTTPError,
     ReadTimeout,
     RequestException,
-    Timeout
+    Timeout,
 )
 from rest_framework.renderers import JSONRenderer
 from sentry_sdk import capture_exception
@@ -3335,14 +3335,14 @@ def merge_scotus_documents(rds_to_download: list[int]) -> list[int] | None:
         pk__in=rds_to_download
     ).only(
         "pk",
-        "filepath_original_source",
+        "document_url",
         "document_number",
         "attachment_number",
         "docket_entry__docket__docket_number",
     )
     rds_to_extract = []
     for rd in rds_objs_to_download:
-        scotus_url = rd.filepath_original_source
+        scotus_url = rd.document_url
         rd_id = rd.pk
         if rd.is_available:
             logger.warning(

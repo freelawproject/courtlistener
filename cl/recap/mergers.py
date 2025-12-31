@@ -2006,7 +2006,7 @@ async def merge_attachment_page_data(
                 pass
 
         if is_scotus:
-            rd.filepath_original_source = attachment["document_url"]
+            rd.document_url = attachment["document_url"]
 
         await rd.asave()
 
@@ -2322,9 +2322,9 @@ def merge_scotus_docket(
     )
     rds_to_download = RECAPDocument.objects.filter(
         docket_entry_id__in=docket_entries_ids
-    ).only("id", "filepath_original_source")
+    ).only("id", "document_url")
     return (
         d,
         download_qp,
-        [rd.pk for rd in rds_to_download if rd.filepath_original_source],
+        [rd.pk for rd in rds_to_download if rd.document_url],
     )

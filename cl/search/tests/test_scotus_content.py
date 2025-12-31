@@ -135,9 +135,7 @@ class ScotusDocketMergeTest(TestCase):
         ).first()
         self.assertEqual(rd_att_1.document_type, RECAPDocument.ATTACHMENT)
 
-        self.assertEqual(
-            rd_att_1.filepath_original_source, att_1["document_url"]
-        )
+        self.assertEqual(rd_att_1.document_url, att_1["document_url"])
         self.assertTrue(rd_att_1.filepath_local)
         self.assertIn("UNITED", rd_att_1.plain_text)
 
@@ -145,9 +143,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entry__docket=docket, description="Attachment 2"
         ).first()
         self.assertEqual(rd_att_2.document_type, RECAPDocument.ATTACHMENT)
-        self.assertEqual(
-            rd_att_2.filepath_original_source, att_2["document_url"]
-        )
+        self.assertEqual(rd_att_2.document_url, att_2["document_url"])
         self.assertTrue(rd_att_2.filepath_local)
         self.assertIn("UNITED", rd_att_2.plain_text)
 
