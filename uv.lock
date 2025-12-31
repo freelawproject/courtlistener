@@ -1039,15 +1039,15 @@ wheels = [
 
 [[package]]
 name = "django-s3-express-cache"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/60/3e/2a1a092c6c7d7f13172bb6c61b86a0136338c4772e664d06808573c2ca60/django_s3_express_cache-0.1.0.tar.gz", hash = "sha256:de993257e79161e3ccb95d7f8cd54db50d329347524a97a23d1484c528c65541", size = 23642, upload-time = "2025-09-21T21:37:30.204Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/a2/4df98848a5ed3ed8a9d26c2a0b9b06ec09ef207ab43a53812a3ae716a333/django_s3_express_cache-0.2.0.tar.gz", hash = "sha256:f477d285049a09168c2781d8b44ce17090af8a0a36700f9d205d57a7be3e764c", size = 29162, upload-time = "2025-12-31T15:50:09.441Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/7a/ffad8e5118a11da20b8398bb38732167110da8cdfb0f2c47366c44faaaa2/django_s3_express_cache-0.1.0-py3-none-any.whl", hash = "sha256:4afdcf962c8c7001d39ba0fb1db2e1ed2fb755b5aead35c75d87e2675bdabfd6", size = 13121, upload-time = "2025-09-21T21:37:29.242Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/df/5a72e255ce4783a2f7a77e40c7a3bf02b8d71cb0ed78d8cb32711d008f0a/django_s3_express_cache-0.2.0-py3-none-any.whl", hash = "sha256:e4afdc1eb16f0839ed55a6f2c2eedb023acbfc4fa663c612c2d772c0adbfb348", size = 17235, upload-time = "2025-12-31T15:50:08.582Z" },
 ]
 
 [[package]]
