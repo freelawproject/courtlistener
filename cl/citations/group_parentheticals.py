@@ -272,4 +272,3 @@ def get_parenthetical_tokens(text: str) -> list[str]:
         del tokens[0]
     tokens = stemmer.stemWords(tokens)
     return tokens
-    
