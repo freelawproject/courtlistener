@@ -336,6 +336,7 @@ dependencies = [
     { name = "django-override-storage" },
     { name = "django-permissions-policy" },
     { name = "django-pghistory" },
+    { name = "django-prometheus" },
     { name = "django-ratelimit" },
     { name = "django-s3-express-cache" },
     { name = "django-ses", extra = ["events"] },
@@ -412,6 +413,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-django" },
+    { name = "responses" },
     { name = "tblib" },
     { name = "types-python-dateutil" },
     { name = "types-redis" },
@@ -450,6 +452,7 @@ requires-dist = [
     { name = "django-override-storage", specifier = ">=0.3.2" },
     { name = "django-permissions-policy", specifier = ">=4.25.0" },
     { name = "django-pghistory", specifier = ">=3.5.4" },
+    { name = "django-prometheus", specifier = ">=2.4.1" },
     { name = "django-ratelimit", specifier = ">=4.1.0" },
     { name = "django-s3-express-cache", specifier = ">=0.1.0" },
     { name = "django-ses", extras = ["events"], specifier = ">=0.44.0" },
@@ -526,6 +529,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-django", specifier = ">=4.10.0" },
+    { name = "responses", specifier = ">=0.25.8" },
     { name = "tblib", specifier = ">=3.0.0" },
     { name = "types-python-dateutil", specifier = ">=2.9.0.20241206" },
     { name = "types-redis", specifier = ">=4.6.0.20241004" },
@@ -988,27 +992,40 @@ wheels = [
 
 [[package]]
 name = "django-pghistory"
-version = "3.5.4"
+version = "3.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-pgtrigger" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/32/44/8685dffb6a2241d8259ff86e8a6e379268aa98457e8d958aea933dcce910/django_pghistory-3.5.4.tar.gz", hash = "sha256:2fec5b7e0c927b00959f8d9807adc3a72f76e920fdf0c4da83db9a524de40305", size = 31223, upload-time = "2025-03-12T20:47:32.886Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/61/06119cef2cb88e2314d00e27fc581c77a97baf90dfa638e03db3d87c2b10/django_pghistory-3.9.0.tar.gz", hash = "sha256:36f883ce91ac27bd3f6841494224c7579dc41243c217db2cdd2caf4c4a13400d", size = 31341, upload-time = "2025-11-30T23:50:01.679Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/76/df702b2c2b9597f2a6ebc11a5b7c836ba304352250e5d345956884577373/django_pghistory-3.5.4-py3-none-any.whl", hash = "sha256:5bde1fda387801aa05c4eee84a90b7d5db3a13d585b7bc0ffa6a3d4b51f2f6da", size = 38358, upload-time = "2025-03-12T20:47:31.731Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/4c/cfbccf04a9aa22e360449be6ec5965ce7a5dbb508733c835ef2643b6a876/django_pghistory-3.9.0-py3-none-any.whl", hash = "sha256:4506aedb59fc0b1061911293170b15e617eb0db72924cee7edc7e30725b3e995", size = 39871, upload-time = "2025-11-30T23:50:00.687Z" },
 ]
 
 [[package]]
 name = "django-pgtrigger"
-version = "4.13.3"
+version = "4.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/98/d93f658316901c54a00ec0caefc3e73796b2f7ffcc1fd11188da22c45027/django_pgtrigger-4.13.3.tar.gz", hash = "sha256:c525f9e81f120d166c4bd5fe8c3770640356f0644edf0fc2b7f6426008e52f77", size = 30723, upload-time = "2024-12-16T01:56:44.466Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/45/3d/ea55015e2e2a8e2230c6a056768512a9660573f8926f87671f166d455936/django_pgtrigger-4.17.0.tar.gz", hash = "sha256:55d297a756b5b6a8e0c533d3323fda1589c699e7d14aa3fff7fa7d774c46363c", size = 32200, upload-time = "2025-12-04T15:46:06.587Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/cb/3bb87d45b1b46ef36f3786fbfcda0a43f80c8fa4e742a350a2cd1512557e/django_pgtrigger-4.13.3-py3-none-any.whl", hash = "sha256:d6e4d17021bbd5e425a308f07414b237b9b34423275d86ad756b90c307df3ca4", size = 34059, upload-time = "2024-12-16T01:56:39.643Z" },
+    { url = "https://files.pythonhosted.org/packages/91/47/13c0c23c134cd0f0b0addfbc3ef1477f90d891184d21689f9074b794b00c/django_pgtrigger-4.17.0-py3-none-any.whl", hash = "sha256:06048cdeb57e20987fd0bf7dd673512a1413a08868eea248d70dbb970e967175", size = 36326, upload-time = "2025-12-04T15:46:05.427Z" },
+]
+
+[[package]]
+name = "django-prometheus"
+version = "2.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "prometheus-client" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/f4/cb39ddd2a41e07a274c4e162c076e906ae232d63b66bbabdea0300878877/django_prometheus-2.4.1.tar.gz", hash = "sha256:073628243d2a6de6a8a8c20e5b512872dfb85d66e1b60b28bcf1eca0155dad95", size = 24464, upload-time = "2025-06-25T15:45:37.149Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/50/9c5e022fa92574e5d20606687f15a2aa255e10512a17d11a8216fa117f72/django_prometheus-2.4.1-py2.py3-none-any.whl", hash = "sha256:7fe5af7f7c9ad9cd8a429fe0f3f1bf651f0e244f77162147869eab7ec09cc5e7", size = 29541, upload-time = "2025-06-25T15:45:35.433Z" },
 ]
 
 [[package]]
@@ -1755,7 +1772,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.6.98"
+version = "2.6.100"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1773,9 +1790,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b3/49/e7d83793d4353f18b46bbe7583c739a899d34ef6818c89e4011351ca1a84/juriscraper-2.6.98.tar.gz", hash = "sha256:69a3bb6f697749cc5dc3981fecb3c3f50f303850a5180bd2b0b2e3bc7c92f419", size = 342373, upload-time = "2025-12-05T19:13:53.129Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/24/0af91c64cb9fd1dbd6f68dfa36f5b1013fd29c48111044c1506acbbdfccf/juriscraper-2.6.100.tar.gz", hash = "sha256:7bd64da8c7f3ee5f510c79bc577e7384d5f23a504cf84b597434f249a4b8040b", size = 343676, upload-time = "2025-12-22T23:36:19.632Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a1/86/8e5c3e90c4a12b282f563280dbaef189d833d61be2913fe6e24a4d9ecfe5/juriscraper-2.6.98-py3-none-any.whl", hash = "sha256:2727e95af3371deb3bdf557304ae5d2b4703f35153e009b20b57fb01b0d6e943", size = 558655, upload-time = "2025-12-05T19:13:51.504Z" },
+    { url = "https://files.pythonhosted.org/packages/63/3c/982139e06dc5b9197b5fd74cc67e697e12808e4290b91f8aeabdbce2a497/juriscraper-2.6.100-py3-none-any.whl", hash = "sha256:5e508c7d93ec24f53e157f0402304057bcc461808003c218c3ffcc7b76cd34df", size = 560132, upload-time = "2025-12-22T23:36:17.714Z" },
 ]
 
 [[package]]
@@ -2280,6 +2297,15 @@ wheels = [
 ]
 
 [[package]]
+name = "prometheus-client"
+version = "0.23.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/53/3edb5d68ecf6b38fcbcc1ad28391117d2a322d9a1a3eff04bfdb184d8c3b/prometheus_client-0.23.1.tar.gz", hash = "sha256:6ae8f9081eaaaf153a2e959d2e6c4f4fb57b12ef76c8c7980202f1e57b48b2ce", size = 80481, upload-time = "2025-09-18T20:47:25.043Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/db/14bafcb4af2139e046d03fd00dea7873e48eafe18b7d2797e73d6681f210/prometheus_client-0.23.1-py3-none-any.whl", hash = "sha256:dd1913e6e76b59cfe44e7a4b83e01afc9873c1bdfd2ed8739f1e76aeca115f99", size = 61145, upload-time = "2025-09-18T20:47:23.875Z" },
+]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.50"
 source = { registry = "https://pypi.org/simple" }
@@ -2740,6 +2766,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/72/97/bf44e6c6bd8ddbb99943baf7ba8b1a8485bcd2fe0e55e5708d7fee4ff1ae/requests_file-2.1.0.tar.gz", hash = "sha256:0f549a3f3b0699415ac04d167e9cb39bccfb730cb832b4d20be3d9867356e658", size = 6891, upload-time = "2024-05-21T16:28:00.24Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/25/dd878a121fcfdf38f52850f11c512e13ec87c2ea72385933818e5b6c15ce/requests_file-2.1.0-py2.py3-none-any.whl", hash = "sha256:cf270de5a4c5874e84599fc5778303d496c10ae5e870bfa378818f35d21bda5c", size = 4244, upload-time = "2024-05-21T16:27:57.733Z" },
+]
+
+[[package]]
+name = "responses"
+version = "0.25.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/95/89c054ad70bfef6da605338b009b2e283485835351a9935c7bfbfaca7ffc/responses-0.25.8.tar.gz", hash = "sha256:9374d047a575c8f781b94454db5cab590b6029505f488d12899ddb10a4af1cf4", size = 79320, upload-time = "2025-08-08T19:01:46.709Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/4c/cc276ce57e572c102d9542d383b2cfd551276581dc60004cb94fe8774c11/responses-0.25.8-py3-none-any.whl", hash = "sha256:0c710af92def29c8352ceadff0c3fe340ace27cf5af1bbe46fb71275bcd2831c", size = 34769, upload-time = "2025-08-08T19:01:45.018Z" },
 ]
 
 [[package]]

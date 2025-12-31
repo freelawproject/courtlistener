@@ -4,14 +4,19 @@ import pytest
 import time_machine
 from django.core import mail
 from django.core.management import call_command
+from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils.timezone import now
-from waffle.testutils import override_switch
+from waffle.testutils import override_flag, override_switch
 
 from cl.lib.redis_utils import get_redis_interface
+from cl.search.models import SEARCH_TYPES
+from cl.stats.metrics import record_prometheus_metric, search_queries_total
 from cl.stats.models import Event
 from cl.stats.utils import get_milestone_range, tally_stat
-from cl.tests.cases import TestCase
-from cl.users.factories import UserFactory
+from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.utils import AsyncAPIClient
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class MilestoneTests(TestCase):
@@ -118,3 +123,148 @@ class StatTests(TestCase):
         # But it must expire no later than tomorrow
         tomorrow = now() + timedelta(days=1)
         self.assertLessEqual(expired_at.date(), tomorrow.date())
+
+
+class PrometheusMetricsTests(TestCase):
+    def setUp(self):
+        search_queries_total._metrics.clear()
+
+    def test_record_prometheus_metric(self) -> None:
+        """Test recording metrics with different handler keys and labels"""
+        test_cases = [
+            {
+                "name": "keyword_web",
+                "handler_key": "search.queries.keyword.web",
+                "query_type": "keyword",
+                "method": "web",
+                "increments": [1],
+            },
+            {
+                "name": "semantic_api",
+                "handler_key": "search.queries.semantic.api",
+                "query_type": "semantic",
+                "method": "api",
+                "increments": [1],
+            },
+            {
+                "name": "accumulation",
+                "handler_key": "search.queries.keyword.api",
+                "query_type": "keyword",
+                "method": "api",
+                "increments": [1, 2, 3],
+            },
+        ]
+
+        for test_case in test_cases:
+            with self.subTest(case=test_case["name"]):
+                initial = search_queries_total.labels(
+                    query_type=test_case["query_type"],
+                    method=test_case["method"],
+                )._value.get()
+
+                for inc in test_case["increments"]:
+                    record_prometheus_metric(test_case["handler_key"], inc)
+
+                final = search_queries_total.labels(
+                    query_type=test_case["query_type"],
+                    method=test_case["method"],
+                )._value.get()
+                expected_total = sum(test_case["increments"])
+                self.assertEqual(final, initial + expected_total)
+
+
+def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:
+    """Parse Prometheus text format into dict of metric names to values."""
+    metrics = {}
+    for line in metrics_text.split("\n"):
+        if line.startswith("#") or not line.strip():
+            continue
+        parts = line.rsplit(" ", 1)
+        if len(parts) != 2:
+            continue
+        metric_name, value = parts
+        try:
+            metrics[metric_name] = float(value)
+        except ValueError:
+            continue
+    return metrics
+
+
+@override_flag("semantic-search", active=True)
+@override_switch("increment-stats", active=True)
+class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
+    """Base class for Prometheus integration tests"""
+
+    def setUp(self):
+        search_queries_total._metrics.clear()
+        self.async_client = AsyncAPIClient()
+
+    async def _get_metric_count(self, query_type: str, method: str) -> float:
+        """Helper to fetch and parse a specific Prometheus metric count"""
+        response = await self.async_client.get(
+            "/monitoring/prometheus/metrics"
+        )
+        self.assertEqual(response.status_code, 200)
+        metrics = parse_prometheus_metrics(response.content.decode("utf-8"))
+        return metrics.get(
+            f'cl_search_queries_total{{method="{method}",query_type="{query_type}"}}',
+            0.0,
+        )
+
+
+@override_flag("store-search-api-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_prometheus_integration")
+class PrometheusIntegrationAPITests(PrometheusIntegrationTestBase):
+    """Integration tests for Prometheus metrics with API searches"""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user_profile = UserProfileWithParentsFactory()
+
+    async def test_api_keyword_search_increments_metric(self) -> None:
+        """Verify keyword API searches increment the Prometheus counter"""
+        initial_count = await self._get_metric_count("keyword", "api")
+
+        search_url = reverse("search-list", kwargs={"version": "v4"})
+        await self.async_client.get(
+            search_url, {"q": "test query", "type": SEARCH_TYPES.OPINION}
+        )
+
+        final_count = await self._get_metric_count("keyword", "api")
+        self.assertEqual(final_count, initial_count + 1)
+
+    async def test_api_semantic_search_increments_metric(self) -> None:
+        """Verify semantic API searches increment the Prometheus counter"""
+        initial_count = await self._get_metric_count("semantic", "api")
+
+        search_url = reverse("search-list", kwargs={"version": "v4"})
+        await self.async_client.get(
+            search_url,
+            {
+                "q": "test query",
+                "type": SEARCH_TYPES.OPINION,
+                "semantic": True,
+            },
+        )
+
+        final_count = await self._get_metric_count("semantic", "api")
+        self.assertEqual(final_count, initial_count + 1)
+
+
+class PrometheusIntegrationWebTests(PrometheusIntegrationTestBase):
+    """Integration tests for Prometheus metrics with web searches"""
+
+    async def test_web_keyword_searches_accumulate(self) -> None:
+        """Verify multiple web searches accumulate correctly in Prometheus"""
+        initial_count = await self._get_metric_count("keyword", "web")
+
+        search_url = reverse("show_results")
+        for i in range(3):
+            await self.async_client.get(
+                search_url,
+                {"q": f"test query {i}", "type": SEARCH_TYPES.OPINION},
+            )
+
+        final_count = await self._get_metric_count("keyword", "web")
+        self.assertEqual(final_count, initial_count + 3)

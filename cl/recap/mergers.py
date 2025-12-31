@@ -949,11 +949,8 @@ async def add_docket_entries(
         # or throw an error.
         params = {"docket_entry": de}
         short_description = docket_entry.get("short_description")
-        if (
-            not docket_entry["document_number"]
-            and short_description
-            or is_scotus
-            and short_description
+        if short_description and (
+            not docket_entry["document_number"] or is_scotus
         ):
             params["description"] = docket_entry["short_description"]
 
@@ -992,9 +989,8 @@ async def add_docket_entries(
             if is_scotus:
                 # SCOTUS documents don't have a pacer_doc_id, so use the
                 # document_number instead to match the document.
-                doc_number = docket_entry.get("document_number")
                 get_params["document_number"] = (
-                    doc_number if doc_number else ""
+                    docket_entry.get("document_number") or ""
                 )
             if de_created is False:
                 # Try to match the RD regardless of the document_type.
@@ -2290,26 +2286,23 @@ def merge_scotus_docket(
         d.save()
 
         # Merge ScotusDocketMetadata
-        scotus_data = ScotusDocketMetadata.objects.filter(docket=d).first()
-        scotus_data = (
-            ScotusDocketMetadata(docket=d)
-            if scotus_data is None
-            else scotus_data
+        defaults = {
+            "capital_case": bool(report_data.get("capital_case")),
+            "date_discretionary_court_decision": report_data.get(
+                "discretionary_court_decision"
+            ),
+        }
+        if links := report_data.get("links"):
+            defaults["linked_with"] = links
+
+        if qp_url := report_data.get("questions_presented"):
+            defaults["questions_presented_url"] = qp_url
+
+        scotus_metadata, _ = ScotusDocketMetadata.objects.update_or_create(
+            docket=d,
+            defaults=defaults,
         )
-        scotus_data.capital_case = bool(
-            report_data.get("capital_case") or False
-        )
-        scotus_data.date_discretionary_court_decision = report_data.get(
-            "discretionary_court_decision"
-        )
-        links = report_data.get("links")
-        scotus_data.linked_with = links if links else scotus_data.linked_with
-        qp_url = report_data.get("questions_presented")
-        download_qp = qp_url and not scotus_data.questions_presented_file
-        scotus_data.questions_presented_url = (
-            qp_url if qp_url else scotus_data.questions_presented_url
-        )
-        scotus_data.save()
+        download_qp = qp_url and not scotus_metadata.questions_presented_file
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
