@@ -2008,6 +2008,10 @@ async def merge_attachment_page_data(
                 )
             except ValueError:
                 pass
+
+        if is_scotus:
+            rd.filepath_original_source = attachment["document_url"]
+
         await rd.asave()
 
     if not is_acms_attachment and not is_scotus:
@@ -2192,14 +2196,18 @@ def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
         entry["short_description"] = main_doc_short_desc
 
 
-def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
+def merge_scotus_docket(
+    report_data: dict[str, Any],
+) -> tuple[Docket, bool, list[int]] | None:
     """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
 
     This will create or update the Docket row for the SCOTUS and
     then create or update the related ScotusDocketMetadata instance.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
-    :return: The created or updated Docket instance.
+    :return: A three-tuple: the created or updated Docket instance, whether the
+    QP file should be downloaded, and the RECAPDocument instances that should
+    be downloaded.
     """
     with transaction.atomic():
         court = Court.objects.get(pk="scotus")
@@ -2297,6 +2305,7 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
         links = report_data.get("links")
         scotus_data.linked_with = links if links else scotus_data.linked_with
         qp_url = report_data.get("questions_presented")
+        download_qp = qp_url and not scotus_data.questions_presented_file
         scotus_data.questions_presented_url = (
             qp_url if qp_url else scotus_data.questions_presented_url
         )
@@ -2304,8 +2313,25 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    items_returned, rds_created, content_updated = async_to_sync(
-        add_docket_entries
-    )(d, report_data["docket_entries"])
+    _, rds_created, _ = async_to_sync(add_docket_entries)(
+        d, report_data["docket_entries"]
+    )
 
-    return d
+    # rds_created only represents the main documents that were created.
+    # We also need to retrieve the related attachment RECAPDocuments
+    # in order to download them.
+    docket_entries_ids = (
+        DocketEntry.objects.filter(
+            recap_documents__pk__in=[rd.pk for rd in rds_created]
+        )
+        .values("id")
+        .distinct()
+    )
+    rds_to_download = RECAPDocument.objects.filter(
+        docket_entry_id__in=docket_entries_ids
+    ).only("id", "filepath_original_source")
+    return (
+        d,
+        download_qp,
+        [rd.pk for rd in rds_to_download if rd.filepath_original_source],
+    )

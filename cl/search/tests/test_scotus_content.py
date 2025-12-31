@@ -4,8 +4,12 @@ from unittest import mock
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
-from cl.corpus_importer.tasks import download_qp_scotus_pdf
+from cl.corpus_importer.tasks import (
+    download_qp_scotus_pdf,
+    ingest_scotus_docket,
+)
 from cl.recap.mergers import merge_scotus_docket
+from cl.recap.tests.tests import mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -31,21 +35,26 @@ class ScotusDocketMergeTest(TestCase):
             jurisdiction="A",
         )
 
-    def test_merge_scotus_docket_creates_docket_and_metadata(self) -> None:
+    @mock.patch("cl.corpus_importer.tasks.logger.info")
+    @mock.patch(
+        "cl.corpus_importer.tasks.requests.get",
+    )
+    def test_merge_scotus_docket_creates_docket_and_metadata(
+        self, mock_get, mock_logger_info
+    ) -> None:
         """Confirm SCOTUS data is merged into Docket and metadata."""
 
+        att_1 = SCOTUSAttachmentFactory(
+            description="Main 1", document_number=23453
+        )
+        att_2 = SCOTUSAttachmentFactory(
+            description="Attachment 2", document_number=23453
+        )
         de_1 = SCOTUSDocketEntryFactory(
             description="lorem ipsum 1",
             date_filed=datetime.date(2015, 8, 19),
             document_number=23453,
-            attachments=[
-                SCOTUSAttachmentFactory(
-                    description="Main 1", document_number=23453
-                ),
-                SCOTUSAttachmentFactory(
-                    description="Attachment 2", document_number=23453
-                ),
-            ],
+            attachments=[att_1, att_2],
         )
         de_2 = SCOTUSDocketEntryFactory(
             description="lorem ipsum 2",
@@ -80,8 +89,20 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers_raw="Docket Num. 22-16375, Docket Num. 22-16622",
             docket_entries=[de_1, de_2, de_3, de_4],
         )
-        docket = merge_scotus_docket(data)
+
+        mock_response = mock.Mock()
+        mock_response.headers = {"content-type": "application/pdf"}
+        with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+            pdf_content = f.read()
+        mock_response.iter_content.return_value = [pdf_content]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value.__enter__.return_value = mock_response
+
+        ingest_scotus_docket(data)
+        docket = Docket.objects.all().first()
         docket.refresh_from_db()
+
+        self.assertEqual(mock_logger_info.call_count, 6)
 
         # Docket fields
         self.assertEqual(docket.court_id, self.court.pk)
@@ -113,10 +134,22 @@ class ScotusDocketMergeTest(TestCase):
             docket_entry__docket=docket, description="Main 1"
         ).first()
         self.assertEqual(rd_att_1.document_type, RECAPDocument.ATTACHMENT)
+
+        self.assertEqual(
+            rd_att_1.filepath_original_source, att_1["document_url"]
+        )
+        self.assertTrue(rd_att_1.filepath_local)
+        self.assertIn("UNITED", rd_att_1.plain_text)
+
         rd_att_2 = RECAPDocument.objects.filter(
             docket_entry__docket=docket, description="Attachment 2"
         ).first()
         self.assertEqual(rd_att_2.document_type, RECAPDocument.ATTACHMENT)
+        self.assertEqual(
+            rd_att_2.filepath_original_source, att_2["document_url"]
+        )
+        self.assertTrue(rd_att_2.filepath_local)
+        self.assertIn("UNITED", rd_att_2.plain_text)
 
         main_rds = RECAPDocument.objects.filter(
             docket_entry__docket=docket,
@@ -162,8 +195,11 @@ class ScotusDocketMergeTest(TestCase):
         )
 
         # Merge again. Confirm objects are not duplicated.
-        docket = merge_scotus_docket(data)
+        ingest_scotus_docket(data)
         docket.refresh_from_db()
+
+        # No additional calls to the download methods’ loggers.
+        self.assertEqual(mock_logger_info.call_count, 6)
 
         # Docket entries
         des = DocketEntry.objects.filter(docket=docket)
@@ -191,7 +227,7 @@ class ScotusDocketMergeTest(TestCase):
         data = ScotusDocketDataFactory(
             docket_number="23A1434", case_name="Old Name", capital_case=False
         )
-        docket = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         dockets = Docket.objects.all()
@@ -207,7 +243,7 @@ class ScotusDocketMergeTest(TestCase):
             linked_with="23-6433",
             lower_court_case_numbers=["23-6433"],
         )
-        updated_docket = merge_scotus_docket(data)
+        updated_docket, _, _ = merge_scotus_docket(data)
         updated_docket.refresh_from_db()
         self.assertEqual(dockets.count(), 1)
         self.assertEqual(scotus_metadata.count(), 1)
@@ -321,7 +357,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers=["10-1000"],
         )
 
-        docket = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -348,7 +384,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers=["10-2000"],
         )
 
-        docket = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -376,7 +412,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers=["10-3000"],
         )
 
-        docket = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])

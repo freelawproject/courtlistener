@@ -3,20 +3,22 @@ import logging
 import os
 import re
 import shutil
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import IO, Any
 
 import environ
 import eyecite
 import internetarchive as ia
 import requests
 from asgiref.sync import async_to_sync
-from celery import Task
+from celery import Task, chain
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -67,7 +69,7 @@ from requests.exceptions import (
     HTTPError,
     ReadTimeout,
     RequestException,
-    Timeout,
+    Timeout
 )
 from rest_framework.renderers import JSONRenderer
 from sentry_sdk import capture_exception
@@ -128,6 +130,7 @@ from cl.recap.mergers import (
     find_docket_object,
     make_recap_sequence_number,
     merge_pacer_docket_into_cl_docket,
+    merge_scotus_docket,
     process_case_query_report,
     save_iquery_to_docket,
     update_docket_metadata,
@@ -139,7 +142,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf_base
+from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
@@ -3179,13 +3182,60 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         )
 
 
+@contextmanager
+def download_pdf_in_stream(
+    url: str,
+    identifier: str | int,
+    temp_prefix: str = "scotus_",
+) -> Iterator[IO[bytes] | None]:
+    """Download a PDF in stream and yield a temporary file to avoid using too
+    much memory
+
+    :param url: The URL to download the PDF from
+    :param identifier: An identifier for logging (docket_id, rd.pk, etc.)
+    :param temp_prefix: Prefix for the temporary file name
+    :yields: A NamedTemporaryFile positioned at the beginning, or None if
+    the response is not a PDF
+    """
+
+    @retry(
+        (ConnectionError, Timeout),
+        tries=3,
+        delay=0.25,
+        backoff=1,
+    )
+    def download_to_file(tmp_file):
+        tmp_file.seek(0)
+        # Clear any partial content from previous attempt
+        tmp_file.truncate()
+        with requests.get(
+            url,
+            stream=True,
+            timeout=60,
+            headers={"User-Agent": "Free Law Project"},
+        ) as response:
+            response.raise_for_status()
+            if not is_pdf(response):
+                logger.warning(
+                    "PDF download: Expected application/pdf for %s from %s; aborting.",
+                    identifier,
+                    url,
+                )
+                return False
+            for chunk in response.iter_content(chunk_size=8 * 1024):
+                if chunk:
+                    tmp_file.write(chunk)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            return True
+
+    with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
+        success = download_to_file(tmp)
+        yield tmp if success else None
+
+
 @app.task(
     bind=True,
-    autoretry_for=(
-        ConnectionError,
-        Timeout,
-    ),
-    max_retries=5,
     ignore_result=True,
 )
 def download_qp_scotus_pdf(self, docket_id: int) -> None:
@@ -3232,54 +3282,120 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         docket_id,
         qp_url,
     )
-    try:
-        with requests.get(
-            qp_url,
-            stream=True,
-            timeout=60,
-            headers={"User-Agent": "Free Law Project"},
-        ) as response:
-            response.raise_for_status()
-            if not is_pdf(response):
-                logger.warning(
-                    "SCOTUS PDF download: Expected application/pdf for docket %s "
-                    "from %s; aborting.",
-                    docket_id,
-                    qp_url,
-                )
-                return None
-            with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
-                # Download the PDF into a tmp file to avoid using too much memory
-                for chunk in response.iter_content(chunk_size=8 * 1024):
-                    if chunk:
-                        tmp.write(chunk)
+    with download_pdf_in_stream(qp_url, docket_id, "scotus_qp_") as tmp:
+        if tmp is None:
+            return None
 
-                # Ensure the buffer is flushed to disk before reading the file
-                tmp.flush()
-                # Move the file pointer to the beginning so it reads the whole file
-                tmp.seek(0)
+        filename = f"{docket_id}-qp.pdf"
+        scotus_meta.questions_presented_file.save(
+            filename, File(tmp), save=True
+        )
+    logger.info(
+        "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
+        docket_id,
+    )
 
-                filename = f"{docket_id}-qp.pdf"
-                scotus_meta.questions_presented_file.save(
-                    filename,
-                    File(tmp),
-                    save=True,
-                )
-            logger.info(
-                "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
-                docket_id,
-            )
-    except RequestException as exc:
-        if self.request.retries == self.max_retries:
+
+@app.task(bind=True)
+def process_scotus_docket(
+    self, report_data: dict[str, Any]
+) -> list[int] | None:
+    """Process and merge a SCOTUS docket report.
+
+    This task merges the provided SCOTUS docket report data into the database,
+    triggers the asynchronous download of related PDFs, and controls task
+    chaining behavior based on whether new RECAPDocument records were created.
+
+    :param self: The Celery task instance.
+    :param report_data: Parsed SCOTUS docket report data.
+    :return: A list of RECAPDocuments created that need to be downloaded or
+    None if no documents were created.
+    """
+    docket, download_qp, rds_to_download = merge_scotus_docket(report_data)
+    if download_qp:
+        download_qp_scotus_pdf.delay(docket.pk)
+    if not rds_to_download:
+        self.request.chain = None
+    return rds_to_download
+
+
+@app.task()
+def merge_scotus_documents(rds_to_download: list[int]) -> list[int] | None:
+    """Download and persist SCOTUS PDF documents for newly created records.
+
+    Given a list of RECAPDocument PKs, this task fetches the associated
+    SCOTUS PDFs, stores them, computes metadata, and marks the documents
+    as available. Documents that are already available are skipped.
+
+    :param rds_to_download: A list of RECAPDocuments created that need to be
+    downloaded.
+    :return: The list of RECAPDocument PKs downloaded that require extraction.
+    """
+    rds_objs_to_download = RECAPDocument.objects.filter(
+        pk__in=rds_to_download
+    ).only(
+        "pk",
+        "filepath_original_source",
+        "document_number",
+        "attachment_number",
+        "docket_entry__docket__docket_number",
+    )
+    rds_to_extract = []
+    for rd in rds_objs_to_download:
+        scotus_url = rd.filepath_original_source
+        rd_id = rd.pk
+        if rd.is_available:
             logger.warning(
-                "SCOTUS PDF download: Unable to download %s for docket %s. "
-                "Exception was: %s",
-                qp_url,
-                docket_id,
-                str(exc),
+                "The SCOTUS document for % is already available; skipping.",
+                rd_id,
             )
             return None
+
         logger.info(
-            "SCOTUS PDF download: Ran into a RequestException. Retrying."
+            "Fetching SCOTUS PDF for RD %s from %s",
+            rd_id,
+            scotus_url,
         )
-        raise self.retry(exc=exc)
+        with download_pdf_in_stream(scotus_url, rd_id, "scotus_doc_") as tmp:
+            if tmp is None:
+                return None
+
+            file_name = get_document_filename(
+                "scotus",
+                rd.docket_entry.docket.docket_number,
+                rd.document_number,
+                rd.attachment_number,
+            )
+            rd.filepath_local.save(file_name, File(tmp), save=False)
+            rd.file_size = rd.filepath_local.size
+            rd.is_available = True
+            rd.date_upload = rd.date_upload or now()
+
+            tmp.seek(0)
+            rd.sha1 = sha1(tmp.read())
+
+            response = async_to_sync(rd_page_count_service)(rd)
+            if response.is_success:
+                rd.page_count = int(response.text)
+            assert isinstance(rd.page_count, (int | type(None))), (
+                "page_count must be an int or None."
+            )
+            rd.save()
+            rds_to_extract.append(rd_id)
+
+    return rds_to_extract
+
+
+def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
+    """Trigger the SCOTUS docket ingestion task chain that processes a SCOTUS
+    docket report, downloads and merges related documents, and extracts
+    document text from the resulting PDFs.
+
+    :param docket_data: Parsed SCOTUS docket report data.
+    :return: None.
+    """
+    return chain(
+        process_scotus_docket.si(docket_data),
+        merge_scotus_documents.s(),
+        extract_recap_pdf.s(),
+    ).apply_async()

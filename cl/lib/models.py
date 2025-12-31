@@ -116,6 +116,11 @@ class AbstractPDF(models.Model):
         null=True,
         blank=True,
     )
+    filepath_original_source = models.CharField(
+        help_text="The URL of the file from the original source",
+        max_length=1000,
+        blank=True,
+    )
 
     class Meta:
         abstract = True
