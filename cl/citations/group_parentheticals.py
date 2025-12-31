@@ -90,6 +90,7 @@ def compute_parenthetical_groups(
     :param parentheticals: A list of parentheticals to organize into groups
     :return: A list of ComputedParentheticalGroup's containing the given parentheticals
     """
+    get_parenthetical_tokens.cache_clear()
     if len(parentheticals) == 0:
         return []
 
@@ -271,3 +272,4 @@ def get_parenthetical_tokens(text: str) -> list[str]:
         del tokens[0]
     tokens = stemmer.stemWords(tokens)
     return tokens
+    
