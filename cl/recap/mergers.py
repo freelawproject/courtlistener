@@ -2306,25 +2306,31 @@ def merge_scotus_docket(
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    _, rds_created, _ = async_to_sync(add_docket_entries)(
+    de_and_rds_updated, rds_created, _ = async_to_sync(add_docket_entries)(
         d, report_data["docket_entries"]
     )
+    _, rds_updated = de_and_rds_updated
 
     # rds_created only represents the main documents that were created.
     # We also need to retrieve the related attachment RECAPDocuments
     # in order to download them.
+    rds_related = rds_updated + rds_created
     docket_entries_ids = (
         DocketEntry.objects.filter(
-            recap_documents__pk__in=[rd.pk for rd in rds_created]
+            recap_documents__pk__in=[rd.pk for rd in rds_related]
         )
         .values("id")
         .distinct()
     )
     rds_to_download = RECAPDocument.objects.filter(
         docket_entry_id__in=docket_entries_ids
-    ).only("id", "document_url")
+    ).only("id", "document_url", "is_available")
     return (
         d,
         download_qp,
-        [rd.pk for rd in rds_to_download if rd.document_url],
+        [
+            rd.pk
+            for rd in rds_to_download
+            if rd.document_url and not rd.is_available
+        ],
     )
