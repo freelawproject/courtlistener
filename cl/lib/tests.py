@@ -1704,6 +1704,17 @@ class TestQueryWrapper(TestCase):
         self.assertEqual(result["url"], "/anonymous/path/")
         self.assertEqual(result["url-name"], "anon-view")
 
+    @override_settings(SQLCOMMENTER_MAX_PATH_LENGTH=10)
+    def test_get_context_truncates_path(self):
+        request = self.request_factory.get("/very/long/path/")
+        request.user = self.user
+        request.resolver_match = self.MockResolverMatch(view_name="test-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context
+
+        self.assertEqual(result["url"], "/very/long…")
+
 
 class TestSqlCommenterMiddleware(TestCase):
     """Integration tests for SqlCommenter middleware"""

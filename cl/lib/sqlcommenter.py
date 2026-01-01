@@ -3,6 +3,7 @@ from functools import cached_property
 from typing import Any
 from urllib.parse import quote
 
+from django.conf import settings
 from django.db import connections
 
 
@@ -77,11 +78,6 @@ class QueryWrapper:
     def get_context(self) -> dict[str, Any]:
         """
         Extract relevant context information from the request for SQL comments.
-
-        This helper mirrors the behavior and intent of the `get_context` method in
-        `pghistory.middleware.HistoryMiddleware`, providing similar request-scoped
-        metadata (such as the current user and request path) for use in query
-        annotation.
         """
         user = (
             self.request.user.pk
@@ -89,10 +85,17 @@ class QueryWrapper:
             and self.request.user.is_authenticated
             else None
         )
+
+        path = None
         resolver_match = self.request.resolver_match
+        if resolver_match:
+            path = self.request.path
+            if path and len(path) > settings.SQLCOMMENTER_MAX_PATH_LENGTH:
+                path = f"{path[: settings.SQLCOMMENTER_MAX_PATH_LENGTH]}…"
+
         return {
             "user_id": user,
-            "url": self.request.path if resolver_match else None,
+            "url": path,
             "url-name": resolver_match.view_name if resolver_match else None,
         }
 
