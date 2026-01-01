@@ -56,7 +56,7 @@ SIMILARITY_THRESHOLD = 0.5
 _EMPTY_SIMILARITY_INDEX = MinHashLSH(
     threshold=SIMILARITY_THRESHOLD, num_perm=64
 )
-_EMPTY_MHASH = MinHash(num_perm=64, seed=42)
+_EMPTY_MHASH = MinHash(num_perm=64)
 
 # We initialize the stemmer once and reuse it because it internally caches
 # frequently seen tokens, giving us a performance benefit if we reuse it.
