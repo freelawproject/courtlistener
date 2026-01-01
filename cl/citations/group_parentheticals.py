@@ -101,8 +101,6 @@ def compute_parenthetical_groups(
     for par in parentheticals:
         mhash = deepcopy(_EMPTY_MHASH)
         tokens = get_parenthetical_tokens(par.text)
-        if not tokens:
-            continue
         mhash.update_batch([gram.encode("utf-8") for gram in tokens])
 
         par_key = str(par.id)
