@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.13.*"
 
 [[package]]
@@ -475,7 +475,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.0.2" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.96" },
+    { name = "juriscraper", specifier = ">=2.7.0" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=5.3.1" },
     { name = "markdown2", specifier = ">=2.5.0" },

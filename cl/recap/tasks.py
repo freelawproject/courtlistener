@@ -3,7 +3,6 @@ import concurrent.futures
 import hashlib
 import json
 import logging
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
@@ -15,7 +14,6 @@ from zipfile import ZipFile
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
 from botocore import exceptions as botocore_exception
-from bs4 import BeautifulSoup
 from celery import Task
 from celery.canvas import chain
 from django.conf import settings
@@ -41,8 +39,11 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
-from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
-from juriscraper.scotus.scotus_email import EmailType
+from juriscraper.scotus import SCOTUSEmail
+from juriscraper.scotus.scotus_email import (
+    SCOTUSConfirmationResult,
+    SCOTUSEmailType,
+)
 from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
@@ -3646,15 +3647,21 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
 )
 def process_scotus_email(
     self: Task, epq: EmailProcessingQueue
-) -> dict[str, Any] | None:
-    """Task to process an email added to the queue from the "scrapers/scotus-email" endpoint. If the email is a case
-    notification email, fetch the docket page and return the scraped data. If the email is a confirmation email, fetch
-    the confirmation page, throwing an error if it indicates that subscription confirmation failed and return `None`.
-    Otherwise, set an error in the processing queue indicating the email type was unrecognized and return `None`.
+) -> dict[str, str] | None:
+    """Task to process an email added to the queue from the
+    "scrapers/scotus-email" endpoint. If the email is a case
+    notification email, fetch the docket page and return the scraped data.
+    If the email is a confirmation email, fetch
+    the confirmation page, throwing an error if it indicates that
+    subscription confirmation failed and return `None`.
+    Otherwise, set an error in the processing queue indicating the email
+    type was unrecognized and return `None`.
 
     :param self: The Celery task
-    :param epq: The EmailProcessingQueue object representing the email to process
-    :return: The scraped data from the docket page for update emails; `None` in all other cases"""
+    :param epq: The EmailProcessingQueue object representing the email to
+    process
+    :return: The scraped data from the docket page for update emails; `None` in
+    all other cases"""
     async_to_sync(mark_pq_status)(
         epq,
         "Processing SCOTUS email",
@@ -3678,10 +3685,11 @@ def process_scotus_email(
 
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)
-    data = scotus_email.data
-    email_type = data["email_type"]
+    handling_result = scotus_email.handle_email()
+    email_type = handling_result["email_type"]
+    data = handling_result["data"]
 
-    if email_type == EmailType.INVALID:
+    if email_type == SCOTUSEmailType.INVALID.value:
         async_to_sync(mark_pq_status)(
             epq,
             "SCOTUS email format is invalid or not recognized.",
@@ -3690,85 +3698,22 @@ def process_scotus_email(
         )
         return None
 
-    if email_type == EmailType.CONFIRMATION:
-        confirmation_link = data["confirmation_link"]
-        response = requests.get(confirmation_link)
-        response.raise_for_status()
-        # The confirmation page by default displays all response messages and uses
-        # a (presumably) server-generated if/else chain with conditions set to `true`
-        # or `false` to determine which message to display. A better solution would be
-        # to either render the page with JS enabled or to parse the script tag into an
-        # AST, but this works for now.
-        document = BeautifulSoup(response.text, "lxml")
-        body_content = document.find("div", class_="body-content")
-        script_tag = body_content.find("script")
-        script = script_tag.text
-        match = re.search(r"true\)\s\{([^}]+)", script)
-        statement_body = match.group(1)
-        visibility_calls = [
-            line.strip() for line in statement_body.split("\n")[2:-1]
-        ]
-        visibility_re = re.compile(r"^\$\(\'#(.+)\'\)\.(show|hide)\(\);$")
-        visibility_matches = [
-            visibility_re.match(call) for call in visibility_calls
-        ]
-        visibility_flags = dict(
-            map(
-                lambda visibility_match: (
-                    visibility_match.group(1),
-                    True if visibility_match.group(2) == "show" else False,
-                ),
-                visibility_matches,
-            )
-        )
-        ok = visibility_flags["divOk"]
-
-        if ok:
-            # Successfully subscribed
+    if email_type == SCOTUSEmailType.CONFIRMATION:
+        if data == SCOTUSConfirmationResult.Success.value:
             async_to_sync(mark_pq_status)(
                 epq,
-                "Successfully confirmed subscription to SCOTUS updates!",
+                "Successfully confirmed SCOTUS subscription.",
                 PROCESSING_STATUS.SUCCESSFUL,
                 "status_message",
             )
             return None
 
-        failure_reason = next(
-            flag[0] for flag in visibility_flags.items() if flag[1]
-        )
-        if failure_reason in [
-            "divBadRequest",
-            "divFail",
-            "divNoVerifyMessage",
-        ]:
-            raise self.retry()
-        failure_reason_map = {
-            "divLinkExpired": "Confirmation link expired",
-            "divNotFound": "The email address is not subscribed",
-            "divDuplicate": "Already subscribed to this case",
-        }
         async_to_sync(mark_pq_status)(
             epq,
-            f"Failed to confirm subscription to SCOTUS updates :( Reason: {failure_reason_map[failure_reason]}",
+            "Failed to confirm SCOTUS subscription.",
             PROCESSING_STATUS.FAILED,
             "status_message",
         )
         return None
 
-    if email_type == EmailType.DOCKET_ENTRY:
-        case_url = data["case_url"]
-        response = requests.get(case_url)
-        response.raise_for_status()
-
-        scotus_docket_html = SCOTUSDocketReportHTML()
-        scotus_docket_html._parse_text(response.text)
-
-        return scotus_docket_html.data
-
-    async_to_sync(mark_pq_status)(
-        epq,
-        f'Unrecognized SCOTUS email type: "{email_type}".',
-        PROCESSING_STATUS.INVALID_CONTENT,
-        "status_message",
-    )
-    return None
+    return data
