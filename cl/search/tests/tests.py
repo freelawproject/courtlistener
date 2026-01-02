@@ -1833,6 +1833,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     @override_flag("store-search-queries", active=True)
+    @override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functions")
     def test_basic_homepage_search_and_signin_and_signout(self) -> None:
         wait = WebDriverWait(self.browser, 1)
 
@@ -1997,6 +1998,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
 @override_flag("store-search-api-queries", active=True)
 @override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_save_search_query")
 class SaveSearchQueryTest(TestCase):
     def setUp(self) -> None:
         self.client = Client()
