@@ -100,6 +100,7 @@ from cl.recap.mergers import (
     get_data_from_att_report,
     merge_attachment_page_data,
     merge_pacer_docket_into_cl_docket,
+    merge_scotus_docket,
     process_orphan_documents,
     update_docket_appellate_metadata,
     update_docket_metadata,
@@ -3645,23 +3646,19 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     retry_backoff=2 * 60,
     retry_backoff_max=60 * 60,
 )
-def process_scotus_email(
-    self: Task, epq: EmailProcessingQueue
-) -> dict[str, str] | None:
+def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
     """Task to process an email added to the queue from the
-    "scrapers/scotus-email" endpoint. If the email is a case
-    notification email, fetch the docket page and return the scraped data.
-    If the email is a confirmation email, fetch
-    the confirmation page, throwing an error if it indicates that
-    subscription confirmation failed and return `None`.
+    "scrapers/scotus-email" endpoint. If the email is a case notification
+    email, fetch the docket page and return the scraped data.
+    If the email is a confirmation email, fetch the confirmation page,
+    throwing an error if it indicates that subscription confirmation failed.
     Otherwise, set an error in the processing queue indicating the email
-    type was unrecognized and return `None`.
+    type was unrecognized.
 
     :param self: The Celery task
     :param epq: The EmailProcessingQueue object representing the email to
     process
-    :return: The scraped data from the docket page for update emails; `None` in
-    all other cases"""
+    """
     async_to_sync(mark_pq_status)(
         epq,
         "Processing SCOTUS email",
@@ -3679,7 +3676,7 @@ def process_scotus_email(
                 PROCESSING_STATUS.FAILED,
                 "status_message",
             )
-            return None
+            return
         else:
             raise self.retry(exc=exc)
 
@@ -3696,7 +3693,7 @@ def process_scotus_email(
             PROCESSING_STATUS.INVALID_CONTENT,
             "status_message",
         )
-        return None
+        return
 
     if email_type == SCOTUSEmailType.CONFIRMATION:
         if data == SCOTUSConfirmationResult.Success.value:
@@ -3706,7 +3703,7 @@ def process_scotus_email(
                 PROCESSING_STATUS.SUCCESSFUL,
                 "status_message",
             )
-            return None
+            return
 
         async_to_sync(mark_pq_status)(
             epq,
@@ -3714,6 +3711,22 @@ def process_scotus_email(
             PROCESSING_STATUS.FAILED,
             "status_message",
         )
-        return None
+        return
+    try:
+        merge_scotus_docket(data)
+    except Exception as e:
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"SCOTUS docket update error: {e}",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+    finally:
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"SCOTUS docket {data['docket_number']} updated successfully.",
+            PROCESSING_STATUS.SUCCESSFUL,
+            "status_message",
+        )
 
-    return data
+    return

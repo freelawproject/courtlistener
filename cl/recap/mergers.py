@@ -2195,6 +2195,7 @@ def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
     then create or update the related ScotusDocketMetadata instance.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
+    :raise ValueError: If the docket number is missing.
     :return: The created or updated Docket instance.
     """
     with transaction.atomic():
