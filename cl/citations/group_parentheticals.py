@@ -254,6 +254,8 @@ def get_representative_parenthetical(
         # The number of neighbors each parenthetical has
         key=lambda par: len(similarity_graph[str(par.id)]),
     )
+
+
 # Cache tokenization results to reduce repeated work during clustering,
 # which frequently processes many identical or near-identical parentheticals.
 # Benchmarks show >99% cache hit rates in realistic workloads, and a ~65×
