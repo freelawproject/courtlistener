@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='opinioncluster',
             name='filepath_xml_scan',
-            field=models.FileField(blank=True, help_text='The XML obtained from LLM containing all available metadata and opinion.', storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
+            field=models.FileField(blank=True, help_text='The XML obtained from LLM containing all available metadata and opinion(s).', storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
         ),
         migrations.AddField(
             model_name='opinionclusterevent',
@@ -60,7 +60,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='opinionclusterevent',
             name='filepath_xml_scan',
-            field=models.FileField(blank=True, help_text='The XML obtained from LLM containing all available metadata and opinion.', storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
+            field=models.FileField(blank=True, help_text='The XML obtained from LLM containing all available metadata and opinion(s).', storage=cl.lib.storage.IncrementingAWSMediaStorage(), upload_to=cl.lib.model_helpers.make_upload_path),
         ),
         migrations.AlterField(
             model_name='docket',
