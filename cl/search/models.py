@@ -3153,6 +3153,9 @@ class Opinion(AbstractDateTimeModel):
     xml_harvard = models.TextField(
         help_text="XML of Harvard CaseLaw Access Project opinion", blank=True
     )
+    xml_scanning = models.TextField(
+        help_text="XML of Scanning Project", blank=True
+    )
     html_with_citations = models.TextField(
         help_text=(
             "HTML of the document with citation links and other "
