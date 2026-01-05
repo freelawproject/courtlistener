@@ -122,24 +122,23 @@ def import_tn_corpus(
             )
 
         # oci - originating_court_information is always `None`` for this import
-        docket, opinion, cluster, citations, oci = make_objects(
+        docket, opinions, cluster, citations, oci = make_objects(
             make_item(case),
             courts[case["court"]],
-            sha1_hash,
-            pdf_data,
+            [(make_item(case), pdf_data, sha1_hash)],
         )
 
         save_everything(
             items={
                 "docket": docket,
-                "opinion": opinion,
+                "opinions": opinions,
                 "cluster": cluster,
                 "citations": citations,
             }
         )
 
         extract_opinion_content.delay(
-            opinion.pk,
+            opinions[0].pk,
             ocr_available=ocr_available,
         )
         logging.info(
