@@ -41,8 +41,14 @@ from cl.search.models import (
 )
 from cl.search.tasks import remove_document_from_es_index
 
+
 MIN_SEQUENCE_SIMILARITY_STRICT = 0.9
 MIN_SEQUENCE_SIMILARITY_LOOSE = 0.7
+
+# Length ratio threshold to prevent merging texts with vastly different lengths
+# A ratio of 0.5 means texts must be within 2x length of each other
+MIN_LENGTH_RATIO = 0.5
+
 DRY_RUN = False
 
 
@@ -386,7 +392,30 @@ def clean_opinion_text(opinion: Opinion) -> str:
     return re.sub(r"\s+", " ", opinion.plain_text)
 
 
-def get_text_similarity(text1: str, text2: str) -> tuple[bool, float, float]:
+def passes_length_ratio_check(
+    text1: str, text2: str, min_ratio: float = MIN_LENGTH_RATIO
+) -> tuple[bool, float]:
+    """Check if two texts have comparable lengths before comparing similarity.
+
+    :param text1: first text to compare
+    :param text2: second text to compare
+    :param min_ratio: minimum acceptable ratio of shorter to longer text.
+        Default 0.5 means texts must be within 2x length of each other.
+    :return: tuple of (passes_check, length_ratio)
+    """
+    len1, len2 = len(text1), len(text2)
+
+    # Handle edge cases
+    if len1 == 0 and len2 == 0:
+        return True, 1.0
+    if len1 == 0 or len2 == 0:
+        return False, 0.0
+
+    ratio = min(len1, len2) / max(len1, len2)
+    return ratio >= min_ratio, ratio
+
+
+def get_text_similarity(text1: str, text2: str) -> tuple[bool, bool, float, float]:
     """Check if the text from both opinions is the same or very similar
 
     A single character difference yields a 0.999 ratio
@@ -808,6 +837,24 @@ def merge_versions_by_text_similarity(
             continue
 
         version_text = clean_opinion_text(version)
+
+        # Check length ratio before expensive similarity calculation
+        passes_length_check, length_ratio = passes_length_ratio_check(
+            main_text, version_text
+        )
+        if not passes_length_check:
+            stats["failed length ratio check"] += 1
+            logger.warning(
+                "Data quality issue: opinions %s and %s have vastly different "
+                "text lengths (ratio: %.3f, lengths: %d/%d). Skipping merge.",
+                main_opinion.id,
+                version.id,
+                length_ratio,
+                len(main_text),
+                len(version_text),
+            )
+            continue
+
         text_is_strictly_similar, text_is_loosely_similar, ratio1, ratio2 = (
             get_text_similarity(main_text, version_text)
         )
