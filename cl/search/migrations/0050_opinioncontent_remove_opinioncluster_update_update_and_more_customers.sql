@@ -9,6 +9,11 @@ CREATE TABLE "search_opinioncontent" ("id" integer NOT NULL PRIMARY KEY GENERATE
 ALTER TABLE "search_opinioncluster" ADD COLUMN "filepath_pdf_scan" varchar(100) DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "filepath_pdf_scan" DROP DEFAULT;
 --
+-- Add field filepath_xml_scan to opinioncluster
+--
+ALTER TABLE "search_opinioncluster" ADD COLUMN "filepath_xml_scan" varchar(100) DEFAULT '' NOT NULL;
+ALTER TABLE "search_opinioncluster" ALTER COLUMN "filepath_xml_scan" DROP DEFAULT;
+--
 -- Alter field source on docket
 --
 -- (no-op)

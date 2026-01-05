@@ -2417,6 +2417,12 @@ class OpinionCluster(AbstractDateTimeModel):
         storage=IncrementingAWSMediaStorage(),
         blank=True,
     )
+    filepath_xml_scan = models.FileField(
+        help_text="The XML obtained from LLM containing all available metadata and opinion(s).",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
     filepath_pdf_scan = models.FileField(
         help_text="The case PDF from the Scanning Project",
         upload_to=make_upload_path,
