@@ -41,7 +41,6 @@ from cl.search.models import (
 )
 from cl.search.tasks import remove_document_from_es_index
 
-
 MIN_SEQUENCE_SIMILARITY_STRICT = 0.9
 MIN_SEQUENCE_SIMILARITY_LOOSE = 0.7
 
@@ -415,7 +414,9 @@ def passes_length_ratio_check(
     return ratio >= min_ratio, ratio
 
 
-def get_text_similarity(text1: str, text2: str) -> tuple[bool, bool, float, float]:
+def get_text_similarity(
+    text1: str, text2: str
+) -> tuple[bool, bool, float, float]:
     """Check if the text from both opinions is the same or very similar
 
     A single character difference yields a 0.999 ratio
