@@ -8,7 +8,7 @@ import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.cache import caches
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
@@ -252,8 +252,10 @@ async def es_get_related_clusters_with_cache(
     :param request:The user request
     :return:Related Cluster Data
     """
-    cache = caches["db_cache"]
-    mlt_cache_key = f"clusters-mlt-es:{cluster.pk}"
+    cache = get_s3_cache("db_cache")
+    mlt_cache_key = make_s3_cache_key(
+        f"clusters-mlt-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
     # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
     # attributes (since they're indexed in ES) instead of the NAMES values.
     search_params: CleanData = {}
@@ -350,8 +352,10 @@ async def es_get_cited_clusters_with_cache(
     :param request:The user request
     :return:The cited by data
     """
-    cache = caches["db_cache"]
-    cache_citing_key = f"clusters-cited-es:{cluster.pk}"
+    cache = get_s3_cache("db_cache")
+    cache_citing_key = make_s3_cache_key(
+        f"clusters-cited-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
 
     sub_opinion_pks = [
         str(pk)
@@ -426,9 +430,13 @@ async def es_get_citing_and_related_clusters_with_cache(
     and a boolean indicating whether the query timed out.
     """
 
-    cache = caches["db_cache"]
-    cache_citing_key = f"clusters-cited-es:{cluster.pk}"
-    mlt_cache_key = f"clusters-mlt-es:{cluster.pk}"
+    cache = get_s3_cache("db_cache")
+    cache_citing_key = make_s3_cache_key(
+        f"clusters-cited-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
+    mlt_cache_key = make_s3_cache_key(
+        f"clusters-mlt-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
     # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
     # attributes (since they're indexed in ES) instead of the NAMES values.
     search_params: CleanData = {}
@@ -565,8 +573,10 @@ async def es_cited_case_count(
     :param sub_opinion_pks: The subopinion ids of the cluster
     :return: Opinion Cited Count
     """
-    cache = caches["db_cache"]
-    cache_cited_by_key = f"cited-by-count-es:{cluster_id}"
+    cache = get_s3_cache("db_cache")
+    cache_cited_by_key = make_s3_cache_key(
+        f"cited-by-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
+    )
     cached_cited_by_count = await cache.aget(cache_cited_by_key) or None
     if cached_cited_by_count is not None:
         return cached_cited_by_count
@@ -608,8 +618,10 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
         # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
         return 0
 
-    cache = caches["db_cache"]
-    cache_related_cases_key = f"related-cases-count-es:{cluster_id}"
+    cache = get_s3_cache("db_cache")
+    cache_related_cases_key = make_s3_cache_key(
+        f"related-cases-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
+    )
     cached_related_cases_count = (
         await cache.aget(cache_related_cases_key) or None
     )
