@@ -3675,7 +3675,8 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
                 PROCESSING_STATUS.FAILED,
                 "status_message",
             )
-            return
+            self.request.chain = None
+            return None
         else:
             raise self.retry(exc=exc)
 
@@ -3692,7 +3693,8 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
             PROCESSING_STATUS.INVALID_CONTENT,
             "status_message",
         )
-        return
+        self.request.chain = None
+        return None
 
     if email_type == SCOTUSEmailType.CONFIRMATION:
         if data == SCOTUSConfirmationResult.Success.value:
@@ -3702,7 +3704,8 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
                 PROCESSING_STATUS.SUCCESSFUL,
                 "status_message",
             )
-            return
+            self.request.chain = None
+            return None
 
         async_to_sync(mark_pq_status)(
             epq,
@@ -3710,9 +3713,10 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
             PROCESSING_STATUS.FAILED,
             "status_message",
         )
-        return
+        self.request.chain = None
+        return None
     try:
-        merge_scotus_docket(data)
+        d = merge_scotus_docket(data)
     except Exception as e:
         async_to_sync(mark_pq_status)(
             epq,
@@ -3721,11 +3725,14 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
             "status_message",
         )
     else:
-        async_to_sync(mark_pq_status)(
+        async_to_sync(associate_related_instances)(
             epq,
-            f"SCOTUS docket {data['docket_number']} updated successfully.",
-            PROCESSING_STATUS.SUCCESSFUL,
-            "status_message",
+            d_id=d.pk,
+            de_id=None,
+            rd_id=None,
         )
+        msg = f"SCOTUS docket {data['docket_number']} updated successfully."
+        status = PROCESSING_STATUS.SUCCESSFUL
+        async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
 
-    return
+    return None
