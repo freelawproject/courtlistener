@@ -48,6 +48,7 @@ from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
+from storages.backends.s3 import S3Storage
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.alerts.utils import (
@@ -87,7 +88,7 @@ from cl.lib.pacer_session import (
     get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import get_document_filename
-from cl.lib.storage import RecapEmailSESStorage
+from cl.lib.storage import RecapEmailSESStorage, SCOTUSSESStorage
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -133,9 +134,8 @@ logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
 
 
-def retrieve_email_from_queue(epq: EmailProcessingQueue):
+def retrieve_email_from_queue(epq: EmailProcessingQueue, bucket: S3Storage):
     message_id = epq.message_id
-    bucket = RecapEmailSESStorage
     # Try to read the file using utf-8.
     # If it fails, fallback on iso-8859-1
     try:
@@ -3106,7 +3106,7 @@ def open_and_validate_email_notification(
     """
 
     try:
-        body = retrieve_email_from_queue(epq)
+        body = retrieve_email_from_queue(epq, RecapEmailSESStorage())
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             msg = "File not found."
@@ -3639,7 +3639,6 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
         requests.ConnectionError,
         requests.RequestException,
         requests.ReadTimeout,
-        PacerLoginException,
         RedisConnectionError,
     ),
     max_retries=10,
@@ -3667,7 +3666,7 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
     )
 
     try:
-        body = retrieve_email_from_queue(epq)
+        body = retrieve_email_from_queue(epq, SCOTUSSESStorage())
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             async_to_sync(mark_pq_status)(
@@ -3721,7 +3720,7 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
             PROCESSING_STATUS.FAILED,
             "status_message",
         )
-    finally:
+    else:
         async_to_sync(mark_pq_status)(
             epq,
             f"SCOTUS docket {data['docket_number']} updated successfully.",
