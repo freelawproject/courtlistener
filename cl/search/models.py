@@ -40,6 +40,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.model_helpers import (
     CSVExportMixin,
+    document_model,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
@@ -3969,3 +3970,64 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
     class Meta:
         verbose_name = "SCOTUS Docket Metadata"
         verbose_name_plural = "SCOTUS Docket Metadata"
+
+
+@pghistory.track()
+@document_model
+class CaseTransfer(AbstractDateTimeModel):
+    """
+    Represents any transfer of a docket between two courts whether that be
+    an appeal, workload balancing, or docket merging.
+
+    :ivar origin_court: The court this transfer originates from.
+    :ivar origin_docket: The docket this transfer originates from.
+    :ivar destination_court: The court the docket is being transferred to.
+    :ivar destination_docket: The case docket in the destination court.
+    :ivar transfer_date: The date this transfer occurred.
+    :ivar transfer_time: The optional time this transfer occurred.
+    :ivar transfer_remarks: Any remarks given regarding this transfer.
+    :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
+    """
+
+    APPEAL = 0
+    WORKLOAD = 1
+    MERGE = 2
+    JURISDICTION = 3
+    transfer_type_choices = {
+        # Appeal from a lower court to a higher court.
+        APPEAL: "Appeal",
+        # Transfer between courts at the same level to balance workload
+        WORKLOAD: "Workload",
+        # Merging of two or more related cases
+        MERGE: "Merge",
+        # Transfer to move a case into a different jurisdiction for some reason
+        JURISDICTION: "Jurisdiction",
+    }
+    origin_court = models.ForeignKey(
+        "search.Court",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_origin_court",
+    )
+    origin_docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_origin_docket",
+    )
+    destination_court = models.ForeignKey(
+        "search.Court",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_destination_court",
+    )
+    destination_docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_destination_docket",
+    )
+    transfer_date = models.DateField()
+    transfer_time = models.TimeField()
+    transfer_remarks = models.TextField(
+        blank=True,
+    )
+    transfer_type = models.SmallIntegerField(
+        choices=transfer_type_choices.items(),
+    )
