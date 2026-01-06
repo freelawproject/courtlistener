@@ -295,8 +295,34 @@ disclosures_debt_fields='(
 	   )'
 disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
 
+# search_casetransfer
+
+case_transfer_fields='(
+	       id, date_created, date_modified, transfer_date, transfer_time, transfer_remarks,
+	       transfer_type, destination_court_id, destination_docket_id, origin_court_id,
+	       origin_docket_id
+	   )'
+case_transfer_csv_filename="search_casetransfer-$(date -I).csv"
+
+# search_texasdocketentry
+
+texas_docket_entry_fields='(
+	       id, date_created, date_modified, appellate_brief, description, remarks,
+	       date_filed, entry_type, sequence_number, docket_id
+	   )'
+texas_docket_entry_csv_filename="search_texasdocketentry-$(date -I).csv"
+
+# search_texasdocument
+
+texas_document_fields='(
+	       id, date_created, date_modified, sha1, page_count, file_size, filepath_local, filepath_ia,
+	       ia_upload_failure_count, thumbnail, thumbnail_status, plain_text, ocr_status, description,
+	       media_id, media_version_id, document_url, docket_entry_id
+	   )'
+texas_document_csv_filename="search_texasdocument-$(date -I).csv"
+
 # If you add or remove a table, you need to update this number
-NUM_TABLES=32
+NUM_TABLES=35
 
 # Every new table added to bulk script should be added as an associative array
 # This ordering is important. Tables with foreign key constraints must be loaded in order.
@@ -335,6 +361,10 @@ declare -a t_29=("disclosures_spouseincome" "$spouseincome_fields" "$spouseincom
 declare -a t_30=("disclosures_reimbursement" "$disclosures_reimbursement_fields" "$disclosures_reimbursement_csv_filename")
 declare -a t_31=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
 declare -a t_32=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
+
+declare -a t_33=("search_casetransfer" "$case_transfer_fields" "$case_transfer_csv_filename")
+declare -a t_34=("search_texasdocketentry" "$texas_docket_entry_fields" "$texas_docket_entry_csv_filename")
+declare -a t_35=("search_texasdocument" "$texas_document_fields" "$texas_document_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists

@@ -52,6 +52,7 @@ from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.docket_sources import DocketSources
+from cl.search.state.texas.models import *
 from cl.users.models import User
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")

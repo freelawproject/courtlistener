@@ -45,6 +45,10 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     )
 
     class Meta:
+        # Django can't reliably determine what app a model belongs to if it's
+        # in a submodule
+        # See: https://stackoverflow.com/a/20283983/22035917
+        app_label = "search"
         ordering = ["-sequence_number"]
 
 
@@ -72,6 +76,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     document_url = models.URLField()
 
     class Meta:
+        app_label = "search"
         indexes = [
             models.Index(fields=["media_id"]),
             models.Index(fields=["filepath_local"]),
