@@ -22,7 +22,7 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 from openai import RateLimitError
 from pydantic import ValidationError
 
-from cl.ai.models import LLMRun, LLMTask
+from cl.ai.models import LLMConfig, LLMPromptSet, LLMRun, LLMTask, Prompt
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
 from cl.audio.factories import AudioFactory
@@ -3999,23 +3999,39 @@ class LlmTest(TestCase):
             },
         }
 
-        try:
-            cls.llm_task_config = LLMTask.objects.get(
-                name="recap-into-opinions-casename-extraction"
-            )
-        except LLMTask.DoesNotExist:
-            print("Doesnt exist")
-            raise ValueError(
-                "Critical Test Failure: The 'recap-into-opinions-casename-extraction' LLMTask "
-                "missing. Did the 0002 data migration run (ai app)?"
-            )
+        cls.llm_config = LLMConfig.objects.create(
+            name="recap-casename-extraction-4o-mini-v1",
+            description="Configuration using GPT-4o-mini for extracting case names from recap opinions",
+            provider="openai",
+            model_name="gpt-4o-mini",
+            parameters={"temperature": 0, "max_tokens": 300},
+        )
 
-        cls.llm_config = cls.llm_task_config.current_config
-        cls.prompt_set = cls.llm_task_config.current_prompt_set
+        sys_prompt_text = """
+            You are an expert in case law and case caption extraction.
+            ... [full text here] ...
+            """
 
-        # Sanity check to ensure migration ran correctly
-        if not cls.prompt_set.prompts.exists():
-            raise ValueError("Migration failed: PromptSet has no prompts!")
+        cls.system_prompt = Prompt.objects.create(
+            name="recap-casename-sys-v1",
+            role=1,  # SYSTEM
+            position=1,
+            text=sys_prompt_text,
+        )
+
+        cls.prompt_set = LLMPromptSet.objects.create(
+            name="recap-into-opinions-casename-extraction",
+            version=1,
+            description="Extracts and verifies the correct case name for an opinion ingested from Recap",
+        )
+        cls.prompt_set.prompts.add(cls.system_prompt)
+
+        cls.llm_task_config = LLMTask.objects.create(
+            name="recap-into-opinions-casename-extraction",
+            current_config=cls.llm_config,
+            current_prompt_set=cls.prompt_set,
+            description="Used in classify_case_name_by_llm task",
+        )
 
     @mock.patch.dict(
         "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
