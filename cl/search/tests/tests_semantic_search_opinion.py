@@ -399,6 +399,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         return r
 
     @override_flag("store-search-api-queries", active=True)
+    @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
     def test_can_perform_a_regular_semantic_query(
         self, inception_mock
     ) -> None:

@@ -150,7 +150,6 @@ REST_FRAMEWORK = {
         # Running bad queries
         # Mega queries on the docket endpoint causing issues
         "ashabana85": "1/hour",
-        "Luris.ai": "1/hour",
         "tannero20": "1/hour",
         # Too difficult
         "aanshshah": "1/hour",

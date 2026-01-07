@@ -462,7 +462,14 @@ def clone_docket(
 
         # Remove unneeded fields
         clean_api_data(
-            docket_data, ["original_court_info", "tags", "panel", "idb_data"]
+            docket_data,
+            [
+                "original_court_info",
+                "tags",
+                "panel",
+                "idb_data",
+                "bankruptcy_information",
+            ],
         )
 
         with transaction.atomic():

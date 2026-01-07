@@ -880,7 +880,18 @@ def es_save_alert_document(
 
     es_document = getattr(es_document_module, es_document_name)
     document = es_document()
-    alert = Alert.objects.get(pk=alert_id)
+    try:
+        alert = Alert.objects.get(pk=alert_id)
+    except Alert.DoesNotExist:
+        # The alert was removed from the DB before the task ran, likely by a user
+        # managing their alerts via the Alerts API.
+        # We can ignore this alert since it no longer exists.
+        logger.warning(
+            "Alert %s no longer exists when processing the indexing task; "
+            "it may have been deleted by the user.",
+            alert_id,
+        )
+        return None
     alert_doc = {
         "timestamp": document.prepare_timestamp(alert),
         "rate": alert.rate,

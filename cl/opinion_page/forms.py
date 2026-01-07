@@ -487,11 +487,16 @@ class BaseCourtUploadForm(forms.Form):
         sha1_hash = sha1(force_bytes(self.cleaned_data.get("pdf_upload")))
         court = Court.objects.get(pk=self.cleaned_data.get("court_str"))
 
-        docket, opinion, cluster, citations, _ = make_objects(
+        docket, opinions, cluster, citations, _ = make_objects(
             self.cleaned_data.get("item"),
             court,
-            sha1_hash,
-            self.cleaned_data.get("pdf_upload"),
+            [
+                (
+                    self.cleaned_data.get("item"),
+                    self.cleaned_data.get("pdf_upload"),
+                    sha1_hash,
+                )
+            ],
         )
 
         if not citations:
@@ -502,7 +507,7 @@ class BaseCourtUploadForm(forms.Form):
         save_everything(
             items={
                 "docket": docket,
-                "opinion": opinion,
+                "opinions": opinions,
                 "cluster": cluster,
                 "citations": citations,
             }
@@ -517,7 +522,7 @@ class BaseCourtUploadForm(forms.Form):
             docket.originating_court_information = originating_court
             docket.save()
 
-        extract_opinion_content.delay(opinion.pk, ocr_available=True)
+        extract_opinion_content.delay(opinions[0].pk, ocr_available=True)
 
         logging.info(
             "Successfully added object cluster: %s for %s",

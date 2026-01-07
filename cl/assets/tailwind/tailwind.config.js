@@ -88,6 +88,9 @@ module.exports = {
           50: '#FFFAEB',
           400: '#FDB022',
         },
+        amber: {
+          450: '#FDB022',
+        },
         blue: {
           700: '#004EEB',
         },
