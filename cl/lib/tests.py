@@ -1589,14 +1589,14 @@ class TestAddSqlComment(SimpleTestCase):
         sql = "SELECT * FROM users;"
         result = add_sql_comment(sql, user_id=42)
         self.assertTrue(result.endswith(";"))
-        self.assertIn("/* user_id='42' */;", result)
+        self.assertIn("/* user_id='42' */", result)
 
     def test_sql_not_ending_with_semicolon(self) -> None:
         """Is the comment appended at the end for SQL without semicolon?"""
         sql = "SELECT * FROM users"
         result = add_sql_comment(sql, user_id=42)
         self.assertFalse(result.endswith(";"))
-        self.assertTrue(result.endswith("/* user_id='42' */"))
+        self.assertTrue(result.startswith("/* user_id='42' */"))
 
     def test_none_values_filtered_out(self) -> None:
         """Are None values filtered from the comment?"""
@@ -1658,7 +1658,7 @@ class TestQueryWrapper(TestCase):
         request = self.request_factory.get("/no-resolver/")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIsNone(result["user_id"])
         self.assertIsNone(result["url"])
@@ -1670,7 +1670,7 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch("test-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/test/path/")
@@ -1683,7 +1683,7 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch("test-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIn("user_id", result)
         self.assertIn("url", result)
@@ -1698,7 +1698,7 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch("anon-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/anonymous/path/")
@@ -1711,7 +1711,7 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch(view_name="test-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertEqual(result["url"], "/very/long…")
 

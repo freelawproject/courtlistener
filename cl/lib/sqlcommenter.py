@@ -1,5 +1,4 @@
 from contextlib import ExitStack
-from functools import cached_property
 from typing import Any
 from urllib.parse import quote
 
@@ -46,8 +45,8 @@ def add_sql_comment(sql: str, **meta: Any) -> str:
     sql = sql.rstrip()
 
     if sql.endswith(";"):
-        return sql[:-1] + " " + comment + ";"
-    return sql + " " + comment
+        return comment + " " + sql[:-1] + ";"
+    return comment + " " + sql
 
 
 class SqlCommenter:
@@ -74,7 +73,6 @@ class QueryWrapper:
     def __init__(self, request):
         self.request = request
 
-    @cached_property
     def get_context(self) -> dict[str, Any]:
         """
         Extract relevant context information from the request for SQL comments.
@@ -100,5 +98,5 @@ class QueryWrapper:
         }
 
     def __call__(self, execute, sql, params, many, context):
-        sql_with_comment = add_sql_comment(sql, **self.get_context)
+        sql_with_comment = add_sql_comment(sql, **self.get_context())
         return execute(sql_with_comment, params, many, context)
