@@ -79,6 +79,12 @@ class QueryWrapper:
         """
         Extract relevant context information from the request for SQL comments.
         """
+        user = (
+            self.request.user.pk
+            if hasattr(self.request, "user")
+            and self.request.user.is_authenticated
+            else None
+        )
 
         path = None
         resolver_match = self.request.resolver_match
@@ -88,6 +94,7 @@ class QueryWrapper:
                 path = f"{path[: settings.SQLCOMMENTER_MAX_PATH_LENGTH]}…"
 
         return {
+            "user_id": user,
             "url": path,
             "url-name": resolver_match.view_name if resolver_match else None,
         }

@@ -1660,6 +1660,7 @@ class TestQueryWrapper(TestCase):
         wrapper = QueryWrapper(request)
         result = wrapper.get_context
 
+        self.assertIsNone(result["user_id"])
         self.assertIsNone(result["url"])
         self.assertIsNone(result["url-name"])
 
@@ -1671,6 +1672,7 @@ class TestQueryWrapper(TestCase):
         wrapper = QueryWrapper(request)
         result = wrapper.get_context
 
+        self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/test/path/")
         self.assertEqual(result["url-name"], "test-view")
 
@@ -1683,8 +1685,10 @@ class TestQueryWrapper(TestCase):
         wrapper = QueryWrapper(request)
         result = wrapper.get_context
 
+        self.assertIn("user_id", result)
         self.assertIn("url", result)
         self.assertEqual(result["url"], "/test/path/")
+        self.assertEqual(result["user_id"], self.user.pk)
         self.assertEqual(result["url-name"], "test-view")
 
     def test_get_context_with_anonymous_user(self) -> None:
@@ -1696,6 +1700,7 @@ class TestQueryWrapper(TestCase):
         wrapper = QueryWrapper(request)
         result = wrapper.get_context
 
+        self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/anonymous/path/")
         self.assertEqual(result["url-name"], "anon-view")
 
