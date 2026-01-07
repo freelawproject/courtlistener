@@ -7,9 +7,6 @@
 {% block description %}Use these APIs to download content from PACER and share it in the RECAP Archive of federal court cases and filings.{% endblock %}
 {% block og_description %}Use these APIs to download content from PACER and share it in the RECAP Archive of federal court cases and filings.{% endblock %}
 
-{% block sidebar %}{% endblock %}
-{% block navbar-r %}active{% endblock %}
-
 {% block content %}
 <c-layout-with-navigation
   data-first-active="about"
@@ -17,7 +14,7 @@
     {'href': '#about', 'text': 'Overview'},
     {'href': '#pacer-fetch', 'text': 'PACER Fetch API', 'children': [
       {'href': '#monitoring', 'text': 'Monitoring'},
-      {'href': '#password-rotation', 'text': 'Password Rotation Requirement<'},
+      {'href': '#password-rotation', 'text': 'Password Rotation Requirement'},
       {'href': '#security', 'text': 'Security'},
       {'href': '#known-issues', 'text': 'Known Issues'},
       {'href': '#pdf', 'text': 'Purchasing PDFs'},
@@ -158,7 +155,7 @@ curl -X POST \
           <li><p><code>docket_number</code> is the visible docket number humans use to refer to the case.</p></li>
           <li>
             <p><code>court</code> is the CourtListener court ID.</p>
-            {% include "includes/court-id-mappings.html" %}
+            <c-court-id-mappings />
           </li>
         </ul>
       </li>
@@ -219,7 +216,7 @@ curl -X POST \
       <li><p><strong>Workflow integration</strong> — Integrate document availability notifications into your systems via <a class="text-primary-600" href="{% url "webhooks_docs" %}#pray-and-pay">webhooks</a>.</p></li>
     </ul>
     <p>To learn more about the Pray and Pay system itself, including how to fulfill prayers and contribute documents, see the help documentation:</p>
-    <p><a class="text-primary-600"href="{% url 'pray_and_pay_help' %}" class="btn btn-default">Pray and Pay Help</a></p>
+    <p><a class="btn btn-outline" href="{% url 'pray_and_pay_help' %}" >Pray and Pay Help</a></p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="creating-prayers">
@@ -245,7 +242,7 @@ curl -X POST \
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="listing-prayers">
-    <h3>Listing Prayers</h3>
+    <h3>Listing Your Prayers</h3>
     <p>To retrieve a list of your active (waiting) prayers, send an HTTP <code>GET</code> request:</p>
     <c-code>
 curl -X GET \
@@ -266,15 +263,15 @@ curl -X DELETE \
     <p>Note that prayers cannot be modified once created. The API does not support <code>PUT</code> or <code>PATCH</code> requests. If you need to change a prayer, delete it and create a new one.</p>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id=prayer-webhooks"">
+  <c-layout-with-navigation.section id="prayer-webhooks">
     <h3>Webhook Notifications</h3>
     <p>When a prayer is granted and the document becomes available, you can be notified immediately via webhooks. This is the recommended way to monitor your prayers instead of polling the API.</p>
     <p>Webhook events are sent as soon as a document becomes available and include the prayer ID, document ID, and status information. To set up webhook notifications for granted prayers, see the webhook documentation:</p>
-    <p><a class="text-primary-600" href="{% url "webhooks_docs" %}#pray-and-pay" class="btn btn-primary">Pray and Pay Webhooks</a></p>
+    <p><a ref="{% url "webhooks_docs" %}#pray-and-pay" class="btn btn-primary">Pray and Pay Webhooks</a></p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="prayer-limitations">
-    <h3>Limitations</h3>
+    <h3>Limitations and Future Plans</h3>
     <p>The Pray and Pay API has the same limitations as the web interface:</p>
     <ul>
       <li><p>Standard users can create a limited number of prayers per day (the same daily quota applies to both web and API usage).</p></li>
@@ -352,7 +349,7 @@ let downloadData =
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="recap-atts">
-    <h3>Uploading Attachment Pages</h3>
+    <h3>Uploading Attachment Menus</h3>
     <p>These are the HTML pages that you will see that list the attachments for a docket entry. The only required field for this upload type is <code>pacer_case_id</code>.</p>
   </c-layout-with-navigation.section>
 
