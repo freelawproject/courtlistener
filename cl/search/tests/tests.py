@@ -1960,7 +1960,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         # She receives a sign out confirmation with links back to the homepage,
         # the block, and an option to sign back in.
         page_text = get_with_wait(wait, (By.TAG_NAME, "body")).text
-        self.assertIn("You Have Successfully Signed Out", page_text)
+        self.assertIn("You have successfully signed out.", page_text)
         links = self.browser.find_elements(By.TAG_NAME, "a")
         self.assertIn("Go to the homepage", [link.text for link in links])
         self.assertIn("Read our blog", [link.text for link in links])

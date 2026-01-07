@@ -44,6 +44,7 @@ jobs:
           -p cl.audio \
           -p cl.citations \
           -p cl.corpus_importer \
+          -p cl.custom_filters \
           -p cl.lib \
           -p cl.opinion_page \
           -p cl.recap_rss \

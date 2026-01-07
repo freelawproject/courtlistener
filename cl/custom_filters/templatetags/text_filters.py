@@ -1,17 +1,36 @@
 import html
 import re
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
+from django.db.models import QuerySet
 from django.template import Library
 from django.template.defaultfilters import stringfilter
 from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
-from django.utils.safestring import SafeData, mark_safe
+from django.utils.safestring import SafeData, SafeString, mark_safe
 
 register = Library()
 
+T = TypeVar("T")
+
+# Type alias for escape functions used in template filters.
+# Both conditional_escape and identity functions match this signature.
+EscapeFunc = Callable[[str], str]
+
+
+def _identity(text: str) -> str:
+    """Identity function that returns the input unchanged."""
+    return text
+
 
 @register.filter(is_safe=True, needs_autoescape=True)
-def oxford_join(items, conjunction="and", separator=",", autoescape=True):
+def oxford_join(
+    items: Iterable[Any],
+    conjunction: str = "and",
+    separator: str = ",",
+    autoescape: bool = True,
+) -> SafeString:
     """Join together items in a human-readable list
 
     Also works for django querysets due to not using negative indexing.
@@ -53,18 +72,15 @@ def oxford_join(items, conjunction="and", separator=",", autoescape=True):
 
 @register.filter(needs_autoescape=True)
 @stringfilter
-def nbsp(text, autoescape=None):
+def nbsp(text: str, autoescape: bool | None = None) -> SafeString:
     """Converts white space to non-breaking spaces
 
     This creates a template filter that converts white space to html non-breaking
     spaces. It uses conditional_escape to escape any strings that are incoming
     and are not already marked as safe.
     """
-
     if isinstance(text, SafeData) or not autoescape:
-        # This is an anonymous python identity function. Simply returns the
-        # value of x when x is given.
-        esc = lambda x: x
+        esc: EscapeFunc = _identity
     else:
         esc = conditional_escape
     return mark_safe(re.sub(r"\s", "&nbsp;", esc(text.strip())))
@@ -72,12 +88,9 @@ def nbsp(text, autoescape=None):
 
 @register.filter(needs_autoescape=True)
 @stringfilter
-def v_wrapper(text, autoescape=None):
+def v_wrapper(text: str, autoescape: bool | None = None) -> SafeString:
     """Wraps every v. in a string with a class of alt"""
-    if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
+    esc: EscapeFunc = conditional_escape if autoescape else _identity
     return mark_safe(
         re.sub(r" v\. ", '<span class="alt"> v. </span>', esc(text))
     )
@@ -85,18 +98,21 @@ def v_wrapper(text, autoescape=None):
 
 @register.filter(needs_autoescape=True)
 @stringfilter
-def underscore_to_space(text, autoescape=None):
+def underscore_to_space(
+    text: str,
+    autoescape: bool | None = None,
+) -> SafeString:
     """Removed underscores from text."""
-    if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
+    esc: EscapeFunc = conditional_escape if autoescape else _identity
     return mark_safe(re.sub("_", " ", esc(text)))
 
 
 @register.filter(needs_autoescape=True)
 @stringfilter
-def compress_whitespace(text, autoescape=None):
+def compress_whitespace(
+    text: str,
+    autoescape: bool | None = None,
+) -> SafeString:
     """Compress whitespace in a string as a browser does with HTML
 
     For example, this:
@@ -107,16 +123,17 @@ def compress_whitespace(text, autoescape=None):
 
     Becomes: 'text foo bar baz'
     """
-    if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
-    text = esc(text)
-    return mark_safe(" ".join(text.split()))
+    esc: EscapeFunc = conditional_escape if autoescape else _identity
+    escaped_text = esc(text)
+    return mark_safe(" ".join(escaped_text.split()))
 
 
 @register.filter(needs_autoescape=True)
-def naturalduration(seconds, autoescape=None, as_dict=False):
+def naturalduration(
+    seconds: int | str | float | None,
+    autoescape: bool | None = None,
+    as_dict: bool = False,
+) -> SafeString | dict[str, int]:
     """Convert a duration in seconds to a duration in hours, minutes, seconds.
 
     For example:
@@ -153,7 +170,7 @@ def naturalduration(seconds, autoescape=None, as_dict=False):
 
 
 @register.filter(is_safe=True)
-def OR_join(queryset):
+def OR_join(queryset: QuerySet[Any]) -> str:
     """Take the input queryset, and return its PKs joined by ' OR '
 
     This is a one-liner, but you can't do this kind of thing in a template.
@@ -162,7 +179,7 @@ def OR_join(queryset):
 
 
 @register.filter(is_safe=True)
-def best_case_name(obj):
+def best_case_name(obj: Any) -> str:
     """Take an object and return the highest quality case name possible.
 
     In general, this means returning the fields in an order like:
@@ -182,24 +199,25 @@ def best_case_name(obj):
 
 
 @register.filter(is_safe=True)
-def uniq(iterable):
+def uniq(iterable: Iterable[T]) -> list[T]:
     """Take an iterable and make it unique. Sorting is not maintained."""
     return list(set(iterable))
 
 
 @register.filter(needs_autoescape=True)
 @stringfilter
-def read_more(s, show_words, autoescape=True):
+def read_more(
+    s: str,
+    show_words: int | str,
+    autoescape: bool = True,
+) -> SafeString | str:
     """Split text after so many words, inserting a "more" link at the end.
 
     Relies on JavaScript to react to the link being clicked and on classes
     found in Bootstrap to hide elements.
     """
     show_words = int(show_words)
-    if autoescape:
-        esc = conditional_escape
-    else:
-        esc = lambda x: x
+    esc: EscapeFunc = conditional_escape if autoescape else _identity
     words = esc(s).split()
 
     if len(words) <= show_words:
@@ -223,6 +241,6 @@ def read_more(s, show_words, autoescape=True):
 
 
 @register.filter(is_safe=True)
-def html_decode(value):
+def html_decode(value: str) -> str:
     """Decode unicode HTML entities."""
     return html.unescape(value)
