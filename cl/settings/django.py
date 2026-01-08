@@ -235,11 +235,9 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 TIME_ZONE = env("TIMEZONE", default="America/Los_Angeles")
 
 MANAGERS = [
-    formataddr(
-        (
-            env("MANAGER_NAME", default="Joe Schmoe"),
-            env("MANAGER_EMAIL", default="joe@courtlistener.com"),
-        )
+    (
+        env("MANAGER_NAME", default="Joe Schmoe"),
+        env("MANAGER_EMAIL", default="joe@courtlistener.com"),
     )
 ]
 
