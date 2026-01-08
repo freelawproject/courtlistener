@@ -4047,7 +4047,6 @@ class DynamicNestedFieldsMixinTests(TestCase):
                 "pacer_sequence_number",
                 "recap_sequence_number",
                 "time_filed",
-                "tags",
             },
         )
 
