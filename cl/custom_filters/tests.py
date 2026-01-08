@@ -9,6 +9,7 @@ from cl.custom_filters.templatetags.extras import (
     granular_date,
     humanize_number,
 )
+from cl.custom_filters.templatetags.svg_tags import svg
 from cl.custom_filters.templatetags.text_filters import (
     naturalduration,
     oxford_join,
@@ -224,3 +225,26 @@ class TestExtras(SimpleTestCase):
                     expected,
                     msg=f"Number formatted incorrectly. Input: {value} - Result: {result} - Expected: {expected}",
                 )
+
+
+class TestSvgTag(SimpleTestCase):
+    """Tests for the svg template tag."""
+
+    def test_svg_renders_without_escaping(self) -> None:
+        """Ensure svg tag returns unescaped SVG markup."""
+        result = svg("heart")
+        # Should contain actual SVG tags, not HTML-escaped versions
+        self.assertIn("<svg", result)
+        self.assertNotIn("&lt;svg", result)
+
+    def test_svg_not_found_in_debug(self) -> None:
+        """Missing SVG returns error message in debug mode."""
+        with self.settings(DEBUG=True):
+            result = svg("nonexistent_svg_that_does_not_exist")
+            self.assertIn("not found", result)
+
+    def test_svg_not_found_in_production(self) -> None:
+        """Missing SVG returns empty string in production."""
+        with self.settings(DEBUG=False):
+            result = svg("nonexistent_svg_that_does_not_exist")
+            self.assertEqual(result, "")
