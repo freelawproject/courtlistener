@@ -49,6 +49,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
@@ -2212,8 +2213,6 @@ class TestS3CacheHelpers(SimpleTestCase):
     @override_settings(DEVELOPMENT=True, TESTING=False)
     def test_get_s3_cache_returns_fallback_in_development(self) -> None:
         """In development mode, get_s3_cache should return the fallback cache."""
-        from cl.lib.s3_cache import get_s3_cache
-
         cache = get_s3_cache("db_cache")
         # In development, should return db_cache, not s3
         # We verify by checking the cache backend class name
@@ -2222,18 +2221,12 @@ class TestS3CacheHelpers(SimpleTestCase):
     @override_settings(DEVELOPMENT=False, TESTING=True)
     def test_get_s3_cache_returns_fallback_in_testing(self) -> None:
         """In testing mode, get_s3_cache should return the fallback cache."""
-        from cl.lib.s3_cache import get_s3_cache
-
         cache = get_s3_cache("db_cache")
         self.assertIn("DatabaseCache", cache.__class__.__name__)
 
     @override_settings(DEVELOPMENT=False, TESTING=False)
     def test_get_s3_cache_returns_s3_in_production(self) -> None:
         """In production mode, get_s3_cache should return the S3 cache."""
-        from unittest.mock import MagicMock, patch
-
-        from cl.lib.s3_cache import get_s3_cache
-
         mock_s3_cache = MagicMock()
         mock_caches = {"s3": mock_s3_cache, "db_cache": MagicMock()}
 
@@ -2244,8 +2237,6 @@ class TestS3CacheHelpers(SimpleTestCase):
     @override_settings(DEVELOPMENT=True, TESTING=False)
     def test_make_s3_cache_key_no_prefix_in_development(self) -> None:
         """In development mode, cache key should not have time-based prefix."""
-        from cl.lib.s3_cache import make_s3_cache_key
-
         base_key = "clusters-mlt-es:123"
         timeout = 60 * 60 * 24 * 7  # 7 days
 
@@ -2255,8 +2246,6 @@ class TestS3CacheHelpers(SimpleTestCase):
     @override_settings(DEVELOPMENT=False, TESTING=True)
     def test_make_s3_cache_key_no_prefix_in_testing(self) -> None:
         """In testing mode, cache key should not have time-based prefix."""
-        from cl.lib.s3_cache import make_s3_cache_key
-
         base_key = "clusters-mlt-es:123"
         timeout = 60 * 60 * 24 * 7  # 7 days
 
@@ -2266,8 +2255,6 @@ class TestS3CacheHelpers(SimpleTestCase):
     @override_settings(DEVELOPMENT=False, TESTING=False)
     def test_make_s3_cache_key_adds_prefix_in_production(self) -> None:
         """In production mode, cache key should have time-based prefix."""
-        from cl.lib.s3_cache import make_s3_cache_key
-
         base_key = "clusters-mlt-es:123"
         timeout = 60 * 60 * 24 * 7  # 7 days
 
@@ -2277,8 +2264,6 @@ class TestS3CacheHelpers(SimpleTestCase):
     @override_settings(DEVELOPMENT=False, TESTING=False)
     def test_make_s3_cache_key_rounds_up_days(self) -> None:
         """Days calculation should round up (e.g., 1.5 days -> 2 days)."""
-        from cl.lib.s3_cache import make_s3_cache_key
-
         base_key = "test-key"
 
         # 1 day exactly
@@ -2295,3 +2280,17 @@ class TestS3CacheHelpers(SimpleTestCase):
         self.assertEqual(
             make_s3_cache_key(base_key, 60 * 60 * 6), "1-days:test-key"
         )
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_persistent_in_production(self) -> None:
+        """In production, timeout=None should use persistent prefix."""
+        base_key = "clusters-mlt-es:123"
+        result = make_s3_cache_key(base_key, None)
+        self.assertEqual(result, f"persistent:{base_key}")
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_persistent_no_prefix_in_dev(self) -> None:
+        """In dev/test, timeout=None should return key unchanged."""
+        base_key = "clusters-mlt-es:123"
+        result = make_s3_cache_key(base_key, None)
+        self.assertEqual(result, base_key)
