@@ -3,8 +3,8 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps import views as sitemaps_views
 from django.urls import include, path, register_converter
-from django.views.decorators.cache import cache_page
 from django.views.generic import RedirectView
+from django_s3_express_cache.decorators import cache_page
 
 from cl.audio.sitemap import AudioSitemap, BlockedAudioSitemap
 from cl.disclosures.sitemap import DisclosureSitemap
@@ -60,7 +60,12 @@ urlpatterns = [
     # Sitemaps
     path(
         "sitemap.xml",
-        cache_page(60 * 60 * 24 * 14, cache="db_cache")(sitemaps_views.index),
+        cache_page(
+            60 * 60 * 24 * 14,
+            cache="db_cache"
+            if settings.DEVELOPMENT or settings.TESTING
+            else "s3",
+        )(sitemaps_views.index),
         {"sitemaps": sitemaps, "sitemap_url_name": "sitemaps"},
     ),
     path(

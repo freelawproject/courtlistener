@@ -19,7 +19,7 @@ DATABASES = {
         "NAME": env("DB_NAME", default="courtlistener"),
         "USER": env("DB_USER", default="postgres"),
         "PASSWORD": env("DB_PASSWORD", default="postgres"),
-        "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
+        "CONN_MAX_AGE": 0,
         "HOST": env("DB_HOST", default="cl-postgres"),
         "OPTIONS": {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
@@ -37,7 +37,7 @@ if env("DB_REPLICA_HOST", default=""):
         "PASSWORD": env("DB_REPLICA_PASSWORD", default="postgres"),
         "HOST": env("DB_REPLICA_HOST", default=""),
         "PORT": "",
-        "CONN_MAX_AGE": env("DB_REPLICA_CONN_MAX_AGE", default=0),
+        "CONN_MAX_AGE": 0,
         "OPTIONS": {
             "sslmode": env("DB_REPLICA_SSL_MODE", default="prefer"),
         },
@@ -140,6 +140,7 @@ MIDDLEWARE = [
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
     "pghistory.middleware.HistoryMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
+    "cl.lib.sqlcommenter.SqlCommenter",
 ]
 
 ROOT_URLCONF = "cl.urls"
@@ -153,6 +154,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.humanize",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.sessions",
     "django.contrib.sites",
     "django.contrib.sitemaps",
@@ -252,7 +254,6 @@ MESSAGE_TAGS = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
-FORMS_URLFIELD_ASSUME_HTTPS = True
 
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle
