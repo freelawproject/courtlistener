@@ -40,7 +40,6 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     )
     entry_type = models.TextField()
     sequence_number = models.CharField(
-        unique=True,
         max_length=16,
     )
 

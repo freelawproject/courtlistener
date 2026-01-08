@@ -566,7 +566,8 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
 
 FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
-    r":(?:var|ivar|cvar)\s+([a-z_]+):([^:]+)", re.IGNORECASE | re.MULTILINE
+    r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
+    re.IGNORECASE | re.MULTILINE,
 )
 
 
@@ -598,15 +599,10 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
             continue
 
         doc = field_docs[field_name]
-        if isinstance(field.help_text, str) and len(field.help_text) == 0:
+        if not field.help_text:
             field.help_text = doc
-        if (
-            isinstance(field.db_comment, str)
-            and len(field.db_comment) == 0
-            or field.db_comment is None
-        ):
+        if not field.db_comment:
             field.db_comment = doc
-        print(getattr(model, field_name))
 
     return model
 

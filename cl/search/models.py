@@ -4025,7 +4025,6 @@ class CaseTransfer(AbstractDateTimeModel):
         related_name="case_transfer_destination_docket",
     )
     transfer_date = models.DateField()
-    transfer_time = models.TimeField()
     transfer_remarks = models.TextField(
         blank=True,
     )
