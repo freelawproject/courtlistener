@@ -1,7 +1,7 @@
 from django import template
 from django.conf import settings
 from django.contrib.staticfiles.finders import find
-from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -58,4 +58,4 @@ def svg(name, **kwargs):
         key = key.replace("_", "-")
         svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
-    return format_html("{}", svg_content.replace("<svg", '<svg role="img"'))
+    return mark_safe(svg_content.replace("<svg", '<svg role="img"'))
