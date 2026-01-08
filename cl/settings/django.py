@@ -1,4 +1,3 @@
-from email.utils import formataddr
 from pathlib import Path
 
 import environ
