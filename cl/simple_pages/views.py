@@ -432,7 +432,7 @@ async def contact(
             default_from = settings.DEFAULT_FROM_EMAIL
             subject = form.email_subject()
             body = form.render_email_body(
-                user_agent=request.META.get("HTTP_USER_AGENT", "Unknown")
+                user_agent=request.headers.get("user-agent", "Unknown")
             )
 
             message = EmailMessage(
