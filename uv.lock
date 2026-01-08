@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.13.*"
 
 [[package]]
@@ -469,7 +469,7 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "httplib2", specifier = ">=0.22.0" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
-    { name = "hyperscan", specifier = ">=0.7.8" },
+    { name = "hyperscan", specifier = ">=0.8.0" },
     { name = "instructor", specifier = ">=1.11.3" },
     { name = "internetarchive", specifier = ">=5.3.1" },
     { name = "ipaddress", specifier = ">=1.0.16" },
@@ -1537,16 +1537,17 @@ wheels = [
 
 [[package]]
 name = "hyperscan"
-version = "0.7.8"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a6/98/b0943c02f1c1886f61aae3203163c08d1b707136c4cee7b216cf7d730457/hyperscan-0.7.8.tar.gz", hash = "sha256:1ed6c87eaf32f77c89fec8c102f20bc677e44c4ce80bde903620f274ea4b8ed7", size = 74532, upload-time = "2024-11-18T06:00:13.099Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/91/8898a43b2568dfa110c348bd007f88556e521a2f5f1b0f6c4ae61f3b924b/hyperscan-0.8.0.tar.gz", hash = "sha256:031056181bea0704a0c397963e5dacc039664e4f7e73aa19c2697f1ec8277da7", size = 122430, upload-time = "2025-12-06T17:36:16.127Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/39/b87ebed983a1cc32c4454254cb2c8b236bf8562cc9fad92629ef995635fe/hyperscan-0.7.8-cp313-cp313-macosx_10_14_x86_64.whl", hash = "sha256:3cf636a32bce0ac42f9ce398a9a44f8ff94268168588618c02a77e0090edb1ad", size = 1720936, upload-time = "2024-10-12T21:03:13.336Z" },
-    { url = "https://files.pythonhosted.org/packages/44/45/dd16f9495e4f0dd19ecf7b0ddf5243c2ce4f48b445bdec12e707eb93fa4d/hyperscan-0.7.8-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:0637b35fc04e918c69ea7f38b12cfe92d8c3dbce52558bbcb3eb12a65555cff1", size = 1705757, upload-time = "2024-10-12T21:03:15.082Z" },
-    { url = "https://files.pythonhosted.org/packages/88/f1/bb597849a98885eac1dcc531295787e50144d32bf240e51bc34e46fdc9d4/hyperscan-0.7.8-cp313-cp313-manylinux_2_28_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:ef590d9a3d0aef435e1892e9b3941e0aac571e4632531e237d95c77fd87cad31", size = 1731805, upload-time = "2024-10-12T21:03:17.093Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/eb/f6ad66f37807d2745f0b8a878fb692fd31bb54f64f4ef97733ab867d8fb7/hyperscan-0.7.8-cp313-cp313-manylinux_2_28_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:2d167f7debc1bd4a1df1467eb143ef350541f8b1613e03f7c2f62a46a4b7f4e2", size = 1751714, upload-time = "2024-10-12T21:03:18.38Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/e0/7426a328515d91e727862c31dfba33a4203fd667884f10ebac9225b9fa42/hyperscan-0.7.8-cp313-cp313-musllinux_1_1_aarch64.whl", hash = "sha256:60c600c11d34c4036850e0cf2e3e3aff437c53d6c53806d7ce477c2455800c86", size = 2294759, upload-time = "2024-10-12T21:03:19.941Z" },
-    { url = "https://files.pythonhosted.org/packages/e7/4f/9b6b8de4a026d058c9836439a42098b94c9481e25168a989a3a5e428f440/hyperscan-0.7.8-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:9bac1a9c407111243d0cd0e597729ac1ccbb3ffa16985bfb9c2becd72cb0caec", size = 2288603, upload-time = "2024-10-12T21:03:21.478Z" },
+    { url = "https://files.pythonhosted.org/packages/7e/a7/3ada6c7335eb040ee51963e394ac6cf316704405a99e1e3f2b6adc76a761/hyperscan-0.8.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:8e067ac2f6ee6849506cfe15f23b669fd7d720e6bc762a38ec646fca2d54f0fe", size = 2312677, upload-time = "2025-12-06T17:35:40.829Z" },
+    { url = "https://files.pythonhosted.org/packages/68/04/f8dc9087e7fa1e6ea3e55e29d31181b5c4afc34eb98f1a3fe87252090ad5/hyperscan-0.8.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:bbeb9112221b5f146e93ed00cc938853dbc757754487bc02d500278afa37fca5", size = 2032875, upload-time = "2025-12-06T17:35:42.295Z" },
+    { url = "https://files.pythonhosted.org/packages/35/cc/6781a590ad386cd67cd742d228e413b77d881294556be27cb864165cc6d5/hyperscan-0.8.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:f6a821250381420af96ca642b07a62ee977217adfa5a47edc3aa0718eacdf705", size = 3015369, upload-time = "2025-12-06T17:35:43.619Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/8e/f92825dff41ae1b14cc2cd541154687e283dd41fb5db659dba6c3b82640b/hyperscan-0.8.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:24abecbb565028d70c19238cc81b351c84355aa333328eb9f1418d012aa0307e", size = 2567751, upload-time = "2025-12-06T17:35:45.37Z" },
+    { url = "https://files.pythonhosted.org/packages/44/0f/c348d09469082b9f791495eb53a810a74258939f572f44076a2c2f33431c/hyperscan-0.8.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:832588c1a09bb7f20d5816599b40aafb1a4c398786c585ff4dad31950aead671", size = 2389682, upload-time = "2025-12-06T17:35:47.063Z" },
+    { url = "https://files.pythonhosted.org/packages/17/28/64deba70f79e8fc5b2c92430587792240c2741278e570dfe33cbcd62a64e/hyperscan-0.8.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:74b71f84e37cf3a7c70991ca08534cb3e299b4e659e555c83dee97af117e7a6e", size = 2582119, upload-time = "2025-12-06T17:35:48.601Z" },
+    { url = "https://files.pythonhosted.org/packages/96/0f/7520e82a724f6288c09cdd8ee9ed4c1c4552d4516839da98eba57c3e4bd2/hyperscan-0.8.0-cp313-cp313-win_amd64.whl", hash = "sha256:a651668d15b4b420fcecce9fd148036101b9724ce1c82f079ee339fa6cb3cf94", size = 1956547, upload-time = "2025-12-06T17:35:50.333Z" },
 ]
 
 [[package]]
