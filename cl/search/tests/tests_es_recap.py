@@ -7157,8 +7157,8 @@ class IndexDocketRECAPDocumentsCommandTest(
         child_count = len(article[0].xpath(".//h4"))
         self.assertEqual(2, child_count)
 
-    @mock.patch("cl.search.admin.delete_from_ia")
-    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    @mock.patch("cl.search.utils.delete_from_ia")
+    @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_re_index_recap_documents_sealed(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
@@ -8655,8 +8655,8 @@ class RECAPIndexingTest(
         docket_doc_no_parties.delete()
         docket_with_no_parties_no_separator.delete()
 
-    @mock.patch("cl.search.admin.delete_from_ia")
-    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    @mock.patch("cl.search.utils.delete_from_ia")
+    @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_seal_documents_action(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
