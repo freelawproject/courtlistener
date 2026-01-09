@@ -1,4 +1,3 @@
-from email.utils import formataddr
 from pathlib import Path
 
 import environ
@@ -80,7 +79,6 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 INSTALL_ROOT = Path(__file__).resolve().parents[2]
 STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 DEBUG = env.bool("DEBUG", default=True)
-DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 MEDIA_ROOT = env("MEDIA_ROOT", default=INSTALL_ROOT / "cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
@@ -235,11 +233,9 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 TIME_ZONE = env("TIMEZONE", default="America/Los_Angeles")
 
 MANAGERS = [
-    formataddr(
-        (
-            env("MANAGER_NAME", default="Joe Schmoe"),
-            env("MANAGER_EMAIL", default="joe@courtlistener.com"),
-        )
+    (
+        env("MANAGER_NAME", default="Joe Schmoe"),
+        env("MANAGER_EMAIL", default="joe@courtlistener.com"),
     )
 ]
 

@@ -24,7 +24,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
-from django_ses import signals
+from django_ses import SESBackend, signals
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -1561,6 +1561,46 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Compare body contents
         self.assertEqual(plaintext_body, "Body goes here\n")
         self.assertEqual(html_body, "<p>Body goes here</p>\n")
+
+    @patch("boto3.Session")
+    def test_email_as_bytes_ses_compatibility(
+        self, mock_session: MagicMock
+    ) -> None:
+        """Verify django-ses email sending works with Python 3.13.
+
+        This is a regression test for issue #6736 where Python 3.13 removed
+        the `linesep` parameter from Message.as_bytes(), causing a TypeError
+        when sending emails via django-ses. The fix was to upgrade django-ses
+        to a version with Python 3.13 support (4.6.0+).
+
+        This test uses the actual SESBackend with a mocked boto3 session to
+        exercise the code path that calls message.as_bytes().
+        """
+        # Mock the boto3 session and SES client
+        mock_client = MagicMock()
+        mock_client.send_raw_email.return_value = {
+            "MessageId": "test-id",
+            "ResponseMetadata": {"RequestId": "test-request-id"},
+        }
+        mock_session.return_value.client.return_value = mock_client
+
+        email = EmailMultiAlternatives(
+            subject="Test as_bytes compatibility",
+            body="Plain text body",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+        )
+        email.attach_alternative("<p>HTML body</p>", "text/html")
+
+        # Send through the actual SES backend - this exercises the code path
+        # that calls message.as_bytes() internally. Before django-ses 4.6.0,
+        # this would raise: TypeError: Message.as_bytes() got an unexpected
+        # keyword argument 'linesep'
+        backend = SESBackend()
+        backend.send_messages([email])
+
+        # Verify the mocked SES client was called
+        mock_client.send_raw_email.assert_called_once()
 
     def test_email_message_class(self) -> None:
         """This test checks if Django EmailMessage class works properly using
