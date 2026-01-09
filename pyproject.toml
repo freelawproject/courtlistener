@@ -92,7 +92,7 @@ dependencies = [
   "sentry-sdk[celery,django]>=2.25.0",
   "selenium>=4.30.0",
   "ipython>=9.0.2",
-  "time-machine>=2.17.0",
+  "time-machine>=3.2.0",
   "dateparser==1.2.1",
   "types-dateparser>=1.2.0.20250208",
   "uvicorn[standard]>=0.34.0",
