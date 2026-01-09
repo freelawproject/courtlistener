@@ -230,6 +230,15 @@ class ProcessingQueue(AbstractDateTimeModel):
         print(self.file_contents)
 
 
+class EMAIL_SOURCES:
+    PACER = 1
+    SCOTUS = 2
+    NAMES = (
+        (PACER, "PACER email notification."),
+        (SCOTUS, "SCOTUS email notification."),
+    )
+
+
 class EmailProcessingQueue(AbstractDateTimeModel):
     """Where @recap.email emails go when received by the API"""
 
@@ -278,6 +287,11 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         RECAPDocument,
         related_name="recap_email_processing_queue",
         help_text="Document(s) created from the PACER email, processed as a function of this queue.",
+    )
+    source = models.SmallIntegerField(
+        help_text="The source from this email notification",
+        choices=EMAIL_SOURCES.NAMES,
+        default=EMAIL_SOURCES.PACER,
     )
 
     def __str__(self) -> str:

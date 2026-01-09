@@ -96,6 +96,10 @@ class RecapEmailSESStorage(S3Storage):
     bucket_name = "recap.email"
 
 
+class SCOTUSSESStorage(S3Storage):
+    bucket_name = "scotus.email"
+
+
 class S3PrivateUUIDStorage(S3Storage):
     """Implements a UUID file system storage.
 
