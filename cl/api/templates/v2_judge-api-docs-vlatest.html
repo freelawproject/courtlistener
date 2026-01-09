@@ -7,9 +7,6 @@
 {% block description %}Use these APIs to query and analyze thousands of federal and state judges, including their biographical information, political affiliations, education and employment histories, judgeships, and more.{% endblock %}
 {% block og_description %}Use these APIs to query and analyze thousands of federal and state judges, including their biographical information, political affiliations, education and employment histories, judgeships, and more.{% endblock %}
 
-{% block sidebar %}{% endblock %}
-{% block navbar-p %}active{% endblock %}
-
 
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
@@ -64,25 +61,24 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="people-endpoint">
-    <h3 id="people-endpoint">People (Judges and Appointers) <br><small><nobr><code>{% url "person-list" version=version %}</code></nobr></small></h3>
+    <h3 id="people-endpoint">People (Judges and Appointers) <br><small><code>{% url "person-list" version=version %}</code></small></h3>
     <p>This API contains the central "person" object. As explained above, people can be judges, appointers, or both.</p>
     <p>This object holds the core metadata about the person, including their biographical data, positions held, educational history, ABA ratings, and political affiliations.</p>
     <p>A few notes:</p>
     <ul>
       <li>
-        <p>Position objects can be quite large, so they are linked in the person object instead of nested within it.
-        </p>
+        <p>Position objects can be quite large, so they are linked in the person object instead of nested within it.</p>
       </li>
       <li>
-        <p>If the <code>is_alias_of</code> field has a value, that means the record represents a nickname for the person referenced in the alias field. Alias records make it possible to find a judge by name, even if they sometimes go by Bob instead of Robert. In our database, this field is a <a href="https://en.wikipedia.org/wiki/Join_(SQL)#Self-join">self-join</a>.</p>
+        <p>If the <code>is_alias_of</code> field has a value, that means the record represents a nickname for the person referenced in the alias field. Alias records make it possible to find a judge by name, even if they sometimes go by Bob instead of Robert. In our database, this field is a <a class="underline" href="https://en.wikipedia.org/wiki/Join_(SQL)#Self-join">self-join</a>.</p>
         <p>In general, you will only want to work with judges where this field is null, indicating a record that represents a person, not an alias to a person.</p>
       </li>
       <li>
         <p>The <code>race</code> and <code>gender</code> fields are not self-reported and should therefore be considered best guesses. We have done our best to gather these fields from reputable sources, but have also supplied values ourselves when it felt appropriate to do so. Some values may be incorrect.</p>
-        <p>To create choices for race, we used the U.S. census and added <a href="https://en.wikipedia.org/wiki/Middle_East_and_North_Africa">MENA (it has since been added to the census)</a>.</p>
+        <p>To create choices for race, we used the U.S. census and added <a class="underline" href="https://en.wikipedia.org/wiki/Middle_East_and_North_Africa">MENA (it has since been added to the census)</a>.</p>
       </li>
       <li>
-        <p>The <code>has_photo</code> field indicates whether we have a photo for the judge in <a href="https://free.law/datasets#judges-portraits">our database of judge portraits</a>.</p>
+        <p>The <code>has_photo</code> field indicates whether we have a photo for the judge in <a class="underline" href="https://free.law/datasets#judges-portraits">our database of judge portraits</a>.</p>
       </li>
       <li>
         <p>The <code>ftm_*</code> fields relate to state court judges, who raise money for elections. Use these fields to link judges to their IDs on <a href="https://www.followthemoney.org/">Follow The Money</a>, where you can gather and analyze the details.</p>
@@ -106,14 +102,14 @@ curl -v \
 
   <c-layout-with-navigation.section id="affiliations-endpoint">
     <h3>Political Affiliations<br />
-    <small><nobr><code>{% url "politicalaffiliation-list" version=version %}</code></nobr></small></h3>
+    <small><code>{% url "politicalaffiliation-list" version=version %}</code></small></h3>
     <p>Use this API to learn the political affiliations of a person. Political affiliations are gathered from a number of sources such as ballots or appointments, and have start and end dates.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="education-history">
     <h3>Educations and Schools<br />
-      <small><nobr><code>{% url "education-list" version=version %}</code></nobr></small></h3>
+      <small><code>{% url "education-list" version=version %}</code></small></h3>
     <p>Use this API to learn about the educational history of a person, including which schools they went to, when, and what degrees they received. Each education object can include a school object based on data from the Department of Education.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
     <p>To filter for judges educated at a particular school:</p>
@@ -133,7 +129,7 @@ curl -v \
 
   <c-layout-with-navigation.section id="retention-events">
     <h3>Retention Events<br>
-    <small><nobr><code>{% url "retentionevent-list" version=version %}</code></nobr></small></h3>
+    <small><code>{% url "retentionevent-list" version=version %}</code></small></h3>
     <p>These are the events that keep a judge in a position, such as a retention vote, or reappointment.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
   </c-layout-with-navigation.section>
