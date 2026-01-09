@@ -461,31 +461,31 @@ requires-dist = [
     { name = "dateparser", specifier = "==1.2.2" },
     { name = "disposable-email-domains" },
     { name = "django", specifier = ">=6.0,<6.1" },
-    { name = "django-admin-cursor-paginator", specifier = ">=0.1.6" },
+    { name = "django-admin-cursor-paginator", specifier = ">=0.1.7" },
     { name = "django-cache-memoize" },
-    { name = "django-cors-headers", specifier = ">=4.7.0" },
-    { name = "django-cotton", specifier = ">=2.5.0" },
-    { name = "django-csp", specifier = ">=3.8" },
+    { name = "django-cors-headers", specifier = ">=4.9.0" },
+    { name = "django-cotton", specifier = ">=2.6.0" },
+    { name = "django-csp", specifier = ">=4.0" },
     { name = "django-cursor-pagination", specifier = ">=0.3.0" },
     { name = "django-elasticsearch-dsl", specifier = ">=8.0" },
     { name = "django-environ", specifier = ">=0.12.0" },
-    { name = "django-extensions", specifier = ">=3.2.3" },
-    { name = "django-filter", specifier = ">=25.1" },
+    { name = "django-extensions", specifier = ">=4.1" },
+    { name = "django-filter", specifier = ">=25.2" },
     { name = "django-hcaptcha", specifier = ">=0.2.0" },
-    { name = "django-localflavor", specifier = ">=4.0" },
+    { name = "django-localflavor", specifier = ">=5.0" },
     { name = "django-markdown-deux", specifier = ">=1.0.6" },
     { name = "django-mathfilters" },
     { name = "django-model-utils", specifier = ">=5.0.0" },
     { name = "django-override-storage", specifier = ">=0.3.2" },
-    { name = "django-permissions-policy", specifier = ">=4.25.0" },
-    { name = "django-pghistory", specifier = ">=3.5.4" },
+    { name = "django-permissions-policy", specifier = ">=4.28.0" },
+    { name = "django-pghistory", specifier = ">=3.9.1" },
     { name = "django-prometheus", specifier = ">=2.4.1" },
     { name = "django-ratelimit", specifier = ">=4.1.0" },
     { name = "django-s3-express-cache", specifier = ">=0.1.0" },
     { name = "django-ses", extras = ["events"], specifier = ">=4.6.0" },
-    { name = "django-storages", specifier = ">=1.14.5" },
-    { name = "django-tailwind", specifier = ">=3.8.0" },
-    { name = "django-waffle", specifier = ">=4.2.0" },
+    { name = "django-storages", specifier = ">=1.14.6" },
+    { name = "django-tailwind", specifier = "~=3.9.1" },
+    { name = "django-waffle", specifier = ">=5.0.0" },
     { name = "djangorestframework", specifier = ">=3.16.1" },
     { name = "djangorestframework-filters", specifier = "==1.0.0.dev2" },
     { name = "djangorestframework-xml", specifier = ">=2.0.0" },
@@ -548,7 +548,7 @@ requires-dist = [
 dev = [
     { name = "django-debug-toolbar", specifier = ">=6.1.0" },
     { name = "django-stubs", specifier = ">=5.2.8" },
-    { name = "django-tailwind", extras = ["reload"], specifier = ">=3.8.0" },
+    { name = "django-tailwind", extras = ["reload"], specifier = "~=3.9.1" },
     { name = "djangorestframework-stubs", specifier = ">=3.16.6" },
     { name = "exrex", specifier = ">=0.12.0" },
     { name = "lxml-stubs", specifier = ">=0.5.1" },
@@ -815,12 +815,12 @@ wheels = [
 
 [[package]]
 name = "django-admin-cursor-paginator"
-version = "0.1.6"
+version = "0.1.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/7d/5ffc8dc775108f640111bcb3b7eae1df6c330e002a335dec982dedc5fe47/django-admin-cursor-paginator-0.1.6.tar.gz", hash = "sha256:42f81854c3f7774b1b9a327ce974586bdbdcca1c761b634a1ebf162c8a65cab9", size = 10062, upload-time = "2024-03-01T19:57:08.305Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9c/b7/df95bba044d589242764eaf4eaad60e7c5cac13197e95f732faeaf72cdb8/django_admin_cursor_paginator-0.1.7.tar.gz", hash = "sha256:a35d89670635cff60ad6b601dd89973c7955f740315535ed92022f854ecb117f", size = 10200, upload-time = "2025-10-26T10:18:37.061Z" }
 
 [[package]]
 name = "django-browser-reload"
@@ -846,39 +846,40 @@ wheels = [
 
 [[package]]
 name = "django-cors-headers"
-version = "4.7.0"
+version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/93/6c/16f6cb6064c63074fd5b2bd494eb319afd846236d9c1a6c765946df2c289/django_cors_headers-4.7.0.tar.gz", hash = "sha256:6fdf31bf9c6d6448ba09ef57157db2268d515d94fc5c89a0a1028e1fc03ee52b", size = 21037, upload-time = "2025-02-06T22:15:28.924Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/21/39/55822b15b7ec87410f34cd16ce04065ff390e50f9e29f31d6d116fc80456/django_cors_headers-4.9.0.tar.gz", hash = "sha256:fe5d7cb59fdc2c8c646ce84b727ac2bca8912a247e6e68e1fb507372178e59e8", size = 21458, upload-time = "2025-09-18T10:40:52.326Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/a2/7bcfff86314bd9dd698180e31ba00604001606efb518a06cca6833a54285/django_cors_headers-4.7.0-py3-none-any.whl", hash = "sha256:f1c125dcd58479fe7a67fe2499c16ee38b81b397463cf025f0e2c42937421070", size = 12794, upload-time = "2025-02-06T22:15:24.341Z" },
+    { url = "https://files.pythonhosted.org/packages/30/d8/19ed1e47badf477d17fb177c1c19b5a21da0fd2d9f093f23be3fb86c5fab/django_cors_headers-4.9.0-py3-none-any.whl", hash = "sha256:15c7f20727f90044dcee2216a9fd7303741a864865f0c3657e28b7056f61b449", size = 12809, upload-time = "2025-09-18T10:40:50.843Z" },
 ]
 
 [[package]]
 name = "django-cotton"
-version = "2.5.0"
+version = "2.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/14/83/5284c3b8605180b1703fff6d445794e22ecfb9a8bfca6299dc25048238df/django_cotton-2.5.0.tar.gz", hash = "sha256:56b8e61b4d8b51667f62995393a24f9a37a4da68517251180754356b76c51df7", size = 29979, upload-time = "2025-11-20T22:22:37.769Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/39/3082ec5f671923bdeda69e57914c578a9aaaf83a86491eb12b1c1e8d1f9c/django_cotton-2.6.0.tar.gz", hash = "sha256:265495daeeff377b5b08fbbbce4c99859ab93df74b6a73b0c0cc2f54dd3c25b2", size = 31073, upload-time = "2025-12-18T15:42:55.846Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/2e/d9726f5cf31720b453baba87741adc24a9c4a1ee451d044b2b2414e623a8/django_cotton-2.5.0-py3-none-any.whl", hash = "sha256:cb8ecdfda233f059d706e9a780c512e27df806aafafacbf2492ef2edd3c4f66b", size = 29316, upload-time = "2025-11-20T22:22:36.915Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/74/a0abaa69b24a7f13c9ea3fd4c316a9c49a50472f819f7fe76635f48d02cb/django_cotton-2.6.0-py3-none-any.whl", hash = "sha256:85d7a992d38b380a49c7ebef0221cac555e8f05d10dd4b42fcd984dc32539de7", size = 30447, upload-time = "2025-12-18T15:42:54.483Z" },
 ]
 
 [[package]]
 name = "django-csp"
-version = "3.8"
+version = "4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
+    { name = "packaging" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/16/c3c65ad59997284402e54d00797c7aca96572df911aede3e1f2cc2e029f8/django_csp-3.8.tar.gz", hash = "sha256:ef0f1a9f7d8da68ae6e169c02e9ac661c0ecf04db70e0d1d85640512a68471c0", size = 13341, upload-time = "2024-03-01T14:00:30.013Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/db/23567744dff2169aadb095f726088074476b24dfff5a759ffcf6389cf401/django_csp-4.0.tar.gz", hash = "sha256:b27010bb702eb20a3dad329178df2b61a2b82d338b70fbdc13c3a3bd28712833", size = 20028, upload-time = "2025-04-02T16:41:46.721Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/ff/2c7a4b6706125a17bd0071802e4894c28772cfcdea20a086a2be3c5fafda/django_csp-3.8-py3-none-any.whl", hash = "sha256:19b2978b03fcd73517d7d67acbc04fbbcaec0facc3e83baa502965892d1e0719", size = 17410, upload-time = "2024-03-01T14:00:28.135Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/a4/736ab90ee527a23e194d1ce7358c6bcced66381ced83c28268b4aea236f7/django_csp-4.0-py3-none-any.whl", hash = "sha256:d5a0a05463a6b75a4f1fc1828c58c89af8db9364d09fc6e12f122b4d7f3d00dc", size = 25689, upload-time = "2025-04-02T16:41:45.689Z" },
 ]
 
 [[package]]
@@ -927,26 +928,26 @@ wheels = [
 
 [[package]]
 name = "django-extensions"
-version = "3.2.3"
+version = "4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/f1/318684c9466968bf9a9c221663128206e460c1a67f595055be4b284cde8a/django-extensions-3.2.3.tar.gz", hash = "sha256:44d27919d04e23b3f40231c4ab7af4e61ce832ef46d610cc650d53e68328410a", size = 277216, upload-time = "2023-06-05T17:09:01.447Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6d/b3/ed0f54ed706ec0b54fd251cc0364a249c6cd6c6ec97f04dc34be5e929eac/django_extensions-4.1.tar.gz", hash = "sha256:7b70a4d28e9b840f44694e3f7feb54f55d495f8b3fa6c5c0e5e12bcb2aa3cdeb", size = 283078, upload-time = "2025-04-11T01:15:39.617Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a7/7e/ba12b9660642663f5273141018d2bec0a1cae1711f4f6d1093920e157946/django_extensions-3.2.3-py3-none-any.whl", hash = "sha256:9600b7562f79a92cbf1fde6403c04fee314608fefbb595502e34383ae8203401", size = 229868, upload-time = "2023-06-05T17:08:58.197Z" },
+    { url = "https://files.pythonhosted.org/packages/64/96/d967ca440d6a8e3861120f51985d8e5aec79b9a8bdda16041206adfe7adc/django_extensions-4.1-py3-none-any.whl", hash = "sha256:0699a7af28f2523bf8db309a80278519362cd4b6e1fd0a8cd4bf063e1e023336", size = 232980, upload-time = "2025-04-11T01:15:37.701Z" },
 ]
 
 [[package]]
 name = "django-filter"
-version = "25.1"
+version = "25.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b5/40/c702a6fe8cccac9bf426b55724ebdf57d10a132bae80a17691d0cf0b9bac/django_filter-25.1.tar.gz", hash = "sha256:1ec9eef48fa8da1c0ac9b411744b16c3f4c31176c867886e4c48da369c407153", size = 143021, upload-time = "2025-02-14T16:30:53.238Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/e4/465d2699cd388c0005fb8d6ae6709f239917c6d8790ac35719676fffdcf3/django_filter-25.2.tar.gz", hash = "sha256:760e984a931f4468d096f5541787efb8998c61217b73006163bf2f9523fe8f23", size = 143818, upload-time = "2025-10-05T09:51:31.521Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/a6/70dcd68537c434ba7cb9277d403c5c829caf04f35baf5eb9458be251e382/django_filter-25.1-py3-none-any.whl", hash = "sha256:4fa48677cf5857b9b1347fed23e355ea792464e0fe07244d1fdfb8a806215b80", size = 94114, upload-time = "2025-02-14T16:30:50.435Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/40/6a02495c5658beb1f31eb09952d8aa12ef3c2a66342331ce3a35f7132439/django_filter-25.2-py3-none-any.whl", hash = "sha256:9c0f8609057309bba611062fe1b720b4a873652541192d232dd28970383633e3", size = 94145, upload-time = "2025-10-05T09:51:29.728Z" },
 ]
 
 [[package]]
@@ -960,15 +961,15 @@ wheels = [
 
 [[package]]
 name = "django-localflavor"
-version = "4.0"
+version = "5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "python-stdnum" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/31/18b46a206ee2c96997e8d5f49db7bb2cc8cc463fa90829545583c7042ad4/django-localflavor-4.0.tar.gz", hash = "sha256:11859e522dba74aa6dde5a659242b1fbc5efb4dea08e9b77315402bdeca5194e", size = 4884470, upload-time = "2023-04-22T12:09:14.913Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/9f/4792bc2359211988f199e947f7b4cd439c6cda92de0f2d14d47d491853f7/django_localflavor-5.0.tar.gz", hash = "sha256:9ddcce5dac6a956d076f3134071c64d4c76e1c7063e8aa7730414a2a1c5ded59", size = 5000251, upload-time = "2025-05-21T08:01:16.028Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/71/768750c99eba036c9053de7f2749493d685b0bf88414248538f0862ec335/django_localflavor-4.0-py3-none-any.whl", hash = "sha256:7a5b1df03ca8e10df9d1b3c2e4314e43383067868183cdf41ab4e7a973694a8b", size = 2885240, upload-time = "2023-04-22T12:09:09.375Z" },
+    { url = "https://files.pythonhosted.org/packages/21/10/677a837683be26517a79f3f45f3a34baca14fa31b0c3c46f8a746f93349b/django_localflavor-5.0-py3-none-any.whl", hash = "sha256:ee32749420cc4a93b18667939fe7fa0da36d71024a0d9578b40809a71489cee7", size = 2979096, upload-time = "2025-05-21T08:01:13.488Z" },
 ]
 
 [[package]]
@@ -1012,28 +1013,28 @@ wheels = [
 
 [[package]]
 name = "django-permissions-policy"
-version = "4.25.0"
+version = "4.28.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/29/27252a33e78014c6d31d200c19269d5b5d49b6e0d9306f1adc85bfb5644c/django_permissions_policy-4.25.0.tar.gz", hash = "sha256:2757397fb6299e187ef146809a047b636584e7431527255615752db6dc2e94f7", size = 10074, upload-time = "2025-02-06T22:18:08.078Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/ad/6445c82d70bcac2b9e2b3e42b59553a195c799c63b7187c310a02a775dc2/django_permissions_policy-4.28.0.tar.gz", hash = "sha256:956ce8b08b82efb11ebabe3c5b11a6eb380f44eb543b3a2130adaec5d7fec651", size = 10728, upload-time = "2025-09-18T11:14:49.23Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/5a/9584102478089aa56f71f5b1f4fc973a37f8107f55b4a67a96d90f6819f3/django_permissions_policy-4.25.0-py3-none-any.whl", hash = "sha256:083a411c31964dd06c9aec4058147dda46bc1c3e04a799cbae7603578d979944", size = 6668, upload-time = "2025-02-06T22:18:05.661Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/7c/395dff3ce4a299de2b0f069c2572bc8f20c149066b6c754b2a08486dacf9/django_permissions_policy-4.28.0-py3-none-any.whl", hash = "sha256:bea079be235a7e10325d4eb84cfb97f44e1ee8a1786da0e3f9122c0a0b1e66ec", size = 6773, upload-time = "2025-09-18T11:14:47.481Z" },
 ]
 
 [[package]]
 name = "django-pghistory"
-version = "3.9.0"
+version = "3.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
     { name = "django-pgtrigger" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ef/61/06119cef2cb88e2314d00e27fc581c77a97baf90dfa638e03db3d87c2b10/django_pghistory-3.9.0.tar.gz", hash = "sha256:36f883ce91ac27bd3f6841494224c7579dc41243c217db2cdd2caf4c4a13400d", size = 31341, upload-time = "2025-11-30T23:50:01.679Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/be/8a/90d0fca7b7548c6894a42bcbc456f55f3e07f7f20086c86ea3b4a84014e3/django_pghistory-3.9.1.tar.gz", hash = "sha256:1ae71ddf7c30a07f988c6001c96a390c881e4fe1ef1cbc4c86f86a5bf5c6e5ba", size = 31337, upload-time = "2025-12-12T01:07:48.272Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/4c/cfbccf04a9aa22e360449be6ec5965ce7a5dbb508733c835ef2643b6a876/django_pghistory-3.9.0-py3-none-any.whl", hash = "sha256:4506aedb59fc0b1061911293170b15e617eb0db72924cee7edc7e30725b3e995", size = 39871, upload-time = "2025-11-30T23:50:00.687Z" },
+    { url = "https://files.pythonhosted.org/packages/93/2c/1aaebe28c56ee627bbb5423ca4b35466d232895de1b843c5872eaa0071cc/django_pghistory-3.9.1-py3-none-any.whl", hash = "sha256:e0a3750b8df9c81b50991bd4ed84ae73ae3a907f5f46c4f27aff2396437d8b3b", size = 39871, upload-time = "2025-12-12T01:07:47.15Z" },
 ]
 
 [[package]]
@@ -1103,14 +1104,14 @@ events = [
 
 [[package]]
 name = "django-storages"
-version = "1.14.5"
+version = "1.14.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d7/eb/4ec2b551a6769cb8112497c9fe5c773717622cec0862a8225bda2dfedb66/django_storages-1.14.5.tar.gz", hash = "sha256:ace80dbee311258453e30cd5cfd91096b834180ccf09bc1f4d2cb6d38d68571a", size = 85867, upload-time = "2025-02-15T16:57:20.187Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/d6/2e50e378fff0408d558f36c4acffc090f9a641fd6e084af9e54d45307efa/django_storages-1.14.6.tar.gz", hash = "sha256:7a25ce8f4214f69ac9c7ce87e2603887f7ae99326c316bc8d2d75375e09341c9", size = 87587, upload-time = "2025-04-02T02:34:55.103Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/61/00e4bcbf55337c2633c6cddc77a15d4ea16cbe74c01c1f745ecde8feff47/django_storages-1.14.5-py3-none-any.whl", hash = "sha256:5ce9c69426f24f379821fd688442314e4aa03de87ae43183c4e16915f4c165d4", size = 32636, upload-time = "2025-02-15T16:57:18.578Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/21/3cedee63417bc5553eed0c204be478071c9ab208e5e259e97287590194f1/django_storages-1.14.6-py3-none-any.whl", hash = "sha256:11b7b6200e1cb5ffcd9962bd3673a39c7d6a6109e8096f0e03d46fab3d3aabd9", size = 33095, upload-time = "2025-04-02T02:34:53.291Z" },
 ]
 
 [[package]]
@@ -1143,14 +1144,14 @@ wheels = [
 
 [[package]]
 name = "django-tailwind"
-version = "3.8.0"
+version = "3.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/ee/1065c57c87213f566d76b398f8391cd544380ef9661f7fdacdfe4264633c/django_tailwind-3.8.0.tar.gz", hash = "sha256:31c2f4a7879d685c2de0feaf0b63f246200b37337bea4d7dbafb59bc3f10c008", size = 8969, upload-time = "2023-12-22T16:05:19.251Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/4a/ad6f842aa3eccffd4fd4f5d20419800fe11cdf45e23bc4e3a2efa3a599a2/django_tailwind-3.9.1.tar.gz", hash = "sha256:518ba44d1e50c285f8ec5c46ebafb3075cec7a753d39a7f5fb69c71abc35009a", size = 9081, upload-time = "2025-04-02T13:26:18.963Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cf/14/20c40882d9ee91f7a2a20d3c0175cf813340c02ae31c975ce567de2c7c67/django_tailwind-3.8.0-py3-none-any.whl", hash = "sha256:fa969c5b95d314b173fe2b2ed2cb2c03f2e2c94fdc2c01ff73a993fa159085da", size = 12936, upload-time = "2023-12-22T16:05:17.26Z" },
+    { url = "https://files.pythonhosted.org/packages/98/3a/57675729ff6a0d0828c38596bedf342df9c16c82e7c9f45bafbb0881472f/django_tailwind-3.9.1-py3-none-any.whl", hash = "sha256:3a1807b4ed93c893d9c8ddbaf2b771d2bc4ef462f2406e17105571234005c601", size = 13028, upload-time = "2025-04-02T13:26:17.628Z" },
 ]
 
 [package.optional-dependencies]
@@ -1160,14 +1161,14 @@ reload = [
 
 [[package]]
 name = "django-waffle"
-version = "4.2.0"
+version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e9/4b/3189241d51f582f1447ad528ed11fffad138d7d9ca3f931220a0da387e3e/django_waffle-4.2.0.tar.gz", hash = "sha256:97709550f4e75ce2a20b13e29f39777e1439a968569f2ee89398ca368afd586c", size = 36538, upload-time = "2024-11-15T17:33:31.816Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/22/e1/6f533da0d4ac89f427dfd9410e39bfc14ae3a23335ecd549d76be4b2a834/django_waffle-5.0.0.tar.gz", hash = "sha256:62f9d00eedf68dafb82657beab56e601bddedc1ea1ccfef91d83df8658708509", size = 37761, upload-time = "2025-06-12T07:38:54.895Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/64/d9d77ae9fdf00e16cd75199a28c40937e5584992cd6c7763b4f2c1bceadd/django_waffle-4.2.0-py3-none-any.whl", hash = "sha256:774f45b929627c9d303620c85419ce1da54066f2082d741af014f5bbd747e372", size = 46785, upload-time = "2024-11-15T17:33:30.094Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/d2/6f0d664bd35a3fdd0403655c7c32ec290704923f11541ef356b180cd8fbf/django_waffle-5.0.0-py3-none-any.whl", hash = "sha256:3312851d9d926b76b9e90712355781700a383b82b5bf2b61e1f1be97532c0f3d", size = 48137, upload-time = "2025-06-12T07:38:53.698Z" },
 ]
 
 [[package]]
@@ -3622,16 +3623,16 @@ wheels = [
 
 [[package]]
 name = "virtualenv"
-version = "20.36.0"
+version = "20.36.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "distlib" },
     { name = "filelock" },
     { name = "platformdirs" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/49/87e23d8f742f10f965bce5d6b285fc88a4f436b11daf6b6225d4d66f8492/virtualenv-20.36.0.tar.gz", hash = "sha256:a3601f540b515a7983508113f14e78993841adc3d83710fa70f0ac50f43b23ed", size = 6032237, upload-time = "2026-01-07T17:20:04.975Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/a3/4d310fa5f00863544e1d0f4de93bddec248499ccf97d4791bc3122c9d4f3/virtualenv-20.36.1.tar.gz", hash = "sha256:8befb5c81842c641f8ee658481e42641c68b5eab3521d8e092d18320902466ba", size = 6032239, upload-time = "2026-01-09T18:21:01.296Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/6a/0af36875e0023a1f2d0b66b4051721fc26740e947696922df1665b75e5d3/virtualenv-20.36.0-py3-none-any.whl", hash = "sha256:e7ded577f3af534fd0886d4ca03277f5542053bedb98a70a989d3c22cfa5c9ac", size = 6008261, upload-time = "2026-01-07T17:20:02.87Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/2a/dc2228b2888f51192c7dc766106cd475f1b768c10caaf9727659726f7391/virtualenv-20.36.1-py3-none-any.whl", hash = "sha256:575a8d6b124ef88f6f51d56d656132389f961062a9177016a50e4f507bbcc19f", size = 6008258, upload-time = "2026-01-09T18:20:59.425Z" },
 ]
 
 [[package]]
