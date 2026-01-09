@@ -56,7 +56,14 @@ from juriscraper.pacer import (
 )
 from juriscraper.pacer.reports import BaseReport
 from juriscraper.pacer.utils import is_pdf
-from juriscraper.state.texas import TexasCaseDocument
+from juriscraper.state.texas import (
+    TexasCaseDocument,
+    TexasCaseEvent,
+    TexasCommonData,
+    TexasSupremeCourtAppellateBrief,
+    TexasSupremeCourtCaseEvent,
+)
+from juriscraper.state.texas.common import TexasAppellateBrief
 from openai import (
     APIConnectionError,
     APIError,
@@ -3404,8 +3411,78 @@ async def merge_texas_documents(
     docket_entry: TexasDocketEntry,
     documents: list[TexasCaseDocument],
 ) -> list[tuple[bool, bool, int]]:
+    """Merges a list of Texas docket entry attachments into CL.
+
+    :param docket_entry: The docket entry this attachment belongs to.
+    :param documents: List of TexasCaseDocument attached to this docket entry.
+    :return: List of tuples with the following entries:
+    - A flag indicating whether the document needed to be created or updated,
+    - A flag indicating which is set to True when the document was successfully
+    created or updated or when an update was unnecessary,
+    - The primary key of the updated TexasDocument object."""
     texas_document_merger = functools.partial(
         merge_texas_document, docket_entry
     )
     texas_document_mergers = map(texas_document_merger, documents)
     return await asyncio.gather(*texas_document_mergers)
+
+
+def texas_docket_entry_sequence_numbers(input: TexasCommonData) -> list[str]:
+    """Calculates the sequence numbers for a scraped list of TexasDocketEntry
+    objects to allow consistent matching and merging.
+
+    :param input: The scraped Texas docket data.
+    :return: A list of sequence numbers corresponding to the list of
+    TexasDocketEntry objects in input["case_events"].
+    """
+    return list(
+        [
+            f"{e['date'].isoformat()}-{i}"
+            for (i, e) in enumerate(input["case_events"])
+        ]
+    )
+
+
+async def merge_texas_docket_entry(
+    docket: Docket,
+    sequence_number: str,
+    appellate_brief: bool,
+    input_docket_entry: TexasCaseEvent
+    | TexasAppellateBrief
+    | TexasSupremeCourtCaseEvent
+    | TexasSupremeCourtAppellateBrief,
+):
+    """Merges a Texas docket entry into CL.
+
+    :param docket: The docket this entry belongs to.
+    :param sequence_number: The sequence number of the docket entry.
+    :param appellate_brief: Whether the docket entry is an appellate brief.
+    :param input_docket_entry: The docket entry being merged.
+    :return: Tuple with the following entries
+    - A flag indicating whether the docket entry or an attached document needed
+    to be created or updated,
+    - A flag which is set to true when the create/update operations are all
+    either successful or unnecessary,
+    - The primary key of the updated TexasDocketEntry object."""
+    (docket_entry, created) = await TexasDocketEntry.objects.aget_or_create(
+        docket=docket,
+        date_filed=input_docket_entry["date"],
+        sequence_number=sequence_number,
+        defaults={
+            "description": input_docket_entry.get("description", ""),
+            "disposition": input_docket_entry.get("disposition", ""),
+            "remarks": input_docket_entry.get("remarks", ""),
+            "entry_type": input_docket_entry["type"],
+            "appellate_brief": appellate_brief,
+        },
+    )
+
+    documents = await merge_texas_documents(
+        docket_entry, input_docket_entry["attachments"]
+    )
+
+    (update_or_create, success) = functools.reduce(
+        lambda x, y: (x[0] or y[0], x[1] and y[1]), documents, (False, True)
+    )
+
+    return created or update_or_create, success, docket_entry.pk
