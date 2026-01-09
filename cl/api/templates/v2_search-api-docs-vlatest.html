@@ -33,14 +33,18 @@
   ]"
 >
   <c-layout-with-navigation.section id="about">
-    <h1 class="font-sans text-display-xs font-semibold text-greyscale-900">Legal Search&nbsp;API</h1>
-    <h2><code>{% url "search-list" version=version %}</code></h2>
+    <h1>Legal Search&nbsp;API</h1>
+    <h2><code class="text-display-xs font-semibold">{% url "search-list" version=version %}</code></h2>
+    <p class="lead v-offset-above-3">Use this API to search case law, PACER data, judges, and oral argument audio recordings.</p>
+    <p>To get the most out of this API, see our <a class="text-primary-600" href="{% url "coverage" %}">coverage</a>, <a class="text-primary-600" href="{% url "advanced_search" %}">advanced operators</a>, and <a class="text-primary-600" href="{% url "relative_dates" %}">relative date queries</a> documentation.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="usage">
     <h2>Basic Usage</h2>
     <p>This API uses the same GET parameters as the front end of the website. To use this API, place a search query on the front end of the website. That will give you a URL like:</p>
-    <c-code>{% get_full_host %}/q=foo</c-code>
+    <c-code>
+      {% get_full_host %}/q=foo
+    </c-code>
     <p>To make this into an API request, copy the GET parameters from this URL to the API endpoint, creating a request like:</p>
     <c-code>
   curl -X GET \
@@ -158,11 +162,11 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="type">
-    <h3>Setting the Result <code>type</code></h3>
+    <h3>Setting the Result Type</h3>
     <p>The most important parameter in this API is <code>type</code>. This parameter sets the type of object you are querying:</p>
     <c-data-table
       safe
-      caption="TBD"
+      caption="Search type parameter values"
       :columns="[
         {'label': 'Type', 'field': 'type'},
         {'label': 'Definition', 'field': 'definition'}
