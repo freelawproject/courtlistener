@@ -1,15 +1,19 @@
+import asyncio
 import copy
+import functools
 import logging
 import os
 import re
 import shutil
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import IO, Any
 
 import environ
 import eyecite
@@ -52,6 +56,7 @@ from juriscraper.pacer import (
 )
 from juriscraper.pacer.reports import BaseReport
 from juriscraper.pacer.utils import is_pdf
+from juriscraper.state.texas import TexasCaseDocument
 from openai import (
     APIConnectionError,
     APIError,
@@ -153,6 +158,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     Tag,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3179,6 +3185,58 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         )
 
 
+@contextmanager
+def download_pdf_in_stream(
+    url: str,
+    identifier: str | int,
+    temp_prefix: str = "scotus_",
+) -> Iterator[IO[bytes] | None]:
+    """Download a PDF in stream and yield a temporary file to avoid using too
+    much memory
+
+    :param url: The URL to download the PDF from
+    :param identifier: An identifier for logging (docket_id, rd.pk, etc.)
+    :param temp_prefix: Prefix for the temporary file name
+    :yields: A NamedTemporaryFile positioned at the beginning, or None if
+    the response is not a PDF
+    """
+
+    @retry(
+        (ConnectionError, Timeout),
+        tries=3,
+        delay=0.25,
+        backoff=1,
+    )
+    def download_to_file(tmp_file):
+        tmp_file.seek(0)
+        # Clear any partial content from previous attempt
+        tmp_file.truncate()
+        with requests.get(
+            url,
+            stream=True,
+            timeout=60,
+            headers={"User-Agent": "Free Law Project"},
+        ) as response:
+            response.raise_for_status()
+            if not is_pdf(response):
+                logger.warning(
+                    "PDF download: Expected application/pdf for %s from %s; aborting.",
+                    identifier,
+                    url,
+                )
+                return False
+            for chunk in response.iter_content(chunk_size=8 * 1024):
+                if chunk:
+                    tmp_file.write(chunk)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            return True
+
+    with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
+        success = download_to_file(tmp)
+        yield tmp if success else None
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -3283,3 +3341,71 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             "SCOTUS PDF download: Ran into a RequestException. Retrying."
         )
         raise self.retry(exc=exc)
+
+
+async def merge_texas_document(
+    docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
+) -> tuple[bool, bool, int]:
+    """Merge a single TexasCaseDocument object into CL.
+
+    Checks if the document exists, creating a TexasDocument object if it does
+    not. Then, if the document is new or has changed (media_version_id is
+    different, fetch the attachment PDF, store it, compute metadata, and
+    mark the document as available.
+
+    :param docket_entry: The docket entry this attachment belongs to.
+    :param input_document: The attachment to merge.
+    :return: Tuple with entries
+    - Flag indicating whether a document needed to be created or updated
+    - Flag indicating whether the update operation was successful or not
+    applicable
+    - Primary key of the TexasDocument object which matches the input document
+    """
+    (texas_document, created) = await TexasDocument.objects.aget_or_create(
+        media_id=input_document["media_id"],
+        docket_entry=docket_entry,
+        defaults={
+            "description": input_document["description"],
+            "media_id": input_document["media_id"],
+            "media_version_id": input_document["media_version_id"],
+            "document_url": input_document["document_url"],
+        },
+    )
+
+    if (
+        created
+        or texas_document.media_version_id
+        != input_document["media_version_id"]
+    ):
+        media_id = input_document["media_id"]
+        media_version_id = input_document["media_version_id"]
+        download_url = input_document["document_url"]
+        with download_pdf_in_stream(
+            download_url, texas_document.pk, "texas_"
+        ) as tmp:
+            if tmp is None:
+                logger.error(
+                    "Failed to download attachment PDF for TexasDocument %s.",
+                    texas_document.pk,
+                )
+                return True, False, texas_document.pk
+            filename = f"{media_id}-{media_version_id}.pdf"
+            texas_document.filepath_local = File(tmp, name=filename)
+        texas_document.description = input_document["description"]
+        texas_document.media_version_id = input_document["media_version_id"]
+        texas_document.document_url = download_url
+        await texas_document.asave()
+        return True, True, texas_document.pk
+
+    return False, True, texas_document.pk
+
+
+async def merge_texas_documents(
+    docket_entry: TexasDocketEntry,
+    documents: list[TexasCaseDocument],
+) -> list[tuple[bool, bool, int]]:
+    texas_document_merger = functools.partial(
+        merge_texas_document, docket_entry
+    )
+    texas_document_mergers = map(texas_document_merger, documents)
+    return await asyncio.gather(*texas_document_mergers)
