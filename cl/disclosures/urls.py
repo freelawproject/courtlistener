@@ -1,6 +1,7 @@
 from django.urls import path
 
 from cl.disclosures.views import (
+    disclosure_typeahead,
     financial_disclosures_home,
     financial_disclosures_viewer,
 )
@@ -15,5 +16,10 @@ urlpatterns = [
         "financial-disclosures/",
         financial_disclosures_home,
         name="financial_disclosures_home",
+    ),
+    path(
+        "financial-disclosures/search/",
+        disclosure_typeahead,
+        name="disclosure_search_typeahead",
     ),
 ]
