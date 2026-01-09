@@ -46,6 +46,8 @@ cl/                     # Main Django project
 
 6. **Async Patterns**: Many views use async. Use `sync_to_async` and `async_to_sync` from `asgiref.sync` when needed.
 
+7. **Imports**: NEVER do inline imports except to prevent circular dependency problems. ALWAYS put imports at the top.
+
 ### Python Style Rules
 
 1. Use modern python features like the walrus operator.
@@ -129,10 +131,10 @@ When creating code that modify Django models, strictly follow the Database Migra
 
 ### Pull Requests
 
-1. Update branch before committing.
-2. Run `pre-commit` and ensure it passes
-3. Submit as **draft** PR
-4. Use the template from `.github/PULL_REQUEST_TEMPLATE.md`
+1. ALWAYS update branch before committing.
+2. ALWAYS run `pre-commit` and ensure it passes
+3. ALWAYS submit as **draft** PR
+4. ALWAYS use the template from `.github/PULL_REQUEST_TEMPLATE.md`
 
 
 ## Available Tools
