@@ -1,13 +1,19 @@
 from datetime import UTC, datetime, timedelta
+from urllib import parse
 
+import requests
 from cache_memoize import cache_memoize
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Sum, Value
+from django.db.models import QuerySet, Sum, Value
 from django.db.models.functions import Coalesce, Floor
 from django.utils.timezone import make_aware, now
+from requests import Response
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import naturalduration
+from cl.lib.cloud_front import invalidate_cloudfront
+from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Opinion
 from cl.search.selectors import get_total_estimate_count
@@ -97,3 +103,73 @@ def get_homepage_stats():
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
+
+
+def delete_from_ia(url: str) -> Response:
+    """Delete an item from Internet Archive by URL
+
+    :param url: The URL of the item, for example,
+    https://archive.org/download/gov.uscourts.nyed.299029/gov.uscourts.nyed.299029.30.0.pdf
+    :return: The requests.Response of the request to IA.
+    """
+    # Get the path and drop the /download/ part of it to just get the bucket
+    # and the path
+    path = parse.urlparse(url).path
+    bucket_path = path.split("/", 2)[2]
+    storage_domain = "https://s3.us.archive.org"
+    return requests.delete(
+        f"{storage_domain}/{bucket_path}",
+        headers={
+            "Authorization": f"LOW {settings.IA_ACCESS_KEY}:{settings.IA_SECRET_KEY}",
+            "x-archive-cascade-delete": "1",
+        },
+        timeout=60,
+    )
+
+
+def seal_documents(queryset: QuerySet) -> list[str]:
+    """Delete a queryset of RECAPDocuments and mark them as sealed.
+
+    :param queryset: A queryset of RECAPDocuments you wish to seal.
+    :return: a list of URLs that did not succeed or an empty list if everything
+    worked well.
+    """
+    ia_failures = []
+    deleted_filepaths = []
+    for rd in queryset:
+        # Thumbnail
+        if rd.thumbnail:
+            deleted_filepaths.append(rd.thumbnail.name)
+            rd.thumbnail.delete()
+
+        # PDF
+        if rd.filepath_local:
+            deleted_filepaths.append(rd.filepath_local.name)
+            rd.filepath_local.delete()
+
+        # Internet Archive
+        if rd.filepath_ia:
+            url = rd.filepath_ia
+            r = delete_from_ia(url)
+            if not r.ok:
+                ia_failures.append(url)
+
+        # Clean up other fields and call save()
+        # Important to use save() to ensure these changes are updated in ES
+        rd.date_upload = None
+        rd.is_available = False
+        rd.is_sealed = True
+        rd.sha1 = ""
+        rd.page_count = None
+        rd.file_size = None
+        rd.ia_upload_failure_count = None
+        rd.filepath_ia = ""
+        rd.thumbnail_status = THUMBNAIL_STATUSES.NEEDED
+        rd.plain_text = ""
+        rd.ocr_status = None
+        rd.save()
+
+    # Do a CloudFront invalidation
+    invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
+
+    return ia_failures
