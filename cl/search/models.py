@@ -3985,8 +3985,6 @@ class CaseTransfer(AbstractDateTimeModel):
     :ivar destination_court: The court the docket is being transferred to.
     :ivar destination_docket: The case docket in the destination court.
     :ivar transfer_date: The date this transfer occurred.
-    :ivar transfer_time: The optional time this transfer occurred.
-    :ivar transfer_remarks: Any remarks given regarding this transfer.
     :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
     """
 
@@ -4025,9 +4023,6 @@ class CaseTransfer(AbstractDateTimeModel):
         related_name="case_transfer_destination_docket",
     )
     transfer_date = models.DateField()
-    transfer_remarks = models.TextField(
-        blank=True,
-    )
     transfer_type = models.SmallIntegerField(
         choices=transfer_type_choices.items(),
     )

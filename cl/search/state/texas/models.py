@@ -20,6 +20,8 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     the brief.
     :ivar remarks: Field unique to the Texas Supreme Court allowing
     commentary and notes on the entry.
+    :ivar disposition: Text indicating whether a motion was dismissed, denied,
+    or granted.
     :ivar date_filed: The date that TAMES indicates this entry was filed.
     :ivar entry_type: The type of entry from TAMES.
     :ivar sequence_number: CL-generated field to keep entries in the same
@@ -33,7 +35,8 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     )
     appellate_brief = models.BooleanField(default=False)
     description = models.TextField(blank=True)
-    remarks = models.TextField()
+    remarks = models.TextField(blank=True)
+    disposition = models.TextField(blank=True)
     date_filed = models.DateField(
         null=True,
         blank=True,
