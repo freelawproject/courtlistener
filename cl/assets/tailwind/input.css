@@ -89,7 +89,7 @@
   }
 
   .alert-warning {
-    @apply alert text-yellow-700 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
+    @apply alert text-greyscale-950 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
   }
 
    .alert-danger {
@@ -102,7 +102,7 @@
     @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus-visible:ring-4 focus-visible:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400;
   }
   .btn-outline {
-    @apply btn bg-white text-greyscale-700 hover:bg-greyscale-400 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-300 disabled:border-greyscale-200 disabled:text-greyscale-400;
+    @apply btn bg-white text-greyscale-700 hover:bg-greyscale-400 hover:text-white border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-300 disabled:border-greyscale-200 disabled:text-greyscale-400;
   }
   .btn-dark {
     @apply btn text-white bg-greyscale-900 hover:bg-greyscale-800 outline-none focus-visible:ring-4 focus-visible:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200;
