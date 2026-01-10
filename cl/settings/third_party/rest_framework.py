@@ -149,7 +149,6 @@ REST_FRAMEWORK = {
         "NicolasMadan": "10/hour",
         # Running bad queries
         # Mega queries on the docket endpoint causing issues
-        "elisadamico95": "1/hour",
         "ashabana85": "1/hour",
         "tannero20": "1/hour",
         # Too difficult
