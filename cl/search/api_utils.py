@@ -4,10 +4,10 @@ from collections import defaultdict
 
 from django.conf import settings
 from django.core.cache import cache
+from elasticsearch.dsl import MultiSearch, Q
+from elasticsearch.dsl.response import Response
+from elasticsearch.dsl.utils import AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
-from elasticsearch_dsl import MultiSearch, Q
-from elasticsearch_dsl.response import Response
-from elasticsearch_dsl.utils import AttrList
 from rest_framework.exceptions import ParseError
 
 from cl.lib.elasticsearch_utils import (

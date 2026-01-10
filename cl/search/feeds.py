@@ -8,8 +8,8 @@ from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
 from django.utils.html import strip_tags
 from django.utils.timezone import is_naive
+from elasticsearch.dsl.response import Response
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
-from elasticsearch_dsl.response import Response
 
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import do_es_feed_query

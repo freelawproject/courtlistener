@@ -3,8 +3,8 @@ from datetime import date
 from enum import StrEnum
 from typing import Any, Literal
 
-from elasticsearch_dsl.response import Hit, Response
-from elasticsearch_dsl.utils import AttrList
+from elasticsearch.dsl.response import Hit, Response
+from elasticsearch.dsl.utils import AttrList
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio

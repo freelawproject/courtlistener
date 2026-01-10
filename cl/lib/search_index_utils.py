@@ -2,9 +2,9 @@ import re
 from datetime import date
 from typing import Any
 
+from elasticsearch.dsl import connections
 from elasticsearch.exceptions import ConflictError
 from elasticsearch.helpers import BulkIndexError, bulk
-from elasticsearch_dsl import connections
 
 from cl.lib.command_utils import logger
 from cl.lib.date_time import midnight_pt

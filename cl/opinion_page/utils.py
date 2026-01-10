@@ -13,8 +13,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.dsl import MultiSearch, Q
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
-from elasticsearch_dsl import MultiSearch, Q
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name

@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from elasticsearch_dsl import Document
+from elasticsearch.dsl import Document
 from waffle.testutils import override_flag
 
 from cl.lib.search_index_utils import index_documents_in_bulk

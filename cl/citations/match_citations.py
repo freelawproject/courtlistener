@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from typing import no_type_check
 
 from asgiref.sync import async_to_sync
-from elasticsearch_dsl.response import Hit
+from elasticsearch.dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,

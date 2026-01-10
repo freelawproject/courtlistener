@@ -9,7 +9,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.timezone import now
-from elasticsearch_dsl import Q, connections
+from elasticsearch.dsl import Q, connections
 from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
