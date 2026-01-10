@@ -304,6 +304,11 @@ class TestExtractWithLLM(TestCase):
                 ),
             ]
         )
+        cls.llm_raw_response = mock.Mock()
+        cls.llm_raw_response.choices = [mock.Mock()]
+        cls.llm_raw_response.choices[
+            0
+        ].message.content = "Raw LLM response string..."
         cls.expected = {
             cls.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
             cls.docket_2.id: "512; 513; 514",
@@ -312,7 +317,7 @@ class TestExtractWithLLM(TestCase):
     @mock.patch("cl.search.docket_number_cleaner.call_llm")
     def test_extract_with_llm(self, mock_call_llm):
         """Verifies that the extract_with_llm function extracts and cleans the docket numbers correctly."""
-        mock_call_llm.return_value = self.llm_response
+        mock_call_llm.return_value = (self.llm_response, self.llm_raw_response)
 
         result = extract_with_llm(
             self.batch, self.system_prompt, self.model_id

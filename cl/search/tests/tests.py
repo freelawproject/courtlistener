@@ -3817,9 +3817,22 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
         self, mock_call_llm, mock_get_redis_key_prefix
     ):
         """Test the llm_clean_docket_number_daemon command in testing mode."""
+
+        mock_raw_completion = mock.Mock()
+        mock_raw_completion.choices = [mock.Mock()]
+        mock_raw_completion.choices[
+            0
+        ].message.content = "Raw LLM response string..."
+
         mock_call_llm.side_effect = [
-            self.model_response,  # First mini model response
-            self.model_response,  # Second mini model response
+            (
+                self.model_response,
+                mock_raw_completion,
+            ),  # First mini model response
+            (
+                self.model_response,
+                mock_raw_completion,
+            ),  # Second mini model response
         ]
 
         with mock.patch("cl.lib.decorators.time.sleep") as mock_sleep:
