@@ -1361,6 +1361,12 @@ class RECAPDocument(
         max_length=64,
         blank=True,
     )
+    document_url = models.URLField(
+        help_text="The URL of the file from the original source",
+        max_length=1000,
+        blank=True,
+        default="",
+    )
 
     es_rd_field_tracker = FieldTracker(
         fields=[
