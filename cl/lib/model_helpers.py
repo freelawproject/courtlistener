@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from django.core.exceptions import ValidationError
+from django.db import models
 from django.utils.text import get_valid_filename, slugify
 from django.utils.timezone import now
 
@@ -562,6 +563,48 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
     """
     # If no match is found, return empty str
     return ""
+
+
+FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
+    r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def document_model(model: type[models.Model]) -> type[models.Model]:
+    """
+    Decorator for Django models to use docstrings to populate unset
+    help_text and db_comment field attributes.
+    """
+    model_fields: dict[str, models.Field] = dict(
+        [(field.name, field) for field in model._meta.local_fields]
+    )
+    docstring = model.__doc__
+    if docstring is None:
+        return model
+    ivar_docs = [
+        (match.group(1).strip(), match.group(2).strip())
+        for match in FIELD_DOCSTRING_EXTRACTION_RE.finditer(docstring)
+    ]
+    field_docs = dict(
+        [
+            (field_name, docstring.replace("\n", " "))
+            for field_name, docstring in ivar_docs
+            if field_name in model_fields
+        ]
+    )
+
+    for field_name, field in model_fields.items():
+        if field_name not in field_docs:
+            continue
+
+        doc = field_docs[field_name]
+        if not field.help_text:
+            field.help_text = doc
+        if not field.db_comment:
+            field.db_comment = doc
+
+    return model
 
 
 class CSVExportMixin:
