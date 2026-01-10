@@ -2804,7 +2804,9 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
-@override_settings(NO_MATCH_HL_SIZE=100)
+@override_settings(
+    NO_MATCH_HL_SIZE=100, WAFFLE_CACHE_PREFIX="SearchAlertsOAESTests"
+)
 @override_switch("increment-stats", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     """Test ES Search Alerts"""
