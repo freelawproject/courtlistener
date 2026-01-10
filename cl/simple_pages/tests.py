@@ -171,7 +171,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         print("✓")
         is_html = "text/html" in r["content-type"]
         if r["content-type"] and is_html:
-            self.assert_page_title_in_html(r.content)
+            self.assert_page_title_in_html(r.content.decode())
 
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""

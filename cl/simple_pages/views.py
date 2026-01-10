@@ -345,7 +345,7 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
                 "state": await fetch_data(Court.STATE_JURISDICTIONS),
                 "territory": await fetch_data(Court.TERRITORY_JURISDICTIONS),
                 "international": await fetch_data(
-                    Court.INTERNATIONAL, group_by_state=False
+                    [Court.INTERNATIONAL], group_by_state=False
                 ),
                 "tribal": await fetch_data(
                     Court.TRIBAL_JURISDICTIONS, group_by_state=False
