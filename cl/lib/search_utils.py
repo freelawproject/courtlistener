@@ -14,7 +14,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl.response import Response
+from elasticsearch.dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from waffle import flag_is_active

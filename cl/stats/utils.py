@@ -4,12 +4,12 @@ from datetime import datetime, timedelta
 import redis
 from django.db import OperationalError, connections
 from django.utils.timezone import now
+from elasticsearch.dsl import connections as es_connections
 from elasticsearch.exceptions import (
     ConnectionError,
     ConnectionTimeout,
     RequestError,
 )
-from elasticsearch_dsl import connections as es_connections
 from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict

@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from lxml import html
 
 from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query

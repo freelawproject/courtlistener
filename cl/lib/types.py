@@ -6,7 +6,7 @@ from typing import Any, NotRequired, TypedDict
 
 from django.http import HttpRequest
 from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl.query import QueryString
+from elasticsearch.dsl.query import QueryString
 
 from cl.users.models import User
 

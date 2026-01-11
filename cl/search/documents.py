@@ -7,8 +7,8 @@ from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
-from elasticsearch_dsl import DenseVector
-from elasticsearch_dsl import Document as DSLDocument
+from elasticsearch.dsl import DenseVector
+from elasticsearch.dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio

@@ -19,7 +19,7 @@ from django.db import IntegrityError, transaction
 from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from factory import RelatedFactory
 from lxml import html
 from selenium.webdriver.common.by import By

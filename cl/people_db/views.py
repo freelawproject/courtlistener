@@ -4,9 +4,9 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from elasticsearch.dsl import MultiSearch
+from elasticsearch.dsl.response import Response
 from elasticsearch.exceptions import RequestError, TransportError
-from elasticsearch_dsl import MultiSearch
-from elasticsearch_dsl.response import Response
 from judge_pics.search import ImageSizes, portrait
 
 from cl.favorites.decorators import track_view_counter
