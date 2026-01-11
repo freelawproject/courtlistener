@@ -1,11 +1,15 @@
 from typing import Any
 
+from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.mail import send_mail
 from django.db.models import QuerySet
 from django.forms.models import model_to_dict
+from django.template import loader
 
 from cl.recap.models import UPLOAD_TYPE, PacerFetchQueue, ProcessingQueue
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Docket, DocketEntry, RECAPDocument
 
 
 def sort_acms_docket_entries(
@@ -201,3 +205,40 @@ def find_subdocket_atts_rds_from_data(
         (pq.pk, subdocket_replication)
         for pq in ProcessingQueue.objects.bulk_create(sub_docket_pqs)
     ]
+
+
+async def send_bad_redaction_email(
+    rd: RECAPDocument,
+    redactions: dict,
+) -> None:
+    """Send email alert when bad redactions are detected.
+
+    :param rd: The RECAPDocument with bad redactions
+    :param redactions: Dict of page_num -> list of {text, bbox}
+    """
+    template = loader.get_template("emails/bad_redaction_alert.txt")
+
+    de = await DocketEntry.objects.select_related("docket__court").aget(
+        pk=rd.docket_entry_id
+    )
+    docket = de.docket
+    court = docket.court
+
+    # Use the model's get_absolute_url which handles all document types
+    document_url = await sync_to_async(rd.get_absolute_url)()
+
+    context = {
+        "rd_id": rd.pk,
+        "docket_name": docket.case_name,
+        "court": court.full_name,
+        "document_number": rd.document_number,
+        "redactions": redactions,
+        "document_url": f"https://www.courtlistener.com{document_url}",
+    }
+
+    await sync_to_async(send_mail)(
+        subject=f"Bad Redactions Detected: {docket.case_name[:50]}",
+        message=template.render(context),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[settings.BAD_REDACTION_EMAIL],  # type: ignore[misc]
+    )
