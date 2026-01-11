@@ -1,0 +1,54 @@
+Hello{% if name %} {{ name }}{% endif %},
+
+We're writing to let you know that we've detected API requests from your
+account that include filter parameters our system doesn't recognize. We wanted
+to give you advance notice because we'll soon be updating our API to reject
+requests that contain unknown filter parameters.
+
+We apologize for any inconvenience this may cause. This change is necessary to
+protect the integrity of our system and ensure that all API users receive
+accurate, filtered results. When invalid filter parameters are used, they are
+silently ignored, which can lead to unexpected results—often returning far more
+data than intended.
+
+
+YOUR AFFECTED API REQUESTS
+--------------------------
+{% for endpoint, params in params_by_endpoint.items %}
+Endpoint: {{ endpoint }}
+{% for param in params %}  - Parameter "{{ param.param }}" was used {{ param.count }} time(s)
+    First seen: {{ param.first_seen }}
+    Last seen: {{ param.last_seen }}
+{% endfor %}
+{% endfor %}
+Total requests with invalid parameters: {{ total_count }}
+
+
+WHAT YOU NEED TO DO
+-------------------
+Please review your API integration code and remove or correct the invalid
+filter parameters listed above. You can find the complete list of valid filter
+parameters for each endpoint in our API documentation:
+
+    https://www.courtlistener.com/help/api/rest/
+
+If you're using a library or tool that generates these parameters, you may need
+to update its configuration or contact its maintainers.
+
+
+QUESTIONS?
+----------
+If you have questions about this change or need help updating your integration,
+please post on our discussion forum:
+
+    https://github.com/freelawproject/courtlistener/discussions/
+
+Our community and team members are happy to help you resolve any issues.
+
+Thank you for using CourtListener's API, and we appreciate your understanding
+as we work to improve the reliability of our services.
+
+
+Best regards,
+The CourtListener Team
+https://www.courtlistener.com/
