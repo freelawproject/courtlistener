@@ -37,7 +37,13 @@ from cl.api.api_permissions import V3APIPermission
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import VersionBasedPagination
-from cl.api.utils import LoggingMixin, get_logging_prefix, invert_user_logs
+from cl.api.utils import (
+    LoggingMixin,
+    detect_unknown_filter_params,
+    get_logging_prefix,
+    get_valid_filter_params,
+    invert_user_logs,
+)
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -112,6 +118,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.filters import CourtFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -4406,3 +4413,198 @@ class BankruptcyInformationAPITests(TestCase):
             {"id", "docket_number", "bankruptcy_information"},
         )
         self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
+
+
+class UnknownFilterParameterTests(TestCase):
+    """Tests for unknown filter parameter detection and handling."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="test")
+
+    def setUp(self) -> None:
+        # Clear any existing bad filter params for the test user
+        self.r = get_redis_interface("STATS")
+        self._clear_test_redis_keys()
+
+    def tearDown(self) -> None:
+        self._clear_test_redis_keys()
+
+    def _clear_test_redis_keys(self) -> None:
+        """Clear Redis keys for the test user."""
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        if keys:
+            self.r.delete(*keys)
+
+    def test_valid_filter_params_accepted(self) -> None:
+        """Verify that valid filter parameters don't store to Redis."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"id": "test"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # No Redis keys should be created for valid params
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 0)
+
+    def test_unknown_params_stored_in_redis_when_not_blocking(self) -> None:
+        """Verify that unknown parameters are stored in Redis when
+        BLOCK_UNKNOWN_FILTERS is False.
+        """
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"invalid_param": "value", "another_bad": "test"},
+        )
+
+        # Request should succeed (not blocked)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # Should have stored the unknown parameters in Redis
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 2)
+
+        # Verify specific keys exist
+        key_names = [k.split(":")[-1] for k in keys]
+        self.assertIn("invalid_param", key_names)
+        self.assertIn("another_bad", key_names)
+
+    @override_settings(BLOCK_UNKNOWN_FILTERS=True)
+    def test_unknown_params_blocked_when_enabled(self) -> None:
+        """Verify that unknown parameters return 400 when BLOCK_UNKNOWN_FILTERS
+        is True.
+        """
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"invalid_param": "value"},
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        data = response.json()
+        self.assertIn("detail", data)
+        self.assertIn("unknown_params", data)
+        self.assertIn("invalid_param", data["unknown_params"])
+
+    def test_framework_params_always_accepted(self) -> None:
+        """Verify that standard framework parameters are always accepted."""
+        self.client.force_login(self.user)
+        framework_params = {
+            "page": "1",
+            "order_by": "id",
+            "format": "json",
+            "fields": "id,full_name",
+            "omit": "resource_uri",
+        }
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            framework_params,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # No Redis keys should be created for framework params
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 0)
+
+    def test_mixed_valid_and_invalid_params(self) -> None:
+        """Verify that mixed valid/invalid params are handled correctly."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {
+                "id": "test",  # valid filter param
+                "page": "1",  # valid framework param
+                "bogus_filter": "value",  # invalid
+            },
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should store only the invalid parameter in Redis
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 1)
+        self.assertIn("bogus_filter", keys[0])
+
+    def test_redis_stores_count_and_timestamps(self) -> None:
+        """Verify that Redis stores count and timestamp data correctly."""
+        self.client.force_login(self.user)
+
+        # Make two requests with the same bad param
+        for _ in range(2):
+            self.client.get(
+                reverse("court-list", kwargs={"version": "v4"}),
+                {"bad_param": "value"},
+            )
+
+        # Check Redis data
+        key = (
+            f"api:bad_filter_params:user:{self.user.pk}:CourtViewSet:bad_param"
+        )
+        data = self.r.hgetall(key)
+
+        self.assertEqual(int(data["count"]), 2)
+        self.assertIn("first_seen", data)
+        self.assertIn("last_seen", data)
+
+    def test_anonymous_users_not_logged(self) -> None:
+        """Verify that anonymous user requests don't create Redis entries."""
+        # Don't login - make anonymous request
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"bad_param": "value"},
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # No Redis keys should be created for anonymous users
+        # Check for any keys (anonymous would have None as user_id)
+        pattern = "api:bad_filter_params:user:None:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 0)
+
+
+class UnknownFilterParameterUtilsTests(SimpleTestCase):
+    """Unit tests for unknown filter parameter utility functions."""
+
+    def test_get_valid_filter_params_returns_base_filters(self) -> None:
+        """Verify that get_valid_filter_params extracts filter names."""
+        valid_params = get_valid_filter_params(CourtFilter)
+
+        # Should include base filters
+        self.assertIn("id", valid_params)
+        self.assertIn("date_modified", valid_params)
+
+    def test_get_valid_filter_params_handles_none(self) -> None:
+        """Verify that get_valid_filter_params handles None filterset."""
+        valid_params = get_valid_filter_params(None)
+        self.assertEqual(valid_params, set())
+
+    def test_detect_unknown_filter_params(self) -> None:
+        """Verify detection of unknown parameters."""
+        query_params = {
+            "id": "test",  # valid
+            "page": "1",  # framework param
+            "invalid": "value",  # unknown
+        }
+
+        unknown = detect_unknown_filter_params(query_params, CourtFilter)
+
+        self.assertEqual(unknown, {"invalid"})
+
+    def test_detect_unknown_filter_params_all_valid(self) -> None:
+        """Verify no unknowns when all params are valid."""
+        query_params = {
+            "id": "test",
+            "page": "1",
+            "order_by": "id",
+        }
+
+        unknown = detect_unknown_filter_params(query_params, CourtFilter)
+
+        self.assertEqual(unknown, set())

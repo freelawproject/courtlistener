@@ -339,7 +339,7 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
         endpoint = view.__class__.__name__
         user_id = getattr(request.user, "pk", None)
 
-        if settings.BLOCK_UNKNOWN_FILTERS:
+        if settings.BLOCK_UNKNOWN_FILTERS:  # type: ignore[misc]
             raise ValidationError(
                 {
                     "detail": "Unknown filter parameters are not allowed.",
