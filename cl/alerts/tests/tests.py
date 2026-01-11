@@ -21,6 +21,7 @@ from lxml import html
 from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
@@ -2803,7 +2804,10 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
-@override_settings(NO_MATCH_HL_SIZE=100)
+@override_settings(
+    NO_MATCH_HL_SIZE=100, WAFFLE_CACHE_PREFIX="SearchAlertsOAESTests"
+)
+@override_switch("increment-stats", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     """Test ES Search Alerts"""
 
