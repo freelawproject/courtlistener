@@ -72,7 +72,10 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.microservice_utils import rd_page_count_service
+from cl.lib.microservice_utils import (
+    check_redactions_service,
+    rd_page_count_service,
+)
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     ProxyPacerSession,
@@ -114,6 +117,7 @@ from cl.recap.utils import (
     find_subdocket_pdf_rds_from_data,
     get_court_id_from_fetch_queue,
     get_main_rds,
+    send_bad_redaction_email,
     sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
@@ -468,6 +472,24 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
                     "page_count must be an int or None."
                 )
             rd.file_size = rd.filepath_local.size
+
+            # Check for bad redactions using X-Ray
+            try:
+                redaction_response = await check_redactions_service(rd)
+                if redaction_response.is_success:
+                    redaction_data = redaction_response.json()
+                    # Response: {"error": false, "results": {"1": [{"text": "...", "bbox": ...}]}}
+                    if not redaction_data.get("error") and redaction_data.get(
+                        "results"
+                    ):
+                        await send_bad_redaction_email(
+                            rd, redaction_data["results"]
+                        )
+            except Exception as e:
+                # Log but don't fail ingestion if redaction check fails
+                logger.warning(
+                    "Redaction check failed for RD %s: %s", rd.pk, e
+                )
 
         rd.ocr_status = None
         rd.is_available = True
