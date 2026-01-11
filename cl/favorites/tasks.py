@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils.timezone import now
@@ -38,14 +39,14 @@ def check_prayer_pacer(self, rd_pk: int, user_pk: int):
     court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     pacer_doc_id = rd.pacer_doc_id
     recap_user = User.objects.get(username="recap")
-    session_data = get_or_cache_pacer_cookies(
+    session_data = async_to_sync(get_or_cache_pacer_cookies)(
         recap_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     receipt_report = DownloadConfirmationPage(court_id, s)
-    receipt_report.query(pacer_doc_id)
+    async_to_sync(receipt_report.query)(pacer_doc_id)
     data = receipt_report.data
 
     if data == {} and not is_pdf(receipt_report.response):

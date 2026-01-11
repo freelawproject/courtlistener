@@ -13,9 +13,10 @@ from typing import Any
 
 import environ
 import eyecite
+import httpx
 import internetarchive as ia
 import requests
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from celery import Task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
@@ -27,10 +28,15 @@ from django.db.models.query import prefetch_related_objects
 from django.utils.timezone import localtime, now
 from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
+    ConnectError,
+    HTTPError,
     HTTPStatusError,
     NetworkError,
     ReadError,
+    ReadTimeout,
     RemoteProtocolError,
+    RequestError,
+    Response,
     TimeoutException,
 )
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
@@ -61,17 +67,8 @@ from openai import (
 )
 from pydantic import ValidationError
 from redis import ConnectionError as RedisConnectionError
-from requests import Response
-from requests.exceptions import (
-    ConnectionError,
-    HTTPError,
-    ReadTimeout,
-    RequestException,
-    Timeout,
-)
 from rest_framework.renderers import JSONRenderer
 from sentry_sdk import capture_exception
-from urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
@@ -303,9 +300,7 @@ def upload_recap_json(self, pk: int, database: str = "default") -> None:
         increment_failure_count(d)
 
 
-@app.task(bind=True, max_retries=5)
-def download_recap_item(
-    self,
+async def download_recap_item(
     url: str,
     filename: str,
     clobber: bool = False,
@@ -315,33 +310,27 @@ def download_recap_item(
     try:
         if os.path.isfile(location) and not clobber:
             raise OSError(f"    IOError: File already exists at {location}")
-        r = requests.get(
-            url,
-            stream=True,
-            timeout=60,
-            headers={"User-Agent": "Free Law Project"},
-        )
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                url,
+                timeout=60,
+                headers={"User-Agent": "Free Law Project"},
+            )
         r.raise_for_status()
-    except requests.Timeout as e:
-        logger.warning("    Timed out attempting to get: %s\n", url)
-        raise self.retry(exc=e, countdown=2)
-    except requests.RequestException as e:
-        logger.warning("    Unable to get %s\nException was:\n%s", url, e)
+    except TimeoutException as e:
+        logger.warning(f"    Timed out attempting to get: {url}\n")
+    except RequestError as e:
+        logger.warning(f"    Unable to get {url}\nException was:\n{e}")
     except OSError as e:
-        logger.warning("    %s", e)
+        logger.warning(f"    {e}")
     else:
         with NamedTemporaryFile(prefix="recap_download_") as tmp:
             r.raw.decode_content = True
-            try:
-                shutil.copyfileobj(r.raw, tmp)
-                tmp.flush()
-            except ReadTimeoutError as exc:
-                # The download failed part way through.
-                raise self.retry(exc=exc)
-            else:
-                # Successful download. Copy from tmp to the right spot. Note
-                # that this will clobber.
-                shutil.copyfile(tmp.name, location)
+            shutil.copyfileobj(r.raw, tmp)
+            tmp.flush()
+            # Successful download. Copy from tmp to the right spot. Note
+            # that this will clobber.
+            shutil.copyfile(tmp.name, location)
 
 
 @app.task(
@@ -362,7 +351,7 @@ def get_and_save_free_document_report(
     :param log_id: a PACERFreeDocumentLog object id
     :return: The status code of the scrape
     """
-    session_data = get_or_cache_pacer_cookies(
+    session_data = async_to_sync(get_or_cache_pacer_cookies)(
         "pacer_scraper",
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
@@ -376,11 +365,11 @@ def get_and_save_free_document_report(
     report = FreeOpinionReport(court_id, s)
     msg = ""
     try:
-        report.query(start, end, sort="case_number")
+        async_to_sync(report.query)(start, end, sort="case_number")
     except (
         TypeError,
-        RequestException,
-        ReadTimeoutError,
+        RequestError,
+        ReadTimeout,
         PacerLoginException,
         ParsingException,
         SoftTimeLimitExceeded,
@@ -391,7 +380,7 @@ def get_and_save_free_document_report(
                 "TypeError getting free document report results, likely due "
                 "to failure to get Nonce."
             )
-        elif isinstance(exc, (RequestException | ReadTimeoutError)):
+        elif isinstance(exc, (RequestError | ReadTimeout)):
             msg = "Unable to get free document report results"
         elif isinstance(exc, PacerLoginException):
             msg = "PacerLoginException while getting free docs"
@@ -665,13 +654,13 @@ def get_and_process_free_pdf(
             return None
         raise self.retry()
 
-    cookies_data = get_or_cache_pacer_cookies(
+    cookies_data = async_to_sync(get_or_cache_pacer_cookies)(
         "pacer_scraper",
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     try:
-        r, r_msg = download_pacer_pdf_by_rd(
+        r, r_msg = async_to_sync(download_pacer_pdf_by_rd)(
             rd.pk,
             result.pacer_case_id,
             result.pacer_doc_id,
@@ -713,14 +702,14 @@ def get_and_process_free_pdf(
         msg = "PacerLoginException while getting free docs."
         logger.info(f"{msg} Retrying.")  # noqa: G004
         # Refresh cookies before retrying
-        get_or_cache_pacer_cookies(
+        async_to_sync(get_or_cache_pacer_cookies)(
             "pacer_scraper",
             username=settings.PACER_USERNAME,
             password=settings.PACER_PASSWORD,
             refresh=True,
         )
         raise self.retry(exc=exc)
-    except (ReadTimeoutError, requests.RequestException) as exc:
+    except (ReadTimeout, RequestError) as exc:
         msg = "Request exception getting free PDF"
         if self.request.retries == self.max_retries:
             logger.warning(msg)
@@ -733,8 +722,7 @@ def get_and_process_free_pdf(
     if r:
         pdf_bytes = r.content
     attachment_number = 0  # Always zero for free opinions
-    success, msg = update_rd_metadata(
-        self,
+    success, msg = async_to_sync(update_rd_metadata)(
         rd.pk,
         pdf_bytes,
         r_msg,
@@ -820,7 +808,7 @@ def upload_to_ia(
     source_url: str,
     media_type: str,
     description: str,
-) -> list[Response] | None:
+) -> list[requests.Response] | None:
     """Upload an item and its files to the Internet Archive
 
     On the Internet Archive there are Items and files. Items have a global
@@ -1047,7 +1035,7 @@ def get_pacer_case_id_and_title(
     )
 
     if not session_data and user_pk:
-        session_data = get_pacer_cookie_from_cache(user_pk)
+        session_data = async_to_sync(get_pacer_cookie_from_cache)(user_pk)
         if not session_data:
             raise Exception("Cookies not available in cache")
     else:
@@ -1061,9 +1049,9 @@ def get_pacer_case_id_and_title(
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     msg = ""
     try:
-        report.query(docket_number)
-    except (RequestException, ReadTimeoutError, PacerLoginException) as exc:
-        if isinstance(exc, (RequestException | ReadTimeoutError)):
+        async_to_sync(report.query)(docket_number)
+    except (RequestError, ReadTimeout, PacerLoginException) as exc:
+        if isinstance(exc, (RequestError | ReadTimeout)):
             msg = (
                 "Network error while running possible case number query on: "
                 "%s.%s"
@@ -1096,7 +1084,7 @@ def get_pacer_case_id_and_title(
 
 @app.task(
     bind=True,
-    autoretry_for=(PacerLoginException, RequestException),
+    autoretry_for=(PacerLoginException, RequestError),
     max_retries=5,
     interval_start=5 * 60,
     interval_step=10 * 60,
@@ -1140,7 +1128,7 @@ def do_case_query_by_pacer_case_id(
     except Docket.MultipleObjectsReturned:
         d = None
 
-    report.query(pacer_case_id)
+    async_to_sync(report.query)(pacer_case_id)
     docket_data = report.data
     logger.info(
         "Querying and parsing complete for %s.%s", court_id, pacer_case_id
@@ -1228,7 +1216,7 @@ def filter_docket_by_tags(
     return data
 
 
-def query_case_query_report(
+async def query_case_query_report(
     court_id: str, pacer_case_id: int
 ) -> tuple[dict[str, Any], str]:
     """Query the iquery page for a given PACER case ID.
@@ -1238,7 +1226,7 @@ def query_case_query_report(
     :return: A two tuple, the report data and the report HTML text.
     """
 
-    session_data = get_or_cache_pacer_cookies(
+    session_data = await get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
@@ -1250,7 +1238,7 @@ def query_case_query_report(
         proxy=session_data.proxy_address,
     )
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-    report.query(pacer_case_id)
+    await report.query(pacer_case_id)
     return report.data, report.response.text
 
 
@@ -1280,10 +1268,10 @@ def make_docket_by_iquery_base(
     """
 
     try:
-        report_data, report_text = query_case_query_report(
+        report_data, report_text = async_to_sync(query_case_query_report)(
             court_id, pacer_case_id
         )
-    except (requests.Timeout, requests.RequestException) as exc:
+    except (TimeoutException, RequestError) as exc:
         logger.warning(
             "Timeout or unknown RequestException on iquery crawl. "
             "Trying again if retries not exceeded."
@@ -1423,7 +1411,7 @@ def make_docket_by_iquery_sweep(
     )
 
 
-@retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
+@retry((TimeoutException, PacerLoginException), tries=3, delay=0.25, backoff=1)
 def query_iquery_page(
     court_id: str, pacer_case_id: int
 ) -> tuple[bool, None] | tuple[dict[str, Any], str]:
@@ -1436,7 +1424,9 @@ def query_iquery_page(
     and the report HTML text.
     """
 
-    report_data, report_text = query_case_query_report(court_id, pacer_case_id)
+    report_data, report_text = async_to_sync(query_case_query_report)(
+        court_id, pacer_case_id
+    )
     if not report_data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
@@ -1521,6 +1511,13 @@ def probe_or_scrape_iquery_pages(
             report_data, report_text = query_iquery_page(
                 court_id, pacer_case_id_to_lookup
             )
+        except TimeoutException:
+            logger.warning(
+                "The court %s website is probably down. Aborting the probe task.",
+                court_id,
+            )
+            break
+
         except HTTPError:
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
@@ -1564,13 +1561,6 @@ def probe_or_scrape_iquery_pages(
                 )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
             return None
-
-        except requests.Timeout:
-            logger.warning(
-                "The court %s website is probably down. Aborting the probe task.",
-                court_id,
-            )
-            break
 
         if report_data:
             # Find and update/store the Docket.
@@ -1759,8 +1749,8 @@ def get_docket_by_pacer_case_id(
     )
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
     try:
-        report.query(pacer_case_id, **kwargs)
-    except (RequestException, ReadTimeoutError) as exc:
+        async_to_sync(report.query)(pacer_case_id, **kwargs)
+    except (RequestError, ReadTimeout) as exc:
         msg = "Network error getting docket: %s"
         if self.request.retries == self.max_retries:
             logger.error(f"{msg} Aborting chain.", logging_id)  # noqa: G004
@@ -1839,8 +1829,8 @@ def get_appellate_docket_by_docket_number(
     logger.info("Querying docket report %s", logging_id)
 
     try:
-        report.query(docket_number, **kwargs)
-    except requests.RequestException as e:
+        async_to_sync(report.query)(docket_number, **kwargs)
+    except RequestError as e:
         logger.warning("Problem getting docket %s", logging_id)
         if self.request.retries == self.max_retries:
             self.request.chain = None
@@ -1886,7 +1876,7 @@ def get_appellate_docket_by_docket_number(
     }
 
 
-def get_att_report_by_rd(
+async def get_att_report_by_rd(
     rd: RECAPDocument,
     session_data: SessionData,
 ) -> AttachmentPage | None:
@@ -1903,9 +1893,11 @@ def get_att_report_by_rd(
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
-    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    is_appellate_case = is_appellate_court(pacer_court_id)
-    is_acms_document = rd.is_acms_document()
+    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
+    d = await Docket.objects.aget(id=de.docket_id)
+    pacer_court_id = map_cl_to_pacer_id(d.court_id)
+    is_appellate_case = await is_appellate_court(pacer_court_id)
+    is_acms_document = await sync_to_async(rd.is_acms_document)()
 
     if is_acms_document:
         report_class = ACMSAttachmentPage
@@ -1917,11 +1909,11 @@ def get_att_report_by_rd(
     att_report = report_class(pacer_court_id, s)
 
     if is_acms_document:
-        docket_case_id = rd.docket_entry.docket.pacer_case_id
+        docket_case_id = d.pacer_case_id
         rd_entry_id = rd.pacer_doc_id
-        att_report.query(docket_case_id, rd_entry_id)
+        await att_report.query(docket_case_id, rd_entry_id)
     else:
-        att_report.query(rd.pacer_doc_id)
+        await att_report.query(rd.pacer_doc_id)
     return att_report
 
 
@@ -1952,7 +1944,7 @@ def get_attachment_page_by_rd(
         self.request.chain = None
         return None
     try:
-        att_report = get_att_report_by_rd(rd, session_data)
+        att_report = async_to_sync(get_att_report_by_rd)(rd, session_data)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
             HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -1972,7 +1964,7 @@ def get_attachment_page_by_rd(
             logger.error(msg, str(exc))
             self.request.chain = None
             return None
-    except requests.RequestException as exc:
+    except RequestError as exc:
         logger.warning("Unable to get attachment page for %s", rd)
         raise self.retry(exc=exc)
     return att_report
@@ -2020,8 +2012,8 @@ def get_bankr_claims_registry(
     logger.info("Querying claims information for %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
     try:
-        report.query(d.pacer_case_id, d.docket_number)
-    except (RequestException, ReadTimeoutError) as exc:
+        async_to_sync(report.query)(d.pacer_case_id, d.docket_number)
+    except (RequestError, ReadTimeout) as exc:
         if self.request.retries == self.max_retries:
             self.request.chain = None
             logger.error(
@@ -2144,7 +2136,7 @@ def save_attachment_pq_from_text(
     return pq.pk
 
 
-def download_acms_pdf_by_rd(
+async def download_acms_pdf_by_rd(
     court_id: str,
     acms_entry_id: str,
     acms_doc_id: str,
@@ -2166,11 +2158,11 @@ def download_acms_pdf_by_rd(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     report = ACMSDocketReport(pacer_court_id, s)
-    r, r_msg = report.download_pdf(acms_entry_id, acms_doc_id)
+    r, r_msg = await report.download_pdf(acms_entry_id, acms_doc_id)
     return r, r_msg
 
 
-def download_pacer_pdf_by_rd(
+async def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
     pacer_doc_id: str,
@@ -2188,34 +2180,36 @@ def download_pacer_pdf_by_rd(
     and proxy.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
-    :return: A two-tuple of requests.Response object usually containing a PDF,
+    :return: A two-tuple of httpx.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
-    rd = RECAPDocument.objects.get(pk=rd_pk)
-    pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
+    rd = await RECAPDocument.objects.aget(pk=rd_pk)
+    de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
+    d = await Docket.objects.aget(id=de.docket_id)
+    pacer_court_id = map_cl_to_pacer_id(d.court_id)
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
-    if is_appellate_court(pacer_court_id):
+    if await is_appellate_court(pacer_court_id):
         report = AppellateDocketReport(pacer_court_id, s)
         pacer_doc_id = (
             pacer_doc_id
             if not rd.attachment_number
             else f"{pacer_doc_id[:3]}1{pacer_doc_id[4:]}"
         )
-        r, r_msg = report.download_pdf(
+        r, r_msg = await report.download_pdf(
             pacer_doc_id=pacer_doc_id, pacer_case_id=pacer_case_id
         )
     else:
         report = FreeOpinionReport(pacer_court_id, s)
-        r, r_msg = report.download_pdf(
+        r, r_msg = await report.download_pdf(
             pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
         )
     return r, r_msg
 
 
-def download_pdf_by_magic_number(
+async def download_pdf_by_magic_number(
     court_id: str,
     pacer_doc_id: str,
     pacer_case_id: str,
@@ -2237,7 +2231,7 @@ def download_pdf_by_magic_number(
     :param de_seq_num: The sequential number assigned by the PACER system to
      identify the docket entry within a case.
     :param acms: Whether the download belongs to an ACMS notification.
-    :return: A two-tuple of requests.Response object usually containing a PDF,
+    :return: A two-tuple of httpx.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
@@ -2245,13 +2239,13 @@ def download_pdf_by_magic_number(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     report = FreeOpinionReport(court_id, s)
-    r, r_msg = report.download_pdf(
+    r, r_msg = await report.download_pdf(
         pacer_case_id, pacer_doc_id, magic_number, appellate, de_seq_num, acms
     )
     return r, r_msg
 
 
-def get_document_number_from_confirmation_page(
+async def get_document_number_from_confirmation_page(
     court_id: str, pacer_doc_id: str
 ) -> str:
     """Get the PACER document number from the PACER download confirmation page.
@@ -2261,20 +2255,20 @@ def get_document_number_from_confirmation_page(
     :return: The PACER document number is available or an empty string if not.
     """
 
-    recap_email_user = User.objects.get(username="recap-email")
-    session_data = get_or_cache_pacer_cookies(
+    recap_email_user = await User.objects.aget(username="recap-email")
+    session_data = await get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     doc_num_report = DownloadConfirmationPage(court_id, s)
-    doc_num_report.query(pacer_doc_id)
+    await doc_num_report.query(pacer_doc_id)
     data = doc_num_report.data
     return data.get("document_number", "")
 
 
-def get_document_number_for_appellate(
+async def get_document_number_for_appellate(
     court_id: str,
     pacer_doc_id: str,
     pq: ProcessingQueue,
@@ -2299,7 +2293,7 @@ def get_document_number_for_appellate(
             pdf_bytes = local_path.read()
     if pdf_bytes:
         # For other jurisdictions try first to get it from the PDF document.
-        dn_response = async_to_sync(microservice)(
+        dn_response = await microservice(
             service="document-number",
             file_type="pdf",
             file=pdf_bytes,
@@ -2310,7 +2304,7 @@ def get_document_number_for_appellate(
     if not document_number and pacer_doc_id and not acms:
         # If we still don't have the document number fall back on the
         # download confirmation page
-        document_number = get_document_number_from_confirmation_page(
+        document_number = await get_document_number_from_confirmation_page(
             court_id, pacer_doc_id
         )
 
@@ -2331,7 +2325,7 @@ def get_document_number_for_appellate(
     return document_number
 
 
-def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
+async def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     """Check if a pacer doc is sealed, querying the document in PACER.
     If a receipt is returned the document is not sealed, otherwise is sealed.
 
@@ -2340,22 +2334,22 @@ def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     :return: True if the document is sealed on PACER, False otherwise.
     """
 
-    recap_email_user = User.objects.get(username="recap-email")
-    session_data = get_or_cache_pacer_cookies(
+    recap_email_user = await User.objects.aget(username="recap-email")
+    session_data = await get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
     receipt_report = DownloadConfirmationPage(court_id, s)
-    receipt_report.query(pacer_doc_id)
+    await receipt_report.query(pacer_doc_id)
     data = receipt_report.data
     if data == {}:
         return True
     return False
 
 
-def is_docket_entry_sealed(
+async def is_docket_entry_sealed(
     court_id: str, case_id: str, doc_id: str | None
 ) -> bool:
     """Check if a docket entry is sealed, querying the download confirmation
@@ -2372,8 +2366,8 @@ def is_docket_entry_sealed(
     if not doc_id:
         return False
 
-    recap_email_user = User.objects.get(username="recap-email")
-    session_data = get_or_cache_pacer_cookies(
+    recap_email_user = await User.objects.aget(username="recap-email")
+    session_data = await get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
@@ -2384,8 +2378,7 @@ def is_docket_entry_sealed(
     return report.is_entry_sealed(case_id, doc_id)
 
 
-def update_rd_metadata(
-    self: Task,
+async def update_rd_metadata(
     rd_pk: int,
     pdf_bytes: bytes | None,
     r_msg: str,
@@ -2398,7 +2391,6 @@ def update_rd_metadata(
 ) -> tuple[bool, str]:
     """After querying PACER and downloading a document, save it to the DB.
 
-    :param self: The celery task
     :param rd_pk: The primary key of the RECAPDocument to work on
     :param pdf_bytes: The byte array of the PDF.
     :param r_msg: A message from the download function about an error that was
@@ -2414,8 +2406,8 @@ def update_rd_metadata(
     error/success message string.
     """
 
-    rd = RECAPDocument.objects.get(pk=rd_pk)
-    if pdf_bytes is None:
+    rd = await RECAPDocument.objects.aget(pk=rd_pk)
+    if not pdf_bytes:
         if r_msg and "An attachment page was returned instead" in r_msg:
             msg = (
                 "This PACER document is part of an attachment page. "
@@ -2429,14 +2421,13 @@ def update_rd_metadata(
                 f"Unable to get PDF for RECAP Document '{rd_pk}' "
                 f"at '{court_id}' with doc id '{pacer_doc_id}'"
             )
-        self.request.chain = None
         return False, msg
 
     file_name = get_document_filename(
         court_id, pacer_case_id, document_number, attachment_number
     )
     cf = ContentFile(pdf_bytes)
-    rd.filepath_local.save(file_name, cf, save=False)
+    await sync_to_async(rd.filepath_local.save)(file_name, cf, save=False)
     rd.file_size = rd.filepath_local.size
     rd.is_available = True  # We've got the PDF.
     rd.date_upload = rd.date_upload or now()
@@ -2445,7 +2436,7 @@ def update_rd_metadata(
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         rd.sha1 = sha1(pdf_bytes)
-        response = async_to_sync(rd_page_count_service)(rd)
+        response = await rd_page_count_service(rd)
         if response.is_success:
             rd.page_count = int(response.text)
         assert isinstance(rd.page_count, (int | type(None))), (
@@ -2453,12 +2444,10 @@ def update_rd_metadata(
         )
 
     # Save and extract, skipping OCR.
-    rd.save()
+    await rd.asave()
 
     # Make sure we mark the docket as needing upload
-    async_to_sync(mark_ia_upload_needed)(
-        rd.docket_entry.docket, save_docket=True
-    )
+    await mark_ia_upload_needed(rd.docket_entry.docket, save_docket=True)
     return True, "Saved item successfully"
 
 
@@ -2480,7 +2469,7 @@ def add_tags(rd: RECAPDocument, tag_name: str | None) -> None:
 
 @app.task(
     bind=True,
-    autoretry_for=(PacerLoginException, RequestException, HTTPError),
+    autoretry_for=(PacerLoginException, RequestError, HTTPError),
     max_retries=3,
     interval_start=5,
     interval_step=5,
@@ -2511,7 +2500,7 @@ def get_pacer_doc_by_rd(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
-    r, r_msg = download_pacer_pdf_by_rd(
+    r, r_msg = async_to_sync(download_pacer_pdf_by_rd)(
         rd.pk,
         pacer_case_id,
         rd.pacer_doc_id,
@@ -2523,8 +2512,7 @@ def get_pacer_doc_by_rd(
     pdf_bytes = None
     if r:
         pdf_bytes = r.content
-    success, msg = update_rd_metadata(
-        self,
+    success, msg = async_to_sync(update_rd_metadata)(
         rd_pk,
         pdf_bytes,
         r_msg,
@@ -2544,7 +2532,7 @@ def get_pacer_doc_by_rd(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ReadTimeout, HTTPError, RequestException),
+    autoretry_for=(ConnectError, ReadTimeout, HTTPError, RequestError),
     max_retries=15,
     interval_start=5,
     interval_step=5,
@@ -2626,7 +2614,7 @@ def get_pacer_doc_by_rd_and_description(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
-    r, r_msg = download_pacer_pdf_by_rd(
+    r, r_msg = async_to_sync(download_pacer_pdf_by_rd)(
         rd.pk,
         pacer_case_id,
         att_found["pacer_doc_id"],
@@ -2638,8 +2626,7 @@ def get_pacer_doc_by_rd_and_description(
     pdf_bytes = None
     if r:
         pdf_bytes = r.content
-    success, msg = update_rd_metadata(
-        self,
+    success, msg = async_to_sync(update_rd_metadata)(
         rd_pk,
         pdf_bytes,
         r_msg,
@@ -2687,12 +2674,12 @@ def get_pacer_doc_id_with_show_case_doc_url(
     last_try = self.request.retries == self.max_retries
     try:
         if rd.document_type == rd.ATTACHMENT:
-            report.query(
+            async_to_sync(report.query)(
                 d.pacer_case_id, rd.document_number, rd.attachment_number
             )
         else:
-            report.query(d.pacer_case_id, rd.document_number)
-    except (RequestException, ReadTimeoutError) as exc:
+            async_to_sync(report.query)(d.pacer_case_id, rd.document_number)
+    except (RequestError, ReadTimeout) as exc:
         msg = "Unable to get PDF for %s"
         if last_try:
             logger.error(msg, rd)
@@ -2813,7 +2800,7 @@ def query_and_save_list_of_creditors(
     if not os.path.exists(html_file):
         try:
             report_hidden_api = PossibleCaseNumberApi(court_id, s)
-            report_hidden_api.query(docket_number)
+            async_to_sync(report_hidden_api.query)(docket_number)
             result = report_hidden_api.data(
                 office_number=row["OFFICE"],
                 docket_number_letters="bk",
@@ -2867,7 +2854,7 @@ def query_and_save_list_of_creditors(
 
         # First get the POST param to ensure the same cost as in the browser.
         try:
-            post_param = report.query_post_param()
+            post_param = async_to_sync(report.query_post_param)()
         except IndexError as exc:
             # Sometimes this query fails, retry if there are retries available.
             if self.request.retries == self.max_retries:
@@ -2895,7 +2882,7 @@ def query_and_save_list_of_creditors(
             logger.info("Invalid POST param for %s, aborting...", court_id)
             return None
 
-        report.query(
+        async_to_sync(report.query)(
             pacer_case_id=pacer_case_id,
             docket_number=docket_number,
             post_param=post_param,
@@ -3183,7 +3170,7 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
     bind=True,
     autoretry_for=(
         ConnectionError,
-        Timeout,
+        requests.Timeout,
     ),
     max_retries=5,
     ignore_result=True,
@@ -3269,7 +3256,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
                 "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
                 docket_id,
             )
-    except RequestException as exc:
+    except requests.RequestException as exc:
         if self.request.retries == self.max_retries:
             logger.warning(
                 "SCOTUS PDF download: Unable to download %s for docket %s. "
