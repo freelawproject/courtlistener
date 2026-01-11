@@ -216,3 +216,8 @@ if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
 
 BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)
+
+# Controls whether unknown API filter parameters should be blocked (400 error)
+# or just logged. Set to True to block invalid filter parameters.
+# Phase 1: False (log only), Phase 2: True (block requests)
+BLOCK_UNKNOWN_FILTERS = env.bool("BLOCK_UNKNOWN_FILTERS", default=False)
