@@ -1,7 +1,8 @@
 from django.db.models import Min, Q
 
 from cl.people_db.models import Person
-from cl.search.models import SOURCES, Court, Opinion
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Court, Opinion
 
 
 def get_scotus_judges(d):
@@ -21,7 +22,7 @@ def get_min_dates():
     """returns a dictionary with key-value (courtid, minimum date)"""
     min_dates = {}
     courts = Court.objects.exclude(
-        dockets__clusters__source__contains=SOURCES.COLUMBIA_ARCHIVE
+        dockets__clusters__source__contains=ClusterSources.COLUMBIA_ARCHIVE
     ).annotate(earliest_date=Min("dockets__clusters__date_filed"))
     for court in courts:
         min_dates[court.pk] = court.earliest_date
