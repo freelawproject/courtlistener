@@ -8,6 +8,7 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from prometheus_client import CollectorRegistry
 from waffle.testutils import override_flag, override_switch
 
 from cl.lib.redis_utils import get_redis_interface
@@ -19,6 +20,7 @@ from cl.stats.metrics import (
     alerts_sent_total,
     record_prometheus_metric,
     record_search_duration,
+    register_celery_queue_collector,
     search_duration_seconds,
     search_queries_total,
     webhooks_sent_total,
@@ -331,6 +333,12 @@ class PrometheusMetricsTests(TestCase):
                 )._sum.get()
                 expected_sum = initial_sum + sum(test_case["durations"])
                 self.assertAlmostEqual(final_sum, expected_sum, places=5)
+
+    def test_celery_queue_collector_registration_idempotent(self) -> None:
+        """Ensure collector registration is idempotent without collecting."""
+        registry = CollectorRegistry()
+        self.assertTrue(register_celery_queue_collector(registry))
+        self.assertFalse(register_celery_queue_collector(registry))
 
 
 def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:

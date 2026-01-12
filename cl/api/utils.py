@@ -1126,17 +1126,17 @@ def update_webhook_event_after_request(
             results = log_webhook_event(webhook_event.webhook.user.pk)
             handle_webhook_events(results, webhook_event.webhook.user)
 
-        # Track webhook metrics in Prometheus
-        event_type_map = {
-            WebhookEventType.DOCKET_ALERT: "webhooks.sent.docket_alert",
-            WebhookEventType.SEARCH_ALERT: "webhooks.sent.search_alert",
-            WebhookEventType.RECAP_FETCH: "webhooks.sent.recap_fetch",
-            WebhookEventType.OLD_DOCKET_ALERTS_REPORT: "webhooks.sent.old_docket_alerts_report",
-            WebhookEventType.PRAY_AND_PAY: "webhooks.sent.pray_and_pay",
-        }
-        handler_key = event_type_map.get(webhook_event.webhook.event_type)
-        if handler_key:
-            record_prometheus_metric(handler_key, 1)
+            # Track webhook metrics in Prometheus
+            event_type_map = {
+                WebhookEventType.DOCKET_ALERT: "webhooks.sent.docket_alert",
+                WebhookEventType.SEARCH_ALERT: "webhooks.sent.search_alert",
+                WebhookEventType.RECAP_FETCH: "webhooks.sent.recap_fetch",
+                WebhookEventType.OLD_DOCKET_ALERTS_REPORT: "webhooks.sent.old_docket_alerts_report",
+                WebhookEventType.PRAY_AND_PAY: "webhooks.sent.pray_and_pay",
+            }
+            handler_key = event_type_map.get(webhook_event.webhook.event_type)
+            if handler_key:
+                record_prometheus_metric(handler_key, 1)
     webhook_event.save()
 
 

@@ -76,7 +76,16 @@ class CeleryQueueCollector:
         yield gauge
 
 
-REGISTRY.register(CeleryQueueCollector())
+def register_celery_queue_collector(registry=REGISTRY) -> bool:
+    """Register CeleryQueueCollector once per registry."""
+    if getattr(registry, "_cl_celery_queue_collector_registered", False):
+        return False
+    registry.register(CeleryQueueCollector())
+    registry._cl_celery_queue_collector_registered = True
+    return True
+
+
+register_celery_queue_collector()
 
 
 def _inc(metric: Counter, inc: int, **kwargs):
