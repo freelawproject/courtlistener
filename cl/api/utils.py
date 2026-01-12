@@ -117,11 +117,6 @@ VALID_FRAMEWORK_PARAMS: frozenset[str] = frozenset(
         "omit",
         # Counting (v4)
         "count",
-        # Search API specific
-        "type",
-        "q",
-        "court_id",
-        "highlight",
     }
 )
 
@@ -309,12 +304,15 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
         """
         filterset_class = self.get_filterset_class(view, queryset)
 
-        unknown_params = detect_unknown_filter_params(
-            request.query_params, filterset_class
-        )
+        # Skip validation for views without a filterset (e.g., search API views
+        # that use their own form-based validation)
+        if filterset_class is not None:
+            unknown_params = detect_unknown_filter_params(
+                request.query_params, filterset_class
+            )
 
-        if unknown_params:
-            self._handle_unknown_params(request, unknown_params, view)
+            if unknown_params:
+                self._handle_unknown_params(request, unknown_params, view)
 
         return super().filter_queryset(request, queryset, view)
 
