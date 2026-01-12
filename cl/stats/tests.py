@@ -18,6 +18,8 @@ from cl.stats.metrics import (
     accounts_deleted_total,
     alerts_sent_total,
     record_prometheus_metric,
+    record_search_duration,
+    search_duration_seconds,
     search_queries_total,
     webhooks_sent_total,
 )
@@ -137,6 +139,7 @@ class StatTests(TestCase):
 class PrometheusMetricsTests(TestCase):
     def setUp(self):
         search_queries_total._metrics.clear()
+        search_duration_seconds._metrics.clear()
         alerts_sent_total._metrics.clear()
         webhooks_sent_total._metrics.clear()
         accounts_created_total._value.set(0)
@@ -281,6 +284,53 @@ class PrometheusMetricsTests(TestCase):
         record_prometheus_metric("accounts.deleted", 1)
         final_deleted = accounts_deleted_total._value.get()
         self.assertEqual(final_deleted, initial_deleted + 1)
+
+    def test_search_duration_histogram(self) -> None:
+        """Test recording search duration histogram metrics"""
+        test_cases = [
+            {
+                "name": "keyword_web",
+                "query_type": "keyword",
+                "method": "web",
+                "durations": [0.1, 0.2, 0.15],
+            },
+            {
+                "name": "semantic_api",
+                "query_type": "semantic",
+                "method": "api",
+                "durations": [0.5, 0.3],
+            },
+            {
+                "name": "keyword_api",
+                "query_type": "keyword",
+                "method": "api",
+                "durations": [0.05],
+            },
+        ]
+
+        for test_case in test_cases:
+            with self.subTest(case=test_case["name"]):
+                # Get initial sum
+                initial_sum = search_duration_seconds.labels(
+                    query_type=test_case["query_type"],
+                    method=test_case["method"],
+                )._sum.get()
+
+                # Record durations
+                for duration in test_case["durations"]:
+                    record_search_duration(
+                        duration,
+                        query_type=test_case["query_type"],
+                        method=test_case["method"],
+                    )
+
+                # Check that sum increased by total of durations
+                final_sum = search_duration_seconds.labels(
+                    query_type=test_case["query_type"],
+                    method=test_case["method"],
+                )._sum.get()
+                expected_sum = initial_sum + sum(test_case["durations"])
+                self.assertAlmostEqual(final_sum, expected_sum, places=5)
 
 
 def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:

@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable
 
 from django.conf import settings
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 from prometheus_client.core import REGISTRY, GaugeMetricFamily
 
 from cl.lib.celery_utils import get_queue_length
@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 search_queries_total = Counter(
     "cl_search_queries_total",
     "Total number of search queries",
+    ["query_type", "method"],
+)
+
+search_duration_seconds = Histogram(
+    "cl_search_duration_seconds",
+    "Duration of search query execution in seconds",
     ["query_type", "method"],
 )
 
@@ -76,6 +82,20 @@ REGISTRY.register(CeleryQueueCollector())
 def _inc(metric: Counter, inc: int, **kwargs):
     """Increment a Counter metric with labels."""
     metric.labels(**kwargs).inc(inc)
+
+
+def record_search_duration(
+    duration_seconds: float, query_type: str, method: str
+):
+    """Record search query duration to the histogram.
+
+    :param duration_seconds: The duration of the search query in seconds.
+    :param query_type: The type of query ("semantic" or "keyword").
+    :param method: The method of access ("web" or "api").
+    """
+    search_duration_seconds.labels(
+        query_type=query_type, method=method
+    ).observe(duration_seconds)
 
 
 def record_prometheus_metric(key, *args):
