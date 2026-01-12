@@ -198,7 +198,11 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             f"Removed {scheduled_alerts_deleted} Scheduled Alert Hits."
         )
 
-    tally_stat("alerts.sent", inc=alerts_sent_count)
+    tally_stat(
+        "alerts.sent",
+        inc=alerts_sent_count,
+        prometheus_handler_key="alerts.sent.search",
+    )
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
 

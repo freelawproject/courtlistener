@@ -360,7 +360,11 @@ def send_alert_and_webhook(
     connection.send_messages(messages)
 
     # Work completed. Tally, log, and clean up
-    tally_stat("alerts.sent", inc=len(messages))
+    tally_stat(
+        "alerts.sent",
+        inc=len(messages),
+        prometheus_handler_key="alerts.sent.docket",
+    )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook

@@ -7,7 +7,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 from django_ses.signals import bounce_received, complaint_received
@@ -16,6 +16,7 @@ from rest_framework.authtoken.models import Token
 from cl.api.models import Webhook
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.storage import S3PrivateUUIDStorage
+from cl.stats.metrics import record_prometheus_metric
 from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
@@ -162,6 +163,7 @@ def complaint_handler(
 def create_auth_token(sender, instance=None, created=False, **kwargs):
     if created:
         Token.objects.create(user=instance)
+        record_prometheus_metric("accounts.created", 1)
 
 
 @receiver(
@@ -205,3 +207,13 @@ def webhook_created_or_updated(
             ):
                 return
         notify_new_or_updated_webhook.delay(instance.pk, created=False)
+
+
+@receiver(
+    post_delete,
+    sender=settings.AUTH_USER_MODEL,
+    dispatch_uid="track_account_deletion",
+)
+def track_account_deletion(sender, instance=None, **kwargs):
+    """Track account deletion in Prometheus metrics."""
+    record_prometheus_metric("accounts.deleted", 1)

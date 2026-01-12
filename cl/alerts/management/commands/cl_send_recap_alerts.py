@@ -717,7 +717,11 @@ def query_and_send_alerts(
         )
 
     # Log and tally the total alerts sent
-    tally_stat("alerts.sent", inc=total_alerts_sent_count)
+    tally_stat(
+        "alerts.sent",
+        inc=total_alerts_sent_count,
+        prometheus_handler_key="alerts.sent.search",
+    )
     logger.info(f"Sent {total_alerts_sent_count} {rate} email alerts.")
 
 
