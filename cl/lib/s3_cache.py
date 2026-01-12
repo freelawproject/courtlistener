@@ -3,20 +3,22 @@ from math import ceil
 from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
+from waffle import switch_is_active
 
 
 def get_s3_cache(fallback_cache: str = "db_cache") -> BaseCache:
     """Get S3 cache in production, fallback cache in dev/test.
 
-    In production, returns the S3 Express cache backend. In development
-    or testing environments, returns the specified fallback cache to avoid
-    requiring S3 access for local development.
+    In production, returns the S3 Express cache backend. In development,
+    testing, or when the enable-s3-cache waffle switch is disabled,
+    returns the specified fallback cache to avoid requiring S3 access
+    for local development or to allow quick rollback if issues arise.
 
     :param fallback_cache: Cache alias to use in dev/test (default: "db_cache")
     :return: Django cache backend instance
     """
     is_dev_or_test = settings.DEVELOPMENT or settings.TESTING
-    if is_dev_or_test:
+    if is_dev_or_test or not switch_is_active("enable-s3-cache"):
         return caches[fallback_cache]
     return caches["s3"]
 
