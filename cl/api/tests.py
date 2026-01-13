@@ -3632,6 +3632,7 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
     def test_can_ignore_invalid_filters(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
@@ -4520,6 +4521,7 @@ class UnknownFilterParameterTests(TestCase):
         keys = list(self.r.scan_iter(match=pattern))
         self.assertEqual(len(keys), 0)
 
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
     def test_mixed_valid_and_invalid_params(self) -> None:
         """Verify that mixed valid/invalid params are handled correctly."""
         self.client.force_login(self.user)
@@ -4539,6 +4541,7 @@ class UnknownFilterParameterTests(TestCase):
         self.assertEqual(len(keys), 1)
         self.assertIn("bogus_filter", keys[0])
 
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
     def test_redis_stores_count_and_timestamps(self) -> None:
         """Verify that Redis stores count and timestamp data correctly."""
         self.client.force_login(self.user)
@@ -4560,6 +4563,7 @@ class UnknownFilterParameterTests(TestCase):
         self.assertIn("first_seen", data)
         self.assertIn("last_seen", data)
 
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
     def test_anonymous_users_not_logged(self) -> None:
         """Verify that anonymous user requests don't create Redis entries."""
         # Don't login - make anonymous request

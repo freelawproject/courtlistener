@@ -118,7 +118,8 @@ def is_valid_filter_param(
     """Check if a parameter is valid for the given filterset.
 
     Handles nested RelatedFilter lookups like 'cluster__docket__court' by
-    recursively traversing the RelatedFilter chain.
+    recursively traversing the RelatedFilter chain. Also handles negation
+    filters with '!' suffix (e.g., 'person!' means "not equal to").
 
     :param param: The parameter name to validate.
     :param filterset_class: The FilterSet class for validation.
@@ -126,6 +127,10 @@ def is_valid_filter_param(
     """
     if filterset_class is None:
         return False
+
+    # Handle negation filter suffix (e.g., person! -> person)
+    if param.endswith("!"):
+        param = param[:-1]
 
     base_filters = filterset_class.base_filters
 
