@@ -141,6 +141,7 @@ from cl.users.models import UserProfile
 from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class BasicAPIPageTest(ESIndexTestCase, TestCase):
     """Test the basic views"""
 
@@ -232,6 +233,7 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             self.assertContains(response, header)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class CoverageTests(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -366,6 +368,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
                 self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
@@ -542,6 +545,7 @@ class ApiQueryCountTests(TestCase):
             )
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""
 
@@ -697,7 +701,7 @@ class ApiEventCreationTestCase(TestCase):
         )
 
 
-@override_settings(BLOCK_NEW_V3_USERS=True)
+@override_settings(BLOCK_NEW_V3_USERS=True, BLOCK_UNKNOWN_FILTERS=True)
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api-block-test:v3",
@@ -845,6 +849,7 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
@@ -915,6 +920,7 @@ class FilteringCountTestMixin:
         return r
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
@@ -1334,6 +1340,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
@@ -1899,6 +1906,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         await self.assertCountInResults(4)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
     """Test selecting only certain fields"""
 
@@ -1979,6 +1987,7 @@ def handle_database_cursor_pagination_wrapper(*args, **kwargs):
     return original_handle_database_cursor_pagination(*args, **kwargs)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class V4DRFPaginationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -2967,6 +2976,7 @@ class V4DRFPaginationTest(TestCase):
         self.assertEqual(len(data), 0)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFRecapPermissionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3020,6 +3030,7 @@ class DRFRecapPermissionTest(TestCase):
             print("✓")
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class WebhooksProxySecurityTest(TestCase):
     """Test Webhook proxy security"""
 
@@ -3104,6 +3115,7 @@ class WebhooksProxySecurityTest(TestCase):
         )
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class WebhooksMilestoneEventsTest(TestCase):
     """Test Webhook milestone events tracking"""
 
@@ -3303,6 +3315,7 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(await milestone_events.acount(), 0)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class CountParameterTests(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3556,6 +3569,7 @@ class TestApiUsage(SimpleTestCase):
         self.assertEqual(dates, ["2023-01-01", "2023-01-02"])
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 @patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
@@ -3800,6 +3814,7 @@ class CacheListApiResponseTest(TestCase):
         self.assertFalse(self.cache.has_key(fake_cache_key))
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class EventCountApiTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3909,6 +3924,7 @@ class DeferredDocketEntryOnlyViewSet(
     )
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DynamicNestedFieldsMixinTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4111,6 +4127,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertIn("tags", prefetches)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class ClusterRedirectionTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4181,6 +4198,7 @@ class ClusterRedirectionTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.GONE)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class TestOpinionViewsetXMLRendering(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4236,6 +4254,7 @@ class TestOpinionViewsetXMLRendering(TestCase):
         self.assertFalse(str(self.good_xml_op_id) in problematic_set)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class BankruptcyInformationAPITests(TestCase):
     """Tests for the bankruptcy-information endpoint and the
     bankruptcy_information field on the docket endpoint.
