@@ -111,17 +111,46 @@ VALID_FRAMEWORK_PARAMS: frozenset[str] = frozenset(
 )
 
 
-def get_valid_filter_params(
+def is_valid_filter_param(
+    param: str,
     filterset_class: type[FilterSet] | None,
-) -> set[str]:
-    """Get all valid filter parameter names from a filterset class.
+) -> bool:
+    """Check if a parameter is valid for the given filterset.
 
-    :param filterset_class: The FilterSet class to extract parameters from.
-    :return: Set of all valid parameter names.
+    Handles nested RelatedFilter lookups like 'cluster__docket__court' by
+    recursively traversing the RelatedFilter chain.
+
+    :param param: The parameter name to validate.
+    :param filterset_class: The FilterSet class for validation.
+    :return: True if the parameter is valid, False otherwise.
     """
     if filterset_class is None:
-        return set()
-    return set(filterset_class.base_filters)
+        return False
+
+    base_filters = filterset_class.base_filters
+
+    # Direct match - parameter exists in base_filters
+    if param in base_filters:
+        return True
+
+    # Handle nested lookups (e.g., cluster__docket__court)
+    if LOOKUP_SEP not in param:
+        return False
+
+    # Split on first __ to get prefix and rest
+    prefix, rest = param.split(LOOKUP_SEP, 1)
+
+    # Check if prefix is a RelatedFilter
+    filter_instance = base_filters.get(prefix)
+    if filter_instance is None:
+        return False
+
+    if not isinstance(filter_instance, RelatedFilter):
+        return False
+
+    # Recursively validate rest against the related filterset
+    related_filterset = filter_instance.filterset
+    return is_valid_filter_param(rest, related_filterset)
 
 
 def detect_unknown_filter_params(
@@ -134,12 +163,11 @@ def detect_unknown_filter_params(
     :param filterset_class: The FilterSet class for validation.
     :return: Set of unknown parameter names.
     """
-    valid_filter_params = get_valid_filter_params(filterset_class)
-    all_valid_params = valid_filter_params | VALID_FRAMEWORK_PARAMS
-
     unknown_params: set[str] = set()
     for param in query_params:
-        if param not in all_valid_params:
+        if param in VALID_FRAMEWORK_PARAMS:
+            continue
+        if not is_valid_filter_param(param, filterset_class):
             unknown_params.add(param)
 
     return unknown_params
@@ -321,6 +349,10 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
         # Return queryset unchanged - actual filtering is done by
         # DisabledHTMLFilterBackend
         return queryset
+
+    def to_html(self, request, queryset, view):
+        """Return empty string to prevent template errors in browsable API."""
+        return ""
 
     def _handle_unknown_params(
         self,

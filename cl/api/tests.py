@@ -41,8 +41,8 @@ from cl.api.utils import (
     LoggingMixin,
     detect_unknown_filter_params,
     get_logging_prefix,
-    get_valid_filter_params,
     invert_user_logs,
+    is_valid_filter_param,
 )
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
@@ -118,7 +118,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
-from cl.search.filters import CourtFilter
+from cl.search.filters import CourtFilter, OpinionFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -4415,6 +4415,7 @@ class BankruptcyInformationAPITests(TestCase):
         self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=False)
 class UnknownFilterParameterTests(TestCase):
     """Tests for unknown filter parameter detection and handling."""
 
@@ -4578,18 +4579,35 @@ class UnknownFilterParameterTests(TestCase):
 class UnknownFilterParameterUtilsTests(SimpleTestCase):
     """Unit tests for unknown filter parameter utility functions."""
 
-    def test_get_valid_filter_params_returns_base_filters(self) -> None:
-        """Verify that get_valid_filter_params extracts filter names."""
-        valid_params = get_valid_filter_params(CourtFilter)
+    def test_is_valid_filter_param_direct_filters(self) -> None:
+        """Verify that is_valid_filter_param validates direct filters."""
+        self.assertTrue(is_valid_filter_param("id", CourtFilter))
+        self.assertTrue(is_valid_filter_param("date_modified", CourtFilter))
+        self.assertFalse(is_valid_filter_param("invalid", CourtFilter))
+        # Test lookup variants with OpinionFilter which has them
+        self.assertTrue(is_valid_filter_param("id__gte", OpinionFilter))
 
-        # Should include base filters
-        self.assertIn("id", valid_params)
-        self.assertIn("date_modified", valid_params)
+    def test_is_valid_filter_param_handles_none(self) -> None:
+        """Verify that is_valid_filter_param handles None filterset."""
+        self.assertFalse(is_valid_filter_param("id", None))
 
-    def test_get_valid_filter_params_handles_none(self) -> None:
-        """Verify that get_valid_filter_params handles None filterset."""
-        valid_params = get_valid_filter_params(None)
-        self.assertEqual(valid_params, set())
+    def test_is_valid_filter_param_nested_related_filters(self) -> None:
+        """Verify that is_valid_filter_param handles nested RelatedFilters."""
+        # Valid nested RelatedFilter paths
+        self.assertTrue(is_valid_filter_param("cluster", OpinionFilter))
+        self.assertTrue(is_valid_filter_param("cluster__docket", OpinionFilter))
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket__court", OpinionFilter)
+        )
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket__court__id", OpinionFilter)
+        )
+
+        # Invalid nested paths
+        self.assertFalse(is_valid_filter_param("cluster__invalid", OpinionFilter))
+        self.assertFalse(
+            is_valid_filter_param("cluster__docket__invalid", OpinionFilter)
+        )
 
     def test_detect_unknown_filter_params(self) -> None:
         """Verify detection of unknown parameters."""
