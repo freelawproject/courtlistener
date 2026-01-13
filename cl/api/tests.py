@@ -4595,7 +4595,9 @@ class UnknownFilterParameterUtilsTests(SimpleTestCase):
         """Verify that is_valid_filter_param handles nested RelatedFilters."""
         # Valid nested RelatedFilter paths
         self.assertTrue(is_valid_filter_param("cluster", OpinionFilter))
-        self.assertTrue(is_valid_filter_param("cluster__docket", OpinionFilter))
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket", OpinionFilter)
+        )
         self.assertTrue(
             is_valid_filter_param("cluster__docket__court", OpinionFilter)
         )
@@ -4604,7 +4606,9 @@ class UnknownFilterParameterUtilsTests(SimpleTestCase):
         )
 
         # Invalid nested paths
-        self.assertFalse(is_valid_filter_param("cluster__invalid", OpinionFilter))
+        self.assertFalse(
+            is_valid_filter_param("cluster__invalid", OpinionFilter)
+        )
         self.assertFalse(
             is_valid_filter_param("cluster__docket__invalid", OpinionFilter)
         )
