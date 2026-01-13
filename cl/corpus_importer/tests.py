@@ -19,7 +19,11 @@ from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
-from juriscraper.state.texas import TexasCaseDocument
+from juriscraper.state.texas import (
+    TexasCaseDocument,
+    TexasCommonData,
+    TexasTrialCourt,
+)
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -82,6 +86,7 @@ from cl.corpus_importer.tasks import (
     merge_texas_document,
     merge_texas_documents,
     probe_or_scrape_iquery_pages,
+    texas_docket_entry_sequence_numbers,
 )
 from cl.corpus_importer.utils import (
     ClusterSourceException,
@@ -2330,6 +2335,30 @@ class TexasMergerTest(TestCase):
         assert len(result) == 2
         assert result[0] == (True, True, result[0][2])
         assert result[1] == (False, True, current_attachment.pk)
+
+    def test_texas_docket_entry_sequence_numbers(self):
+        """Do we generate sequence numbers correctly?"""
+        event_1 = {"date": date.fromisoformat("2025-01-02")}
+        event_2 = {"date": date.fromisoformat("2025-01-02")}
+        event_3 = {"date": date.fromisoformat("2025-01-03")}
+        input_data = TexasCommonData(
+            appellate_briefs=[event_2],
+            case_events=[event_1, event_2, event_3],
+            case_name_full="Robert v. Robert",
+            case_name="Bob v. Bob",
+            case_type="Court",
+            court_id="texas_coa1",
+            date_filed=date.fromisoformat("2025-01-02"),
+            docket_number="1234",
+            parties=[],
+            trial_court=MagicMock(spec=TexasTrialCourt),
+        )
+
+        output = texas_docket_entry_sequence_numbers(input_data)
+        assert len(output) == 3
+        assert output[0] == "2025-01-02-0"
+        assert output[1] == "2025-01-02-1"
+        assert output[2] == "2025-01-03-2"
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
