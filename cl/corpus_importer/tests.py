@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, timedelta
 from unittest import mock
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import eyecite
 import pytest
@@ -9,6 +9,7 @@ import time_machine
 from bs4 import BeautifulSoup
 from celery.exceptions import Retry
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
@@ -18,6 +19,7 @@ from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.state.texas import TexasCaseDocument
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -77,6 +79,7 @@ from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
     generate_ia_json,
     get_and_save_free_document_report,
+    merge_texas_document,
     probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
@@ -141,6 +144,7 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
@@ -2085,6 +2089,173 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             mock_logger.info.assert_called_with(
                 f"Cluster id: {cluster.id} already merged"
             )
+
+
+class TexasMergerTest(TestCase):
+    def setUp(self):
+        """Set up texas merger tests"""
+        self.download_pdf_patch = patch(
+            "cl.corpus_importer.tasks.download_pdf_in_stream"
+        )
+        self.download_pdf_mock = self.download_pdf_patch.start()
+        self.texas_sc = CourtFactory.create(id="texas_sc")
+        self.texas_cca = CourtFactory.create(id="texas_cca")
+        self.texas_coa1 = CourtFactory.create(id="texas_coa1")
+        self.docket_number_coa1 = "01-25-00011-CV"
+        self.docket_coa1 = DocketFactory.create(
+            court=self.texas_coa1, docket_number=self.docket_number_coa1
+        )
+        self.docket_coa1_entry = TexasDocketEntry.objects.create(
+            docket=self.docket_coa1,
+            entry_type="idk",
+            sequence_number="2025-08-01-10",
+        )
+
+    def tearDown(self):
+        """Tear down patches and remove added objects"""
+        Docket.objects.all().delete()
+        TexasDocketEntry.objects.all().delete()
+        TexasDocument.objects.all().delete()
+        self.download_pdf_patch.stop()
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_document_new_document(self):
+        """Can we correctly add a new attachment to an existing docket entry?"""
+        docket_entry = self.docket_coa1_entry
+
+        # Mock PDF download context manager
+        file_mock = MagicMock()
+        self.download_pdf_mock.return_value.__enter__.return_value = file_mock
+
+        input_document = TexasCaseDocument(
+            description="Sample Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+            file_size_str="1kB",
+            file_size_bytes=1000,
+        )
+
+        # Run the function
+        result = await merge_texas_document(docket_entry, input_document)
+
+        # Assertions
+        assert result == (True, True, result[2])
+        try:
+            created_document = await TexasDocument.objects.aget(pk=result[2])
+        except ObjectDoesNotExist:
+            created_document = None
+        assert created_document is not None
+        assert created_document.docket_entry_id == docket_entry.id
+        assert created_document.description == input_document["description"]
+        assert str(created_document.media_id) == input_document["media_id"]
+        assert (
+            str(created_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert (
+            str(created_document.document_url)
+            == input_document["document_url"]
+        )
+
+        assert self.download_pdf_mock.called
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_document_existing_document_no_update(self):
+        """Can we correctly update an existing document?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocument(
+            description="Sample Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+            file_size_str="1kB",
+            file_size_bytes=1000,
+        )
+
+        # Create an existing and up to date attachment
+        current_document = await TexasDocument.objects.acreate(
+            docket_entry=docket_entry,
+            description=input_document["description"],
+            media_id=input_document["media_id"],
+            media_version_id=input_document["media_version_id"],
+            document_url=input_document["document_url"],
+        )
+
+        # Run the function
+        result = await merge_texas_document(docket_entry, input_document)
+
+        # Assertions
+        assert result == (False, True, current_document.pk)
+        result_document = await TexasDocument.objects.aget(pk=result[2])
+        assert result_document is not None
+        assert result_document.docket_entry_id == docket_entry.id
+        assert result_document.description == input_document["description"]
+        assert str(result_document.media_id) == input_document["media_id"]
+        assert (
+            str(result_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert (
+            str(result_document.document_url) == input_document["document_url"]
+        )
+
+        assert not self.download_pdf_mock.called
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_document_existing_document_update(self):
+        """Can we correctly update an existing document?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocument(
+            description="Sample Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+            file_size_str="1kB",
+            file_size_bytes=1000,
+        )
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_document_pdf_download_failure(self):
+        """Can we correctly handle a failed PDF download?"""
+        # Mock inputs
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocument(
+            description="Sample Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+            file_size_str="1kB",
+            file_size_bytes=1000,
+        )
+
+        # Mock PDF download failure
+        self.download_pdf_mock.return_value.__enter__.return_value = None
+
+        # Run the function
+        result = await merge_texas_document(docket_entry, input_document)
+
+        # Assertions
+        assert result == (True, False, result[2])
+
+        try:
+            created_document = await TexasDocument.objects.aget(pk=result[2])
+        except ObjectDoesNotExist:
+            created_document = None
+        assert created_document is not None
+        assert created_document.docket_entry_id == docket_entry.id
+        assert created_document.description == input_document["description"]
+        assert str(created_document.media_id) == input_document["media_id"]
+        assert (
+            str(created_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert (
+            str(created_document.document_url)
+            == input_document["document_url"]
+        )
+
+        assert self.download_pdf_mock.called
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

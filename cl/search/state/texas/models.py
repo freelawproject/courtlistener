@@ -3,7 +3,8 @@
 import pghistory
 from django.db import models
 
-from cl.lib.model_helpers import CSVExportMixin, document_model
+from cl.lib.decorators import document_model
+from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 
 

@@ -4,14 +4,13 @@ from datetime import datetime
 from typing import TypeVar
 
 import nh3
-import pghistory
 import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, models, transaction
+from django.db import IntegrityError, transaction
 from django.db.models import (
     Case,
     CharField,
@@ -39,8 +38,6 @@ from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.model_helpers import (
-    CSVExportMixin,
-    document_model,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,

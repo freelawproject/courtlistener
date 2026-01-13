@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Callable
 from functools import wraps
@@ -11,6 +12,7 @@ from asgiref.sync import iscoroutinefunction, sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
+from django.db import models
 from django.utils.cache import patch_response_headers
 
 logger = logging.getLogger(__name__)
@@ -158,3 +160,45 @@ def cache_page_ignore_params(timeout: int, cache_alias: str = "default"):
         return _wrapped_view
 
     return decorator
+
+
+FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
+    r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def document_model(model: type[models.Model]) -> type[models.Model]:
+    """
+    Decorator for Django models to use docstrings to populate unset
+    help_text and db_comment field attributes.
+    """
+    model_fields: dict[str, models.Field] = dict(
+        [(field.name, field) for field in model._meta.local_fields]
+    )
+    docstring = model.__doc__
+    if docstring is None:
+        return model
+    ivar_docs = [
+        (match.group(1).strip(), match.group(2).strip())
+        for match in FIELD_DOCSTRING_EXTRACTION_RE.finditer(docstring)
+    ]
+    field_docs = dict(
+        [
+            (field_name, docstring.replace("\n", " "))
+            for field_name, docstring in ivar_docs
+            if field_name in model_fields
+        ]
+    )
+
+    for field_name, field in model_fields.items():
+        if field_name not in field_docs:
+            continue
+
+        doc = field_docs[field_name]
+        if not field.help_text:
+            field.help_text = doc
+        if not field.db_comment:
+            field.db_comment = doc
+
+    return model

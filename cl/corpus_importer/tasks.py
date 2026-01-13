@@ -3372,18 +3372,18 @@ async def merge_texas_document(
     """
     (texas_document, created) = await TexasDocument.objects.aget_or_create(
         media_id=input_document["media_id"],
+        media_version_id=input_document["media_version_id"],
         docket_entry=docket_entry,
         defaults={
             "description": input_document["description"],
             "media_id": input_document["media_id"],
-            "media_version_id": input_document["media_version_id"],
             "document_url": input_document["document_url"],
         },
     )
 
     if (
         created
-        or texas_document.media_version_id
+        or str(texas_document.media_version_id)
         != input_document["media_version_id"]
     ):
         media_id = input_document["media_id"]
