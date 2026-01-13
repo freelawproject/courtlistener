@@ -37,7 +37,7 @@ class Command(VerboseCommand):
             "--clear-after-send",
             action="store_true",
             default=False,
-            help="Clear Redis records after sending emails (use with caution).",
+            help="Clear Redis records after sending emails (use with caution to prevent repeat emails).",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:

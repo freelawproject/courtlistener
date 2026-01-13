@@ -1,15 +1,19 @@
 Hello{% if name %} {{ name }}{% endif %},
 
-We're writing to let you know that we've detected API requests from your
-account that include filter parameters our system doesn't recognize. We wanted
-to give you advance notice because we'll soon be updating our API to reject
-requests that contain unknown filter parameters.
+We're writing to let you know that in the last 24 hours we detected API
+requests from your account that include invalid GET parameters our system
+doesn't recognize. In the coming days, we will begin returning HTTP 400 errors
+for such requests.
+
+This email is your advance notice and your opportunity to address this issue.
 
 We apologize for any inconvenience this may cause. This change is necessary to
 protect the integrity of our system and ensure that all API users receive
 accurate, filtered results. When invalid filter parameters are used, they are
 silently ignored, which can lead to unexpected results—often returning far more
-data than intended.
+data than intended. Previously, this was not a common problem, but a plethora
+of vibe-coded solutions now regularly trigger very heavy usage of our system
+that we need to urgently address.
 
 
 YOUR AFFECTED API REQUESTS
@@ -45,9 +49,16 @@ please post on our discussion forum:
 
 Our community and team members are happy to help you resolve any issues.
 
-Thank you for using CourtListener's API, and we appreciate your understanding
-as we work to improve the reliability of our services.
+This is a rapid change to our APIs that we are considering a fix, not a
+backwards incompatibility. The only functionality we are removing is the
+ability to use the API incorrectly, which should help fix clients that are not
+working properly.
 
+This email will be re-sent with daily updates for approximately two weeks until
+we begin blocking these requests instead of simply alerting about them.
+
+We hope you understand, and we appreciate your assistance making our APIs work
+well for all of our users.
 
 Best regards,
 The CourtListener Team

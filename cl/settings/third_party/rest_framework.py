@@ -198,8 +198,10 @@ REST_FRAMEWORK = {
     ),
     # Filtering
     "DEFAULT_FILTER_BACKENDS": (
-        # This is a tweaked version of RestFrameworkFilterBackend
+        # DisabledHTMLFilterBackend disables showing filters in the browsable API
         "cl.api.utils.DisabledHTMLFilterBackend",
+        # Validates query params and logs/blocks unknown filter parameters
+        "cl.api.utils.UnknownFilterParamValidationBackend",
         "rest_framework.filters.OrderingFilter",
     ),
     # Assorted & Sundry

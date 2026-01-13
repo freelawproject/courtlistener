@@ -91,16 +91,6 @@ class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
     id = serializers.ReadOnlyField()
 
 
-class UnknownFilterParameterError(Exception):
-    """Raised when unknown filter parameters are detected in API requests."""
-
-    def __init__(self, unknown_params: set[str]) -> None:
-        self.unknown_params = unknown_params
-        super().__init__(
-            f"Unknown filter parameters: {sorted(unknown_params)}"
-        )
-
-
 # Standard DRF/framework query parameters that are always valid
 VALID_FRAMEWORK_PARAMS: frozenset[str] = frozenset(
     {
@@ -126,23 +116,12 @@ def get_valid_filter_params(
 ) -> set[str]:
     """Get all valid filter parameter names from a filterset class.
 
-    This includes:
-    - Direct filter fields (e.g., "id", "date_created")
-    - Lookup expressions (e.g., "id__gte", "date_created__range")
-    - Related filters (e.g., "court__id", "docket__date_filed__gte")
-
     :param filterset_class: The FilterSet class to extract parameters from.
     :return: Set of all valid parameter names.
     """
     if filterset_class is None:
         return set()
-
-    valid_params: set[str] = set()
-
-    for filter_name in filterset_class.base_filters:
-        valid_params.add(filter_name)
-
-    return valid_params
+    return set(filterset_class.base_filters)
 
 
 def detect_unknown_filter_params(
@@ -193,7 +172,7 @@ def log_bad_filter_params_to_redis(
 
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
-    current_time = datetime.now(UTC).isoformat()
+    current_time = now().isoformat()
 
     for param in bad_params:
         key = f"{BAD_FILTER_PARAMS_PREFIX}:user:{user_id}:{endpoint}:{param}"
@@ -213,7 +192,8 @@ def get_bad_filter_params_for_user(user_id: int) -> list[dict[str, Any]]:
     """Get all bad filter parameter records for a specific user.
 
     :param user_id: The user's primary key.
-    :return: List of dicts with endpoint, param, count, first_seen, last_seen.
+    :return: List of dicts with endpoint, param, count, first_seen, last_seen
+        (as datetime objects).
     """
     r = get_redis_interface("STATS")
     pattern = f"{BAD_FILTER_PARAMS_PREFIX}:user:{user_id}:*"
@@ -226,13 +206,23 @@ def get_bad_filter_params_for_user(user_id: int) -> list[dict[str, Any]]:
             endpoint = parts[4]
             param = parts[5]
             data = r.hgetall(key)
+            first_seen_str = data.get("first_seen", "")
+            last_seen_str = data.get("last_seen", "")
             results.append(
                 {
                     "endpoint": endpoint,
                     "param": param,
                     "count": int(data.get("count", 0)),
-                    "first_seen": data.get("first_seen", ""),
-                    "last_seen": data.get("last_seen", ""),
+                    "first_seen": (
+                        datetime.fromisoformat(first_seen_str)
+                        if first_seen_str
+                        else None
+                    ),
+                    "last_seen": (
+                        datetime.fromisoformat(last_seen_str)
+                        if last_seen_str
+                        else None
+                    ),
                 }
             )
 
@@ -277,20 +267,29 @@ def clear_bad_filter_params_for_user(user_id: int) -> int:
 
 
 class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
-    """Filter backend that disables HTML rendering and validates query params.
+    """Disable showing filters in the browsable API.
 
-    This backend:
-    1. Disables showing filters in the browsable API (for performance)
-    2. Validates query parameters against known filter fields
-    3. Can log or block requests with unknown filter parameters
-
-    The validation behavior is controlled by the BLOCK_UNKNOWN_FILTERS setting:
-    - False (default): Log unknown parameters but allow the request
-    - True: Return 400 error for requests with unknown parameters
+    Ideally, we'd want to show fields in the browsable API, but for related
+    objects this loads every object into the HTML and it loads them from the DB
+    one query at a time. It's insanity, so it's gotta be disabled globally.
     """
 
     def to_html(self, request, queryset, view):
         return ""
+
+
+class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
+    """Filter backend that validates query params against known filter fields.
+
+    This backend:
+    1. Validates query parameters against known filter fields
+    2. Logs unknown parameters to Redis for later notification
+    3. Can optionally block requests with unknown filter parameters
+
+    The validation behavior is controlled by the BLOCK_UNKNOWN_FILTERS setting:
+    - False (default): Log unknown parameters but allow the request
+    - True: Log and return 400 error for requests with unknown parameters
+    """
 
     def filter_queryset(self, request, queryset, view):
         """Filter the queryset, with optional validation of query parameters.
@@ -322,12 +321,11 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
         unknown_params: set[str],
         view,
     ) -> None:
-        """Handle unknown filter parameters by storing to Redis or raising error.
+        """Handle unknown filter parameters by logging and optionally blocking.
 
-        When BLOCK_UNKNOWN_FILTERS is False (default), stores the unknown
-        parameter usage in Redis for later notification via management command.
-
-        When BLOCK_UNKNOWN_FILTERS is True, returns a 400 error.
+        Always logs the unknown parameter usage to Redis for later notification
+        via management command. Additionally raises a 400 error if blocking is
+        enabled.
 
         :param request: The DRF request object.
         :param unknown_params: Set of unknown parameter names.
@@ -337,19 +335,20 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
         endpoint = view.__class__.__name__
         user_id = getattr(request.user, "pk", None)
 
+        # Always log to Redis for notification
+        log_bad_filter_params_to_redis(
+            user_id=user_id,
+            endpoint=endpoint,
+            bad_params=unknown_params,
+        )
+
+        # Additionally block the request if configured
         if settings.BLOCK_UNKNOWN_FILTERS:  # type: ignore[misc]
             raise ValidationError(
                 {
                     "detail": "Unknown filter parameters are not allowed.",
                     "unknown_params": sorted(unknown_params),
                 }
-            )
-        else:
-            # Store to Redis for later notification
-            log_bad_filter_params_to_redis(
-                user_id=user_id,
-                endpoint=endpoint,
-                bad_params=unknown_params,
             )
 
 

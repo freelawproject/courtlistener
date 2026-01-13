@@ -4478,7 +4478,7 @@ class UnknownFilterParameterTests(TestCase):
     @override_settings(BLOCK_UNKNOWN_FILTERS=True)
     def test_unknown_params_blocked_when_enabled(self) -> None:
         """Verify that unknown parameters return 400 when BLOCK_UNKNOWN_FILTERS
-        is True.
+        is True and that data is still logged to Redis.
         """
         self.client.force_login(self.user)
         response = self.client.get(
@@ -4491,6 +4491,12 @@ class UnknownFilterParameterTests(TestCase):
         self.assertIn("detail", data)
         self.assertIn("unknown_params", data)
         self.assertIn("invalid_param", data["unknown_params"])
+
+        # Verify data was ALSO logged to Redis (not just blocked)
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 1)
+        self.assertIn("invalid_param", keys[0])
 
     def test_framework_params_always_accepted(self) -> None:
         """Verify that standard framework parameters are always accepted."""
