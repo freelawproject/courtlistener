@@ -80,6 +80,7 @@ from cl.corpus_importer.tasks import (
     generate_ia_json,
     get_and_save_free_document_report,
     merge_texas_document,
+    merge_texas_documents,
     probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
@@ -2292,6 +2293,43 @@ class TexasMergerTest(TestCase):
         )
 
         assert self.download_pdf_mock.called
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_documents(self):
+        """Can we correctly handle multiple documents?"""
+        docket_entry = self.docket_coa1_entry
+        existing_document = TexasCaseDocument(
+            description="Sample Document 2",
+            media_id="123e4567-e89b-12d3-a456-426614174001",
+            media_version_id="789e4567-e89b-12d3-a456-426614174112",
+            document_url="https://example.com/sample2.pdf",
+            file_size_str="2kB",
+            file_size_bytes=2000,
+        )
+        current_attachment = await TexasDocument.objects.acreate(
+            docket_entry=docket_entry,
+            description=existing_document["description"],
+            media_id=existing_document["media_id"],
+            media_version_id=existing_document["media_version_id"],
+            document_url=existing_document["document_url"],
+        )
+        input_documents = [
+            TexasCaseDocument(
+                description="Sample Document",
+                media_id="123e4567-e89b-12d3-a456-426614174000",
+                media_version_id="789e4567-e89b-12d3-a456-426614174111",
+                document_url="https://example.com/sample.pdf",
+                file_size_str="1kB",
+                file_size_bytes=1000,
+            ),
+            existing_document,
+        ]
+
+        result = await merge_texas_documents(docket_entry, input_documents)
+
+        assert len(result) == 2
+        assert result[0] == (True, True, result[0][2])
+        assert result[1] == (False, True, current_attachment.pk)
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
