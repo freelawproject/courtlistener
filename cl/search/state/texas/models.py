@@ -6,6 +6,8 @@ from django.db import models
 from cl.lib.model_helpers import CSVExportMixin, document_model
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 
+__all__ = ["TexasDocketEntry", "TexasDocument"]
+
 
 @pghistory.track()
 @document_model
