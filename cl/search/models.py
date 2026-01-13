@@ -40,6 +40,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
+    CSVExportMixin,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
