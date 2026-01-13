@@ -292,12 +292,17 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
     """
 
     def filter_queryset(self, request, queryset, view):
-        """Filter the queryset, with optional validation of query parameters.
+        """Validate query parameters without applying filters.
+
+        This backend only validates parameters and logs/blocks unknown ones.
+        It does NOT apply filters itself - that's handled by
+        DisabledHTMLFilterBackend. Calling super().filter_queryset() would
+        apply filters twice, causing duplicate results from JOINs.
 
         :param request: The DRF request object.
         :param queryset: The queryset to filter.
         :param view: The view instance.
-        :return: The filtered queryset.
+        :return: The queryset unchanged.
         :raises ValidationError: If unknown parameters are found and blocking
             is enabled.
         """
@@ -313,7 +318,9 @@ class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
             if unknown_params:
                 self._handle_unknown_params(request, unknown_params, view)
 
-        return super().filter_queryset(request, queryset, view)
+        # Return queryset unchanged - actual filtering is done by
+        # DisabledHTMLFilterBackend
+        return queryset
 
     def _handle_unknown_params(
         self,
