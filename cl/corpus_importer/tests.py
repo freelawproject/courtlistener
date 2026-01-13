@@ -2204,7 +2204,6 @@ class TexasMergerTest(TestCase):
 
     @pytest.mark.asyncio
     async def test_merge_texas_document_existing_document_update(self):
-        """Can we correctly update an existing document?"""
         docket_entry = self.docket_coa1_entry
         input_document = TexasCaseDocument(
             description="Sample Document",
@@ -2214,6 +2213,43 @@ class TexasMergerTest(TestCase):
             file_size_str="1kB",
             file_size_bytes=1000,
         )
+        old_document = TexasCaseDocument(
+            description="Sample Document 2",
+            media_id=input_document["media_id"],
+            media_version_id="789e4567-e89b-12d3-a456-426614174112",
+            document_url="https://example.com/sample2.pdf",
+            file_size_str="2kB",
+            file_size_bytes=2000,
+        )
+
+        # Create an attachment
+        current_document = await TexasDocument.objects.acreate(
+            docket_entry=docket_entry,
+            description=old_document["description"],
+            media_id=old_document["media_id"],
+            media_version_id=old_document["media_version_id"],
+            document_url=old_document["document_url"],
+        )
+
+        # Run the function
+        result = await merge_texas_document(docket_entry, input_document)
+
+        # Assertions
+        assert result == (True, True, current_document.pk)
+        result_document = await TexasDocument.objects.aget(pk=result[2])
+        assert result_document is not None
+        assert result_document.docket_entry_id == docket_entry.id
+        assert result_document.description == input_document["description"]
+        assert str(result_document.media_id) == input_document["media_id"]
+        assert (
+            str(result_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert (
+            str(result_document.document_url) == input_document["document_url"]
+        )
+
+        assert self.download_pdf_mock.called
 
     @pytest.mark.asyncio
     async def test_merge_texas_document_pdf_download_failure(self):
