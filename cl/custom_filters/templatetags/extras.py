@@ -413,6 +413,15 @@ def has_attr(obj, attr_name):
 
 
 @register.filter
+def get_item(obj, key):
+    """Get item using bracket notation. Works for dicts, forms, lists, etc."""
+    try:
+        return obj[key]
+    except (KeyError, TypeError, IndexError):
+        return ""
+
+
+@register.filter
 def get_attr(obj, attr_name):
     """Return the value of the attribute attr_name."""
     return getattr(obj, attr_name, "")
@@ -422,3 +431,9 @@ def get_attr(obj, attr_name):
 def get_request_value(request_get, field_name):
     """Simple tag to get value from request.GET given a field name"""
     return request_get.get(field_name, "")
+
+
+@register.simple_tag
+def render_field_with_id(field, field_id):
+    """Render a form field with a custom ID attribute."""
+    return field.as_widget(attrs={"id": field_id})
