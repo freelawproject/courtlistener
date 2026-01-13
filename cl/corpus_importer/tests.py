@@ -24,6 +24,7 @@ from juriscraper.state.texas import (
     TexasCommonData,
     TexasTrialCourt,
 )
+from juriscraper.state.texas.common import TexasAppellateBrief
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -83,6 +84,7 @@ from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
     generate_ia_json,
     get_and_save_free_document_report,
+    merge_texas_docket_entry,
     merge_texas_document,
     merge_texas_documents,
     probe_or_scrape_iquery_pages,
@@ -2359,6 +2361,174 @@ class TexasMergerTest(TestCase):
         assert output[0] == "2025-01-02-0"
         assert output[1] == "2025-01-02-1"
         assert output[2] == "2025-01-03-2"
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_docket_entry_new_entry(self):
+        """Can we correctly handle a docket entry?"""
+        docket_entry = TexasAppellateBrief(
+            attachments=[
+                TexasCaseDocument(
+                    description="Sample Document",
+                    media_id="123e4567-e89b-12d3-a456-426614174000",
+                    media_version_id="789e4567-e89b-12d3-a456-426614174111",
+                    document_url="https://example.com/sample.pdf",
+                    file_size_str="1kB",
+                    file_size_bytes=1000,
+                ),
+            ],
+            description="An appellate brief, what more can you say?",
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+
+        output = await merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02-0", True, docket_entry
+        )
+
+        assert output == (True, True, output[2])
+        created_docket_entry = await TexasDocketEntry.objects.aget(
+            pk=output[2]
+        )
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == docket_entry["type"]
+        assert created_docket_entry.description == docket_entry["description"]
+        assert created_docket_entry.date_filed == docket_entry["date"]
+        n_attachments = await TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).acount()
+        assert n_attachments == 1
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_docket_entry_no_update(self):
+        """Can we correctly handle a docket entry update noop?"""
+        js_docket_entry = TexasAppellateBrief(
+            attachments=[
+                TexasCaseDocument(
+                    description="Sample Document",
+                    media_id="123e4567-e89b-12d3-a456-426614174000",
+                    media_version_id="789e4567-e89b-12d3-a456-426614174111",
+                    document_url="https://example.com/sample.pdf",
+                    file_size_str="1kB",
+                    file_size_bytes=1000,
+                ),
+            ],
+            description="An appellate brief, what more can you say?",
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+
+        (_, _, pk) = await merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02-0", True, js_docket_entry
+        )
+        # noop
+        output = await merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02-0", True, js_docket_entry
+        )
+        assert output == (False, True, output[2])
+        assert output[2] == pk
+        created_docket_entry = await TexasDocketEntry.objects.aget(
+            pk=output[2]
+        )
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == js_docket_entry["type"]
+        assert (
+            created_docket_entry.description == js_docket_entry["description"]
+        )
+        assert created_docket_entry.date_filed == js_docket_entry["date"]
+        n_attachments = await TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).acount()
+        assert n_attachments == 1
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_docket_entry_add_document(self):
+        """Can we correctly handle a docket entry update noop?"""
+        js_docket_entry = TexasAppellateBrief(
+            attachments=[
+                TexasCaseDocument(
+                    description="Sample Document",
+                    media_id="123e4567-e89b-12d3-a456-426614174000",
+                    media_version_id="789e4567-e89b-12d3-a456-426614174111",
+                    document_url="https://example.com/sample.pdf",
+                    file_size_str="1kB",
+                    file_size_bytes=1000,
+                ),
+            ],
+            description="An appellate brief, what more can you say?",
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+
+        (_, _, pk) = await merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02-0", True, js_docket_entry
+        )
+        js_docket_entry["attachments"].append(
+            TexasCaseDocument(
+                description="Sample Document 2",
+                media_id="123e4567-e89b-12d3-a456-426614174001",
+                media_version_id="789e4567-e89b-12d3-a456-426614174112",
+                document_url="https://example.com/sample2.pdf",
+                file_size_str="1kB",
+                file_size_bytes=1000,
+            )
+        )
+        output = await merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02-0", True, js_docket_entry
+        )
+        assert output == (True, True, output[2])
+        assert output[2] == pk
+        created_docket_entry = await TexasDocketEntry.objects.aget(
+            pk=output[2]
+        )
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == js_docket_entry["type"]
+        assert (
+            created_docket_entry.description == js_docket_entry["description"]
+        )
+        assert created_docket_entry.date_filed == js_docket_entry["date"]
+        n_attachments = await TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).acount()
+        assert n_attachments == 2
+
+    @pytest.mark.asyncio
+    async def test_merge_texas_docket_entry_failed_download(self):
+        """Can we correctly handle a docket entry update noop?"""
+        js_docket_entry = TexasAppellateBrief(
+            attachments=[
+                TexasCaseDocument(
+                    description="Sample Document",
+                    media_id="123e4567-e89b-12d3-a456-426614174000",
+                    media_version_id="789e4567-e89b-12d3-a456-426614174111",
+                    document_url="https://example.com/sample.pdf",
+                    file_size_str="1kB",
+                    file_size_bytes=1000,
+                ),
+            ],
+            description="An appellate brief, what more can you say?",
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+
+        self.download_pdf_mock.return_value.__enter__.return_value = None
+
+        output = await merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02-0", True, js_docket_entry
+        )
+        assert output == (True, False, output[2])
+        created_docket_entry = await TexasDocketEntry.objects.aget(
+            pk=output[2]
+        )
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == js_docket_entry["type"]
+        assert (
+            created_docket_entry.description == js_docket_entry["description"]
+        )
+        assert created_docket_entry.date_filed == js_docket_entry["date"]
+        n_attachments = await TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).acount()
+        assert n_attachments == 1
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
