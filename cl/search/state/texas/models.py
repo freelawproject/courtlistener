@@ -7,6 +7,8 @@ from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 
+__all__ = ["TexasDocketEntry", "TexasDocument"]
+
 
 @pghistory.track()
 @document_model
