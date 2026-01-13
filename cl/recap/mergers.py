@@ -1275,7 +1275,9 @@ def disassociate_extraneous_entities(
     ).delete()
 
 
-def normalize_scotus_parties(parties: list) -> list:
+def normalize_scotus_parties(
+    parties: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Transform SCOTUS court party data to PACER-like format.
 
     This allows reuse of the existing add_parties_and_attorneys() method
@@ -2372,7 +2374,7 @@ def merge_scotus_docket(
         )
         download_qp = qp_url and not scotus_metadata.questions_presented_file
 
-    # Parties merger.
+    # Merge Parties
     if report_data["parties"]:
         normalized_parties = normalize_scotus_parties(report_data["parties"])
         add_parties_and_attorneys(d, normalized_parties)
