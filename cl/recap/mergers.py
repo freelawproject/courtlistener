@@ -1275,6 +1275,76 @@ def disassociate_extraneous_entities(
     ).delete()
 
 
+def normalize_scotus_parties(
+    parties: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Transform SCOTUS court party data to PACER-like format.
+
+    This allows reuse of the existing add_parties_and_attorneys() method
+    for SCOTUS court data.
+
+    :param parties: List of party dicts in SCOTUS format.
+    :returns: List of party dicts in PACER-like format compatible with
+    add_parties_and_attorneys()
+    """
+    normalized = []
+
+    for party in parties:
+        normalized_party = {
+            "name": party.get("name", ""),
+            "type": party.get("type", "Unknown"),
+            "date_terminated": None,
+            "extra_info": "",
+            "attorneys": [],
+        }
+
+        for atty in party.get("attorneys", []):
+            # Build contact string from structured fields
+            contact_parts = []
+
+            if atty.get("title"):
+                contact_parts.append(atty["title"])
+
+            if atty.get("address"):
+                contact_parts.append(atty["address"])
+
+            # Build city, state zip line
+            city_state_zip_parts = []
+            if atty.get("city"):
+                city_state_zip_parts.append(atty["city"])
+            if atty.get("state"):
+                city_state_zip_parts.append(atty["state"])
+
+            if city_state_zip_parts:
+                line = ", ".join(city_state_zip_parts)
+                if atty.get("zip"):
+                    line += f" {atty['zip']}"
+                contact_parts.append(line)
+
+            if atty.get("phone"):
+                contact_parts.append(atty["phone"])
+
+            if atty.get("email"):
+                contact_parts.append(f"Email: {atty['email']}")
+
+            # Build roles list
+            roles = []
+            if atty.get("is_counsel_of_record"):
+                roles.append("LEAD ATTORNEY")
+
+            normalized_party["attorneys"].append(
+                {
+                    "name": atty.get("name", ""),
+                    "contact": "\n".join(contact_parts),
+                    "roles": roles,
+                }
+            )
+
+        normalized.append(normalized_party)
+
+    return normalized
+
+
 @transaction.atomic
 # Retry on transaction deadlocks; see #814.
 @retry(OperationalError, tries=2, delay=1, backoff=1, logger=logger)
@@ -2303,6 +2373,11 @@ def merge_scotus_docket(
             defaults=defaults,
         )
         download_qp = qp_url and not scotus_metadata.questions_presented_file
+
+    # Merge Parties
+    if report_data["parties"]:
+        normalized_parties = normalize_scotus_parties(report_data["parties"])
+        add_parties_and_attorneys(d, normalized_parties)
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])

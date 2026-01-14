@@ -413,6 +413,31 @@ class SCOTUSDocketEntryFactory(DictFactory):
     document_number = Faker("pyint", min_value=1, max_value=1000)
 
 
+class SCOTUSAttorneyFactory(DictFactory):
+    """Factory for SCOTUS attorney dicts."""
+
+    address = Faker("street_address")
+    city = Faker("city")
+    email = Faker("email")
+    is_counsel_of_record = Faker("boolean")
+    name = Faker("name")
+    phone = Faker("phone_number")
+    state = Faker("state_abbr")
+    title = Faker("company")
+    zip = Faker("postcode")
+
+
+class SCOTUSPartyFactory(DictFactory):
+    """Factory for SCOTUS party dicts."""
+
+    attorneys = List([SubFactory(SCOTUSAttorneyFactory)])
+    name = Faker("company")
+    type = Faker(
+        "random_element",
+        elements=["Petitioner", "Respondent", "Amicus Curiae"],
+    )
+
+
 class ScotusDocketDataFactory(DictFactory):
     capital_case = Faker("boolean")
     case_name = Faker("case_name")
@@ -427,4 +452,4 @@ class ScotusDocketDataFactory(DictFactory):
     lower_court_rehearing_denied_date = Faker("date_object")
     questions_presented = Faker("url")
     docket_entries = List([SubFactory(SCOTUSDocketEntryFactory)])
-    parties = []
+    parties = List([SubFactory(SCOTUSPartyFactory)])

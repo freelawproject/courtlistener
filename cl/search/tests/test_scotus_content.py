@@ -8,14 +8,24 @@ from cl.corpus_importer.tasks import (
     download_qp_scotus_pdf,
     ingest_scotus_docket,
 )
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    AttorneyOrganizationAssociation,
+    Party,
+    PartyType,
+    Role,
+)
 from cl.recap.mergers import merge_scotus_docket
 from cl.recap.tests.tests import mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     SCOTUSAttachmentFactory,
+    SCOTUSAttorneyFactory,
     ScotusDocketDataFactory,
     SCOTUSDocketEntryFactory,
+    SCOTUSPartyFactory,
 )
 from cl.search.models import (
     Docket,
@@ -81,6 +91,51 @@ class ScotusDocketMergeTest(TestCase):
             document_number=None,
             attachments=[],
         )
+        atty_1 = SCOTUSAttorneyFactory(
+            name="Paul D. Clement",
+            address="706 Duke Street",
+            city="Alexandria",
+            state="VA",
+            zip="22314",
+            phone="(202) 742-8900",
+            email="PAUL.CLEMENT@CLEMENTMURPHY.COM",
+            is_counsel_of_record=True,
+            title="Clement & Murphy, LLC",
+        )
+        atty_2 = SCOTUSAttorneyFactory(
+            name="Noel John Francisco",
+            address="51 Louisiana Avenue, NW",
+            city="Washington",
+            state="DC",
+            zip="20001",
+            phone="(202) 879-3939",
+            email="NJFRANCISCO@JONESDAY.COM",
+            is_counsel_of_record=True,
+            title="Law Firm Test LLC",
+        )
+        atty_3 = SCOTUSAttorneyFactory(
+            name="Eric Nelson",
+            address="54 Florence Street",
+            city="Staten Island",
+            state="NY",
+            zip="10308",
+            phone="(718) 356-0566",
+            email=None,
+            is_counsel_of_record=False,
+            title=None,
+        )
+
+        party_1 = SCOTUSPartyFactory(
+            name="Encino Motorcars, LLC",
+            type="Petitioner",
+            attorneys=[atty_1],
+        )
+        party_2 = SCOTUSPartyFactory(
+            name="United States",
+            type="Respondent",
+            attorneys=[atty_2, atty_3],
+        )
+
         data = ScotusDocketDataFactory(
             docket_number="23-1434",
             capital_case=False,
@@ -88,6 +143,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers=["22-16375", "22-16622"],
             lower_court_case_numbers_raw="Docket Num. 22-16375, Docket Num. 22-16622",
             docket_entries=[de_1, de_2, de_3, de_4],
+            parties=[party_1, party_2],
         )
 
         mock_response = mock.Mock()
@@ -190,6 +246,133 @@ class ScotusDocketMergeTest(TestCase):
             data["lower_court_rehearing_denied_date"],
         )
 
+        # Assert parties were created
+        parties = Party.objects.filter(party_types__docket=docket)
+        self.assertEqual(parties.count(), 2, "Wrong number of parties.")
+
+        # Assert party 1 - Petitioner
+        party_1_db = Party.objects.filter(
+            name="Encino Motorcars, LLC", party_types__docket=docket
+        ).first()
+        self.assertIsNotNone(party_1_db)
+
+        party_type_1 = PartyType.objects.filter(
+            docket=docket, party=party_1_db
+        ).first()
+        self.assertEqual(party_type_1.name, "Petitioner")
+
+        # Assert party 2 - Respondent
+        party_2_db = Party.objects.filter(
+            name="United States", party_types__docket=docket
+        ).first()
+        self.assertIsNotNone(party_2_db)
+
+        party_type_2 = PartyType.objects.filter(
+            docket=docket, party=party_2_db
+        ).first()
+        self.assertEqual(party_type_2.name, "Respondent")
+
+        # Assert attorneys were created
+        attorneys = Attorney.objects.filter(roles__docket=docket).distinct()
+        self.assertEqual(attorneys.count(), 3, "Wrong number of attorneys.")
+
+        # Assert attorney 1 - Paul D. Clement
+        atty_1_db = Attorney.objects.filter(
+            name="Paul D. Clement", roles__docket=docket
+        ).first()
+        self.assertIsNotNone(atty_1_db)
+        self.assertEqual(atty_1_db.phone, "(202) 742-8900")
+        self.assertEqual(atty_1_db.email, "PAUL.CLEMENT@CLEMENTMURPHY.COM")
+        self.assertIn("706 Duke Street", atty_1_db.contact_raw)
+        self.assertIn("Alexandria", atty_1_db.contact_raw)
+
+        # Assert attorney 1 has LEAD role (is_counsel_of_record=True)
+        atty_1_role = Role.objects.filter(
+            attorney=atty_1_db, docket=docket, party=party_1_db
+        ).first()
+        self.assertEqual(atty_1_role.role, Role.ATTORNEY_LEAD)
+
+        # Assert attorney 2 - Noel John Francisco
+        atty_2_db = Attorney.objects.filter(
+            name="Noel John Francisco", roles__docket=docket
+        ).first()
+        self.assertIsNotNone(atty_2_db)
+        self.assertEqual(atty_2_db.email, "NJFRANCISCO@JONESDAY.COM")
+
+        atty_2_role = Role.objects.filter(
+            attorney=atty_2_db, docket=docket, party=party_2_db
+        ).first()
+        self.assertEqual(atty_2_role.role, Role.ATTORNEY_LEAD)
+
+        # Assert attorney 3 - Eric Nelson (not counsel of record)
+        atty_3_db = Attorney.objects.filter(
+            name="Eric Nelson", roles__docket=docket
+        ).first()
+        self.assertIsNotNone(atty_3_db)
+        self.assertEqual(atty_3_db.email, "")  # email was None
+
+        atty_3_role = Role.objects.filter(
+            attorney=atty_3_db, docket=docket, party=party_2_db
+        ).first()
+        # Not counsel of record, so should not be ATTORNEY_LEAD
+        self.assertEqual(atty_3_role.role, Role.UNKNOWN)
+
+        # Assert AttorneyOrganization instances were created
+        attorney_orgs = AttorneyOrganization.objects.all()
+
+        # 3 orgs expected: "Clement & Murphy, LLC", "Law Firm Test LLC" and
+        # Eric Nelson.
+        self.assertEqual(
+            attorney_orgs.count(), 3, "Wrong number of attorney organizations."
+        )
+
+        # Assert organization 1 - Clement & Murphy, LLC
+        org_1 = AttorneyOrganization.objects.filter(
+            name="Clement & Murphy, LLC"
+        ).first()
+        self.assertIsNotNone(org_1)
+        self.assertEqual(org_1.address1, "706 Duke St.")
+        self.assertEqual(org_1.city, "Alexandria")
+        self.assertEqual(org_1.state, "VA")
+        self.assertEqual(org_1.zip_code, "22314")
+
+        # Assert organization 2 - Law Firm Test LLC
+        org_2 = AttorneyOrganization.objects.filter(
+            name="Law Firm Test LLC"
+        ).first()
+        self.assertIsNotNone(org_2)
+        self.assertEqual(org_2.address1, "51 Louisiana Ave., NW")
+        self.assertEqual(org_2.city, "Washington")
+        self.assertEqual(org_2.state, "DC")
+        self.assertEqual(org_2.zip_code, "20001")
+
+        org_3 = AttorneyOrganization.objects.filter(name="Eric Nelson").first()
+        self.assertIsNotNone(org_3)
+        self.assertEqual(org_3.address1, "54 Florence St.")
+        self.assertEqual(org_3.city, "Staten Island")
+        self.assertEqual(org_3.state, "NY")
+        self.assertEqual(org_3.zip_code, "10308")
+
+        # Assert AttorneyOrganizationAssociation links attorneys to orgs
+        assoc_1 = AttorneyOrganizationAssociation.objects.filter(
+            attorney=atty_1_db, attorney_organization=org_1, docket=docket
+        ).first()
+        self.assertIsNotNone(
+            assoc_1,
+        )
+        assoc_2 = AttorneyOrganizationAssociation.objects.filter(
+            attorney=atty_2_db, attorney_organization=org_2, docket=docket
+        ).first()
+        self.assertIsNotNone(
+            assoc_2,
+        )
+        assoc_3 = AttorneyOrganizationAssociation.objects.filter(
+            attorney=atty_3_db, docket=docket
+        ).first()
+        self.assertIsNotNone(
+            assoc_3,
+        )
+
         # Merge again. Confirm objects are not duplicated.
         ingest_scotus_docket(data)
         docket.refresh_from_db()
@@ -216,6 +399,23 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(rd_att_2_1.document_type, RECAPDocument.ATTACHMENT)
         self.assertEqual(rd_att_1.pk, rd_att_1_1.pk)
         self.assertEqual(rd_att_2.pk, rd_att_2_1.pk)
+
+        # No more parties created.
+        parties_after = Party.objects.filter(party_types__docket=docket)
+        self.assertEqual(parties_after.count(), 2, "Parties were duplicated.")
+
+        attorneys_after = Attorney.objects.filter(
+            roles__docket=docket
+        ).distinct()
+        self.assertEqual(
+            attorneys_after.count(), 3, "Attorneys were duplicated."
+        )
+
+        attorney_orgs = AttorneyOrganization.objects.all()
+
+        self.assertEqual(
+            attorneys_after.count(), 3, "AttorneysOrgs were duplicated."
+        )
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
