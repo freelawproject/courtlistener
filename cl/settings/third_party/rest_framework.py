@@ -176,7 +176,7 @@ REST_FRAMEWORK = {
     },
     "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {
         "jafrank": "180/minute",
-        "LexText": "180/minute",
+        "LexText": "360/minute",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
