@@ -37,7 +37,7 @@ def make_s3_cache_key(base_key: str, timeout_seconds: int | None) -> str:
     :return: Cache key with time-based prefix (production) or unchanged (dev/test)
     """
     is_dev_or_test = settings.DEVELOPMENT or settings.TESTING
-    if is_dev_or_test:
+    if is_dev_or_test or not switch_is_active("enable-s3-cache"):
         return base_key
     if timeout_seconds is None:
         return f"persistent:{base_key}"
