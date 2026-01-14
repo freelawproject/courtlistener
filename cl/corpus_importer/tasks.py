@@ -58,6 +58,7 @@ from juriscraper.pacer.reports import BaseReport
 from juriscraper.pacer.utils import is_pdf
 from juriscraper.state.texas import (
     TexasCaseEvent,
+    TexasCaseParty,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
 )
@@ -138,6 +139,7 @@ from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
+    add_parties_and_attorneys,
     add_tags_to_objs,
     find_docket_object,
     make_recap_sequence_number,
@@ -3487,3 +3489,48 @@ async def merge_texas_docket_entry(
     )
 
     return created or update_or_create, success, docket_entry.pk
+
+
+def normalize_texas_parties(
+    parties: list[TexasCaseParty],
+) -> list[dict[str, Any]]:
+    """Transform Texas court party data to PACER-like format.
+
+    This allows reuse of the existing add_parties_and_attorneys() method for
+    Texas court data.
+
+    :param parties: List of party dicts in Texas format.
+    :returns: List of party dicts in PACER-like format compatible with
+    add_parties_and_attorneys()
+    """
+    return [
+        {
+            "name": party["name"],
+            "type": party["type"],
+            "date_terminated": None,
+            "extra_info": "",
+            "attorneys": [
+                {
+                    "name": attorney,
+                    "contact": attorney,
+                    "roles": ["LEAD_ATTORNEY"] if i == 0 else ["UNKNOWN"],
+                }
+                for i, attorney in enumerate(party["representatives"])
+            ],
+        }
+        for party in parties
+    ]
+
+
+def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
+    """Merge Texas case parties and attorneys into the given docket.
+
+    This function takes a docket and a list of parties associated with a Texas
+    case, normalizes the parties into a PACER-like format, and incorporates
+    them along with their associated attorneys into the docket using
+    add_parties_and_attorneys().
+
+    :param docket: The docket to which parties and attorneys should be added.
+    :param parties: The parties involved in the Texas case.
+    """
+    add_parties_and_attorneys(docket, normalize_texas_parties(parties))
