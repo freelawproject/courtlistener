@@ -9,6 +9,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
@@ -1715,6 +1716,44 @@ class TestQueryWrapper(TestCase):
         result = wrapper.get_context()
 
         self.assertEqual(result["url"], "/very/long…")
+
+    def test_get_context_with_unevaluated_lazy_user(self) -> None:
+        """Does get_context handle unevaluated SimpleLazyObject without recursion?
+
+        When request.user is a SimpleLazyObject that hasn't been evaluated,
+        accessing is_authenticated would trigger a database query to fetch
+        the user. That query would go through the SQL commenter again, causing
+        infinite recursion. This test verifies we handle this case correctly.
+        """
+        request = self.request_factory.get("/lazy/user/path/")
+        # Create an unevaluated SimpleLazyObject (simulating Django's lazy user)
+        request.user = SimpleLazyObject(lambda: self.user)
+        request.resolver_match = self.MockResolverMatch("lazy-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        # User should be None since the lazy object hasn't been evaluated
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/lazy/user/path/")
+        self.assertEqual(result["url-name"], "lazy-view")
+
+    def test_get_context_with_evaluated_lazy_user(self) -> None:
+        """Does get_context return user_id for an evaluated SimpleLazyObject?"""
+        request = self.request_factory.get("/lazy/user/path/")
+        lazy_user = SimpleLazyObject(lambda: self.user)
+        # Force evaluation of the lazy object
+        _ = lazy_user.pk  # type: ignore[attr-defined]
+        request.user = lazy_user
+        request.resolver_match = self.MockResolverMatch("lazy-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        # User should be set since the lazy object has been evaluated
+        self.assertEqual(result["user_id"], self.user.pk)
+        self.assertEqual(result["url"], "/lazy/user/path/")
+        self.assertEqual(result["url-name"], "lazy-view")
 
 
 class TestSqlCommenterMiddleware(TestCase):
