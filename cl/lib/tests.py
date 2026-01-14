@@ -2246,7 +2246,7 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
         )
 
 
-class TestS3CacheHelpers(SimpleTestCase):
+class TestS3CacheHelpers(TestCase):
     """Tests for the S3 cache helper functions in cl/lib/s3_cache.py"""
 
     @override_settings(DEVELOPMENT=True, TESTING=False)
