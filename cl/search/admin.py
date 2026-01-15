@@ -361,7 +361,9 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = ("pk",)  # Required for search box; actual search handled by get_search_results
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
     search_help_text = "Search by RECAP Document ID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry", "tags")
