@@ -311,9 +311,37 @@ class ModelTest(TestCase):
         self.op_c = OpinionContent.objects.create(
             opinion=self.op,
             content=op_content,
-            source=OpinionContent.SCANNING,
+            source=OpinionContent.FLP_XML,
             extraction_type=OpinionContent.LLM,
-            is_main_version=False,
+        )
+
+        self.assertEqual(self.op_c.opinion, self.op)
+        self.assertEqual(self.op_c.content, op_content)
+        self.assertEqual(self.op_c.source, OpinionContent.FLP_XML)
+        self.assertEqual(self.op_c.extraction_type, OpinionContent.LLM)
+
+    def test_opinion_content_str(self):
+        """Test the __str__ method of the OpinionContent model."""
+        self.docket = Docket.objects.create(
+            case_name="People v. Curry",
+            court_id="cal",
+            source=Docket.SCANNING_PROJECT,
+        )
+        self.oc = OpinionCluster.objects.create(
+            case_name="People v. Curry",
+            docket=self.docket,
+            date_filed=datetime.date(2023, 11, 25),
+        )
+        self.op = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
+        self.op_c = OpinionContent.objects.create(
+            opinion=self.op,
+            content="test content",
+            source=OpinionContent.FLP_XML,
+            extraction_type=OpinionContent.LLM,
+        )
+        self.assertEqual(
+            str(self.op_c),
+            f"{self.op_c.pk} - {self.oc.case_name}",
         )
 
 

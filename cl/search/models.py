@@ -3279,13 +3279,20 @@ class OpinionJoinedBy(Opinion.joined_by.through):
 
 
 class OpinionContent(AbstractDateTimeModel):
+    """Stores normalized opinion text content.
+
+    Each Opinion can have multiple OpinionContent records, one per content type.
+    This normalized structure replaces the previous wide table design that had
+    separate fields for each content source (plain_text, html, html_lawbox, etc.).
+    """
+
     SCRAPERS = 1
     XML_HARVARD = 2
     HTML_ANON_2020 = 3
     COLUMBIA_ARCHIVE = 4
     LAWBOX = 5
     RECAP = 6
-    SCANNING = 7
+    FLP_XML = 7
     SOURCES = (
         (SCRAPERS, "Got from juriscraper"),
         (XML_HARVARD, "Got from CAP"),
@@ -3293,7 +3300,7 @@ class OpinionContent(AbstractDateTimeModel):
         (COLUMBIA_ARCHIVE, "Got from Columbia import"),
         (LAWBOX, "Got from Lawbox"),
         (RECAP, "Free opinions on RECAP"),
-        (SCANNING, "Got from scanning project"),
+        (FLP_XML, "FLP XML"),
     )
 
     DEFAULT = 0
@@ -3307,8 +3314,16 @@ class OpinionContent(AbstractDateTimeModel):
             "Extracted via LLM",
         ),
     )
-    opinion = models.ForeignKey(Opinion, on_delete=models.CASCADE)
-    content = models.TextField(help_text="The extracted opinion content")
+    opinion = models.ForeignKey(
+        Opinion,
+        help_text="The opinion this content belongs to",
+        related_name="contents",
+        on_delete=models.CASCADE,
+    )
+    content = models.TextField(
+        help_text="The text content of the opinion",
+        blank=True,
+    )
     source = models.SmallIntegerField(
         help_text="Source of the opinions content",
         choices=SOURCES,
@@ -3317,49 +3332,6 @@ class OpinionContent(AbstractDateTimeModel):
         help_text="Source of the opinions content",
         choices=EXTRACTION_METHOD,
     )
-    is_main_version = models.BooleanField(
-        help_text="True if this is the most up to date or official version of the Opinion's content"
-    )
-    page_count = models.IntegerField()
-    sha1 = models.CharField(
-        help_text=(
-            "unique ID for the document, as generated via SHA1 of the "
-            "binary file or text data"
-        ),
-        max_length=40,
-        db_index=True,
-        blank=True,
-    )
-    page_count = models.IntegerField(
-        help_text="The number of pages in the document, if known",
-        blank=True,
-        null=True,
-    )
-    download_url = models.URLField(
-        help_text=(
-            "The URL where the item was originally scraped. Note that "
-            "these URLs may often be dead due to the court or the bulk "
-            "provider changing their website. We keep the original link "
-            "here given that it often contains valuable metadata."
-        ),
-        max_length=500,
-        db_index=True,
-        null=True,
-        blank=True,
-    )
-    local_path = models.FileField(
-        help_text=(
-            "The location in AWS S3 where the original opinion file is "
-            f"stored. {s3_warning_note}"
-        ),
-        upload_to=make_upload_path,
-        storage=IncrementingAWSMediaStorage(),
-        blank=True,
-        db_index=True,
-    )
-    # TODO future work: add es_pa_field_tracker and es_o_field_tracker
-    # TODO future work: add custom manager
-    # TODO future work: update factories to create OpinionContent when creating Opinion
 
     def __str__(self) -> str:
         try:

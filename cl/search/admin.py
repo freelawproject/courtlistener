@@ -70,6 +70,7 @@ class OpinionContentAdmin(CursorPaginatorAdmin):
         "date_created",
         "date_modified",
     )
+    list_filter = ("source",)
     list_display = ("__str__", "source", "extraction_type")
 
 
