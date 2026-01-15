@@ -42,7 +42,9 @@ from cl.lib.model_helpers import (
     CSVExportMixin,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_pdf_path,
     make_recap_path,
+    make_scotus_docket_number_core,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
@@ -299,6 +301,14 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     docket_number = models.TextField(
         help_text="The docket number in the lower court.", blank=True
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     assigned_to = models.ForeignKey(
         "people_db.Person",
         help_text="The judge the case was assigned to.",
@@ -358,6 +368,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     date_received_coa = models.DateField(
         help_text="The date the case was received at the court of appeals.",
+        blank=True,
+        null=True,
+    )
+    date_rehearing_denied = models.DateField(
+        help_text="The date the petition for rehearing was denied at the "
+        "lower court.",
         blank=True,
         null=True,
     )
@@ -831,8 +847,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
-            self.docket_number_core = make_docket_number_core(
-                self.docket_number
+            self.docket_number_core = (
+                make_scotus_docket_number_core(self.docket_number)
+                if self.court_id == "scotus"
+                else make_docket_number_core(self.docket_number)
             )
 
         if self.source in self.RECAP_SOURCES():
@@ -1938,14 +1956,14 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         )
 
-    def appellate_pacer_courts(self) -> models.QuerySet:
+    def appellate_courts(self) -> models.QuerySet:
         return self.filter(
             Q(jurisdiction=Court.FEDERAL_APPELLATE)
             |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
-        ).exclude(pk="scotus")
+        )
 
     def bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
@@ -3897,3 +3915,57 @@ class ClusterRedirection(models.Model):
                 cluster=cluster_to_keep,
                 reason=reason,
             )
+
+
+@pghistory.track()
+class ScotusDocketMetadata(AbstractDateTimeModel):
+    """Supreme Court-specific metadata associated with a docket.
+
+    These fields capture information that only applies to SCOTUS cases, so we
+    keep them in a separate model instead of adding them directly to the Docket
+    namespace.
+    """
+
+    docket = models.OneToOneField(
+        "search.Docket",
+        help_text="The docket this SCOTUS metadata applies to.",
+        related_name="scotus_metadata",
+        on_delete=models.CASCADE,
+    )
+    capital_case = models.BooleanField(
+        help_text="Whether this SCOTUS case is a capital case.",
+        default=False,
+    )
+    date_discretionary_court_decision = models.DateField(
+        help_text="The date of the Court's discretionary decision.",
+        blank=True,
+        null=True,
+    )
+    linked_with = models.CharField(
+        help_text=(
+            "Field describing any other docket(s) this case is "
+            "linked with, as shown on the SCOTUS docket."
+        ),
+        max_length=1000,
+        blank=True,
+    )
+    questions_presented_url = models.CharField(
+        help_text="URL to the 'Questions Presented' page or document, if available.",
+        max_length=1000,
+        blank=True,
+    )
+    questions_presented_file = models.FileField(
+        help_text="A local copy of the 'Questions Presented' document."
+        "The path is AWS S3 where the file is saved.",
+        upload_to=make_pdf_path,
+        storage=IncrementingAWSMediaStorage(),
+        max_length=1000,
+        blank=True,
+    )
+
+    def __str__(self) -> str:
+        return f"SCOTUS metadata for docket {self.docket_id}"
+
+    class Meta:
+        verbose_name = "SCOTUS Docket Metadata"
+        verbose_name_plural = "SCOTUS Docket Metadata"

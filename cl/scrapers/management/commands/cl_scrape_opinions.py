@@ -16,7 +16,6 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
 
 from cl import settings
-from cl.alerts.models import RealTimeQueue
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
@@ -38,7 +37,6 @@ from cl.scrapers.utils import (
     update_or_create_originating_court_information,
 )
 from cl.search.models import (
-    SEARCH_TYPES,
     SOURCES,
     Citation,
     Court,
@@ -57,11 +55,10 @@ cnt = CaseNameTweaker()
 def make_objects(
     item: dict[str, str | Any],
     court: Court,
-    sha1_hash: str,
-    content: bytes,
+    opinions_content: list[tuple[dict, bytes, str]],
 ) -> tuple[
     Docket,
-    Opinion,
+    list[Opinion],
     OpinionCluster,
     list[Citation],
     OriginatingCourtInformation,
@@ -77,7 +74,7 @@ def make_objects(
     plural names, like in
     `item.get("disposition") or item.get("dispositions", "")`
 
-    Returns the created objects.
+    :return: the created objects.
     """
     blocked = item["blocked_statuses"]
     if blocked:
@@ -137,27 +134,32 @@ def make_objects(
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
-    url = item["download_urls"]
-    if court.id == "tax":
-        url = ""
+    opinions = []
+    for opinion_metadata, content, sha1_hash in opinions_content:
+        url = opinion_metadata["download_urls"]
+        if court.id == "tax":
+            url = ""
 
-    opinion = Opinion(
-        type=item.get("types", Opinion.COMBINED),
-        sha1=sha1_hash,
-        download_url=url,
-        joined_by_str=item.get("joined_by", ""),
-        per_curiam=item.get("per_curiam", False),
-        author_str=item.get("author_str") or item.get("authors", ""),
-    )
+        opinion = Opinion(
+            type=opinion_metadata.get("types", Opinion.COMBINED),
+            sha1=sha1_hash,
+            download_url=url,
+            joined_by_str=opinion_metadata.get("joined_by", ""),
+            per_curiam=opinion_metadata.get("per_curiam", False),
+            author_str=opinion_metadata.get("author_str")
+            or opinion_metadata.get("authors", ""),
+        )
 
-    cf = ContentFile(content)
-    extension = get_extension(content)
-    file_name = trunc(item["case_names"].lower(), 75) + extension
-    opinion.file_with_date = cluster.date_filed
-    opinion.local_path.save(file_name, cf, save=False)
-    check_duplicate_ingestion(opinion.local_path.name)
+        cf = ContentFile(content)
+        extension = get_extension(content)
+        file_name = trunc(item["case_names"].lower(), 75) + extension
+        opinion.file_with_date = cluster.date_filed
+        opinion.local_path.save(file_name, cf, save=False)
+        check_duplicate_ingestion(opinion.local_path.name)
 
-    return docket, opinion, cluster, citations, originating_court_info
+        opinions.append(opinion)
+
+    return docket, opinions, cluster, citations, originating_court_info
 
 
 @transaction.atomic
@@ -167,7 +169,7 @@ def save_everything(
 ) -> None:
     """Saves all the sub items and associates them as appropriate."""
     docket, cluster = items["docket"], items["cluster"]
-    opinion, citations = items["opinion"], items["citations"]
+    opinions, citations = items["opinions"], items["citations"]
     originating_court_info = items.get("originating_court_information")
 
     # if the docket already had a related `originating_court_information`
@@ -184,30 +186,31 @@ def save_everything(
         citation.cluster_id = cluster.pk
         citation.save()
 
-    if opinion.author_str:
-        candidate = async_to_sync(lookup_judges_by_messy_str)(
-            opinion.author_str, docket.court.pk, cluster.date_filed
-        )
-        if len(candidate) == 1:
-            opinion.author = candidate[0]
-
     if cluster.judges:
         candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
             cluster.judges, docket.court.pk, cluster.date_filed
         )
 
-        if len(candidate_judges) == 1 and not opinion.author_str:
-            opinion.author = candidate_judges[0]
+        if (
+            len(candidate_judges) == 1
+            and len(opinions) == 1
+            and not opinions[0].author_str
+        ):
+            opinions[0].author = candidate_judges[0]
         elif len(candidate_judges) > 1:
             for candidate in candidate_judges:
                 cluster.panel.add(candidate)
 
-    opinion.cluster = cluster
-    opinion.save()
-    if not backscrape:
-        RealTimeQueue.objects.create(
-            item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
-        )
+    for opinion in opinions:
+        if opinion.author_str:
+            candidate = async_to_sync(lookup_judges_by_messy_str)(
+                opinion.author_str, docket.court.pk, cluster.date_filed
+            )
+            if len(candidate) == 1:
+                opinion.author = candidate[0]
+
+        opinion.cluster = cluster
+        opinion.save()
 
 
 class Command(ScraperCommand):
@@ -306,6 +309,86 @@ class Command(ScraperCommand):
         if update_site_hash:
             dup_checker.update_site_hash(site.hash)
 
+    def get_opinions_content(
+        self, case_dict: dict, site, court, dup_checker, next_case_date
+    ) -> list[tuple[dict, bytes, str]]:
+        """Downloads opinions and checks if the content is duplicated
+
+        :return: a list of dictionaries containing the binary content and the hash of the content
+        """
+        opinions_content = []
+        opinions_to_download = []
+
+        # this field is populated when usign cl_back_scrape_citations
+        if case_dict.get("content"):
+            content = case_dict.pop("content")
+            opinions_content.append(
+                (case_dict, content, sha1(force_bytes(content)))
+            )
+        elif case_dict.get("sub_opinions"):
+            opinions_to_download = case_dict["sub_opinions"]
+        else:
+            opinions_to_download.append(case_dict)
+
+        # download content
+        for sub_opinion in opinions_to_download:
+            content = site.download_content(
+                sub_opinion["download_urls"], media_root=settings.MEDIA_ROOT
+            )
+            opinions_content.append(
+                (sub_opinion, content, sha1(force_bytes(content)))
+            )
+
+        for metadata, content, sha1_hash in opinions_content:
+            if (
+                court.pk == "nev"
+                and case_dict["precedential_statuses"] == "Unpublished"
+            ) or court.pk in ["neb"]:
+                # Nevada's non-precedential cases have different SHA1 sums
+                # every time.
+
+                # Nebraska updates the pdf causing the SHA1 to not match
+                # the opinions in CL causing duplicates. See CL issue #1452
+
+                lookup_params = {
+                    "lookup_value": metadata["download_urls"],
+                    "lookup_by": "download_url",
+                }
+            else:
+                lookup_params = {
+                    "lookup_value": sha1_hash,
+                    "lookup_by": "sha1",
+                }
+
+            # Duplicates will raise errors
+            try:
+                dup_checker.press_on(
+                    Opinion,
+                    case_dict["case_dates"],
+                    next_case_date,
+                    **lookup_params,
+                )
+            except SingleDuplicateError as exc:
+                # track clusters if they have more than 1 sub opinions but one
+                # of them is a duplicate
+                if len(opinions_content) > 1:
+                    logger.error(
+                        "Cluster had 1 of %s duplicate sub opinion %s",
+                        len(opinions_content),
+                        opinions_to_download,
+                        exc_info=True,
+                    )
+                raise exc
+
+            # Not a duplicate, carry on
+            logger.info(
+                "Adding new document found at: %s",
+                metadata["download_urls"].encode(),
+            )
+            dup_checker.reset()
+
+        return opinions_content
+
     def ingest_a_case(
         self,
         item,
@@ -315,75 +398,39 @@ class Command(ScraperCommand):
         dup_checker: DupChecker,
         court: Court,
     ):
-        if item.get("content"):
-            content = item.pop("content")
-        else:
-            content = site.download_content(
-                item["download_urls"], media_root=settings.MEDIA_ROOT
-            )
-
-        # request.content is sometimes a str, sometimes unicode, so
-        # force it all to be bytes, pleasing hashlib.
-        sha1_hash = sha1(force_bytes(content))
-
-        if (
-            court.pk == "nev"
-            and item["precedential_statuses"] == "Unpublished"
-        ) or court.pk in ["neb"]:
-            # Nevada's non-precedential cases have different SHA1 sums
-            # every time.
-
-            # Nebraska updates the pdf causing the SHA1 to not match
-            # the opinions in CL causing duplicates. See CL issue #1452
-
-            lookup_params = {
-                "lookup_value": item["download_urls"],
-                "lookup_by": "download_url",
-            }
-        else:
-            lookup_params = {
-                "lookup_value": sha1_hash,
-                "lookup_by": "sha1",
-            }
-
-        # Duplicates will raise errors
-        dup_checker.press_on(
-            Opinion, item["case_dates"], next_case_date, **lookup_params
+        opinions_content = self.get_opinions_content(
+            item, site, court, dup_checker, next_case_date
         )
-
-        # Not a duplicate, carry on
-        logger.info(
-            "Adding new document found at: %s", item["download_urls"].encode()
-        )
-        dup_checker.reset()
 
         child_court = get_child_court(item.get("child_courts", ""), court.id)
 
-        docket, opinion, cluster, citations, originating_court_info = (
-            make_objects(item, child_court or court, sha1_hash, content)
+        docket, opinions, cluster, citations, originating_court_info = (
+            make_objects(item, child_court or court, opinions_content)
         )
 
         save_everything(
             items={
                 "docket": docket,
-                "opinion": opinion,
+                "opinions": opinions,
                 "cluster": cluster,
                 "citations": citations,
                 "originating_court_information": originating_court_info,
             }
         )
-        extract_opinion_content.delay(
-            opinion.pk,
-            ocr_available=ocr_available,
-            juriscraper_module=site.court_id,
-            percolate_opinion=True,
-        )
 
-        logger.info(
-            "Successfully added opinion %s: %s",
-            opinion.pk,
-            item["case_names"].encode(),
-        )
+        for opinion in opinions:
+            extract_opinion_content.delay(
+                opinion.pk,
+                ocr_available=ocr_available,
+                juriscraper_module=site.court_id,
+                percolate_opinion=True,
+            )
+
+            logger.info(
+                "Successfully added opinion %s: %s",
+                opinion.pk,
+                item["case_names"].encode(),
+            )
 
     def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site(save_response_fn=save_response).parse()

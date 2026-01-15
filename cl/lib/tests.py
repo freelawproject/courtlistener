@@ -2,12 +2,14 @@ import datetime
 import pickle
 from typing import TypedDict, cast
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from asgiref.sync import async_to_sync
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.test import SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
@@ -24,6 +26,7 @@ from cl.lib.model_helpers import (
     is_docket_number,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_scotus_docket_number_core,
     make_upload_path,
 )
 from cl.lib.pacer import (
@@ -47,7 +50,9 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
+from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -65,6 +70,7 @@ from cl.search.factories import (
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import TestCase
+from cl.users.factories import UserFactory
 
 
 class TestPacerUtils(TestCase):
@@ -450,39 +456,31 @@ class TestModelHelpers(TestCase):
 
     def test_clean_docket_number(self) -> None:
         """Can we clean and return a docket number if it has a valid format?"""
+        test_cases = {
+            # Not valid docket number formats for district, bankruptcy or appellate
+            # no docket number returned
+            "Nos. C 123-80-123-82": "",
+            "Nos. C 123-80-123": "",
+            "Nos. 212-213": "",
+            # Multiple valid docket numbers, no docket number returned
+            "Nos. 14-13542, 14-13657, 15-10967, 15-11166": "",
+            "12-33112, 12-33112": "",
+            # One valid docket number, return the cleaned number
+            "CIVIL ACTION NO. 7:17-CV-00426": "7:17-cv-00426",
+            "Case No.1:19-CV-00118-MRB": "1:19-cv-00118",
+            "Case 12-33112": "12-33112",
+            "12-33112": "12-33112",
+            "12-cv-01032-JKG-MJL": "12-cv-01032",
+            "Nos. 212-213, Dockets 27264, 27265": "",
+            "Nos. 12-213, Dockets 27264, 27265": "12-213",
+            # SCOTUS A Dockets.
+            "Docket: 16A989": "16a989",
+            "Case  17A80": "17a80",
+        }
 
-        # Not valid docket number formats for district, bankruptcy or appellate
-        # not docket number returned
-        self.assertEqual(clean_docket_number("Nos. C 123-80-123-82"), "")
-        self.assertEqual(clean_docket_number("Nos. C 123-80-123"), "")
-        self.assertEqual(clean_docket_number("Nos. 212-213"), "")
-
-        # Multiple valid docket numbers, not docket number returned
-        self.assertEqual(
-            clean_docket_number("Nos. 14-13542, 14-13657, 15-10967, 15-11166"),
-            "",
-        )
-        self.assertEqual(clean_docket_number("12-33112, 12-33112"), "")
-
-        # One valid docket number, return the cleaned number
-        self.assertEqual(
-            clean_docket_number("CIVIL ACTION NO. 7:17-CV-00426"),
-            "7:17-cv-00426",
-        )
-        self.assertEqual(
-            clean_docket_number("Case No.1:19-CV-00118-MRB"), "1:19-cv-00118"
-        )
-        self.assertEqual(clean_docket_number("Case 12-33112"), "12-33112")
-        self.assertEqual(clean_docket_number("12-33112"), "12-33112")
-        self.assertEqual(
-            clean_docket_number("12-cv-01032-JKG-MJL"), "12-cv-01032"
-        )
-        self.assertEqual(
-            clean_docket_number("Nos. 212-213, Dockets 27264, 27265"), ""
-        )
-        self.assertEqual(
-            clean_docket_number("Nos. 12-213, Dockets 27264, 27265"), "12-213"
-        )
+        for raw, expected in test_cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_docket_number(raw), expected)
 
     def test_is_docket_number(self) -> None:
         """Test is_docket_number method correctly detects a docket number."""
@@ -497,6 +495,34 @@ class TestModelHelpers(TestCase):
         self.assertEqual(is_docket_number("21-string"), False)
         self.assertEqual(is_docket_number("string-2134"), False)
         self.assertEqual(is_docket_number("21"), False)
+
+    def test_making_scotus_docket_number_core(self) -> None:
+        """Test make_scotus_docket_number_core method correctly creates
+        docket number core for scotus dockets.
+        """
+
+        test_cases = [
+            # None or empty inputs
+            (None, ""),
+            ("", ""),
+            # SCOTUS A dockets
+            ("16A985", "16A00985"),
+            ("16a985", "16A00985"),
+            ("22A1", "22A00001"),
+            ("22A12345", "22A12345"),
+            # SCOTUS appellate style docket numbers (YY-NNNNNN)
+            ("12-33112", "12033112"),
+            ("12-000001", "12000001"),
+            ("06-10672", "06010672"),
+            # Non-matching SCOTUS docket numbers
+            ("23-cv-001", ""),
+        ]
+
+        for input_value, expected in test_cases:
+            with self.subTest(input=input_value, expected=expected):
+                self.assertEqual(
+                    make_scotus_docket_number_core(input_value), expected
+                )
 
 
 class S3PrivateUUIDStorageTest(TestCase):
@@ -1542,6 +1568,253 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 )
 
 
+class TestAddSqlComment(SimpleTestCase):
+    """Test the add_sql_comment function"""
+
+    def test_no_metadata_returns_unchanged_sql(self) -> None:
+        """Does an empty meta dict return the original SQL unchanged?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql)
+        self.assertEqual(result, sql)
+
+    def test_with_metadata_appends_comment(self) -> None:
+        """Does metadata get appended as a SQL comment?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=123, url="/test/path")
+        self.assertIn("/* ", result)
+        self.assertIn("user_id='123'", result)
+        self.assertIn("url='/test/path'", result)
+        self.assertIn(" */", result)
+
+    def test_sql_ending_with_semicolon(self) -> None:
+        """Is the comment inserted before the semicolon?"""
+        sql = "SELECT * FROM users;"
+        result = add_sql_comment(sql, user_id=42)
+        self.assertTrue(result.endswith(";"))
+        self.assertIn("/* user_id='42' */", result)
+
+    def test_sql_not_ending_with_semicolon(self) -> None:
+        """Is the comment appended at the end for SQL without semicolon?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=42)
+        self.assertFalse(result.endswith(";"))
+        self.assertTrue(result.startswith("/* user_id='42' */"))
+
+    def test_none_values_filtered_out(self) -> None:
+        """Are None values filtered from the comment?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=None, url="/test")
+        self.assertNotIn("user_id", result)
+        self.assertIn("url='/test'", result)
+
+    def test_all_none_values_returns_unchanged(self) -> None:
+        """Does all-None metadata return the original SQL unchanged?"""
+        sql = "SELECT * FROM users"
+        result = add_sql_comment(sql, user_id=None, url=None)
+        self.assertEqual(result, sql)
+
+    def test_sql_with_trailing_whitespace(self) -> None:
+        """Is trailing whitespace handled correctly?"""
+        sql = "SELECT * FROM users   "
+        result = add_sql_comment(sql, user_id=1)
+        self.assertIn("/* user_id='1' */", result)
+        self.assertNotIn("   /*", result)
+
+    def test_add_sql_comment_prevents_comment_closure_injection(self) -> None:
+        sql = "SELECT * FROM users"
+        malicious_path = "/test*/;DROP TABLE users;--"
+
+        result = add_sql_comment(sql, url=malicious_path)
+
+        # The injected terminator must NOT appear
+        self.assertNotIn("*/;DROP TABLE", result)
+
+        # SQL comment must still be intact
+        self.assertEqual(result.count("/*"), 1)
+        self.assertEqual(result.count("*/"), 1)
+
+    def test_add_sql_comment_handles_newlines_safely(self) -> None:
+        sql = "SELECT 1"
+        path = "/test\n*/\nDROP TABLE users;"
+
+        result = add_sql_comment(sql, url=path)
+
+        self.assertNotIn("\nDROP TABLE", result)
+        self.assertEqual(result.count("/*"), 1)
+        self.assertEqual(result.count("*/"), 1)
+
+
+class TestQueryWrapper(TestCase):
+    """Test the QueryWrapper class"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.request_factory = RequestFactory()
+
+    class MockResolverMatch:
+        def __init__(self, view_name="test-view"):
+            self.view_name = view_name
+
+    def test_get_context_without_resolver_match(self) -> None:
+        request = self.request_factory.get("/no-resolver/")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        self.assertIsNone(result["user_id"])
+        self.assertIsNone(result["url"])
+        self.assertIsNone(result["url-name"])
+
+    def test_get_context_without_user(self) -> None:
+        """Does get_context return None user_id when request has no user?"""
+        request = self.request_factory.get("/test/path/")
+        request.resolver_match = self.MockResolverMatch("test-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/test/path/")
+        self.assertEqual(result["url-name"], "test-view")
+
+    def test_get_context_with_authenticated_user(self) -> None:
+        """Does get_context return user_id and url for authenticated user?"""
+        request = self.request_factory.get("/test/path/")
+        request.user = self.user
+        request.resolver_match = self.MockResolverMatch("test-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        self.assertIn("user_id", result)
+        self.assertIn("url", result)
+        self.assertEqual(result["url"], "/test/path/")
+        self.assertEqual(result["user_id"], self.user.pk)
+        self.assertEqual(result["url-name"], "test-view")
+
+    def test_get_context_with_anonymous_user(self) -> None:
+        """Does get_context handle anonymous user correctly?"""
+        request = self.request_factory.get("/anonymous/path/")
+        request.user = AnonymousUser()
+        request.resolver_match = self.MockResolverMatch("anon-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/anonymous/path/")
+        self.assertEqual(result["url-name"], "anon-view")
+
+    @override_settings(SQLCOMMENTER_MAX_PATH_LENGTH=10)
+    def test_get_context_truncates_path(self):
+        request = self.request_factory.get("/very/long/path/")
+        request.user = self.user
+        request.resolver_match = self.MockResolverMatch(view_name="test-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        self.assertEqual(result["url"], "/very/long…")
+
+    def test_get_context_with_unevaluated_lazy_user(self) -> None:
+        """Does get_context handle unevaluated SimpleLazyObject without recursion?
+
+        When request.user is a SimpleLazyObject that hasn't been evaluated,
+        accessing is_authenticated would trigger a database query to fetch
+        the user. That query would go through the SQL commenter again, causing
+        infinite recursion. This test verifies we handle this case correctly.
+        """
+        request = self.request_factory.get("/lazy/user/path/")
+        # Create an unevaluated SimpleLazyObject (simulating Django's lazy user)
+        request.user = SimpleLazyObject(lambda: self.user)
+        request.resolver_match = self.MockResolverMatch("lazy-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        # User should be None since the lazy object hasn't been evaluated
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/lazy/user/path/")
+        self.assertEqual(result["url-name"], "lazy-view")
+
+    def test_get_context_with_evaluated_lazy_user(self) -> None:
+        """Does get_context return user_id for an evaluated SimpleLazyObject?"""
+        request = self.request_factory.get("/lazy/user/path/")
+        lazy_user = SimpleLazyObject(lambda: self.user)
+        # Force evaluation of the lazy object
+        _ = lazy_user.pk  # type: ignore[attr-defined]
+        request.user = lazy_user
+        request.resolver_match = self.MockResolverMatch("lazy-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        # User should be set since the lazy object has been evaluated
+        self.assertEqual(result["user_id"], self.user.pk)
+        self.assertEqual(result["url"], "/lazy/user/path/")
+        self.assertEqual(result["url-name"], "lazy-view")
+
+
+class TestSqlCommenterMiddleware(TestCase):
+    """Integration tests for SqlCommenter middleware"""
+
+    class MockResolverMatch:
+        def __init__(self, view_name="test-view"):
+            self.view_name = view_name
+
+    def test_middleware_adds_comment_to_queries(self) -> None:
+        """Does the middleware add comments to database queries?"""
+        mock_get_response = MagicMock(return_value="response")
+
+        class MockRequest:
+            path = "/test/"
+            resolver_match = self.MockResolverMatch("test-view")
+
+        middleware = SqlCommenter(mock_get_response)
+
+        with patch("cl.lib.sqlcommenter.connections") as mock_connections:
+            mock_db = MagicMock()
+            mock_connections.__iter__ = MagicMock(
+                return_value=iter(["default"])
+            )
+            mock_connections.__getitem__ = MagicMock(return_value=mock_db)
+
+            result = middleware(MockRequest())
+
+            self.assertEqual(result, "response")
+            mock_get_response.assert_called_once()
+            mock_db.execute_wrapper.assert_called_once()
+
+    def test_query_wrapper_modifies_sql(self) -> None:
+        """Does QueryWrapper correctly modify SQL before execution?"""
+
+        class MockRequest:
+            path = "/api/test/"
+            resolver_match = self.MockResolverMatch("test-view")
+
+        wrapper = QueryWrapper(MockRequest())
+
+        mock_execute = MagicMock(return_value="result")
+        mock_connection = MagicMock()
+        context = {"connection": mock_connection}
+
+        result = wrapper(
+            mock_execute,
+            "SELECT * FROM test_table",
+            (),
+            False,
+            context,
+        )
+
+        self.assertEqual(result, "result")
+        call_args = mock_execute.call_args
+        modified_sql = call_args[0][0]
+        self.assertIn("/* ", modified_sql)
+        self.assertIn("url='/api/test/'", modified_sql)
+        self.assertIn(" */", modified_sql)
+
+
 @override_settings(CHARS_THRESHOLD_OCR_PER_PAGE=50)
 class TestRecapUtils(SimpleTestCase):
     def test_needs_ocr_cacb_example(self):
@@ -1971,3 +2244,96 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
             needs_ocr(header_text),
             msg="Should need OCR with only headers/pagination",
         )
+
+
+class TestS3CacheHelpers(TestCase):
+    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py"""
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_get_s3_cache_returns_fallback_in_development(self) -> None:
+        """In development mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        # In development, should return db_cache, not s3
+        # We verify by checking the cache backend class name
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_get_s3_cache_returns_fallback_in_testing(self) -> None:
+        """In testing mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_get_s3_cache_returns_s3_in_production(self) -> None:
+        """In production mode, get_s3_cache should return the S3 cache."""
+        mock_s3_cache = MagicMock()
+        mock_caches = {"s3": mock_s3_cache, "db_cache": MagicMock()}
+
+        with patch("cl.lib.s3_cache.caches", mock_caches):
+            with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+                cache = get_s3_cache("db_cache")
+                self.assertEqual(cache, mock_s3_cache)
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_no_prefix_in_development(self) -> None:
+        """In development mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_make_s3_cache_key_no_prefix_in_testing(self) -> None:
+        """In testing mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_adds_prefix_in_production(self) -> None:
+        """In production mode, cache key should have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, timeout)
+            self.assertEqual(result, f"7-days:{base_key}")
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_rounds_up_days(self) -> None:
+        """Days calculation should round up (e.g., 1.5 days -> 2 days)."""
+        base_key = "test-key"
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            # 1 day exactly
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 24), "1-days:test-key"
+            )
+
+            # 1.5 days -> rounds to 2
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 36), "2-days:test-key"
+            )
+
+            # 6 hours -> rounds to 1
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 6), "1-days:test-key"
+            )
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_persistent_in_production(self) -> None:
+        """In production, timeout=None should use persistent prefix."""
+        base_key = "clusters-mlt-es:123"
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, None)
+            self.assertEqual(result, f"persistent:{base_key}")
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_persistent_no_prefix_in_dev(self) -> None:
+        """In dev/test, timeout=None should return key unchanged."""
+        base_key = "clusters-mlt-es:123"
+        result = make_s3_cache_key(base_key, None)
+        self.assertEqual(result, base_key)
