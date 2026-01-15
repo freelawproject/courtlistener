@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 from django.db.models import Count, Q
-from elasticsearch_dsl import Search
+from elasticsearch.dsl import Search
 from tqdm import tqdm
 
 from cl.lib.command_utils import BaseCommand, logger

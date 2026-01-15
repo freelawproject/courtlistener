@@ -66,7 +66,7 @@ base_connection_params = {
     "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
     "verify_certs": False,
     "ca_certs": ELASTICSEARCH_CA_CERT,
-    "timeout": ELASTICSEARCH_TIMEOUT,
+    "request_timeout": ELASTICSEARCH_TIMEOUT,
 }
 no_retry_conn = base_connection_params.copy()
 no_retry_conn["max_retries"] = 0

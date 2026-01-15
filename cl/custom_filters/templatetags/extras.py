@@ -13,7 +13,7 @@ from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import make_aware
-from elasticsearch_dsl import AttrDict, AttrList
+from elasticsearch.dsl import AttrDict, AttrList
 
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
 from cl.search.models import SEARCH_TYPES, Court, Docket, DocketEntry

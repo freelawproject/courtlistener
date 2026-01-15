@@ -5,7 +5,7 @@ from functools import reduce
 from unittest import mock
 
 from django.urls import reverse
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from lxml import html
 
 from cl.lib.elasticsearch_utils import (

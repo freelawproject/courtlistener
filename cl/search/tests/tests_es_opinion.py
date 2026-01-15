@@ -20,8 +20,8 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils.html import strip_tags
 from django.utils.timezone import now
+from elasticsearch.dsl import Q
 from elasticsearch.exceptions import ConnectionTimeout
-from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.request import Request
@@ -3201,7 +3201,7 @@ class RelatedSearchTest(
 
         # Timeout Request for related cases and there is no cache
         with mock.patch(
-            "elasticsearch_dsl.Search.execute"
+            "elasticsearch.dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
@@ -3227,7 +3227,7 @@ class RelatedSearchTest(
 
         # Timeout Request for cited by cases and there is no cache
         with mock.patch(
-            "elasticsearch_dsl.Search.execute"
+            "elasticsearch.dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
@@ -3270,7 +3270,7 @@ class RelatedSearchTest(
         )
 
         with mock.patch(
-            "elasticsearch_dsl.Search.execute"
+            "elasticsearch.dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionError()
             r = await self.async_client.get(
@@ -3309,7 +3309,7 @@ class RelatedSearchTest(
 
         # Timeout Request for related cases
         with mock.patch(
-            "elasticsearch_dsl.Search.execute"
+            "elasticsearch.dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
@@ -3348,7 +3348,7 @@ class RelatedSearchTest(
 
         # Timeout Request for cited by cases
         with mock.patch(
-            "elasticsearch_dsl.Search.execute"
+            "elasticsearch.dsl.Search.execute"
         ) as mock_m_search_execute:
             mock_m_search_execute.side_effect = ConnectionTimeout(
                 "Connection timeout"
