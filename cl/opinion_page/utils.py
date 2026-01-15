@@ -4,17 +4,15 @@ import traceback
 from dataclasses import dataclass, field
 from io import StringIO
 
-import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
-from elasticsearch_dsl import MultiSearch, Q
+from elasticsearch_dsl import Q
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -26,6 +24,7 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     build_more_like_this_query,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.recap.constants import COURT_TIMEZONES
@@ -252,8 +251,10 @@ async def es_get_related_clusters_with_cache(
     :param request:The user request
     :return:Related Cluster Data
     """
-    cache = caches["db_cache"]
-    mlt_cache_key = f"clusters-mlt-es:{cluster.pk}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    mlt_cache_key = await sync_to_async(make_s3_cache_key)(
+        f"clusters-mlt-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
     # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
     # attributes (since they're indexed in ES) instead of the NAMES values.
     search_params: CleanData = {}
@@ -350,8 +351,10 @@ async def es_get_cited_clusters_with_cache(
     :param request:The user request
     :return:The cited by data
     """
-    cache = caches["db_cache"]
-    cache_citing_key = f"clusters-cited-es:{cluster.pk}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_citing_key = await sync_to_async(make_s3_cache_key)(
+        f"clusters-cited-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
 
     sub_opinion_pks = [
         str(pk)
@@ -412,150 +415,6 @@ async def es_get_cited_clusters_with_cache(
     return cluster_results
 
 
-async def es_get_citing_and_related_clusters_with_cache(
-    cluster: OpinionCluster,
-    request: HttpRequest,
-) -> RelatedCitingResults:
-    """Use Elasticsearch to get clusters citing and related clusters to the
-    one we're looking at.
-
-    :param cluster: The cluster we're targeting
-    :param request: The HttpRequest object.
-    :return: A RelatedCitingResults object containing related_clusters,
-    sub_opinion_pks, url_search_params, citing_clusters, citing_cluster_count,
-    and a boolean indicating whether the query timed out.
-    """
-
-    cache = caches["db_cache"]
-    cache_citing_key = f"clusters-cited-es:{cluster.pk}"
-    mlt_cache_key = f"clusters-mlt-es:{cluster.pk}"
-    # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
-    # attributes (since they're indexed in ES) instead of the NAMES values.
-    search_params: CleanData = {}
-    url_search_params = {
-        f"stat_{v[0]}": "on" for v in PRECEDENTIAL_STATUS.NAMES
-    }
-    sub_opinion_pks = [
-        str(pk)
-        async for pk in cluster.sub_opinions.values_list("pk", flat=True)
-    ]
-    if settings.RELATED_FILTER_BY_STATUS:
-        # Filter results by status (e.g., Precedential)
-        # Update URL parameters accordingly
-        search_params[
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}"
-        ] = True
-        url_search_params = {
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
-        }
-
-    if is_bot(request) or not sub_opinion_pks:
-        return RelatedCitingResults(url_search_params=url_search_params)
-
-    if not await sync_to_async(waffle.flag_is_active)(
-        request, "citing_and_related_enabled"
-    ):
-        # Don't perform any queries if citing_and_related_enabled is disabled.
-        # Return True for timeout to display buttons for users to click.
-        return RelatedCitingResults(
-            url_search_params=url_search_params, timeout=True
-        )
-
-    (
-        cached_citing_results,
-        cached_citing_cluster_count,
-        timeout_cited,
-    ) = await cache.aget(cache_citing_key) or (None, 0, False)
-
-    cached_related_clusters, timeout_related = (
-        await cache.aget(mlt_cache_key) or (None, False)
-        if settings.RELATED_USE_CACHE
-        else (None, False)
-    )
-    # Prepare cited and related cluster queries if not cached results.
-    cluster_search = OpinionClusterDocument.search()
-    multi_search = MultiSearch()
-    responses = None
-    response_index = 0
-    related_index = citing_index = None
-    if cached_related_clusters is None:
-        related_query = await build_related_clusters_query(
-            cluster_search, sub_opinion_pks
-        )
-        related_query = related_query.extra(
-            size=settings.RELATED_COUNT,
-            track_total_hits=False,
-        )
-        multi_search = multi_search.add(related_query)
-        related_index = response_index
-        response_index += 1
-
-    if cached_citing_results is None:
-        cited_query = await build_cites_clusters_query(
-            cluster_search, sub_opinion_pks
-        )
-        multi_search = multi_search.add(cited_query)
-        citing_index = response_index
-    try:
-        # Execute the MultiSearch request as needed based on available
-        # cached results
-        multi_search.params(
-            timeout=f"{settings.ELASTICSEARCH_FAST_QUERIES_TIMEOUT}s"
-        )
-        responses = multi_search.execute() if multi_search._searches else []
-    except (ConnectionError, RequestError, ApiError) as e:
-        logger.warning("Error getting cited and related clusters: %s", e)
-        if settings.DEBUG is True:
-            traceback.print_exc()
-        return RelatedCitingResults(url_search_params=url_search_params)
-    except ConnectionTimeout as e:
-        logger.warning(
-            "ConnectionTimeout getting cited and related clusters: %s", e
-        )
-        timeout_related = timeout_cited = True
-
-    results = RelatedCitingResults(url_search_params=url_search_params)
-    results.related_clusters = (
-        list(responses[related_index])
-        if responses and related_index is not None
-        else cached_related_clusters or []
-    )
-    results.citing_clusters = (
-        list(responses[citing_index])
-        if responses and citing_index is not None
-        else cached_citing_results or []
-    )
-    results.citing_cluster_count = (
-        responses[citing_index].hits.total.value
-        if responses and citing_index is not None
-        else cached_citing_cluster_count or 0
-    )
-    timeout_related = False if results.related_clusters else timeout_related
-    timeout_cited = False if results.citing_clusters else timeout_cited
-
-    # Set cache for citing and mlt results.
-    if citing_index is not None:
-        await cache.aset(
-            cache_citing_key,
-            (
-                results.citing_clusters,
-                results.citing_cluster_count,
-                timeout_cited,
-            ),
-            settings.RELATED_CACHE_TIMEOUT,
-        )
-    if related_index is not None:
-        await cache.aset(
-            mlt_cache_key,
-            (results.related_clusters, timeout_related),
-            settings.RELATED_CACHE_TIMEOUT,
-        )
-
-    results.timeout = any([timeout_cited, timeout_related])
-    results.sub_opinion_pks = list(map(int, sub_opinion_pks))
-    return results
-
-
 async def es_cited_case_count(
     cluster_id: int, sub_opinion_pks: list[str]
 ) -> int:
@@ -565,8 +424,10 @@ async def es_cited_case_count(
     :param sub_opinion_pks: The subopinion ids of the cluster
     :return: Opinion Cited Count
     """
-    cache = caches["db_cache"]
-    cache_cited_by_key = f"cited-by-count-es:{cluster_id}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_cited_by_key = await sync_to_async(make_s3_cache_key)(
+        f"cited-by-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
+    )
     cached_cited_by_count = await cache.aget(cache_cited_by_key) or None
     if cached_cited_by_count is not None:
         return cached_cited_by_count
@@ -608,8 +469,10 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
         # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
         return 0
 
-    cache = caches["db_cache"]
-    cache_related_cases_key = f"related-cases-count-es:{cluster_id}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_related_cases_key = await sync_to_async(make_s3_cache_key)(
+        f"related-cases-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
+    )
     cached_related_cases_count = (
         await cache.aget(cache_related_cases_key) or None
     )
