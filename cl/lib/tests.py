@@ -2298,35 +2298,38 @@ class TestS3CacheHelpers(TestCase):
         base_key = "clusters-mlt-es:123"
         timeout = 60 * 60 * 24 * 7  # 7 days
 
-        result = make_s3_cache_key(base_key, timeout)
-        self.assertEqual(result, f"7-days:{base_key}")
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, timeout)
+            self.assertEqual(result, f"7-days:{base_key}")
 
     @override_settings(DEVELOPMENT=False, TESTING=False)
     def test_make_s3_cache_key_rounds_up_days(self) -> None:
         """Days calculation should round up (e.g., 1.5 days -> 2 days)."""
         base_key = "test-key"
 
-        # 1 day exactly
-        self.assertEqual(
-            make_s3_cache_key(base_key, 60 * 60 * 24), "1-days:test-key"
-        )
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            # 1 day exactly
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 24), "1-days:test-key"
+            )
 
-        # 1.5 days -> rounds to 2
-        self.assertEqual(
-            make_s3_cache_key(base_key, 60 * 60 * 36), "2-days:test-key"
-        )
+            # 1.5 days -> rounds to 2
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 36), "2-days:test-key"
+            )
 
-        # 6 hours -> rounds to 1
-        self.assertEqual(
-            make_s3_cache_key(base_key, 60 * 60 * 6), "1-days:test-key"
-        )
+            # 6 hours -> rounds to 1
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 6), "1-days:test-key"
+            )
 
     @override_settings(DEVELOPMENT=False, TESTING=False)
     def test_make_s3_cache_key_persistent_in_production(self) -> None:
         """In production, timeout=None should use persistent prefix."""
         base_key = "clusters-mlt-es:123"
-        result = make_s3_cache_key(base_key, None)
-        self.assertEqual(result, f"persistent:{base_key}")
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, None)
+            self.assertEqual(result, f"persistent:{base_key}")
 
     @override_settings(DEVELOPMENT=True, TESTING=False)
     def test_make_s3_cache_key_persistent_no_prefix_in_dev(self) -> None:

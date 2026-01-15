@@ -251,8 +251,8 @@ async def es_get_related_clusters_with_cache(
     :param request:The user request
     :return:Related Cluster Data
     """
-    cache = get_s3_cache("db_cache")
-    mlt_cache_key = make_s3_cache_key(
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    mlt_cache_key = await sync_to_async(make_s3_cache_key)(
         f"clusters-mlt-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
     )
     # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
@@ -351,8 +351,8 @@ async def es_get_cited_clusters_with_cache(
     :param request:The user request
     :return:The cited by data
     """
-    cache = get_s3_cache("db_cache")
-    cache_citing_key = make_s3_cache_key(
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_citing_key = await sync_to_async(make_s3_cache_key)(
         f"clusters-cited-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
     )
 
@@ -424,8 +424,8 @@ async def es_cited_case_count(
     :param sub_opinion_pks: The subopinion ids of the cluster
     :return: Opinion Cited Count
     """
-    cache = get_s3_cache("db_cache")
-    cache_cited_by_key = make_s3_cache_key(
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_cited_by_key = await sync_to_async(make_s3_cache_key)(
         f"cited-by-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
     )
     cached_cited_by_count = await cache.aget(cache_cited_by_key) or None
@@ -469,8 +469,8 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
         # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
         return 0
 
-    cache = get_s3_cache("db_cache")
-    cache_related_cases_key = make_s3_cache_key(
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_related_cases_key = await sync_to_async(make_s3_cache_key)(
         f"related-cases-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
     )
     cached_related_cases_count = (
