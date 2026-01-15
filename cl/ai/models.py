@@ -211,6 +211,7 @@ class LLMRequest(AbstractDateTimeModel):
         help_text="Additional input data or parameters for the LLM",
         default=dict,
         blank=True,
+        null=True,
     )
     batch_response_file = models.FileField(
         help_text="The batch response file from the LLM provider (e.g., a JSONL file)",
