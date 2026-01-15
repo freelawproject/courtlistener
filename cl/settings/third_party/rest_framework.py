@@ -162,6 +162,7 @@ REST_FRAMEWORK = {
         "arivdc": "10/hour",
         "Mpits003": "1/hour",
         # Throttling up.
+        "hmturner08": "15000/hour",  # Tryandai needs big boost through 1/19
         "JonasHappel": "10000/hour",
         "YFIN": "430000/day",
         "mlissner": "1000000/hour",  # Needed for benchmarking (not greed)
