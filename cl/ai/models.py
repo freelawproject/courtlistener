@@ -159,7 +159,6 @@ class LLMRequest(AbstractDateTimeModel):
         help_text="The current status of the request",
         choices=TaskStatus.NAMES,
         default=TaskStatus.UNPROCESSED,
-        db_index=True,
     )
     prompts = models.ManyToManyField(
         Prompt,
@@ -242,7 +241,6 @@ class LLMTask(AbstractDateTimeModel):
         help_text="The current status of the task",
         choices=TaskStatus.NAMES,
         default=TaskStatus.UNPROCESSED,
-        db_index=True,
     )
 
     llm_key = models.CharField(
@@ -253,7 +251,6 @@ class LLMTask(AbstractDateTimeModel):
     task = models.SmallIntegerField(
         help_text="The task to run.",
         choices=Task.NAMES,
-        db_index=True,
     )
 
     retry_count = models.SmallIntegerField(
