@@ -361,13 +361,35 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = ("pk__exact",)
+    search_fields = ("pk",)  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by RECAP Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry", "tags")
     readonly_fields = (
         "date_created",
         "date_modified",
     )
     actions = ("seal_documents",)
+
+    def get_search_results(
+        self, request: HttpRequest, queryset: QuerySet, search_term: str
+    ) -> tuple[QuerySet, bool]:
+        """Override to search by pk without varchar casting.
+
+        Django 6.0.1 casts non-text fields to CharField for text lookups,
+        which prevents index usage on large tables. This method handles
+        pk searches with direct integer comparison.
+
+        See: https://github.com/freelawproject/courtlistener/issues/6790
+        """
+        if not search_term:
+            return queryset, False
+
+        try:
+            pk_value = int(search_term.strip())
+            return queryset.filter(pk=pk_value), False
+        except ValueError:
+            return queryset.none(), False
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
