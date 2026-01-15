@@ -16,7 +16,7 @@ from rest_framework.authtoken.models import Token
 from cl.api.models import Webhook
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.storage import S3PrivateUUIDStorage
-from cl.stats.metrics import record_prometheus_metric
+from cl.stats.metrics import accounts_created_total, accounts_deleted_total
 from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
@@ -163,7 +163,7 @@ def complaint_handler(
 def create_auth_token(sender, instance=None, created=False, **kwargs):
     if created:
         Token.objects.create(user=instance)
-        record_prometheus_metric("accounts.created", 1)
+        accounts_created_total.inc()
 
 
 @receiver(
@@ -216,4 +216,4 @@ def webhook_created_or_updated(
 )
 def track_account_deletion(sender, instance=None, **kwargs):
     """Track account deletion in Prometheus metrics."""
-    record_prometheus_metric("accounts.deleted", 1)
+    accounts_deleted_total.inc()

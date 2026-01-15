@@ -18,7 +18,6 @@ from cl.stats.metrics import (
     accounts_created_total,
     accounts_deleted_total,
     alerts_sent_total,
-    record_prometheus_metric,
     record_search_duration,
     register_celery_queue_collector,
     search_duration_seconds,
@@ -147,26 +146,23 @@ class PrometheusMetricsTests(TestCase):
         accounts_created_total._value.set(0)
         accounts_deleted_total._value.set(0)
 
-    def test_record_prometheus_metric(self) -> None:
-        """Test recording metrics with different handler keys and labels"""
+    def test_search_queries_metric(self) -> None:
+        """Test recording search query metrics with different labels"""
         test_cases = [
             {
                 "name": "keyword_web",
-                "handler_key": "search.queries.keyword.web",
                 "query_type": "keyword",
                 "method": "web",
                 "increments": [1],
             },
             {
                 "name": "semantic_api",
-                "handler_key": "search.queries.semantic.api",
                 "query_type": "semantic",
                 "method": "api",
                 "increments": [1],
             },
             {
                 "name": "accumulation",
-                "handler_key": "search.queries.keyword.api",
                 "query_type": "keyword",
                 "method": "api",
                 "increments": [1, 2, 3],
@@ -181,7 +177,10 @@ class PrometheusMetricsTests(TestCase):
                 )._value.get()
 
                 for inc in test_case["increments"]:
-                    record_prometheus_metric(test_case["handler_key"], inc)
+                    search_queries_total.labels(
+                        query_type=test_case["query_type"],
+                        method=test_case["method"],
+                    ).inc(inc)
 
                 final = search_queries_total.labels(
                     query_type=test_case["query_type"],
@@ -195,13 +194,11 @@ class PrometheusMetricsTests(TestCase):
         test_cases = [
             {
                 "name": "search_alert",
-                "handler_key": "alerts.sent.search",
                 "alert_type": "search_alert",
                 "increments": [1],
             },
             {
                 "name": "docket_alert",
-                "handler_key": "alerts.sent.docket",
                 "alert_type": "docket_alert",
                 "increments": [1, 2],
             },
@@ -214,7 +211,9 @@ class PrometheusMetricsTests(TestCase):
                 )._value.get()
 
                 for inc in test_case["increments"]:
-                    record_prometheus_metric(test_case["handler_key"], inc)
+                    alerts_sent_total.labels(
+                        alert_type=test_case["alert_type"]
+                    ).inc(inc)
 
                 final = alerts_sent_total.labels(
                     alert_type=test_case["alert_type"],
@@ -227,31 +226,26 @@ class PrometheusMetricsTests(TestCase):
         test_cases = [
             {
                 "name": "docket_alert",
-                "handler_key": "webhooks.sent.docket_alert",
                 "event_type": "docket_alert",
                 "increments": [1],
             },
             {
                 "name": "search_alert",
-                "handler_key": "webhooks.sent.search_alert",
                 "event_type": "search_alert",
                 "increments": [1],
             },
             {
                 "name": "recap_fetch",
-                "handler_key": "webhooks.sent.recap_fetch",
                 "event_type": "recap_fetch",
                 "increments": [1, 1],
             },
             {
                 "name": "old_docket_alerts_report",
-                "handler_key": "webhooks.sent.old_docket_alerts_report",
                 "event_type": "old_docket_alerts_report",
                 "increments": [1],
             },
             {
                 "name": "pray_and_pay",
-                "handler_key": "webhooks.sent.pray_and_pay",
                 "event_type": "pray_and_pay",
                 "increments": [1],
             },
@@ -264,7 +258,9 @@ class PrometheusMetricsTests(TestCase):
                 )._value.get()
 
                 for inc in test_case["increments"]:
-                    record_prometheus_metric(test_case["handler_key"], inc)
+                    webhooks_sent_total.labels(
+                        event_type=test_case["event_type"]
+                    ).inc(inc)
 
                 final = webhooks_sent_total.labels(
                     event_type=test_case["event_type"],
@@ -276,14 +272,14 @@ class PrometheusMetricsTests(TestCase):
         """Test recording account creation and deletion metrics"""
         # Test accounts created
         initial_created = accounts_created_total._value.get()
-        record_prometheus_metric("accounts.created", 1)
-        record_prometheus_metric("accounts.created", 2)
+        accounts_created_total.inc()
+        accounts_created_total.inc(2)
         final_created = accounts_created_total._value.get()
         self.assertEqual(final_created, initial_created + 3)
 
         # Test accounts deleted
         initial_deleted = accounts_deleted_total._value.get()
-        record_prometheus_metric("accounts.deleted", 1)
+        accounts_deleted_total.inc()
         final_deleted = accounts_deleted_total._value.get()
         self.assertEqual(final_deleted, initial_deleted + 1)
 

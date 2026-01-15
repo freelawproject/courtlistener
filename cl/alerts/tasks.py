@@ -53,6 +53,7 @@ from cl.search.types import (
     SearchAlertHitType,
     SendAlertsResponse,
 )
+from cl.stats.metrics import alerts_sent_total
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -360,11 +361,8 @@ def send_alert_and_webhook(
     connection.send_messages(messages)
 
     # Work completed. Tally, log, and clean up
-    tally_stat(
-        "alerts.sent",
-        inc=len(messages),
-        prometheus_handler_key="alerts.sent.docket",
-    )
+    tally_stat("alerts.sent", inc=len(messages))
+    alerts_sent_total.labels(alert_type="docket_alert").inc(len(messages))
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook
