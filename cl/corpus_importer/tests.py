@@ -2310,9 +2310,9 @@ class TexasMergerTest(TestCase):
 
         output = texas_docket_entry_sequence_numbers(input_data)
         assert len(output) == 3
-        assert output[0] == "2025-01-02-0"
-        assert output[1] == "2025-01-02-1"
-        assert output[2] == "2025-01-03-2"
+        assert output[0] == "2025-01-02.000"
+        assert output[1] == "2025-01-02.001"
+        assert output[2] == "2025-01-03.000"
 
     def test_merge_texas_docket_entry_new_entry(self):
         """Can we correctly handle a docket entry?"""

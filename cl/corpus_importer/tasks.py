@@ -3354,6 +3354,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
 @app.task(
     bind=True,
     ignore_result=True,
+    # No retries because download_pdf_in_stream already has retry logic
 )
 def download_texas_document_pdf(self: Task, texas_document_pk: int) -> None:
     """Download a PDF and return its path.
@@ -3462,12 +3463,15 @@ def texas_docket_entry_sequence_numbers(input: TexasCommonData) -> list[str]:
     :return: A list of sequence numbers corresponding to the list of
     TexasDocketEntry objects in input["case_events"].
     """
-    return list(
-        [
-            f"{e['date'].isoformat()}-{i}"
-            for (i, e) in enumerate(input["case_events"])
-        ]
-    )
+    dates = [e["date"].isoformat() for e in input["case_events"]]
+    date_counts: dict[str, int] = {}
+    sequence_numbers = []
+    for entry_date in dates:
+        i = date_counts.get(entry_date, 0)
+        sequence_numbers.append(f"{entry_date}.{i:0>3}")
+        date_counts[entry_date] = i + 1
+
+    return sequence_numbers
 
 
 def merge_texas_docket_entry(
