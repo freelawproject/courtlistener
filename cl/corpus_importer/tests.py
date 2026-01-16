@@ -82,6 +82,7 @@ from cl.corpus_importer.signals import (
 )
 from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
+    download_texas_document_pdf,
     generate_ia_json,
     get_and_save_free_document_report,
     merge_texas_docket_entry,
@@ -2102,10 +2103,10 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 class TexasMergerTest(TestCase):
     def setUp(self):
         """Set up texas merger tests"""
-        self.download_pdf_patch = patch(
-            "cl.corpus_importer.tasks.download_pdf_in_stream"
+        self.download_task_patch = patch(
+            "cl.corpus_importer.tasks.download_texas_document_pdf.delay"
         )
-        self.download_pdf_mock = self.download_pdf_patch.start()
+        self.download_task_mock = self.download_task_patch.start()
         self.texas_sc = CourtFactory.create(id="texas_sc")
         self.texas_cca = CourtFactory.create(id="texas_cca")
         self.texas_coa1 = CourtFactory.create(id="texas_coa1")
@@ -2124,16 +2125,11 @@ class TexasMergerTest(TestCase):
         Docket.objects.all().delete()
         TexasDocketEntry.objects.all().delete()
         TexasDocument.objects.all().delete()
-        self.download_pdf_patch.stop()
+        self.download_task_patch.stop()
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_document_new_document(self):
+    def test_merge_texas_document_new_document(self):
         """Can we correctly add a new attachment to an existing docket entry?"""
         docket_entry = self.docket_coa1_entry
-
-        # Mock PDF download context manager
-        file_mock = MagicMock()
-        self.download_pdf_mock.return_value.__enter__.return_value = file_mock
 
         input_document = TexasCaseDocument(
             description="Sample Document",
@@ -2145,12 +2141,12 @@ class TexasMergerTest(TestCase):
         )
 
         # Run the function
-        result = await merge_texas_document(docket_entry, input_document)
+        result = merge_texas_document(docket_entry, input_document)
 
         # Assertions
         assert result == (True, True, result[2])
         try:
-            created_document = await TexasDocument.objects.aget(pk=result[2])
+            created_document = TexasDocument.objects.get(pk=result[2])
         except ObjectDoesNotExist:
             created_document = None
         assert created_document is not None
@@ -2166,11 +2162,10 @@ class TexasMergerTest(TestCase):
             == input_document["document_url"]
         )
 
-        assert self.download_pdf_mock.called
+        self.download_task_mock.assert_called_once_with(created_document.pk)
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_document_existing_document_no_update(self):
-        """Can we correctly update an existing document?"""
+    def test_merge_texas_document_existing_document_no_update(self):
+        """Can we correctly handle an existing document with no update needed?"""
         docket_entry = self.docket_coa1_entry
         input_document = TexasCaseDocument(
             description="Sample Document",
@@ -2182,7 +2177,7 @@ class TexasMergerTest(TestCase):
         )
 
         # Create an existing and up to date attachment
-        current_document = await TexasDocument.objects.acreate(
+        current_document = TexasDocument.objects.create(
             docket_entry=docket_entry,
             description=input_document["description"],
             media_id=input_document["media_id"],
@@ -2191,11 +2186,11 @@ class TexasMergerTest(TestCase):
         )
 
         # Run the function
-        result = await merge_texas_document(docket_entry, input_document)
+        result = merge_texas_document(docket_entry, input_document)
 
         # Assertions
         assert result == (False, True, current_document.pk)
-        result_document = await TexasDocument.objects.aget(pk=result[2])
+        result_document = TexasDocument.objects.get(pk=result[2])
         assert result_document is not None
         assert result_document.docket_entry_id == docket_entry.id
         assert result_document.description == input_document["description"]
@@ -2208,10 +2203,10 @@ class TexasMergerTest(TestCase):
             str(result_document.document_url) == input_document["document_url"]
         )
 
-        assert not self.download_pdf_mock.called
+        self.download_task_mock.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_document_existing_document_update(self):
+    def test_merge_texas_document_existing_document_update(self):
+        """Can we correctly update an existing document with new version?"""
         docket_entry = self.docket_coa1_entry
         input_document = TexasCaseDocument(
             description="Sample Document",
@@ -2231,7 +2226,7 @@ class TexasMergerTest(TestCase):
         )
 
         # Create an attachment
-        current_document = await TexasDocument.objects.acreate(
+        current_document = TexasDocument.objects.create(
             docket_entry=docket_entry,
             description=old_document["description"],
             media_id=old_document["media_id"],
@@ -2240,11 +2235,11 @@ class TexasMergerTest(TestCase):
         )
 
         # Run the function
-        result = await merge_texas_document(docket_entry, input_document)
+        result = merge_texas_document(docket_entry, input_document)
 
         # Assertions
         assert result == (True, True, current_document.pk)
-        result_document = await TexasDocument.objects.aget(pk=result[2])
+        result_document = TexasDocument.objects.get(pk=result[2])
         assert result_document is not None
         assert result_document.docket_entry_id == docket_entry.id
         assert result_document.description == input_document["description"]
@@ -2257,52 +2252,9 @@ class TexasMergerTest(TestCase):
             str(result_document.document_url) == input_document["document_url"]
         )
 
-        assert self.download_pdf_mock.called
+        self.download_task_mock.assert_called_once_with(current_document.pk)
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_document_pdf_download_failure(self):
-        """Can we correctly handle a failed PDF download?"""
-        # Mock inputs
-        docket_entry = self.docket_coa1_entry
-        input_document = TexasCaseDocument(
-            description="Sample Document",
-            media_id="123e4567-e89b-12d3-a456-426614174000",
-            media_version_id="789e4567-e89b-12d3-a456-426614174111",
-            document_url="https://example.com/sample.pdf",
-            file_size_str="1kB",
-            file_size_bytes=1000,
-        )
-
-        # Mock PDF download failure
-        self.download_pdf_mock.return_value.__enter__.return_value = None
-
-        # Run the function
-        result = await merge_texas_document(docket_entry, input_document)
-
-        # Assertions
-        assert result == (True, False, result[2])
-
-        try:
-            created_document = await TexasDocument.objects.aget(pk=result[2])
-        except ObjectDoesNotExist:
-            created_document = None
-        assert created_document is not None
-        assert created_document.docket_entry_id == docket_entry.id
-        assert created_document.description == input_document["description"]
-        assert str(created_document.media_id) == input_document["media_id"]
-        assert (
-            str(created_document.media_version_id)
-            == input_document["media_version_id"]
-        )
-        assert (
-            str(created_document.document_url)
-            == input_document["document_url"]
-        )
-
-        assert self.download_pdf_mock.called
-
-    @pytest.mark.asyncio
-    async def test_merge_texas_documents(self):
+    def test_merge_texas_documents(self):
         """Can we correctly handle multiple documents?"""
         docket_entry = self.docket_coa1_entry
         existing_document = TexasCaseDocument(
@@ -2313,7 +2265,7 @@ class TexasMergerTest(TestCase):
             file_size_str="2kB",
             file_size_bytes=2000,
         )
-        current_attachment = await TexasDocument.objects.acreate(
+        current_attachment = TexasDocument.objects.create(
             docket_entry=docket_entry,
             description=existing_document["description"],
             media_id=existing_document["media_id"],
@@ -2332,7 +2284,7 @@ class TexasMergerTest(TestCase):
             existing_document,
         ]
 
-        result = await merge_texas_documents(docket_entry, input_documents)
+        result = merge_texas_documents(docket_entry, input_documents)
 
         assert len(result) == 2
         assert result[0] == (True, True, result[0][2])
@@ -2362,8 +2314,7 @@ class TexasMergerTest(TestCase):
         assert output[1] == "2025-01-02-1"
         assert output[2] == "2025-01-03-2"
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_docket_entry_new_entry(self):
+    def test_merge_texas_docket_entry_new_entry(self):
         """Can we correctly handle a docket entry?"""
         docket_entry = TexasAppellateBrief(
             attachments=[
@@ -2381,25 +2332,22 @@ class TexasMergerTest(TestCase):
             type="Brief",
         )
 
-        output = await merge_texas_docket_entry(
+        output = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02-0", True, docket_entry
         )
 
         assert output == (True, True, output[2])
-        created_docket_entry = await TexasDocketEntry.objects.aget(
-            pk=output[2]
-        )
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == docket_entry["type"]
         assert created_docket_entry.description == docket_entry["description"]
         assert created_docket_entry.date_filed == docket_entry["date"]
-        n_attachments = await TexasDocument.objects.filter(
+        n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
-        ).acount()
+        ).count()
         assert n_attachments == 1
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_docket_entry_no_update(self):
+    def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
         js_docket_entry = TexasAppellateBrief(
             attachments=[
@@ -2417,32 +2365,29 @@ class TexasMergerTest(TestCase):
             type="Brief",
         )
 
-        (_, _, pk) = await merge_texas_docket_entry(
+        (_, _, pk) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02-0", True, js_docket_entry
         )
         # noop
-        output = await merge_texas_docket_entry(
+        output = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02-0", True, js_docket_entry
         )
         assert output == (False, True, output[2])
         assert output[2] == pk
-        created_docket_entry = await TexasDocketEntry.objects.aget(
-            pk=output[2]
-        )
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == js_docket_entry["type"]
         assert (
             created_docket_entry.description == js_docket_entry["description"]
         )
         assert created_docket_entry.date_filed == js_docket_entry["date"]
-        n_attachments = await TexasDocument.objects.filter(
+        n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
-        ).acount()
+        ).count()
         assert n_attachments == 1
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_docket_entry_add_document(self):
-        """Can we correctly handle a docket entry update noop?"""
+    def test_merge_texas_docket_entry_add_document(self):
+        """Can we correctly add a new document to an existing docket entry?"""
         js_docket_entry = TexasAppellateBrief(
             attachments=[
                 TexasCaseDocument(
@@ -2459,7 +2404,7 @@ class TexasMergerTest(TestCase):
             type="Brief",
         )
 
-        (_, _, pk) = await merge_texas_docket_entry(
+        (_, _, pk) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02-0", True, js_docket_entry
         )
         js_docket_entry["attachments"].append(
@@ -2472,63 +2417,101 @@ class TexasMergerTest(TestCase):
                 file_size_bytes=1000,
             )
         )
-        output = await merge_texas_docket_entry(
+        output = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02-0", True, js_docket_entry
         )
         assert output == (True, True, output[2])
         assert output[2] == pk
-        created_docket_entry = await TexasDocketEntry.objects.aget(
-            pk=output[2]
-        )
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == js_docket_entry["type"]
         assert (
             created_docket_entry.description == js_docket_entry["description"]
         )
         assert created_docket_entry.date_filed == js_docket_entry["date"]
-        n_attachments = await TexasDocument.objects.filter(
+        n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
-        ).acount()
+        ).count()
         assert n_attachments == 2
 
-    @pytest.mark.asyncio
-    async def test_merge_texas_docket_entry_failed_download(self):
-        """Can we correctly handle a docket entry update noop?"""
-        js_docket_entry = TexasAppellateBrief(
-            attachments=[
-                TexasCaseDocument(
-                    description="Sample Document",
-                    media_id="123e4567-e89b-12d3-a456-426614174000",
-                    media_version_id="789e4567-e89b-12d3-a456-426614174111",
-                    document_url="https://example.com/sample.pdf",
-                    file_size_str="1kB",
-                    file_size_bytes=1000,
-                ),
-            ],
-            description="An appellate brief, what more can you say?",
-            date=date.fromisoformat("2025-01-02"),
-            type="Brief",
+
+class DownloadTexasDocumentPdfTest(TestCase):
+    def setUp(self):
+        """Set up test fixtures for download_texas_document_pdf tests."""
+        self.download_pdf_patch = patch(
+            "cl.corpus_importer.tasks.download_pdf_in_stream"
+        )
+        self.download_pdf_mock = self.download_pdf_patch.start()
+        self.texas_coa1 = CourtFactory.create(id="texas_coa1")
+        self.docket = DocketFactory.create(
+            court=self.texas_coa1, docket_number="01-25-00011-CV"
+        )
+        self.docket_entry = TexasDocketEntry.objects.create(
+            docket=self.docket,
+            entry_type="Brief",
+            sequence_number="2025-08-01-10",
         )
 
+    def tearDown(self):
+        """Tear down patches and remove added objects."""
+        Docket.objects.all().delete()
+        TexasDocketEntry.objects.all().delete()
+        TexasDocument.objects.all().delete()
+        self.download_pdf_patch.stop()
+
+    def test_download_texas_document_pdf_success(self):
+        """Can we successfully download a PDF for a TexasDocument?"""
+        texas_document = TexasDocument.objects.create(
+            docket_entry=self.docket_entry,
+            description="Test Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+        )
+
+        # Mock successful PDF download
+        file_mock = MagicMock()
+        self.download_pdf_mock.return_value.__enter__.return_value = file_mock
+
+        result = download_texas_document_pdf(texas_document.pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_called_once_with(
+            "https://example.com/sample.pdf", texas_document.pk, "texas_"
+        )
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local is not None
+
+    def test_download_texas_document_pdf_document_not_found(self):
+        """Do we handle a missing TexasDocument gracefully?"""
+        non_existent_pk = 99999
+
+        result = download_texas_document_pdf(non_existent_pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_not_called()
+
+    def test_download_texas_document_pdf_download_failure(self):
+        """Do we handle a failed PDF download gracefully?"""
+        texas_document = TexasDocument.objects.create(
+            docket_entry=self.docket_entry,
+            description="Test Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+        )
+
+        # Mock failed PDF download
         self.download_pdf_mock.return_value.__enter__.return_value = None
 
-        output = await merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-02-0", True, js_docket_entry
+        result = download_texas_document_pdf(texas_document.pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_called_once_with(
+            "https://example.com/sample.pdf", texas_document.pk, "texas_"
         )
-        assert output == (True, False, output[2])
-        created_docket_entry = await TexasDocketEntry.objects.aget(
-            pk=output[2]
-        )
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == js_docket_entry["type"]
-        assert (
-            created_docket_entry.description == js_docket_entry["description"]
-        )
-        assert created_docket_entry.date_filed == js_docket_entry["date"]
-        n_attachments = await TexasDocument.objects.filter(
-            docket_entry_id=created_docket_entry.id
-        ).acount()
-        assert n_attachments == 1
+        texas_document.refresh_from_db()
+        assert not texas_document.filepath_local
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

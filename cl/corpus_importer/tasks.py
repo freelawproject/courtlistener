@@ -1,4 +1,3 @@
-import asyncio
 import copy
 import functools
 import logging
@@ -3352,7 +3351,49 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         raise self.retry(exc=exc)
 
 
-async def merge_texas_document(
+@app.task(
+    bind=True,
+    ignore_result=True,
+)
+def download_texas_document_pdf(self: Task, texas_document_pk: int) -> None:
+    """Download a PDF and return its path.
+
+    :param self: The Celery task instance
+    :param texas_document_pk: The primary key of the TexasDocument instance to
+    update the attachment for."""
+    try:
+        texas_document = TexasDocument.objects.get(pk=texas_document_pk)
+    except TexasDocument.DoesNotExist:
+        logger.warning(
+            "Texas document PDF download: TexasDocument %s does not exist; skipping.",
+            texas_document_pk,
+        )
+        return None
+
+    url = texas_document.document_url
+    logger.info(
+        "Texas PDF download: Fetching PDF for TexasDocument %s from %s",
+        texas_document_pk,
+        url,
+    )
+
+    with download_pdf_in_stream(url, texas_document.pk, "texas_") as tmp:
+        if tmp is None:
+            logger.error(
+                "Failed to download attachment PDF for TexasDocument %s from URL %s.",
+                texas_document.pk,
+                url,
+            )
+            return None
+        filename = (
+            f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
+        )
+        texas_document.filepath_local = File(tmp, name=filename)
+        texas_document.save()
+        return None
+
+
+def merge_texas_document(
     docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
 ) -> tuple[bool, bool, int]:
     """Merge a single TexasCaseDocument object into CL.
@@ -3370,7 +3411,7 @@ async def merge_texas_document(
     applicable
     - Primary key of the TexasDocument object which matches the input document
     """
-    (texas_document, created) = await TexasDocument.objects.aget_or_create(
+    (texas_document, created) = TexasDocument.objects.get_or_create(
         media_id=input_document["media_id"],
         docket_entry=docket_entry,
         defaults={
@@ -3385,30 +3426,17 @@ async def merge_texas_document(
         or str(texas_document.media_version_id)
         != input_document["media_version_id"]
     ):
-        media_id = input_document["media_id"]
-        media_version_id = input_document["media_version_id"]
-        download_url = input_document["document_url"]
-        with download_pdf_in_stream(
-            download_url, texas_document.pk, "texas_"
-        ) as tmp:
-            if tmp is None:
-                logger.error(
-                    "Failed to download attachment PDF for TexasDocument %s.",
-                    texas_document.pk,
-                )
-                return True, False, texas_document.pk
-            filename = f"{media_id}-{media_version_id}.pdf"
-            texas_document.filepath_local = File(tmp, name=filename)
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
-        texas_document.document_url = download_url
-        await texas_document.asave()
+        texas_document.document_url = input_document["document_url"]
+        texas_document.save()
+        download_texas_document_pdf.delay(texas_document.pk)
         return True, True, texas_document.pk
 
     return False, True, texas_document.pk
 
 
-async def merge_texas_documents(
+def merge_texas_documents(
     docket_entry: TexasDocketEntry,
     documents: list[TexasCaseDocument],
 ) -> list[tuple[bool, bool, int]]:
@@ -3421,11 +3449,9 @@ async def merge_texas_documents(
     - A flag indicating which is set to True when the document was successfully
     created or updated or when an update was unnecessary,
     - The primary key of the updated TexasDocument object."""
-    texas_document_merger = functools.partial(
-        merge_texas_document, docket_entry
-    )
-    texas_document_mergers = map(texas_document_merger, documents)
-    return await asyncio.gather(*texas_document_mergers)
+    return [
+        merge_texas_document(docket_entry, document) for document in documents
+    ]
 
 
 def texas_docket_entry_sequence_numbers(input: TexasCommonData) -> list[str]:
@@ -3444,7 +3470,7 @@ def texas_docket_entry_sequence_numbers(input: TexasCommonData) -> list[str]:
     )
 
 
-async def merge_texas_docket_entry(
+def merge_texas_docket_entry(
     docket: Docket,
     sequence_number: str,
     appellate_brief: bool,
@@ -3465,7 +3491,7 @@ async def merge_texas_docket_entry(
     - A flag which is set to true when the create/update operations are all
     either successful or unnecessary,
     - The primary key of the updated TexasDocketEntry object."""
-    (docket_entry, created) = await TexasDocketEntry.objects.aget_or_create(
+    (docket_entry, created) = TexasDocketEntry.objects.get_or_create(
         docket=docket,
         date_filed=input_docket_entry["date"],
         sequence_number=sequence_number,
@@ -3478,7 +3504,7 @@ async def merge_texas_docket_entry(
         },
     )
 
-    documents = await merge_texas_documents(
+    documents = merge_texas_documents(
         docket_entry, input_docket_entry["attachments"]
     )
 
