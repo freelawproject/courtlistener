@@ -80,6 +80,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_sweep",
 )
 @override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPAlertsSweepIndexTest")
 class RECAPAlertsSweepIndexTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
