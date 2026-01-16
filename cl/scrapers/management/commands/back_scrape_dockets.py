@@ -74,7 +74,7 @@ class RateLimitedRequestManager:
     def __enter__(self) -> "RateLimitedRequestManager":
         return self
 
-    def __exit__(self,exc_type, exc_value,traceback) -> None:
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         # Leave the logging to Sentry
         self.close()
 
@@ -128,6 +128,7 @@ class RateLimitedRequestManager:
             response = self.session.request(method, url, **kwargs)
 
             if response.status_code != 403:
+                response.raise_for_status()
                 return response
 
             # Handle 403 with exponential backoff
@@ -171,7 +172,7 @@ class RateLimitedRequestManager:
         response = self._request_with_retry(method, url, **kwargs)
 
         if self.all_response_fn:
-            self.all_response_fn(self, response)
+            self.all_response_fn(response)
 
         return response
 
@@ -191,7 +192,7 @@ class RateLimitedRequestManager:
 def save_docket_response(
     response: requests.Response,
     scraper_class_name: str,
-    case_meta:dict,
+    case_meta: dict,
     court_id: str = "unknown_court",
 ) -> None:
     """Store docket scraper response content and headers in S3.
@@ -206,8 +207,12 @@ def save_docket_response(
     storage = S3GlacierInstantRetrievalStorage()
 
     # Docket number with non-s3-safe characters replaced with a _
-    case_number = re.sub(r"[^0-9a-zA-Z!_.*'()-]","_",(case_meta.get("case_number")))
-    base_name = f"responses/dockets/{scraper_class_name}/{court_id}/{case_number}"
+    case_number = re.sub(
+        r"[^0-9a-zA-Z!_.*'()-]", "_", (case_meta.get("case_number"))
+    )
+    base_name = (
+        f"responses/dockets/{scraper_class_name}/{court_id}/{case_number}"
+    )
 
     headers_json = json.dumps(dict(response.headers), indent=4)
     storage.save(f"{base_name}_headers.json", ContentFile(headers_json))
@@ -223,6 +228,19 @@ def save_docket_response(
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
 
+
+def save_search_response_factory(scraper_class_name: str):
+    storage = S3GlacierInstantRetrievalStorage()
+    prefix = f"dockets/{scraper_class_name}/searches/"
+
+    def save_search_reponse(response: requests.Response):
+        now_str = datetime.now().strftime("%Y/%m/%d/%H_%M_%S_%f")
+        path = f"{prefix}{now_str}.html"
+        storage.save(path, ContentFile(response.content))
+
+    return save_search_reponse
+
+
 class Command(BaseCommand):
     help = "Runs BaseStateScraper backfill operations for docket enumeration."
 
@@ -230,7 +248,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--scraper",
             help="The module path of the scraper to run (e.g., juriscraper.state.texas.tames)",
-            required=True
+            required=True,
         )
         parser.add_argument(
             "--backscrape-start",
@@ -320,17 +338,25 @@ class Command(BaseCommand):
         )
 
         search_rm_args = {
-            "requests_per_second":options["search_rate"],
-            "max_backoff_seconds":options["max_backoff"],
+            "requests_per_second": options["search_rate"],
+            "max_backoff_seconds": options["max_backoff"],
+            "all_response_fn": save_search_response_factory(
+                scraper_class_name
+            ),
         }
 
         case_rm_args = {
-            "requests_per_second":options["case_rate"],
-            "max_backoff_seconds":options["max_backoff"],
+            "requests_per_second": options["case_rate"],
+            "max_backoff_seconds": options["max_backoff"],
             # We are manually processing the saves here since we can do it with a bit more info
         }
 
-        with RateLimitedRequestManager(**search_rm_args) as search_request_manager, RateLimitedRequestManager(**case_rm_args) as case_request_manager:
+        with (
+            RateLimitedRequestManager(
+                **search_rm_args
+            ) as search_request_manager,
+            RateLimitedRequestManager(**case_rm_args) as case_request_manager,
+        ):
             # Instantiate the scraper with our rate-limited search request manager
             scraper = scraper_class(request_manager=search_request_manager)
 
@@ -339,7 +365,11 @@ class Command(BaseCommand):
             end_date = self._parse_date(options["backscrape_end"])
 
             # Determine courts to scrape
-            courts = [c.strip() for c in options["courts"].split(",")] if options["courts"] else None
+            courts = (
+                [c.strip() for c in options["courts"].split(",")]
+                if options["courts"]
+                else None
+            )
 
             logger.info(
                 "Backfilling %d courts from %s to %s",
@@ -379,7 +409,6 @@ class Command(BaseCommand):
             logger.info(
                 "Backfill complete. Processed %d cases total.", case_count
             )
-
 
     def _parse_date(self, date_str: str) -> date:
         """Parse a date string in various formats.
