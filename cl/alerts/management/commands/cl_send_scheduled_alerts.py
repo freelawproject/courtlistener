@@ -16,7 +16,6 @@ from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESDictDocument
-from cl.stats.metrics import alerts_sent_total
 from cl.stats.utils import tally_stat
 
 DAYS_TO_DELETE = 90
@@ -200,7 +199,6 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
         )
 
     tally_stat("alerts.sent", inc=alerts_sent_count)
-    alerts_sent_total.labels(alert_type="search_alert").inc(alerts_sent_count)
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
 

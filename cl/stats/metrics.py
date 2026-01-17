@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from prometheus_client import Counter, Histogram
 from prometheus_client.core import REGISTRY, GaugeMetricFamily
+from sentry_sdk import capture_exception
 
 from cl.lib.celery_utils import get_queue_length
 
@@ -36,36 +37,6 @@ Usage:
 Labels:
     query_type: 'keyword' | 'semantic'
     method: 'web' | 'api'
-"""
-
-# Alert metrics
-alerts_sent_total = Counter(
-    "cl_alerts_sent_total",
-    "Total number of alerts sent",
-    ["alert_type"],
-)
-"""
-Usage:
-    alerts_sent_total.labels(alert_type='search_alert').inc()
-    alerts_sent_total.labels(alert_type='docket_alert').inc(5)
-
-Labels:
-    alert_type: 'search_alert' | 'docket_alert'
-"""
-
-# Webhook metrics
-webhooks_sent_total = Counter(
-    "cl_webhooks_sent_total",
-    "Total number of webhooks sent",
-    ["event_type"],
-)
-"""
-Usage:
-    webhooks_sent_total.labels(event_type='docket_alert').inc()
-
-Labels:
-    event_type: 'docket_alert' | 'search_alert' | 'recap_fetch' |
-                'old_docket_alerts_report' | 'pray_and_pay'
 """
 
 # Account metrics
@@ -108,11 +79,8 @@ class CeleryQueueCollector:
             try:
                 length = get_queue_length(queue)
                 gauge.add_metric([queue], length)
-            except Exception:
-                logger.exception(
-                    "Failed to get queue length for %s",
-                    queue,
-                )
+            except Exception as e:
+                capture_exception(e)
         yield gauge
 
 

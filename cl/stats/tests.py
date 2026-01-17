@@ -17,12 +17,10 @@ from cl.stats.metrics import (
     CeleryQueueCollector,
     accounts_created_total,
     accounts_deleted_total,
-    alerts_sent_total,
     record_search_duration,
     register_celery_queue_collector,
     search_duration_seconds,
     search_queries_total,
-    webhooks_sent_total,
 )
 from cl.stats.models import Event
 from cl.stats.utils import get_milestone_range, tally_stat
@@ -141,8 +139,6 @@ class PrometheusMetricsTests(TestCase):
     def setUp(self):
         search_queries_total._metrics.clear()
         search_duration_seconds._metrics.clear()
-        alerts_sent_total._metrics.clear()
-        webhooks_sent_total._metrics.clear()
         accounts_created_total._value.set(0)
         accounts_deleted_total._value.set(0)
 
@@ -185,85 +181,6 @@ class PrometheusMetricsTests(TestCase):
                 final = search_queries_total.labels(
                     query_type=test_case["query_type"],
                     method=test_case["method"],
-                )._value.get()
-                expected_total = sum(test_case["increments"])
-                self.assertEqual(final, initial + expected_total)
-
-    def test_alert_metrics(self) -> None:
-        """Test recording alert metrics with different alert types"""
-        test_cases = [
-            {
-                "name": "search_alert",
-                "alert_type": "search_alert",
-                "increments": [1],
-            },
-            {
-                "name": "docket_alert",
-                "alert_type": "docket_alert",
-                "increments": [1, 2],
-            },
-        ]
-
-        for test_case in test_cases:
-            with self.subTest(case=test_case["name"]):
-                initial = alerts_sent_total.labels(
-                    alert_type=test_case["alert_type"],
-                )._value.get()
-
-                for inc in test_case["increments"]:
-                    alerts_sent_total.labels(
-                        alert_type=test_case["alert_type"]
-                    ).inc(inc)
-
-                final = alerts_sent_total.labels(
-                    alert_type=test_case["alert_type"],
-                )._value.get()
-                expected_total = sum(test_case["increments"])
-                self.assertEqual(final, initial + expected_total)
-
-    def test_webhook_metrics(self) -> None:
-        """Test recording webhook metrics with different event types"""
-        test_cases = [
-            {
-                "name": "docket_alert",
-                "event_type": "docket_alert",
-                "increments": [1],
-            },
-            {
-                "name": "search_alert",
-                "event_type": "search_alert",
-                "increments": [1],
-            },
-            {
-                "name": "recap_fetch",
-                "event_type": "recap_fetch",
-                "increments": [1, 1],
-            },
-            {
-                "name": "old_docket_alerts_report",
-                "event_type": "old_docket_alerts_report",
-                "increments": [1],
-            },
-            {
-                "name": "pray_and_pay",
-                "event_type": "pray_and_pay",
-                "increments": [1],
-            },
-        ]
-
-        for test_case in test_cases:
-            with self.subTest(case=test_case["name"]):
-                initial = webhooks_sent_total.labels(
-                    event_type=test_case["event_type"],
-                )._value.get()
-
-                for inc in test_case["increments"]:
-                    webhooks_sent_total.labels(
-                        event_type=test_case["event_type"]
-                    ).inc(inc)
-
-                final = webhooks_sent_total.labels(
-                    event_type=test_case["event_type"],
                 )._value.get()
                 expected_total = sum(test_case["increments"])
                 self.assertEqual(final, initial + expected_total)
