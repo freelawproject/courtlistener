@@ -111,9 +111,15 @@ VALID_FRAMEWORK_PARAMS: frozenset[str] = frozenset(
 )
 
 
+# Maximum allowed depth for nested filter validation to prevent DOS attacks
+# via circular filter references (e.g., clusters__docket__clusters__docket__...)
+MAX_FILTER_DEPTH = 4
+
+
 def is_valid_filter_param(
     param: str,
     filterset_class: type[FilterSet] | None,
+    depth: int = 0,
 ) -> bool:
     """Check if a parameter is valid for the given filterset.
 
@@ -123,9 +129,14 @@ def is_valid_filter_param(
 
     :param param: The parameter name to validate.
     :param filterset_class: The FilterSet class for validation.
+    :param depth: Current recursion depth (used internally to prevent DOS).
     :return: True if the parameter is valid, False otherwise.
     """
     if filterset_class is None:
+        return False
+
+    # Prevent DOS via deeply nested circular filter references
+    if depth > MAX_FILTER_DEPTH:
         return False
 
     # Handle negation filter suffix (e.g., person! -> person)
@@ -147,15 +158,12 @@ def is_valid_filter_param(
 
     # Check if prefix is a RelatedFilter
     filter_instance = base_filters.get(prefix)
-    if filter_instance is None:
-        return False
-
     if not isinstance(filter_instance, RelatedFilter):
         return False
 
     # Recursively validate rest against the related filterset
     related_filterset = filter_instance.filterset
-    return is_valid_filter_param(rest, related_filterset)
+    return is_valid_filter_param(rest, related_filterset, depth + 1)
 
 
 def detect_unknown_filter_params(

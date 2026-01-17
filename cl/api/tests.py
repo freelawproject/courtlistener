@@ -118,7 +118,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
-from cl.search.filters import CourtFilter, OpinionFilter
+from cl.search.filters import CourtFilter, DocketFilter, OpinionFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -4659,3 +4659,19 @@ class UnknownFilterParameterUtilsTests(SimpleTestCase):
         unknown = detect_unknown_filter_params(query_params, CourtFilter)
 
         self.assertEqual(unknown, set())
+
+    def test_is_valid_filter_param_max_depth_prevents_dos(self) -> None:
+        """Verify that deeply nested circular filters are rejected.
+
+        This prevents DOS attacks where an attacker creates params like:
+        clusters__docket__clusters__docket__... (repeated many times)
+        """
+        # Build a deeply nested circular filter path that exceeds max depth
+        deep_circular_path = "__".join(
+            ["clusters", "docket"] * 10
+        )  # 20 levels deep
+
+        # Should be rejected due to depth limit, not cause recursion error
+        self.assertFalse(
+            is_valid_filter_param(deep_circular_path, DocketFilter)
+        )
