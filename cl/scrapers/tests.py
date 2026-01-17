@@ -2086,3 +2086,35 @@ class SubscribeToSCOTUSTest(TestCase):
             1,
             "Should have requested exactly 1 transcription",
         )
+
+
+class SetOrderingKeysTest(SimpleTestCase):
+    def test_set_ordering_keys(self):
+        """Test if set_ordering_keys correctly assigns ordering_key to multiple opinions"""
+        opinions_content = [
+            (
+                {"types": "030concurrence", "download_urls": "url1"},
+                b"",
+                "sha1",
+            ),
+            ({"types": "020lead", "download_urls": "url2"}, b"", "sha2"),
+            ({"types": "040dissent", "download_urls": "url3"}, b"", "sha3"),
+            (
+                {"types": "030concurrence", "download_urls": "url4"},
+                b"",
+                "sha4",
+            ),
+        ]
+
+        cl_scrape_opinions.set_ordering_keys(opinions_content)
+
+        # Expected order based on types and original index:
+        # 020lead (index 1) -> 1
+        # 030concurrence (index 0) -> 2
+        # 030concurrence (index 3) -> 3
+        # 040dissent (index 2) -> 4
+
+        self.assertEqual(opinions_content[1][0]["ordering_key"], 1)
+        self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
+        self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
+        self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
