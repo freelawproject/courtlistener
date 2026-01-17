@@ -21,6 +21,7 @@ from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 from juriscraper.state.texas import (
     TexasCaseDocument,
+    TexasCaseParty,
     TexasCommonData,
     TexasTrialCourt,
 )
@@ -88,6 +89,8 @@ from cl.corpus_importer.tasks import (
     merge_texas_docket_entry,
     merge_texas_document,
     merge_texas_documents,
+    merge_texas_parties,
+    normalize_texas_parties,
     probe_or_scrape_iquery_pages,
     texas_docket_entry_sequence_numbers,
 )
@@ -122,7 +125,14 @@ from cl.people_db.lookup_utils import (
     find_all_judges,
     find_just_name,
 )
-from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    Party,
+    PartyType,
+    Position,
+    Role,
+)
 from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
@@ -2624,6 +2634,190 @@ class DownloadTexasDocumentPdfTest(TestCase):
         )
         texas_document.refresh_from_db()
         assert not texas_document.filepath_local
+
+    def test_merge_single_party_with_attorney(self):
+        """Can we merge a single party with an attorney?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Test Party",
+                type="Appellant",
+                representatives=["Test Attorney"],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check party was created
+        assert Party.objects.filter(name="Test Party").exists()
+        party = Party.objects.get(name="Test Party")
+
+        # Check party type was associated with docket
+        assert PartyType.objects.filter(
+            docket=self.docket_coa1, party=party, name="Appellant"
+        ).exists()
+
+        # Check attorney was created
+        assert Attorney.objects.filter(name="Test Attorney").exists()
+
+        # Check role was created linking party, attorney, and docket
+        assert Role.objects.filter(
+            docket=self.docket_coa1,
+            party=party,
+            attorney__name="Test Attorney",
+        ).exists()
+
+    def test_merge_multiple_parties(self):
+        """Can we merge multiple parties?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Appellant Party",
+                type="Appellant",
+                representatives=["Appellant Attorney"],
+            ),
+            TexasCaseParty(
+                name="Appellee Party",
+                type="Appellee",
+                representatives=[
+                    "Appellee Attorney One",
+                    "Appellee Attorney Two",
+                ],
+            ),
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check both parties were created
+        assert Party.objects.filter(name="Appellant Party").exists()
+        assert Party.objects.filter(name="Appellee Party").exists()
+
+        # Check all attorneys were created
+        assert Attorney.objects.filter(name="Appellant Attorney").exists()
+        assert Attorney.objects.filter(name="Appellee Attorney One").exists()
+        assert Attorney.objects.filter(name="Appellee Attorney Two").exists()
+
+        # Check correct number of roles
+        assert Role.objects.filter(docket=self.docket_coa1).count() == 3
+
+    def test_merge_party_without_representatives(self):
+        """Can we merge a party that has no representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Pro Se Party",
+                type="Appellant",
+                representatives=[],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check party was created
+        assert Party.objects.filter(name="Pro Se Party").exists()
+
+        # Check party type exists
+        party = Party.objects.get(name="Pro Se Party")
+        assert PartyType.objects.filter(
+            docket=self.docket_coa1, party=party, name="Appellant"
+        ).exists()
+
+        # No attorneys should be created for this party
+        assert (
+            Role.objects.filter(docket=self.docket_coa1, party=party).count()
+            == 0
+        )
+
+    def test_merge_empty_parties_preserves_existing(self):
+        """Does merging empty parties preserve existing party data?"""
+        # First add some parties
+        initial_parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Existing Party",
+                type="Appellant",
+                representatives=["Existing Attorney"],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, initial_parties)
+        initial_party_count = self.docket_coa1.parties.count()
+
+        # Now merge empty list
+        merge_texas_parties(self.docket_coa1, [])
+
+        # Existing parties should be preserved
+        assert self.docket_coa1.parties.count() == initial_party_count
+
+    def test_normalize_single_party_no_representatives(self):
+        """Can we normalize a party without representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="John Doe",
+                type="Appellant",
+                representatives=[],
+            )
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 1
+        assert result[0]["name"] == "John Doe"
+        assert result[0]["type"] == "Appellant"
+        assert result[0]["date_terminated"] is None
+        assert result[0]["extra_info"] == ""
+        assert result[0]["attorneys"] == []
+
+    def test_normalize_single_party_with_representatives(self):
+        """Can we normalize a party with multiple representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Jane Smith",
+                type="Appellee",
+                representatives=[
+                    "Attorney One",
+                    "Attorney Two",
+                    "Attorney Three",
+                ],
+            )
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 1
+        assert result[0]["name"] == "Jane Smith"
+        assert result[0]["type"] == "Appellee"
+        assert len(result[0]["attorneys"]) == 3
+
+        # First attorney should be lead
+        assert result[0]["attorneys"][0]["name"] == "Attorney One"
+        assert result[0]["attorneys"][0]["contact"] == "Attorney One"
+        assert result[0]["attorneys"][0]["roles"] == ["LEAD_ATTORNEY"]
+
+        # Subsequent attorneys should have UNKNOWN role
+        assert result[0]["attorneys"][1]["name"] == "Attorney Two"
+        assert result[0]["attorneys"][1]["roles"] == ["UNKNOWN"]
+        assert result[0]["attorneys"][2]["name"] == "Attorney Three"
+        assert result[0]["attorneys"][2]["roles"] == ["UNKNOWN"]
+
+    def test_normalize_multiple_parties(self):
+        """Can we normalize multiple parties?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Petitioner Corp",
+                type="Petitioner",
+                representatives=["Lead Counsel"],
+            ),
+            TexasCaseParty(
+                name="Respondent LLC",
+                type="Respondent",
+                representatives=["Defense Attorney", "Co-Counsel"],
+            ),
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 2
+
+        assert result[0]["name"] == "Petitioner Corp"
+        assert result[0]["type"] == "Petitioner"
+        assert len(result[0]["attorneys"]) == 1
+        assert result[0]["attorneys"][0]["roles"] == ["LEAD_ATTORNEY"]
+
+        assert result[1]["name"] == "Respondent LLC"
+        assert result[1]["type"] == "Respondent"
+        assert len(result[1]["attorneys"]) == 2
+
+    def test_normalize_empty_parties_list(self):
+        """Can we handle an empty parties list?"""
+        result = normalize_texas_parties([])
+        assert result == []
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
