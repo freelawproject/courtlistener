@@ -184,5 +184,5 @@ urlpatterns = [
         SESEventWebhookView.as_view(),
         name="handle_ses_webhook",
     ),
-    re_path(r"^api/htmx/", include(router.urls)),
+    path("api/htmx/", include(router.urls)),
 ]

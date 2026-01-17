@@ -180,6 +180,11 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         r = await self.async_client.get(reverse("webhooks_docs"))
         self.assertEqual(r.status_code, 200)
 
+    async def test_tag_api_help(self) -> None:
+        """Can we load the tag API help page?"""
+        r = await self.async_client.get(reverse("tag_api_help"))
+        self.assertEqual(r.status_code, 200)
+
     async def test_webhooks_getting_started(self) -> None:
         r = await self.async_client.get(reverse("webhooks_getting_started"))
         self.assertEqual(r.status_code, 200)
@@ -4029,7 +4034,6 @@ class DynamicNestedFieldsMixinTests(TestCase):
                 "pacer_sequence_number",
                 "recap_sequence_number",
                 "time_filed",
-                "tags",
             },
         )
 

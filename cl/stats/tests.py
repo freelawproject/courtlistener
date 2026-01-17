@@ -4,6 +4,7 @@ import pytest
 import time_machine
 from django.core import mail
 from django.core.management import call_command
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from waffle.testutils import override_flag, override_switch
@@ -81,6 +82,7 @@ class PartnershipEmailTests(TestCase):
 
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="StatTests")
 class StatTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
@@ -191,6 +193,7 @@ def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:
 
 @override_flag("semantic-search", active=True)
 @override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="PrometheusIntegrationTestBase")
 class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
     """Base class for Prometheus integration tests"""
 
@@ -212,6 +215,7 @@ class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
 
 
 @override_flag("store-search-api-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_prometheus_integration")
 class PrometheusIntegrationAPITests(PrometheusIntegrationTestBase):
     """Integration tests for Prometheus metrics with API searches"""
 

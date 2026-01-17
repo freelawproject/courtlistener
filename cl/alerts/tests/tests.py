@@ -21,6 +21,7 @@ from lxml import html
 from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
@@ -949,7 +950,9 @@ class DisableDocketAlertTest(TestCase):
         )
 
     def test_alert_created_recently_termination_year_ago(self) -> None:
-        self.alert.docket.date_terminated = now() - timedelta(days=365)
+        self.alert.docket.date_terminated = timezone.localdate() - timedelta(
+            days=365
+        )
         self.alert.docket.save()
 
         report = build_user_report(self.alert.user)
@@ -965,7 +968,7 @@ class DisableDocketAlertTest(TestCase):
         """Flag it if alert is old and item was terminated 90-97 days ago"""
         self.backdate_alert()
         for i in range(90, 97):
-            new_date_terminated = now() - timedelta(days=i)
+            new_date_terminated = timezone.localdate() - timedelta(days=i)
             print(f"Trying a date_terminated of {new_date_terminated}")
             self.alert.docket.date_terminated = new_date_terminated
             self.alert.docket.save()
@@ -1677,7 +1680,7 @@ class SearchAlertsWebhooksTest(
         )
         self.assertEqual(r.json()["count"], 0)
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with (
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -2803,7 +2806,10 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
-@override_settings(NO_MATCH_HL_SIZE=100)
+@override_settings(
+    NO_MATCH_HL_SIZE=100, WAFFLE_CACHE_PREFIX="SearchAlertsOAESTests"
+)
+@override_switch("increment-stats", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     """Test ES Search Alerts"""
 
@@ -2919,7 +2925,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
         self.assertEqual(r.json()["count"], 0)
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with (
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -2944,7 +2950,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -3097,7 +3103,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=1, hour=5)
+            mock_date = timezone.localtime(now()).replace(day=1, hour=5)
             with (
                 time_machine.travel(mock_date, tick=False),
                 self.captureOnCommitCallbacks(execute=True),
@@ -3413,7 +3419,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(month=1, day=30, hour=0)
+            mock_date = timezone.localtime(now()).replace(
+                month=1, day=30, hour=0
+            )
             with time_machine.travel(mock_date, tick=False):
                 # Call mly command
                 with self.assertRaises(InvalidDateError):
@@ -3990,7 +3998,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
 
         # Send dly alerts and check assertions.
-        mock_date = now().replace(day=1, hour=0)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=0)
         with time_machine.travel(mock_date, tick=False):
             # Call dly command
             call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
@@ -4404,5 +4412,5 @@ class EmailWithSurrogatesTest(TestCase):
         email = EmailSent.objects.first()
         self.assertEqual(
             email.plain_text,
-            "government interest.” Saxe v. State Coll.",
+            "government interest.” Saxe v. State Coll.\n",
         )

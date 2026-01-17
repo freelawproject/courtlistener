@@ -11,4 +11,4 @@ def is_ajax(request: HttpRequest) -> bool:
     :param request: The HttpRequest from the user.
     :return: True if ajax, else False
     """
-    return request.META.get("HTTP_X_REQUESTED_WITH") == "XMLHttpRequest"
+    return request.headers.get("x-requested-with") == "XMLHttpRequest"

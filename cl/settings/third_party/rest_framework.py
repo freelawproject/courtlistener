@@ -150,7 +150,6 @@ REST_FRAMEWORK = {
         # Running bad queries
         # Mega queries on the docket endpoint causing issues
         "ashabana85": "1/hour",
-        "Luris.ai": "1/hour",
         "tannero20": "1/hour",
         # Too difficult
         "aanshshah": "1/hour",
@@ -163,6 +162,7 @@ REST_FRAMEWORK = {
         "arivdc": "10/hour",
         "Mpits003": "1/hour",
         # Throttling up.
+        "hmturner08": "15000/hour",  # Tryandai needs big boost through 1/19
         "JonasHappel": "10000/hour",
         "YFIN": "430000/day",
         "mlissner": "1000000/hour",  # Needed for benchmarking (not greed)
@@ -177,7 +177,7 @@ REST_FRAMEWORK = {
     },
     "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {
         "jafrank": "180/minute",
-        "LexText": "180/minute",
+        "LexText": "360/minute",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (

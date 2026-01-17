@@ -89,7 +89,7 @@
   }
 
   .alert-warning {
-    @apply alert text-yellow-700 bg-yellow-100 border-yellow-500;
+    @apply alert text-yellow-700 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
   }
 
    .alert-danger {
@@ -204,6 +204,7 @@
   }
   .focus-container { /** provides focus state when a child input is focused */
     @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
+    @apply [&:has(select:focus)]:outline [&:has(select:focus)]:outline-2 [&:has(select:focus)]:outline-primary-600 flex;
   }
   .capped-width {
     @apply w-full max-w-[--content-max-width] mx-auto;
