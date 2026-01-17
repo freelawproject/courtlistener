@@ -334,7 +334,7 @@
               <tr>
                 <td>
                   {% if item.page_number %}
-                    <a href="{{ disclosure.filepath }}#page={{ item.page_number }}" title="Go to PDF page">
+                    <a href="{{ disclosure.filepath.url }}#page={{ item.page_number }}" title="Go to PDF page">
                       <i class="fa fa-file-text-o gray"></i>
                     </a>
                   {% endif %}
@@ -387,7 +387,7 @@
           <i class="fa fa-exclamation-triangle gray fa-3x"></i>
           <h1>Table extraction failed.</h1>
           <p>
-            <a href="{{ disclosure.filepath }}">Click here to view the disclosure as a PDF document</a>
+            <a href="{{ disclosure.filepath.url }}">Click here to view the disclosure as a PDF document</a>
           </p>
         </div>
       {% endif %}
@@ -419,8 +419,8 @@
         </span>
       </h3>
       <hr>
-      <a href="{{ disclosure.filepath }}">
-        <img src="{{ disclosure.thumbnail }}"
+      <a href="{{ disclosure.filepath.url }}">
+        <img src="{{ disclosure.thumbnail.url }}"
              alt="Disclosure document thumbnail"
              class="img-responsive thumbnail shadow img-thumbnail judge-pic"
              width="100%">

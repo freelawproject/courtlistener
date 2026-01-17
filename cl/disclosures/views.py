@@ -15,6 +15,7 @@ from django.db.models import (
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from judge_pics.search import ImageSizes, portrait
 
 from cl.disclosures.models import FinancialDisclosure
@@ -138,7 +139,7 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
                 "positions",
                 queryset=Position.objects.filter(court__isnull=False)
                 .select_related("court")
-                .only("pk", "court_id", "person_id")
+                .only("pk", "court_id", "person_id", "court__short_name")
                 .order_by("-date_start"),
                 to_attr="court_positions",
             ),
@@ -162,10 +163,14 @@ async def disclosure_typeahead(request: HttpRequest) -> HttpResponse:
 
         thumbnail_path = portrait(person.id, ImageSizes.SMALL)
 
-        # Get URL to newest disclosure
+        # Get URL to newest disclosure (build URL directly to avoid N+1 query
+        # from get_absolute_url() accessing person.pk and person.slug)
         url = ""
         if hasattr(person, "disclosures") and person.disclosures:
-            url = person.disclosures[0].get_absolute_url()
+            url = reverse(
+                "financial_disclosures_viewer",
+                args=(person.pk, person.disclosures[0].pk, person.slug),
+            )
 
         results.append(
             {

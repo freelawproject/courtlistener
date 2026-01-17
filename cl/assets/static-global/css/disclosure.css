@@ -53,7 +53,8 @@
   border-radius: 10px;
 }
 
-tr.tr-results:hover {
+tr.tr-results:hover,
+tr.tr-results.active {
   background-color: whitesmoke;
   border-radius: 10px !important;
 }
