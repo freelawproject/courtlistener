@@ -3474,6 +3474,7 @@ def texas_docket_entry_sequence_numbers(input: TexasCommonData) -> list[str]:
     return sequence_numbers
 
 
+@transaction.atomic
 def merge_texas_docket_entry(
     docket: Docket,
     sequence_number: str,
@@ -3495,19 +3496,88 @@ def merge_texas_docket_entry(
     - A flag which is set to true when the create/update operations are all
     either successful or unnecessary,
     - The primary key of the updated TexasDocketEntry object."""
-    (docket_entry, created) = TexasDocketEntry.objects.get_or_create(
+    logger.info(
+        "Merging TexasDocketEntry with sequence number %s into Docket %s",
+        sequence_number,
+        docket.pk,
+    )
+    docket_entries = TexasDocketEntry.objects.filter(
         docket=docket,
         date_filed=input_docket_entry["date"],
-        sequence_number=sequence_number,
-        defaults={
-            "description": input_docket_entry.get("description", ""),
-            "disposition": input_docket_entry.get("disposition", ""),
-            "remarks": input_docket_entry.get("remarks", ""),
-            "entry_type": input_docket_entry["type"],
-            "appellate_brief": appellate_brief,
-        },
+        entry_type=input_docket_entry["type"],
+        appellate_brief=appellate_brief,
     )
+    count_matching_entries = docket_entries.count()
 
+    if count_matching_entries == 0:
+        logger.info(
+            "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
+            sequence_number,
+            docket.pk,
+        )
+        docket_entry = TexasDocketEntry.objects.create(
+            docket=docket,
+            date_filed=input_docket_entry["date"],
+            entry_type=input_docket_entry["type"],
+            appellate_brief=appellate_brief,
+        )
+        created = True
+    elif count_matching_entries == 1:
+        logger.info(
+            "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+            sequence_number,
+            docket.pk,
+        )
+        docket_entry = docket_entries.first()
+        created = False
+    else:
+        # More filtering needed
+        matching_sequence_number = docket_entries.filter(
+            sequence_number=sequence_number
+        ).first()
+        logger.info(
+            "Multiple matching TexasDocketEntries found for sequence number %s on Docket %s.",
+            sequence_number,
+            docket.pk,
+        )
+        if matching_sequence_number:
+            logger.info(
+                "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+                sequence_number,
+                docket.pk,
+            )
+            docket_entry = matching_sequence_number
+            created = False
+        else:
+            logger.info(
+                "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
+                sequence_number,
+                docket.pk,
+            )
+            docket_entry = TexasDocketEntry.objects.create(
+                docket=docket,
+                date_filed=input_docket_entry["date"],
+                entry_type=input_docket_entry["type"],
+                appellate_brief=appellate_brief,
+            )
+            created = True
+
+    docket_entry.sequence_number = sequence_number
+    docket_entry.description = input_docket_entry.get("description", "")
+    docket_entry.disposition = input_docket_entry.get("disposition", "")
+    docket_entry.remarks = input_docket_entry.get("remarks", "")
+    logger.info(
+        "Saving TexasDocketEntry %s on Docket %s",
+        docket_entry.pk,
+        docket.pk,
+    )
+    docket_entry.save()
+
+    logger.info(
+        "Merging attachments for TexasDocketEntry %s on Docket %s",
+        docket_entry.pk,
+        docket.pk,
+    )
     documents = merge_texas_documents(
         docket_entry, input_docket_entry["attachments"]
     )

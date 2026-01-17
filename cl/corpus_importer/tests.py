@@ -2434,6 +2434,118 @@ class TexasMergerTest(TestCase):
         ).count()
         assert n_attachments == 2
 
+    def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
+        """When multiple entries match by date/type/brief, use the one with matching sequence number."""
+        # Create two entries with same date, type, and appellate_brief
+        existing_entry_1 = TexasDocketEntry.objects.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-02"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-02.000",
+            description="First entry",
+        )
+        existing_entry_2 = TexasDocketEntry.objects.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-02"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-02.001",
+            description="Second entry",
+        )
+
+        js_docket_entry = TexasAppellateBrief(
+            attachments=[],
+            description="Updated description",
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+
+        # Should match the second entry by sequence number
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.001", True, js_docket_entry
+        )
+
+        assert output == (False, True, existing_entry_2.pk)
+        updated_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert updated_entry.description == "Updated description"
+        assert updated_entry.sequence_number == "2025-01-02.001"
+        # Ensure the first entry was not modified
+        existing_entry_1.refresh_from_db()
+        assert existing_entry_1.description == "First entry"
+
+    def test_merge_texas_docket_entry_single_match_updates_entry(self):
+        """When exactly one entry matches by date/type/brief, update it even with different sequence number."""
+        existing_entry = TexasDocketEntry.objects.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-04"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-04.000",
+            description="Original description",
+        )
+
+        js_docket_entry = TexasAppellateBrief(
+            attachments=[],
+            description="Updated description",
+            date=date.fromisoformat("2025-01-04"),
+            type="Brief",
+        )
+
+        # Should update existing entry and change its sequence number
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-04.001", True, js_docket_entry
+        )
+
+        assert output == (False, True, existing_entry.pk)
+        updated_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert updated_entry.description == "Updated description"
+        assert updated_entry.sequence_number == "2025-01-04.001"
+
+    def test_merge_texas_docket_entry_multiple_matches_without_sequence(self):
+        """When multiple entries match by date/type/brief but none match sequence, create a new entry."""
+        # Create two entries with same date, type, and appellate_brief
+        existing_entry_1 = TexasDocketEntry.objects.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-03"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-03.000",
+            description="First entry",
+        )
+        existing_entry_2 = TexasDocketEntry.objects.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-03"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-03.001",
+            description="Second entry",
+        )
+
+        js_docket_entry = TexasAppellateBrief(
+            attachments=[],
+            description="New third entry",
+            date=date.fromisoformat("2025-01-03"),
+            type="Brief",
+        )
+
+        # Should create a new entry since no sequence number matches
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-03.002", True, js_docket_entry
+        )
+
+        assert output[0] is True  # created
+        assert output[1] is True  # success
+        assert output[2] not in (existing_entry_1.pk, existing_entry_2.pk)
+        new_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert new_entry.description == "New third entry"
+        assert new_entry.sequence_number == "2025-01-03.002"
+        # Ensure existing entries were not modified
+        existing_entry_1.refresh_from_db()
+        existing_entry_2.refresh_from_db()
+        assert existing_entry_1.description == "First entry"
+        assert existing_entry_2.description == "Second entry"
+
 
 class DownloadTexasDocumentPdfTest(TestCase):
     def setUp(self):
