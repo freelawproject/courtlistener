@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% load extras %}{% load waffle_tags %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_search-api-docs-vlatest.html                         ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}Legal Search API – CourtListener.com{% endblock %}
 {% block og_title %}Legal Search API – CourtListener.com{% endblock %}
 
@@ -142,7 +155,7 @@
   <p>This means that it does not use the same approach to ordering, filtering, or field definitions as our other APIs, and sending an HTTP <code>OPTIONS</code> request won't be useful.
   </p>
 
-  <p>CourtListener's search results are powered by the <a href="{% url "citegeist_help" %}">Citegeist Relevancy Engine</a>, which supports both keyword search and semantic search.
+  <p>CourtListener's search results are powered by the <a href="{% url "citegeist_help" %}">Citegeist&trade; Relevancy Engine</a>, which supports both keyword search and semantic search.
   </p>
   <p>Semantic search makes it possible to query the case law database using plain language queries, instead of keywords. It can be a better tool for untrained users, while keyword search provides a powerful ranking system with deep pagination that may be more familiar to attorneys.
   </p>
@@ -225,7 +238,7 @@
   <h3 id="ordering">Ordering Results</h3>
   <p>Each search <code>type</code> can be sorted by certain fields. These are available on the front end in the ordering drop down, which sets the <code>order_by</code> parameter.
   </p>
-  <p><a href="{% url "citegeist_help" %}">Citegeist</a> sorts results when you order by relevancy. It uses a combination of factors to provide the most important results first.
+  <p>Our <a href="{% url "citegeist_help" %}">Citegeist&trade; Relevancy Engine</a> sorts results when you order by relevancy. It uses a combination of factors to provide the most important results first.
   </p>
   <p>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order. For example, if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.
   </p>
