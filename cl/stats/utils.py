@@ -14,6 +14,11 @@ from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import get_redis_interface
+from cl.stats.constants import (
+    STAT_LABEL_VALUES,
+    STAT_LABELS,
+    STAT_METRICS_PREFIX,
+)
 
 MILESTONES = OrderedDict(
     (
@@ -51,6 +56,46 @@ def get_milestone_range(start, end):
     return out
 
 
+def _validate_labels(name: str, labels: dict[str, str]) -> None:
+    """Validate labels match expected schema and values."""
+    expected = STAT_LABELS.get(name, [])
+
+    # Check all expected labels are present
+    if set(labels.keys()) != set(expected):
+        raise ValueError(
+            f"Labels for '{name}' must be {expected}, got {list(labels.keys())}"
+        )
+
+    # Check each value is valid
+    for label_name, value in labels.items():
+        allowed_enum = STAT_LABEL_VALUES.get(label_name)
+        if allowed_enum:
+            allowed_values = [e.value for e in allowed_enum]
+            if value not in allowed_values:
+                raise ValueError(
+                    f"Invalid value '{value}' for label '{label_name}'. "
+                    f"Allowed: {allowed_values}"
+                )
+
+
+def _update_prometheus_stat(
+    name: str, inc: int, labels: dict[str, str] | None
+) -> None:
+    """Write prometheus-compatible key to Redis."""
+    r = get_redis_interface("STATS")
+
+    # Build key: prometheus:stat:{name}:{label1}:{label2}:...
+    if labels:
+        # Use STAT_LABELS order for consistent key structure
+        label_order = STAT_LABELS.get(name, [])
+        label_values = ":".join(labels[label] for label in label_order)
+        key = f"{STAT_METRICS_PREFIX}{name}:{label_values}"
+    else:
+        key = f"{STAT_METRICS_PREFIX}{name}"
+
+    r.incrby(key, inc)
+
+
 def _update_cached_stat(key, inc, date_logged):
     r = get_redis_interface("STATS")
 
@@ -78,15 +123,24 @@ def tally_stat(
     name,
     inc=1,
     date_logged=None,
+    labels: dict[str, str] | None = None,
 ) -> int:
     """Tally an event's occurrence to Redis.
 
     Will assume the following overridable values:
        - the event happened today.
        - the event happened once.
+
+    :param name: The stat name (e.g., "search.results" or StatMetric.SEARCH_RESULTS)
+    :param inc: The amount to increment (default: 1)
+    :param date_logged: The date to log the stat for (default: today)
+    :param labels: Optional dict of label names to values for Prometheus metrics
     """
     if not switch_is_active("increment-stats"):
         return
+
+    if labels:
+        _validate_labels(name, labels)
 
     current_dt = now()
     if date_logged is None:
@@ -94,7 +148,9 @@ def tally_stat(
 
     key = f"{name}.{date_logged.isoformat()}"
 
-    return _update_cached_stat(key, inc, date_logged)
+    result = _update_cached_stat(key, inc, date_logged)
+    _update_prometheus_stat(name, inc, labels)
+    return result
 
 
 def check_redis() -> bool:

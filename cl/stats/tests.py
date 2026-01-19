@@ -13,17 +13,31 @@ from waffle.testutils import override_flag, override_switch
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
+from cl.stats.constants import (
+    STAT_METRICS_PREFIX,
+    StatAlertType,
+    StatMethod,
+    StatMetric,
+    StatQueryType,
+)
 from cl.stats.metrics import (
     CeleryQueueCollector,
+    StatMetricsCollector,
     accounts_created_total,
     accounts_deleted_total,
     record_search_duration,
     register_celery_queue_collector,
+    register_stat_metrics_collector,
     search_duration_seconds,
     search_queries_total,
 )
 from cl.stats.models import Event
-from cl.stats.utils import get_milestone_range, tally_stat
+from cl.stats.utils import (
+    _update_prometheus_stat,
+    _validate_labels,
+    get_milestone_range,
+    tally_stat,
+)
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import AsyncAPIClient
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -95,9 +109,13 @@ class PartnershipEmailTests(TestCase):
 class StatTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
-        key = self.r.keys("test*")
-        if key:
-            self.r.delete(*key)
+        # Clean up date-based test keys
+        keys = self.r.keys("test*")
+        if keys:
+            self.r.delete(*keys)
+        # Clean up prometheus test keys
+        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}test*"):
+            self.r.delete(key)
 
     def test_tally_a_stat(self) -> None:
         count = tally_stat("test")
@@ -418,3 +436,228 @@ class CeleryQueueCollectorIntegrationTests(TestCase):
         self.assertIn("cl_celery_queue_length", content)
         # Check for at least one queue label
         self.assertIn('queue="celery"', content)
+
+
+class ValidateLabelsTests(TestCase):
+    """Unit tests for _validate_labels helper function"""
+
+    def test_valid_labels_pass(self) -> None:
+        """Test that valid labels don't raise an error"""
+        # Valid search.results labels
+        _validate_labels(
+            StatMetric.SEARCH_RESULTS,
+            {"query_type": StatQueryType.KEYWORD, "method": StatMethod.WEB},
+        )
+        _validate_labels(
+            StatMetric.SEARCH_RESULTS,
+            {"query_type": StatQueryType.SEMANTIC, "method": StatMethod.API},
+        )
+        # Valid alerts.sent labels
+        _validate_labels(
+            StatMetric.ALERTS_SENT,
+            {"alert_type": StatAlertType.DOCKET},
+        )
+        _validate_labels(
+            StatMetric.ALERTS_SENT,
+            {"alert_type": StatAlertType.RECAP},
+        )
+
+    def test_missing_labels_raise(self) -> None:
+        """Test that missing labels raise ValueError"""
+        with self.assertRaises(ValueError) as ctx:
+            _validate_labels(
+                StatMetric.SEARCH_RESULTS, {"query_type": "keyword"}
+            )
+        self.assertIn("must be", str(ctx.exception))
+
+    def test_extra_labels_raise(self) -> None:
+        """Test that extra labels raise ValueError"""
+        with self.assertRaises(ValueError) as ctx:
+            _validate_labels(
+                StatMetric.SEARCH_RESULTS,
+                {
+                    "query_type": "keyword",
+                    "method": "web",
+                    "extra": "value",
+                },
+            )
+        self.assertIn("must be", str(ctx.exception))
+
+    def test_invalid_values_raise(self) -> None:
+        """Test that invalid label values raise ValueError"""
+        with self.assertRaises(ValueError) as ctx:
+            _validate_labels(
+                StatMetric.SEARCH_RESULTS,
+                {"query_type": "invalid", "method": "web"},
+            )
+        self.assertIn("Invalid value", str(ctx.exception))
+        self.assertIn("invalid", str(ctx.exception))
+
+
+@pytest.mark.django_db
+@override_switch("increment-stats", active=True)
+class UpdatePrometheusStatTests(TestCase):
+    """Unit tests for _update_prometheus_stat helper function"""
+
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        # Clean up any prometheus:stat: keys
+        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
+            self.r.delete(key)
+
+    def test_writes_key_without_labels(self) -> None:
+        """Test that keys are written correctly without labels"""
+        _update_prometheus_stat("test.metric", 5, None)
+
+        key = f"{STAT_METRICS_PREFIX}test.metric"
+        value = int(self.r.get(key) or 0)
+        self.assertEqual(value, 5)
+
+    def test_writes_key_with_labels(self) -> None:
+        """Test that keys are written correctly with labels"""
+        _update_prometheus_stat(
+            StatMetric.SEARCH_RESULTS,
+            3,
+            {"query_type": "keyword", "method": "web"},
+        )
+
+        # Key should include label values in the order defined in STAT_LABELS
+        key = f"{STAT_METRICS_PREFIX}search.results:keyword:web"
+        value = int(self.r.get(key) or 0)
+        self.assertEqual(value, 3)
+
+    def test_increments_existing_key(self) -> None:
+        """Test that the stat increments correctly"""
+        _update_prometheus_stat(
+            StatMetric.ALERTS_SENT,
+            2,
+            {"alert_type": "docket"},
+        )
+        _update_prometheus_stat(
+            StatMetric.ALERTS_SENT,
+            3,
+            {"alert_type": "docket"},
+        )
+
+        key = f"{STAT_METRICS_PREFIX}alerts.sent:docket"
+        value = int(self.r.get(key) or 0)
+        self.assertEqual(value, 5)
+
+
+@pytest.mark.django_db
+@override_switch("increment-stats", active=True)
+class StatMetricsCollectorTests(TestCase):
+    """Unit tests for StatMetricsCollector"""
+
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        # Clean up any prometheus:stat: keys
+        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
+            self.r.delete(key)
+
+    def test_collects_metrics_from_redis(self) -> None:
+        """Test that collector reads and formats metrics from Redis"""
+        # Set up some test data in Redis
+        key1 = f"{STAT_METRICS_PREFIX}search.results:keyword:web"
+        key2 = f"{STAT_METRICS_PREFIX}search.results:semantic:api"
+        key3 = f"{STAT_METRICS_PREFIX}alerts.sent:docket"
+        self.r.set(key1, 10)
+        self.r.set(key2, 5)
+        self.r.set(key3, 20)
+
+        # Verify keys were written
+        self.assertEqual(int(self.r.get(key1)), 10)
+
+        # Verify scan_iter finds the keys
+        found_keys = list(self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"))
+        self.assertGreaterEqual(
+            len(found_keys), 3, f"Expected 3+ keys, found: {found_keys}"
+        )
+
+        collector = StatMetricsCollector()
+        metrics = list(collector.collect())
+
+        # Find the search.results metric
+        search_metric = next(
+            (m for m in metrics if m.name == "cl_search_results"), None
+        )
+        self.assertIsNotNone(search_metric)
+
+        # Should have at least 2 samples for search.results
+        self.assertGreaterEqual(len(search_metric.samples), 2)
+
+        # Check that our test values are present
+        sample_values = {
+            tuple(s.labels.values()): s.value for s in search_metric.samples
+        }
+        self.assertEqual(sample_values.get(("keyword", "web")), 10)
+        self.assertEqual(sample_values.get(("semantic", "api")), 5)
+
+        # Find the alerts.sent metric
+        alerts_metric = next(
+            (m for m in metrics if m.name == "cl_alerts_sent"), None
+        )
+        self.assertIsNotNone(alerts_metric)
+
+        # Check that our test value is present
+        alert_values = {
+            tuple(s.labels.values()): s.value for s in alerts_metric.samples
+        }
+        self.assertEqual(alert_values.get(("docket",)), 20)
+
+    def test_handles_empty_redis(self) -> None:
+        """Test that collector handles empty Redis gracefully"""
+        collector = StatMetricsCollector()
+        metrics = list(collector.collect())
+        self.assertEqual(len(metrics), 0)
+
+    def test_registration_idempotent(self) -> None:
+        """Ensure StatMetricsCollector registration is idempotent"""
+        registry = CollectorRegistry()
+        self.assertTrue(register_stat_metrics_collector(registry))
+        self.assertFalse(register_stat_metrics_collector(registry))
+
+
+@pytest.mark.django_db
+@override_switch("increment-stats", active=True)
+class TallyStatWithLabelsTests(TestCase):
+    """Integration tests for tally_stat with labels"""
+
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        # Clean up test keys and search.results keys
+        for pattern in ["test*", "search.results*", "alerts.sent*"]:
+            keys = self.r.keys(pattern)
+            if keys:
+                self.r.delete(*keys)
+        # Clean up prometheus keys
+        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
+            self.r.delete(key)
+
+    def test_tally_stat_with_labels_writes_both_keys(self) -> None:
+        """Test that tally_stat writes both the date-based key and prometheus key"""
+        tally_stat(
+            StatMetric.SEARCH_RESULTS,
+            labels={
+                "query_type": StatQueryType.KEYWORD,
+                "method": StatMethod.WEB,
+            },
+        )
+
+        # Check date-based key exists (legacy format)
+        date_key = f"{StatMetric.SEARCH_RESULTS}.{now().date().isoformat()}"
+        date_value = int(self.r.get(date_key) or 0)
+        self.assertEqual(date_value, 1)
+
+        # Check prometheus key exists
+        prom_key = f"{STAT_METRICS_PREFIX}search.results:keyword:web"
+        prom_value = int(self.r.get(prom_key) or 0)
+        self.assertEqual(prom_value, 1)
+
+    def test_tally_stat_validates_labels(self) -> None:
+        """Test that tally_stat validates labels before writing"""
+        with self.assertRaises(ValueError):
+            tally_stat(
+                StatMetric.SEARCH_RESULTS,
+                labels={"query_type": "invalid", "method": "web"},
+            )
