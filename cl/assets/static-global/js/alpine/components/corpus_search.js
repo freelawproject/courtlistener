@@ -126,6 +126,11 @@ document.addEventListener('alpine:init', () => {
     toggleAdvancedFiltersDesktop() {
       this.advancedFiltersExpandedDesktop = !this.advancedFiltersExpandedDesktop;
     },
+    closeAdvancedFiltersDesktopIfOpen() {
+      if (this.advancedFiltersExpandedDesktop) {
+        this.advancedFiltersExpandedDesktop = false;
+      }
+    },
     toggleAdvancedFilters() {
       this.advancedFiltersExpanded = !this.advancedFiltersExpanded;
     },

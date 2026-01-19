@@ -2825,7 +2825,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Emails are sent
         self.assertEqual(len(mail.outbox), 2)
         # Retrieve the stored messages and update its message_id for testing
-        stored_emails = list(EmailSent.objects.all())
+        stored_emails = list(EmailSent.objects.all().order_by("pk"))
         stored_emails[0].message_id = "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0"
         stored_emails[0].save()
 
