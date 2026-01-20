@@ -55,7 +55,7 @@ data-first-active="about"
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="disclosure-api">
-    <h3 id="disclosure-api">Disclosures <small>— <code>{% url "financialdisclosure-list" version=version %}</code></small></h3>
+    <h3>Disclosures <small>— <code>{% url "financialdisclosure-list" version=version %}</code></small></h3>
     <p>This API contains information about the main document itself and is the link between the other financial disclosure endpoints and the judges in our system.</p>
   </c-layout-with-navigation.section>
 
@@ -234,7 +234,7 @@ curl "{% get_full_host %}{% url "investment-list" version=version %}?redacted=Tr
     <p>The table below gives a brief example where we would infer that the blank cell below the cell for <code>AAPL</code> also refers to <code>AAPL</code>:</p>
     <c-data-table
       safe
-      caption="TBD"
+      caption="Sample table showing how to read data where duplicate successive values have been omitted"
       :columns="[
         {'label': 'Description', 'field': 'description'},
         {'label': 'Date', 'field': 'date'},
@@ -255,7 +255,7 @@ curl "{% get_full_host %}{% url "investment-list" version=version %}?redacted=Tr
 curl "{% get_full_host %}{% url "investment-list" version=version %}?gross_value_code=P4&fields=investments" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
     </c-code>
-    <p>Additionally, you could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a class="text-primary-600" href="{% url "view_person" 1213 "ruth-bader-ginsberg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
+    <p>Additionally, you could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a class="text-primary-600" href="{% url "view_person" 1213 "ruth-bader-ginsburg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
     <c-code>
 curl "{% get_full_host %}{% url "financialdisclosure-list" version=version %}?person=1213&fields=gifts" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'

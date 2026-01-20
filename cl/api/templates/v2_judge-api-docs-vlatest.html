@@ -61,7 +61,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="people-endpoint">
-    <h3 id="people-endpoint">People (Judges and Appointers) <small>— <code>{% url "person-list" version=version %}</code></small></h3>
+    <h3>People (Judges and Appointers) <small>— <code>{% url "person-list" version=version %}</code></small></h3>
     <p>This API contains the central "person" object. As explained above, people can be judges, appointers, or both.</p>
     <p>This object holds the core metadata about the person, including their biographical data, positions held, educational history, ABA ratings, and political affiliations.</p>
     <p>A few notes:</p>
@@ -88,7 +88,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="positions-endpoint">
-    <h3 id="positions-endpoint">Positions <small>— <code>{% url "position-list" version=version %}</code></small></h3>
+    <h3>Positions <small>— <code>{% url "position-list" version=version %}</code></small></h3>
     <p>Use this API to learn the positions held by a person, including their time as president, in private practice, as a judge, or in any number of other roles in society or the judiciary.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
     <p>To filter to positions for a particular person:</p>
