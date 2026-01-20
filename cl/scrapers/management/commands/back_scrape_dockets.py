@@ -231,7 +231,7 @@ def save_docket_response(
 
 def save_search_response_factory(scraper_class_name: str):
     storage = S3GlacierInstantRetrievalStorage()
-    prefix = f"dockets/{scraper_class_name}/searches/"
+    prefix = f"responses/dockets/{scraper_class_name}/searches/"
 
     def save_search_reponse(response: requests.Response):
         now_str = datetime.now().strftime("%Y/%m/%d/%H_%M_%S_%f")
