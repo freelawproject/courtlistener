@@ -376,11 +376,11 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         # Define two opinions for the same cluster
         op1 = {
             "download_urls": "https://example.com/op1.pdf",
-            "type": Opinion.LEAD,
+            "types": Opinion.LEAD,
         }
         op2 = {
             "download_urls": "https://example.com/op2.pdf",
-            "type": Opinion.DISSENT,
+            "types": Opinion.DISSENT,
         }
         returned_cluster = {
             "docket_numbers": "123-456",
