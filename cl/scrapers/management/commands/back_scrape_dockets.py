@@ -52,7 +52,7 @@ class RateLimitedRequestManager:
                 HTTP response. Receives the request manager and response.
         """
         if session is not None:
-            self.session = session
+            self.session: requests.Session | None = session
         else:
             self.session = requests.Session()
             self.session.headers.update(
@@ -125,6 +125,8 @@ class RateLimitedRequestManager:
             self._wait_for_rate_limit()
             self._last_request_time = time.monotonic()
 
+            if not self.session:
+                raise ValueError("RequestManager has no session, likely invoked after closed.")
             response = self.session.request(method, url, **kwargs)
 
             if response.status_code != 403:
@@ -178,6 +180,8 @@ class RateLimitedRequestManager:
 
     def merge_headers(self, headers: dict[str, str]) -> None:
         """Merge additional headers into the session headers."""
+        if not self.session:
+            raise ValueError("RequestManager has no session, likely invoked after closed.")
         self.session.headers.update(headers)
 
     def get(self, url: str, **kwargs) -> requests.Response:
@@ -208,7 +212,7 @@ def save_docket_response(
 
     # Docket number with non-s3-safe characters replaced with a _
     case_number = re.sub(
-        r"[^0-9a-zA-Z!_.*'()-]", "_", (case_meta.get("case_number"))
+        r"[^0-9a-zA-Z!_.*'()-]", "_", (case_meta.get("case_number")) # type: ignore [arg-type]
     )
     base_name = (
         f"responses/dockets/{scraper_class_name}/{court_id}/{case_number}"
