@@ -20,12 +20,8 @@ from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 from juriscraper.state.texas import (
-    TexasCaseDocument,
     TexasCaseParty,
-    TexasCommonData,
-    TexasTrialCourt,
 )
-from juriscraper.state.texas.common import TexasAppellateBrief
 from openai import RateLimitError
 from pydantic import ValidationError
 
