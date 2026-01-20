@@ -3969,3 +3969,78 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
     class Meta:
         verbose_name = "SCOTUS Docket Metadata"
         verbose_name_plural = "SCOTUS Docket Metadata"
+
+
+@pghistory.track()
+class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
+    """
+    Represents a docket entry in a SCOTUS docket.
+
+    :ivar docket: The Docket this entry is associated with.
+    :ivar entry_number: Entry number on the SCOTUS Docket page.
+    :ivar description: For appellate brief events, a short description of
+    the brief.
+    :ivar date_filed: The date that TAMES indicates this entry was filed.
+    :ivar sequence_number: CL-generated field to keep entries in the same
+    order they appear in TAMES. Concatenation of filing date (in ISO format)
+    and the index in the TAMES table.
+    """
+
+    docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+    )
+    entry_number = models.IntegerField(
+        null=True,
+        blank=True,
+    )
+    description = models.TextField(blank=True)
+    date_filed = models.DateField(
+        null=True,
+        blank=True,
+    )
+    sequence_number = models.CharField(
+        max_length=16,
+    )
+
+    class Meta:
+        ordering = ["-sequence_number"]
+
+
+@pghistory.track()
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
+    """
+    Represents an attachment to a SCOTUS docket entry.
+
+    :ivar docket_entry: The Docket this document is associated with.
+    :ivar description: The description of this file in SCOTUS.
+    :ivar document_number: The document number on the docket page in SCOTUS.
+    :ivar attachment_number: The attachment number on the docket page in SCOTUS.
+    :ivar document_url: The download URL that SCOTUS provided for this document.
+    """
+
+    docket_entry = models.ForeignKey(
+        SCOTUSDocketEntry, on_delete=models.CASCADE
+    )
+    description = models.TextField(blank=True)
+    document_number = models.IntegerField(
+        max_length=32,
+        blank=True,
+    )
+    attachment_number = models.SmallIntegerField(
+        blank=True,
+        null=True,
+    )
+    document_url = models.URLField()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["document_number"]),
+            models.Index(fields=["filepath_local"]),
+        ]
+        unique_together = (
+            "docket_entry",
+            "document_number",
+            "attachment_number",
+        )
+        ordering = ("document_number", "attachment_number")
