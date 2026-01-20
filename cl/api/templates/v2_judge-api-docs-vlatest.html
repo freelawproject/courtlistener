@@ -61,7 +61,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="people-endpoint">
-    <h3 id="people-endpoint">People (Judges and Appointers) <br><small><code>{% url "person-list" version=version %}</code></small></h3>
+    <h3 id="people-endpoint">People (Judges and Appointers) <small>— <code>{% url "person-list" version=version %}</code></small></h3>
     <p>This API contains the central "person" object. As explained above, people can be judges, appointers, or both.</p>
     <p>This object holds the core metadata about the person, including their biographical data, positions held, educational history, ABA ratings, and political affiliations.</p>
     <p>A few notes:</p>
@@ -88,8 +88,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="positions-endpoint">
-    <h3 id="positions-endpoint">Positions<br />
-    <small><code>{% url "position-list" version=version %}</code></small></h3>
+    <h3 id="positions-endpoint">Positions <small>— <code>{% url "position-list" version=version %}</code></small></h3>
     <p>Use this API to learn the positions held by a person, including their time as president, in private practice, as a judge, or in any number of other roles in society or the judiciary.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
     <p>To filter to positions for a particular person:</p>
@@ -101,15 +100,13 @@ curl -v \
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="affiliations-endpoint">
-    <h3>Political Affiliations<br />
-    <small><code>{% url "politicalaffiliation-list" version=version %}</code></small></h3>
+    <h3>Political Affiliations <small>— <code>{% url "politicalaffiliation-list" version=version %}</code></small></h3>
     <p>Use this API to learn the political affiliations of a person. Political affiliations are gathered from a number of sources such as ballots or appointments, and have start and end dates.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="education-history">
-    <h3>Educations and Schools<br />
-      <small><code>{% url "education-list" version=version %}</code></small></h3>
+    <h3>Educations and Schools <small>— <code>{% url "education-list" version=version %}</code></small></h3>
     <p>Use this API to learn about the educational history of a person, including which schools they went to, when, and what degrees they received. Each education object can include a school object based on data from the Department of Education.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
     <p>To filter for judges educated at a particular school:</p>
@@ -121,22 +118,19 @@ curl -v \
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="aba-ratings">
-    <h3>ABA Ratings <br>
-    <small><code>{% url "abarating-list" version=version %}</code></small></h3>
+    <h3>ABA Ratings <small>— <code>{% url "abarating-list" version=version %}</code></small></h3>
     <p>These are the American Bar Association ratings that are given to many judges, particularly those that are nominated to federal positions.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="retention-events">
-    <h3>Retention Events<br>
-    <small><code>{% url "retentionevent-list" version=version %}</code></small></h3>
+    <h3>Retention Events <small>— <code>{% url "retentionevent-list" version=version %}</code></small></h3>
     <p>These are the events that keep a judge in a position, such as a retention vote, or reappointment.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="sources-endpoint">
-    <h3>Sources<br>
-    <small><code>{% url "source-list" version=version %}</code></small></h3>
+    <h3>Sources <small>— <code>{% url "source-list" version=version %}</code></small></h3>
     <p>This API keeps a list of sources that explain how we built this database.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
   </c-layout-with-navigation.section>
