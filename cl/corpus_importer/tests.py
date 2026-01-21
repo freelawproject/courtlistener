@@ -2137,6 +2137,11 @@ class TexasMergerTest(TestCase):
             sequence_number="2025-08-01-10",
         )
 
+        self.download_pdf_patch = patch(
+            "cl.corpus_importer.tasks.download_pdf_in_stream"
+        )
+        self.download_pdf_mock = self.download_pdf_patch.start()
+
     def tearDown(self):
         """Tear down patches and remove added objects"""
         Docket.objects.all().delete()
@@ -2144,6 +2149,7 @@ class TexasMergerTest(TestCase):
         TexasDocument.objects.all().delete()
         self.download_task_patch.stop()
         self.extract_pdf_document_patch.stop()
+        self.download_pdf_patch.stop()
 
     def test_merge_texas_document_new_document(self):
         """Can we correctly add a new attachment to an existing docket entry?"""
@@ -2322,10 +2328,14 @@ class TexasMergerTest(TestCase):
         (_, _, pk) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+        # Reset call count
+        self.extract_pdf_document_mock.reset_mock()
+
         # noop
         output = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+
         assert output == (False, True, output[2])
         assert output[2] == pk
         created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
@@ -2349,10 +2359,14 @@ class TexasMergerTest(TestCase):
         (_, _, pk) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+        # Reset call count
+        self.extract_pdf_document_mock.reset_mock()
+
         js_docket_entry["attachments"].append(TexasCaseDocumentFactory())
         output = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+
         assert output == (True, True, output[2])
         assert output[2] == pk
         created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
@@ -2479,85 +2493,6 @@ class TexasMergerTest(TestCase):
         existing_entry_2.refresh_from_db()
         assert existing_entry_1.description == "First entry"
         assert existing_entry_2.description == "Second entry"
-
-
-class DownloadTexasDocumentPdfTest(TestCase):
-    def setUp(self):
-        """Set up test fixtures for download_texas_document_pdf tests."""
-        self.download_pdf_patch = patch(
-            "cl.corpus_importer.tasks.download_pdf_in_stream"
-        )
-        self.download_pdf_mock = self.download_pdf_patch.start()
-        self.texas_coa1 = CourtFactory.create(id="texas_coa1")
-        self.docket = DocketFactory.create(
-            court=self.texas_coa1, docket_number="01-25-00011-CV"
-        )
-        self.docket_entry = TexasDocketEntry.objects.create(
-            docket=self.docket,
-            entry_type="Brief",
-            sequence_number="2025-08-01-10",
-        )
-
-    def tearDown(self):
-        """Tear down patches and remove added objects."""
-        Docket.objects.all().delete()
-        TexasDocketEntry.objects.all().delete()
-        TexasDocument.objects.all().delete()
-        self.download_pdf_patch.stop()
-
-    def test_download_texas_document_pdf_success(self):
-        """Can we successfully download a PDF for a TexasDocument?"""
-        texas_document = TexasDocument.objects.create(
-            docket_entry=self.docket_entry,
-            description="Test Document",
-            media_id="123e4567-e89b-12d3-a456-426614174000",
-            media_version_id="789e4567-e89b-12d3-a456-426614174111",
-            document_url="https://example.com/sample.pdf",
-        )
-
-        # Mock successful PDF download
-        file_mock = MagicMock()
-        self.download_pdf_mock.return_value.__enter__.return_value = file_mock
-
-        result = download_texas_document_pdf(texas_document.pk)
-
-        assert result is None
-        self.download_pdf_mock.assert_called_once_with(
-            "https://example.com/sample.pdf", texas_document.pk, "texas_"
-        )
-        texas_document.refresh_from_db()
-        assert texas_document.filepath_local is not None
-
-    def test_download_texas_document_pdf_document_not_found(self):
-        """Do we handle a missing TexasDocument gracefully?"""
-        non_existent_pk = 99999
-
-        result = download_texas_document_pdf(non_existent_pk)
-
-        assert result is None
-        self.download_pdf_mock.assert_not_called()
-
-    def test_download_texas_document_pdf_download_failure(self):
-        """Do we handle a failed PDF download gracefully?"""
-        texas_document = TexasDocument.objects.create(
-            docket_entry=self.docket_entry,
-            description="Test Document",
-            media_id="123e4567-e89b-12d3-a456-426614174000",
-            media_version_id="789e4567-e89b-12d3-a456-426614174111",
-            document_url="https://example.com/sample.pdf",
-        )
-
-        # Mock failed PDF download
-        self.download_pdf_mock.return_value.__enter__.return_value = None
-
-        result = download_texas_document_pdf(texas_document.pk)
-
-        assert result is None
-        self.download_pdf_mock.assert_called_once_with(
-            "https://example.com/sample.pdf", texas_document.pk, "texas_"
-        )
-        texas_document.refresh_from_db()
-        assert not texas_document.filepath_local
 
     def test_merge_single_party_with_attorney(self):
         """Can we merge a single party with an attorney?"""
@@ -2742,6 +2677,60 @@ class DownloadTexasDocumentPdfTest(TestCase):
         """Can we handle an empty parties list?"""
         result = normalize_texas_parties([])
         assert result == []
+
+    def test_download_texas_document_pdf_success(self):
+        """Can we successfully download a PDF for a TexasDocument?"""
+        texas_document = TexasDocument.objects.create(
+            docket_entry=self.docket_coa1_entry,
+            description="Test Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+        )
+
+        # Mock successful PDF download
+        file_mock = MagicMock()
+        self.download_pdf_mock.return_value.__enter__.return_value = file_mock
+
+        result = download_texas_document_pdf(texas_document.pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_called_once_with(
+            "https://example.com/sample.pdf", texas_document.pk, "texas_"
+        )
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local is not None
+
+    def test_download_texas_document_pdf_document_not_found(self):
+        """Do we handle a missing TexasDocument gracefully?"""
+        non_existent_pk = 99999
+
+        result = download_texas_document_pdf(non_existent_pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_not_called()
+
+    def test_download_texas_document_pdf_download_failure(self):
+        """Do we handle a failed PDF download gracefully?"""
+        texas_document = TexasDocument.objects.create(
+            docket_entry=self.docket_coa1_entry,
+            description="Test Document",
+            media_id="123e4567-e89b-12d3-a456-426614174000",
+            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+            document_url="https://example.com/sample.pdf",
+        )
+
+        # Mock failed PDF download
+        self.download_pdf_mock.return_value.__enter__.return_value = None
+
+        result = download_texas_document_pdf(texas_document.pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_called_once_with(
+            "https://example.com/sample.pdf", texas_document.pk, "texas_"
+        )
+        texas_document.refresh_from_db()
+        assert not texas_document.filepath_local
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

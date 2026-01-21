@@ -3458,9 +3458,12 @@ def merge_texas_documents(
 
     # Perform plaintext extraction on documents that were successfully created
     # or updated.
-    extract_pdf_document.delay(
-        [o[2] for o in output if o[0] and o[1]], False, False, TexasDocument
-    )
+    documents_to_extract = [o[2] for o in output if o[0] and o[1]]
+    # Only spawn the task if we need to extract a document.
+    if len(documents_to_extract) > 0:
+        extract_pdf_document.delay(
+            documents_to_extract, False, False, TexasDocument
+        )
 
     return output
 
