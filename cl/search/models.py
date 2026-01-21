@@ -4029,6 +4029,7 @@ class CaseTransfer(AbstractDateTimeModel):
 
 
 @pghistory.track()
+@document_model
 class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     """
     Represents a docket entry in a SCOTUS docket.
@@ -4065,6 +4066,7 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
 
 @pghistory.track()
+@document_model
 class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     """
     Represents an attachment to a SCOTUS docket entry.
