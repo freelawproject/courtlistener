@@ -10,8 +10,6 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cl.settings")
 
 app = Celery("cl")
 
-import cl.stats.celery_metrics  # noqa: F401,E402 - registers signal handlers
-
 # Bump the recursion limit to 10× normal to account for really big chains. See:
 # https://github.com/celery/celery/issues/1078
 sys.setrecursionlimit(10000)

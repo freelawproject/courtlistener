@@ -11,7 +11,6 @@ from sentry_sdk import capture_exception
 
 from cl.lib.celery_utils import get_queue_length
 from cl.lib.redis_utils import get_redis_interface
-from cl.stats.celery_metrics import METRICS_PREFIX
 from cl.stats.constants import STAT_LABELS, STAT_METRICS_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -91,55 +90,6 @@ class CeleryQueueCollector:
         yield gauge
 
 
-class CeleryTaskMetricsCollector:
-    """Collects Celery task metrics from Redis at scrape time.
-
-    Works across multiple Celery workers since values are stored in
-    Redis rather than process-local memory.
-    """
-
-    def describe(self):
-        return []
-
-    def collect(self):
-        r = get_redis_interface("STATS")
-
-        # Task execution counts by status
-        counter = CounterMetricFamily(
-            "cl_celery_task_executions_total",
-            "Total Celery task executions",
-            labels=["task", "status"],
-        )
-        for key in r.scan_iter(f"{METRICS_PREFIX}task_total:*"):
-            # Key format: prometheus:celery:task_total:{task_name}:{status}
-            parts = key.rsplit(":", 2)
-            task_name, status = parts[1], parts[2]
-            count = int(r.get(key) or 0)
-            counter.add_metric([task_name, status], count)
-        yield counter
-
-        # Task duration (sum and count for computing averages in Prometheus)
-        duration_sum = GaugeMetricFamily(
-            "cl_celery_task_duration_seconds_sum",
-            "Sum of task execution durations in seconds",
-            labels=["task"],
-        )
-        duration_count = CounterMetricFamily(
-            "cl_celery_task_duration_seconds_count",
-            "Count of task executions (for duration averaging)",
-            labels=["task"],
-        )
-        for key in r.scan_iter(f"{METRICS_PREFIX}task_duration_sum:*"):
-            task_name = key.split(":")[-1]
-            sum_val = float(r.get(key) or 0)
-            count_key = f"{METRICS_PREFIX}task_duration_count:{task_name}"
-            count_val = int(r.get(count_key) or 0)
-            duration_sum.add_metric([task_name], sum_val)
-            duration_count.add_metric([task_name], count_val)
-        yield duration_sum
-        yield duration_count
-
-
 class StatMetricsCollector:
     """Collects tally_stat metrics from Redis for Prometheus."""
 
@@ -206,7 +156,6 @@ def register_celery_queue_collector(registry=REGISTRY) -> bool:
 
 register_stat_metrics_collector()
 register_celery_queue_collector()
-REGISTRY.register(CeleryTaskMetricsCollector())
 
 
 def record_search_duration(
