@@ -29,6 +29,7 @@ from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
+from cl.lib.models import AbstractPDF
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
@@ -435,13 +436,14 @@ def find_and_merge_versions(self, pk: int) -> None:
     max_retries=3,
     retry_backoff=10,
 )
-def extract_recap_pdf(
+def extract_pdf_document(
     self,
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
+    model=RECAPDocument,
 ) -> list[int]:
-    """Celery task wrapper for extract_recap_pdf_base
+    """Celery task wrapper for extract_pdf_document_base
     Extract the contents from a RECAP PDF if necessary.
 
     In order to avoid the issue described here:
@@ -452,8 +454,8 @@ def extract_recap_pdf(
     to sentry.
 
     To avoid logging every retry to sentry a new base method was created:
-    extract_recap_pdf_base that method should be used when a synchronous call
-    is needed within a parent task.
+    extract_pdf_document_base that method should be used when a synchronous
+    call is needed within a parent task.
 
     And this task wrapper should be used elsewhere for asynchronous calls
     (delay, async).
@@ -462,19 +464,22 @@ def extract_recap_pdf(
     :param ocr_available: Whether it's needed to perform OCR extraction.
     :param check_if_needed: Whether it's needed to check if the RECAPDocument
     needs extraction.
+    :param model: The document model (inheriting from `AbstractPDF`) to operate
+    on.
 
     :return: A list of processed RECAPDocument
     """
 
-    return async_to_sync(extract_recap_pdf_base)(
-        pks, ocr_available, check_if_needed
+    return async_to_sync(extract_pdf_document_base)(
+        pks, ocr_available, check_if_needed, model
     )
 
 
-async def extract_recap_pdf_base(
+async def extract_pdf_document_base(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
+    model=RECAPDocument,
 ) -> list[int]:
     """Extract the contents from a RECAP PDF if necessary.
 
@@ -482,6 +487,8 @@ async def extract_recap_pdf_base(
     :param ocr_available: Whether it's needed to perform OCR extraction.
     :param check_if_needed: Whether it's needed to check if the RECAPDocument
     needs extraction.
+    :param model: The document model (inheriting from `AbstractPDF`) to operate
+    on.
 
     :return: A list of processed RECAPDocument
     """
@@ -491,7 +498,7 @@ async def extract_recap_pdf_base(
 
     processed: list[int] = []
     for pk in pks:
-        rd = await RECAPDocument.objects.aget(pk=pk)
+        rd = await model.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
@@ -521,14 +528,14 @@ async def extract_recap_pdf_base(
         has_content = bool(content)
         match has_content, extracted_by_ocr:
             case True, True:
-                rd.ocr_status = RECAPDocument.OCR_COMPLETE
+                rd.ocr_status = AbstractPDF.OCR_COMPLETE
             case True, False:
                 if not ocr_needed:
-                    rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+                    rd.ocr_status = AbstractPDF.OCR_UNNECESSARY
             case False, True:
-                rd.ocr_status = RECAPDocument.OCR_FAILED
+                rd.ocr_status = AbstractPDF.OCR_FAILED
             case False, False:
-                rd.ocr_status = RECAPDocument.OCR_NEEDED
+                rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         await rd.asave(

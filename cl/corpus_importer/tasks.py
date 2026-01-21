@@ -154,7 +154,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf_base
+from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
@@ -771,7 +771,7 @@ def get_and_process_free_pdf(
 
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
-    async_to_sync(extract_recap_pdf_base)(
+    async_to_sync(extract_pdf_document_base)(
         rd.pk, ocr_available=False, check_if_needed=False
     )
     return {"result": result, "rd_pk": rd.pk}
@@ -2670,7 +2670,7 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     # Skip OCR for now. It'll happen in a second step.
-    async_to_sync(extract_recap_pdf_base)(rd.pk, ocr_available=False)
+    async_to_sync(extract_pdf_document_base)(rd.pk, ocr_available=False)
 
 
 @app.task(
@@ -3452,9 +3452,17 @@ def merge_texas_documents(
     - A flag indicating which is set to True when the document was successfully
     created or updated or when an update was unnecessary,
     - The primary key of the updated TexasDocument object."""
-    return [
+    output = [
         merge_texas_document(docket_entry, document) for document in documents
     ]
+
+    # Perform plaintext extraction on documents that were successfully created
+    # or updated.
+    extract_pdf_document.delay(
+        [o[2] for o in output if o[0] and o[1]], False, False, TexasDocument
+    )
+
+    return output
 
 
 def texas_docket_entry_sequence_numbers(input: TexasCommonData) -> list[str]:

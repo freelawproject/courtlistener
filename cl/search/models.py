@@ -1598,9 +1598,9 @@ class RECAPDocument(
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
-            from cl.scrapers.tasks import extract_recap_pdf
+            from cl.scrapers.tasks import extract_pdf_document
 
-            tasks.append(extract_recap_pdf.si(self.pk))
+            tasks.append(extract_pdf_document.si(self.pk))
 
         if len(tasks) > 0:
             chain(*tasks)()

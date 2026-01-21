@@ -117,8 +117,8 @@ from cl.recap.utils import (
     sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
-    extract_recap_pdf,
-    extract_recap_pdf_base,  # noqa: F401
+    extract_pdf_document,
+    extract_pdf_document_base,  # noqa: F401
 )
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import index_docket_parties_in_es
@@ -196,7 +196,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
             rd_pk = fq.recap_document_id
             c = chain(
                 fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
-                extract_recap_pdf.si(rd_pk),
+                extract_pdf_document.si(rd_pk),
                 mark_fq_successful.si(fq.pk),
             )
         case _:
@@ -486,7 +486,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
     if not existing_document and not pq.debug:
         await sync_to_async(
             chain(
-                extract_recap_pdf.si(rd.pk),
+                extract_pdf_document.si(rd.pk),
             ).apply_async
         )()
 
@@ -3614,5 +3614,5 @@ def process_recap_email(
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
         process_recap_email.si(epq.pk, user.pk),
-        extract_recap_pdf.s(),
+        extract_pdf_document.s(),
     ).apply_async()

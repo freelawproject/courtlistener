@@ -2118,6 +2118,12 @@ class TexasMergerTest(TestCase):
             "cl.corpus_importer.tasks.download_texas_document_pdf.delay"
         )
         self.download_task_mock = self.download_task_patch.start()
+        self.extract_pdf_document_patch = patch(
+            "cl.recap.tasks.extract_pdf_document.delay"
+        )
+        self.extract_pdf_document_mock = (
+            self.extract_pdf_document_patch.start()
+        )
         self.texas_sc = CourtFactory.create(id="texas_sc")
         self.texas_cca = CourtFactory.create(id="texas_cca")
         self.texas_coa1 = CourtFactory.create(id="texas_coa1")
@@ -2137,6 +2143,7 @@ class TexasMergerTest(TestCase):
         TexasDocketEntry.objects.all().delete()
         TexasDocument.objects.all().delete()
         self.download_task_patch.stop()
+        self.extract_pdf_document_patch.stop()
 
     def test_merge_texas_document_new_document(self):
         """Can we correctly add a new attachment to an existing docket entry?"""
@@ -2306,6 +2313,7 @@ class TexasMergerTest(TestCase):
             docket_entry_id=created_docket_entry.id
         ).count()
         assert n_attachments == 1
+        assert self.extract_pdf_document_mock.call_count == 1
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
@@ -2331,6 +2339,7 @@ class TexasMergerTest(TestCase):
             docket_entry_id=created_docket_entry.id
         ).count()
         assert n_attachments == len(js_docket_entry["attachments"])
+        assert self.extract_pdf_document_mock.call_count == 0
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
@@ -2357,6 +2366,7 @@ class TexasMergerTest(TestCase):
             docket_entry_id=created_docket_entry.id
         ).count()
         assert n_attachments == initial_n_attachments + 1
+        assert self.extract_pdf_document_mock.call_count == 1
 
     def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
         """When multiple entries match by date/type/brief, use the one with matching sequence number."""
