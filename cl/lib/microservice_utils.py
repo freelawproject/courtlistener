@@ -16,7 +16,7 @@ from httpx import (
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
 from cl.lib.exceptions import NoSuchKey
-from cl.search.models import Opinion, RECAPDocument
+from cl.search.models import Opinion, RECAPDocument, SCOTUSDocument
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +130,13 @@ async def microservice(
                             item.local_path_original_file.open(mode="rb"),
                         )
                     }
+        elif isinstance(item, SCOTUSDocument):
+            files = {
+                "file": (
+                    item.filepath_local.name,
+                    item.filepath_local.open(mode="rb"),
+                )
+            }
     # Sometimes we will want to pass in a filename and the file bytes
     # to avoid writing them to disk. Filename can often be generic
     # and is used to identify the file extension for our microservices

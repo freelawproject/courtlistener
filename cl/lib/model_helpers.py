@@ -187,6 +187,7 @@ def make_pdf_path(instance, filename, thumbs=False):
         ClaimHistory,
         RECAPDocument,
         ScotusDocketMetadata,
+        SCOTUSDocument,
     )
 
     if isinstance(instance, RECAPDocument):
@@ -207,6 +208,10 @@ def make_pdf_path(instance, filename, thumbs=False):
         slug = slugify(Path(filename).stem)
         file_name = f"gov.scotus.{slug}.pdf"
         return str(Path("scotus") / "qp" / file_name)
+    elif isinstance(instance, SCOTUSDocument):
+        slug = slugify(Path(filename).stem)
+        file_name = f"gov.scotus.{slug}.pdf"
+        return str(Path("scotus") / "documents" / file_name)
     else:
         raise ValueError(
             f"Unknown model type in make_pdf_path function: {type(instance)}"

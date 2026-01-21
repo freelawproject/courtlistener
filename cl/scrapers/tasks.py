@@ -47,6 +47,7 @@ from cl.search.models import (
     Opinion,
     OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -440,6 +441,7 @@ def extract_recap_pdf(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
+    court_id: str | None = None,
 ) -> list[int]:
     """Celery task wrapper for extract_recap_pdf_base
     Extract the contents from a RECAP PDF if necessary.
@@ -462,12 +464,13 @@ def extract_recap_pdf(
     :param ocr_available: Whether it's needed to perform OCR extraction.
     :param check_if_needed: Whether it's needed to check if the RECAPDocument
     needs extraction.
+    :param court_id: The court ID to use.
 
     :return: A list of processed RECAPDocument
     """
 
     return async_to_sync(extract_recap_pdf_base)(
-        pks, ocr_available, check_if_needed
+        pks, ocr_available, check_if_needed, court_id
     )
 
 
@@ -475,6 +478,7 @@ async def extract_recap_pdf_base(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
+    court_id: str | None = None,
 ) -> list[int]:
     """Extract the contents from a RECAP PDF if necessary.
 
@@ -482,16 +486,23 @@ async def extract_recap_pdf_base(
     :param ocr_available: Whether it's needed to perform OCR extraction.
     :param check_if_needed: Whether it's needed to check if the RECAPDocument
     needs extraction.
+    :param court_id: The court ID to work on.
 
     :return: A list of processed RECAPDocument
     """
-
     if not is_iter(pks):
         pks = [pks]
 
     processed: list[int] = []
+
+    match court_id:
+        case "scotus":
+            document_class = SCOTUSDocument
+        case _:
+            document_class = RECAPDocument
+
     for pk in pks:
-        rd = await RECAPDocument.objects.aget(pk=pk)
+        rd = await document_class.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
@@ -521,14 +532,14 @@ async def extract_recap_pdf_base(
         has_content = bool(content)
         match has_content, extracted_by_ocr:
             case True, True:
-                rd.ocr_status = RECAPDocument.OCR_COMPLETE
+                rd.ocr_status = document_class.OCR_COMPLETE
             case True, False:
                 if not ocr_needed:
-                    rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+                    rd.ocr_status = document_class.OCR_UNNECESSARY
             case False, True:
-                rd.ocr_status = RECAPDocument.OCR_FAILED
+                rd.ocr_status = document_class.OCR_FAILED
             case False, False:
-                rd.ocr_status = RECAPDocument.OCR_NEEDED
+                rd.ocr_status = document_class.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         await rd.asave(

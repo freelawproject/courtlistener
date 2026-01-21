@@ -7,6 +7,7 @@ from django.test import TestCase
 from cl.corpus_importer.tasks import (
     download_qp_scotus_pdf,
     ingest_scotus_docket,
+    merge_scotus_docket,
 )
 from cl.people_db.models import (
     Attorney,
@@ -16,7 +17,6 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
-from cl.recap.mergers import merge_scotus_docket
 from cl.recap.tests.tests import mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
@@ -29,9 +29,9 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     Docket,
-    DocketEntry,
-    RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
 )
 
 
@@ -172,51 +172,34 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(docket.appeal_from_id, self.lower_court.pk)
 
         # Docket entries
-        des = DocketEntry.objects.filter(docket=docket)
+        des = SCOTUSDocketEntry.objects.filter(docket=docket)
         self.assertEqual(des.count(), 4, "Wrong number of Docket entries.")
 
         des_tests = [de_1, de_2, de_3, de_4]
         for de in des_tests:
-            de_db = DocketEntry.objects.filter(
+            de_db = SCOTUSDocketEntry.objects.filter(
                 docket=docket, description=de["description"]
             ).first()
             self.assertEqual(de["document_number"], de_db.entry_number)
 
-        rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
-        self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
+        rds = SCOTUSDocument.objects.filter(docket_entry__docket=docket)
+        self.assertEqual(rds.count(), 4, "Wrong number of Documents.")
         rds_pks = set(rds.values_list("pk", flat=True))
 
-        rd_att_1 = RECAPDocument.objects.filter(
+        rd_att_1 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Main 1"
         ).first()
-        self.assertEqual(rd_att_1.document_type, RECAPDocument.ATTACHMENT)
 
         self.assertEqual(rd_att_1.document_url, att_1["document_url"])
         self.assertTrue(rd_att_1.filepath_local)
         self.assertIn("UNITED", rd_att_1.plain_text)
 
-        rd_att_2 = RECAPDocument.objects.filter(
+        rd_att_2 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Attachment 2"
         ).first()
-        self.assertEqual(rd_att_2.document_type, RECAPDocument.ATTACHMENT)
         self.assertEqual(rd_att_2.document_url, att_2["document_url"])
         self.assertTrue(rd_att_2.filepath_local)
         self.assertIn("UNITED", rd_att_2.plain_text)
-
-        main_rds = RECAPDocument.objects.filter(
-            docket_entry__docket=docket,
-            document_type=RECAPDocument.PACER_DOCUMENT,
-        )
-        self.assertEqual(
-            main_rds.count(), 2, "Wrong number of Main documents."
-        )
-
-        atts_rds = RECAPDocument.objects.filter(
-            docket_entry__docket=docket, document_type=RECAPDocument.ATTACHMENT
-        )
-        self.assertEqual(
-            atts_rds.count(), 4, "Wrong number of Attachment documents."
-        )
 
         # ScotusDocketMetadata fields
         metadata = docket.scotus_metadata
@@ -381,22 +364,20 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(mock_logger_info.call_count, 6)
 
         # Docket entries
-        des = DocketEntry.objects.filter(docket=docket)
+        des = SCOTUSDocketEntry.objects.filter(docket=docket)
         self.assertEqual(des.count(), 4, "Wrong number of Docket entries.")
 
-        rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
-        self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
+        rds = SCOTUSDocument.objects.filter(docket_entry__docket=docket)
+        self.assertEqual(rds.count(), 4, "Wrong number of Documents")
         rds_pks_new = set(rds.values_list("pk", flat=True))
         self.assertEqual(rds_pks, rds_pks_new)
 
-        rd_att_1_1 = RECAPDocument.objects.filter(
+        rd_att_1_1 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Main 1"
         ).first()
-        self.assertEqual(rd_att_1_1.document_type, RECAPDocument.ATTACHMENT)
-        rd_att_2_1 = RECAPDocument.objects.filter(
+        rd_att_2_1 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Attachment 2"
         ).first()
-        self.assertEqual(rd_att_2_1.document_type, RECAPDocument.ATTACHMENT)
         self.assertEqual(rd_att_1.pk, rd_att_1_1.pk)
         self.assertEqual(rd_att_2.pk, rd_att_2_1.pk)
 
@@ -425,8 +406,9 @@ class ScotusDocketMergeTest(TestCase):
             case_name="Old Name",
             capital_case=False,
             lower_court=self.lower_court.full_name,
+            docket_entries=[],
         )
-        docket, _, _ = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         dockets = Docket.objects.all()
@@ -442,8 +424,9 @@ class ScotusDocketMergeTest(TestCase):
             linked_with="23-6433",
             lower_court=self.lower_court.full_name,
             lower_court_case_numbers=["23-6433"],
+            docket_entries=[],
         )
-        updated_docket, _, _ = merge_scotus_docket(data)
+        updated_docket, _ = merge_scotus_docket(data)
         updated_docket.refresh_from_db()
         self.assertEqual(dockets.count(), 1)
         self.assertEqual(scotus_metadata.count(), 1)
@@ -469,7 +452,9 @@ class ScotusDocketMergeTest(TestCase):
         """Confirm ValueError is raised when docket_number is missing."""
 
         data = ScotusDocketDataFactory(
-            case_name="New SCOTUS Case Name", docket_number=None
+            case_name="New SCOTUS Case Name",
+            docket_number=None,
+            docket_entries=[],
         )
 
         with self.assertRaisesMessage(
@@ -555,9 +540,10 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23-1435",
             lower_court="Imaginary Court of The Dragons",
             lower_court_case_numbers=["10-1000"],
+            docket_entries=[],
         )
 
-        docket, _, _ = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -582,9 +568,10 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23-1436",
             lower_court="District of Massachusetts",
             lower_court_case_numbers=["10-2000"],
+            docket_entries=[],
         )
 
-        docket, _, _ = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -610,9 +597,10 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23-1437",
             lower_court="Non-existent Court",
             lower_court_case_numbers=["10-3000"],
+            docket_entries=[],
         )
 
-        docket, _, _ = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
