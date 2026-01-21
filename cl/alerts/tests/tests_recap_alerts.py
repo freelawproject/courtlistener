@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.dateformat import format
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from elasticsearch_dsl import Q, connections
 from waffle.testutils import override_switch
 
@@ -1899,7 +1899,7 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Send scheduled Monthly alerts and check assertions.
-        current_date = now().replace(day=1, hour=8)
+        current_date = localtime(now()).replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
             call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
             alerts_runtime_naive = datetime.datetime.now()
