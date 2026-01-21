@@ -107,6 +107,7 @@ class PartnershipEmailTests(TestCase):
 
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="StatTests")
 class StatTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
@@ -292,6 +293,7 @@ def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:
 
 @override_flag("semantic-search", active=True)
 @override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="PrometheusIntegrationTestBase")
 class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
     """Base class for Prometheus integration tests"""
 
