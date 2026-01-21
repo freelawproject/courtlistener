@@ -22,6 +22,7 @@ from cl.stats.constants import (
 )
 from cl.stats.metrics import (
     CeleryQueueCollector,
+    CeleryTaskMetricsCollector,
     StatMetricsCollector,
     accounts_created_total,
     accounts_deleted_total,
@@ -436,6 +437,259 @@ class CeleryQueueCollectorIntegrationTests(TestCase):
         self.assertIn("cl_celery_queue_length", content)
         # Check for at least one queue label
         self.assertIn('queue="celery"', content)
+
+
+class CeleryTaskMetricsCollectorTests(TestCase):
+    """Unit tests for CeleryTaskMetricsCollector
+
+    Each test uses a unique prefix to avoid collisions when tests run in
+    parallel. The prefix is patched via decorator on each test method.
+    """
+
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+
+    def _cleanup_keys(self, prefix: str) -> None:
+        """Clean up Redis keys with the given prefix"""
+        for key in self.r.scan_iter(f"{prefix}*"):
+            self.r.delete(key)
+
+    @patch(
+        "cl.stats.metrics.METRICS_PREFIX",
+        "test:collects_counters:prometheus:celery:",
+    )
+    def test_collects_task_execution_counters(self) -> None:
+        """Test that collector reads task execution counters from Redis"""
+        prefix = "test:collects_counters:prometheus:celery:"
+        try:
+            # Set up test data in Redis
+            self.r.set(f"{prefix}task_total:my.task.name:success", 10)
+            self.r.set(f"{prefix}task_total:my.task.name:failure", 2)
+            self.r.set(f"{prefix}task_total:another.task:success", 5)
+
+            collector = CeleryTaskMetricsCollector()
+            metrics = list(collector.collect())
+
+            # First yielded metric should be the counter
+            counter = metrics[0]
+            self.assertEqual(counter.name, "cl_celery_task_executions")
+
+            # Check samples have correct labels and values
+            samples_by_labels = {
+                (s.labels["task"], s.labels["status"]): s.value
+                for s in counter.samples
+            }
+            self.assertEqual(
+                samples_by_labels[("my.task.name", "success")], 10
+            )
+            self.assertEqual(samples_by_labels[("my.task.name", "failure")], 2)
+            self.assertEqual(samples_by_labels[("another.task", "success")], 5)
+        finally:
+            self._cleanup_keys(prefix)
+
+    @patch(
+        "cl.stats.metrics.METRICS_PREFIX",
+        "test:collects_duration:prometheus:celery:",
+    )
+    def test_collects_task_duration_metrics(self) -> None:
+        """Test that collector reads duration sum and count from Redis"""
+        prefix = "test:collects_duration:prometheus:celery:"
+        try:
+            self.r.set(f"{prefix}task_duration_sum:my.task", "12.5")
+            self.r.set(f"{prefix}task_duration_count:my.task", 5)
+            self.r.set(f"{prefix}task_duration_sum:other.task", "3.25")
+            self.r.set(f"{prefix}task_duration_count:other.task", 2)
+
+            collector = CeleryTaskMetricsCollector()
+            metrics = list(collector.collect())
+
+            # Should yield 3 metrics: counter, duration_sum, duration_count
+            self.assertEqual(len(metrics), 3)
+
+            duration_sum = metrics[1]
+            duration_count = metrics[2]
+
+            self.assertEqual(
+                duration_sum.name, "cl_celery_task_duration_seconds_sum"
+            )
+            self.assertEqual(
+                duration_count.name, "cl_celery_task_duration_seconds_count"
+            )
+
+            # Check duration sum samples
+            sum_by_task = {
+                s.labels["task"]: s.value for s in duration_sum.samples
+            }
+            self.assertAlmostEqual(sum_by_task["my.task"], 12.5)
+            self.assertAlmostEqual(sum_by_task["other.task"], 3.25)
+
+            # Check duration count samples
+            count_by_task = {
+                s.labels["task"]: s.value for s in duration_count.samples
+            }
+            self.assertEqual(count_by_task["my.task"], 5)
+            self.assertEqual(count_by_task["other.task"], 2)
+        finally:
+            self._cleanup_keys(prefix)
+
+    @patch(
+        "cl.stats.metrics.METRICS_PREFIX",
+        "test:handles_bytes:prometheus:celery:",
+    )
+    def test_handles_byte_values_from_redis(self) -> None:
+        """Test that collector handles bytes returned by Redis correctly.
+
+        Python's int() and float() can handle byte strings like b"5" and
+        b"1.5", so the collector works regardless of decode_responses setting.
+        """
+        prefix = "test:handles_bytes:prometheus:celery:"
+        try:
+            self.r.set(f"{prefix}task_total:byte.test:success", "42")
+            self.r.set(f"{prefix}task_duration_sum:byte.test", "7.5")
+            self.r.set(f"{prefix}task_duration_count:byte.test", "3")
+
+            collector = CeleryTaskMetricsCollector()
+            metrics = list(collector.collect())
+
+            # Counter should have the correct value
+            counter = metrics[0]
+            sample = next(
+                s for s in counter.samples if s.labels["task"] == "byte.test"
+            )
+            self.assertEqual(sample.value, 42)
+
+            # Duration sum should have correct float value
+            duration_sum = metrics[1]
+            sum_sample = next(
+                s
+                for s in duration_sum.samples
+                if s.labels["task"] == "byte.test"
+            )
+            self.assertAlmostEqual(sum_sample.value, 7.5)
+        finally:
+            self._cleanup_keys(prefix)
+
+    @patch(
+        "cl.stats.metrics.METRICS_PREFIX",
+        "test:key_parsing:prometheus:celery:",
+    )
+    def test_key_parsing_extracts_task_name_and_status(self) -> None:
+        """Test that rsplit correctly parses keys with colons in task names.
+
+        Key format: {prefix}task_total:{task}:{status}
+        Task names can contain colons (e.g., cl.audio.tasks:process_audio),
+        so rsplit(":", 2) is used to only split the last two segments.
+        """
+        prefix = "test:key_parsing:prometheus:celery:"
+        try:
+            # Task name with a colon (simulating module path notation)
+            self.r.set(
+                f"{prefix}task_total:cl.audio.tasks:process_audio:success",
+                15,
+            )
+
+            collector = CeleryTaskMetricsCollector()
+            metrics = list(collector.collect())
+
+            counter = metrics[0]
+            # rsplit(":", 2) gives parts where parts[1]=task, parts[2]=status
+            samples_by_labels = {
+                (s.labels["task"], s.labels["status"]): s.value
+                for s in counter.samples
+            }
+            self.assertEqual(
+                samples_by_labels[("process_audio", "success")], 15
+            )
+        finally:
+            self._cleanup_keys(prefix)
+
+    @patch(
+        "cl.stats.metrics.METRICS_PREFIX",
+        "test:missing_count:prometheus:celery:",
+    )
+    def test_handles_missing_duration_count_key(self) -> None:
+        """Test that collector handles missing duration count key gracefully.
+
+        If task_duration_sum exists but task_duration_count doesn't,
+        the collector should use 0 for the count.
+        """
+        prefix = "test:missing_count:prometheus:celery:"
+        try:
+            self.r.set(f"{prefix}task_duration_sum:orphan.task", "5.0")
+            # Deliberately not setting task_duration_count:orphan.task
+
+            collector = CeleryTaskMetricsCollector()
+            metrics = list(collector.collect())
+
+            duration_count = metrics[2]
+            count_sample = next(
+                (
+                    s
+                    for s in duration_count.samples
+                    if s.labels["task"] == "orphan.task"
+                ),
+                None,
+            )
+            self.assertIsNotNone(count_sample)
+            self.assertEqual(count_sample.value, 0)
+        finally:
+            self._cleanup_keys(prefix)
+
+    @patch(
+        "cl.stats.metrics.METRICS_PREFIX",
+        "test:empty_redis:prometheus:celery:",
+    )
+    def test_handles_empty_redis(self) -> None:
+        """Test that collector handles empty Redis gracefully"""
+        prefix = "test:empty_redis:prometheus:celery:"
+        try:
+            # Ensure no keys exist with this prefix
+            self._cleanup_keys(prefix)
+
+            collector = CeleryTaskMetricsCollector()
+            metrics = list(collector.collect())
+
+            # Should still yield 3 metric families, but with no samples
+            self.assertEqual(len(metrics), 3)
+            for metric in metrics:
+                self.assertEqual(len(metric.samples), 0)
+        finally:
+            self._cleanup_keys(prefix)
+
+    @patch(
+        "cl.stats.metrics.METRICS_PREFIX",
+        "test:none_values:prometheus:celery:",
+    )
+    def test_handles_none_values(self) -> None:
+        """Test that collector handles None/missing values with 'or 0'.
+
+        The implementation uses `int(r.get(key) or 0)` and
+        `float(r.get(key) or 0)` to handle cases where keys exist but have
+        None values.
+        """
+        prefix = "test:none_values:prometheus:celery:"
+        try:
+            # Ensure no keys exist - r.get() will return None
+            self._cleanup_keys(prefix)
+
+            collector = CeleryTaskMetricsCollector()
+            metrics = list(collector.collect())
+
+            # Should not raise any errors
+            self.assertEqual(len(metrics), 3)
+        finally:
+            self._cleanup_keys(prefix)
+
+    def test_describe_returns_empty_list(self) -> None:
+        """Test that describe() returns empty list for dynamic collector.
+
+        Collectors that generate metrics dynamically at scrape time
+        should return an empty list from describe() to avoid registration
+        issues.
+        """
+        collector = CeleryTaskMetricsCollector()
+        description = collector.describe()
+        self.assertEqual(description, [])
 
 
 class ValidateLabelsTests(TestCase):
