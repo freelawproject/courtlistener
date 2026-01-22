@@ -40,28 +40,29 @@ def log_invalid_embedding_errors(embeddings: Any):
         )
 
 
-async def clean_up_recap_document_file(item: RECAPDocument) -> None:
-    """Clean up the RecapDocument file-related fields after detecting the file
+async def clean_up_recap_document_file(item: AbstractPDF) -> None:
+    """Clean up the document's file-related fields after detecting the file
     doesn't exist in the storage.
 
-    :param item: The RECAPDocument to work on.
+    :param item: The document to work on.
     :return: None
     """
 
     if isinstance(item, AbstractPDF):
         await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
-        item.date_upload = None
         item.file_size = None
         item.page_count = None
-        item.is_available = False
+        if isinstance(item, RECAPDocument):
+            item.date_upload = None
+            item.is_available = False
         await item.asave()
 
 
 async def microservice(
     service: str,
     method: str = "POST",
-    item: RECAPDocument | Opinion | Audio | None = None,
+    item: AbstractPDF | Opinion | Audio | None = None,
     file: BufferedReader | None = None,
     file_type: str | None = None,
     filepath: str | None = None,
