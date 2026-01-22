@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.visualizations.models import JSONVersion, Referer, SCOTUSMap
+from cl.visualizations.models import JSONVersion, SCOTUSMap
 
 
 @admin.register(JSONVersion)
@@ -17,38 +17,9 @@ class JSONVersionInline(admin.StackedInline):
     extra = 1
 
 
-@admin.register(Referer)
-class RefererAdmin(admin.ModelAdmin):
-    readonly_fields = (
-        "date_created",
-        "date_modified",
-    )
-    raw_id_fields = ("map",)
-    list_filter = ("display",)
-    list_display = (
-        "__str__",
-        "display",
-        "date_created",
-        "date_modified",
-    )
-    search_fields = (
-        "id",
-        "url",
-        "page_title",
-    )
-
-
-class RefererInline(admin.StackedInline):
-    model = Referer
-    extra = 1
-
-
 @admin.register(SCOTUSMap)
 class SCOTUSMapAdmin(admin.ModelAdmin):
-    inlines = (
-        JSONVersionInline,
-        RefererInline,
-    )
+    inlines = (JSONVersionInline,)
     raw_id_fields = (
         "clusters",
         "cluster_start",
