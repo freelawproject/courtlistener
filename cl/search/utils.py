@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
-from django.db.models import Count, Sum, Value
+from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce, Floor
 from django.utils.timezone import make_aware, now
 
@@ -11,7 +11,6 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Opinion
 from cl.search.selectors import get_total_estimate_count
-from cl.visualizations.models import SCOTUSMap
 
 
 def get_redis_stat_sum(key_pattern: str, days: int = 10) -> int:
@@ -95,18 +94,6 @@ def get_homepage_stats():
             Audio.objects.aggregate(Sum("duration"))["duration__sum"],
             as_dict=True,
         )["d"],
-        "viz_in_last_ten": SCOTUSMap.objects.filter(
-            date_published__gte=ten_days_ago, published=True
-        ).count(),
-        "visualizations": SCOTUSMap.objects.filter(
-            published=True, deleted=False
-        )
-        .annotate(Count("clusters"))
-        .filter(
-            # Ensures that we only show good stuff on homepage
-            clusters__count__gt=10,
-        )
-        .order_by("-date_published", "-date_modified", "-date_created")[:1],
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data

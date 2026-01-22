@@ -81,3 +81,4 @@ jobs:
           cl/search/management/commands/llm_clean_docket_number_daemon.py \
           cl/search/docket_number_cleaner.py \
           cl/search/management/commands/clean_docket_number_raw.py \
+          cl/scrapers/management/commands/back_scrape_dockets.py \
