@@ -19,7 +19,7 @@ import eyecite
 import internetarchive as ia
 import requests
 from asgiref.sync import async_to_sync
-from celery import Task
+from celery import Task, chain
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -64,7 +64,6 @@ from juriscraper.state.texas import (
 from juriscraper.state.texas.common import (
     TexasAppellateBrief,
     TexasCaseDocument,
-    TexasCommonData,
 )
 from openai import (
     APIConnectionError,
@@ -3358,12 +3357,17 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
     ignore_result=True,
     # No retries because download_pdf_in_stream already has retry logic
 )
-def download_texas_document_pdf(self: Task, texas_document_pk: int) -> None:
+def download_texas_document_pdf(
+    self: Task, texas_document_pk: int
+) -> int | None:
     """Download a PDF and return its path.
 
-    :param self: The Celery task instance
+    :param self: The Celery task instance.
     :param texas_document_pk: The primary key of the TexasDocument instance to
-    update the attachment for."""
+    update the attachment for.
+
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed."""
     try:
         texas_document = TexasDocument.objects.get(pk=texas_document_pk)
     except TexasDocument.DoesNotExist:
@@ -3393,7 +3397,7 @@ def download_texas_document_pdf(self: Task, texas_document_pk: int) -> None:
         )
         texas_document.filepath_local = File(tmp, name=filename)
         texas_document.save()
-        return None
+        return texas_document_pk
 
 
 def merge_texas_document(
@@ -3433,7 +3437,12 @@ def merge_texas_document(
         texas_document.media_version_id = input_document["media_version_id"]
         texas_document.document_url = input_document["document_url"]
         texas_document.save()
-        download_texas_document_pdf.delay(texas_document.pk)
+        chain(
+            download_texas_document_pdf.si(texas_document.pk),
+            extract_pdf_document.s(
+                check_if_needed=False, model_name="search.TexasDocument"
+            ),
+        ).apply_async()
         return True, True, texas_document.pk
 
     return False, True, texas_document.pk
@@ -3459,32 +3468,8 @@ def merge_texas_documents(
     # Perform plaintext extraction on documents that were successfully created
     # or updated.
     documents_to_extract = [o[2] for o in output if o[0] and o[1]]
-    # Only spawn the task if we need to extract a document.
-    if len(documents_to_extract) > 0:
-        extract_pdf_document.delay(
-            documents_to_extract, False, False, TexasDocument
-        )
 
     return output
-
-
-def texas_docket_entry_sequence_numbers(input: TexasCommonData) -> list[str]:
-    """Calculates the sequence numbers for a scraped list of TexasDocketEntry
-    objects to allow consistent matching and merging.
-
-    :param input: The scraped Texas docket data.
-    :return: A list of sequence numbers corresponding to the list of
-    TexasDocketEntry objects in input["case_events"].
-    """
-    dates = [e["date"].isoformat() for e in input["case_events"]]
-    date_counts: dict[str, int] = {}
-    sequence_numbers = []
-    for entry_date in dates:
-        i = date_counts.get(entry_date, 0)
-        sequence_numbers.append(f"{entry_date}.{i:0>3}")
-        date_counts[entry_date] = i + 1
-
-    return sequence_numbers
 
 
 @transaction.atomic
@@ -3514,6 +3499,7 @@ def merge_texas_docket_entry(
         sequence_number,
         docket.pk,
     )
+    Docket.objects.select_for_update().get(pk=docket.pk)
     docket_entries = TexasDocketEntry.objects.filter(
         docket=docket,
         date_filed=input_docket_entry["date"],
@@ -3528,7 +3514,7 @@ def merge_texas_docket_entry(
             sequence_number,
             docket.pk,
         )
-        docket_entry = TexasDocketEntry.objects.create(
+        docket_entry = TexasDocketEntry(
             docket=docket,
             date_filed=input_docket_entry["date"],
             entry_type=input_docket_entry["type"],
@@ -3562,12 +3548,12 @@ def merge_texas_docket_entry(
             docket_entry = matching_sequence_number
             created = False
         else:
-            logger.info(
+            logger.error(
                 "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
                 sequence_number,
                 docket.pk,
             )
-            docket_entry = TexasDocketEntry.objects.create(
+            docket_entry = TexasDocketEntry(
                 docket=docket,
                 date_filed=input_docket_entry["date"],
                 entry_type=input_docket_entry["type"],

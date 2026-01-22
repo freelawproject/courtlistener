@@ -16,6 +16,7 @@ from httpx import (
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
 from cl.lib.exceptions import NoSuchKey
+from cl.lib.models import AbstractPDF
 from cl.search.models import Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     :return: None
     """
 
-    if isinstance(item, RECAPDocument):
+    if isinstance(item, AbstractPDF):
         await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
         item.date_upload = None
@@ -96,7 +97,7 @@ async def microservice(
     # Handle our documents based on the type of model object
     # Sadly these are not uniform
     if item:
-        if isinstance(item, RECAPDocument):
+        if isinstance(item, AbstractPDF):
             try:
                 files = {
                     "file": (

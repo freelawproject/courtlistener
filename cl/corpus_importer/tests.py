@@ -88,7 +88,6 @@ from cl.corpus_importer.tasks import (
     merge_texas_parties,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
-    texas_docket_entry_sequence_numbers,
 )
 from cl.corpus_importer.utils import (
     ClusterSourceException,
@@ -97,6 +96,7 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    create_docket_entry_sequence_numbers,
     get_start_of_quarter,
     merge_case_names,
     merge_docket_numbers,
@@ -136,6 +136,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
     get_recap_documents_pray_and_pay,
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.recap.tests.tests import mock_bucket_open
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
@@ -160,9 +161,10 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.state.texas.factories import (
-    TexasCaseDocumentFactory,
-    TexasCommonDataFactory,
+    TexasCaseDocumentDictFactory,
+    TexasDocketEntryDictFactory,
     TexasDocketEntryFactory,
+    TexasDocumentFactory,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
@@ -172,6 +174,22 @@ from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+class UtilsTest(SimpleTestCase):
+    def test_create_docket_entry_sequence_numbers(self):
+        """Do we generate sequence numbers correctly?"""
+        entry_1 = {"date": date.fromisoformat("2025-01-02")}
+        entry_2 = {"date": date.fromisoformat("2025-01-02")}
+        entry_3 = {"date": date.fromisoformat("2025-01-03")}
+
+        output = create_docket_entry_sequence_numbers(
+            [entry_1, entry_3, entry_2]
+        )
+        assert len(output) == 3
+        assert output[0] == "2025-01-02.001"
+        assert output[1] == "2025-01-03.001"
+        assert output[2] == "2025-01-02.002"
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -2115,38 +2133,36 @@ class TexasMergerTest(TestCase):
     def setUp(self):
         """Set up texas merger tests"""
         self.download_task_patch = patch(
-            "cl.corpus_importer.tasks.download_texas_document_pdf.delay"
+            "cl.corpus_importer.tasks.download_texas_document_pdf.si"
         )
         self.download_task_mock = self.download_task_patch.start()
         self.extract_pdf_document_patch = patch(
-            "cl.recap.tasks.extract_pdf_document.delay"
+            "cl.recap.tasks.extract_pdf_document.s"
         )
         self.extract_pdf_document_mock = (
             self.extract_pdf_document_patch.start()
         )
-        self.texas_sc = CourtFactory.create(id="texas_sc")
-        self.texas_cca = CourtFactory.create(id="texas_cca")
-        self.texas_coa1 = CourtFactory.create(id="texas_coa1")
-        self.docket_number_coa1 = "01-25-00011-CV"
-        self.docket_coa1 = DocketFactory.create(
-            court=self.texas_coa1, docket_number=self.docket_number_coa1
-        )
-        self.docket_coa1_entry = TexasDocketEntry.objects.create(
-            docket=self.docket_coa1,
-            entry_type="idk",
-            sequence_number="2025-08-01-10",
-        )
-
         self.download_pdf_patch = patch(
             "cl.corpus_importer.tasks.download_pdf_in_stream"
         )
         self.download_pdf_mock = self.download_pdf_patch.start()
 
+    @classmethod
+    def setUpTestData(cls):
+        """Create test data for Texas merger tests"""
+        cls.texas_sc = CourtFactory.create(id="texas_sc")
+        cls.texas_cca = CourtFactory.create(id="texas_cca")
+        cls.texas_coa1 = CourtFactory.create(id="texas_coa1")
+        cls.docket_number_coa1 = "01-25-00011-CV"
+        cls.docket_coa1 = DocketFactory.create(
+            court=cls.texas_coa1, docket_number=cls.docket_number_coa1
+        )
+        cls.docket_coa1_entry = TexasDocketEntryFactory.create(
+            docket=cls.docket_coa1,
+        )
+
     def tearDown(self):
-        """Tear down patches and remove added objects"""
-        Docket.objects.all().delete()
-        TexasDocketEntry.objects.all().delete()
-        TexasDocument.objects.all().delete()
+        """Tear down patches"""
         self.download_task_patch.stop()
         self.extract_pdf_document_patch.stop()
         self.download_pdf_patch.stop()
@@ -2155,7 +2171,7 @@ class TexasMergerTest(TestCase):
         """Can we correctly add a new attachment to an existing docket entry?"""
         docket_entry = self.docket_coa1_entry
 
-        input_document = TexasCaseDocumentFactory()
+        input_document = TexasCaseDocumentDictFactory()
 
         # Run the function
         result = merge_texas_document(docket_entry, input_document)
@@ -2184,10 +2200,10 @@ class TexasMergerTest(TestCase):
     def test_merge_texas_document_existing_document_no_update(self):
         """Can we correctly handle an existing document with no update needed?"""
         docket_entry = self.docket_coa1_entry
-        input_document = TexasCaseDocumentFactory()
+        input_document = TexasCaseDocumentDictFactory()
 
         # Create an existing and up to date attachment
-        current_document = TexasDocument.objects.create(
+        current_document = TexasDocumentFactory.create(
             docket_entry=docket_entry,
             description=input_document["description"],
             media_id=input_document["media_id"],
@@ -2218,13 +2234,13 @@ class TexasMergerTest(TestCase):
     def test_merge_texas_document_existing_document_update(self):
         """Can we correctly update an existing document with new version?"""
         docket_entry = self.docket_coa1_entry
-        input_document = TexasCaseDocumentFactory()
-        old_document = TexasCaseDocumentFactory(
+        input_document = TexasCaseDocumentDictFactory()
+        old_document = TexasCaseDocumentDictFactory(
             media_id=input_document["media_id"],
         )
 
         # Create an attachment
-        current_document = TexasDocument.objects.create(
+        current_document = TexasDocumentFactory.create(
             docket_entry=docket_entry,
             description=old_document["description"],
             media_id=old_document["media_id"],
@@ -2252,11 +2268,41 @@ class TexasMergerTest(TestCase):
 
         self.download_task_mock.assert_called_once_with(current_document.pk)
 
+    @mock.patch(
+        "cl.corpus_importer.tasks.requests.get",
+    )
+    def test_merge_texas_document_plaintext_extraction(self, mock_get):
+        """
+        Ensure plaintext extraction is triggered by `merge_texas_document`.
+        """
+        # Stop the mocks just for this test
+        self.download_task_patch.stop()
+        self.extract_pdf_document_patch.stop()
+        self.download_pdf_patch.stop()
+
+        mock_response = mock.Mock()
+        mock_response.headers = {"content-type": "application/pdf"}
+        with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+            pdf_content = f.read()
+        mock_response.iter_content.return_value = [pdf_content]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value.__enter__.return_value = mock_response
+
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocumentDictFactory()
+        (_, _, pk) = merge_texas_document(docket_entry, input_document)
+        docket_entry.refresh_from_db()
+        document = TexasDocument.objects.get(pk=pk)
+
+        self.assertEqual(document.document_url, input_document["document_url"])
+        self.assertTrue(document.filepath_local)
+        self.assertIn("UNITED", document.plain_text)
+
     def test_merge_texas_documents(self):
         """Can we correctly handle multiple documents?"""
         docket_entry = self.docket_coa1_entry
-        existing_document = TexasCaseDocumentFactory()
-        current_attachment = TexasDocument.objects.create(
+        existing_document = TexasCaseDocumentDictFactory()
+        current_attachment = TexasDocumentFactory.create(
             docket_entry=docket_entry,
             description=existing_document["description"],
             media_id=existing_document["media_id"],
@@ -2264,7 +2310,7 @@ class TexasMergerTest(TestCase):
             document_url=existing_document["document_url"],
         )
         input_documents = [
-            TexasCaseDocumentFactory(),
+            TexasCaseDocumentDictFactory(),
             existing_document,
         ]
 
@@ -2274,33 +2320,10 @@ class TexasMergerTest(TestCase):
         assert result[0] == (True, True, result[0][2])
         assert result[1] == (False, True, current_attachment.pk)
 
-    def test_texas_docket_entry_sequence_numbers(self):
-        """Do we generate sequence numbers correctly?"""
-        event_1 = TexasDocketEntryFactory(
-            date=date.fromisoformat("2025-01-02")
-        )
-        event_2 = TexasDocketEntryFactory(
-            date=date.fromisoformat("2025-01-02")
-        )
-        event_3 = TexasDocketEntryFactory(
-            date=date.fromisoformat("2025-01-03")
-        )
-        input_data = TexasCommonDataFactory(
-            appellate_briefs=[event_2],
-            case_events=[event_1, event_2, event_3],
-            date_filed=date.fromisoformat("2025-01-02"),
-        )
-
-        output = texas_docket_entry_sequence_numbers(input_data)
-        assert len(output) == 3
-        assert output[0] == "2025-01-02.000"
-        assert output[1] == "2025-01-02.001"
-        assert output[2] == "2025-01-03.000"
-
     def test_merge_texas_docket_entry_new_entry(self):
         """Can we correctly handle a docket entry?"""
-        docket_entry = TexasDocketEntryFactory(
-            attachments=[TexasCaseDocumentFactory()],
+        docket_entry = TexasDocketEntryDictFactory(
+            attachments=[TexasCaseDocumentDictFactory()],
             date=date.fromisoformat("2025-01-02"),
             type="Brief",
         )
@@ -2323,7 +2346,7 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
-        js_docket_entry = TexasDocketEntryFactory()
+        js_docket_entry = TexasDocketEntryDictFactory()
 
         (_, _, pk) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
@@ -2353,7 +2376,7 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
-        js_docket_entry = TexasDocketEntryFactory()
+        js_docket_entry = TexasDocketEntryDictFactory()
         initial_n_attachments = len(js_docket_entry["attachments"])
 
         (_, _, pk) = merge_texas_docket_entry(
@@ -2362,7 +2385,7 @@ class TexasMergerTest(TestCase):
         # Reset call count
         self.extract_pdf_document_mock.reset_mock()
 
-        js_docket_entry["attachments"].append(TexasCaseDocumentFactory())
+        js_docket_entry["attachments"].append(TexasCaseDocumentDictFactory())
         output = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
@@ -2385,7 +2408,7 @@ class TexasMergerTest(TestCase):
     def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
         """When multiple entries match by date/type/brief, use the one with matching sequence number."""
         # Create two entries with same date, type, and appellate_brief
-        existing_entry_1 = TexasDocketEntry.objects.create(
+        existing_entry_1 = TexasDocketEntryFactory.create(
             docket=self.docket_coa1,
             date_filed=date.fromisoformat("2025-01-02"),
             entry_type="Brief",
@@ -2393,7 +2416,7 @@ class TexasMergerTest(TestCase):
             sequence_number="2025-01-02.000",
             description="First entry",
         )
-        existing_entry_2 = TexasDocketEntry.objects.create(
+        existing_entry_2 = TexasDocketEntryFactory.create(
             docket=self.docket_coa1,
             date_filed=date.fromisoformat("2025-01-02"),
             entry_type="Brief",
@@ -2402,7 +2425,7 @@ class TexasMergerTest(TestCase):
             description="Second entry",
         )
 
-        js_docket_entry = TexasDocketEntryFactory(
+        js_docket_entry = TexasDocketEntryDictFactory(
             attachments=[],
             description="Updated description",
             date=date.fromisoformat("2025-01-02"),
@@ -2423,8 +2446,9 @@ class TexasMergerTest(TestCase):
         assert existing_entry_1.description == "First entry"
 
     def test_merge_texas_docket_entry_single_match_updates_entry(self):
-        """When exactly one entry matches by date/type/brief, update it even with different sequence number."""
-        existing_entry = TexasDocketEntry.objects.create(
+        """When exactly one entry matches by date/type/brief, update it even
+        with different sequence number."""
+        existing_entry = TexasDocketEntryFactory.create(
             docket=self.docket_coa1,
             date_filed=date.fromisoformat("2025-01-04"),
             entry_type="Brief",
@@ -2433,7 +2457,7 @@ class TexasMergerTest(TestCase):
             description="Original description",
         )
 
-        js_docket_entry = TexasDocketEntryFactory(
+        js_docket_entry = TexasDocketEntryDictFactory(
             attachments=[],
             description="Updated description",
             date=date.fromisoformat("2025-01-04"),
@@ -2453,7 +2477,7 @@ class TexasMergerTest(TestCase):
     def test_merge_texas_docket_entry_multiple_matches_without_sequence(self):
         """When multiple entries match by date/type/brief but none match sequence, create a new entry."""
         # Create two entries with same date, type, and appellate_brief
-        existing_entry_1 = TexasDocketEntry.objects.create(
+        existing_entry_1 = TexasDocketEntryFactory.create(
             docket=self.docket_coa1,
             date_filed=date.fromisoformat("2025-01-03"),
             entry_type="Brief",
@@ -2461,7 +2485,7 @@ class TexasMergerTest(TestCase):
             sequence_number="2025-01-03.000",
             description="First entry",
         )
-        existing_entry_2 = TexasDocketEntry.objects.create(
+        existing_entry_2 = TexasDocketEntryFactory.create(
             docket=self.docket_coa1,
             date_filed=date.fromisoformat("2025-01-03"),
             entry_type="Brief",
@@ -2470,7 +2494,7 @@ class TexasMergerTest(TestCase):
             description="Second entry",
         )
 
-        js_docket_entry = TexasDocketEntryFactory(
+        js_docket_entry = TexasDocketEntryDictFactory(
             attachments=[],
             description="New third entry",
             date=date.fromisoformat("2025-01-03"),
@@ -2680,11 +2704,7 @@ class TexasMergerTest(TestCase):
 
     def test_download_texas_document_pdf_success(self):
         """Can we successfully download a PDF for a TexasDocument?"""
-        texas_document = TexasDocument.objects.create(
-            docket_entry=self.docket_coa1_entry,
-            description="Test Document",
-            media_id="123e4567-e89b-12d3-a456-426614174000",
-            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+        texas_document = TexasDocumentFactory.create(
             document_url="https://example.com/sample.pdf",
         )
 
@@ -2694,7 +2714,7 @@ class TexasMergerTest(TestCase):
 
         result = download_texas_document_pdf(texas_document.pk)
 
-        assert result is None
+        assert result is not None
         self.download_pdf_mock.assert_called_once_with(
             "https://example.com/sample.pdf", texas_document.pk, "texas_"
         )
@@ -2712,11 +2732,7 @@ class TexasMergerTest(TestCase):
 
     def test_download_texas_document_pdf_download_failure(self):
         """Do we handle a failed PDF download gracefully?"""
-        texas_document = TexasDocument.objects.create(
-            docket_entry=self.docket_coa1_entry,
-            description="Test Document",
-            media_id="123e4567-e89b-12d3-a456-426614174000",
-            media_version_id="789e4567-e89b-12d3-a456-426614174111",
+        texas_document = TexasDocumentFactory.create(
             document_url="https://example.com/sample.pdf",
         )
 

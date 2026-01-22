@@ -11,6 +11,7 @@ import openai
 import requests
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
+from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from httpx import Response
@@ -436,42 +437,71 @@ def find_and_merge_versions(self, pk: int) -> None:
     max_retries=3,
     retry_backoff=10,
 )
+def extract_recap_pdf(
+    self,
+    pks: int | list[int],
+    ocr_available: bool = True,
+    check_if_needed: bool = True,
+):
+    """
+    Temporary task method to prevent `extract_recap_pdf` tasks currently in the
+    Celery queue from failing. Should be removed once there are no remaining
+    tasks referencing this method.
+    """
+    return async_to_sync(extract_pdf_document_base)(
+        pks, ocr_available, check_if_needed, "search.RECAPDocument"
+    )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
+    max_retries=3,
+    retry_backoff=10,
+)
 def extract_pdf_document(
     self,
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-    model=RECAPDocument,
+    model_name: str = "search.RECAPDocument",
 ) -> list[int]:
-    """Celery task wrapper for extract_pdf_document_base
-    Extract the contents from a RECAP PDF if necessary.
+    """Celery task wrapper for `extract_pdf_document_base`
+    Extract the contents from a PDF if necessary.
 
-    In order to avoid the issue described here:
-    https://github.com/freelawproject/courtlistener/issues/2103#issuecomment-1206700403
+    In order to avoid the issue described [here](
+    https://github.com/freelawproject/courtlistener/issues/2103#issuecomment-1206700403)
 
     If a Celery task is called as a synchronous function within another parent
-    task when it fails the parent task will be retried and every retry logged
+    task, when it fails, the parent task will be retried and every retry logged
     to sentry.
 
-    To avoid logging every retry to sentry a new base method was created:
+    To avoid logging every retry to sentry, a new base method was created:
     extract_pdf_document_base that method should be used when a synchronous
     call is needed within a parent task.
 
     And this task wrapper should be used elsewhere for asynchronous calls
     (delay, async).
 
-    :param pks: The RECAPDocument pk or list of pks to work on.
-    :param ocr_available: Whether it's needed to perform OCR extraction.
-    :param check_if_needed: Whether it's needed to check if the RECAPDocument
+    :param pks: The document pk or list of pks to work on.
+    :param ocr_available: Whether it's necessary to perform OCR extraction.
+    :param check_if_needed: Whether it's necessary to check if the document
     needs extraction.
-    :param model: The document model (inheriting from `AbstractPDF`) to operate
-    on.
+    :param model_name: The name of the document model (inheriting from
+    `AbstractPDF`) to operate on. This is passed as a string to avoid
+    serialization errors during task initialization (see [this comment](
+    https://github.com/freelawproject/courtlistener/pull/6761/changes/BASE..540fd91fa5e9e43a96926e891cdb2de83d31088b#r2717354169
+    )).
 
-    :return: A list of processed RECAPDocument
+    :return: A list of processed document pks.
     """
 
     return async_to_sync(extract_pdf_document_base)(
-        pks, ocr_available, check_if_needed, model
+        pks, ocr_available, check_if_needed, model_name
     )
 
 
@@ -479,23 +509,24 @@ async def extract_pdf_document_base(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-    model=RECAPDocument,
+    model_name: str = "search.RECAPDocument",
 ) -> list[int]:
-    """Extract the contents from a RECAP PDF if necessary.
+    """Extract the contents from a PDF if necessary.
 
-    :param pks: The RECAPDocument pk or list of pks to work on.
-    :param ocr_available: Whether it's needed to perform OCR extraction.
-    :param check_if_needed: Whether it's needed to check if the RECAPDocument
+    :param pks: The document pk or list of pks to work on.
+    :param ocr_available: Whether it's necessary to perform OCR extraction.
+    :param check_if_needed: Whether it's necessary to check if the document
     needs extraction.
-    :param model: The document model (inheriting from `AbstractPDF`) to operate
-    on.
+    :param model_name: The name of the document model (inheriting from
+    `AbstractPDF`) to operate on.
 
-    :return: A list of processed RECAPDocument
+    :return: A list of processed document pks.
     """
 
     if not is_iter(pks):
         pks = [pks]
 
+    model = apps.get_model(model_name)
     processed: list[int] = []
     for pk in pks:
         rd = await model.objects.aget(pk=pk)
@@ -538,10 +569,14 @@ async def extract_pdf_document_base(
                 rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
-        await rd.asave(
-            do_extraction=False,
-            update_fields=["ocr_status", "plain_text"],
-        )
+        # Kludgey fix to handle RECAPDocument's custom save logic.
+        if isinstance(model, RECAPDocument):
+            await rd.asave(
+                do_extraction=False,
+                update_fields=["ocr_status", "plain_text"],
+            )
+        else:
+            await rd.asave(update_fields=["ocr_status", "plain_text"])
         processed.append(pk)
 
     return processed

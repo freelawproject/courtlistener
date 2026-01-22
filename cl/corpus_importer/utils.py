@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterator
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, Literal
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -1268,3 +1268,25 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
         )
         .values_list("pk", flat=True)
     )
+
+
+def create_docket_entry_sequence_numbers(
+    docket_entries: list[dict[Literal["date"], Any]],
+) -> list[str]:
+    """Calculates the sequence numbers for a list of docket entries to allow
+    consistent matching and merging.
+
+    :param docket_entries: A list of dictionaries, which must all include a
+    "date" field with the `date` type.
+    :return: A list of sequence numbers corresponding to the list of docket
+    entries.
+    """
+    dates = [d["date"].isoformat() for d in docket_entries]
+    date_counts: dict[str, int] = {}
+    sequence_numbers = []
+    for entry_date in dates:
+        i = date_counts.get(entry_date, 1)
+        sequence_numbers.append(f"{entry_date}.{i:0>3}")
+        date_counts[entry_date] = i + 1
+
+    return sequence_numbers
