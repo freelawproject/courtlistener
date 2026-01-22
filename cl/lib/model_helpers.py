@@ -146,6 +146,43 @@ def make_path(root: str, filename: str) -> str:
     )
 
 
+def make_llm_task_input_file_path(instance: "LLMTask", filename: str) -> str:
+    """Create a date-based path for LLMTask input files.
+
+    Ensures the filename is unique by prepending the task's primary key.
+
+    Example: llm-tasks/2026/01/15/101-scan_file.pdf
+    """
+    unique_filename = f"{instance.pk}-{filename}"
+    return make_path("llm-tasks", unique_filename)
+
+
+def make_llm_request_response_file_path(
+    instance: "LLMRequest", filename: str
+) -> str:
+    """Create a date-based path for LLMRequest response files.
+
+    Ensures the filename is unique by prepending the request's primary key.
+
+    Example: llm-requests/2026/01/15/1-batch_response.jsonl
+    """
+    unique_filename = f"{instance.pk}-{filename}"
+    return make_path("llm-requests", unique_filename)
+
+
+def make_llm_task_response_file_path(
+    instance: "LLMTask", filename: str
+) -> str:
+    """Create a date-based path for LLMTask response files.
+
+    Ensures the filename is unique by prepending the task's primary key.
+
+    Example: llm-tasks/responses/2026/01/15/101-result.json
+    """
+    unique_filename = f"{instance.pk}-{filename}"
+    return make_path("llm-tasks/responses", unique_filename)
+
+
 def make_lasc_path(instance, filename):
     """Make a simple path for uploaded files.
 

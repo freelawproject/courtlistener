@@ -2,89 +2,47 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
-from cl.lib.model_helpers import make_path
+from cl.lib.model_helpers import (
+    make_llm_request_response_file_path,
+    make_llm_task_input_file_path,
+    make_llm_task_response_file_path,
+)
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.storage import IncrementingAWSMediaStorage
 
 
-def make_input_file_path(instance: "LLMTask", filename: str) -> str:
-    """
-    Creates a date-based path for the input file, ensuring the filename is
-    unique by prepending the task's primary key.
-
-    Example:
-    llm-tasks/2026/01/15/101-scan_file.pdf
-    """
-    unique_filename = f"{instance.pk}-{filename}"
-    return make_path("llm-tasks", unique_filename)
-
-
-def make_response_file_path(instance: "LLMRequest", filename: str) -> str:
-    """
-    Creates a date-based path for the response file, ensuring the filename is
-    unique by prepending the request's primary key.
-
-    Example:
-    llm-requests/2026/01/15/1-batch_response.jsonl
-    """
-    unique_filename = f"{instance.pk}-{filename}"
-    return make_path("llm-requests", unique_filename)
-
-
-class LLMProvider:
+class LLMProvider(models.IntegerChoices):
     """LLM Provider choices"""
 
-    GEMINI = 1
-    OPENAI = 2
-    ANTHROPIC = 3
-    NAMES = (
-        (GEMINI, "Google Gemini"),
-        (OPENAI, "OpenAI"),
-        (ANTHROPIC, "Anthropic"),
-    )
+    GEMINI = 1, "Google Gemini"
+    OPENAI = 2, "OpenAI"
+    ANTHROPIC = 3, "Anthropic"
 
 
-class Task:
+class Task(models.IntegerChoices):
     """LLM Task choices"""
 
-    SCAN_EXTRACTION = 1
-    SCRAPER_EXTRACTION = 2
-    CASENAME = 3
-    CLEAN_DOCKET_NUMBERS = 4
-    NAMES = (
-        (SCAN_EXTRACTION, "Extract text from scan"),
-        (SCRAPER_EXTRACTION, "Extract text from scraped documents"),
-        (CASENAME, "Case Name Extraction"),
-        (CLEAN_DOCKET_NUMBERS, "Clean Docket Numbers"),
-    )
+    SCAN_EXTRACTION = 1, "Extract text from scan"
+    SCRAPER_EXTRACTION = 2, "Extract text from scraped documents"
+    CASENAME = 3, "Case Name Extraction"
+    CLEAN_DOCKET_NUMBERS = 4, "Clean Docket Numbers"
 
 
-class TaskStatus:
+class TaskStatus(models.IntegerChoices):
     """LLM Task status choices"""
 
-    UNPROCESSED = 0
-    IN_PROGRESS = 1
-    SUCCEEDED = 2
-    FAILED = 3
-    FINISHED = 4
-    NAMES = (
-        (UNPROCESSED, "Unprocessed"),
-        (IN_PROGRESS, "In Progress"),
-        (SUCCEEDED, "Succeeded"),
-        (FAILED, "Failed"),
-        (FINISHED, "Finished"),
-    )
+    UNPROCESSED = 0, "Unprocessed"
+    IN_PROGRESS = 1, "In Progress"
+    SUCCEEDED = 2, "Succeeded"
+    FAILED = 3, "Failed"
+    FINISHED = 4, "Finished"
 
 
-class PromptTypes:
+class PromptTypes(models.IntegerChoices):
     """Prompt type choices"""
 
-    SYSTEM = 1
-    USER = 2
-    NAMES = (
-        (SYSTEM, "System"),
-        (USER, "User"),
-    )
+    SYSTEM = 1, "System"
+    USER = 2, "User"
 
 
 class Prompt(AbstractDateTimeModel):
@@ -101,7 +59,7 @@ class Prompt(AbstractDateTimeModel):
     )
     prompt_type = models.SmallIntegerField(
         help_text="Whether this is a system or user prompt",
-        choices=PromptTypes.NAMES,
+        choices=PromptTypes,
         default=PromptTypes.SYSTEM,
     )
     text = models.TextField(
@@ -132,12 +90,12 @@ class LLMRequest(AbstractDateTimeModel):
     """
 
     name = models.CharField(
-        help_text="Human-readable request name",
+        help_text="Human-readable request name. e.g., 'Batch run for Jan 20 scans'",
         max_length=255,
         blank=True,
     )
     is_batch = models.BooleanField(
-        help_text="Whether this is a batch request or single request",
+        help_text="True if this request groups multiple tasks for a batch API call",
         default=False,
     )
     batch_id = models.CharField(
@@ -147,17 +105,17 @@ class LLMRequest(AbstractDateTimeModel):
     )
     provider = models.SmallIntegerField(
         help_text="The LLM provider used for this request",
-        choices=LLMProvider.NAMES,
+        choices=LLMProvider,
         default=LLMProvider.GEMINI,
     )
     api_model_name = models.CharField(
-        help_text="Specific model version (e.g., gemini-2.0-flash, claude-opus-4.1)",
+        help_text="Specific model version (e.g., gemini-3-pro-preview, claude-sonnet-4.5)",
         max_length=100,
         blank=True,
     )
     status = models.SmallIntegerField(
         help_text="The current status of the request",
-        choices=TaskStatus.NAMES,
+        choices=TaskStatus,
         default=TaskStatus.UNPROCESSED,
     )
     prompts = models.ManyToManyField(
@@ -207,14 +165,13 @@ class LLMRequest(AbstractDateTimeModel):
         blank=True,
     )
     extra_config_params = models.JSONField(
-        help_text="Additional input data or parameters for the LLM",
+        help_text="JSON object with additional provider-specific parameters (e.g., temperature, max_tokens).",
         default=dict,
         blank=True,
-        null=True,
     )
     batch_response_file = models.FileField(
         help_text="The batch response file from the LLM provider (e.g., a JSONL file)",
-        upload_to=make_response_file_path,
+        upload_to=make_llm_request_response_file_path,
         storage=IncrementingAWSMediaStorage(),
         max_length=1000,
         blank=True,
@@ -239,18 +196,18 @@ class LLMTask(AbstractDateTimeModel):
 
     status = models.SmallIntegerField(
         help_text="The current status of the task",
-        choices=TaskStatus.NAMES,
+        choices=TaskStatus,
         default=TaskStatus.UNPROCESSED,
     )
 
     llm_key = models.CharField(
         max_length=255,
-        help_text="The LLM key for this task",
+        help_text="A unique identifier for this task, used to map results back from a batch job.",
     )
 
     task = models.SmallIntegerField(
-        help_text="The task to run.",
-        choices=Task.NAMES,
+        help_text="The specific type of operation this task represents.",
+        choices=Task,
     )
 
     retry_count = models.SmallIntegerField(
@@ -265,15 +222,18 @@ class LLMTask(AbstractDateTimeModel):
     # Input file (generic - could be PDF, text, etc.)
     input_file = models.FileField(
         help_text="The input file to be processed (PDF, text, etc.)",
-        upload_to=make_input_file_path,
+        upload_to=make_llm_task_input_file_path,
         storage=IncrementingAWSMediaStorage(),
         max_length=1000,
         blank=True,
     )
+    input_text = models.TextField(
+        help_text="Text input for the task, if not using a file.", blank=True
+    )
 
     response_file = models.FileField(
         help_text="Full response from the LLM provider stored as a file",
-        upload_to=make_response_file_path,
+        upload_to=make_llm_task_response_file_path,
         storage=IncrementingAWSMediaStorage(),
         max_length=1000,
         blank=True,
