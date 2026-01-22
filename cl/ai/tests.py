@@ -1,5 +1,4 @@
 import os
-import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -153,48 +152,36 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_instance.files.upload.return_value = mock_uploaded_file
         mock_client_class.return_value = mock_client_instance
 
-        # Create a temporary test file
-        with tempfile.NamedTemporaryFile(
-            suffix=".pdf", delete=False
-        ) as temp_file:
-            temp_file.write(b"test pdf content")
-            temp_file_path = temp_file.name
+        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
+        tasks_data = [
+            {
+                "llm_key": "task-1",
+                "input_file_path": "/fake/path/test.pdf",
+            }
+        ]
 
-        try:
-            wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-            tasks_data = [
-                {
-                    "llm_key": "task-1",
-                    "input_file_path": temp_file_path,
-                }
-            ]
+        result = wrapper.prepare_batch_requests(
+            tasks_data=tasks_data, user_prompt="Extract text from this PDF"
+        )
 
-            result = wrapper.prepare_batch_requests(
-                tasks_data=tasks_data, user_prompt="Extract text from this PDF"
-            )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["key"], "task-1")
+        self.assertIn("request", result[0])
+        self.assertIn("contents", result[0]["request"])
 
-            self.assertEqual(len(result), 1)
-            self.assertEqual(result[0]["key"], "task-1")
-            self.assertIn("request", result[0])
-            self.assertIn("contents", result[0]["request"])
+        # Verify file was uploaded
+        mock_client_instance.files.upload.assert_called_once()
 
-            # Verify file was uploaded
-            mock_client_instance.files.upload.assert_called_once()
+        # Check the request structure
+        contents = result[0]["request"]["contents"]
+        self.assertEqual(len(contents), 1)
+        self.assertEqual(contents[0]["role"], "user")
 
-            # Check the request structure
-            contents = result[0]["request"]["contents"]
-            self.assertEqual(len(contents), 1)
-            self.assertEqual(contents[0]["role"], "user")
-
-            parts = contents[0]["parts"]
-            # Should have: file_data + user_prompt
-            self.assertEqual(len(parts), 2)
-            self.assertIn("file_data", parts[0])
-            self.assertEqual(parts[1]["text"], "Extract text from this PDF")
-
-        finally:
-            # Clean up temp file
-            os.remove(temp_file_path)
+        parts = contents[0]["parts"]
+        # Should have: file_data + user_prompt
+        self.assertEqual(len(parts), 2)
+        self.assertIn("file_data", parts[0])
+        self.assertEqual(parts[1]["text"], "Extract text from this PDF")
 
     @patch("cl.ai.llm_providers.google.genai.Client")
     def test_prepare_batch_requests_with_text_only(self, mock_client_class):

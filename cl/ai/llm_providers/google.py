@@ -207,6 +207,7 @@ class GoogleGenAIBatchWrapper:
             mode="w+", delete=False, suffix=".jsonl"
         ) as temp_f:
             temp_f.write(jsonl_content)
+            temp_f.flush()
             temp_file_path = temp_f.name
 
         try:
