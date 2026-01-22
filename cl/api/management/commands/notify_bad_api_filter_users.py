@@ -1,4 +1,5 @@
 import sys
+from datetime import date
 from typing import Any
 
 from django.contrib.auth.models import User
@@ -11,6 +12,8 @@ from cl.api.utils import (
     get_bad_filter_params_for_user,
 )
 from cl.lib.command_utils import VerboseCommand, logger
+
+ENFORCEMENT_DATE = date(2026, 2, 10)
 
 
 class Command(VerboseCommand):
@@ -129,6 +132,7 @@ class Command(VerboseCommand):
             "name": user.first_name or user.username,
             "params_by_endpoint": params_by_endpoint,
             "total_count": sum(r["count"] for r in bad_params),
+            "enforcement_date": ENFORCEMENT_DATE,
         }
 
         email_txt = txt_template.render(context)
