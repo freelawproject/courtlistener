@@ -50,6 +50,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
@@ -2243,3 +2244,96 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
             needs_ocr(header_text),
             msg="Should need OCR with only headers/pagination",
         )
+
+
+class TestS3CacheHelpers(TestCase):
+    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py"""
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_get_s3_cache_returns_fallback_in_development(self) -> None:
+        """In development mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        # In development, should return db_cache, not s3
+        # We verify by checking the cache backend class name
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_get_s3_cache_returns_fallback_in_testing(self) -> None:
+        """In testing mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_get_s3_cache_returns_s3_in_production(self) -> None:
+        """In production mode, get_s3_cache should return the S3 cache."""
+        mock_s3_cache = MagicMock()
+        mock_caches = {"s3": mock_s3_cache, "db_cache": MagicMock()}
+
+        with patch("cl.lib.s3_cache.caches", mock_caches):
+            with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+                cache = get_s3_cache("db_cache")
+                self.assertEqual(cache, mock_s3_cache)
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_no_prefix_in_development(self) -> None:
+        """In development mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_make_s3_cache_key_no_prefix_in_testing(self) -> None:
+        """In testing mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_adds_prefix_in_production(self) -> None:
+        """In production mode, cache key should have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, timeout)
+            self.assertEqual(result, f"7-days:{base_key}")
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_rounds_up_days(self) -> None:
+        """Days calculation should round up (e.g., 1.5 days -> 2 days)."""
+        base_key = "test-key"
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            # 1 day exactly
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 24), "1-days:test-key"
+            )
+
+            # 1.5 days -> rounds to 2
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 36), "2-days:test-key"
+            )
+
+            # 6 hours -> rounds to 1
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 6), "1-days:test-key"
+            )
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_persistent_in_production(self) -> None:
+        """In production, timeout=None should use persistent prefix."""
+        base_key = "clusters-mlt-es:123"
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, None)
+            self.assertEqual(result, f"persistent:{base_key}")
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_persistent_no_prefix_in_dev(self) -> None:
+        """In dev/test, timeout=None should return key unchanged."""
+        base_key = "clusters-mlt-es:123"
+        result = make_s3_cache_key(base_key, None)
+        self.assertEqual(result, base_key)
