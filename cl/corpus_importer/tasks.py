@@ -3621,7 +3621,9 @@ def merge_scotus_docket(
             docket=d,
             defaults=defaults,
         )
-        download_qp = qp_url and not scotus_metadata.questions_presented_file
+        download_qp = bool(
+            qp_url and not scotus_metadata.questions_presented_file
+        )
 
     # Merge Parties
     if report_data["parties"]:
