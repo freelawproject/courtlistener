@@ -11,10 +11,7 @@ from django.utils.html import format_html
 
 from cl.alerts.models import DocketAlert
 from cl.lib.admin import build_admin_url
-from cl.lib.cloud_front import invalidate_cloudfront
-from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.string_utils import trunc
-from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
     BankruptcyInformation,
     Citation,
@@ -35,6 +32,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SearchQuery,
 )
+from cl.search.utils import seal_documents
 from cl.visualizations.models import SCOTUSMap
 
 
@@ -361,7 +359,11 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = ("pk__exact",)
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by RECAP Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry", "tags")
     readonly_fields = (
         "date_created",
@@ -369,46 +371,29 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
     )
     actions = ("seal_documents",)
 
+    def get_search_results(
+        self, request: HttpRequest, queryset: QuerySet, search_term: str
+    ) -> tuple[QuerySet, bool]:
+        """Override to search by pk without varchar casting.
+
+        Django 6.0.1 casts non-text fields to CharField for text lookups,
+        which prevents index usage on large tables. This method handles
+        pk searches with direct integer comparison.
+
+        See: https://github.com/freelawproject/courtlistener/issues/6790
+        """
+        if not search_term:
+            return queryset, False
+
+        try:
+            pk_value = int(search_term.strip())
+            return queryset.filter(pk=pk_value), False
+        except ValueError:
+            return queryset.none(), False
+
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
-        ia_failures = []
-        deleted_filepaths = []
-        for rd in queryset:
-            # Thumbnail
-            if rd.thumbnail:
-                deleted_filepaths.append(rd.thumbnail.name)
-                rd.thumbnail.delete()
-
-            # PDF
-            if rd.filepath_local:
-                deleted_filepaths.append(rd.filepath_local.name)
-                rd.filepath_local.delete()
-
-            # Internet Archive
-            if rd.filepath_ia:
-                url = rd.filepath_ia
-                r = delete_from_ia(url)
-                if not r.ok:
-                    ia_failures.append(url)
-
-            # Clean up other fields and call save()
-            # Important to use save() to ensure these changes are updated in ES
-            rd.date_upload = None
-            rd.is_available = False
-            rd.is_sealed = True
-            rd.sha1 = ""
-            rd.page_count = None
-            rd.file_size = None
-            rd.ia_upload_failure_count = None
-            rd.filepath_ia = ""
-            rd.thumbnail_status = THUMBNAIL_STATUSES.NEEDED
-            rd.plain_text = ""
-            rd.ocr_status = None
-            rd.save()
-
-        # Do a CloudFront invalidation
-        invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
-
+        ia_failures = seal_documents(queryset)
         if ia_failures:
             self.message_user(
                 request,
