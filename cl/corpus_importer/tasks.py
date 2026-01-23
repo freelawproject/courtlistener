@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import logging
 import os
 import re
@@ -86,6 +87,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.utils import (
+    DownloadPDFResult,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
@@ -100,7 +102,7 @@ from cl.lib.courts import find_court_object_by_name
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
 from cl.lib.llm import call_llm
-from cl.lib.microservice_utils import microservice, rd_page_count_service
+from cl.lib.microservice_utils import doc_page_count_service, microservice
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -2454,7 +2456,7 @@ def update_rd_metadata(
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         rd.sha1 = sha1(pdf_bytes)
-        response = async_to_sync(rd_page_count_service)(rd)
+        response = async_to_sync(doc_page_count_service)(rd)
         if response.is_success:
             rd.page_count = int(response.text)
         assert isinstance(rd.page_count, (int | type(None))), (
@@ -3193,7 +3195,7 @@ def download_pdf_in_stream(
     url: str,
     identifier: str | int,
     temp_prefix: str = "scotus_",
-) -> Iterator[IO[bytes] | None]:
+) -> Iterator[tuple[IO[bytes], str] | None]:
     """Download a PDF in stream and yield a temporary file to avoid using too
     much memory
 
@@ -3214,6 +3216,7 @@ def download_pdf_in_stream(
         tmp_file.seek(0)
         # Clear any partial content from previous attempt
         tmp_file.truncate()
+        hasher = hashlib.sha1()
         with requests.get(
             url,
             stream=True,
@@ -3227,17 +3230,18 @@ def download_pdf_in_stream(
                     identifier,
                     url,
                 )
-                return False
+                return DownloadPDFResult(success=False)
             for chunk in response.iter_content(chunk_size=8 * 1024):
                 if chunk:
                     tmp_file.write(chunk)
+                    hasher.update(chunk)
             tmp_file.flush()
             tmp_file.seek(0)
-            return True
+            return DownloadPDFResult(success=True, sha1=hasher.hexdigest())
 
     with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
-        success = download_to_file(tmp)
-        yield tmp if success else None
+        result = download_to_file(tmp)
+        yield (tmp, result.sha1) if result.success else None
 
 
 @app.task(
@@ -3288,10 +3292,11 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         docket_id,
         qp_url,
     )
-    with download_pdf_in_stream(qp_url, docket_id, "scotus_qp_") as tmp:
-        if tmp is None:
+    with download_pdf_in_stream(qp_url, docket_id, "scotus_qp_") as result:
+        if result is None:
             return None
 
+        tmp, _ = result
         filename = f"{docket_id}-qp.pdf"
         scotus_meta.questions_presented_file.save(
             filename, File(tmp), save=True
@@ -3359,7 +3364,9 @@ def merge_scotus_document(
     if created:
         chain(
             download_scotus_document_pdf.si(scotus_document.pk),
-            extract_recap_pdf.s(court_id="scotus"),
+            extract_recap_pdf.s(
+                check_if_needed=False, model_name="search.SCOTUSDocument"
+            ),
         ).apply_async()
         return True, scotus_document.pk
     return False, scotus_document.pk
@@ -3672,8 +3679,8 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         doc_pk,
         url,
     )
-    with download_pdf_in_stream(url, doc_pk, "scotus_") as tmp:
-        if tmp is None:
+    with download_pdf_in_stream(url, doc_pk, "scotus_") as result:
+        if result is None:
             logger.error(
                 "Failed to download attachment PDF for SCOTUSDocument %s from URL %s.",
                 doc_pk,
@@ -3681,12 +3688,22 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
             )
             self.request.chain = None
             return None
+
+        tmp, sha1_hash = result
         filename = (
             f"scotus.{doc.docket_entry.docket.docket_number}."
             f"{doc.document_number}."
             f"{doc.attachment_number or 0}.pdf"
         )
-        doc.filepath_local = File(tmp, name=filename)
+        doc.filepath_local.save(filename, File(tmp), save=False)
+        doc.file_size = doc.filepath_local.size
+        doc.sha1 = sha1_hash
+        response = async_to_sync(doc_page_count_service)(doc)
+        if response.is_success:
+            doc.page_count = int(response.text)
+        assert isinstance(doc.page_count, (int | type(None))), (
+            "page_count must be an int or None."
+        )
         doc.save()
         return doc_pk
 

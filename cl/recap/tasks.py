@@ -72,7 +72,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.microservice_utils import rd_page_count_service
+from cl.lib.microservice_utils import doc_page_count_service
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     ProxyPacerSession,
@@ -461,7 +461,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
                 )
 
             # Do page count and extraction
-            response = await rd_page_count_service(rd)
+            response = await doc_page_count_service(rd)
             if response.is_success:
                 rd.page_count = int(response.text)
                 assert isinstance(rd.page_count, (int | type(None))), (

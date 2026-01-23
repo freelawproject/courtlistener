@@ -192,6 +192,8 @@ class ScotusDocketMergeTest(TestCase):
 
         self.assertEqual(rd_att_1.document_url, att_1["document_url"])
         self.assertTrue(rd_att_1.filepath_local)
+        self.assertEqual(rd_att_1.page_count, 1)
+        self.assertIsNotNone(rd_att_1.sha1)
         self.assertIn("UNITED", rd_att_1.plain_text)
 
         rd_att_2 = SCOTUSDocument.objects.filter(

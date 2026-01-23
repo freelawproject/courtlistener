@@ -11,6 +11,7 @@ import openai
 import requests
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
+from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
 from httpx import Response
@@ -29,6 +30,7 @@ from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
+from cl.lib.models import AbstractPDF
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
@@ -46,8 +48,6 @@ from cl.search.models import (
     Docket,
     Opinion,
     OriginatingCourtInformation,
-    RECAPDocument,
-    SCOTUSDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -441,7 +441,7 @@ def extract_recap_pdf(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-    court_id: str | None = None,
+    model_name: str = "search.RECAPDocument",
 ) -> list[int]:
     """Celery task wrapper for extract_recap_pdf_base
     Extract the contents from a RECAP PDF if necessary.
@@ -464,13 +464,14 @@ def extract_recap_pdf(
     :param ocr_available: Whether it's needed to perform OCR extraction.
     :param check_if_needed: Whether it's needed to check if the RECAPDocument
     needs extraction.
-    :param court_id: The court ID to use.
+    :param model_name: The name of the document model (inheriting from
+    `AbstractPDF`) to operate on.
 
-    :return: A list of processed RECAPDocument
+    :return: A list of processed document pks.
     """
 
     return async_to_sync(extract_recap_pdf_base)(
-        pks, ocr_available, check_if_needed, court_id
+        pks, ocr_available, check_if_needed, model_name
     )
 
 
@@ -478,31 +479,26 @@ async def extract_recap_pdf_base(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-    court_id: str | None = None,
+    model_name: str = "search.RECAPDocument",
 ) -> list[int]:
-    """Extract the contents from a RECAP PDF if necessary.
+    """Extract the contents from a PDF if necessary.
 
-    :param pks: The RECAPDocument pk or list of pks to work on.
-    :param ocr_available: Whether it's needed to perform OCR extraction.
-    :param check_if_needed: Whether it's needed to check if the RECAPDocument
+    :param pks: The document pk or list of pks to work on.
+    :param ocr_available: Whether it's necessary to perform OCR extraction.
+    :param check_if_needed: Whether it's necessary to check if the document
     needs extraction.
-    :param court_id: The court ID to work on.
+    :param model_name: The name of the document model (inheriting from
+    `AbstractPDF`) to operate on.
 
-    :return: A list of processed RECAPDocument
+    :return: A list of processed document pks.
     """
     if not is_iter(pks):
         pks = [pks]
 
+    model = apps.get_model(model_name)
     processed: list[int] = []
-
-    match court_id:
-        case "scotus":
-            document_class = SCOTUSDocument
-        case _:
-            document_class = RECAPDocument
-
     for pk in pks:
-        rd = await document_class.objects.aget(pk=pk)
+        rd = await model.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
@@ -532,14 +528,14 @@ async def extract_recap_pdf_base(
         has_content = bool(content)
         match has_content, extracted_by_ocr:
             case True, True:
-                rd.ocr_status = document_class.OCR_COMPLETE
+                rd.ocr_status = AbstractPDF.OCR_COMPLETE
             case True, False:
                 if not ocr_needed:
-                    rd.ocr_status = document_class.OCR_UNNECESSARY
+                    rd.ocr_status = AbstractPDF.OCR_UNNECESSARY
             case False, True:
-                rd.ocr_status = document_class.OCR_FAILED
+                rd.ocr_status = AbstractPDF.OCR_FAILED
             case False, False:
-                rd.ocr_status = document_class.OCR_NEEDED
+                rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
         await rd.asave(

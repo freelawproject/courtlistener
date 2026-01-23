@@ -4,6 +4,7 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Any
@@ -1268,3 +1269,11 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
         )
         .values_list("pk", flat=True)
     )
+
+
+@dataclass
+class DownloadPDFResult:
+    """Result of a PDF download operation."""
+
+    success: bool
+    sha1: str | None = None

@@ -60,7 +60,7 @@ async def clean_up_recap_document_file(item: RECAPDocument) -> None:
 async def microservice(
     service: str,
     method: str = "POST",
-    item: RECAPDocument | Opinion | Audio | None = None,
+    item: SCOTUSDocument | RECAPDocument | Opinion | Audio | None = None,
     file: BufferedReader | None = None,
     file_type: str | None = None,
     filepath: str | None = None,
@@ -154,7 +154,6 @@ async def microservice(
             params=params,
             timeout=services[service]["timeout"],
         )
-
         return await client.send(req)
 
 
@@ -165,16 +164,18 @@ async def microservice(
     backoff=2,
     logger=logger,
 )
-async def rd_page_count_service(rd: RECAPDocument) -> Response:
+async def doc_page_count_service(
+    doc: RECAPDocument | SCOTUSDocument,
+) -> Response:
     """Call page-count from doctor with retries
 
-    :param rd: the recap document to count pages
+    :param doc: the document to count pages
     :return: Response object
     """
     try:
         response = await microservice(
             service="page-count",
-            item=rd,
+            item=doc,
         )
         return response
     except ClientError as error:
