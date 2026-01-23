@@ -366,6 +366,54 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
 
+    @patch(
+        "cl.scrapers.management.commands.cl_scrape_opinions.Command.get_opinions_content"
+    )
+    def test_scrape_multiple_opinions_per_cluster(
+        self, patched_get_opinions_content
+    ):
+        """Test if we can ingest multiple opinions per opinion cluster"""
+        # Define two opinions for the same cluster
+        op1 = {
+            "download_urls": "https://example.com/op1.pdf",
+            "types": Opinion.LEAD,
+        }
+        op2 = {
+            "download_urls": "https://example.com/op2.pdf",
+            "types": Opinion.DISSENT,
+        }
+        returned_cluster = {
+            "docket_numbers": "123-456",
+            "case_names": "Multiple Opinion Case",
+            "case_dates": date(2023, 1, 1),
+            "precedential_statuses": "Published",
+            "date_filed_is_approximate": False,
+            "blocked_statuses": False,
+            "sub_opinions": [op1, op2],
+        }
+        patched_get_opinions_content.return_value = [
+            (op1, b"111", "111"),
+            (op2, b"222", "222"),
+        ]
+
+        mock_site = MagicMock()
+        mock_site.__iter__.return_value = [returned_cluster]
+        mock_site.court_id = "test"
+        mock_site.url = "111"
+        mock_site.hash = "234"
+
+        cl_scrape_opinions.Command().scrape_court(mock_site)
+
+        # a single cluster with 2 sub opinions was created
+        clusters = OpinionCluster.objects.filter(
+            docket__docket_number="123-456"
+        )
+        self.assertEqual(clusters.count(), 1)
+        cluster = clusters.first()
+
+        opinions = Opinion.objects.filter(cluster=cluster)
+        self.assertEqual(opinions.count(), 2)
+
 
 class IngestionTest(TestCase):
     fixtures = [
@@ -2038,3 +2086,35 @@ class SubscribeToSCOTUSTest(TestCase):
             1,
             "Should have requested exactly 1 transcription",
         )
+
+
+class SetOrderingKeysTest(SimpleTestCase):
+    def test_set_ordering_keys(self):
+        """Test if set_ordering_keys correctly assigns ordering_key to multiple opinions"""
+        opinions_content = [
+            (
+                {"types": "030concurrence", "download_urls": "url1"},
+                b"",
+                "sha1",
+            ),
+            ({"types": "020lead", "download_urls": "url2"}, b"", "sha2"),
+            ({"types": "040dissent", "download_urls": "url3"}, b"", "sha3"),
+            (
+                {"types": "030concurrence", "download_urls": "url4"},
+                b"",
+                "sha4",
+            ),
+        ]
+
+        cl_scrape_opinions.set_ordering_keys(opinions_content)
+
+        # Expected order based on types and original index:
+        # 020lead (index 1) -> 1
+        # 030concurrence (index 0) -> 2
+        # 030concurrence (index 3) -> 3
+        # 040dissent (index 2) -> 4
+
+        self.assertEqual(opinions_content[1][0]["ordering_key"], 1)
+        self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
+        self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
+        self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
