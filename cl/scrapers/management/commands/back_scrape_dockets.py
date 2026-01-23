@@ -8,8 +8,10 @@ import json
 import re
 import time
 from datetime import date, datetime
+from urllib.parse import urlparse
 
 import requests
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from juriscraper.lib.importer import build_module_list
@@ -197,6 +199,150 @@ class RateLimitedRequestManager:
         return self.request("POST", url, **kwargs)
 
 
+class ProxyRequestManager(RateLimitedRequestManager):
+    """Request manager that round-robins requests through a list of proxies.
+
+    Extends RateLimitedRequestManager with proxy support using the webhook
+    sentry pattern (converting HTTPS to HTTP and setting X-WhSentry-TLS header).
+
+    Attributes:
+        proxies: List of proxy addresses to round-robin through
+        _proxy_index: Current index in the proxy list
+    """
+
+    def __init__(
+        self,
+        proxies: list[str],
+        requests_per_second: float = 1.0,
+        max_backoff_seconds: int = 300,
+        session: requests.Session | None = None,
+        all_response_fn=None,
+    ) -> None:
+        """Initialize the proxy request manager.
+
+        Args:
+            proxies: List of proxy addresses to round-robin through
+            requests_per_second: Maximum requests per second (default 1.0)
+            max_backoff_seconds: Maximum backoff time for 403 retries (default 300)
+            session: Optional requests Session. If not provided, a new session
+                will be created with default headers.
+            all_response_fn: Optional callback function invoked after every
+                HTTP response.
+
+        Raises:
+            ValueError: If proxies list is empty
+        """
+        if not proxies:
+            raise ValueError("proxies list cannot be empty")
+
+        super().__init__(
+            requests_per_second=requests_per_second,
+            max_backoff_seconds=max_backoff_seconds,
+            session=session,
+            all_response_fn=all_response_fn,
+        )
+
+        self.proxies = proxies
+        self._proxy_index = 0
+
+        # Add the webhook sentry TLS header
+        if self.session:
+            self.session.headers["X-WhSentry-TLS"] = "true"
+
+    def _get_next_proxy(self) -> str:
+        """Get the next proxy in round-robin order.
+
+        Returns:
+            The next proxy address
+        """
+        proxy = self.proxies[self._proxy_index]
+        self._proxy_index = (self._proxy_index + 1) % len(self.proxies)
+        return proxy
+
+    def _change_protocol(self, url: str) -> str:
+        """Convert HTTPS URL to HTTP for webhook sentry proxy.
+
+        The proxy handles TLS termination when X-WhSentry-TLS header is set.
+
+        Args:
+            url: The URL to modify
+
+        Returns:
+            The URL with HTTPS converted to HTTP
+        """
+        parsed = urlparse(url)
+        return parsed._replace(scheme="http").geturl()
+
+    def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        **kwargs,
+    ) -> requests.Response:
+        """Make a request through proxy with exponential backoff retry on 403.
+
+        Overrides parent to add proxy configuration and URL conversion.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: URL to request
+            **kwargs: Additional arguments passed to session.request()
+
+        Returns:
+            The requests Response object
+
+        Raises:
+            requests.HTTPError: If max backoff time exceeded on 403
+        """
+        kwargs.setdefault("timeout", 60)
+        backoff = 1
+        total_wait = 0
+
+        # Convert HTTPS to HTTP for webhook sentry
+        url = self._change_protocol(url)
+
+        while True:
+            self._wait_for_rate_limit()
+            self._last_request_time = time.monotonic()
+
+            if not self.session:
+                raise ValueError(
+                    "RequestManager has no session, likely invoked after closed."
+                )
+
+            # Set proxy for this request
+            proxy_address = self._get_next_proxy()
+            kwargs["proxies"] = {"http": proxy_address}
+
+            response = self.session.request(method, url, **kwargs)
+
+            if response.status_code != 403:
+                response.raise_for_status()
+                return response
+
+            # Handle 403 with exponential backoff
+            if total_wait >= self.max_backoff_seconds:
+                logger.error(
+                    "Max backoff time (%d seconds) exceeded for URL: %s",
+                    self.max_backoff_seconds,
+                    url,
+                )
+                response.raise_for_status()
+
+            logger.warning(
+                "Received 403 Forbidden for %s. Backing off for %d seconds (total: %d/%d)",
+                url,
+                backoff,
+                total_wait,
+                self.max_backoff_seconds,
+            )
+            time.sleep(backoff)
+            total_wait += backoff
+            backoff = min(backoff * 2, self.max_backoff_seconds - total_wait)
+            if backoff <= 0:
+                backoff = 1
+
+
 def save_docket_response(
     response: requests.Response,
     scraper_class_name: str,
@@ -358,6 +504,7 @@ class Command(BaseCommand):
         case_rm_args = {
             "requests_per_second": options["case_rate"],
             "max_backoff_seconds": options["max_backoff"],
+            "proxies": settings.EGRESS_PROXY_HOSTS,
             # We are manually processing the saves here since we can do it with a bit more info
         }
 
@@ -365,7 +512,7 @@ class Command(BaseCommand):
             RateLimitedRequestManager(
                 **search_rm_args
             ) as search_request_manager,
-            RateLimitedRequestManager(**case_rm_args) as case_request_manager,
+            ProxyRequestManager(**case_rm_args) as case_request_manager,
         ):
             # Instantiate the scraper with our rate-limited search request manager
             scraper = scraper_class(request_manager=search_request_manager)
