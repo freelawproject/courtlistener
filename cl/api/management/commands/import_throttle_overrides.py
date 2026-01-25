@@ -11,6 +11,16 @@ from cl.lib.command_utils import VerboseCommand, logger
 # Rates that indicate blocking (workarounds used before we had proper blocking)
 BLOCKED_RATES = {"1/hour", "10/hour"}
 
+# Stats tracking for import operations
+STATS = {
+    "total": 0,
+    "blocked": 0,
+    "rate_limited": 0,
+    "user_not_found": 0,
+    "already_exists": 0,
+    "errors": 0,
+}
+
 
 class Command(VerboseCommand):
     """Import throttle overrides from settings into the database.
@@ -38,7 +48,6 @@ class Command(VerboseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         super().handle(*args, **options)
-        self.options = options
         self.dry_run = options["dry_run"]
 
         if self.dry_run:
@@ -55,58 +64,42 @@ class Command(VerboseCommand):
             "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES", {}
         )
 
-        api_stats = self._import_overrides(
-            api_overrides, ThrottleType.API, "API"
-        )
-        citation_stats = self._import_overrides(
+        self._import_overrides(api_overrides, ThrottleType.API, "API")
+
+        self._import_overrides(
             citation_overrides, ThrottleType.CITATION_LOOKUP, "Citation Lookup"
         )
-
-        self._print_summary(api_stats, citation_stats)
+        self._print_summary()
 
     def _import_overrides(
         self,
         overrides: dict[str, str],
         throttle_type: int,
         type_name: str,
-    ) -> dict[str, int]:
+    ) -> None:
         """Import a set of throttle overrides.
 
         :param overrides: Dict mapping username to rate string.
         :param throttle_type: The ThrottleType value.
         :param type_name: Human-readable name for logging.
-        :return: Stats dict with counts of created, blocked, skipped, etc.
         """
-        stats = {
-            "total": len(overrides),
-            "created": 0,
-            "blocked": 0,
-            "rate_limited": 0,
-            "user_not_found": 0,
-            "already_exists": 0,
-            "errors": 0,
-        }
-
+        STATS["total"] += len(overrides)
         logger.info(f"Processing {len(overrides)} {type_name} overrides...")
 
         for username, rate in overrides.items():
-            result = self._process_override(username, rate, throttle_type)
-            stats[result] += 1
-
-        return stats
+            self._process_override(username, rate, throttle_type)
 
     def _process_override(
         self,
         username: str,
         rate: str,
         throttle_type: int,
-    ) -> str:
+    ) -> None:
         """Process a single throttle override.
 
         :param username: The username to create the override for.
         :param rate: The rate string (e.g., "1000/hour").
         :param throttle_type: The ThrottleType value.
-        :return: Result category string for stats tracking.
         """
         try:
             user = User.objects.get(username=username)
@@ -115,7 +108,8 @@ class Command(VerboseCommand):
                 sys.stdout.write(f"  SKIP: User '{username}' not found\n")
             else:
                 logger.warning(f"User '{username}' not found, skipping")
-            return "user_not_found"
+            STATS["user_not_found"] += 1
+            return
 
         is_blocked = rate in BLOCKED_RATES
 
@@ -124,7 +118,8 @@ class Command(VerboseCommand):
             sys.stdout.write(
                 f"  {action}: {username} ({ThrottleType(throttle_type).label})\n"
             )
-            return "blocked" if is_blocked else "rate_limited"
+            STATS["blocked" if is_blocked else "rate_limited"] += 1
+            return
 
         try:
             if is_blocked:
@@ -135,7 +130,7 @@ class Command(VerboseCommand):
                     rate="",
                     notes=f"Imported from settings. Original rate: {rate}",
                 )
-                return "blocked"
+                STATS["blocked"] += 1
             else:
                 APIThrottle.objects.create(
                     user=user,
@@ -144,61 +139,49 @@ class Command(VerboseCommand):
                     rate=rate,
                     notes="Imported from settings.",
                 )
-                return "rate_limited"
+                STATS["rate_limited"] += 1
 
         except IntegrityError:
             logger.warning(
                 f"APIThrottle already exists for user '{username}' "
                 f"and throttle_type {throttle_type}"
             )
-            return "already_exists"
+            STATS["already_exists"] += 1
         except Exception as e:
             logger.error(f"Error creating APIThrottle for '{username}': {e}")
-            return "errors"
+            STATS["errors"] += 1
 
     def _print_summary(
-        self,
-        api_stats: dict[str, int],
-        citation_stats: dict[str, int],
+        self
     ) -> None:
-        """Print a summary of the import operation.
-
-        :param api_stats: Stats dict for API overrides.
-        :param citation_stats: Stats dict for Citation overrides.
-        """
+        """Print a summary of the import operation."""
         sys.stdout.write("\n" + "=" * 60 + "\n")
         sys.stdout.write("IMPORT SUMMARY\n")
         sys.stdout.write("=" * 60 + "\n\n")
 
-        for name, stats in [
-            ("API Throttles", api_stats),
-            ("Citation Lookup Throttles", citation_stats),
-        ]:
-            sys.stdout.write(f"{name}:\n")
-            sys.stdout.write(f"  Total in settings:    {stats['total']}\n")
-            if self.dry_run:
-                sys.stdout.write(
-                    f"  Would block:          {stats['blocked']}\n"
-                )
-                sys.stdout.write(
-                    f"  Would rate limit:     {stats['rate_limited']}\n"
-                )
-            else:
-                created = stats["blocked"] + stats["rate_limited"]
-                sys.stdout.write(
-                    f"  Created (blocked):    {stats['blocked']}\n"
-                )
-                sys.stdout.write(
-                    f"  Created (rate limit): {stats['rate_limited']}\n"
-                )
-                sys.stdout.write(
-                    f"  Already exists:       {stats['already_exists']}\n"
-                )
+        sys.stdout.write(f"  Total in settings:    {STATS['total']}\n")
+        if self.dry_run:
             sys.stdout.write(
-                f"  User not found:       {stats['user_not_found']}\n"
+                f"  Would block:          {STATS['blocked']}\n"
             )
-            if stats["errors"]:
-                sys.stdout.write(
-                    f"  Errors:               {stats['errors']}\n"
-                )
-            sys.stdout.write("\n")
+            sys.stdout.write(
+                f"  Would rate limit:     {STATS['rate_limited']}\n"
+            )
+        else:
+            sys.stdout.write(
+                f"  Created (blocked):    {STATS['blocked']}\n"
+            )
+            sys.stdout.write(
+                f"  Created (rate limit): {STATS['rate_limited']}\n"
+            )
+            sys.stdout.write(
+                f"  Already exists:       {STATS['already_exists']}\n"
+            )
+        sys.stdout.write(
+            f"  User not found:       {STATS['user_not_found']}\n"
+        )
+        if STATS["errors"]:
+            sys.stdout.write(
+                f"  Errors:               {STATS['errors']}\n"
+            )
+        sys.stdout.write("\n")
