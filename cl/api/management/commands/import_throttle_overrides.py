@@ -151,9 +151,7 @@ class Command(VerboseCommand):
             logger.error(f"Error creating APIThrottle for '{username}': {e}")
             STATS["errors"] += 1
 
-    def _print_summary(
-        self
-    ) -> None:
+    def _print_summary(self) -> None:
         """Print a summary of the import operation."""
         sys.stdout.write("\n" + "=" * 60 + "\n")
         sys.stdout.write("IMPORT SUMMARY\n")
@@ -161,16 +159,12 @@ class Command(VerboseCommand):
 
         sys.stdout.write(f"  Total in settings:    {STATS['total']}\n")
         if self.dry_run:
-            sys.stdout.write(
-                f"  Would block:          {STATS['blocked']}\n"
-            )
+            sys.stdout.write(f"  Would block:          {STATS['blocked']}\n")
             sys.stdout.write(
                 f"  Would rate limit:     {STATS['rate_limited']}\n"
             )
         else:
-            sys.stdout.write(
-                f"  Created (blocked):    {STATS['blocked']}\n"
-            )
+            sys.stdout.write(f"  Created (blocked):    {STATS['blocked']}\n")
             sys.stdout.write(
                 f"  Created (rate limit): {STATS['rate_limited']}\n"
             )
@@ -181,7 +175,5 @@ class Command(VerboseCommand):
             f"  User not found:       {STATS['user_not_found']}\n"
         )
         if STATS["errors"]:
-            sys.stdout.write(
-                f"  Errors:               {STATS['errors']}\n"
-            )
+            sys.stdout.write(f"  Errors:               {STATS['errors']}\n")
         sys.stdout.write("\n")
