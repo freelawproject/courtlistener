@@ -2337,3 +2337,131 @@ class TestS3CacheHelpers(TestCase):
         base_key = "clusters-mlt-es:123"
         result = make_s3_cache_key(base_key, None)
         self.assertEqual(result, base_key)
+
+
+class TieredCacheTest(SimpleTestCase):
+    """Tests for the tiered_cache decorator."""
+
+    def setUp(self) -> None:
+        from cl.lib.decorators import clear_tiered_cache
+
+        clear_tiered_cache()
+        cache.clear()
+        self.call_count = 0
+
+    def tearDown(self) -> None:
+        from cl.lib.decorators import clear_tiered_cache
+
+        clear_tiered_cache()
+        cache.clear()
+
+    def test_caches_result(self) -> None:
+        """Test that tiered_cache caches the result of a function."""
+        from cl.lib.decorators import tiered_cache
+
+        @tiered_cache(timeout=60)
+        def expensive_function(x: int) -> int:
+            self.call_count += 1
+            return x * 2
+
+        # First call should execute the function
+        result1 = expensive_function(5)
+        self.assertEqual(result1, 10)
+        self.assertEqual(self.call_count, 1)
+
+        # Second call should return cached result
+        result2 = expensive_function(5)
+        self.assertEqual(result2, 10)
+        self.assertEqual(self.call_count, 1)  # Still 1, not called again
+
+    def test_different_args_produce_different_cache_keys(self) -> None:
+        """Test that different arguments produce different cache entries."""
+        from cl.lib.decorators import tiered_cache
+
+        @tiered_cache(timeout=60)
+        def multiply(x: int, y: int) -> int:
+            self.call_count += 1
+            return x * y
+
+        # First call with (2, 3)
+        result1 = multiply(2, 3)
+        self.assertEqual(result1, 6)
+        self.assertEqual(self.call_count, 1)
+
+        # Call with different args (3, 4)
+        result2 = multiply(3, 4)
+        self.assertEqual(result2, 12)
+        self.assertEqual(self.call_count, 2)
+
+        # Call again with (2, 3) - should be cached
+        result3 = multiply(2, 3)
+        self.assertEqual(result3, 6)
+        self.assertEqual(self.call_count, 2)
+
+    def test_memory_cache_is_checked_before_redis(self) -> None:
+        """Test that memory cache is checked before Redis cache."""
+        from cl.lib.decorators import tiered_cache
+
+        @tiered_cache(timeout=60)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        # First call populates both caches
+        result1 = get_value()
+        self.assertEqual(result1, "value")
+        self.assertEqual(self.call_count, 1)
+
+        # Clear Redis cache but leave memory cache
+        cache.clear()
+
+        # Second call should still return cached result from memory
+        result2 = get_value()
+        self.assertEqual(result2, "value")
+        self.assertEqual(self.call_count, 1)
+
+    def test_redis_cache_populates_memory_cache(self) -> None:
+        """Test that reading from Redis cache also populates memory cache."""
+        from cl.lib.decorators import (
+            clear_tiered_cache,
+            tiered_cache,
+        )
+
+        @tiered_cache(timeout=60)
+        def get_data() -> dict:
+            self.call_count += 1
+            return {"key": "value"}
+
+        # First call
+        result1 = get_data()
+        self.assertEqual(result1, {"key": "value"})
+        self.assertEqual(self.call_count, 1)
+
+        # Clear memory cache but leave Redis cache
+        clear_tiered_cache()
+
+        # Second call should read from Redis and repopulate memory
+        result2 = get_data()
+        self.assertEqual(result2, {"key": "value"})
+        self.assertEqual(self.call_count, 1)  # Still 1, read from Redis
+
+    def test_kwargs_affect_cache_key(self) -> None:
+        """Test that keyword arguments are included in cache key."""
+        from cl.lib.decorators import tiered_cache
+
+        @tiered_cache(timeout=60)
+        def greet(name: str, greeting: str = "Hello") -> str:
+            self.call_count += 1
+            return f"{greeting}, {name}!"
+
+        result1 = greet("Alice", greeting="Hello")
+        self.assertEqual(result1, "Hello, Alice!")
+        self.assertEqual(self.call_count, 1)
+
+        result2 = greet("Alice", greeting="Hi")
+        self.assertEqual(result2, "Hi, Alice!")
+        self.assertEqual(self.call_count, 2)
+
+        result3 = greet("Alice", greeting="Hello")
+        self.assertEqual(result3, "Hello, Alice!")
+        self.assertEqual(self.call_count, 2)  # Cached
