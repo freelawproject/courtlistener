@@ -3,10 +3,122 @@ from http import HTTPStatus
 
 import pghistory
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
+
+# Duration map for rate parsing (mirrors DRF's SimpleRateThrottle)
+RATE_DURATION_MAP = {
+    "s": 1,
+    "sec": 1,
+    "second": 1,
+    "m": 60,
+    "min": 60,
+    "minute": 60,
+    "h": 3600,
+    "hour": 3600,
+    "d": 86400,
+    "day": 86400,
+}
+
+
+def parse_rate(rate: str) -> tuple[int, int] | None:
+    """Parse rate string like '100/hour' into (num_requests, duration_seconds).
+
+    This mirrors DRF's SimpleRateThrottle.parse_rate() but can be used without
+    instantiating a throttle class.
+
+    :param rate: Rate string in format 'number/period' (e.g., '100/hour').
+    :return: Tuple of (num_requests, duration_seconds) or None if invalid.
+    """
+    if not rate:
+        return None
+
+    try:
+        num_str, period = rate.split("/")
+        num_requests = int(num_str)
+    except (ValueError, AttributeError):
+        return None
+
+    duration = RATE_DURATION_MAP.get(period.lower())
+    if duration is None:
+        return None
+
+    return num_requests, duration
+
+
+class ThrottleType(models.IntegerChoices):
+    API = 1, "API"
+    CITATION_LOOKUP = 2, "Citation Lookup"
+
+
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+    model_name="APIThrottleHistoryEvent",
+)
+class APIThrottle(AbstractDateTimeModel):
+    """Override rate limits or block specific users for API endpoints."""
+
+    user: models.ForeignKey[User, User] = models.ForeignKey(
+        User,
+        help_text="The user whose throttle rate is being overridden.",
+        related_name="api_throttles",
+        on_delete=models.CASCADE,
+    )
+    throttle_type: models.SmallIntegerField = models.SmallIntegerField(
+        help_text="The type of throttle being overridden.",
+        choices=ThrottleType.choices,
+    )
+    blocked: models.BooleanField = models.BooleanField(
+        help_text="If True, the user is blocked from making requests. "
+        "Takes precedence over rate.",
+        default=False,
+    )
+    rate: models.CharField = models.CharField(
+        help_text="The rate limit (e.g., '100/hour', '1000/day'). "
+        "Required if not blocked.",
+        max_length=20,
+        blank=True,
+    )
+    notes: models.TextField = models.TextField(
+        help_text="Admin notes about why this override exists.",
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "throttle_type"],
+                name="unique_user_throttle_type",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        if self.blocked:
+            return f"<APIThrottle: {self.user.username} blocked for {self.get_throttle_type_display()}>"
+        return f"<APIThrottle: {self.user.username} at {self.rate} for {self.get_throttle_type_display()}>"
+
+    def clean(self) -> None:
+        super().clean()
+        if not self.blocked and not self.rate:
+            raise ValidationError(
+                {"rate": "Rate is required when user is not blocked."}
+            )
+        if self.rate:
+            # Validate rate format
+            result = parse_rate(self.rate)
+            if result is None:
+                raise ValidationError(
+                    {
+                        "rate": f"Invalid rate format: {self.rate}. "
+                        "Use format like '100/hour', '1000/day', '60/min'."
+                    }
+                )
 
 
 class WebhookEventType(models.IntegerChoices):

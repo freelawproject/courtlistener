@@ -4675,3 +4675,174 @@ class UnknownFilterParameterUtilsTests(SimpleTestCase):
         self.assertFalse(
             is_valid_filter_param(deep_circular_path, DocketFilter)
         )
+
+
+class APIThrottleModelTest(TestCase):
+    """Tests for the APIThrottle model."""
+
+    def test_create_api_throttle_with_rate(self) -> None:
+        """Test creating an APIThrottle with a rate limit."""
+        from cl.api.factories import APIThrottleFactory
+        from cl.api.models import ThrottleType
+
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="1000/hour",
+        )
+
+        self.assertEqual(throttle.rate, "1000/hour")
+        self.assertFalse(throttle.blocked)
+        self.assertEqual(throttle.throttle_type, ThrottleType.API)
+
+    def test_create_blocked_throttle(self) -> None:
+        """Test creating a blocked APIThrottle."""
+        from cl.api.factories import APIThrottleFactory
+        from cl.api.models import ThrottleType
+
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=True,
+            rate="",
+        )
+
+        self.assertTrue(throttle.blocked)
+
+    def test_str_representation_with_rate(self) -> None:
+        """Test __str__ returns correct format for rate-limited user."""
+        from cl.api.factories import APIThrottleFactory
+        from cl.api.models import ThrottleType
+
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="5000/hour",
+        )
+
+        self.assertIn(throttle.user.username, str(throttle))
+        self.assertIn("5000/hour", str(throttle))
+        self.assertIn("API", str(throttle))
+
+    def test_str_representation_blocked(self) -> None:
+        """Test __str__ returns correct format for blocked user."""
+        from cl.api.factories import APIThrottleFactory
+        from cl.api.models import ThrottleType
+
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            blocked=True,
+            rate="",
+        )
+
+        self.assertIn(throttle.user.username, str(throttle))
+        self.assertIn("blocked", str(throttle))
+        self.assertIn("Citation Lookup", str(throttle))
+
+    def test_rate_validation_accepts_valid_formats(self) -> None:
+        """Test that rate validation accepts valid rate formats."""
+
+        from cl.api.factories import APIThrottleFactory
+
+        valid_rates = [
+            "100/hour",
+            "1000/day",
+            "60/min",
+            "5000/hour",
+            "10/second",
+        ]
+
+        for rate in valid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                # Should not raise
+                throttle.clean()
+
+    def test_rate_validation_rejects_invalid_formats(self) -> None:
+        """Test that rate validation rejects invalid rate formats."""
+        from django.core.exceptions import ValidationError
+
+        from cl.api.factories import APIThrottleFactory
+
+        invalid_rates = [
+            "invalid",
+            "100",
+            "/hour",
+            "abc/hour",
+            "100/",
+            "100/invalid",
+        ]
+
+        for rate in invalid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                with self.assertRaises(ValidationError) as ctx:
+                    throttle.clean()
+                self.assertIn("rate", ctx.exception.message_dict)
+
+    def test_blocked_user_does_not_require_rate(self) -> None:
+        """Test that blocked users don't need a rate."""
+        from cl.api.factories import APIThrottleFactory
+
+        throttle = APIThrottleFactory.build(blocked=True, rate="")
+        # Should not raise
+        throttle.clean()
+
+    def test_non_blocked_user_requires_rate(self) -> None:
+        """Test that non-blocked users must have a rate."""
+        from django.core.exceptions import ValidationError
+
+        from cl.api.factories import APIThrottleFactory
+
+        throttle = APIThrottleFactory.build(blocked=False, rate="")
+        with self.assertRaises(ValidationError) as ctx:
+            throttle.clean()
+        self.assertIn("rate", ctx.exception.message_dict)
+
+    def test_unique_constraint_user_throttle_type(self) -> None:
+        """Test that user+throttle_type combination must be unique."""
+        from django.db import IntegrityError
+
+        from cl.api.factories import APIThrottleFactory
+        from cl.api.models import ThrottleType
+
+        throttle1 = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="1000/hour",
+        )
+
+        with self.assertRaises(IntegrityError):
+            APIThrottleFactory(
+                user=throttle1.user,
+                throttle_type=ThrottleType.API,
+                rate="2000/hour",
+            )
+
+    def test_same_user_different_throttle_types_allowed(self) -> None:
+        """Test that same user can have different throttle types."""
+        from cl.api.factories import APIThrottleFactory
+        from cl.api.models import ThrottleType
+
+        throttle1 = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="1000/hour",
+        )
+
+        # Should not raise
+        throttle2 = APIThrottleFactory(
+            user=throttle1.user,
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="60/min",
+        )
+
+        self.assertEqual(throttle1.user, throttle2.user)
+        self.assertNotEqual(throttle1.throttle_type, throttle2.throttle_type)
+
+    def test_factory_creates_valid_throttle(self) -> None:
+        """Test that the factory creates a valid APIThrottle."""
+        from cl.api.factories import APIThrottleFactory
+
+        throttle = APIThrottleFactory()
+
+        self.assertIsNotNone(throttle.pk)
+        self.assertIsNotNone(throttle.user)
+        self.assertIsNotNone(throttle.rate)
