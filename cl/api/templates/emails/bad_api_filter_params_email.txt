@@ -54,8 +54,8 @@ backwards incompatibility. The only functionality we are removing is the
 ability to use the API incorrectly, which should help fix clients that are not
 working properly.
 
-This email will be re-sent with daily updates for approximately two weeks until
-we begin blocking these requests instead of simply alerting about them.
+This email will be re-sent with daily updates until {{ enforcement_date|date:"F jS, Y" }}
+when we will begin blocking these requests instead of simply alerting about them.
 
 We hope you understand, and we appreciate your assistance making our APIs work
 well for all of our users.

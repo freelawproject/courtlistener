@@ -18,7 +18,6 @@ from cl.people_db.sitemap import PersonSitemap
 from cl.search.models import SEARCH_TYPES
 from cl.simple_pages.sitemap import SimpleSitemap
 from cl.sitemap import cached_sitemap
-from cl.visualizations.sitemap import VizSitemap
 
 register_converter(BlankSlugConverter, "blank-slug")
 
@@ -27,7 +26,6 @@ sitemaps = {
     SEARCH_TYPES.OPINION: OpinionSitemap,
     SEARCH_TYPES.PEOPLE: PersonSitemap,
     "disclosures": DisclosureSitemap,
-    "visualizations": VizSitemap,
     "simple": SimpleSitemap,
     "blocked-audio": BlockedAudioSitemap,
     "blocked-dockets": BlockedDocketSitemap,
