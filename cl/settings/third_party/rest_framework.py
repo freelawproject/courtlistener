@@ -26,9 +26,6 @@ REST_FRAMEWORK = {
         "user": "5000/hour",
         "citations": "60/min",
     },
-    # Note: Throttle overrides are now stored in the database (APIThrottle model)
-    # and managed via Django admin. Use the import_throttle_overrides command
-    # to migrate existing overrides from this file to the database.
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.BasicAuthentication",

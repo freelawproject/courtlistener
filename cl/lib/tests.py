@@ -18,6 +18,7 @@ from cl.lib.courts import (
     lookup_child_courts_cache,
 )
 from cl.lib.date_time import midnight_pt
+from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
@@ -2343,21 +2344,14 @@ class TieredCacheTest(SimpleTestCase):
     """Tests for the tiered_cache decorator."""
 
     def setUp(self) -> None:
-        from cl.lib.decorators import clear_tiered_cache
-
         clear_tiered_cache()
-        cache.clear()
         self.call_count = 0
 
     def tearDown(self) -> None:
-        from cl.lib.decorators import clear_tiered_cache
-
         clear_tiered_cache()
-        cache.clear()
 
     def test_caches_result(self) -> None:
         """Test that tiered_cache caches the result of a function."""
-        from cl.lib.decorators import tiered_cache
 
         @tiered_cache(timeout=60)
         def expensive_function(x: int) -> int:
@@ -2376,7 +2370,6 @@ class TieredCacheTest(SimpleTestCase):
 
     def test_different_args_produce_different_cache_keys(self) -> None:
         """Test that different arguments produce different cache entries."""
-        from cl.lib.decorators import tiered_cache
 
         @tiered_cache(timeout=60)
         def multiply(x: int, y: int) -> int:
@@ -2400,7 +2393,6 @@ class TieredCacheTest(SimpleTestCase):
 
     def test_memory_cache_is_checked_before_redis(self) -> None:
         """Test that memory cache is checked before Redis cache."""
-        from cl.lib.decorators import tiered_cache
 
         @tiered_cache(timeout=60)
         def get_value() -> str:
@@ -2412,8 +2404,11 @@ class TieredCacheTest(SimpleTestCase):
         self.assertEqual(result1, "value")
         self.assertEqual(self.call_count, 1)
 
-        # Clear Redis cache but leave memory cache
-        cache.clear()
+        # Clear Redis cache but leave memory cache (clear only tiered: keys)
+        r = get_redis_interface("CACHE")
+        keys = list(r.scan_iter(match=":1:tiered:*"))
+        if keys:
+            r.delete(*keys)
 
         # Second call should still return cached result from memory
         result2 = get_value()
@@ -2422,10 +2417,6 @@ class TieredCacheTest(SimpleTestCase):
 
     def test_redis_cache_populates_memory_cache(self) -> None:
         """Test that reading from Redis cache also populates memory cache."""
-        from cl.lib.decorators import (
-            clear_tiered_cache,
-            tiered_cache,
-        )
 
         @tiered_cache(timeout=60)
         def get_data() -> dict:
@@ -2437,8 +2428,8 @@ class TieredCacheTest(SimpleTestCase):
         self.assertEqual(result1, {"key": "value"})
         self.assertEqual(self.call_count, 1)
 
-        # Clear memory cache but leave Redis cache
-        clear_tiered_cache()
+        # Clear only memory cache, leave Redis cache intact
+        _memory_cache.clear()
 
         # Second call should read from Redis and repopulate memory
         result2 = get_data()
@@ -2447,7 +2438,6 @@ class TieredCacheTest(SimpleTestCase):
 
     def test_kwargs_affect_cache_key(self) -> None:
         """Test that keyword arguments are included in cache key."""
-        from cl.lib.decorators import tiered_cache
 
         @tiered_cache(timeout=60)
         def greet(name: str, greeting: str = "Hello") -> str:
