@@ -42,6 +42,7 @@ from cl.api.factories import (
 )
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
+    ThrottleType,
     WebhookEvent,
     WebhookEventType,
 )
@@ -49,6 +50,7 @@ from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     LoggingMixin,
     detect_unknown_filter_params,
+    get_all_throttle_overrides,
     get_logging_prefix,
     invert_user_logs,
     is_valid_filter_param,
@@ -72,6 +74,7 @@ from cl.disclosures.api_views import (
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -4736,3 +4739,89 @@ class APIThrottleModelTest(TestCase):
         with self.assertRaises(ValidationError) as ctx:
             throttle.clean()
         self.assertIn("rate", ctx.exception.message_dict)
+
+
+class ThrottleOverrideIntegrationTest(TestCase):
+    """Integration tests for throttle overrides using the APIThrottle model."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_get_all_throttle_overrides_returns_dict(self) -> None:
+        """Test that get_all_throttle_overrides returns a dict of overrides."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="10000/hour",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertFalse(blocked)
+        self.assertEqual(rate, "10000/hour")
+
+    def test_get_all_throttle_overrides_returns_blocked_status(self) -> None:
+        """Test that blocked users are correctly returned."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=True,
+            rate="",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertTrue(blocked)
+        self.assertEqual(rate, "")
+
+    def test_throttle_overrides_are_cached(self) -> None:
+        """Test that throttle overrides are cached."""
+        # Create a throttle
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="5000/hour",
+        )
+
+        # First call
+        overrides1 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides1)
+
+        # Delete the throttle from DB
+        throttle.delete()
+
+        # Second call should still return cached result
+        overrides2 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides2)
+
+        # Clear cache and call again
+        clear_tiered_cache()
+        overrides3 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(throttle.user.username, overrides3)
+
+    def test_different_throttle_types_have_separate_caches(self) -> None:
+        """Test that API and CITATION_LOOKUP have separate cache entries."""
+        api_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="10000/hour",
+        )
+        citation_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="120/min",
+        )
+
+        api_overrides = get_all_throttle_overrides(ThrottleType.API)
+        citation_overrides = get_all_throttle_overrides(
+            ThrottleType.CITATION_LOOKUP
+        )
+
+        self.assertIn(api_throttle.user.username, api_overrides)
+        self.assertNotIn(citation_throttle.user.username, api_overrides)
+
+        self.assertIn(citation_throttle.user.username, citation_overrides)
+        self.assertNotIn(api_throttle.user.username, citation_overrides)
