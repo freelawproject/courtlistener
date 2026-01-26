@@ -1192,6 +1192,13 @@ def build_has_child_query(
     }
     if highlight_options and child_highlighting:
         inner_hits["highlight"] = highlight_options
+    if alerts and child_type == "recap_document":
+        inner_hits["sort"] = [
+            {"_score": {"order": "desc"}},
+            {"document_number": {"order": "asc", "missing": "_last"}},
+            {"attachment_number": {"order": "asc", "missing": "_last"}},
+            {"id": {"order": "asc"}},
+        ]
 
     return Q(
         "has_child",
