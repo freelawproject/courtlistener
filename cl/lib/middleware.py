@@ -1,3 +1,4 @@
+import os
 from collections.abc import Awaitable, Callable
 
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
@@ -94,7 +95,10 @@ class IncrementalNewTemplateMiddleware:
 
         # {response.template_name} could return a list if TemplateView is used directly
         old_template = response.template_name
-        if isinstance(old_template, list | tuple):
+        path_exists = os.path.exists(f"/cl/api/templates/{old_template[0]}")
+        if isinstance(old_template, list | tuple) and path_exists:
+            old_template = old_template[0]
+        else:
             old_template = old_template[1]
 
         if not isinstance(old_template, str):
