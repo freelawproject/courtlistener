@@ -7,6 +7,7 @@ multiple courts within a state, with rate limiting and retry support.
 import json
 import re
 import time
+from collections.abc import Mapping
 from datetime import date, datetime
 
 import requests
@@ -16,7 +17,35 @@ from juriscraper.lib.importer import build_module_list
 from juriscraper.state.BaseStateScraper import BaseStateScraper
 
 from cl.lib.command_utils import logger
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
+
+REDIS_AUTORESUME_KEY = "scraper:TAMES:end-date"
+
+REDIS = get_redis_interface("CACHE")
+
+
+def get_last_checkpoint() -> date | None:
+    stored_values = REDIS.hgetall(REDIS_AUTORESUME_KEY)
+    if not (stored_values and stored_values.get("checkpoint")):
+        return None
+    latest_checkpoint = datetime.strptime(
+        stored_values.get("checkpoint"),  # type: ignore [arg-type]
+        "%Y-%m-%d",
+    ).date()
+    return latest_checkpoint
+
+
+def set_last_checkpoint(checkpoint: date) -> None:
+    pipe = REDIS.pipeline()
+    pipe.hgetall(REDIS_AUTORESUME_KEY)
+    log_info: Mapping[str | bytes, int | str] = {
+        "checkpoint": checkpoint.isoformat(),
+        "checkpoint_time": datetime.now().isoformat(),
+    }
+    pipe.hset(REDIS_AUTORESUME_KEY, mapping=log_info)
+    pipe.expire(REDIS_AUTORESUME_KEY, 60 * 60 * 24 * 28)  # 4 weeks
+    pipe.execute()
 
 
 class RateLimitedRequestManager:
@@ -296,6 +325,12 @@ class Command(BaseCommand):
             default=300,
             help="Maximum seconds to wait during exponential backoff on 403 errors (default: 300)",
         )
+        parser.add_argument(
+            "--auto-resume",
+            default=False,
+            action="store_true",
+            help="Auto resume the command using the last end-date stored in redis. ",
+        )
 
     def handle(self, *args, **options):
         scraper_module_path = options["scraper"]
@@ -343,6 +378,21 @@ class Command(BaseCommand):
                 f"No BaseStateScraper subclass found in module: {scraper_module_path}"
             )
 
+        auto_resume = False
+        end_date = self._parse_date(options["backscrape_end"])
+
+        if options.get("auto_resume"):
+            auto_resume = True
+            saved_checkpoint = get_last_checkpoint()
+            if saved_checkpoint:
+                end_date = saved_checkpoint
+                logger.info("Autoresuming with an end date of %s", end_date)
+            else:
+                logger.info(
+                    "No checkpoints found, using %s as end date, will add checkpoints for further autoresume",
+                    end_date,
+                )
+
         logger.info(
             "Starting docket backfill with scraper: %s", scraper_class_name
         )
@@ -370,9 +420,8 @@ class Command(BaseCommand):
             # Instantiate the scraper with our rate-limited search request manager
             scraper = scraper_class(request_manager=search_request_manager)
 
-            # Parse date range
+            # Parse start date
             start_date = self._parse_date(options["backscrape_start"])
-            end_date = self._parse_date(options["backscrape_end"])
 
             # Determine courts to scrape
             courts = (
@@ -410,6 +459,24 @@ class Command(BaseCommand):
 
                     if case_count % 100 == 0:
                         logger.info("Processed %d cases", case_count)
+                        # TAMES search defaults to descending by date
+                        # checkpoint every 100/case-rate seconds
+                        if auto_resume and not case.get("date_filed"):
+                            logger.warning(
+                                f"No case date, no checkpoint:{case}"
+                            )
+                        if auto_resume and case.get("date_filed"):
+                            try:
+                                latest_date = datetime.strptime(
+                                    case.get("date_filed"), "%m/%d/%Y"
+                                ).date()
+                                set_last_checkpoint(latest_date)
+                                logger.info("Checkpointed at %s", latest_date)
+                            except ValueError:
+                                logger.warning(
+                                    "Failed to save checkpoint for (date_filed=%s). Using prior checkpoint.",
+                                    case.get("date_filed"),
+                                )
 
                 except requests.RequestException as e:
                     logger.error(
