@@ -47,7 +47,6 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    es_get_citing_and_related_clusters_with_cache,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
@@ -201,28 +200,6 @@ class OpinionPageLoadTest(
         response = await self.async_client.get(path)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn("33 state 1", response.content.decode())
-
-    async def test_es_get_citing_clusters_with_cache(self) -> None:
-        """Does es_get_citing_and_related_clusters_with_cache return the
-        correct clusters citing and the total cites count?
-        """
-
-        request = AsyncRequestFactory().get("/")
-        result = await es_get_citing_and_related_clusters_with_cache(
-            self.o_cluster_3, request
-        )
-        clusters = result.citing_clusters
-        count = result.citing_cluster_count
-
-        c_list_names = [c["caseName"] for c in clusters]
-        expected_clusters = [
-            self.o_cluster_1.case_name,
-            self.o_cluster_2.case_name,
-            self.o_cluster_4.case_name,
-        ]
-        # Compare expected clusters citing and total count.
-        self.assertEqual(set(c_list_names), set(expected_clusters))
-        self.assertEqual(count, len(expected_clusters))
 
 
 class ViewRecapDocumentTest(TestCase):

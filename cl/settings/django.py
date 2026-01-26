@@ -79,7 +79,6 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 INSTALL_ROOT = Path(__file__).resolve().parents[2]
 STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 DEBUG = env.bool("DEBUG", default=True)
-DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 MEDIA_ROOT = env("MEDIA_ROOT", default=INSTALL_ROOT / "cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
@@ -140,6 +139,7 @@ MIDDLEWARE = [
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
     "pghistory.middleware.HistoryMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
+    "cl.lib.sqlcommenter.SqlCommenter",
 ]
 
 ROOT_URLCONF = "cl.urls"
@@ -153,6 +153,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.humanize",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.sessions",
     "django.contrib.sites",
     "django.contrib.sitemaps",
@@ -252,7 +253,6 @@ MESSAGE_TAGS = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
-FORMS_URLFIELD_ASSUME_HTTPS = True
 
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle

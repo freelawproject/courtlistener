@@ -1228,6 +1228,7 @@ class OpinionV4APISearchTest(
 
 
 @override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinions_es_search")
 class OpinionsESSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -3069,15 +3070,15 @@ class RelatedSearchTest(
         ]
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
                 "Debbas v. Franklin",
             ),
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/",
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
                 "Voutila v. Bonvini",
             ),
         ]
@@ -3115,15 +3116,15 @@ class RelatedSearchTest(
 
         expected_related_cases = [
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/",
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
                 "Voutila v. Bonvini",
             ),
             (
-                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/",
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
                 "case name cluster 3",
             ),
         ]
@@ -3163,15 +3164,15 @@ class RelatedSearchTest(
         ]
         expected_related_cases = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
                 "Debbas v. Franklin",
             ),
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/",
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
                 "case name cluster 3",
             ),
         ]
@@ -3327,15 +3328,15 @@ class RelatedSearchTest(
         ]
         expected_related_cases = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
                 "Debbas v. Franklin",
             ),
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/",
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
                 "Voutila v. Bonvini",
             ),
         ]

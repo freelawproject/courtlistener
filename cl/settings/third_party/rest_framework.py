@@ -150,7 +150,6 @@ REST_FRAMEWORK = {
         # Running bad queries
         # Mega queries on the docket endpoint causing issues
         "ashabana85": "1/hour",
-        "Luris.ai": "1/hour",
         "tannero20": "1/hour",
         # Too difficult
         "aanshshah": "1/hour",
@@ -163,6 +162,7 @@ REST_FRAMEWORK = {
         "arivdc": "10/hour",
         "Mpits003": "1/hour",
         # Throttling up.
+        "hmturner08": "15000/hour",  # Tryandai needs big boost through 1/19
         "JonasHappel": "10000/hour",
         "YFIN": "430000/day",
         "mlissner": "1000000/hour",  # Needed for benchmarking (not greed)
@@ -177,7 +177,7 @@ REST_FRAMEWORK = {
     },
     "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {
         "jafrank": "180/minute",
-        "LexText": "180/minute",
+        "LexText": "360/minute",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -199,8 +199,10 @@ REST_FRAMEWORK = {
     ),
     # Filtering
     "DEFAULT_FILTER_BACKENDS": (
-        # This is a tweaked version of RestFrameworkFilterBackend
+        # DisabledHTMLFilterBackend disables showing filters in the browsable API
         "cl.api.utils.DisabledHTMLFilterBackend",
+        # Validates query params and logs/blocks unknown filter parameters
+        "cl.api.utils.UnknownFilterParamValidationBackend",
         "rest_framework.filters.OrderingFilter",
     ),
     # Assorted & Sundry
@@ -217,3 +219,8 @@ if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
 
 BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)
+
+# Controls whether unknown API filter parameters should be blocked (400 error)
+# or just logged. Set to True to block invalid filter parameters.
+# Phase 1: False (log only), Phase 2: True (block requests)
+BLOCK_UNKNOWN_FILTERS = env.bool("BLOCK_UNKNOWN_FILTERS", default=False)
