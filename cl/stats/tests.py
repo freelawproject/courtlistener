@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
 
 import pytest
 import time_machine
@@ -78,6 +80,30 @@ class PartnershipEmailTests(TestCase):
 
         # Should exclude v4 API user-specific event
         self.assertNotIn(v4_api_user_event.description, body)
+
+
+class ElasticsearchStatusTests(TestCase):
+    @override_settings(ELASTICSEARCH_DISABLED=True)
+    def test_elasticsearch_status_disabled(self) -> None:
+        response = self.client.get(reverse("elastic_status"))
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(
+            response.json(),
+            {"is_elastic_up": True, "elasticsearch_disabled": True},
+        )
+
+    @override_settings(ELASTICSEARCH_DISABLED=False)
+    @patch("cl.stats.views.check_elasticsearch", return_value=True)
+    def test_elasticsearch_status_enabled_ok(
+        self, mock_check: MagicMock
+    ) -> None:
+        response = self.client.get(reverse("elastic_status"))
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(
+            response.json(),
+            {"is_elastic_up": True, "elasticsearch_disabled": False},
+        )
+        mock_check.assert_called_once_with()
 
 
 @pytest.mark.django_db
