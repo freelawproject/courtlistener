@@ -40,16 +40,6 @@
       <a href="#learn-more">Where can I learn more about PACER and RECAP?</a><br>
     </p>
 
-    <h3 class="bottom">Supreme Court Citation Networks</h3>
-    <p>
-      <a href="#circles-change-size">Why do the case circles change size?</a><br>
-      <a href="#what-cases-mean">How can I find out what the cases in my network mean?</a><br>
-      <a href="#default-two-degree">Why did my network default to 2-degrees?</a><br>
-      <a href="#case-missing">Why is a case missing in my network?</a><br>
-      <a href="#embed-network">How do I embed a network in my blog?</a><br>
-      <a href="#dod">What do you mean by "Degree of Dissent"?</a>
-    </p>
-
     <h3 class="bottom">Coverage and Content</h3>
     <p>
       <a href="#what-coverage-exists">What is your coverage of legal materials and how comprehensive is
@@ -225,36 +215,6 @@
 
     <h3 id="learn-more">Where can I learn more about PACER and RECAP?</h3>
     <p>We have <a href="https://free.law/recap/faq/">a more detailed FAQ specifically about RECAP</a> at <a href="https://free.law/recap/">its homepage on the Free Law Project website</a>.
-    </p>
-
-
-    <h2 id="supreme-court-networks">Supreme Court Citation Networks</h2>
-    <h3 id="circles-change-size">Why do the case circles change size?</h3>
-    <p>Circles change size based on the number of citations to it by other cases in the network. The more cases that cite to <i>Case A</i>, the larger it will be. The only exception to this rule is the rightmost case on network (with the most recent date). For visual clarity, this anchor case is always represented with a large circle.</p>
-
-    <h3 id="what-cases-mean">How can I find out what the cases in my network mean?</h3>
-    <p>This tool will not read the cases for you but it will make your reading more efficient. You can read opinion text directly by clicking on opinions in the visualization. You can see all the Supreme Court Database information for a case. Information will open in a separate window and includes issue area, legal provision involved, and detailed voting information. By using SCDB information and skimming opinion text, you can figure out what is going on in the case fairly quickly. Some networks also have helpful user descriptions. </p>
-
-    <h3 id="default-two-degree">Why did my network default to 2-degrees?</h3>
-    <p>We do not generate 3-degree networks when it will contain more than 70 cases. We have found networks larger than 70 are too unwieldy and so default those networks to 2-degrees.</p>
-
-    <h3 id="case-missing">Why is a case missing from my network?</h3>
-    <p>When the Supreme Court cites to recently decided cases, the citation form is non-standard such as citing to <i>Slip. Op</i> or <i>555 S.Ct ___</i>. This currently confounds our automatic citation parser. It's a problem we're working on.</p>
-
-    <h3 id="embed-network">How do I embed a network in my blog?</h3>
-    <p>On the network display page, the "Embed" box is on the right side of the page. Click in the box and copy the HTML code. You can then put this code in your WordPress blog (or Liguides site, or etc) just as you would embed a video from YouTube.</p>
-
-    <h3 id="dod">What do you mean by "Degree of Dissent"?</h3>
-    <p>We use <em>Degree of Dissent</em> (DoD) in our <a
-            href="{% url "mapper_homepage" %}">visualizations of Supreme Court
-        networks</a> to indicate the average level of disagreement in the cases
-        shown. For example, in a network that shows two cases, each with
-        unanimous 9-0 votes, there would be no dissent, and so the score would
-        be 0. By contrast, if a network had only two cases, each with 5-4
-        decisions, the DoD would be 1.0, indicating a highly
-        dissenting network. Mathematically, the DoD for a given case is calculated by multiplying the number of dissents by 0.25. This means that a 9-0 case will have the same DoD as a 8-0 case (0.0) and a 6-3 will have the same DoD as 5-3 case.
-    </p>
-    <p>In some cases you may see that the DoD is not using all of the cases in a network, stating something like: "Degree of Dissent: 0.73 for 16 cases of 17." This occurs because some cases do not have vote information in the Supreme Court Database (Spaeth).
     </p>
 
 
