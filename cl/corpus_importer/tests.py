@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, call, patch
 
 import eyecite
 import pytest
+import requests
+import responses
 import time_machine
 from bs4 import BeautifulSoup
 from celery.exceptions import Retry
@@ -2268,10 +2270,8 @@ class TexasMergerTest(TestCase):
 
         self.download_task_mock.assert_called_once_with(current_document.pk)
 
-    @mock.patch(
-        "cl.corpus_importer.tasks.requests.get",
-    )
-    def test_merge_texas_document_plaintext_extraction(self, mock_get):
+    @responses.activate
+    def test_merge_texas_document_plaintext_extraction(self):
         """
         Ensure plaintext extraction is triggered by `merge_texas_document`.
         """
@@ -2280,20 +2280,28 @@ class TexasMergerTest(TestCase):
         self.extract_pdf_document_patch.stop()
         self.download_pdf_patch.stop()
 
-        mock_response = mock.Mock()
-        mock_response.headers = {"content-type": "application/pdf"}
-        with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
-            pdf_content = f.read()
-        mock_response.iter_content.return_value = [pdf_content]
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value.__enter__.return_value = mock_response
+        input_document = TexasCaseDocumentDictFactory()
+
+        # Slight optimization for the failure case where the merger fails to
+        # request a PDF
+        def get_test_pdf(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+                return 200, {"Content-Type": "application/pdf"}, f.read()
+
+        response = responses.add_callback(
+            responses.GET,
+            input_document["document_url"],
+            callback=get_test_pdf,
+        )
 
         docket_entry = self.docket_coa1_entry
-        input_document = TexasCaseDocumentDictFactory()
         (_, _, pk) = merge_texas_document(docket_entry, input_document)
         docket_entry.refresh_from_db()
         document = TexasDocument.objects.get(pk=pk)
 
+        self.assertEqual(response.call_count, 1)
         self.assertEqual(document.document_url, input_document["document_url"])
         self.assertTrue(document.filepath_local)
         self.assertIn("UNITED", document.plain_text)

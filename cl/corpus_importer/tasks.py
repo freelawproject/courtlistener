@@ -54,7 +54,6 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from juriscraper.pacer.utils import is_pdf
 from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
@@ -3194,6 +3193,21 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         )
 
 
+def is_pdf(response: Response) -> bool:
+    """Check if a `requests.Response` object wraps a PDF file using the
+    "Content-Type" header.
+
+    :param response: The `requests.Response` object to check.
+    :return: Whether the response is a PDF file."""
+    return (
+        response.headers.get("Content-Type", "")
+        # MIME types are case-insensitive
+        # (https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types)
+        .lower()
+        .startswith("application/pdf")
+    )
+
+
 @contextmanager
 def download_pdf_in_stream(
     url: str,
@@ -3375,6 +3389,7 @@ def download_texas_document_pdf(
             "Texas document PDF download: TexasDocument %s does not exist; skipping.",
             texas_document_pk,
         )
+        self.request.chain = None
         return None
 
     url = texas_document.document_url
@@ -3391,6 +3406,7 @@ def download_texas_document_pdf(
                 texas_document.pk,
                 url,
             )
+            self.request.chain = None
             return None
         filename = (
             f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
@@ -3465,10 +3481,6 @@ def merge_texas_documents(
         merge_texas_document(docket_entry, document) for document in documents
     ]
 
-    # Perform plaintext extraction on documents that were successfully created
-    # or updated.
-    documents_to_extract = [o[2] for o in output if o[0] and o[1]]
-
     return output
 
 
@@ -3481,7 +3493,7 @@ def merge_texas_docket_entry(
     | TexasAppellateBrief
     | TexasSupremeCourtCaseEvent
     | TexasSupremeCourtAppellateBrief,
-):
+) -> tuple[bool, bool, int]:
     """Merges a Texas docket entry into CL.
 
     :param docket: The docket this entry belongs to.
