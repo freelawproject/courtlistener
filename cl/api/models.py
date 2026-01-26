@@ -19,13 +19,7 @@ class ThrottleType(models.IntegerChoices):
     CITATION_LOOKUP = 2, "Citation Lookup"
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-    model_name="APIThrottleHistoryEvent",
-)
+@pghistory.track()
 class APIThrottle(AbstractDateTimeModel):
     """Override rate limits or block specific users for API endpoints."""
 
