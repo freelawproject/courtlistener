@@ -4076,8 +4076,6 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
     :ivar document_number: The document number on the docket page in SCOTUS.
     :ivar attachment_number: The attachment number on the docket page in SCOTUS.
     :ivar document_url: The download URL that SCOTUS provided for this document.
-    :ivar file_name: The document file name from SCOTUS, useful as a unique
-    identifier.
     """
 
     docket_entry = models.ForeignKey(
@@ -4093,10 +4091,6 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         null=True,
     )
     document_url = models.URLField()
-    file_name = models.CharField(
-        max_length=255,
-        blank=True,
-    )
 
     class Meta:
         indexes = [
