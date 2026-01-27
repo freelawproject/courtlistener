@@ -366,7 +366,7 @@ async def get_lifetime_prayer_stats(
     if data is not None:
         return PrayerStats(**data)
 
-    prayer_by_status = Prayer.objects.filter(status=status)
+    prayer_by_status = Prayer.objects.filter(status=status, via_api=False)
 
     prayer_count = await prayer_by_status.acount()
 
