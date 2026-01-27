@@ -95,11 +95,20 @@ class IncrementalNewTemplateMiddleware:
 
         # {response.template_name} could return a list if TemplateView is used directly
         old_template = response.template_name
-        path_exists = os.path.exists(f"/cl/api/templates/{old_template[0]}")
-        if isinstance(old_template, list | tuple) and path_exists:
-            old_template = old_template[0]
-        else:
-            old_template = old_template[1]
+        if isinstance(old_template, (list, tuple)):
+            # Check if the first template exists anywhere in the project
+            try:
+                get_template(old_template[0])
+                path_exists = True
+            except TemplateDoesNotExist:
+                path_exists = False
+
+            if path_exists:
+                old_template = old_template[0]
+            elif len(old_template) > 1:
+                old_template = old_template[1]
+            else:
+                old_template = old_template[0]
 
         if not isinstance(old_template, str):
             return response
