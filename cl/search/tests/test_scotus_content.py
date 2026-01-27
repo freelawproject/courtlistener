@@ -8,6 +8,7 @@ from cl.corpus_importer.tasks import (
     download_qp_scotus_pdf,
     ingest_scotus_docket,
     merge_scotus_docket,
+    merge_scotus_document,
 )
 from cl.people_db.models import (
     Attorney,
@@ -21,11 +22,12 @@ from cl.recap.tests.tests import mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    SCOTUSAttachmentFactory,
-    SCOTUSAttorneyFactory,
+    SCOTUSAttachmentDataFactory,
+    SCOTUSAttorneyDataFactory,
     ScotusDocketDataFactory,
+    SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
-    SCOTUSPartyFactory,
+    SCOTUSPartyDataFactory,
 )
 from cl.search.models import (
     Docket,
@@ -54,44 +56,44 @@ class ScotusDocketMergeTest(TestCase):
     ) -> None:
         """Confirm SCOTUS data is merged into Docket and metadata."""
 
-        att_1 = SCOTUSAttachmentFactory(
+        att_1 = SCOTUSAttachmentDataFactory(
             description="Main 1", document_number=23453
         )
-        att_2 = SCOTUSAttachmentFactory(
+        att_2 = SCOTUSAttachmentDataFactory(
             description="Attachment 2", document_number=23453
         )
-        de_1 = SCOTUSDocketEntryFactory(
+        de_1 = SCOTUSDocketEntryDataFactory(
             description="lorem ipsum 1",
             date_filed=datetime.date(2015, 8, 19),
             document_number=23453,
             attachments=[att_1, att_2],
         )
-        de_2 = SCOTUSDocketEntryFactory(
+        de_2 = SCOTUSDocketEntryDataFactory(
             description="lorem ipsum 2",
             date_filed=datetime.date(2015, 8, 21),
             document_number=23455,
             attachments=[
-                SCOTUSAttachmentFactory(
+                SCOTUSAttachmentDataFactory(
                     description="Main 1.1 ", document_number=23455
                 ),
-                SCOTUSAttachmentFactory(
+                SCOTUSAttachmentDataFactory(
                     description="Attachment 2.1 ", document_number=23455
                 ),
             ],
         )
-        de_3 = SCOTUSDocketEntryFactory(
+        de_3 = SCOTUSDocketEntryDataFactory(
             description="Low after process.",
             date_filed=datetime.date(2015, 8, 22),
             document_number=None,
             attachments=[],
         )
-        de_4 = SCOTUSDocketEntryFactory(
+        de_4 = SCOTUSDocketEntryDataFactory(
             description="Key street surface",
             date_filed=datetime.date(2015, 8, 22),
             document_number=None,
             attachments=[],
         )
-        atty_1 = SCOTUSAttorneyFactory(
+        atty_1 = SCOTUSAttorneyDataFactory(
             name="Paul D. Clement",
             address="706 Duke Street",
             city="Alexandria",
@@ -102,7 +104,7 @@ class ScotusDocketMergeTest(TestCase):
             is_counsel_of_record=True,
             title="Clement & Murphy, LLC",
         )
-        atty_2 = SCOTUSAttorneyFactory(
+        atty_2 = SCOTUSAttorneyDataFactory(
             name="Noel John Francisco",
             address="51 Louisiana Avenue, NW",
             city="Washington",
@@ -113,7 +115,7 @@ class ScotusDocketMergeTest(TestCase):
             is_counsel_of_record=True,
             title="Law Firm Test LLC",
         )
-        atty_3 = SCOTUSAttorneyFactory(
+        atty_3 = SCOTUSAttorneyDataFactory(
             name="Eric Nelson",
             address="54 Florence Street",
             city="Staten Island",
@@ -125,12 +127,12 @@ class ScotusDocketMergeTest(TestCase):
             title=None,
         )
 
-        party_1 = SCOTUSPartyFactory(
+        party_1 = SCOTUSPartyDataFactory(
             name="Encino Motorcars, LLC",
             type="Petitioner",
             attorneys=[atty_1],
         )
-        party_2 = SCOTUSPartyFactory(
+        party_2 = SCOTUSPartyDataFactory(
             name="United States",
             type="Respondent",
             attorneys=[atty_2, atty_3],
@@ -613,3 +615,112 @@ class ScotusDocketMergeTest(TestCase):
             "cadc123",
             "Non-existent Court",
         )
+
+    @mock.patch("cl.corpus_importer.tasks.chain")
+    def test_merge_scotus_document_triggers_download_correctly(
+        self, mock_chain
+    ) -> None:
+        """Confirm PDF download is triggered only when document is new or
+        filename changes."""
+
+        docket = DocketFactory(
+            court=self.court,
+            docket_number="23-1435",
+            source=Docket.SCRAPER,
+        )
+        docket_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            entry_number=1,
+            description="Test entry",
+            date_filed=datetime.date(2015, 8, 19),
+        )
+
+        # Case 1: New document, should trigger download
+        doc_data_1 = {
+            "document_number": 1,
+            "attachment_number": 0,
+            "document_url": "https://example.com/path/to/document1.pdf",
+            "description": "Main document",
+        }
+
+        created, doc_pk = merge_scotus_document(docket_entry, doc_data_1)
+
+        self.assertTrue(created, "Document should be created")
+        self.assertEqual(
+            mock_chain.call_count,
+            1,
+            "Download should be triggered for new document",
+        )
+        mock_chain.reset_mock()
+
+        # Verify the document was created correctly
+        scotus_doc = SCOTUSDocument.objects.get(pk=doc_pk)
+        self.assertEqual(scotus_doc.document_url, doc_data_1["document_url"])
+        self.assertEqual(scotus_doc.file_name, "document1.pdf")
+        self.assertEqual(
+            SCOTUSDocument.objects.count(), 1, "Should have 1 document"
+        )
+
+        # Case 2: Update same document with same filename, should NOT trigger download
+        doc_data_2 = doc_data_1
+        doc_data_2["description"] = "Updated description"
+
+        created, doc_pk_2 = merge_scotus_document(docket_entry, doc_data_2)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_2, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            0,
+            "Download should NOT be triggered when filename unchanged",
+        )
+
+        # Verify description was updated but URL remains the same
+        scotus_doc.refresh_from_db()
+        self.assertEqual(scotus_doc.description, "Updated description")
+        self.assertEqual(scotus_doc.document_url, doc_data_2["document_url"])
+        self.assertEqual(
+            SCOTUSDocument.objects.count(), 1, "Should still have 1 document"
+        )
+
+        # Case 3: Update document with different filename, should trigger download
+        doc_data_3 = doc_data_2
+        doc_data_3["document_url"] = (
+            "https://example.com/different/path/document2.pdf"
+        )
+
+        created, doc_pk_3 = merge_scotus_document(docket_entry, doc_data_3)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_3, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            1,
+            "Download should be triggered when filename changes",
+        )
+
+        # Verify the URL was updated
+        scotus_doc.refresh_from_db()
+        self.assertEqual(scotus_doc.document_url, doc_data_3["document_url"])
+        self.assertEqual(scotus_doc.file_name, "document2.pdf")
+
+        # Case 4: Update with different URL but same filename - should NOT trigger download
+        mock_chain.reset_mock()
+        doc_data_4 = doc_data_3
+        doc_data_4["document_url"] = (
+            "https://example.com/other-files/document2.pdf"
+        )
+        created, doc_pk_4 = merge_scotus_document(docket_entry, doc_data_4)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_4, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            0,
+            "Download should NOT be triggered when filename is the same",
+        )
+
+        # Verify the URL was updated even though download wasn't triggered
+        scotus_doc.refresh_from_db()
+        self.assertEqual(scotus_doc.document_url, doc_data_4["document_url"])
+        self.assertEqual(scotus_doc.file_name, "document2.pdf")

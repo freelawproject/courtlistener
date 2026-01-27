@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Any
+from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -32,6 +33,16 @@ from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+def extract_file_name_from_url(url: str) -> str:
+    """Extract the filename from a URL.
+
+    :param url: The URL to extract the filename from.
+    :return: The filename extracted from the URL path.
+    """
+    parsed_url = urlparse(url)
+    return parsed_url.path.split("/")[-1]
 
 
 class OpinionMatchingException(Exception):
@@ -1282,7 +1293,7 @@ def create_docket_entry_sequence_numbers(
     :return: A list of sequence numbers corresponding to the list of docket
     entries.
     """
-    dates = [d["date"].isoformat() for d in docket_entries]
+    dates = [d["date_filed"].isoformat() for d in docket_entries]
     date_counts: dict[str, int] = {}
     sequence_numbers = []
     for entry_date in dates:

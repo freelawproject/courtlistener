@@ -4116,6 +4116,13 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             ]
         )
 
+    @property
+    def file_name(self) -> str:
+        """Extract the filename from the document_url."""
+        from cl.corpus_importer.utils import extract_file_name_from_url
+
+        return extract_file_name_from_url(self.document_url)
+
     def save(
         self,
         update_fields=None,

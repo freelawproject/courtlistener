@@ -92,6 +92,7 @@ from cl.corpus_importer.utils import (
     compute_blocked_court_wait,
     compute_next_binary_probe,
     create_docket_entry_sequence_numbers,
+    extract_file_name_from_url,
     is_appellate_court,
     is_long_appellate_document_number,
     make_iquery_probing_key,
@@ -3341,8 +3342,8 @@ def merge_scotus_document(
     """Merge a single SCOTUSDocument attachment into CL.
 
     Checks if the document exists, creating a SCOTUSDocument object if it does
-    not. Then, if the document is new fetch the attachment PDF,
-    store it, compute metadata.
+    not. Then, if the document is new or the filename has changed,
+    fetch the attachment PDF, store it, and compute metadata.
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param doc_data: The attachment data to merge.
@@ -3355,7 +3356,8 @@ def merge_scotus_document(
     description = doc_data.get("description", "")
     attachment_number = doc_data["attachment_number"]
 
-    scotus_document, created = SCOTUSDocument.objects.update_or_create(
+    # Retrieve existing object or create new one
+    scotus_document, created = SCOTUSDocument.objects.get_or_create(
         docket_entry=docket_entry,
         document_number=document_number,
         attachment_number=attachment_number,
@@ -3364,15 +3366,32 @@ def merge_scotus_document(
             "document_url": document_url,
         },
     )
-    if created:
+
+    # Check if the filename has changed for existing documents
+    file_name_changed = False
+    if not created:
+        old_file_name = extract_file_name_from_url(
+            scotus_document.document_url
+        )
+        new_file_name = extract_file_name_from_url(document_url)
+        file_name_changed = old_file_name != new_file_name
+
+        # Update the fields
+        scotus_document.description = description
+        scotus_document.document_url = document_url
+        scotus_document.save(
+            update_fields=["description", "document_url", "date_modified"]
+        )
+
+    if created or file_name_changed:
         chain(
             download_scotus_document_pdf.si(scotus_document.pk),
             extract_recap_pdf.s(
                 check_if_needed=False, model_name="search.SCOTUSDocument"
             ),
         ).apply_async()
-        return True, scotus_document.pk
-    return False, scotus_document.pk
+
+    return created, scotus_document.pk
 
 
 def merge_scotus_docket_entry(
@@ -3491,7 +3510,6 @@ def add_scotus_docket_entries(
             sequence_number,
             docket_entry,
         )
-
         if de_pk is None:
             logger.warning(
                 "Failed to merge SCOTUSDocketEntry with sequence number %s "
