@@ -3370,9 +3370,7 @@ def merge_scotus_document(
     # Check if the filename has changed for existing documents
     file_name_changed = False
     if not created:
-        old_file_name = extract_file_name_from_url(
-            scotus_document.url
-        )
+        old_file_name = extract_file_name_from_url(scotus_document.url)
         new_file_name = extract_file_name_from_url(url)
         file_name_changed = old_file_name != new_file_name
 
