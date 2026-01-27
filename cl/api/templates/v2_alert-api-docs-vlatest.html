@@ -130,7 +130,7 @@ curl -X GET \
     <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
     <c-code>
 curl -X OPTIONS \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "docket-alert-list" version=version %}"
     </c-code>
   </c-layout-with-navigation.section>
