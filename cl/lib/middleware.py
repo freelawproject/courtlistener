@@ -1,4 +1,3 @@
-import os
 from collections.abc import Awaitable, Callable
 
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
