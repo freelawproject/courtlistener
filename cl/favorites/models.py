@@ -171,6 +171,11 @@ class Prayer(models.Model):
         choices=STATUSES,
         default=WAITING,
     )
+    via_api = models.BooleanField(
+        help_text="Whether the prayer wa created via the API (unlimited)",
+        default=False, 
+        db_index=True
+    )
 
     class Meta:
         constraints = [
