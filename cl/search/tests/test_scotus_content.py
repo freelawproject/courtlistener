@@ -192,7 +192,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entry__docket=docket, description="Main 1"
         ).first()
 
-        self.assertEqual(rd_att_1.document_url, att_1["document_url"])
+        self.assertEqual(rd_att_1.url, att_1["document_url"])
         self.assertTrue(rd_att_1.filepath_local)
         self.assertEqual(rd_att_1.page_count, 1)
         self.assertIsNotNone(rd_att_1.sha1)
@@ -201,7 +201,7 @@ class ScotusDocketMergeTest(TestCase):
         rd_att_2 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Attachment 2"
         ).first()
-        self.assertEqual(rd_att_2.document_url, att_2["document_url"])
+        self.assertEqual(rd_att_2.url, att_2["document_url"])
         self.assertTrue(rd_att_2.filepath_local)
         self.assertIn("UNITED", rd_att_2.plain_text)
 
@@ -655,7 +655,7 @@ class ScotusDocketMergeTest(TestCase):
 
         # Verify the document was created correctly
         scotus_doc = SCOTUSDocument.objects.get(pk=doc_pk)
-        self.assertEqual(scotus_doc.document_url, doc_data_1["document_url"])
+        self.assertEqual(scotus_doc.url, doc_data_1["document_url"])
         self.assertEqual(scotus_doc.file_name, "document1.pdf")
         self.assertEqual(
             SCOTUSDocument.objects.count(), 1, "Should have 1 document"
@@ -678,7 +678,7 @@ class ScotusDocketMergeTest(TestCase):
         # Verify description was updated but URL remains the same
         scotus_doc.refresh_from_db()
         self.assertEqual(scotus_doc.description, "Updated description")
-        self.assertEqual(scotus_doc.document_url, doc_data_2["document_url"])
+        self.assertEqual(scotus_doc.url, doc_data_2["document_url"])
         self.assertEqual(
             SCOTUSDocument.objects.count(), 1, "Should still have 1 document"
         )
@@ -701,7 +701,7 @@ class ScotusDocketMergeTest(TestCase):
 
         # Verify the URL was updated
         scotus_doc.refresh_from_db()
-        self.assertEqual(scotus_doc.document_url, doc_data_3["document_url"])
+        self.assertEqual(scotus_doc.url, doc_data_3["document_url"])
         self.assertEqual(scotus_doc.file_name, "document2.pdf")
 
         # Case 4: Update with different URL but same filename - should NOT trigger download
@@ -722,5 +722,5 @@ class ScotusDocketMergeTest(TestCase):
 
         # Verify the URL was updated even though download wasn't triggered
         scotus_doc.refresh_from_db()
-        self.assertEqual(scotus_doc.document_url, doc_data_4["document_url"])
+        self.assertEqual(scotus_doc.url, doc_data_4["document_url"])
         self.assertEqual(scotus_doc.file_name, "document2.pdf")

@@ -3352,7 +3352,7 @@ def merge_scotus_document(
         - The pk of the SCOTUSDocument object.
     """
     document_number = doc_data["document_number"]
-    document_url = doc_data["document_url"]
+    url = doc_data["document_url"]
     description = doc_data.get("description", "")
     attachment_number = doc_data["attachment_number"]
 
@@ -3363,7 +3363,7 @@ def merge_scotus_document(
         attachment_number=attachment_number,
         defaults={
             "description": description,
-            "document_url": document_url,
+            "url": url,
         },
     )
 
@@ -3371,16 +3371,16 @@ def merge_scotus_document(
     file_name_changed = False
     if not created:
         old_file_name = extract_file_name_from_url(
-            scotus_document.document_url
+            scotus_document.url
         )
-        new_file_name = extract_file_name_from_url(document_url)
+        new_file_name = extract_file_name_from_url(url)
         file_name_changed = old_file_name != new_file_name
 
         # Update the fields
         scotus_document.description = description
-        scotus_document.document_url = document_url
+        scotus_document.url = url
         scotus_document.save(
-            update_fields=["description", "document_url", "date_modified"]
+            update_fields=["description", "url", "date_modified"]
         )
 
     if created or file_name_changed:
@@ -3683,7 +3683,7 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         self.request.chain = None
         return None
 
-    url = doc.document_url
+    url = doc.url
     logger.info(
         "SCOTUS PDF download: Fetching PDF for SCOTUSDocument %s from %s",
         doc_pk,
