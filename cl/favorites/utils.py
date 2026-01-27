@@ -101,9 +101,9 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     :return: A queryset of RECAPDocuments in descending order of preference.
     """
 
-    waiting_prayers = Prayer.objects.filter(status=Prayer.WAITING).values(
-        "recap_document_id"
-    )
+    waiting_prayers = Prayer.objects.filter(
+        status=Prayer.WAITING, via_api=False
+    ).values("recap_document_id")
 
     # Subquery to fetch the view_count from GenericCount
     view_count_subquery = Subquery(
@@ -151,7 +151,8 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         )
         .annotate(
             prayer_count=Count(
-                "prayers", filter=Q(prayers__status=Prayer.WAITING)
+                "prayers",
+                filter=Q(prayers__status=Prayer.WAITING, prayers__via_api=False),
             ),
             view_count=view_count_subquery,
             doc_unavailable=Case(
