@@ -39,11 +39,14 @@ from rest_framework_filters.filterset import related
 
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
+    APIThrottle,
+    ThrottleType,
     Webhook,
     WebhookEvent,
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
+from cl.lib.decorators import tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
@@ -870,6 +873,26 @@ class NoFilterCacheListMixin:
         return response
 
 
+@tiered_cache(timeout=300)  # 5 minute cache
+def get_all_throttle_overrides(
+    throttle_type: int,
+) -> dict[str, tuple[bool, str]]:
+    """Get all throttle overrides of a given type, cached for 5 minutes.
+
+    Loads all throttle overrides at once to avoid per-user DB hits since most
+    users don't have overrides.
+
+    :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
+    :return: Dictionary mapping username to (blocked, rate) tuples.
+    """
+    overrides: dict[str, tuple[bool, str]] = {}
+    for username, blocked, rate in APIThrottle.objects.filter(
+        throttle_type=throttle_type
+    ).values_list("user__username", "blocked", "rate"):
+        overrides[username] = (blocked, rate)
+    return overrides
+
+
 class ExceptionalUserRateThrottle(UserRateThrottle):
     def allow_request(self, request, view):
         """
@@ -887,12 +910,16 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
 
-        # Adjust if user has special privileges.
-        override_rate = settings.REST_FRAMEWORK["OVERRIDE_THROTTLE_RATES"].get(
-            request.user.username, None
-        )
-        if override_rate is not None:
-            self.num_requests, self.duration = self.parse_rate(override_rate)
+        # Check if user has a throttle override in the database
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        override = overrides.get(request.user.username)
+        if override is not None:
+            blocked, rate = override
+            if blocked:
+                # User is blocked - deny immediately
+                return self.throttle_failure()
+            if rate:
+                self.num_requests, self.duration = self.parse_rate(rate)
 
         # Drop any requests from the history which have now passed the
         # throttle duration
@@ -942,26 +969,40 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             "ident": request.user.pk,
         }
 
-    def get_citations_rate(self, request):
+    def get_citations_rate(self, request) -> str | None:
         """
-        Checks the settings for a custom citations API rate limit.
+        Check for a custom citations API rate limit from the database.
 
-        If the authenticated user has a custom rate limit set in the settings,
-        it returns that value. Otherwise, it returns the default rate limit.
+        If the authenticated user has a custom rate limit set in the database,
+        it returns that value. If blocked, returns None to signal denial.
+        Otherwise, it returns the default rate limit.
 
-        Args:
-            request: The request object with the user's data.
+        :param request: The request object with the user's data.
+        :return: Rate string (e.g., '100/hour'), or None if user is blocked.
         """
         default_rate = self.THROTTLE_RATES["citations"]
-        custom_rate = settings.REST_FRAMEWORK[
-            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
-        ].get(request.user.username, None)
-        return custom_rate or default_rate
+        overrides = get_all_throttle_overrides(ThrottleType.CITATION_LOOKUP)
+        override = overrides.get(request.user.username)
+        if override is not None:
+            blocked, rate = override
+            if blocked:
+                return None  # Signal that user is blocked
+            if rate:
+                return rate
+        return default_rate
 
     def throttle_request_by_citation_count(self, request, view):
-        max_num_citations, _ = self.parse_rate(
-            self.get_citations_rate(request)
-        )
+        rate = self.get_citations_rate(request)
+        if rate is None:
+            # User is blocked - deny request immediately
+            raise Throttled(
+                detail={
+                    "error_message": "Your account has been blocked from the citations API.",
+                    "wait_until": None,
+                }
+            )
+
+        max_num_citations, _ = self.parse_rate(rate)
 
         self.key = self.get_cache_key_for_citations(request, view)
         self.history = self.cache.get(self.key, [])
