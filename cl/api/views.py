@@ -13,6 +13,8 @@ from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 
+from cl.api.models import ThrottleType
+from cl.api.utils import get_all_throttle_overrides
 from cl.lib.elasticsearch_utils import (
     do_es_alert_estimation_query,
     get_court_opinions_counts,
@@ -147,10 +149,16 @@ async def citation_lookup_api(
     default_throttle_rate = parse_throttle_rate_for_template(rate)
     custom_throttle_rate = None
     if request.user and request.user.is_authenticated:
-        rate = settings.REST_FRAMEWORK[  # type: ignore
-            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
-        ].get(request.user.username, None)
-        custom_throttle_rate = parse_throttle_rate_for_template(rate)
+        overrides = await sync_to_async(get_all_throttle_overrides)(
+            ThrottleType.CITATION_LOOKUP
+        )
+        override = overrides.get(request.user.username)
+        if override is not None:
+            blocked, custom_rate = override
+            if not blocked and custom_rate:
+                custom_throttle_rate = parse_throttle_rate_for_template(
+                    custom_rate
+                )
 
     return TemplateResponse(
         request,
