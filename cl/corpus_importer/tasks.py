@@ -91,6 +91,7 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    create_docket_entry_sequence_numbers,
     is_appellate_court,
     is_long_appellate_document_number,
     make_iquery_probing_key,
@@ -3294,6 +3295,11 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
     )
     with download_pdf_in_stream(qp_url, docket_id, "scotus_qp_") as result:
         if result is None:
+            logger.error(
+                "Failed to download QP file for SCOTUS Docket %s from URL %s.",
+                docket_id,
+                qp_url,
+            )
             return None
 
         tmp, _ = result
@@ -3315,18 +3321,15 @@ def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
     """
 
     for entry in docket_entries:
-        main_doc_short_desc = ""
-        attachments = entry.get("attachments") or []
+        attachments = entry.setdefault("attachments", [])
+        main_doc_short_desc = (
+            attachments[0]["description"] if attachments else ""
+        )
         entry["pacer_doc_id"] = ""
 
         for idx, attachment in enumerate(attachments, start=1):
-            if idx == 1:
-                main_doc_short_desc = attachment["description"]
             attachment["attachment_number"] = idx
             attachment["pacer_doc_id"] = ""
-
-        if not attachments:
-            entry["attachments"] = []
 
         entry["short_description"] = main_doc_short_desc
 
@@ -3372,26 +3375,6 @@ def merge_scotus_document(
     return False, scotus_document.pk
 
 
-def scotus_docket_entry_sequence_numbers(
-    docket_entries: list[dict[str, Any]],
-) -> list[str]:
-    """Calculates the sequence numbers for a list of SCOTUS docket entries
-    to allow consistent matching and merging.
-
-    :param docket_entries: The list of scraped SCOTUS docket entry dicts.
-    :return: A list of sequence numbers corresponding to the list of docket
-        entries.
-    """
-    dates = [e["date_filed"].isoformat() for e in docket_entries]
-    date_counts: dict[str, int] = {}
-    sequence_numbers = []
-    for entry_date in dates:
-        i = date_counts.get(entry_date, 1)
-        sequence_numbers.append(f"{entry_date}.{i:0>3}")
-        date_counts[entry_date] = i + 1
-    return sequence_numbers
-
-
 def merge_scotus_docket_entry(
     docket: Docket,
     sequence_number: str,
@@ -3434,33 +3417,41 @@ def merge_scotus_docket_entry(
 
         else:
             normalize_long_description(input_docket_entry)
-            des = SCOTUSDocketEntry.objects.filter(
-                docket=docket,
-                description=input_docket_entry["description"],
-                date_filed=input_docket_entry["date_filed"],
-            )
-            count = des.count()
-            if count == 0:
-                des_seq = SCOTUSDocketEntry.objects.filter(
+            try:
+                de = SCOTUSDocketEntry.objects.get(
                     docket=docket,
-                    sequence_number=sequence_number,
+                    description=input_docket_entry["description"],
+                    date_filed=input_docket_entry["date_filed"],
                 )
-                if des_seq.count() == 0:
+                de_created = False
+            except SCOTUSDocketEntry.DoesNotExist:
+                # Check if sequence_number already exists
+                try:
+                    de = SCOTUSDocketEntry.objects.get(
+                        docket=docket,
+                        sequence_number=sequence_number,
+                    )
+                    de_created = False
+                except SCOTUSDocketEntry.DoesNotExist:
                     de = SCOTUSDocketEntry(
                         docket=docket,
                         date_filed=date_filed,
-                        entry_number=entry_number,
                         sequence_number=sequence_number,
                     )
                     de_created = True
-            elif count == 1:
-                de = des.first()
-                de_created = False
-            else:
+                except SCOTUSDocketEntry.MultipleObjectsReturned:
+                    logger.error(
+                        "Multiple matching SCOTUSDocketEntries found for sequence_number "
+                        "%s on Docket %s.",
+                        sequence_number,
+                        docket.pk,
+                    )
+                    return False, None
+            except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
                     "Multiple matching unnumbered SCOTUSDocketEntries found for description "
                     "%s on Docket %s.",
-                    description,
+                    input_docket_entry["description"],
                     docket.pk,
                 )
                 return False, None
@@ -3491,7 +3482,7 @@ def add_scotus_docket_entries(
         - List of SCOTUSDocument PKs that were created
         - List of SCOTUSDocument PKs that were updated
     """
-    sequence_numbers = scotus_docket_entry_sequence_numbers(docket_entries)
+    sequence_numbers = create_docket_entry_sequence_numbers(docket_entries)
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
@@ -3501,7 +3492,7 @@ def add_scotus_docket_entries(
             docket_entry,
         )
 
-        if not de_pk:
+        if de_pk is None:
             logger.warning(
                 "Failed to merge SCOTUSDocketEntry with sequence number %s "
                 "on Docket %s",
@@ -3520,9 +3511,8 @@ def merge_scotus_docket(
     then create or update the related ScotusDocketMetadata instance.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
-    :return: A three-tuple: the created or updated Docket instance, whether the
-    QP file should be downloaded, and the RECAPDocument instances that should
-    be downloaded.
+    :return: A two-tuple: the created or updated Docket instance, whether the
+    QP file should be downloaded.
     """
     with transaction.atomic():
         court = Court.objects.get(pk="scotus")
@@ -3532,7 +3522,7 @@ def merge_scotus_docket(
                 "Docket number can't be missing in SCOTUS dockets."
             )
 
-        case_name = report_data.get("case_name") or ""
+        case_name = report_data.get("case_name", "")
         date_filed = report_data.get("date_filed")
         lower_court_name = report_data.get("lower_court")
 
@@ -3611,7 +3601,7 @@ def merge_scotus_docket(
                 "discretionary_court_decision"
             ),
         }
-        if links := report_data.get("links"):
+        if links := report_data.get("links", ""):
             defaults["linked_with"] = links
 
         if qp_url := report_data.get("questions_presented"):
