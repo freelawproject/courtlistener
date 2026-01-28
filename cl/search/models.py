@@ -4038,10 +4038,10 @@ class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     :ivar entry_number: Entry number on the SCOTUS Docket page.
     :ivar description: For appellate brief events, a short description of
     the brief.
-    :ivar date_filed: The date that TAMES indicates this entry was filed.
+    :ivar date_filed: The date that SCOTUS indicates this entry was filed.
     :ivar sequence_number: CL-generated field to keep entries in the same
-    order they appear in TAMES. Concatenation of filing date (in ISO format)
-    and the index in the TAMES table.
+    order they appear in SCOTUS. Concatenation of filing date (in ISO format)
+    and the index in the SCOTUS table.
     """
 
     docket = models.ForeignKey(
