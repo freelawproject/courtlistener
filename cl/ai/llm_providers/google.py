@@ -74,20 +74,16 @@ class GoogleGenAIBatchWrapper:
     A stateless wrapper for Google GenAI batch operations, decoupled from Django.
     """
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str):
         """
         Initializes the Google GenAI client.
 
-        :param api_key: The Google API key. If not provided, it will be
-                        retrieved from the 'GEMINI_API_KEY' environment variable.
-        :raises ValueError: If the API key is not provided or found in the environment.
+        :param api_key: The Google API key (required, no fallback).
+        :raises ValueError: If the API key is not provided.
         """
-        key = api_key or os.environ.get("GEMINI_API_KEY")
-        if not key:
-            raise ValueError(
-                "GEMINI_API_KEY not provided or found in environment variables."
-            )
-        self.client = genai.Client(api_key=key)
+        if not api_key:
+            raise ValueError("API key is required for GoogleGenAIBatchWrapper")
+        self.client = genai.Client(api_key=api_key)
 
     def get_or_create_cache(
         self,
@@ -107,8 +103,10 @@ class GoogleGenAIBatchWrapper:
         """
         for cache in self.client.caches.list():
             if cache.display_name == cache_display_name:
+                print(f"Found existing cache: {cache_display_name}")
                 return cache.name
 
+        print(f"Creating new cache: {cache_display_name}")
         cached_content = self.client.caches.create(
             model=model_name,
             config=types.CreateCachedContentConfig(
@@ -119,6 +117,7 @@ class GoogleGenAIBatchWrapper:
                 ttl=cache_ttl,
             ),
         )
+        print(f"Cache created successfully: {cache_display_name}")
         return cached_content.name
 
     def prepare_batch_requests(

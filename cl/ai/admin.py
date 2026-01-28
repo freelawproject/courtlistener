@@ -23,6 +23,33 @@ class PromptAdmin(admin.ModelAdmin):
         return str(obj)
 
 
+class LLMTaskInline(admin.TabularInline):
+    """Inline to display related LLMTask objects in LLMRequest admin."""
+
+    model = LLMTask
+    extra = 0
+    can_delete = False
+    show_change_link = True
+    fields = (
+        "status",
+        "llm_key",
+        "task",
+        "error_message",
+        "date_created",
+    )
+    readonly_fields = (
+        "status",
+        "llm_key",
+        "task",
+        "error_message",
+        "date_created",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        """Disable adding tasks from the inline."""
+        return False
+
+
 @admin.register(LLMRequest)
 class LLMRequestAdmin(admin.ModelAdmin):
     list_display = (
@@ -41,6 +68,7 @@ class LLMRequestAdmin(admin.ModelAdmin):
     search_fields = ("name", "batch_id")
     readonly_fields = ("date_created", "date_modified")
     filter_horizontal = ("prompts",)
+    inlines = [LLMTaskInline]
 
     @admin.display(description="Request", ordering="id")
     def request_details_link(self, obj):

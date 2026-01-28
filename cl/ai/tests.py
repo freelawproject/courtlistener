@@ -1,4 +1,3 @@
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -68,20 +67,17 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_class.assert_called_once_with(api_key="test-api-key-123")
         self.assertIsNotNone(wrapper.client)
 
-    @patch.dict(os.environ, {"GEMINI_API_KEY": "env-api-key-456"})
     @patch("cl.ai.llm_providers.google.genai.Client")
-    def test_init_with_env_variable(self, mock_client_class):
-        """Test wrapper initialization using environment variable."""
-        wrapper = GoogleGenAIBatchWrapper()
-        mock_client_class.assert_called_once_with(api_key="env-api-key-456")
-        self.assertIsNotNone(wrapper.client)
-
-    @patch.dict(os.environ, {}, clear=True)
-    def test_init_without_api_key_raises_error(self):
+    def test_init_without_api_key_raises_error(self, mock_client_class):
         """Test that initialization fails without an API key."""
         with self.assertRaises(ValueError) as context:
-            GoogleGenAIBatchWrapper()
-        self.assertIn("GEMINI_API_KEY not provided", str(context.exception))
+            GoogleGenAIBatchWrapper(api_key="")
+        self.assertIn("API key is required", str(context.exception))
+
+        # Also test with None
+        with self.assertRaises(ValueError) as context:
+            GoogleGenAIBatchWrapper(api_key=None)
+        self.assertIn("API key is required", str(context.exception))
 
     @patch("cl.ai.llm_providers.google.genai.Client")
     def test_get_or_create_cache_finds_existing(self, mock_client_class):
