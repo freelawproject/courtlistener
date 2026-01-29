@@ -127,14 +127,16 @@ import tempfile
 from collections.abc import Generator
 
 import boto3
+import environ
 import sentry_sdk
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
+from cl.lib.command_utils import VerboseCommand
 from cl.ai.models import (
     LLMProvider,
     LLMRequest,
@@ -195,9 +197,10 @@ def get_s3_file_list(
 
         # In dev mode, add session token if available
         if settings.DEVELOPMENT:
-            session_token = os.environ.get(
-                "AWS_SESSION_TOKEN"
-            ) or os.environ.get("AWS_DEV_SESSION_TOKEN")
+            env = environ.FileAwareEnv()
+            session_token = env(
+                "AWS_SESSION_TOKEN", default=None
+            ) or env("AWS_DEV_SESSION_TOKEN", default=None)
             if session_token:
                 client_kwargs["aws_session_token"] = session_token
 
@@ -258,7 +261,7 @@ def get_s3_file_list(
         raise CommandError(f"AWS SDK error: {e}")
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = "Create and submit Google Gemini batch requests for files stored in S3."
 
     def add_arguments(self, parser):
@@ -311,7 +314,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write("Starting new Gemini batch request process...")
+        super().handle(*args, **options)
+        logger.info("Starting new Gemini batch request process...")
 
         # 1. Get and validate arguments
         s3_path = options["path"]
@@ -327,7 +331,8 @@ class Command(BaseCommand):
             )
 
         # Get GEMINI_BATCH_API_KEY from environment
-        batch_api_key = os.environ.get("GEMINI_BATCH_API_KEY")
+        env = environ.FileAwareEnv()
+        batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
         if not batch_api_key:
             raise CommandError(
                 "GEMINI_BATCH_API_KEY environment variable is required. "
@@ -356,11 +361,11 @@ class Command(BaseCommand):
             date_started=now(),
         )
         llm_request.prompts.set([system_prompt, user_prompt])
-        self.stdout.write(f"Created LLMRequest with ID: {llm_request.pk}")
+        logger.info(f"Created LLMRequest with ID: {llm_request.pk}")
 
         # 4. Fetch PDF files from S3 and create tasks
         bucket = options.get("bucket") or settings.AWS_STORAGE_BUCKET_NAME
-        self.stdout.write(
+        logger.info(
             f"Fetching PDF files from S3: s3://{bucket}/{s3_path}"
         )
         tasks_data = []
@@ -384,12 +389,12 @@ class Command(BaseCommand):
                 if store_files:
                     # Option 1: Duplicate to CourtListener storage
                     task.input_file.save(filename, ContentFile(file_content))
-                    self.stdout.write(f"  - Stored file: {filename}")
+                    logger.info(f"  - Stored file: {filename}")
                 else:
                     # Option 2: Just set the S3 key reference (no duplication)
                     task.input_file.name = s3_key
                     task.save()
-                    self.stdout.write(f"  - Referenced S3 file: {s3_key}")
+                    logger.info(f"  - Referenced S3 file: {s3_key}")
 
                 # Create temporary file for upload to Google GenAI
                 temp_file = tempfile.NamedTemporaryFile(
@@ -410,21 +415,21 @@ class Command(BaseCommand):
 
         llm_request.total_tasks = len(tasks_data)
         llm_request.save()
-        self.stdout.write(
+        logger.info(
             f"Created {llm_request.total_tasks} LLMTask objects."
         )
 
         # 5. Use the decoupled wrapper to prepare and execute the batch
         try:
-            self.stdout.write("Initializing Google GenAI wrapper...")
+            logger.info("Initializing Google GenAI wrapper...")
             wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
 
-            self.stdout.write("Preparing batch requests...")
+            logger.info("Preparing batch requests...")
             prepared_requests = wrapper.prepare_batch_requests(
                 tasks_data, user_prompt.text
             )
 
-            self.stdout.write("Executing batch job...")
+            logger.info("Executing batch job...")
             batch_id = wrapper.execute_batch(
                 model_name=llm_request.api_model_name,
                 requests=prepared_requests,
@@ -437,10 +442,8 @@ class Command(BaseCommand):
             llm_request.batch_id = batch_id
             llm_request.save()
 
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Batch job sent to provider. Batch ID: {batch_id}"
-                )
+            logger.info(
+                f"Batch job sent to provider. Batch ID: {batch_id}"
             )
 
         except ValueError as e:
@@ -462,7 +465,7 @@ class Command(BaseCommand):
             raise CommandError(f"Failed to create batch job: {e}")
         finally:
             # Clean up temporary files
-            self.stdout.write("Cleaning up temporary files...")
+            logger.info("Cleaning up temporary files...")
             for temp_file_path in temp_files:
                 try:
                     if os.path.exists(temp_file_path):
@@ -470,9 +473,6 @@ class Command(BaseCommand):
                 except OSError as e:
                     # Only warn if it's not a "file doesn't exist" error
                     if e.errno != 2:  # errno.ENOENT
-                        self.stderr.write(
-                            f"Warning: Failed to remove temp file {temp_file_path}: {e}"
-                        )
                         logger.warning(
                             f"Failed to remove temp file {temp_file_path}: {e}"
                         )

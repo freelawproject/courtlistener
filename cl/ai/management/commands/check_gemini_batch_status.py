@@ -49,23 +49,27 @@ import json
 import logging
 import os
 
+import environ
 import sentry_sdk
 from django.core.files.base import ContentFile
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
+from cl.lib.command_utils import VerboseCommand
 from cl.ai.models import LLMProvider, LLMRequest, TaskStatus
 
 logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = "Check the status of in-progress Google Gemini batch jobs and download results when complete."
 
     def handle(self, *args, **options):
+        super().handle(*args, **options)
         # Get GEMINI_BATCH_API_KEY from environment
-        batch_api_key = os.environ.get("GEMINI_BATCH_API_KEY")
+        env = environ.FileAwareEnv()
+        batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
         if not batch_api_key:
             raise CommandError(
                 "GEMINI_BATCH_API_KEY environment variable is required. "
@@ -78,7 +82,7 @@ class Command(BaseCommand):
             status=TaskStatus.IN_PROGRESS,
             provider=LLMProvider.GEMINI,
         )
-        self.stdout.write(
+        logger.info(
             f"Found {len(pending_requests)} pending batch requests to check."
         )
 
@@ -87,7 +91,7 @@ class Command(BaseCommand):
 
         wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
         for request in pending_requests:
-            self.stdout.write(
+            logger.info(
                 f"Checking status for request: {request.pk} ({request.batch_id})"
             )
             try:
@@ -100,13 +104,13 @@ class Command(BaseCommand):
                     "JOB_STATE_EXPIRED",
                 }
                 if job.state.name not in completed_states:
-                    self.stdout.write(
+                    logger.info(
                         f"  - Job state is '{job.state.name}'. Skipping for now."
                     )
                     continue
 
                 if job.state.name == "JOB_STATE_SUCCEEDED":
-                    self.stdout.write(
+                    logger.info(
                         "  - Job succeeded. Downloading and processing results..."
                     )
                     jsonl_content = wrapper.download_results(job)
@@ -152,8 +156,8 @@ class Command(BaseCommand):
                                 )
                             except (TypeError, ValueError) as e:
                                 # JSON serialization failed - fall back to string
-                                self.stderr.write(
-                                    f"Warning: Could not serialize JSON for task {task.llm_key}: {e}"
+                                logger.warning(
+                                    f"Could not serialize JSON for task {task.llm_key}: {e}"
                                 )
                                 task.response_file.save(
                                     f"{task.llm_key}_result.txt",
@@ -173,7 +177,7 @@ class Command(BaseCommand):
                     request.date_completed = now()
 
                 else:  # Failed, Cancelled, or Expired
-                    self.stdout.write(
+                    logger.info(
                         f"  - Job ended with non-success state: {job.state.name}"
                     )
                     request.status = TaskStatus.FAILED
@@ -190,17 +194,11 @@ class Command(BaseCommand):
 
             except ValueError as e:
                 # Specific handling for download_results errors
-                self.stderr.write(
-                    f"Error downloading results for request {request.pk}: {e}"
-                )
                 logger.warning(
                     f"ValueError downloading results for request {request.pk}: {e}"
                 )
             except Exception as e:
                 # Unexpected error - log, report to Sentry, mark as failed
-                self.stderr.write(
-                    f"Unexpected error checking request {request.pk}: {e}"
-                )
                 logger.exception(
                     f"Unexpected error in check_gemini_batch_status for request {request.pk}"
                 )
@@ -211,10 +209,4 @@ class Command(BaseCommand):
                 request.date_completed = now()
                 request.save()
 
-                self.stderr.write(
-                    f"  - Marked request {request.pk} as FAILED to prevent retries"
-                )
-
-        self.stdout.write(
-            self.style.SUCCESS("Finished checking all pending requests.")
-        )
+        logger.info("Finished checking all pending requests.")

@@ -1,11 +1,24 @@
 import json
+import logging
 import mimetypes
 import os
 import tempfile
-from typing import Any
+from typing import Any, TypedDict
 
 from google import genai
 from google.genai import types
+
+logger = logging.getLogger(__name__)
+
+
+class ProcessedResult(TypedDict):
+    """Structure for processed batch result."""
+
+    key: str
+    status: str  # "SUCCEEDED" or "FAILED"
+    content: str | None
+    error_message: str | None
+    raw_result: dict[str, Any]
 
 
 class _ResponseValidator:
@@ -103,10 +116,10 @@ class GoogleGenAIBatchWrapper:
         """
         for cache in self.client.caches.list():
             if cache.display_name == cache_display_name:
-                print(f"Found existing cache: {cache_display_name}")
+                logger.info(f"Found existing cache: {cache_display_name}")
                 return cache.name
 
-        print(f"Creating new cache: {cache_display_name}")
+        logger.info(f"Creating new cache: {cache_display_name}")
         cached_content = self.client.caches.create(
             model=model_name,
             config=types.CreateCachedContentConfig(
@@ -117,7 +130,7 @@ class GoogleGenAIBatchWrapper:
                 ttl=cache_ttl,
             ),
         )
-        print(f"Cache created successfully: {cache_display_name}")
+        logger.info(f"Cache created successfully: {cache_display_name}")
         return cached_content.name
 
     def prepare_batch_requests(
@@ -248,14 +261,15 @@ class GoogleGenAIBatchWrapper:
         """
         if job.state != types.JobState.JOB_STATE_SUCCEEDED:
             raise ValueError(
-                "Cannot download results for a job that has not succeeded."
+                f"Cannot download results for job in state {job.state.name}. "
+                f"Expected JOB_STATE_SUCCEEDED."
             )
 
         return self.client.files.download(file=job.dest.file_name).decode(
             "utf-8"
         )
 
-    def process_results(self, jsonl_content: str) -> list[dict[str, Any]]:
+    def process_results(self, jsonl_content: str) -> list[ProcessedResult]:
         """
         Parses a raw JSONL result string and validates each line item.
 
@@ -263,6 +277,9 @@ class GoogleGenAIBatchWrapper:
         :return: A list of structured dictionaries, one for each task result,
                  containing the key, status, content, and any error messages.
         """
+        if not jsonl_content or not jsonl_content.strip():
+            return []
+
         processed_results = []
         results = [
             json.loads(line)
