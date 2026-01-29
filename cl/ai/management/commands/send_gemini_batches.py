@@ -136,7 +136,6 @@ from django.core.management.base import CommandError
 from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
-from cl.lib.command_utils import VerboseCommand
 from cl.ai.models import (
     LLMProvider,
     LLMRequest,
@@ -146,6 +145,7 @@ from cl.ai.models import (
     Task,
     TaskStatus,
 )
+from cl.lib.command_utils import VerboseCommand
 
 logger = logging.getLogger(__name__)
 
@@ -198,9 +198,9 @@ def get_s3_file_list(
         # In dev mode, add session token if available
         if settings.DEVELOPMENT:
             env = environ.FileAwareEnv()
-            session_token = env(
-                "AWS_SESSION_TOKEN", default=None
-            ) or env("AWS_DEV_SESSION_TOKEN", default=None)
+            session_token = env("AWS_SESSION_TOKEN", default=None) or env(
+                "AWS_DEV_SESSION_TOKEN", default=None
+            )
             if session_token:
                 client_kwargs["aws_session_token"] = session_token
 
@@ -365,9 +365,7 @@ class Command(VerboseCommand):
 
         # 4. Fetch PDF files from S3 and create tasks
         bucket = options.get("bucket") or settings.AWS_STORAGE_BUCKET_NAME
-        logger.info(
-            f"Fetching PDF files from S3: s3://{bucket}/{s3_path}"
-        )
+        logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
         tasks_data = []
         temp_files = []
         store_files = options["store_input_files"]
@@ -415,9 +413,7 @@ class Command(VerboseCommand):
 
         llm_request.total_tasks = len(tasks_data)
         llm_request.save()
-        logger.info(
-            f"Created {llm_request.total_tasks} LLMTask objects."
-        )
+        logger.info(f"Created {llm_request.total_tasks} LLMTask objects.")
 
         # 5. Use the decoupled wrapper to prepare and execute the batch
         try:
@@ -442,9 +438,7 @@ class Command(VerboseCommand):
             llm_request.batch_id = batch_id
             llm_request.save()
 
-            logger.info(
-                f"Batch job sent to provider. Batch ID: {batch_id}"
-            )
+            logger.info(f"Batch job sent to provider. Batch ID: {batch_id}")
 
         except ValueError as e:
             # Google API initialization or configuration errors

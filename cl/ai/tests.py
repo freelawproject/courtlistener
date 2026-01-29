@@ -392,7 +392,9 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         with self.assertRaises(ValueError) as context:
             wrapper.download_results(mock_job)
 
-        self.assertIn("Cannot download results for job in state", str(context.exception))
+        self.assertIn(
+            "Cannot download results for job in state", str(context.exception)
+        )
         self.assertIn("JOB_STATE_RUNNING", str(context.exception))
         mock_client_instance.files.download.assert_not_called()
 
@@ -899,7 +901,9 @@ class SendGeminiBatchesTest(TestCase):
                     user_prompt=self.user_prompt.pk,
                 )
 
-            self.assertIn("Invalid system or user prompt", str(context.exception))
+            self.assertIn(
+                "Invalid system or user prompt", str(context.exception)
+            )
 
         # Test case 2: Prompt doesn't exist at all
         with self.subTest(case="nonexistent_prompt"):
@@ -911,7 +915,9 @@ class SendGeminiBatchesTest(TestCase):
                     user_prompt=self.user_prompt.pk,
                 )
 
-            self.assertIn("Invalid system or user prompt", str(context.exception))
+            self.assertIn(
+                "Invalid system or user prompt", str(context.exception)
+            )
 
     @patch("cl.ai.management.commands.send_gemini_batches.os.remove")
     @patch(
@@ -1253,7 +1259,9 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Mock JSONL content with mixed results - use actual request pk
         request_pk = llm_request.pk
-        jsonl_content = f'{{"key": "scan-batch-{request_pk}-0", "response": {{}}}}'
+        jsonl_content = (
+            f'{{"key": "scan-batch-{request_pk}-0", "response": {{}}}}'
+        )
         mock_wrapper.download_results.return_value = jsonl_content
 
         # Mock processed results with mixed success/failure - use actual request pk

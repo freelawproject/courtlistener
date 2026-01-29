@@ -47,7 +47,6 @@ EXAMPLE OUTPUT:
 
 import json
 import logging
-import os
 
 import environ
 import sentry_sdk
@@ -56,8 +55,8 @@ from django.core.management.base import CommandError
 from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
-from cl.lib.command_utils import VerboseCommand
 from cl.ai.models import LLMProvider, LLMRequest, TaskStatus
+from cl.lib.command_utils import VerboseCommand
 
 logger = logging.getLogger(__name__)
 
