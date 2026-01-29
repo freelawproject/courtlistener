@@ -98,16 +98,9 @@ class IncrementalNewTemplateMiddleware:
             # Check if the first template exists anywhere in the project
             try:
                 get_template(old_template[0])
-                path_exists = True
+                old_template = old_template[0]
             except TemplateDoesNotExist:
-                path_exists = False
-
-            if path_exists:
-                old_template = old_template[0]
-            elif len(old_template) > 1:
-                old_template = old_template[1]
-            else:
-                old_template = old_template[0]
+                old_template = old_template[1] if len(old_template) > 1 else old_template[0]
 
         if not isinstance(old_template, str):
             return response
