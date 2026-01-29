@@ -32,6 +32,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SearchQuery,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.search.utils import seal_documents
 from cl.visualizations.models import SCOTUSMap
 
@@ -564,3 +565,49 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+class TexasDocumentInline(admin.StackedInline):
+    model = TexasDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(TexasDocketEntry)
+class TexasDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (TexasDocumentInline,)
+    search_help_text = (
+        "Search TexasDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "disposition",
+        "remarks",
+        "date_filed",
+        "appellate_brief",
+        "entry_type",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Texas docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
