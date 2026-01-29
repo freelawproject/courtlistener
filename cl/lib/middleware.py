@@ -100,7 +100,11 @@ class IncrementalNewTemplateMiddleware:
                 get_template(old_template[0])
                 old_template = old_template[0]
             except TemplateDoesNotExist:
-                old_template = old_template[1] if len(old_template) > 1 else old_template[0]
+                old_template = (
+                    old_template[1]
+                    if len(old_template) > 1
+                    else old_template[0]
+                )
 
         if not isinstance(old_template, str):
             return response
