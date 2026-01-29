@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import functools
 import logging
 import os
 import re
@@ -3519,7 +3518,10 @@ def merge_texas_document(
             ),
         ).apply_async()
         return MergeResult(
-            create=not existed, update=True, success=True, pk=texas_document.pk
+            create=not existed,
+            update=existed,
+            success=True,
+            pk=texas_document.pk,
         )
 
     return MergeResult.unnecessary(texas_document.pk)
@@ -3528,21 +3530,15 @@ def merge_texas_document(
 def merge_texas_documents(
     docket_entry: TexasDocketEntry,
     documents: list[TexasCaseDocument],
-) -> list[tuple[bool, bool, int]]:
+) -> list[MergeResult]:
     """Merges a list of Texas docket entry attachments into CL.
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param documents: List of TexasCaseDocument attached to this docket entry.
-    :return: List of tuples with the following entries:
-    - A flag indicating whether the document needed to be created or updated,
-    - A flag indicating which is set to True when the document was successfully
-    created or updated or when an update was unnecessary,
-    - The primary key of the updated TexasDocument object."""
-    output = [
+    :return: List of the results of each merge operation"""
+    return [
         merge_texas_document(docket_entry, document) for document in documents
     ]
-
-    return output
 
 
 @transaction.atomic
@@ -3579,9 +3575,10 @@ def merge_texas_docket_entry(
         entry_type=input_docket_entry["type"],
         appellate_brief=appellate_brief,
     )
-    count_matching_entries = docket_entries.count()
 
-    if count_matching_entries == 0:
+    try:
+        docket_entry = docket_entries.get()
+    except TexasDocketEntry.DoesNotExist:
         logger.info(
             "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
             sequence_number,
@@ -3594,15 +3591,7 @@ def merge_texas_docket_entry(
             appellate_brief=appellate_brief,
         )
         created = True
-    elif count_matching_entries == 1:
-        logger.info(
-            "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
-            sequence_number,
-            docket.pk,
-        )
-        docket_entry = docket_entries.first()
-        created = False
-    else:
+    except TexasDocketEntry.MultipleObjectsReturned:
         # More filtering needed
         matching_sequence_number = docket_entries.filter(
             sequence_number=sequence_number
@@ -3633,6 +3622,13 @@ def merge_texas_docket_entry(
                 appellate_brief=appellate_brief,
             )
             created = True
+    else:
+        logger.info(
+            "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+            sequence_number,
+            docket.pk,
+        )
+        created = False
 
     docket_entry.sequence_number = sequence_number
     docket_entry.description = input_docket_entry.get("description", "")
@@ -3650,15 +3646,16 @@ def merge_texas_docket_entry(
         docket_entry.pk,
         docket.pk,
     )
-    documents = merge_texas_documents(
+    document_results = merge_texas_documents(
         docket_entry, input_docket_entry["attachments"]
     )
 
-    (update_or_create, success) = functools.reduce(
-        lambda x, y: (x[0] or y[0], x[1] and y[1]), documents, (False, True)
+    return MergeResult(
+        create=created or any(r.create for r in document_results),
+        update=not created or any(r.update for r in document_results),
+        success=all(r.success for r in document_results),
+        pk=docket_entry.pk,
     )
-
-    return created or update_or_create, success, docket_entry.pk
 
 
 def normalize_texas_parties(
@@ -3692,7 +3689,9 @@ def normalize_texas_parties(
     ]
 
 
-def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
+def merge_texas_parties(
+    docket: Docket, parties: list[TexasCaseParty]
+) -> MergeResult:
     """Merge Texas case parties and attorneys into the given docket.
 
     This function takes a docket and a list of parties associated with a Texas
@@ -3702,8 +3701,12 @@ def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
 
     :param docket: The docket to which parties and attorneys should be added.
     :param parties: The parties involved in the Texas case.
+    :return: A MergeResult indicating the operation succeeded. Note that
+        create and update flags are always False and pk is always None since
+        add_parties_and_attorneys does not return this information.
     """
     add_parties_and_attorneys(docket, normalize_texas_parties(parties))
+    return MergeResult(create=False, update=False, success=True, pk=None)
 
 
 def merge_texas_docket_originating_court(
