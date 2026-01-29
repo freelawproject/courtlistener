@@ -125,6 +125,11 @@
   .input-text {
     @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
   }
+  /* Use to resize code elements within h3 */
+  .text-display-xxs {
+    font-size: 18px;
+    line-height: 28px;
+  }
 
   /* ----------- THIRD PARTY OVERRIDES ----------- */
 
