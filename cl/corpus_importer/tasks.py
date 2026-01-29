@@ -3460,10 +3460,17 @@ class MergeResult[T = int](NamedTuple):
         :return: The constructed MergeResult object."""
         return MergeResult(create=False, update=False, success=False, pk=None)
 
+    @staticmethod
+    def unnecessary(pk: T) -> MergeResult[T]:
+        """Shorthand for the result of a unnecessary merge operation.
+
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=False, update=False, success=True, pk=pk)
+
 
 def merge_texas_document(
     docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
-) -> tuple[bool, bool, int]:
+) -> MergeResult:
     """Merge a single TexasCaseDocument object into CL.
 
     Checks if the document exists, creating a TexasDocument object if it does
@@ -3473,27 +3480,34 @@ def merge_texas_document(
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param input_document: The attachment to merge.
-    :return: Tuple with entries
-    - Flag indicating whether a document needed to be created or updated
-    - Flag indicating whether the update operation was successful or not
-    applicable
-    - Primary key of the TexasDocument object which matches the input document
-    """
-    (texas_document, created) = TexasDocument.objects.get_or_create(
-        media_id=input_document["media_id"],
-        docket_entry=docket_entry,
-        defaults={
-            "description": input_document["description"],
-            "media_version_id": input_document["media_version_id"],
-            "document_url": input_document["document_url"],
-        },
-    )
-    update = (
-        str(texas_document.media_version_id)
-        != input_document["media_version_id"]
-    )
+    :return: The result of the merge operation."""
+    try:
+        texas_document = TexasDocument.objects.get(
+            media_id=input_document["media_id"],
+            docket_entry=docket_entry,
+        )
+    except TexasDocument.DoesNotExist:
+        existed = False
+        needs_update = True
+        texas_document = TexasDocument(
+            media_id=input_document["media_id"],
+            docket_entry=docket_entry,
+        )
+    except TexasDocument.MultipleObjectsReturned:
+        logger.error(
+            "Found multiple TexasDocument objects on the same docket entry (%s) with the same media_id (%s)",
+            docket_entry.pk,
+            input_document["media_id"],
+        )
+        return MergeResult.failed()
+    else:
+        existed = True
+        needs_update = (
+            str(texas_document.media_version_id)
+            != input_document["media_version_id"]
+        )
 
-    if created or update:
+    if needs_update:
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
         texas_document.document_url = input_document["document_url"]
@@ -3504,9 +3518,11 @@ def merge_texas_document(
                 check_if_needed=False, model_name="search.TexasDocument"
             ),
         ).apply_async()
-        return True, True, texas_document.pk
+        return MergeResult(
+            create=not existed, update=True, success=True, pk=texas_document.pk
+        )
 
-    return False, True, texas_document.pk
+    return MergeResult.unnecessary(texas_document.pk)
 
 
 def merge_texas_documents(
@@ -3538,7 +3554,7 @@ def merge_texas_docket_entry(
     | TexasAppellateBrief
     | TexasSupremeCourtCaseEvent
     | TexasSupremeCourtAppellateBrief,
-) -> tuple[bool, bool, int]:
+) -> MergeResult:
     """Merges a Texas docket entry into CL.
 
     :param docket: The docket this entry belongs to.
@@ -3816,6 +3832,8 @@ def merge_texas_docket(
             docket.appeal_from = lower_court_id
         else:
             docket.appeal_from_str = lower_court_data.get("name")
+
+        docket.save()
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
     # TODO: Error logging
