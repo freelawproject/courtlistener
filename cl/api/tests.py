@@ -14,6 +14,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
 from django.core.cache import caches
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
@@ -34,12 +35,22 @@ from rest_framework_xml.renderers import XMLRenderer
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
-from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
+from cl.api.factories import (
+    APIThrottleFactory,
+    WebhookEventFactory,
+    WebhookFactory,
+)
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    ThrottleType,
+    WebhookEvent,
+    WebhookEventType,
+)
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     LoggingMixin,
     detect_unknown_filter_params,
+    get_all_throttle_overrides,
     get_logging_prefix,
     invert_user_logs,
     is_valid_filter_param,
@@ -63,6 +74,7 @@ from cl.disclosures.api_views import (
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -4675,3 +4687,154 @@ class UnknownFilterParameterUtilsTests(SimpleTestCase):
         self.assertFalse(
             is_valid_filter_param(deep_circular_path, DocketFilter)
         )
+
+
+class APIThrottleModelTest(TestCase):
+    """Tests for the APIThrottle model."""
+
+    def test_rate_validation_accepts_valid_formats(self) -> None:
+        """Test that rate validation accepts valid rate formats."""
+        valid_rates = [
+            "100/hour",
+            "1000/day",
+            "60/min",
+            "5000/hour",
+            "10/second",
+        ]
+
+        for rate in valid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                # Should not raise
+                throttle.clean()
+
+    def test_rate_validation_rejects_invalid_formats(self) -> None:
+        """Test that rate validation rejects invalid rate formats."""
+        invalid_rates = [
+            "invalid",
+            "100",
+            "/hour",
+            "abc/hour",
+            "100/",
+            "100/invalid",
+            "100/2h",  # number before unit is invalid
+        ]
+
+        for rate in invalid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                with self.assertRaises(ValidationError) as ctx:
+                    throttle.clean()
+                self.assertIn("rate", ctx.exception.message_dict)
+
+    def test_blocked_user_does_not_require_rate(self) -> None:
+        """Test that blocked users don't need a rate."""
+        throttle = APIThrottleFactory.build(blocked=True, rate="")
+        # Should not raise
+        throttle.clean()
+
+    def test_non_blocked_user_requires_rate(self) -> None:
+        """Test that non-blocked users must have a rate."""
+        throttle = APIThrottleFactory.build(blocked=False, rate="")
+        with self.assertRaises(ValidationError) as ctx:
+            throttle.clean()
+        self.assertIn("rate", ctx.exception.message_dict)
+
+
+class ThrottleOverrideIntegrationTest(TestCase):
+    """Integration tests for throttle overrides using the APIThrottle model."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_get_all_throttle_overrides_returns_dict(self) -> None:
+        """Test that get_all_throttle_overrides returns a dict of overrides."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="10000/hour",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertFalse(blocked)
+        self.assertEqual(rate, "10000/hour")
+
+    def test_get_all_throttle_overrides_returns_blocked_status(self) -> None:
+        """Test that blocked users are correctly returned."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=True,
+            rate="",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertTrue(blocked)
+        self.assertEqual(rate, "")
+
+    def test_throttle_overrides_are_cached(self) -> None:
+        """Test that throttle overrides are cached."""
+        # Create a throttle
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="5000/hour",
+        )
+
+        # First call
+        overrides1 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides1)
+
+        # Delete the throttle from DB
+        throttle.delete()
+
+        # Second call should still return cached result
+        overrides2 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides2)
+
+        # Clear cache and call again
+        clear_tiered_cache()
+        overrides3 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(throttle.user.username, overrides3)
+
+    def test_different_throttle_types_have_separate_caches(self) -> None:
+        """Test that API and CITATION_LOOKUP have separate cache entries."""
+        api_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="10000/hour",
+        )
+        citation_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="120/min",
+        )
+
+        api_overrides = get_all_throttle_overrides(ThrottleType.API)
+        citation_overrides = get_all_throttle_overrides(
+            ThrottleType.CITATION_LOOKUP
+        )
+
+        self.assertIn(api_throttle.user.username, api_overrides)
+        self.assertNotIn(citation_throttle.user.username, api_overrides)
+
+        self.assertIn(citation_throttle.user.username, citation_overrides)
+        self.assertNotIn(api_throttle.user.username, citation_overrides)
+
+    async def test_citation_lookup_page_loads_with_throttle_override(
+        self,
+    ) -> None:
+        """Test citation lookup help page loads for user with custom rate."""
+        throttle = await sync_to_async(APIThrottleFactory)(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="500/hour",
+        )
+        client = AsyncClient()
+        await sync_to_async(client.force_login)(throttle.user)
+        response = await client.get(reverse("citation_lookup_api"))
+        self.assertEqual(response.status_code, HTTPStatus.OK)
