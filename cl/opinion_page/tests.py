@@ -29,6 +29,7 @@ from factory import RelatedFactory
 from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
+from cl.favorites.models import GenericCount
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -1295,12 +1296,13 @@ class DocketSitemapTest(SitemapTest):
             date_filed=datetime.date.today(),
         )
         # Included b/c many views
-        DocketFactory.create(
+        docket = DocketFactory.create(
             source=Docket.RECAP,
             blocked=False,
-            view_count=50,
             date_filed=datetime.date.today() - datetime.timedelta(days=60),
         )
+        label = f"d.{docket.pk}:view"
+        GenericCount.objects.create(label=label, value=50)
         # Excluded b/c blocked
         DocketFactory.create(
             source=Docket.RECAP,

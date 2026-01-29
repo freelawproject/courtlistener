@@ -103,12 +103,11 @@ class DocketSitemap(InfinitePaginatorSitemap):
         # Ordering should NOT be set here, define the ordering in the separate `ordering` property
         return (
             Docket.objects.filter(
-                date_filed__gt=recent_date,
                 source__in=Docket.RECAP_SOURCES(),
                 blocked=False,
             )
             .annotate(view_counter=Coalesce(view_count_subquery, Value(0)))
-            .filter(view_counter__gt=10)
+            .filter(Q(view_counter__gt=10) | Q(date_filed__gt=recent_date))
             .only("date_modified", "pk", "slug")
         )
 
