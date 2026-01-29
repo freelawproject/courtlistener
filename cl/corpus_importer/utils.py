@@ -1290,3 +1290,27 @@ def create_docket_entry_sequence_numbers(
         date_counts[entry_date] = i + 1
 
     return sequence_numbers
+
+
+def juriscraper_to_cl_court_id(js_court_id: str) -> str | None:
+    """Converts a court ID from Juriscraper to the court ID used in the
+    database. Utility function for a lot of if statements basically.
+
+    :param js_court_id: The court ID from Juriscraper.
+    :return: The ID of this court in the database or `None` if the Juriscraper
+    ID was not recognized."""
+    if js_court_id.startswith("texas_"):
+        js_texas_court_id = js_court_id[len("texas_") :]
+
+        if js_texas_court_id.startswith("coa"):
+            coa_number = int(js_texas_court_id[len("coa") :])
+            # TODO 13A and B (for some reason)
+            return f"txctapp{coa_number}"
+        if js_texas_court_id == "coscca":
+            return "texcrimapp"
+        if js_texas_court_id == "cossup":
+            return "tex"
+        logger.error("Unrecognized Texas court ID: %s", js_court_id)
+        return None
+    logger.error("Unrecognized court ID: %s", js_court_id)
+    return None
