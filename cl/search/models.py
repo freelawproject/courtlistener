@@ -4103,3 +4103,58 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
+
+    def __str__(self) -> str:
+        return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
+    @property
+    def needs_extraction(self):
+        """Does the item need extraction and does it have all the right
+        fields? Items needing OCR still need extraction.
+        """
+        return all(
+            [
+                self.ocr_status is None or self.ocr_status == self.OCR_NEEDED,
+                self.filepath_local,
+            ]
+        )
+
+    @property
+    def file_name(self) -> str:
+        """Extract the filename from the url."""
+        from cl.corpus_importer.utils import extract_file_name_from_url
+
+        return extract_file_name_from_url(self.url)
+
+    def save(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        index=False,
+        *args,
+        **kwargs,
+    ):
+        self.clean()
+        super().save(update_fields=update_fields, *args, **kwargs)
+        tasks = []
+        if do_extraction and self.needs_extraction:
+            # Context extraction not done and is requested.
+            from cl.scrapers.tasks import extract_recap_pdf
+
+            tasks.append(extract_recap_pdf.si(self.pk))
+        if len(tasks) > 0:
+            chain(*tasks)()
+
+    async def asave(
+        self,
+        update_fields=None,
+        do_extraction=False,
+        *args,
+        **kwargs,
+    ):
+        return await sync_to_async(self.save)(
+            update_fields=update_fields,
+            do_extraction=do_extraction,
+            *args,
+            **kwargs,
+        )
