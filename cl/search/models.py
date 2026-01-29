@@ -4104,6 +4104,9 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         )
         ordering = ("document_number", "attachment_number")
 
+    def __str__(self) -> str:
+        return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
     @property
     def needs_extraction(self):
         """Does the item need extraction and does it have all the right

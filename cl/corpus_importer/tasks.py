@@ -3703,8 +3703,9 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
             f"{doc.document_number}."
             f"{doc.attachment_number or 0}.pdf"
         )
-        doc.filepath_local.save(filename, File(tmp), save=False)
-        doc.file_size = doc.filepath_local.size
+        downloaded_file = File(tmp)
+        doc.filepath_local.save(filename, downloaded_file, save=False)
+        doc.file_size = downloaded_file.size
         doc.sha1 = sha1_hash
         response = async_to_sync(doc_page_count_service)(doc)
         if response.is_success:

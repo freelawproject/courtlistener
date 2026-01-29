@@ -29,7 +29,9 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     SearchQuery,
 )
 from cl.search.utils import seal_documents
@@ -564,3 +566,60 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+class SCOTUSDocumentInline(admin.StackedInline):
+    model = SCOTUSDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(SCOTUSDocketEntry)
+class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (SCOTUSDocumentInline,)
+    search_help_text = (
+        "Search SCOTUSDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "date_filed",
+        "entry_number",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
+
+
+@admin.register(SCOTUSDocument)
+class SCOTUSDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by SCOTUSDocument Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
