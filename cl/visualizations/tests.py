@@ -2,6 +2,7 @@
 Unit tests for Visualizations
 """
 
+from datetime import date
 from http import HTTPStatus
 
 from asgiref.sync import sync_to_async
@@ -10,6 +11,11 @@ from django.contrib.auth.models import Permission
 from django.urls import reverse
 from rest_framework.response import Response
 
+from cl.search.factories import (
+    CourtFactory,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionsCitedWithParentsFactory,
+)
 from cl.search.models import OpinionCluster
 from cl.tests.cases import APITestCase, SimpleTestCase, TestCase
 from cl.tests.utils import make_client
@@ -22,7 +28,24 @@ from cl.visualizations.network_utils import reverse_endpoints_if_needed
 class TestVizUtils(TestCase):
     """Tests for Visualization app utils"""
 
-    fixtures = ["scotus_map_data.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        # Create the two OpinionClusters needed for tests
+        cls.cluster_marsh = OpinionClusterWithChildrenAndParentsFactory(
+            case_name="Marsh v. Chambers",
+            case_name_short="Marsh",
+            docket__court=cls.court_scotus,
+            docket__case_name="Marsh v. Chambers",
+            date_filed=date(1983, 7, 4),
+        )
+        cls.cluster_greece = OpinionClusterWithChildrenAndParentsFactory(
+            case_name="Town of Greece v. Galloway",
+            case_name_short="Town/Greece",
+            docket__court=cls.court_scotus,
+            docket__case_name="Town of Greece v. Galloway",
+            date_filed=date(2014, 5, 5),
+        )
 
     async def test_reverse_endpoints_does_not_reverse_good_inputs(
         self,
@@ -62,7 +85,28 @@ class TestVizUtils(TestCase):
 class TestVizModels(TestCase):
     """Tests for Visualization models"""
 
-    fixtures = ["scotus_map_data.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        # Create the two OpinionClusters needed for tests
+        cls.cluster_marsh = OpinionClusterWithChildrenAndParentsFactory(
+            case_name="Marsh v. Chambers",
+            case_name_short="Marsh",
+            docket__court=cls.court_scotus,
+            docket__case_name="Marsh v. Chambers",
+            date_filed=date(1983, 7, 4),
+        )
+        cls.cluster_greece = OpinionClusterWithChildrenAndParentsFactory(
+            case_name="Town of Greece v. Galloway",
+            case_name_short="Town/Greece",
+            docket__court=cls.court_scotus,
+            docket__case_name="Town of Greece v. Galloway",
+            date_filed=date(2014, 5, 5),
+        )
+        OpinionsCitedWithParentsFactory(
+            cited_opinion=cls.cluster_marsh.sub_opinions.first(),
+            citing_opinion=cls.cluster_greece.sub_opinions.first(),
+        )
 
     async def test_SCOTUSMap_builds_nx_digraph(self) -> None:
         """Tests build_nx_digraph method to see how it works"""
@@ -139,10 +183,33 @@ class TestVisualizationRedirects(SimpleTestCase):
 class APIVisualizationTestCase(APITestCase):
     """Check that visualizations are created properly through the API."""
 
-    fixtures = ["api_scotus_map_data.json"]
-
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        # Create two OpinionClusters with citation relationship for API tests
+        # Cluster 1 cites Cluster 2
+        cls.cluster_debbas = OpinionClusterWithChildrenAndParentsFactory(
+            case_name="Debbas v. Franklin",
+            case_name_short="Debbas",
+            precedential_status="Errata",
+            docket__court=cls.court_scotus,
+            docket__case_name="Debbas v. Franklin",
+            date_filed=date(2015, 1, 15),
+        )
+        cls.cluster_howard = OpinionClusterWithChildrenAndParentsFactory(
+            case_name="Howard v. Honda",
+            case_name_short="Howard",
+            precedential_status="Published",
+            docket__court=cls.court_scotus,
+            docket__case_name="Howard v. Honda",
+            date_filed=date(2010, 6, 1),
+        )
+        # Create citation relationship
+        OpinionsCitedWithParentsFactory(
+            cited_opinion=cls.cluster_howard.sub_opinions.first(),
+            citing_opinion=cls.cluster_debbas.sub_opinions.first(),
+        )
+
         # Add the permissions to the user.
         cls.up = UserProfileWithParentsFactory.create(
             user__username="recap-user",
@@ -169,10 +236,12 @@ class APIVisualizationTestCase(APITestCase):
         data = {
             "title": title,
             "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_debbas.pk},
             ),
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_howard.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -182,10 +251,12 @@ class APIVisualizationTestCase(APITestCase):
         data = {
             "title": "",
             "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_debbas.pk},
             ),
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_howard.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -198,7 +269,8 @@ class APIVisualizationTestCase(APITestCase):
             "title": "My Invalid Visualization - No Cluster Start Provided",
             "cluster_start": "",
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_howard.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -212,7 +284,8 @@ class APIVisualizationTestCase(APITestCase):
         data = {
             "title": "My Invalid Visualization - No Cluster End Provided",
             "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_debbas.pk},
             ),
             "cluster_end": "",
         }
@@ -228,7 +301,8 @@ class APIVisualizationTestCase(APITestCase):
                 "opinioncluster-detail", kwargs={"version": "v3", "pk": 999}
             ),
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_howard.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -255,7 +329,8 @@ class APIVisualizationTestCase(APITestCase):
             res["cluster_start"],
             "http://testserver{}".format(
                 reverse(
-                    "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                    "opinioncluster-detail",
+                    kwargs={"version": "v3", "pk": self.cluster_howard.pk},
                 )
             ),
         )
@@ -263,7 +338,8 @@ class APIVisualizationTestCase(APITestCase):
             res["cluster_end"],
             f"http://testserver{
                 reverse(
-                    'opinioncluster-detail', kwargs={'version': 'v3', 'pk': 1}
+                    'opinioncluster-detail',
+                    kwargs={'version': 'v3', 'pk': self.cluster_debbas.pk},
                 )
             }",
         )
