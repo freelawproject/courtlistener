@@ -1582,6 +1582,10 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         self.assertIn("The input is too long to process.", r.data["detail"])
 
 
+@override_settings()
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functional")
+@override_flag("ui_flag_for_o_es", active=True)
+@override_flag("citing_and_related_enabled", active=True)
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1669,7 +1673,6 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             self.assertIn("1337", result.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    @override_flag("citing_and_related_enabled", active=True)
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navigates to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
