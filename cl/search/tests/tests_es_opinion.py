@@ -2926,6 +2926,8 @@ class OpinionSearchJurisdictionRelevancyTest(
 
 
 @override_settings(RELATED_MLT_MINTF=1)
+@override_settings(WAFFLE_CACHE_PREFIX="test_related_search_test")
+@override_flag("citing_and_related_enabled", active=True)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
