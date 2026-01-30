@@ -577,6 +577,22 @@ class TexasDocumentInline(admin.StackedInline):
     )
 
 
+@admin.register(TexasDocument)
+class TexasDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "media_version_id",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = (
+        "Search by Texas Document media version ID (exact match)."
+    )
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
 @admin.register(TexasDocketEntry)
 class TexasDocketEntryAdmin(CursorPaginatorAdmin):
     inlines = (TexasDocumentInline,)
@@ -589,11 +605,11 @@ class TexasDocketEntryAdmin(CursorPaginatorAdmin):
     )
     list_display = (
         "get_pk",
-        "get_trunc_description",
-        "disposition",
-        "remarks",
-        "date_filed",
         "appellate_brief",
+        "get_trunc_description",
+        "get_trunc_remarks",
+        "disposition",
+        "date_filed",
         "entry_type",
         "sequence_number",
     )
@@ -611,3 +627,7 @@ class TexasDocketEntryAdmin(CursorPaginatorAdmin):
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
         return trunc(obj.description, 35, ellipsis="...")
+
+    @admin.display(description="Remarks")
+    def get_trunc_remarks(self, obj):
+        return trunc(obj.remarks, 35, ellipsis="...")
