@@ -35,7 +35,7 @@
     <p>Webhook events are nothing more than HTTP POST requests sent to your server. To receive these events, you will need to begin by creating a URL in your application.</p>
     <p>Some requirements to consider for the URL that you create:</p>
     <ul>
-      <li>Our webhook system <a class="text-primary-600" href="{% url 'webhooks_docs' %}#security">does not support authentication</a>, so the URL you create should be long and random.</li>
+      <li><a class="text-primary-600" href="{% url 'webhooks_docs' %}#security">Our webhook system does not support authentication</a>, so the URL you create should be long and random.</li>
       <li>Our POST requests will come from one of two static IP addresses, <code>34.210.230.218</code> and <code>54.189.59.91</code>. We recommend only allowing traffic from these addresses.</li>
       <li>Your URL must receive POST requests and should not accept any other HTTP verbs.</li>
       <li>If you are using a web framework like Django or Ruby on Rails, the webhook URL will need to be exempted from the cross site request forgery (CSRF) protection system. If this is not done, most web frameworks will block POST requests from outside domains like ours.</li>
@@ -108,7 +108,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
     <p>Your Webhook endpoint is now created:</p>
     <p>
       <img src="{% static "png/webhook-disabled-v2.png" %}"
-         alt="screenshot of a disabled webhook endpoint"
+         alt="screenshot of the developer tools panel listing a disabled webhook endpoint"
          class="img-responsive img-rounded shadow center-block"
          height="261"
          width="652">
@@ -116,12 +116,12 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="testing">
-    <h2>Testing a Webhook endpoint.</h2>
+    <h2>Testing a Webhook Endpoint</h2>
     <p>Getting a webhook working properly can be difficult, so we have a testing tool that will send you a sample webhook event on demand. </p>
     <p>To use the tool, go to webhooks panel and click the “Test” button for the endpoint you wish to test:</p>
     <p>
       <img src="{% static "png/webhook-disabled-v2.png" %}"
-         alt="screenshot of a disabled webhook endpoint"
+         alt="screenshot of the developer tools panel listing a disabled webhook endpoint"
          class="img-responsive img-rounded shadow center-block"
          height="261"
          width="652">
