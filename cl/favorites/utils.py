@@ -275,16 +275,11 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
         )
     )
 
-    for prayer in granted_prayers:
-        # Send webhook for each enabled webhook
-        for webhook in prayer.user.granted_prayer_webhooks:
-            send_pray_and_pay_webhooks.delay(prayer.pk, webhook.pk)
-
     # copying code from cl/favorites/tasks.py to account for circumstance where
     # someone buys a document from PACER despite it being marked sealed on RECAP
     PrayerAvailability.objects.filter(recap_document=instance).delete()
 
-    # Send email notifications in bulk.
+    # Prepare email templates and context
     subject = "A document you requested is now on CourtListener"
     txt_template = loader.get_template("prayer_email.txt")
     html_template = loader.get_template("prayer_email.html")
@@ -292,33 +287,45 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
     docket = instance.docket_entry.docket
     docket_entry = instance.docket_entry
     document_url = instance.get_absolute_url()
-    num_waiting = granted_prayers.count()
     doc_price = price(instance)
 
+    # Send webhooks for all prayers, emails only for web UI prayers
     messages = []
+    web_ui_prayer_count = 0
+
     for prayer in granted_prayers:
-        context = {
-            "docket": docket,
-            "docket_entry": docket_entry,
-            "rd": instance,
-            "document_url": document_url,
-            "num_waiting": num_waiting,
-            "price": doc_price,
-            "date_created": prayer.date_created,
-        }
-        txt = txt_template.render(context)
-        html = html_template.render(context)
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=txt,
-            from_email=settings.DEFAULT_ALERTS_EMAIL,
-            to=[prayer.user.email],
-            headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
-        )
-        msg.attach_alternative(html, "text/html")
-        messages.append(msg)
-    connection = get_connection()
-    connection.send_messages(messages)
+        # Send webhook for each enabled webhook (all prayers)
+        for webhook in prayer.user.granted_prayer_webhooks:
+            send_pray_and_pay_webhooks.delay(prayer.pk, webhook.pk)
+
+        # Send email only for web UI prayers (not API prayers)
+        if not prayer.via_api:
+            web_ui_prayer_count += 1
+            context = {
+                "docket": docket,
+                "docket_entry": docket_entry,
+                "rd": instance,
+                "document_url": document_url,
+                "num_waiting": web_ui_prayer_count,
+                "price": doc_price,
+                "date_created": prayer.date_created,
+            }
+            txt = txt_template.render(context)
+            html = html_template.render(context)
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=txt,
+                from_email=settings.DEFAULT_ALERTS_EMAIL,
+                to=[prayer.user.email],
+                headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
+            )
+            msg.attach_alternative(html, "text/html")
+            messages.append(msg)
+
+    # Send all email notifications in bulk
+    if messages:
+        connection = get_connection()
+        connection.send_messages(messages)
 
 
 @dataclass
@@ -401,6 +408,9 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
     user_prayer = open_prayers.filter(user__pk=user_pk).first()
 
     if not user_prayer:
+        return
+
+    if user_prayer.via_api:
         return
 
     email_recipients = [
