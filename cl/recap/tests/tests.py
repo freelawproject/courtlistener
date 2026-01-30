@@ -5814,7 +5814,15 @@ class ClaimsRegistryTaskTest(TestCase):
 
 
 class RecapDocketAppellateTaskTest(TestCase):
-    fixtures = ["hawaii_court.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        CourtFactory(
+            id="hid",
+            jurisdiction="SA",
+            short_name="Faked Hawaii Court",
+            full_name="Faked Hawaii Super Court",
+            in_use=False,
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
