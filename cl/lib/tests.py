@@ -238,7 +238,7 @@ class TestPacerSessionUtils(TestCase):
             self.test_cookies,
             "http://proxy_1:9090",
         )
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_user_new_cookie", username="test", password="password"
         )
         self.assertEqual(mock_log_into_pacer.call_count, 1)
@@ -248,7 +248,7 @@ class TestPacerSessionUtils(TestCase):
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_parse_cookie_proxy_pair_properly(self, mock_log_into_pacer):
         """Can we parse the dataclass from cache properly?"""
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_user_new_format", username="test", password="password"
         )
         self.assertEqual(mock_log_into_pacer.call_count, 0)
@@ -266,7 +266,7 @@ class TestPacerSessionUtils(TestCase):
 
         # Attempts to get almost expired cookies with the new format from cache
         # Expects refresh.
-        session_data = get_or_cache_pacer_cookies(
+        session_data = async_to_sync(get_or_cache_pacer_cookies)(
             "test_new_format_almost_expired",
             username="test",
             password="password",

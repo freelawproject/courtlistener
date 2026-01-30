@@ -502,7 +502,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.9.0" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.68" },
+    { name = "juriscraper", git = "https://github.com/ttys0dev/juriscraper.git?rev=2d53ce5bc623bb3b1a59ca48fbd1b69944a6a736" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "markdown2", specifier = ">=2.5.4" },
@@ -1815,7 +1815,7 @@ wheels = [
 [[package]]
 name = "juriscraper"
 version = "2.7.5"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/ttys0dev/juriscraper.git?rev=2d53ce5bc623bb3b1a59ca48fbd1b69944a6a736#2d53ce5bc623bb3b1a59ca48fbd1b69944a6a736" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
@@ -1825,16 +1825,11 @@ dependencies = [
     { name = "feedparser" },
     { name = "geonamescache" },
     { name = "html5lib" },
+    { name = "httpx", extra = ["http2"] },
     { name = "lxml" },
     { name = "nh3" },
     { name = "python-dateutil" },
-    { name = "requests" },
     { name = "selenium" },
-    { name = "tldextract" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/04/aae3dde2abf5e7d95cd288e3fde8fd28edf87f8e7ea7ca1adcdc4a0a14f8/juriscraper-2.7.5.tar.gz", hash = "sha256:6d0768945c8b10408894f710f30d5cfab56e6a89b7b97ba4eea41c40ae5fa915", size = 375853, upload-time = "2026-01-28T15:00:04.544Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/da/fb/57d1cc125bc01092dd9702ce4ae2432cde06622842fdc3b7a92e36fe83f1/juriscraper-2.7.5-py3-none-any.whl", hash = "sha256:eb1150fea3107244277b884b8fdc53764a44d18a5ece6b9306d089ba9542206a", size = 599383, upload-time = "2026-01-28T15:00:02.444Z" },
 ]
 
 [[package]]
@@ -2858,18 +2853,6 @@ wheels = [
 ]
 
 [[package]]
-name = "requests-file"
-version = "3.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/f8/5dc70102e4d337063452c82e1f0d95e39abfe67aa222ed8a5ddeb9df8de8/requests_file-3.0.1.tar.gz", hash = "sha256:f14243d7796c588f3521bd423c5dea2ee4cc730e54a3cac9574d78aca1272576", size = 6967, upload-time = "2025-10-20T18:56:42.279Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/d5/de8f089119205a09da657ed4784c584ede8381a0ce6821212a6d4ca47054/requests_file-3.0.1-py2.py3-none-any.whl", hash = "sha256:d0f5eb94353986d998f80ac63c7f146a307728be051d4d1cd390dbdb59c10fa2", size = 4514, upload-time = "2025-10-20T18:56:41.184Z" },
-]
-
-[[package]]
 name = "responses"
 version = "0.25.8"
 source = { registry = "https://pypi.org/simple" }
@@ -3220,21 +3203,6 @@ name = "timeout-decorator"
 version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/80/f8/0802dd14c58b5d3d72bb9caa4315535f58787a1dc50b81bbbcaaa15451be/timeout-decorator-0.5.0.tar.gz", hash = "sha256:6a2f2f58db1c5b24a2cc79de6345760377ad8bdc13813f5265f6c3e63d16b3d7", size = 4754, upload-time = "2020-11-15T00:53:06.506Z" }
-
-[[package]]
-name = "tldextract"
-version = "5.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "filelock" },
-    { name = "idna" },
-    { name = "requests" },
-    { name = "requests-file" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/65/7b/644fbbb49564a6cb124a8582013315a41148dba2f72209bba14a84242bf0/tldextract-5.3.1.tar.gz", hash = "sha256:a72756ca170b2510315076383ea2993478f7da6f897eef1f4a5400735d5057fb", size = 126105, upload-time = "2025-12-28T23:58:05.532Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6d/42/0e49d6d0aac449ca71952ec5bae764af009754fcb2e76a5cc097543747b3/tldextract-5.3.1-py3-none-any.whl", hash = "sha256:6bfe36d518de569c572062b788e16a659ccaceffc486d243af0484e8ecf432d9", size = 105886, upload-time = "2025-12-28T23:58:04.071Z" },
-]
 
 [[package]]
 name = "tqdm"

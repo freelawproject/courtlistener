@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -128,7 +129,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
         ]:
             # Appellate court dockets. Is the court valid?
-            if not is_appellate_court(attrs["court"].pk):
+            if not async_to_sync(is_appellate_court)(attrs["court"].pk):
                 raise ValidationError(
                     "{} is not an appellate court ID. Did you mean to use the "
                     "upload_type for district dockets?".format(attrs["court"])
@@ -319,7 +320,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         if (
             attrs.get("pacer_case_id")
             and not attrs.get("docket_number")
-            and is_appellate_court(attrs.get("court").pk)
+            and async_to_sync(is_appellate_court)(attrs.get("court").pk)
         ):
             # The user is trying to purchase an appellate docket using only the
             # PACER case ID, which is not supported.
@@ -331,7 +332,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
         court_id = get_court_id_from_fetch_queue(attrs)
         if (
             attrs.get("de_number_end") or attrs.get("de_number_start")
-        ) and is_appellate_court(court_id):
+        ) and async_to_sync(is_appellate_court)(court_id):
             raise ValidationError(
                 "Docket entry filtering by number is not supported for "
                 "appellate courts. Use date range filtering with "
@@ -371,7 +372,7 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
         # Do the PACER credentials work?
         try:
-            _ = get_or_cache_pacer_cookies(
+            _ = async_to_sync(get_or_cache_pacer_cookies)(
                 attrs["user"].pk,
                 username=attrs.pop("pacer_username"),
                 password=attrs.pop("pacer_password"),

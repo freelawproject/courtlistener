@@ -112,7 +112,7 @@ dependencies = [
   "django-cotton>=2.6.0",
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=8.0",
-  "juriscraper>=2.6.68",
+  "juriscraper @ git+https://github.com/ttys0dev/juriscraper.git@2d53ce5bc623bb3b1a59ca48fbd1b69944a6a736",
   "instructor>=1.14.1",
   "django-s3-express-cache>=0.1.0",
   "zohocrmsdk8-0==4.0.0",
@@ -138,6 +138,9 @@ dev = [
   "django-tailwind[reload]~=3.9.1",
   "responses>=0.25.8",
 ]
+
+[tool.uv.sources]
+juriscraper = {git = "https://github.com/ttys0dev/juriscraper.git", rev = "2d53ce5bc623bb3b1a59ca48fbd1b69944a6a736"}
 
 [tool.ruff]
 line-length = 79

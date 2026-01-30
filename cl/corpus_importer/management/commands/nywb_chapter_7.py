@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 
 from cl.corpus_importer.bulk_utils import (
@@ -32,7 +33,7 @@ def get_dockets(options):
     pacer_session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    pacer_session.login()
+    async_to_sync(pacer_session.login)()
     for i, row in enumerate(reader):
         if i < options["offset"]:
             continue
@@ -43,7 +44,7 @@ def get_dockets(options):
             pacer_session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            pacer_session.login()
+            async_to_sync(pacer_session.login)()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()

@@ -20,7 +20,7 @@ from cl.alerts.utils import (
     set_skip_percolation_if_parties_data,
 )
 from cl.corpus_importer.utils import (
-    ais_appellate_court,
+    is_appellate_court,
     is_long_appellate_document_number,
     mark_ia_upload_needed,
 )
@@ -972,7 +972,8 @@ async def add_docket_entries(
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
 
-        appellate_court_id_exists = await ais_appellate_court(d.court_id)
+        appellate_court_id_exists = await is_appellate_court(d.court_id)
+        appellate_rd_att_exists = False
         if de_created is False and appellate_court_id_exists:
             # In existing appellate entry merges, check if the entry has at
             # least one attachment.
@@ -1859,7 +1860,7 @@ async def merge_attachment_page_data(
             ContentFile(text.encode()),
         )
 
-    court_is_appellate = await ais_appellate_court(court.pk)
+    court_is_appellate = await is_appellate_court(court.pk)
     main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
