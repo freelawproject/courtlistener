@@ -22,6 +22,7 @@ from rest_framework.serializers import CharField
 from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    build_search_feed_query,
     compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
@@ -6561,6 +6562,12 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
+    def setUp(self):
+        r = get_redis_interface("CACHE")
+        keys = r.keys("*search_feed_cache:*")
+        if keys:
+            r.delete(*keys)
+
     def test_do_recap_search_feed_have_content(self) -> None:
         """Can we make a RECAP Search Feed?"""
         with self.captureOnCommitCallbacks(execute=True):
@@ -6837,6 +6844,141 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "Invalid search syntax. Please check your request and try again.",
             response.content.decode(),
         )
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=True)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_cache_hit(self, mock_build_query: mock.Mock) -> None:
+        """Can we cache RECAP feed results and retrieve them on subsequent
+        requests?
+        """
+        mock_build_query.side_effect = build_search_feed_query
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+
+        # First request - results will be cached
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        # Second request with same parameters should return cached results
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should NOT be called again (cache hit)
+        self.assertEqual(
+            mock_build_query.call_count,
+            1,
+            msg="build_search_feed_query should only be called once when cache hits",
+        )
+
+        # Responses should be identical
+        self.assertEqual(response_1.content, response_2.content)
+
+        # Verify content is valid feed XML
+        xml_tree = etree.fromstring(response_2.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = xml_tree.xpath("//atom:entry", namespaces=namespaces)
+        self.assertGreater(len(entries), 0, msg="Feed should contain entries")
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=True)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_cache_miss_on_different_params(
+        self, mock_build_query: mock.Mock
+    ) -> None:
+        """Does cache miss when parameters change?"""
+
+        # Set up the mock to call the real function
+        mock_build_query.side_effect = build_search_feed_query
+
+        params_1 = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+        params_2 = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Leave to File",
+        }
+
+        # First request
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params_1,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        # Second request with different parameters should not hit same cache
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params_2,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should be called again (cache miss)
+        self.assertEqual(
+            mock_build_query.call_count,
+            2,
+            msg="build_search_feed_query should be called twice for different parameters",
+        )
+
+        # Responses should be different
+        self.assertNotEqual(response_1.content, response_2.content)
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=False)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_no_cache_when_disabled(
+        self, mock_build_query: mock.Mock
+    ) -> None:
+        """Does caching not occur when ELASTICSEARCH_API_MICRO_CACHE_ENABLED
+        is False?
+        """
+        # Set up the mock to call the real function
+        mock_build_query.side_effect = build_search_feed_query
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+
+        # Make two requests - caching should be disabled
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should be called again (no cache)
+        self.assertEqual(
+            mock_build_query.call_count,
+            2,
+            msg="build_search_feed_query should be called twice when caching disabled",
+        )
+
+        # Both responses should still be identical (same query)
+        # but they are generated independently without cache
+        self.assertEqual(response_1.content, response_2.content)
+
+        # Verify content is valid feed XML
+        xml_tree = etree.fromstring(response_2.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = xml_tree.xpath("//atom:entry", namespaces=namespaces)
+        self.assertGreater(len(entries), 0, msg="Feed should contain entries")
 
 
 class IndexDocketRECAPDocumentsCommandTest(
