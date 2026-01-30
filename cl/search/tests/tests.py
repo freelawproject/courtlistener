@@ -1669,6 +1669,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             self.assertIn("1337", result.text)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    @override_flag("citing_and_related_enabled", active=True)
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navigates to CL and does a simple wild card search
         self.browser.get(self.live_server_url)
