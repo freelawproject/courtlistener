@@ -4,6 +4,7 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Literal
@@ -1290,3 +1291,11 @@ def create_docket_entry_sequence_numbers(
         date_counts[entry_date] = i + 1
 
     return sequence_numbers
+
+
+@dataclass
+class DownloadPDFResult:
+    """Result of a PDF download operation."""
+
+    success: bool
+    sha1: str | None = None

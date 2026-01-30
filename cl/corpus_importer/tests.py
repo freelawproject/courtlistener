@@ -1,9 +1,10 @@
 import json
 from datetime import date, datetime, timedelta
 from unittest import mock
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import call, patch
 
 import eyecite
+import httpx
 import pytest
 import requests
 import responses
@@ -2710,24 +2711,35 @@ class TexasMergerTest(TestCase):
         result = normalize_texas_parties([])
         assert result == []
 
-    def test_download_texas_document_pdf_success(self):
+    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
+    @responses.activate
+    def test_download_texas_document_pdf_success(self, pcs_mock):
         """Can we successfully download a PDF for a TexasDocument?"""
-        texas_document = TexasDocumentFactory.create(
-            document_url="https://example.com/sample.pdf",
+        self.download_pdf_patch.stop()
+        texas_document = TexasDocumentFactory.create()
+
+        def get_test_pdf(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+                return 200, {"Content-Type": "application/pdf"}, f.read()
+
+        pdf_response = responses.add_callback(
+            responses.GET,
+            texas_document.document_url,
+            callback=get_test_pdf,
         )
 
-        # Mock successful PDF download
-        file_mock = MagicMock()
-        self.download_pdf_mock.return_value.__enter__.return_value = file_mock
+        pcs_mock.return_value = httpx.Response(200, text="1")
 
         result = download_texas_document_pdf(texas_document.pk)
 
         assert result is not None
-        self.download_pdf_mock.assert_called_once_with(
-            "https://example.com/sample.pdf", texas_document.pk, "texas_"
-        )
         texas_document.refresh_from_db()
         assert texas_document.filepath_local is not None
+        assert texas_document.page_count == 1
+        assert pdf_response.call_count == 1
+        assert pcs_mock.call_count == 1
 
     def test_download_texas_document_pdf_document_not_found(self):
         """Do we handle a missing TexasDocument gracefully?"""

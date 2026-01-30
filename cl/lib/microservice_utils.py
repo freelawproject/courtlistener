@@ -160,10 +160,10 @@ async def microservice(
     backoff=2,
     logger=logger,
 )
-async def rd_page_count_service(rd: RECAPDocument) -> Response:
+async def doc_page_count_service(rd: AbstractPDF) -> Response:
     """Call page-count from doctor with retries
 
-    :param rd: the recap document to count pages
+    :param rd: the document to count pages
     :return: Response object
     """
     try:
