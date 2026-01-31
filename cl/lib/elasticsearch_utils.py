@@ -15,7 +15,6 @@ from typing import Any, Literal
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from django.core.cache import cache
 from django.core.paginator import Page
 from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
@@ -38,6 +37,7 @@ from cl.lib.courts import lookup_child_courts_cache
 from cl.lib.crypto import sha256
 from cl.lib.date_time import midnight_pt
 from cl.lib.microservice_utils import microservice
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -2714,8 +2714,12 @@ def do_es_feed_query(
         # Generate cache key
         sorted_params = dict(sorted(cache_params.items()))
         params_hash = sha256(pickle.dumps(sorted_params))
-        cache_key = f"search_feed_cache:{params_hash}"
 
+        cache = get_s3_cache("default")
+        cache_key = make_s3_cache_key(
+            f"search_feed_cache:{params_hash}",
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
         # Try to retrieve from cache
         cached_results = cache.get(cache_key)
         if cached_results:
