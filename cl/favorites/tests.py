@@ -44,6 +44,7 @@ from cl.favorites.utils import (
     get_user_prayer_history,
     get_user_prayers,
     prayer_unavailable,
+    send_prayer_emails,
 )
 from cl.lib.test_helpers import (
     AudioTestCase,
@@ -1903,3 +1904,38 @@ class PrayerAPITests(PrayAndPayTestCase):
         response = await self.make_a_prayer(self.client, self.rd_3.pk)
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         self.assertEqual(await prayers.acount(), 3)
+
+    async def test_api_prayers_excluded_from_leaderboard(self) -> None:
+        """Verify that API prayers are excluded from the leaderboard."""
+
+        await self.make_a_prayer(self.client, self.rd_2.pk)
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 0)
+
+    async def test_api_prayers_excluded_from_stats(self) -> None:
+        """Verify that API prayers are excluded from summary statistics."""
+
+        await self.make_a_prayer(self.client, self.rd_2.pk)
+
+        # Get lifetime stats for waiting prayers
+        stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+
+        # API prayer should not be counted in stats
+        self.assertEqual(stats.prayer_count, 0)
+        self.assertEqual(stats.distinct_count, 0)
+        self.assertEqual(stats.distinct_users, 0)
+
+    async def test_api_prayers_skip_emails(self) -> None:
+        """Verify that API prayers do not trigger email notifications."""
+
+        await self.make_a_prayer(self.client, self.rd_2.pk)
+
+        # Mark the document as available (simulate granting the prayer)
+        self.rd_2.is_available = True
+        await self.rd_2.asave()
+
+        # Send prayer emails
+        await sync_to_async(send_prayer_emails)(self.rd_2)
+
+        # No emails should be sent for API prayers
+        self.assertEqual(len(mail.outbox), 0)
