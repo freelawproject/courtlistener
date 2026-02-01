@@ -1747,6 +1747,7 @@ class PrayerAPITests(PrayAndPayTestCase):
         self.assertIsNotNone(prayer_first)
         self.assertEqual(await prayer.acount(), 1)
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertTrue(prayer_first.via_api)
 
     async def test_duplicate_prayer_fails(self) -> None:
         """Ensure a user can't create multiple prayers for the same document
@@ -1853,33 +1854,22 @@ class PrayerAPITests(PrayAndPayTestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
 
-    @override_settings(ALLOWED_PRAYER_COUNT=2)
-    async def test_prayer_creation_eligibility(self):
-        """Test the prayer creation eligibility and limits in the API."""
-        current_time = timezone.now()
+    async def test_api_prayers_unlimited(self):
+        """Test that API prayers are unlimited and not subject to limiting."""
+
         prayers = Prayer.objects.all()
+        
+        # First prayer succeed
+        response = await self.make_a_prayer(self.client, self.rd_1.pk)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await prayers.acount(), 1)
 
-        with time_machine.travel(current_time, tick=False):
-            # First prayer succeed
-            response = await self.make_a_prayer(self.client, self.rd_1.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 1)
+        # Second prayer succeed
+        response = await self.make_a_prayer(self.client, self.rd_2.pk)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await prayers.acount(), 2)
 
-            # Second prayer succeed
-            response = await self.make_a_prayer(self.client, self.rd_2.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 2)
-
-            # Third prayer fails due to limit
-            response = await self.make_a_prayer(self.client, self.rd_3.pk)
-            self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
-            self.assertIn("maximum number of prayers", str(response.data))
-            self.assertEqual(await prayers.acount(), 2)
-
-        # After more than 24 hours the user is eligible to create more prays.
-        with time_machine.travel(
-            current_time + timedelta(hours=25), tick=False
-        ):
-            response = await self.make_a_prayer(self.client, self.rd_3.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 3)
+        # Third prayer succeed
+        response = await self.make_a_prayer(self.client, self.rd_3.pk)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await prayers.acount(), 3)
