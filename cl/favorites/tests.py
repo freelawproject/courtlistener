@@ -1447,6 +1447,36 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         )
         self.assertEqual(total_cost, 3.2)
 
+    @override_settings(ALLOWED_PRAYER_COUNT=2)
+    async def test_web_ui_prayer_rate_limiting(self) -> None:
+        """Verify that web UI prayers are still subject to rate limiting."""
+        current_time = now()
+        prayers = Prayer.objects.all()
+
+        with time_machine.travel(current_time, tick=False):
+            # First prayer should succeed
+            prayer_1 = await create_prayer(self.user, self.rd_2)
+            self.assertIsNotNone(prayer_1)
+            self.assertEqual(await prayers.acount(), 1)
+
+            # Second prayer should succeed
+            prayer_2 = await create_prayer(self.user, self.rd_3)
+            self.assertIsNotNone(prayer_2)
+            self.assertEqual(await prayers.acount(), 2)
+
+            # Third prayer should fail due to rate limiting
+            prayer_3 = await create_prayer(self.user, self.rd_4)
+            self.assertIsNone(prayer_3)
+            self.assertEqual(await prayers.acount(), 2)
+
+        # After more than 24 hours the user is eligible to create more prays.
+        with time_machine.travel(
+            current_time + timedelta(hours=25), tick=False
+        ):
+            prayer_4 = await create_prayer(self.user, self.rd_4)
+            self.assertIsNotNone(prayer_4)
+            self.assertEqual(await prayers.acount(), 3)
+
 
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
