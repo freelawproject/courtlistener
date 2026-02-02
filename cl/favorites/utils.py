@@ -291,16 +291,13 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
     # Send webhooks for all prayers, emails only for web UI prayers
     messages = []
-    web_ui_prayer_count = 0
+    web_ui_prayer_count = sum(1 for p in granted_prayers if not p.via_api)
 
     for prayer in granted_prayers:
-        # Send webhook for each enabled webhook (all prayers)
         for webhook in prayer.user.granted_prayer_webhooks:
             send_pray_and_pay_webhooks.delay(prayer.pk, webhook.pk)
 
-        # Send email only for web UI prayers (not API prayers)
         if not prayer.via_api:
-            web_ui_prayer_count += 1
             context = {
                 "docket": docket,
                 "docket_entry": docket_entry,
@@ -322,7 +319,6 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
             msg.attach_alternative(html, "text/html")
             messages.append(msg)
 
-    # Send all email notifications in bulk
     if messages:
         connection = get_connection()
         connection.send_messages(messages)
