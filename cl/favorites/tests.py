@@ -11,7 +11,6 @@ from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
 from django.test import override_settings
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
@@ -1889,7 +1888,7 @@ class PrayerAPITests(PrayAndPayTestCase):
         """Test that API prayers are unlimited and not subject to limiting."""
 
         prayers = Prayer.objects.all()
-        
+
         # First prayer succeed
         response = await self.make_a_prayer(self.client, self.rd_1.pk)
         self.assertEqual(response.status_code, HTTPStatus.CREATED)

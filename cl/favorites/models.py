@@ -173,8 +173,8 @@ class Prayer(models.Model):
     )
     via_api = models.BooleanField(
         help_text="Whether the prayer was created via the API (unlimited)",
-        default=False, 
-        db_index=True
+        default=False,
+        db_index=True,
     )
 
     class Meta:

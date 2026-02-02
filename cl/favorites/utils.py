@@ -152,7 +152,9 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         .annotate(
             prayer_count=Count(
                 "prayers",
-                filter=Q(prayers__status=Prayer.WAITING, prayers__via_api=False),
+                filter=Q(
+                    prayers__status=Prayer.WAITING, prayers__via_api=False
+                ),
             ),
             view_count=view_count_subquery,
             doc_unavailable=Case(
