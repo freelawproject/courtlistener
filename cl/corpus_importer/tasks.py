@@ -3418,9 +3418,12 @@ def download_texas_document_pdf(
         filename = (
             f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
         )
-        texas_document.filepath_local.save(filename, File(tmp), save=False)
-        texas_document.file_size = texas_document.filepath_local.size
-        # texas_document.sha1 = sha1_hash
+        downloaded_file = File(tmp)
+        texas_document.filepath_local.save(
+            filename, downloaded_file, save=False
+        )
+        texas_document.file_size = downloaded_file.size
+        texas_document.sha1 = sha1_hash
         response = async_to_sync(doc_page_count_service)(texas_document)
         if response.is_success:
             texas_document.page_count = int(response.text)
