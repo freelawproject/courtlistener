@@ -372,6 +372,7 @@ class TestStringUtils(SimpleTestCase):
 
 class TestModelHelpers(TestCase):
     """Test the model_utils helper functions"""
+
     court: Court
 
     @classmethod
