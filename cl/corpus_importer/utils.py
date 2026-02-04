@@ -1315,6 +1315,8 @@ def juriscraper_to_cl_court_id(js_court_id: str) -> str | None:
         return None
     logger.error("Unrecognized court ID: %s", js_court_id)
     return None
+
+
 @dataclass
 class DownloadPDFResult:
     """Result of a PDF download operation."""
