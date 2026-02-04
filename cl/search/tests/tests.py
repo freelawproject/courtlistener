@@ -1847,7 +1847,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
             EC.presence_of_element_located(cited_by_tab_locator)
         )
         WebDriverWait(self.browser, 10).until(
-            lambda driver: "(" in driver.find_element(*cited_by_tab_locator).text
+            lambda driver: "("
+            in driver.find_element(*cited_by_tab_locator).text
         )
         cited_by_tab = self.browser.find_element(*cited_by_tab_locator)
         cited_by_count = re.search(r"\((\d+)\)", cited_by_tab.text)
