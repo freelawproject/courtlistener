@@ -8,7 +8,7 @@ from django.db.models import Model
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
-from cl.api.admin import WebhookInline
+from cl.api.admin import APIThrottleInline, WebhookInline
 from cl.donate.admin import (
     DonationInline,
     MonthlyDonationInline,
@@ -78,6 +78,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         NeonMembershipInline,
         TokenInline,
         WebhookInline,
+        APIThrottleInline,
     )
     list_display = (
         "username",

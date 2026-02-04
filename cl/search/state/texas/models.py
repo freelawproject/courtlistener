@@ -55,6 +55,7 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         # See: https://stackoverflow.com/a/20283983/22035917
         app_label = "search"
         ordering = ["-sequence_number"]
+        # verbose_name_plural = "Texas Docket Entries"
 
 
 @pghistory.track()

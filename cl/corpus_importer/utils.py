@@ -4,6 +4,7 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Literal
@@ -1314,3 +1315,9 @@ def juriscraper_to_cl_court_id(js_court_id: str) -> str | None:
         return None
     logger.error("Unrecognized court ID: %s", js_court_id)
     return None
+@dataclass
+class DownloadPDFResult:
+    """Result of a PDF download operation."""
+
+    success: bool
+    sha1: str | None = None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import logging
 import os
 import re
@@ -102,6 +103,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.utils import (
+    DownloadPDFResult,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
@@ -117,7 +119,10 @@ from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
 from cl.lib.llm import call_llm
-from cl.lib.microservice_utils import microservice, rd_page_count_service
+from cl.lib.microservice_utils import (
+    doc_page_count_service,
+    microservice,
+)
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -2467,7 +2472,7 @@ def update_rd_metadata(
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         rd.sha1 = sha1(pdf_bytes)
-        response = async_to_sync(rd_page_count_service)(rd)
+        response = async_to_sync(doc_page_count_service)(rd)
         if response.is_success:
             rd.page_count = int(response.text)
         assert isinstance(rd.page_count, (int | type(None))), (
@@ -3221,7 +3226,7 @@ def download_pdf_in_stream(
     url: str,
     identifier: str | int,
     temp_prefix: str = "scotus_",
-) -> Iterator[IO[bytes] | None]:
+) -> Iterator[tuple[IO[bytes], str] | None]:
     """Download a PDF in stream and yield a temporary file to avoid using too
     much memory
 
@@ -3242,6 +3247,7 @@ def download_pdf_in_stream(
         tmp_file.seek(0)
         # Clear any partial content from previous attempt
         tmp_file.truncate()
+        hasher = hashlib.sha1()
         with requests.get(
             url,
             stream=True,
@@ -3255,17 +3261,18 @@ def download_pdf_in_stream(
                     identifier,
                     url,
                 )
-                return False
+                return DownloadPDFResult(success=False)
             for chunk in response.iter_content(chunk_size=8 * 1024):
                 if chunk:
                     tmp_file.write(chunk)
+                    hasher.update(chunk)
             tmp_file.flush()
             tmp_file.seek(0)
-            return True
+            return DownloadPDFResult(success=True, sha1=hasher.hexdigest())
 
     with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
-        success = download_to_file(tmp)
-        yield tmp if success else None
+        result = download_to_file(tmp)
+        yield (tmp, result.sha1) if result.success else None
 
 
 @app.task(
@@ -3407,8 +3414,8 @@ def download_texas_document_pdf(
         url,
     )
 
-    with download_pdf_in_stream(url, texas_document.pk, "texas_") as tmp:
-        if tmp is None:
+    with download_pdf_in_stream(url, texas_document.pk, "texas_") as result:
+        if result is None:
             logger.error(
                 "Failed to download attachment PDF for TexasDocument %s from URL %s.",
                 texas_document.pk,
@@ -3416,10 +3423,19 @@ def download_texas_document_pdf(
             )
             self.request.chain = None
             return None
+        tmp, sha1_hash = result
         filename = (
             f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
         )
-        texas_document.filepath_local = File(tmp, name=filename)
+        downloaded_file = File(tmp)
+        texas_document.filepath_local.save(
+            filename, downloaded_file, save=False
+        )
+        texas_document.file_size = downloaded_file.size
+        texas_document.sha1 = sha1_hash
+        response = async_to_sync(doc_page_count_service)(texas_document)
+        if response.is_success:
+            texas_document.page_count = int(response.text)
         texas_document.save()
         return texas_document_pk
 
