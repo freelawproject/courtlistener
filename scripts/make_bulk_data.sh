@@ -421,7 +421,7 @@ export BULK_DB_NAME=courtlistener
 export PGPASSWORD=\$BULK_DB_PASSWORD
 
 echo "Loading schema to database: $schema_filename"
-psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER"
+psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER" --dbname "\$BULK_DB_NAME"
 
 EOF
 
