@@ -10,7 +10,6 @@ from cl.api.utils import (
     FilterManyToManyMixin,
     NoEmptyFilterSet,
 )
-from cl.people_db.lookup_utils import lookup_judge_by_name_components
 from cl.people_db.models import (
     ABARating,
     Attorney,
@@ -158,24 +157,6 @@ class PositionFilter(NoEmptyFilterSet):
             "location_city": BASIC_TEXT_LOOKUPS,
             "location_state": BASIC_TEXT_LOOKUPS,
         }
-
-
-class PersonDisclosureFilter(NoEmptyFilterSet):
-    """Filters for looking up judges in the disclosure pages"""
-
-    fullname = filters.Filter(method="filter_fullname")
-
-    def filter_fullname(
-        self,
-        queryset: QuerySet,
-        name: str,
-        value: str,
-    ) -> QuerySet:
-        return lookup_judge_by_name_components(queryset, value)
-
-    class Meta:
-        model = Person
-        fields = {}
 
 
 class PersonFilter(NoEmptyFilterSet):

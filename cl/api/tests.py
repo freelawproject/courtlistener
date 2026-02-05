@@ -82,7 +82,6 @@ from cl.people_db.api_views import (
     AttorneyViewSet,
     EducationViewSet,
     PartyViewSet,
-    PersonDisclosureViewSet,
     PersonViewSet,
     PoliticalAffiliationViewSet,
     RetentionEventViewSet,
@@ -2608,18 +2607,6 @@ class V4DRFPaginationTest(TestCase):
             secondary_cursor_key="date_modified",
             non_cursor_key="date_dob",
             viewset=PersonViewSet,
-        )
-
-    async def test_disclosuretypeahead_endpoint(self):
-        """Test the V4 PersonDisclosure endpoint confirming that their
-        cursor and page number pagination works properly."""
-
-        await self._base_test_for_v4_endpoints(
-            endpoint="disclosuretypeahead-list",
-            default_ordering="-id",
-            secondary_cursor_key="date_modified",
-            non_cursor_key="name_last",
-            viewset=PersonDisclosureViewSet,
         )
 
     async def test_positions_endpoint(self):
