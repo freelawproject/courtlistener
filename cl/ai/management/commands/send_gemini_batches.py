@@ -378,7 +378,9 @@ class Command(VerboseCommand):
                 file_extension=".pdf",  # Hardcoded to PDF only
             ):
                 # e.g. scan-batch-1-197a40aadcbe
-                llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
+                llm_key = (
+                    f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
+                )
                 task = LLMTask.objects.create(
                     request=llm_request,
                     task=Task.SCAN_EXTRACTION,
