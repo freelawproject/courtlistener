@@ -1,0 +1,65 @@
+Hello{% if name %} {{ name }}{% endif %},
+
+We're writing to let you know that in the last 24 hours we detected API
+requests from your account that include invalid GET parameters our system
+doesn't recognize. In the coming days, we will begin returning HTTP 400 errors
+for such requests.
+
+This email is your advance notice and your opportunity to address this issue.
+
+We apologize for any inconvenience this may cause. This change is necessary to
+protect the integrity of our system and ensure that all API users receive
+accurate, filtered results. When invalid filter parameters are used, they are
+silently ignored, which can lead to unexpected results—often returning far more
+data than intended. Previously, this was not a common problem, but a plethora
+of vibe-coded solutions now regularly trigger very heavy usage of our system
+that we need to urgently address.
+
+
+YOUR AFFECTED API REQUESTS
+--------------------------
+{% for endpoint, params in params_by_endpoint.items %}
+Endpoint: {{ endpoint }}
+{% for param in params %}  - Parameter "{{ param.param }}" was used {{ param.count }} time(s)
+    First seen: {{ param.first_seen }}
+    Last seen: {{ param.last_seen }}
+{% endfor %}
+{% endfor %}
+Total requests with invalid parameters: {{ total_count }}
+
+
+WHAT YOU NEED TO DO
+-------------------
+Please review your API integration code and remove or correct the invalid
+filter parameters listed above. You can find the complete list of valid filter
+parameters for each endpoint in our API documentation:
+
+    https://www.courtlistener.com/help/api/rest/
+
+If you're using a library or tool that generates these parameters, you may need
+to update its configuration or contact its maintainers.
+
+
+QUESTIONS?
+----------
+If you have questions about this change or need help updating your integration,
+please post on our discussion forum:
+
+    https://github.com/freelawproject/courtlistener/discussions/
+
+Our community and team members are happy to help you resolve any issues.
+
+This is a rapid change to our APIs that we are considering a fix, not a
+backwards incompatibility. The only functionality we are removing is the
+ability to use the API incorrectly, which should help fix clients that are not
+working properly.
+
+This email will be re-sent with daily updates until {{ enforcement_date|date:"F jS, Y" }}
+when we will begin blocking these requests instead of simply alerting about them.
+
+We hope you understand, and we appreciate your assistance making our APIs work
+well for all of our users.
+
+Best regards,
+The CourtListener Team
+https://www.courtlistener.com/

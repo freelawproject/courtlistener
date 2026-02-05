@@ -18,6 +18,7 @@ from cl.lib.courts import (
     lookup_child_courts_cache,
 )
 from cl.lib.date_time import midnight_pt
+from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
@@ -50,6 +51,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
@@ -2243,3 +2245,213 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
             needs_ocr(header_text),
             msg="Should need OCR with only headers/pagination",
         )
+
+
+class TestS3CacheHelpers(TestCase):
+    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py"""
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_get_s3_cache_returns_fallback_in_development(self) -> None:
+        """In development mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        # In development, should return db_cache, not s3
+        # We verify by checking the cache backend class name
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_get_s3_cache_returns_fallback_in_testing(self) -> None:
+        """In testing mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_get_s3_cache_returns_s3_in_production(self) -> None:
+        """In production mode, get_s3_cache should return the S3 cache."""
+        mock_s3_cache = MagicMock()
+        mock_caches = {"s3": mock_s3_cache, "db_cache": MagicMock()}
+
+        with patch("cl.lib.s3_cache.caches", mock_caches):
+            with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+                cache = get_s3_cache("db_cache")
+                self.assertEqual(cache, mock_s3_cache)
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_no_prefix_in_development(self) -> None:
+        """In development mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_make_s3_cache_key_no_prefix_in_testing(self) -> None:
+        """In testing mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_adds_prefix_in_production(self) -> None:
+        """In production mode, cache key should have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, timeout)
+            self.assertEqual(result, f"7-days:{base_key}")
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_rounds_up_days(self) -> None:
+        """Days calculation should round up (e.g., 1.5 days -> 2 days)."""
+        base_key = "test-key"
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            # 1 day exactly
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 24), "1-days:test-key"
+            )
+
+            # 1.5 days -> rounds to 2
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 36), "2-days:test-key"
+            )
+
+            # 6 hours -> rounds to 1
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 6), "1-days:test-key"
+            )
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_persistent_in_production(self) -> None:
+        """In production, timeout=None should use persistent prefix."""
+        base_key = "clusters-mlt-es:123"
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, None)
+            self.assertEqual(result, f"persistent:{base_key}")
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_persistent_no_prefix_in_dev(self) -> None:
+        """In dev/test, timeout=None should return key unchanged."""
+        base_key = "clusters-mlt-es:123"
+        result = make_s3_cache_key(base_key, None)
+        self.assertEqual(result, base_key)
+
+
+class TieredCacheTest(SimpleTestCase):
+    """Tests for the tiered_cache decorator."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.call_count = 0
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_caches_result(self) -> None:
+        """Test that tiered_cache caches the result of a function."""
+
+        @tiered_cache(timeout=60)
+        def expensive_function(x: int) -> int:
+            self.call_count += 1
+            return x * 2
+
+        # First call should execute the function
+        result1 = expensive_function(5)
+        self.assertEqual(result1, 10)
+        self.assertEqual(self.call_count, 1)
+
+        # Second call should return cached result
+        result2 = expensive_function(5)
+        self.assertEqual(result2, 10)
+        self.assertEqual(self.call_count, 1)  # Still 1, not called again
+
+    def test_different_args_produce_different_cache_keys(self) -> None:
+        """Test that different arguments produce different cache entries."""
+
+        @tiered_cache(timeout=60)
+        def multiply(x: int, y: int) -> int:
+            self.call_count += 1
+            return x * y
+
+        # First call with (2, 3)
+        result1 = multiply(2, 3)
+        self.assertEqual(result1, 6)
+        self.assertEqual(self.call_count, 1)
+
+        # Call with different args (3, 4)
+        result2 = multiply(3, 4)
+        self.assertEqual(result2, 12)
+        self.assertEqual(self.call_count, 2)
+
+        # Call again with (2, 3) - should be cached
+        result3 = multiply(2, 3)
+        self.assertEqual(result3, 6)
+        self.assertEqual(self.call_count, 2)
+
+    def test_memory_cache_is_checked_before_redis(self) -> None:
+        """Test that memory cache is checked before Redis cache."""
+
+        @tiered_cache(timeout=60)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        # First call populates both caches
+        result1 = get_value()
+        self.assertEqual(result1, "value")
+        self.assertEqual(self.call_count, 1)
+
+        # Clear Redis cache but leave memory cache (clear only tiered: keys)
+        r = get_redis_interface("CACHE")
+        keys = list(r.scan_iter(match=":1:tiered:*"))
+        if keys:
+            r.delete(*keys)
+
+        # Second call should still return cached result from memory
+        result2 = get_value()
+        self.assertEqual(result2, "value")
+        self.assertEqual(self.call_count, 1)
+
+    def test_redis_cache_populates_memory_cache(self) -> None:
+        """Test that reading from Redis cache also populates memory cache."""
+
+        @tiered_cache(timeout=60)
+        def get_data() -> dict:
+            self.call_count += 1
+            return {"key": "value"}
+
+        # First call
+        result1 = get_data()
+        self.assertEqual(result1, {"key": "value"})
+        self.assertEqual(self.call_count, 1)
+
+        # Clear only memory cache, leave Redis cache intact
+        _memory_cache.clear()
+
+        # Second call should read from Redis and repopulate memory
+        result2 = get_data()
+        self.assertEqual(result2, {"key": "value"})
+        self.assertEqual(self.call_count, 1)  # Still 1, read from Redis
+
+    def test_kwargs_affect_cache_key(self) -> None:
+        """Test that keyword arguments are included in cache key."""
+
+        @tiered_cache(timeout=60)
+        def greet(name: str, greeting: str = "Hello") -> str:
+            self.call_count += 1
+            return f"{greeting}, {name}!"
+
+        result1 = greet("Alice", greeting="Hello")
+        self.assertEqual(result1, "Hello, Alice!")
+        self.assertEqual(self.call_count, 1)
+
+        result2 = greet("Alice", greeting="Hi")
+        self.assertEqual(result2, "Hi, Alice!")
+        self.assertEqual(self.call_count, 2)
+
+        result3 = greet("Alice", greeting="Hello")
+        self.assertEqual(result3, "Hello, Alice!")
+        self.assertEqual(self.call_count, 2)  # Cached

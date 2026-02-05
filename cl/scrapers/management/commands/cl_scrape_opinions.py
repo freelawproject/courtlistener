@@ -51,6 +51,32 @@ die_now = False
 cnt = CaseNameTweaker()
 
 
+def set_ordering_keys(opinions_content: list[tuple[dict]]) -> None:
+    """Set a value for Opinion.ordering_key
+
+    To know the relative order inside the cluster, we must know all the
+    opinion types. Opinion types have an inherent order given by the first
+    3 digits "010combined" < "020lead" < "030concurrence" < "040dissent" ...
+
+    For scraped clusters we may
+    - get 2 of one type. For example, 2 concurrences
+
+    :param opinions_content: a list of tuples; where the first element of each
+        tuple is a metadata dict
+    :return None
+    """
+    types = [
+        # we are sure the types key exist, since this is a cluster with more
+        # than 1 opinion
+        (opinion_metadata["types"], index)
+        for index, (opinion_metadata, _, _) in enumerate(opinions_content)
+    ]
+    order = 1
+    for _, index in sorted(types):
+        opinions_content[index][0]["ordering_key"] = order
+        order += 1
+
+
 @transaction.atomic
 def make_objects(
     item: dict[str, str | Any],
@@ -135,6 +161,10 @@ def make_objects(
     citations = [cite for cite in citations if cite]
 
     opinions = []
+
+    if len(opinions_content) > 1:
+        set_ordering_keys(opinions_content)
+
     for opinion_metadata, content, sha1_hash in opinions_content:
         url = opinion_metadata["download_urls"]
         if court.id == "tax":
@@ -148,6 +178,7 @@ def make_objects(
             per_curiam=opinion_metadata.get("per_curiam", False),
             author_str=opinion_metadata.get("author_str")
             or opinion_metadata.get("authors", ""),
+            ordering_key=opinion_metadata.get("ordering_key"),
         )
 
         cf = ContentFile(content)

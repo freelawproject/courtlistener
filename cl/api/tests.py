@@ -14,6 +14,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
 from django.core.cache import caches
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
@@ -34,10 +35,26 @@ from rest_framework_xml.renderers import XMLRenderer
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
-from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
+from cl.api.factories import (
+    APIThrottleFactory,
+    WebhookEventFactory,
+    WebhookFactory,
+)
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    ThrottleType,
+    WebhookEvent,
+    WebhookEventType,
+)
 from cl.api.pagination import VersionBasedPagination
-from cl.api.utils import LoggingMixin, get_logging_prefix, invert_user_logs
+from cl.api.utils import (
+    LoggingMixin,
+    detect_unknown_filter_params,
+    get_all_throttle_overrides,
+    get_logging_prefix,
+    invert_user_logs,
+    is_valid_filter_param,
+)
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -57,6 +74,7 @@ from cl.disclosures.api_views import (
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -113,6 +131,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.filters import CourtFilter, DocketFilter, OpinionFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -134,6 +153,7 @@ from cl.users.models import UserProfile
 from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class BasicAPIPageTest(ESIndexTestCase, TestCase):
     """Test the basic views"""
 
@@ -225,6 +245,7 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             self.assertContains(response, header)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class CoverageTests(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -359,6 +380,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
                 self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
@@ -535,6 +557,7 @@ class ApiQueryCountTests(TestCase):
             )
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""
 
@@ -690,7 +713,7 @@ class ApiEventCreationTestCase(TestCase):
         )
 
 
-@override_settings(BLOCK_NEW_V3_USERS=True)
+@override_settings(BLOCK_NEW_V3_USERS=True, BLOCK_UNKNOWN_FILTERS=True)
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api-block-test:v3",
@@ -838,6 +861,7 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
@@ -908,6 +932,7 @@ class FilteringCountTestMixin:
         return r
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
@@ -1327,6 +1352,7 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
@@ -1892,6 +1918,7 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         await self.assertCountInResults(4)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
     """Test selecting only certain fields"""
 
@@ -1972,6 +1999,7 @@ def handle_database_cursor_pagination_wrapper(*args, **kwargs):
     return original_handle_database_cursor_pagination(*args, **kwargs)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class V4DRFPaginationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -2960,6 +2988,7 @@ class V4DRFPaginationTest(TestCase):
         self.assertEqual(len(data), 0)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFRecapPermissionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3013,6 +3042,7 @@ class DRFRecapPermissionTest(TestCase):
             print("✓")
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class WebhooksProxySecurityTest(TestCase):
     """Test Webhook proxy security"""
 
@@ -3097,6 +3127,7 @@ class WebhooksProxySecurityTest(TestCase):
         )
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class WebhooksMilestoneEventsTest(TestCase):
     """Test Webhook milestone events tracking"""
 
@@ -3296,6 +3327,7 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(await milestone_events.acount(), 0)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class CountParameterTests(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3549,6 +3581,7 @@ class TestApiUsage(SimpleTestCase):
         self.assertEqual(dates, ["2023-01-01", "2023-01-02"])
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 @patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
@@ -3625,6 +3658,7 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
     def test_can_ignore_invalid_filters(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
@@ -3792,6 +3826,7 @@ class CacheListApiResponseTest(TestCase):
         self.assertFalse(self.cache.has_key(fake_cache_key))
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class EventCountApiTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3901,6 +3936,7 @@ class DeferredDocketEntryOnlyViewSet(
     )
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DynamicNestedFieldsMixinTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4103,6 +4139,7 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertIn("tags", prefetches)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class ClusterRedirectionTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4173,6 +4210,7 @@ class ClusterRedirectionTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.GONE)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class TestOpinionViewsetXMLRendering(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4228,6 +4266,7 @@ class TestOpinionViewsetXMLRendering(TestCase):
         self.assertFalse(str(self.good_xml_op_id) in problematic_set)
 
 
+@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class BankruptcyInformationAPITests(TestCase):
     """Tests for the bankruptcy-information endpoint and the
     bankruptcy_information field on the docket endpoint.
@@ -4406,3 +4445,396 @@ class BankruptcyInformationAPITests(TestCase):
             {"id", "docket_number", "bankruptcy_information"},
         )
         self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
+
+
+@override_settings(BLOCK_UNKNOWN_FILTERS=False)
+class UnknownFilterParameterTests(TestCase):
+    """Tests for unknown filter parameter detection and handling."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="test")
+
+    def setUp(self) -> None:
+        # Clear any existing bad filter params for the test user
+        self.r = get_redis_interface("STATS")
+        self._clear_test_redis_keys()
+
+    def tearDown(self) -> None:
+        self._clear_test_redis_keys()
+
+    def _clear_test_redis_keys(self) -> None:
+        """Clear Redis keys for the test user."""
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        if keys:
+            self.r.delete(*keys)
+
+    def test_valid_filter_params_accepted(self) -> None:
+        """Verify that valid filter parameters don't store to Redis."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"id": "test"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # No Redis keys should be created for valid params
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 0)
+
+    def test_unknown_params_stored_in_redis_when_not_blocking(self) -> None:
+        """Verify that unknown parameters are stored in Redis when
+        BLOCK_UNKNOWN_FILTERS is False.
+        """
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"invalid_param": "value", "another_bad": "test"},
+        )
+
+        # Request should succeed (not blocked)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # Should have stored the unknown parameters in Redis
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 2)
+
+        # Verify specific keys exist
+        key_names = [k.split(":")[-1] for k in keys]
+        self.assertIn("invalid_param", key_names)
+        self.assertIn("another_bad", key_names)
+
+    @override_settings(BLOCK_UNKNOWN_FILTERS=True)
+    def test_unknown_params_blocked_when_enabled(self) -> None:
+        """Verify that unknown parameters return 400 when BLOCK_UNKNOWN_FILTERS
+        is True and that data is still logged to Redis.
+        """
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"invalid_param": "value"},
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        data = response.json()
+        self.assertIn("detail", data)
+        self.assertIn("unknown_params", data)
+        self.assertIn("invalid_param", data["unknown_params"])
+
+        # Verify data was ALSO logged to Redis (not just blocked)
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 1)
+        self.assertIn("invalid_param", keys[0])
+
+    def test_framework_params_always_accepted(self) -> None:
+        """Verify that standard framework parameters are always accepted."""
+        self.client.force_login(self.user)
+        framework_params = {
+            "page": "1",
+            "order_by": "id",
+            "format": "json",
+            "fields": "id,full_name",
+            "omit": "resource_uri",
+        }
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            framework_params,
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # No Redis keys should be created for framework params
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 0)
+
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
+    def test_mixed_valid_and_invalid_params(self) -> None:
+        """Verify that mixed valid/invalid params are handled correctly."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {
+                "id": "test",  # valid filter param
+                "page": "1",  # valid framework param
+                "bogus_filter": "value",  # invalid
+            },
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should store only the invalid parameter in Redis
+        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 1)
+        self.assertIn("bogus_filter", keys[0])
+
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
+    def test_redis_stores_count_and_timestamps(self) -> None:
+        """Verify that Redis stores count and timestamp data correctly."""
+        self.client.force_login(self.user)
+
+        # Make two requests with the same bad param
+        for _ in range(2):
+            self.client.get(
+                reverse("court-list", kwargs={"version": "v4"}),
+                {"bad_param": "value"},
+            )
+
+        # Check Redis data
+        key = (
+            f"api:bad_filter_params:user:{self.user.pk}:CourtViewSet:bad_param"
+        )
+        data = self.r.hgetall(key)
+
+        self.assertEqual(int(data["count"]), 2)
+        self.assertIn("first_seen", data)
+        self.assertIn("last_seen", data)
+
+    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
+    def test_anonymous_users_not_logged(self) -> None:
+        """Verify that anonymous user requests don't create Redis entries."""
+        # Don't login - make anonymous request
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"bad_param": "value"},
+        )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # No Redis keys should be created for anonymous users
+        # Check for any keys (anonymous would have None as user_id)
+        pattern = "api:bad_filter_params:user:None:*"
+        keys = list(self.r.scan_iter(match=pattern))
+        self.assertEqual(len(keys), 0)
+
+
+class UnknownFilterParameterUtilsTests(SimpleTestCase):
+    """Unit tests for unknown filter parameter utility functions."""
+
+    def test_is_valid_filter_param_direct_filters(self) -> None:
+        """Verify that is_valid_filter_param validates direct filters."""
+        self.assertTrue(is_valid_filter_param("id", CourtFilter))
+        self.assertTrue(is_valid_filter_param("date_modified", CourtFilter))
+        self.assertFalse(is_valid_filter_param("invalid", CourtFilter))
+        # Test lookup variants with OpinionFilter which has them
+        self.assertTrue(is_valid_filter_param("id__gte", OpinionFilter))
+
+    def test_is_valid_filter_param_handles_none(self) -> None:
+        """Verify that is_valid_filter_param handles None filterset."""
+        self.assertFalse(is_valid_filter_param("id", None))
+
+    def test_is_valid_filter_param_nested_related_filters(self) -> None:
+        """Verify that is_valid_filter_param handles nested RelatedFilters."""
+        # Valid nested RelatedFilter paths
+        self.assertTrue(is_valid_filter_param("cluster", OpinionFilter))
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket", OpinionFilter)
+        )
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket__court", OpinionFilter)
+        )
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket__court__id", OpinionFilter)
+        )
+
+        # Invalid nested paths
+        self.assertFalse(
+            is_valid_filter_param("cluster__invalid", OpinionFilter)
+        )
+        self.assertFalse(
+            is_valid_filter_param("cluster__docket__invalid", OpinionFilter)
+        )
+
+    def test_detect_unknown_filter_params(self) -> None:
+        """Verify detection of unknown parameters."""
+        query_params = {
+            "id": "test",  # valid
+            "page": "1",  # framework param
+            "invalid": "value",  # unknown
+        }
+
+        unknown = detect_unknown_filter_params(query_params, CourtFilter)
+
+        self.assertEqual(unknown, {"invalid"})
+
+    def test_detect_unknown_filter_params_all_valid(self) -> None:
+        """Verify no unknowns when all params are valid."""
+        query_params = {
+            "id": "test",
+            "page": "1",
+            "order_by": "id",
+        }
+
+        unknown = detect_unknown_filter_params(query_params, CourtFilter)
+
+        self.assertEqual(unknown, set())
+
+    def test_is_valid_filter_param_max_depth_prevents_dos(self) -> None:
+        """Verify that deeply nested circular filters are rejected.
+
+        This prevents DOS attacks where an attacker creates params like:
+        clusters__docket__clusters__docket__... (repeated many times)
+        """
+        # Build a deeply nested circular filter path that exceeds max depth
+        deep_circular_path = "__".join(
+            ["clusters", "docket"] * 10
+        )  # 20 levels deep
+
+        # Should be rejected due to depth limit, not cause recursion error
+        self.assertFalse(
+            is_valid_filter_param(deep_circular_path, DocketFilter)
+        )
+
+
+class APIThrottleModelTest(TestCase):
+    """Tests for the APIThrottle model."""
+
+    def test_rate_validation_accepts_valid_formats(self) -> None:
+        """Test that rate validation accepts valid rate formats."""
+        valid_rates = [
+            "100/hour",
+            "1000/day",
+            "60/min",
+            "5000/hour",
+            "10/second",
+        ]
+
+        for rate in valid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                # Should not raise
+                throttle.clean()
+
+    def test_rate_validation_rejects_invalid_formats(self) -> None:
+        """Test that rate validation rejects invalid rate formats."""
+        invalid_rates = [
+            "invalid",
+            "100",
+            "/hour",
+            "abc/hour",
+            "100/",
+            "100/invalid",
+            "100/2h",  # number before unit is invalid
+        ]
+
+        for rate in invalid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                with self.assertRaises(ValidationError) as ctx:
+                    throttle.clean()
+                self.assertIn("rate", ctx.exception.message_dict)
+
+    def test_blocked_user_does_not_require_rate(self) -> None:
+        """Test that blocked users don't need a rate."""
+        throttle = APIThrottleFactory.build(blocked=True, rate="")
+        # Should not raise
+        throttle.clean()
+
+    def test_non_blocked_user_requires_rate(self) -> None:
+        """Test that non-blocked users must have a rate."""
+        throttle = APIThrottleFactory.build(blocked=False, rate="")
+        with self.assertRaises(ValidationError) as ctx:
+            throttle.clean()
+        self.assertIn("rate", ctx.exception.message_dict)
+
+
+class ThrottleOverrideIntegrationTest(TestCase):
+    """Integration tests for throttle overrides using the APIThrottle model."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_get_all_throttle_overrides_returns_dict(self) -> None:
+        """Test that get_all_throttle_overrides returns a dict of overrides."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="10000/hour",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertFalse(blocked)
+        self.assertEqual(rate, "10000/hour")
+
+    def test_get_all_throttle_overrides_returns_blocked_status(self) -> None:
+        """Test that blocked users are correctly returned."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=True,
+            rate="",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertTrue(blocked)
+        self.assertEqual(rate, "")
+
+    def test_throttle_overrides_are_cached(self) -> None:
+        """Test that throttle overrides are cached."""
+        # Create a throttle
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="5000/hour",
+        )
+
+        # First call
+        overrides1 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides1)
+
+        # Delete the throttle from DB
+        throttle.delete()
+
+        # Second call should still return cached result
+        overrides2 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides2)
+
+        # Clear cache and call again
+        clear_tiered_cache()
+        overrides3 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(throttle.user.username, overrides3)
+
+    def test_different_throttle_types_have_separate_caches(self) -> None:
+        """Test that API and CITATION_LOOKUP have separate cache entries."""
+        api_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="10000/hour",
+        )
+        citation_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="120/min",
+        )
+
+        api_overrides = get_all_throttle_overrides(ThrottleType.API)
+        citation_overrides = get_all_throttle_overrides(
+            ThrottleType.CITATION_LOOKUP
+        )
+
+        self.assertIn(api_throttle.user.username, api_overrides)
+        self.assertNotIn(citation_throttle.user.username, api_overrides)
+
+        self.assertIn(citation_throttle.user.username, citation_overrides)
+        self.assertNotIn(api_throttle.user.username, citation_overrides)
+
+    async def test_citation_lookup_page_loads_with_throttle_override(
+        self,
+    ) -> None:
+        """Test citation lookup help page loads for user with custom rate."""
+        throttle = await sync_to_async(APIThrottleFactory)(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="500/hour",
+        )
+        client = AsyncClient()
+        await sync_to_async(client.force_login)(throttle.user)
+        response = await client.get(reverse("citation_lookup_api"))
+        self.assertEqual(response.status_code, HTTPStatus.OK)
