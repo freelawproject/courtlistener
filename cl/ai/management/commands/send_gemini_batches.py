@@ -124,6 +124,7 @@ NEXT STEPS AFTER RUNNING:
 import logging
 import os
 import tempfile
+import uuid
 from collections.abc import Generator
 
 import boto3
@@ -298,7 +299,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--cache-name",
             type=str,
-            default=None,
+            default="scanning-project-sys-prompt",
             help="An optional, stable name for the system prompt cache.",
         )
         parser.add_argument(
@@ -378,7 +379,8 @@ class Command(VerboseCommand):
                 bucket_name=options.get("bucket"),
                 file_extension=".pdf",  # Hardcoded to PDF only
             ):
-                llm_key = f"scan-batch-{llm_request.pk}"
+                # e.g. scan-batch-1-197a40aadcbe
+                llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
                 task = LLMTask.objects.create(
                     request=llm_request,
                     task=Task.SCAN_EXTRACTION,
