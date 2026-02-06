@@ -68,7 +68,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     provided. Used to perform document merging.
     :ivar media_version_id: The MediaVersionID parameter from the download
     URL that TAMES provided. Used to perform document merging.
-    :ivar document_url: The download URL that TAMES provided for this document.
+    :ivar url: The download URL that TAMES provided for this document.
     """
 
     docket_entry = models.ForeignKey(
@@ -77,7 +77,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
-    document_url = models.URLField()
+    url = models.URLField()
 
     class Meta:
         app_label = "search"
