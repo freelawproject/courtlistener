@@ -24,7 +24,6 @@ urlpatterns = [
     path("person/", advanced, name="advanced_p"),
     path("recap/", advanced, name="advanced_r"),
     path("parenthetical/", es_search, name="advanced_pa"),
-    path("financial-disclosures/", advanced, name="advanced_fd"),
     # Feeds & Podcasts
     re_path(
         r"^feed/(search)/$",
