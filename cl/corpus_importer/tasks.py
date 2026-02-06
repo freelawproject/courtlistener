@@ -175,6 +175,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
     ScotusDocketMetadata,
     Tag,
@@ -3725,15 +3726,45 @@ def merge_texas_parties(
     return MergeResult(create=False, update=False, success=True, pk=None)
 
 
+def texas_court_name_to_court(name: str, court_type=None) -> Court | None:
+    """Translates a Texas court name to a CourtListener court ID.
+
+    Uses the name and type of court extracted from Juriscraper and attempts to
+    translate them to a CL `Court` object. If we cannot find a matching `Court`
+    object, return `None`."""
+    raise NotImplementedError
+
+
 def merge_texas_docket_originating_court(
-    docket: Docket, originating_court_data: TexasTrialCourt
+    docket: Docket,
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
 ) -> MergeResult:
     """Merge originating court information into the given Texas docket.
 
     :param docket: The docket to add the originating court to.
-    :param originating_court_data: The originating court data from Juriscraper.
+    :param docket_data: The docket data from Juriscraper.
     :return: The result of the merge operation."""
-    raise NotImplementedError
+    originating_court_information = docket.originating_court_information
+    originating_court_data = docket_data["trial_court"]
+    created = False
+    if not originating_court_information:
+        created = True
+        originating_court_information = OriginatingCourtInformation(
+            docket_number=originating_court_data["case"],
+        )
+
+    originating_court_information.court_reporter = originating_court_data[
+        "reporter"
+    ]
+    originating_court_information.assigned_to_str = originating_court_data[
+        "judge"
+    ]
+    # TODO Get judge from PeopleDB to add
+    originating_court_information.save()
+
+    return MergeResult(create=created, update=False, success=True, pk=None)
 
 
 def merge_texas_case_transfers(
@@ -3791,7 +3822,11 @@ def merge_texas_docket(
     :param court: The court to add the docket to.
     :param docket_data: The scraped Texas docket data.
     :return: The result of the merge operation."""
+    # TODO Maybe we should derive `court` from the scraped data to make things simpler
     with transaction.atomic():
+        Docket.objects.select_for_update().get(
+            docket_number=docket_data["docket_number"], court_id=court.pk
+        )
         docket_number = docket_data["docket_number"]
         try:
             docket = Docket.objects.get(
@@ -3826,7 +3861,7 @@ def merge_texas_docket(
         docket.date_filed = docket_data["date_filed"]
         docket.cause = docket_data["case_type"]
         originating_court_merge_result = merge_texas_docket_originating_court(
-            docket, docket_data["trial_court"]
+            docket, docket_data
         )
         if not originating_court_merge_result.success:
             logger.error(
@@ -3837,25 +3872,31 @@ def merge_texas_docket(
         lower_court_data: TexasAppealsCourt | TexasTrialCourt = (
             docket_data.get("appeals_court", docket_data["trial_court"])
         )
+        # TODO Won't have court_id
         lower_court_id = juriscraper_to_cl_court_id(
             lower_court_data["court_id"]
         )
 
         if lower_court_id is not None:
+            docket.appeal_from = lower_court_id
+        else:
             logger.warning(
                 "Failed to find court ID %s while populating appeal_from field for Texas docket %s in court %s",
                 lower_court_id,
                 docket.pk,
                 court.pk,
             )
-            docket.appeal_from = lower_court_id
-        else:
-            docket.appeal_from_str = lower_court_data.get("name")
+        docket.appeal_from_str = lower_court_data.get("name")
 
         docket.save()
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
-    # TODO: Error logging
+    if not party_merge_result.success:
+        logger.error(
+            "Failed to merge party data for Texas docket %s in court %s",
+            docket.docket_number,
+            court.pk,
+        )
 
     entry_merge_results = [
         merge_texas_docket_entry(
@@ -3869,7 +3910,6 @@ def merge_texas_docket(
             docket_data["case_events"],
         )
     ]
-    # TODO: Error logging
 
     merge_case_transfer_result = merge_texas_case_transfers(
         docket, docket_data
