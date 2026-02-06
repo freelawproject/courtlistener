@@ -20,6 +20,10 @@ from cl.search.factories import (
     ParentheticalWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.state.texas.factories import (
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
+)
 from cl.users.factories import UserFactory
 
 FACTORIES = {
@@ -49,6 +53,9 @@ FACTORIES = {
     600: AudioWithParentsFactory,
     # API
     700: WebhookEventWithParentsFactory,
+    # Texas
+    800: TexasDocketEntryFactory,
+    801: TexasDocumentFactory,
 }
 factories_str = "\n".join(f"{k}: {v}" for k, v in FACTORIES.items())
 

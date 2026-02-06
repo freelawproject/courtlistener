@@ -38,9 +38,9 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
+from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
     CSVExportMixin,
-    document_model,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
@@ -1598,9 +1598,9 @@ class RECAPDocument(
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
-            from cl.scrapers.tasks import extract_recap_pdf
+            from cl.scrapers.tasks import extract_pdf_document
 
-            tasks.append(extract_recap_pdf.si(self.pk))
+            tasks.append(extract_pdf_document.si(self.pk))
 
         if len(tasks) > 0:
             chain(*tasks)()
