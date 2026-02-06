@@ -126,7 +126,10 @@ from cl.recap.tasks import (
     process_recap_upload,
     process_recap_zip,
 )
-from cl.recap.utils import get_court_id_from_fetch_queue
+from cl.recap.utils import (
+    get_court_id_from_fetch_queue,
+    send_bad_redaction_email,
+)
 from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
@@ -8688,3 +8691,140 @@ class RemoveDuplicatedMinuteEntries(TestCase):
                 entry_db.recap_documents.all()[0].description,
                 entry["short_description"],
             )
+
+
+class BadRedactionCheckTest(TestCase):
+    """Tests for the X-Ray bad redaction checking feature."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="txnd", jurisdiction="FB")
+        cls.user = User.objects.get(username="recap")
+
+    def setUp(self):
+        self.docket = DocketFactory(
+            court=self.court,
+            case_name="Test Case v. Bad Redactions",
+            pacer_case_id="12345",
+        )
+        self.de = DocketEntryFactory(docket=self.docket, entry_number=1)
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
+            document_number="1",
+            pacer_doc_id="test-doc-id",
+            is_available=True,
+        )
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+
+    async def _create_processing_queue(self):
+        """Helper to create a ProcessingQueue for testing."""
+        f = SimpleUploadedFile("test.pdf", b"fake pdf content")
+        with mock.patch(
+            "cl.lib.storage.get_name_by_incrementing",
+            side_effect=clobbering_get_name,
+        ):
+            return await sync_to_async(ProcessingQueue.objects.create)(
+                court=self.court,
+                uploader=self.user,
+                pacer_case_id="12345",
+                pacer_doc_id="test-doc-id",
+                document_number="1",
+                filepath_local=f,
+                upload_type=UPLOAD_TYPE.PDF,
+            )
+
+    def _mock_redaction_response(self, results=None, error=False):
+        """Helper to create a mock redaction check response."""
+        mock_response = MagicMock()
+        mock_response.is_success = True
+        mock_response.json.return_value = {
+            "error": error,
+            "results": results or {},
+        }
+        return mock_response
+
+    @mock.patch("cl.recap.tasks.check_redactions_service")
+    @mock.patch("cl.recap.tasks.send_bad_redaction_email")
+    async def test_bad_redaction_triggers_email(
+        self, mock_send_email, mock_check_redactions
+    ):
+        """When bad redactions are found, an email should be sent."""
+        mock_check_redactions.return_value = self._mock_redaction_response(
+            results={
+                "1": [{"text": "Secret SSN", "bbox": (100, 200, 300, 220)}]
+            }
+        )
+        pq = await self._create_processing_queue()
+
+        with mock.patch("cl.recap.tasks.extract_recap_pdf.si"):
+            await process_recap_pdf(pq.pk)
+
+        mock_send_email.assert_called_once()
+        redactions_arg = mock_send_email.call_args[0][1]
+        self.assertEqual(redactions_arg["1"][0]["text"], "Secret SSN")
+
+    @mock.patch("cl.recap.tasks.check_redactions_service")
+    @mock.patch("cl.recap.tasks.send_bad_redaction_email")
+    async def test_no_bad_redactions_no_email(
+        self, mock_send_email, mock_check_redactions
+    ):
+        """When no bad redactions are found, no email should be sent."""
+        mock_check_redactions.return_value = self._mock_redaction_response()
+        pq = await self._create_processing_queue()
+
+        with mock.patch("cl.recap.tasks.extract_recap_pdf.si"):
+            await process_recap_pdf(pq.pk)
+
+        mock_send_email.assert_not_called()
+
+    @mock.patch("cl.recap.tasks.check_redactions_service")
+    @mock.patch("cl.recap.tasks.send_bad_redaction_email")
+    async def test_redaction_check_failure_does_not_block_ingestion(
+        self, mock_send_email, mock_check_redactions
+    ):
+        """If redaction check fails, PDF ingestion should still complete."""
+        mock_check_redactions.side_effect = Exception("Doctor service down")
+        pq = await self._create_processing_queue()
+
+        with mock.patch("cl.recap.tasks.extract_recap_pdf.si"):
+            rd = await process_recap_pdf(pq.pk)
+
+        self.assertIsNotNone(rd)
+        await pq.arefresh_from_db()
+        self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    async def test_send_bad_redaction_email_content(self):
+        """Test the email content when bad redactions are found."""
+        redactions = {
+            "1": [{"text": "Hidden SSN", "bbox": (10, 20, 100, 30)}],
+            "3": [{"text": "Secret text", "bbox": (50, 60, 150, 70)}],
+        }
+
+        await send_bad_redaction_email(self.rd, redactions)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("Bad Redactions Detected", email.subject)
+        self.assertEqual(email.to, [settings.BAD_REDACTION_EMAIL])
+        self.assertIn("Hidden SSN", email.body)
+        self.assertIn("Page 1", email.body)
+        self.assertIn("Page 3", email.body)
+
+    async def test_send_bad_redaction_email_for_attachment(self):
+        """Test email URL is correct for attachment documents."""
+        rd_attachment = await sync_to_async(RECAPDocument.objects.create)(
+            docket_entry=self.de,
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="1",
+            attachment_number=2,
+            pacer_doc_id="test-att-id",
+        )
+
+        await send_bad_redaction_email(
+            rd_attachment, {"1": [{"text": "Secret", "bbox": (0, 0, 10, 10)}]}
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("/1/2/", mail.outbox[0].body)
