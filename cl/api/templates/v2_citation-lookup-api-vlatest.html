@@ -39,18 +39,24 @@
 
   <c-layout-with-navigation.section id="usage">
     <h2>Usage</h2>
-    <p>The simplest way to query this API is to send it a blob of text. If the text does not have any citations, it will simply return an empty JSON object:</p>
+    <p>The simplest way to query this API is to send it a blob of text. If the text does not have any citations, it will simply return an empty JSON array:</p>
     <c-code>
 curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  --data 'text=Put some text here'\
-  []
+  --data 'text=Put some text here'
+    </c-code>
+    <p>Returns:</p>
+    <c-code>
+[]
     </c-code>
     <p>If the text contains valid citations, it will return a list of the citations, analyzing each. This example contains a single citation that is found:</p>
     <c-code>
 curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'text=Obergefell v. Hodges (576 U.S. 644) established the right to marriage among same-sex couples'
+    </c-code>
+  <p>Which would return:</p>
+    <c-code>
 [
   {
     "citation": "576 U.S. 644",
