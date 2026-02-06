@@ -5,7 +5,7 @@
 </p>
 <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request:
 </p>
-<c-code>
+<c-code disable_copy>
 curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
@@ -13,7 +13,7 @@ curl -v \
 
 </c-code>
 <p>To look up a particular docket, use its ID:</p>
-<c-code>
+<c-code disable_copy>
 curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "docket-detail" version=version pk="4214664" %}"
@@ -21,7 +21,7 @@ curl -v \
 </c-code>
 <p>The response you get will not list the docket entries, parties, or attorneys for the docket (doing so doesn't scale), but will have many other metadata fields:
 </p>
-<c-code>
+<c-code disable_copy>
 {
   "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/4214664/",
   "id": 4214664,
