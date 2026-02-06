@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import hashlib
 import logging
@@ -12,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any
+from typing import IO, Any, NamedTuple
 
 import environ
 import eyecite
@@ -55,15 +57,20 @@ from juriscraper.pacer import (
 )
 from juriscraper.pacer.reports import BaseReport
 from juriscraper.state.texas import (
+    TexasAppealsCourt,
     TexasCaseEvent,
     TexasCaseParty,
+    TexasCourtOfCriminalAppealsDocket,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
+    TexasSupremeCourtDocket,
+    TexasTrialCourt,
 )
 from juriscraper.state.texas.common import (
     TexasAppellateBrief,
     TexasCaseDocument,
 )
+from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import (
     APIConnectionError,
     APIError,
@@ -100,8 +107,10 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    create_docket_entry_sequence_numbers,
     is_appellate_court,
     is_long_appellate_document_number,
+    juriscraper_to_cl_court_id,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
@@ -166,6 +175,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
     ScotusDocketMetadata,
     Tag,
@@ -3431,9 +3441,52 @@ def download_texas_document_pdf(
         return texas_document_pk
 
 
+class MergeResult[T = int](NamedTuple):
+    """Stores data about the result of an attempted merge operation."""
+
+    create: bool
+    """Whether a document needed to be created."""
+    update: bool
+    """Whether a document needed to be updated."""
+    success: bool
+    """Whether the operation was successful."""
+    pk: T | None
+    """The primary key of the created or updated object."""
+
+    @staticmethod
+    def created(pk: T) -> MergeResult[T]:
+        """Shorthand for the result of a successful creation operation.
+
+        :param pk: The primary key of the created object.
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=True, update=False, success=True, pk=pk)
+
+    @staticmethod
+    def updated(pk: T) -> MergeResult[T]:
+        """Shorthand for the result of a successful update operation.
+
+        :param pk: The primary key of the updated object.
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=False, update=True, success=True, pk=pk)
+
+    @staticmethod
+    def failed() -> MergeResult[T]:
+        """Shorthand for the result of a failed merge operation.
+
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=False, update=False, success=False, pk=None)
+
+    @staticmethod
+    def unnecessary(pk: T) -> MergeResult[T]:
+        """Shorthand for the result of a unnecessary merge operation.
+
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=False, update=False, success=True, pk=pk)
+
+
 def merge_texas_document(
     docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
-) -> tuple[bool, bool, int]:
+) -> MergeResult:
     """Merge a single TexasCaseDocument object into CL.
 
     Checks if the document exists, creating a TexasDocument object if it does
@@ -3443,27 +3496,34 @@ def merge_texas_document(
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param input_document: The attachment to merge.
-    :return: Tuple with entries
-    - Flag indicating whether a document needed to be created or updated
-    - Flag indicating whether the update operation was successful or not
-    applicable
-    - Primary key of the TexasDocument object which matches the input document
-    """
-    (texas_document, created) = TexasDocument.objects.get_or_create(
-        media_id=input_document["media_id"],
-        docket_entry=docket_entry,
-        defaults={
-            "description": input_document["description"],
-            "media_version_id": input_document["media_version_id"],
-            "document_url": input_document["document_url"],
-        },
-    )
+    :return: The result of the merge operation."""
+    try:
+        texas_document = TexasDocument.objects.get(
+            media_id=input_document["media_id"],
+            docket_entry=docket_entry,
+        )
+    except TexasDocument.DoesNotExist:
+        existed = False
+        needs_update = True
+        texas_document = TexasDocument(
+            media_id=input_document["media_id"],
+            docket_entry=docket_entry,
+        )
+    except TexasDocument.MultipleObjectsReturned:
+        logger.error(
+            "Found multiple TexasDocument objects on the same docket entry (%s) with the same media_id (%s)",
+            docket_entry.pk,
+            input_document["media_id"],
+        )
+        return MergeResult.failed()
+    else:
+        existed = True
+        needs_update = (
+            str(texas_document.media_version_id)
+            != input_document["media_version_id"]
+        )
 
-    if (
-        created
-        or str(texas_document.media_version_id)
-        != input_document["media_version_id"]
-    ):
+    if needs_update:
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
         texas_document.document_url = input_document["document_url"]
@@ -3474,29 +3534,28 @@ def merge_texas_document(
                 check_if_needed=False, model_name="search.TexasDocument"
             ),
         ).apply_async()
-        return True, True, texas_document.pk
+        return MergeResult(
+            create=not existed,
+            update=existed,
+            success=True,
+            pk=texas_document.pk,
+        )
 
-    return False, True, texas_document.pk
+    return MergeResult.unnecessary(texas_document.pk)
 
 
 def merge_texas_documents(
     docket_entry: TexasDocketEntry,
     documents: list[TexasCaseDocument],
-) -> list[tuple[bool, bool, int]]:
+) -> list[MergeResult]:
     """Merges a list of Texas docket entry attachments into CL.
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param documents: List of TexasCaseDocument attached to this docket entry.
-    :return: List of tuples with the following entries:
-    - A flag indicating whether the document needed to be created or updated,
-    - A flag indicating which is set to True when the document was successfully
-    created or updated or when an update was unnecessary,
-    - The primary key of the updated TexasDocument object."""
-    output = [
+    :return: List of the results of each merge operation"""
+    return [
         merge_texas_document(docket_entry, document) for document in documents
     ]
-
-    return output
 
 
 @transaction.atomic
@@ -3508,7 +3567,7 @@ def merge_texas_docket_entry(
     | TexasAppellateBrief
     | TexasSupremeCourtCaseEvent
     | TexasSupremeCourtAppellateBrief,
-) -> tuple[bool, bool, int]:
+) -> MergeResult:
     """Merges a Texas docket entry into CL.
 
     :param docket: The docket this entry belongs to.
@@ -3608,10 +3667,11 @@ def merge_texas_docket_entry(
         docket_entry, input_docket_entry["attachments"]
     )
 
-    return (
-        created or any(r[0] for r in document_results),
-        all(r[1] for r in document_results),
-        docket_entry.pk,
+    return MergeResult(
+        create=created or any(r.create for r in document_results),
+        update=not created or any(r.update for r in document_results),
+        success=all(r.success for r in document_results),
+        pk=docket_entry.pk,
     )
 
 
@@ -3646,7 +3706,9 @@ def normalize_texas_parties(
     ]
 
 
-def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
+def merge_texas_parties(
+    docket: Docket, parties: list[TexasCaseParty]
+) -> MergeResult:
     """Merge Texas case parties and attorneys into the given docket.
 
     This function takes a docket and a list of parties associated with a Texas
@@ -3656,5 +3718,233 @@ def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
 
     :param docket: The docket to which parties and attorneys should be added.
     :param parties: The parties involved in the Texas case.
+    :return: A MergeResult indicating the operation succeeded. Note that
+        create and update flags are always False and pk is always None since
+        add_parties_and_attorneys does not return this information.
     """
     add_parties_and_attorneys(docket, normalize_texas_parties(parties))
+    return MergeResult(create=False, update=False, success=True, pk=None)
+
+
+def texas_court_name_to_court(name: str, court_type=None) -> Court | None:
+    """Translates a Texas court name to a CourtListener court ID.
+
+    Uses the name and type of court extracted from Juriscraper and attempts to
+    translate them to a CL `Court` object. If we cannot find a matching `Court`
+    object, return `None`."""
+    raise NotImplementedError
+
+
+def merge_texas_docket_originating_court(
+    docket: Docket,
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> MergeResult:
+    """Merge originating court information into the given Texas docket.
+
+    :param docket: The docket to add the originating court to.
+    :param docket_data: The docket data from Juriscraper.
+    :return: The result of the merge operation."""
+    originating_court_information = docket.originating_court_information
+    originating_court_data = docket_data["trial_court"]
+    created = False
+    if not originating_court_information:
+        created = True
+        originating_court_information = OriginatingCourtInformation(
+            docket_number=originating_court_data["case"],
+        )
+
+    originating_court_information.court_reporter = originating_court_data[
+        "reporter"
+    ]
+    originating_court_information.assigned_to_str = originating_court_data[
+        "judge"
+    ]
+    # TODO Get judge from PeopleDB to add
+    originating_court_information.save()
+
+    return MergeResult(create=created, update=False, success=True, pk=None)
+
+
+def merge_texas_case_transfers(
+    docket: Docket,
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> MergeResult:
+    """Merge appeal and work sharing information into the given Texas docket.
+
+    :param docket: The docket to add the appeal information to.
+    :param docket_data: The docket data from Juriscraper.
+    :return: The result of the CaseTransfer merge operation"""
+    raise NotImplementedError
+
+
+def generate_texas_appellate_brief_flags(
+    case_events: list[TexasCaseEvent],
+    appellate_briefs: list[TexasAppellateBrief],
+) -> list[bool]:
+    """Generates a list of booleans indicating whether the corresponding entry
+    in the list of TexasCaseEvents is in the list of TexasAppellateBriefs.
+
+    :param case_events: A list of TexasCaseEvent objects.
+    :param appellate_briefs: A list of TexasAppellateBrief objects.
+    :return: A list of booleans indicating whether the corresponding entry is
+    an appellate brief."""
+    if not appellate_briefs:
+        return [False] * len(case_events)
+    i = 0
+    flags = []
+    # Assumes that appellate briefs will appear in the same order as the
+    # corresponding case events.
+    for case_event in case_events:
+        if i == len(appellate_briefs):
+            flags.append(False)
+            continue
+        if case_event == appellate_briefs[i]:
+            flags.append(True)
+            i += 1
+        else:
+            flags.append(False)
+
+    return flags
+
+
+def merge_texas_docket(
+    court: Court,
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> MergeResult:
+    """Merges scraped data from a Texas docket into the `Docket` table.
+
+    :param court: The court to add the docket to.
+    :param docket_data: The scraped Texas docket data.
+    :return: The result of the merge operation."""
+    # TODO Maybe we should derive `court` from the scraped data to make things simpler
+    with transaction.atomic():
+        Docket.objects.select_for_update().get(
+            docket_number=docket_data["docket_number"], court_id=court.pk
+        )
+        docket_number = docket_data["docket_number"]
+        try:
+            docket = Docket.objects.get(
+                court_id=court.pk, docket_number=docket_number
+            )
+        except Docket.DoesNotExist:
+            logger.info(
+                "Could not find docket %s in court %s. Creating new Docket.",
+                docket_number,
+                court.pk,
+            )
+            docket_created = True
+            docket = Docket(
+                court_id=court.pk,
+                docket_number=docket_number,
+            )
+        except Docket.MultipleObjectsReturned:
+            logger.error(
+                "Multiple dockets found for court %s with docket number %s. This likely indicates an error in the merging code.",
+                court.pk,
+                docket_number,
+            )
+            return MergeResult.failed()
+        else:
+            logger.info(
+                "Found existing Docket with docket number %s in court %s. Acquiring DB lock for update.",
+                docket_number,
+                court.pk,
+            )
+            docket_created = False
+            Docket.objects.select_for_update().get(pk=docket.pk)
+        docket.date_filed = docket_data["date_filed"]
+        docket.cause = docket_data["case_type"]
+        originating_court_merge_result = merge_texas_docket_originating_court(
+            docket, docket_data
+        )
+        if not originating_court_merge_result.success:
+            logger.error(
+                "Failed to update originating court information for Texas docket %s in court %s",
+                docket.docket_number,
+                court.pk,
+            )
+        lower_court_data: TexasAppealsCourt | TexasTrialCourt = (
+            docket_data.get("appeals_court", docket_data["trial_court"])
+        )
+        # TODO Won't have court_id
+        lower_court_id = juriscraper_to_cl_court_id(
+            lower_court_data["court_id"]
+        )
+
+        if lower_court_id is not None:
+            docket.appeal_from = lower_court_id
+        else:
+            logger.warning(
+                "Failed to find court ID %s while populating appeal_from field for Texas docket %s in court %s",
+                lower_court_id,
+                docket.pk,
+                court.pk,
+            )
+        docket.appeal_from_str = lower_court_data.get("name")
+
+        docket.save()
+
+    party_merge_result = merge_texas_parties(docket, docket_data["parties"])
+    if not party_merge_result.success:
+        logger.error(
+            "Failed to merge party data for Texas docket %s in court %s",
+            docket.docket_number,
+            court.pk,
+        )
+
+    entry_merge_results = [
+        merge_texas_docket_entry(
+            docket, sequence_number, appellate_brief, entry
+        )
+        for sequence_number, appellate_brief, entry in zip(
+            create_docket_entry_sequence_numbers(docket_data["case_events"]),
+            generate_texas_appellate_brief_flags(
+                docket_data["case_events"], docket_data["appellate_briefs"]
+            ),
+            docket_data["case_events"],
+        )
+    ]
+
+    merge_case_transfer_result = merge_texas_case_transfers(
+        docket, docket_data
+    )
+    if not merge_case_transfer_result.success:
+        logger.error(
+            "Failed to merge CaseTransfer data for Texas docket %s in court %s",
+            docket.docket_number,
+            court.pk,
+        )
+
+    create = (
+        docket_created
+        or party_merge_result.create
+        or originating_court_merge_result.create
+        or merge_case_transfer_result.create
+        or any(r.create for r in entry_merge_results)
+    )
+    update = (
+        not docket_created
+        or party_merge_result.update
+        or originating_court_merge_result.update
+        or merge_case_transfer_result.update
+        or any(r.update for r in entry_merge_results)
+    )
+    success = (
+        party_merge_result.success
+        and originating_court_merge_result.success
+        and merge_case_transfer_result.success
+        and all(r.success for r in entry_merge_results)
+    )
+
+    return MergeResult(
+        create=create,
+        update=update,
+        success=success,
+        pk=docket.pk,
+    )
