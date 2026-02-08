@@ -63,12 +63,12 @@ from cl.tests.cases import (
 )
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
+from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
     normalize_addresses,
 )
-from cl.users.admin import UserAdmin
 from cl.users.factories import (
     EmailSentFactory,
     UserFactory,
