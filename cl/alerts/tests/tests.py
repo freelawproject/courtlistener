@@ -2327,10 +2327,13 @@ class OldDocketAlertsReportToggleTest(TestCase):
         report = build_user_report(self.user_profile.user, delete=True)
         self.assertEqual(report.total_count(), 0)
 
+    @time_machine.travel("2024-01-15T12:00:00Z", tick=False)
     def test_old_docket_alert_report_timeline(self):
         """Can we properly warn and disable docket alerts based on their age
         considering their date_modified is updated when the alert_type change?
         """
+
+        base = now()
 
         # Create today a subscription docket alert from a case terminated long
         # time ago.
@@ -2356,7 +2359,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(active_docket_alerts.count(), 1)
 
         # Simulate user disabling docket alert 60 days in the future.
-        plus_sixty_days = now() + timedelta(days=60)
+        plus_sixty_days = base + timedelta(days=60)
         with time_machine.travel(plus_sixty_days, tick=False):
             # User disabled Docket alert manually.
             da.alert_type = DocketAlert.UNSUBSCRIPTION
@@ -2368,7 +2371,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(da.date_modified, plus_sixty_days)
 
         # Simulate user re-enabling docket alert 85 days in the future.
-        plus_eighty_five_days = now() + timedelta(days=85)
+        plus_eighty_five_days = base + timedelta(days=85)
         with time_machine.travel(plus_eighty_five_days, tick=False):
             # User re-enable Docket alert manually.
             da.alert_type = DocketAlert.SUBSCRIPTION
@@ -2381,7 +2384,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 95 days in the future, 10 days since docket alert was
         # re-enabled
-        plus_ninety_five_days = now() + timedelta(days=95)
+        plus_ninety_five_days = base + timedelta(days=95)
         with time_machine.travel(plus_ninety_five_days, tick=False):
             report = build_user_report(self.user_profile.user, delete=True)
 
@@ -2392,7 +2395,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 268 days in the future, 183 days since docket alert was
         # re-enabled
-        plus_two_hundred_sixty_eight_days = now() + timedelta(days=268)
+        plus_two_hundred_sixty_eight_days = base + timedelta(days=268)
         with time_machine.travel(
             plus_two_hundred_sixty_eight_days, tick=False
         ):
@@ -2407,15 +2410,14 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 272 days in the future, 187 days since docket alert was
         # re-enabled
-        plus_two_hundred_sixty_eight_days = now() + timedelta(days=272)
+        plus_two_hundred_seventy_two_days = base + timedelta(days=272)
         with time_machine.travel(
-            plus_two_hundred_sixty_eight_days, tick=False
+            plus_two_hundred_seventy_two_days, tick=False
         ):
             report = build_user_report(self.user_profile.user, delete=True)
 
-        # After run the report 272 days in the future a warning should go out
-        # but no alert should be disabled since the docket alert was re-enabled
-        # 187 days ago.
+        # After run the report 272 days in the future the alert should be
+        # disabled since the docket alert was re-enabled 187 days ago.
         self.assertEqual(report.total_count(), 1)
         self.assertEqual(len(report.disabled_alerts), 1)
         self.assertEqual(active_docket_alerts.count(), 0)
