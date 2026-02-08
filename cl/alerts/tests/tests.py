@@ -3507,11 +3507,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         initial_stat_count = int(self.r.get(stat_key) or 0)
         with time_machine.travel(mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        after_rt_stat_count = int(self.r.get(stat_key) or 0)
 
         # 1 email should be sent for the rt_oa_search_alert and rt_oa_search_alert_2
         self.assertEqual(
             len(mail.outbox), 1, msg="Wrong number of emails sent."
         )
+        # Confirm stat was incremented by the RT command.
+        self.assertEqual(after_rt_stat_count - initial_stat_count, 1)
 
         # The OA RT alert email should contain 2 alerts, one for rt_oa_search_alert
         # and one for rt_oa_search_alert_2. First alert should contain 2 hits.
@@ -3648,7 +3651,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         rt_oral_argument_3.delete()
 
         # Confirm Stat object is properly created and updated (check delta).
+        # RT command should have incremented by 1, daily command by 1.
         final_stat_count = int(self.r.get(stat_key) or 0)
+        self.assertEqual(
+            final_stat_count - after_rt_stat_count,
+            1,
+            msg="Daily command did not increment stat.",
+        )
         self.assertEqual(final_stat_count - initial_stat_count, 2)
 
         # Remove test instances.
