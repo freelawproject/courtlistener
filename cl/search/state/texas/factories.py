@@ -34,15 +34,58 @@ class TexasCasePartyDictFactory(DictFactory):
     representatives = List([Faker("name")])
 
 
-class TexasTrialCourtDictFactory(DictFactory):
-    # TODO Placeholder
-    name = Faker("pystr")
+class TexasOriginatingCourtDictFactory(DictFactory):
+    name = Faker("court_name")
+    # TODO Replace the literals with values from Juriscraper when the dependency is updated
+    court_type = Faker(
+        "random_element",
+        elements=(
+            "texas_appellate",
+            "texas_district",
+            "texas_probate",
+            "texas_business",
+            "texas_county",
+            "texas_municipal",
+            "texas_justice",
+            "texas_unknown",
+        ),
+    )
+    county = Faker("pystr")
+    judge = Faker("name")
+    # Close enough for testing
+    case = Faker("federal_district_docket_number")
+    reporter = Faker("name")
+    punishment = Faker("pystr")
+
+
+class TexasOriginatingAppellateCourtDictFactory(
+    TexasOriginatingCourtDictFactory
+):
+    court_id = Faker(
+        "random_element",
+        elements=("texas_coa01", "texas_coa02", "texas_coa14", "texas_coa15"),
+    )
+
+
+class TexasOriginatingDistrictCourtDictFactory(
+    TexasOriginatingCourtDictFactory
+):
+    district = Faker("random_element", elements=list(range(1, 527)) + [None])
 
 
 class TexasCommonDataDictFactory(DictFactory):
     court_id = Faker(
         "random_element",
-        elements=("texctapp1", "texctapp2", "tex", "texcrimapp"),
+        elements=(
+            "texas_coa01",
+            "texas_coa02",
+            "texas_cossup",
+            "texas_coscca",
+        ),
+    )
+    court_type = Faker(
+        "random_element",
+        elements=("texas_appellate", "texas_final"),
     )
     # Not correct, but close enough
     docket_number = Faker("federal_district_docket_number")
@@ -51,7 +94,7 @@ class TexasCommonDataDictFactory(DictFactory):
     date_filed = Faker("date_object")
     case_type = Faker("pystr")
     parties = List([SubFactory(TexasCasePartyDictFactory)])
-    trial_court = SubFactory(TexasTrialCourtDictFactory)
+    originating_court = SubFactory(TexasOriginatingCourtDictFactory)
     case_events = List([SubFactory(TexasDocketEntryDictFactory)])
     appellate_briefs = LazyAttribute(
         lambda d: filter(
