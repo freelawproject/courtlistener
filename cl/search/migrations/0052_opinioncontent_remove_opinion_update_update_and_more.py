@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0050_alter_opinion_opinions_cited'),
+        ('search', '0051_texas_models'),
     ]
 
     operations = [
