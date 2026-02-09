@@ -3286,6 +3286,10 @@ class OpinionContent(AbstractDateTimeModel):
     Each Opinion can have multiple OpinionContent records, one per content type.
     This normalized structure replaces the previous wide table design that had
     separate fields for each content source (plain_text, html, html_lawbox, etc.).
+
+    Future work: Add fields from Opinion model (sha1, download_url,
+    local_path, etc.) so existing content can be copied from Opinion
+    to OpinionContent, enabling full versioning support.
     """
 
     SCRAPERS = 1
