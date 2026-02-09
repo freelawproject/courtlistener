@@ -12,10 +12,9 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import validate_email
 from django.db import IntegrityError
-from django.db.models import Count, F
+from django.db.models import F
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -66,7 +65,6 @@ from cl.users.utils import (
     emails,
     message_dict,
 )
-from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
 
@@ -234,66 +232,6 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
         request,
         "profile/donations.html",
         {"page": "profile_your_support", "private": True},
-    )
-
-
-@login_required
-@never_cache
-def view_visualizations(request: AuthenticatedHttpRequest) -> HttpResponse:
-    visualizations = (
-        SCOTUSMap.objects.filter(user=request.user, deleted=False)
-        .annotate(Count("clusters"))
-        .order_by("-date_created")
-    )
-    paginator = Paginator(visualizations, 20, orphans=2)
-    page = request.GET.get("page", 1)
-    try:
-        paged_vizes = paginator.page(page)
-    except PageNotAnInteger:
-        paged_vizes = paginator.page(1)
-    except EmptyPage:
-        paged_vizes = paginator.page(paginator.num_pages)
-    return TemplateResponse(
-        request,
-        "profile/visualizations.html",
-        {
-            "results": paged_vizes,
-            "page": "visualizations_active",
-            "private": True,
-        },
-    )
-
-
-@login_required
-@never_cache
-def view_deleted_visualizations(
-    request: AuthenticatedHttpRequest,
-) -> HttpResponse:
-    thirty_days_ago = now() - timedelta(days=30)
-    visualizations = (
-        SCOTUSMap.objects.filter(
-            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago
-        )
-        .annotate(Count("clusters"))
-        .order_by("-date_created")
-    )
-    paginator = Paginator(visualizations, 20, orphans=2)
-    page = request.GET.get("page", 1)
-    try:
-        paged_vizes = paginator.page(page)
-    except PageNotAnInteger:
-        paged_vizes = paginator.page(1)
-    except EmptyPage:
-        paged_vizes = paginator.page(paginator.num_pages)
-
-    return TemplateResponse(
-        request,
-        "profile/visualizations_deleted.html",
-        {
-            "results": paged_vizes,
-            "page": "visualizations_trash",
-            "private": True,
-        },
     )
 
 
