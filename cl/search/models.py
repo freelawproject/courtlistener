@@ -3981,9 +3981,9 @@ class CaseTransfer(AbstractDateTimeModel):
     an appeal, workload balancing, or docket merging.
 
     :ivar origin_court: The court this transfer originates from.
-    :ivar origin_docket: The docket this transfer originates from.
+    :ivar origin_docket_id: The ID of the docket this transfer originates from.
     :ivar destination_court: The court the docket is being transferred to.
-    :ivar destination_docket: The case docket in the destination court.
+    :ivar destination_docket_id: The ID of the case docket in the destination court.
     :ivar transfer_date: The date this transfer occurred.
     :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
     """
@@ -4007,21 +4007,13 @@ class CaseTransfer(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_court",
     )
-    origin_docket = models.ForeignKey(
-        "search.Docket",
-        on_delete=models.CASCADE,
-        related_name="case_transfer_origin_docket",
-    )
+    origin_docket_id = models.TextField()
     destination_court = models.ForeignKey(
         "search.Court",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_court",
     )
-    destination_docket = models.ForeignKey(
-        "search.Docket",
-        on_delete=models.CASCADE,
-        related_name="case_transfer_destination_docket",
-    )
+    destination_docket_id = models.TextField()
     transfer_date = models.DateField()
     transfer_type = models.SmallIntegerField(
         choices=transfer_type_choices.items(),
