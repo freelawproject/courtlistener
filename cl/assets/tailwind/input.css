@@ -87,12 +87,10 @@
   .alert {
     @apply px-4 py-3 text-sm rounded-[10px] border;
   }
-
   .alert-warning {
     @apply alert text-greyscale-950 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
   }
-
-   .alert-danger {
+  .alert-danger {
     @apply alert bg-red-100 text-red-700 border-red-500;
   }
   .btn {
@@ -129,6 +127,12 @@
   .text-display-xxs {
     font-size: 18px;
     line-height: 28px;
+  }
+  /* Screenshots used in Help pages */
+  .screenshot {
+    border-radius: 16px;
+    display: block;
+    max-width: 100%;
   }
 
   /* ----------- THIRD PARTY OVERRIDES ----------- */
