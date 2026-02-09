@@ -67,8 +67,10 @@ from juriscraper.state.texas import (
     TexasTrialCourt,
 )
 from juriscraper.state.texas.common import (
+    CourtID,
     TexasAppellateBrief,
     TexasCaseDocument,
+    TexasCommonData,
 )
 from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import (
@@ -3544,20 +3546,6 @@ def merge_texas_document(
     return MergeResult.unnecessary(texas_document.pk)
 
 
-def merge_texas_documents(
-    docket_entry: TexasDocketEntry,
-    documents: list[TexasCaseDocument],
-) -> list[MergeResult]:
-    """Merges a list of Texas docket entry attachments into CL.
-
-    :param docket_entry: The docket entry this attachment belongs to.
-    :param documents: List of TexasCaseDocument attached to this docket entry.
-    :return: List of the results of each merge operation"""
-    return [
-        merge_texas_document(docket_entry, document) for document in documents
-    ]
-
-
 @transaction.atomic
 def merge_texas_docket_entry(
     docket: Docket,
@@ -3663,9 +3651,10 @@ def merge_texas_docket_entry(
         docket_entry.pk,
         docket.pk,
     )
-    document_results = merge_texas_documents(
-        docket_entry, input_docket_entry["attachments"]
-    )
+    document_results = [
+        merge_texas_document(input_docket_entry, document)
+        for document in input_docket_entry["attachments"]
+    ]
 
     return MergeResult(
         create=created or any(r.create for r in document_results),
@@ -3726,13 +3715,49 @@ def merge_texas_parties(
     return MergeResult(create=False, update=False, success=True, pk=None)
 
 
-def texas_court_name_to_court(name: str, court_type=None) -> Court | None:
-    """Translates a Texas court name to a CourtListener court ID.
+def texas_js_court_id_to_court_id(js_court_id: str) -> str:
+    """Translates a Juriscraper Texas court ID to a CourtListener Court ID.
 
-    Uses the name and type of court extracted from Juriscraper and attempts to
-    translate them to a CL `Court` object. If we cannot find a matching `Court`
-    object, return `None`."""
-    raise NotImplementedError
+    :param js_court_id: The court ID extracted from Juriscraper.
+    :return: The corresponding Court ID."""
+    if js_court_id == CourtID.SUPREME_COURT.value:
+        return "tex"
+    if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+        return "texcrimapp"
+    # Court of appeals
+    appellate_number = str(int(js_court_id[len("texas_") :]))
+    if appellate_number == "13":
+        appellate_number = "13A"
+    return f"txctapp{appellate_number}"
+
+
+def texas_originating_court_to_court_id(
+    court_data: TexasOriginatingCourt,
+) -> str | None:
+    """Attempts to translate Juriscraper Texas originating court data to a
+    CourtListener Court ID.
+
+    :param court_data: The originating court data from Juriscraper.
+    :return: The matching Court ID or None if no court could be found."""
+    # TODO Replace with JS CourtID enum values when dependency is updated
+    court_type = court_data["court_type"]
+    if court_type == "texas_appellate":
+        return texas_js_court_id_to_court_id(court_data["court_id"])
+    if court_type == "texas_district":
+        district_number = court_data["district"]
+        if district_number:
+            if district_number > 1:
+                district_number = district_number + 1
+            return f"txdistct{district_number}"
+        return "texdistct"
+    if court_type == "texas_business":
+        return "texbizct"
+    if court_type == "texas_municipal":
+        return "texctyct"
+    if court_type == "texas_probate":
+        return "texprobct"
+    # County, justice, and unknown court types
+    return None
 
 
 def merge_texas_docket_originating_court(
@@ -3812,17 +3837,17 @@ def generate_texas_appellate_brief_flags(
 
 
 def merge_texas_docket(
-    court: Court,
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> MergeResult:
     """Merges scraped data from a Texas docket into the `Docket` table.
 
-    :param court: The court to add the docket to.
     :param docket_data: The scraped Texas docket data.
     :return: The result of the merge operation."""
-    # TODO Maybe we should derive `court` from the scraped data to make things simpler
+    court = Court.objects.get(
+        pk=texas_js_court_id_to_court_id(docket_data["court_id"])
+    )
     with transaction.atomic():
         Docket.objects.select_for_update().get(
             docket_number=docket_data["docket_number"], court_id=court.pk
@@ -3869,13 +3894,17 @@ def merge_texas_docket(
                 docket.docket_number,
                 court.pk,
             )
-        lower_court_data: TexasAppealsCourt | TexasTrialCourt = (
-            docket_data.get("appeals_court", docket_data["trial_court"])
-        )
-        # TODO Won't have court_id
-        lower_court_id = juriscraper_to_cl_court_id(
-            lower_court_data["court_id"]
-        )
+
+        if docket_data["court_type"] == "texas_appellate":
+            lower_court_data = docket_data["originating_court"]
+            lower_court_id = texas_originating_court_to_court_id(
+                lower_court_data
+            )
+        else:
+            lower_court_data = docket_data["appeals_court"]
+            lower_court_id = texas_js_court_id_to_court_id(
+                lower_court_data["court_id"]
+            )
 
         if lower_court_id is not None:
             docket.appeal_from = lower_court_id
