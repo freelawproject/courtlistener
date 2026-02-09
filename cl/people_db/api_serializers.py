@@ -1,4 +1,3 @@
-from judge_pics.search import ImageSizes, portrait
 from rest_framework import serializers
 
 from cl.api.utils import (
@@ -7,7 +6,6 @@ from cl.api.utils import (
     NestedDynamicFieldsMixin,
     RetrieveFilteredFieldsMixin,
 )
-from cl.disclosures.utils import make_disclosure_year_range
 from cl.people_db.models import (
     ABARating,
     Attorney,
@@ -111,47 +109,6 @@ class ABARatingSerializer(
     class Meta:
         model = ABARating
         fields = "__all__"
-
-
-class PersonDisclosureSerializer(
-    DynamicFieldsMixin,
-    HyperlinkedModelSerializerWithId,
-):
-    position_str = serializers.SerializerMethodField()
-    name_full = serializers.CharField()
-    disclosure_years = serializers.SerializerMethodField()
-    thumbnail_path = serializers.SerializerMethodField()
-    newest_disclosure_url = serializers.SerializerMethodField()
-
-    def get_position_str(self, obj: Person) -> str:
-        """Make a simple string of a judge's most recent position
-
-        Assumes you have the judge's position prefetched in the `positions`
-        attr.
-        """
-        if len(obj.court_positions) > 0:
-            return obj.court_positions[0].court.short_name
-        return ""
-
-    def get_disclosure_years(self, obj: Person) -> str:
-        return make_disclosure_year_range(obj)
-
-    def get_thumbnail_path(self, obj: Person) -> str:
-        return portrait(obj.id, ImageSizes.SMALL)
-
-    def get_newest_disclosure_url(self, obj: Person) -> str:
-        """Get the URL of the"""
-        return obj.disclosures[0].get_absolute_url()
-
-    class Meta:
-        model = Person
-        fields = (
-            "position_str",
-            "name_full",
-            "disclosure_years",
-            "thumbnail_path",
-            "newest_disclosure_url",
-        )
 
 
 class PersonSerializer(
