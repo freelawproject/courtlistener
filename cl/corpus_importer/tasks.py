@@ -171,6 +171,7 @@ from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
+    CaseTransfer,
     ClaimHistory,
     Court,
     Docket,
@@ -3803,7 +3804,131 @@ def merge_texas_case_transfers(
     :param docket: The docket to add the appeal information to.
     :param docket_data: The docket data from Juriscraper.
     :return: The result of the CaseTransfer merge operation"""
-    raise NotImplementedError
+    trial_court_id = texas_originating_court_to_court_id(
+        docket_data["originating_court"]
+    )
+
+    if docket_data["court_type"] == "texas_final":
+        # Assume that the originating court -> appellate court transfer will
+        # be populated by an appellate docket later on.
+        transfer = CaseTransfer(
+            destination_court=docket.court,
+            destination_docket_id=docket.docket_number,
+            transfer_date=docket_data["date_filed"],
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        appeals_court = docket_data["appeals_court"]
+        if appeals_court["court_id"] == CourtID.UNKNOWN:
+            appeals_court_id = "texapp"
+        else:
+            appeals_court_id = texas_js_court_id_to_court_id(
+                appeals_court["court_id"]
+            )
+
+        if docket_data["court_id"] == CourtID.COURT_OF_CRIMINAL_APPEALS:
+            # Death penalty cases are automatically appealed to the CCA so the
+            # appellate court may be missing.
+            appeals_court = docket_data["appeals_court"]
+            if appeals_court["court_id"] == CourtID.UNKNOWN:
+                # Death penalty appeal
+                if trial_court_id:
+                    transfer.origin_court = Court.objects.get(
+                        pk=trial_court_id
+                    )
+                    transfer.origin_docket_id = docket_data[
+                        "originating_court"
+                    ]["case"]
+                else:
+                    logger.error(
+                        "Unable to determine trial court ID for Texas docket %s to create CaseTransfer",
+                        docket.docket_number,
+                    )
+                    return MergeResult.failed()
+            else:
+                transfer.origin_court = Court.objects.get(pk=appeals_court_id)
+                transfer.origin_docket_id = appeals_court["case_number"]
+        elif docket_data["court_id"] == CourtID.SUPREME_COURT:
+            transfer.origin_court = Court.objects.get(pk=appeals_court_id)
+            transfer.origin_docket_id = appeals_court["case_number"]
+        else:
+            logger.error(
+                "Unrecognized Texas final court ID %s while creating CaseTransfer",
+                docket_data["court_id"],
+            )
+            return MergeResult.failed()
+        transfers = [transfer]
+    elif docket_data["court_type"] == "texas_appellate":
+        transfers = []
+        if trial_court_id:
+            transfers.append(
+                CaseTransfer(
+                    origin_court=Court.objects.get(pk=trial_court_id),
+                    origin_docket_id=docket_data["originating_court"]["case"],
+                    destination_court=docket.court,
+                    destination_docket_id=docket.docket_number,
+                    transfer_date=docket_data["date_filed"],
+                    transfer_type=CaseTransfer.APPEAL,
+                )
+            )
+        if docket_data["transfer_from"]:
+            transfers.append(
+                CaseTransfer(
+                    origin_court=Court.objects.get(
+                        pk=texas_js_court_id_to_court_id(
+                            docket_data["transfer_from"]["court_id"]
+                        )
+                    ),
+                    origin_docket_id=docket_data["transfer_from"][
+                        "origin_docket"
+                    ],
+                    destination_court=docket.court,
+                    destination_docket_id=docket.docket_number,
+                    # The "date" field of transfers is not always set, but when it is, it seems to match date filed.
+                    transfer_date=docket_data["date_filed"],
+                    transfer_type=CaseTransfer.WORKLOAD,
+                )
+            )
+        # Assume that the value in the "transfer_to" field will be filled in
+        # by another court.
+    else:
+        logger.error(
+            "Unrecognized Texas court type %s while creating CaseTransfer",
+            docket_data["court_type"],
+        )
+        return MergeResult.failed()
+
+    any_created = False
+    for transfer in transfers:
+        _, created = CaseTransfer.objects.get_or_create(
+            origin_court=transfer.origin_court,
+            origin_docket_id=transfer.origin_docket_id,
+            destination_court=transfer.destination_court,
+            destination_docket_id=transfer.destination_docket_id,
+            transfer_date=transfer.transfer_date,
+            transfer_type=transfer.transfer_type,
+        )
+        if created:
+            any_created = True
+            logger.info(
+                "Created CaseTransfer object from docket %s in court %s to docket %s in court %s",
+                transfer.origin_docket_id,
+                transfer.origin_court.pk,
+                transfer.destination_docket_id,
+                transfer.destination_court.pk,
+            )
+        else:
+            logger.warning(
+                "CaseTransfer object from docket %s in court %s to docket %s in court %s already exists",
+                transfer.origin_docket_id,
+                transfer.origin_court.pk,
+                transfer.destination_docket_id,
+                transfer.destination_court.pk,
+            )
+
+    return MergeResult(
+        success=True, created=any_created, updated=False, pk=None
+    )
 
 
 def generate_texas_appellate_brief_flags(
