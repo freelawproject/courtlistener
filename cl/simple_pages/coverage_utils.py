@@ -11,7 +11,10 @@ from cl.search.models import Court, Docket, OpinionCluster
 logger = logging.getLogger(__name__)
 
 
-async def fetch_data(jurisdictions, group_by_state=True):
+async def fetch_data(
+    jurisdictions: list[str],
+    group_by_state: bool = True,
+) -> dict[str, list[dict[str, Any]]]:
     """Fetch Court Data
 
     Fetch data and organize it to group courts
@@ -20,14 +23,14 @@ async def fetch_data(jurisdictions, group_by_state=True):
     :param group_by_state: Do we group by states
     :return: Ordered court data
     """
-    courts = {}
+    courts: dict[str, list[dict[str, Any]]] = {}
     async for court in Court.objects.filter(
         jurisdiction__in=jurisdictions,
         parent_court__isnull=True,
     ).exclude(appeals_to__id="cafc"):
         court_has_content = await Docket.objects.filter(court=court).aexists()
         descendant_json = await get_descendants_dict(court)
-        # Dont add any courts without a docket associated with it or
+        # Don't add any courts without a docket associated with it or
         # a descendant court
         if not court_has_content and not descendant_json:
             continue
@@ -48,7 +51,7 @@ async def fetch_data(jurisdictions, group_by_state=True):
     return courts
 
 
-async def get_descendants_dict(court):
+async def get_descendants_dict(court: Court) -> list[dict[str, Any]]:
     """Get descendants (if any) of court
 
     A simple method to help recsuively iterate for child courts
@@ -67,12 +70,12 @@ async def get_descendants_dict(court):
     return descendants
 
 
-async def fetch_federal_data():
+async def fetch_federal_data() -> dict[str, dict[str, Any]]:
     """Gather federal court data hierarchically by circuits
 
     :return: A dict with the data in it
     """
-    court_data = {}
+    court_data: dict[str, dict[str, Any]] = {}
     async for court in Court.objects.filter(
         jurisdiction=Court.FEDERAL_APPELLATE, parent_court__isnull=True
     ):
@@ -86,12 +89,12 @@ async def fetch_federal_data():
         elif court.id == "cafc":
             # Add Special Article I and III tribunals
             # that appeal cleanly to Federal Circuit
-            accepts_appeals_from = {}
+            accepts_appeals_from: dict[str, Court] = {}
             async for appealing_court in court.appeals_from.all():
                 accepts_appeals_from[appealing_court.id] = appealing_court
             court_data[court.id]["appeals_from"] = accepts_appeals_from
         else:
-            filter_pairs = {
+            filter_pairs: dict[str, dict[str, Any]] = {
                 "district": {
                     "jurisdiction": Court.FEDERAL_DISTRICT,
                 },
@@ -121,7 +124,7 @@ async def fetch_federal_data():
     return court_data
 
 
-def build_chart_data(court_ids: list[str]):
+def build_chart_data(court_ids: list[str]) -> list[dict[str, Any]]:
     """Find and Organize Chart Data
 
     :param court_ids: List of court ids to chart
