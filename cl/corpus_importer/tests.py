@@ -87,6 +87,7 @@ from cl.corpus_importer.tasks import (
     generate_ia_json,
     get_and_save_free_document_report,
     merge_texas_case_transfers,
+    merge_texas_docket,
     merge_texas_docket_entry,
     merge_texas_docket_originating_court,
     merge_texas_document,
@@ -3074,6 +3075,54 @@ class TexasMergerTest(TestCase):
 
         transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
+
+    def test_merge_texas_docket_appellate_sets_appeal_from(self):
+        """Does merge_texas_docket set appeal_from for appellate courts?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            court_type="texas_district",
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert result.pk == self.docket_coa1.pk
+
+        self.docket_coa1.refresh_from_db()
+        assert self.docket_coa1.date_filed == docket_data["date_filed"]
+        assert self.docket_coa1.cause == docket_data["case_type"]
+        assert self.docket_coa1.appeal_from_id == "texdistct6"
+        assert self.docket_coa1.appeal_from_str == texas_district.full_name
+
+    def test_merge_texas_docket_final_court_sets_appeal_from(self):
+        """Does merge_texas_docket set appeal_from for final courts?"""
+        docket_sc = DocketFactory.create(court=self.texas_sc)
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            docket_number=docket_sc.docket_number,
+            appeals_court=appeals_court,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert result.pk == docket_sc.pk
+
+        docket_sc.refresh_from_db()
+        assert docket_sc.date_filed == docket_data["date_filed"]
+        assert docket_sc.cause == docket_data["case_type"]
+        assert docket_sc.appeal_from_id == "txctapp1"
+        assert docket_sc.appeal_from_str == self.texas_coa1.full_name
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

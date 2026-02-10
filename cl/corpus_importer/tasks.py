@@ -4040,7 +4040,9 @@ def merge_texas_docket(
             )
 
         if lower_court_id is not None:
-            docket.appeal_from = lower_court_id
+            court = Court.objects.get(pk=lower_court_id)
+            docket.appeal_from = court
+            court_name = court.full_name
         else:
             logger.warning(
                 "Failed to find court ID %s while populating appeal_from field for Texas docket %s in court %s",
@@ -4048,7 +4050,9 @@ def merge_texas_docket(
                 docket.pk,
                 court.pk,
             )
-        docket.appeal_from_str = lower_court_data.get("name")
+            # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
+            court_name = lower_court_data["name"]
+        docket.appeal_from_str = court_name
 
         docket.save()
 

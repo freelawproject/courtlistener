@@ -98,8 +98,11 @@ class TexasCommonDataDictFactory(DictFactory):
     originating_court = SubFactory(TexasOriginatingCourtDictFactory)
     case_events = List([SubFactory(TexasDocketEntryDictFactory)])
     appellate_briefs = LazyAttribute(
-        lambda d: filter(
-            lambda e: True if random.random() < 0.1 else False, d.case_events
+        lambda d: list(
+            filter(
+                lambda e: True if random.random() < 0.1 else False,
+                d.case_events,
+            )
         )
     )
 
