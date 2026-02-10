@@ -2227,6 +2227,8 @@ class TexasMergerTest(TestCase):
             media_version_id=input_document["media_version_id"],
             document_url=input_document["document_url"],
         )
+        current_document.filepath_local = "a"
+        current_document.save()
 
         # Run the function
         result = merge_texas_document(docket_entry, input_document)
@@ -2360,7 +2362,10 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
-        pk = result.pk
+        documents = TexasDocument.objects.filter(docket_entry_id=pk)
+        for document in documents:
+            document.filepath_local = "a"
+            document.save()
         # Reset call count
         self.extract_pdf_document_mock.reset_mock()
 
@@ -2395,7 +2400,10 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
-        pk = result.pk
+        documents = TexasDocument.objects.filter(docket_entry_id=pk)
+        for document in documents:
+            document.filepath_local = "a"
+            document.save()
         # Reset call count
         self.extract_pdf_document_mock.reset_mock()
 
