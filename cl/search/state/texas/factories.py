@@ -41,8 +41,6 @@ class TexasOriginatingCourtDictFactory(DictFactory):
     court_type = Faker(
         "random_element",
         elements=(
-            "texas_appellate",
-            "texas_district",
             "texas_probate",
             "texas_business",
             "texas_county",
@@ -62,6 +60,7 @@ class TexasOriginatingCourtDictFactory(DictFactory):
 class TexasOriginatingAppellateCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
+    court_type = "texas_appellate"
     court_id = Faker(
         "random_element",
         elements=("texas_coa01", "texas_coa02", "texas_coa14", "texas_coa15"),
@@ -71,6 +70,7 @@ class TexasOriginatingAppellateCourtDictFactory(
 class TexasOriginatingDistrictCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
+    court_type = "texas_district"
     district = Faker("random_element", elements=list(range(1, 527)) + [None])
 
 

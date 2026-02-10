@@ -25,6 +25,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Court,
     Docket,
@@ -428,3 +429,23 @@ class ScotusDocketDataFactory(DictFactory):
     questions_presented = Faker("url")
     docket_entries = List([SubFactory(SCOTUSDocketEntryFactory)])
     parties = []
+
+
+class CaseTransferFactory(DjangoModelFactory):
+    origin_court = SubFactory(CourtFactory)
+    origin_docket_number = Faker("federal_district_docket_number")
+    destination_court = SubFactory(CourtFactory)
+    destination_docket_number = Faker("federal_district_docket_number")
+    transfer_date = Faker("date_object")
+    transfer_type = Faker(
+        "random_element",
+        elements=(
+            CaseTransfer.APPEAL,
+            CaseTransfer.WORKLOAD,
+            CaseTransfer.MERGE,
+            CaseTransfer.JURISDICTION,
+        ),
+    )
+
+    class Meta:
+        model = CaseTransfer

@@ -145,6 +145,7 @@ from cl.recap.tests.tests import mock_bucket_open
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
+    CaseTransferFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
@@ -176,6 +177,7 @@ from cl.search.state.texas.factories import (
     TexasDocketEntryFactory,
     TexasDocumentFactory,
     TexasFinalCourtDocketDictFactory,
+    TexasOriginatingCourtDictFactory,
     TexasOriginatingDistrictCourtDictFactory,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
@@ -2162,9 +2164,9 @@ class TexasMergerTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Create test data for Texas merger tests"""
-        cls.texas_sc = CourtFactory.create(id="texas_sc")
-        cls.texas_cca = CourtFactory.create(id="texas_cca")
-        cls.texas_coa1 = CourtFactory.create(id="texas_coa1")
+        cls.texas_sc = CourtFactory.create(id="tex")
+        cls.texas_cca = CourtFactory.create(id="texcrimapp")
+        cls.texas_coa1 = CourtFactory.create(id="txctapp1")
         cls.docket_number_coa1 = "01-25-00011-CV"
         cls.docket_coa1 = DocketFactory.create(
             court=cls.texas_coa1, docket_number=cls.docket_number_coa1
@@ -2783,10 +2785,11 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""
+        self.docket_coa1.originating_court_information = None
+        self.docket_coa1.save()
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             docket_number=self.docket_number_coa1,
             originating_court=TexasOriginatingDistrictCourtDictFactory(
-                court_type="texas_district",
                 district=5,
             ),
         )
@@ -2869,14 +2872,13 @@ class TexasMergerTest(TestCase):
         assert result.success is True
         assert result.create is True
 
-        transfers = CaseTransfer.objects.filter(
-            destination_court=self.texas_coa1,
-            destination_docket_number=self.docket_number_coa1,
-        )
+        transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
         transfer = transfers.first()
+        assert transfer.destination_court == self.texas_coa1
+        assert transfer.destination_docket_number == self.docket_number_coa1
         assert transfer.origin_court == texas_district
-        assert transfer.origin_docket_number == "2023-12345"
+        assert transfer.origin_docket_number == originating_court["case"]
         assert transfer.transfer_type == CaseTransfer.APPEAL
         assert transfer.transfer_date == date(2025, 1, 15)
 
@@ -2888,13 +2890,10 @@ class TexasMergerTest(TestCase):
         texas_coa2 = CourtFactory.create(id="txctapp2")
 
         originating_court = TexasOriginatingDistrictCourtDictFactory(
-            court_type="texas_district",
             district=5,
-            case="2023-12345",
         )
         transfer_from = TexasAppellateTransferDictFactory(
             court_id=CourtID.SECOND_COURT_OF_APPEALS.value,
-            origin_docket="02-24-00999-CV",
             date=date(2025, 1, 10),
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(
@@ -2910,25 +2909,35 @@ class TexasMergerTest(TestCase):
         assert result.success is True
         assert result.create is True
 
-        transfers = CaseTransfer.objects.filter(
-            destination_court=self.texas_coa1,
-            destination_docket_number=self.docket_number_coa1,
-        )
+        transfers = CaseTransfer.objects.all()
         assert transfers.count() == 2
 
         appeal_transfer = transfers.get(transfer_type=CaseTransfer.APPEAL)
+        assert appeal_transfer.destination_court == self.texas_coa1
+        assert (
+            appeal_transfer.destination_docket_number
+            == self.docket_number_coa1
+        )
         assert appeal_transfer.origin_court == texas_district
-        assert appeal_transfer.origin_docket_number == "2023-12345"
+        assert (
+            appeal_transfer.origin_docket_number == originating_court["case"]
+        )
 
         workload_transfer = transfers.get(transfer_type=CaseTransfer.WORKLOAD)
+        assert workload_transfer.destination_court == self.texas_coa1
+        assert (
+            workload_transfer.destination_docket_number
+            == self.docket_number_coa1
+        )
         assert workload_transfer.origin_court == texas_coa2
-        assert workload_transfer.origin_docket_number == "02-24-00999-CV"
+        assert (
+            workload_transfer.origin_docket_number
+            == transfer_from["origin_docket"]
+        )
 
     def test_merge_texas_case_transfers_supreme_court(self):
         """Can we create a CaseTransfer for a Supreme Court case?"""
-        docket_sc = DocketFactory.create(
-            court=self.texas_sc, docket_number="25-0100"
-        )
+        docket_sc = DocketFactory.create(court=self.texas_sc)
 
         appeals_court = TexasAppellateCourtInfoDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
@@ -2936,12 +2945,7 @@ class TexasMergerTest(TestCase):
         )
         docket_data = TexasFinalCourtDocketDictFactory(
             court_id=CourtID.SUPREME_COURT.value,
-            docket_number="25-0100",
-            date_filed=date(2025, 1, 15),
-            originating_court=TexasOriginatingDistrictCourtDictFactory(
-                court_type="texas_district",
-                district=5,
-            ),
+            docket_number=docket_sc.docket_number,
             appeals_court=appeals_court,
         )
 
@@ -2950,22 +2954,19 @@ class TexasMergerTest(TestCase):
         assert result.success is True
         assert result.create is True
 
-        transfers = CaseTransfer.objects.filter(
-            destination_court=self.texas_sc,
-            destination_docket_number="25-0100",
-        )
+        transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
         transfer = transfers.first()
+        assert transfer.destination_court == self.texas_sc
+        assert transfer.destination_docket_number == docket_sc.docket_number
         assert transfer.origin_court == self.texas_coa1
         assert transfer.origin_docket_number == self.docket_number_coa1
         assert transfer.transfer_type == CaseTransfer.APPEAL
-        assert transfer.transfer_date == date(2025, 1, 15)
+        assert transfer.transfer_date == docket_data["date_filed"]
 
     def test_merge_texas_case_transfers_cca_from_appellate(self):
         """Can we create a CaseTransfer for CCA from appellate court?"""
-        docket_cca = DocketFactory.create(
-            court=self.texas_cca, docket_number="PD-0100-25"
-        )
+        docket_cca = DocketFactory.create(court=self.texas_cca)
 
         appeals_court = TexasAppellateCourtInfoDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
@@ -2973,12 +2974,7 @@ class TexasMergerTest(TestCase):
         )
         docket_data = TexasFinalCourtDocketDictFactory(
             court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
-            docket_number="PD-0100-25",
-            date_filed=date(2025, 1, 15),
-            originating_court=TexasOriginatingDistrictCourtDictFactory(
-                court_type="texas_district",
-                district=5,
-            ),
+            docket_number=docket_cca.docket_number,
             appeals_court=appeals_court,
         )
 
@@ -2987,12 +2983,11 @@ class TexasMergerTest(TestCase):
         assert result.success is True
         assert result.create is True
 
-        transfers = CaseTransfer.objects.filter(
-            destination_court=self.texas_cca,
-            destination_docket_number="PD-0100-25",
-        )
+        transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
         transfer = transfers.first()
+        assert transfer.destination_court == self.texas_cca
+        assert transfer.destination_docket_number == docket_cca.docket_number
         assert transfer.origin_court == self.texas_coa1
         assert transfer.origin_docket_number == self.docket_number_coa1
         assert transfer.transfer_type == CaseTransfer.APPEAL
@@ -3001,16 +2996,15 @@ class TexasMergerTest(TestCase):
         self,
     ):
         """Can we handle death penalty direct appeals to CCA?"""
-        docket_cca = DocketFactory.create(
-            court=self.texas_cca, docket_number="AP-76,000"
-        )
+        texas_district = CourtFactory.create(id="texdistct6")
+        docket_cca = DocketFactory.create(court=self.texas_cca)
 
         originating_court = TexasOriginatingDistrictCourtDictFactory(
             district=5
         )
         docket_data = TexasFinalCourtDocketDictFactory(
             court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
-            docket_number="AP-76,000",
+            docket_number=docket_cca.docket_number,
             originating_court=originating_court,
             appeals_court=None,
         )
@@ -3020,21 +3014,19 @@ class TexasMergerTest(TestCase):
         assert result.success is True
         assert result.create is True
 
-        transfers = CaseTransfer.objects.filter(
-            destination_court=self.texas_cca,
-            destination_docket_number="AP-76,000",
-        )
+        transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
         transfer = transfers.first()
-        assert transfer.origin_court.id == "txdistct6"
+        assert transfer.destination_court == self.texas_cca
+        assert transfer.destination_docket_number == docket_cca.docket_number
+        assert transfer.origin_court == texas_district
         assert transfer.origin_docket_number == originating_court["case"]
         assert transfer.transfer_type == CaseTransfer.APPEAL
 
     def test_merge_texas_case_transfers_no_trial_court_info(self):
         """Do we handle appellate cases without trial court info?"""
-        originating_court = TexasOriginatingDistrictCourtDictFactory(
+        originating_court = TexasOriginatingCourtDictFactory(
             court_type="texas_unknown",
-            district=None,
             case="",
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(
@@ -3048,35 +3040,30 @@ class TexasMergerTest(TestCase):
 
         assert result.success is True
 
-        transfers = CaseTransfer.objects.filter(
-            destination_court=self.texas_coa1,
-            destination_docket_number=self.docket_number_coa1,
-        )
+        transfers = CaseTransfer.objects.all()
         assert transfers.count() == 0
 
     def test_merge_texas_case_transfers_duplicate_handling(self):
         """Do we properly handle duplicate CaseTransfer objects?"""
         texas_district = CourtFactory.create(id="texdistct6")
 
-        CaseTransfer.objects.create(
+        transfer = CaseTransferFactory.create(
             origin_court=texas_district,
-            origin_docket_number="2023-12345",
             destination_court=self.texas_coa1,
             destination_docket_number=self.docket_number_coa1,
-            transfer_date=date(2025, 1, 15),
             transfer_type=CaseTransfer.APPEAL,
         )
 
         originating_court = TexasOriginatingDistrictCourtDictFactory(
             court_type="texas_district",
             district=5,
-            case="2023-12345",
+            case=transfer.origin_docket_number,
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
             docket_number=self.docket_number_coa1,
-            date_filed=date(2025, 1, 15),
             originating_court=originating_court,
+            date_filed=transfer.transfer_date,
             transfer_from=None,
         )
 
@@ -3085,10 +3072,7 @@ class TexasMergerTest(TestCase):
         assert result.success is True
         assert result.create is False
 
-        transfers = CaseTransfer.objects.filter(
-            destination_court=self.texas_coa1,
-            destination_docket_number=self.docket_number_coa1,
-        )
+        transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
 
 
