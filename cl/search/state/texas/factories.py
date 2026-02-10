@@ -5,6 +5,7 @@ import random
 from factory import DictFactory, Faker, List, SubFactory
 from factory.declarations import LazyAttribute
 from factory.django import DjangoModelFactory
+from juriscraper.state.texas.common import CourtID
 
 from cl.search.factories import DocketFactory
 from cl.search.models import TexasDocketEntry, TexasDocument
@@ -77,10 +78,10 @@ class TexasCommonDataDictFactory(DictFactory):
     court_id = Faker(
         "random_element",
         elements=(
-            "texas_coa01",
-            "texas_coa02",
-            "texas_cossup",
-            "texas_coscca",
+            CourtID.FIRST_COURT_OF_APPEALS.value,
+            CourtID.SECOND_COURT_OF_APPEALS.value,
+            CourtID.SUPREME_COURT.value,
+            CourtID.COURT_OF_CRIMINAL_APPEALS.value,
         ),
     )
     court_type = Faker(
@@ -136,10 +137,10 @@ class TexasAppellateCourtInfoDictFactory(DictFactory):
     court_id = Faker(
         "random_element",
         elements=(
-            "texas_coa01",
-            "texas_coa02",
-            "texas_coa14",
-            "texas_unknown",
+            CourtID.FIRST_COURT_OF_APPEALS.value,
+            CourtID.SECOND_COURT_OF_APPEALS.value,
+            CourtID.FOURTEENTH_COURT_OF_APPEALS.value,
+            CourtID.UNKNOWN.value,
         ),
     )
     case_number = Faker("federal_district_docket_number")
@@ -155,7 +156,11 @@ class TexasAppellateTransferDictFactory(DictFactory):
 
     court_id = Faker(
         "random_element",
-        elements=("texas_coa01", "texas_coa02", "texas_coa14"),
+        elements=(
+            CourtID.FIRST_COURT_OF_APPEALS.value,
+            CourtID.SECOND_COURT_OF_APPEALS.value,
+            CourtID.FOURTEENTH_COURT_OF_APPEALS.value,
+        ),
     )
     origin_docket = Faker("federal_district_docket_number")
     date = Faker("date_object")
@@ -167,7 +172,11 @@ class TexasCourtOfAppealsDocketDictFactory(TexasCommonDataDictFactory):
     court_type = "texas_appellate"
     court_id = Faker(
         "random_element",
-        elements=("texas_coa01", "texas_coa02", "texas_coa14"),
+        elements=(
+            CourtID.FIRST_COURT_OF_APPEALS.value,
+            CourtID.SECOND_COURT_OF_APPEALS.value,
+            CourtID.FOURTEENTH_COURT_OF_APPEALS.value,
+        ),
     )
     transfer_from = LazyAttribute(
         lambda d: TexasAppellateTransferDictFactory.create()
@@ -186,5 +195,9 @@ class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
 
     court_type = "texas_final"
     court_id = Faker(
-        "random_element", elements=("texas_cossup", "texas_coscca")
+        "random_element",
+        elements=(
+            CourtID.SUPREME_COURT.value,
+            CourtID.COURT_OF_CRIMINAL_APPEALS.value,
+        ),
     )
