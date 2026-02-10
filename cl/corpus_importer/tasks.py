@@ -3463,6 +3463,7 @@ def merge_texas_document(
         created
         or str(texas_document.media_version_id)
         != input_document["media_version_id"]
+        or not texas_document.filepath_local
     ):
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
