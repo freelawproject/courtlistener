@@ -85,9 +85,10 @@ from cl.corpus_importer.tasks import (
     download_texas_document_pdf,
     generate_ia_json,
     get_and_save_free_document_report,
+    merge_texas_case_transfers,
     merge_texas_docket_entry,
+    merge_texas_docket_originating_court,
     merge_texas_document,
-    merge_texas_documents,
     merge_texas_parties,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
@@ -157,17 +158,23 @@ from cl.search.factories import (
 from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
+    CaseTransfer,
     Citation,
     Docket,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
 )
 from cl.search.state.texas.factories import (
+    TexasAppellateCourtInfoDictFactory,
     TexasCaseDocumentDictFactory,
+    TexasCourtOfAppealsDocketDictFactory,
     TexasDocketEntryDictFactory,
     TexasDocketEntryFactory,
     TexasDocumentFactory,
+    TexasFinalCourtDocketDictFactory,
+    TexasOriginatingDistrictCourtDictFactory,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
@@ -2799,6 +2806,314 @@ class TexasMergerTest(TestCase):
         )
         texas_document.refresh_from_db()
         assert not texas_document.filepath_local
+
+    def test_merge_texas_docket_originating_court_creates_new(self):
+        """Can we create new originating court information?"""
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            docket_number=self.docket_number_coa1,
+            originating_court=TexasOriginatingDistrictCourtDictFactory(
+                court_type="texas_district",
+                district=5,
+            ),
+        )
+
+        result = merge_texas_docket_originating_court(
+            self.docket_coa1, docket_data
+        )
+
+        assert result.create is True
+        assert result.success is True
+
+        self.docket_coa1.refresh_from_db()
+        originating_info = self.docket_coa1.originating_court_information
+        assert originating_info is not None
+        assert (
+            originating_info.docket_number
+            == docket_data["originating_court"]["case"]
+        )
+        assert (
+            originating_info.court_reporter
+            == docket_data["originating_court"]["reporter"]
+        )
+        assert (
+            originating_info.assigned_to_str
+            == docket_data["originating_court"]["judge"]
+        )
+
+    def test_merge_texas_docket_originating_court_updates_existing(self):
+        """Can we update existing originating court information?"""
+        # Create existing originating court information
+        self.docket_coa1.originating_court_information = (
+            OriginatingCourtInformation.objects.create(
+                docket_number="OLD-123",
+                court_reporter="Old Reporter",
+                assigned_to_str="Old Judge",
+            )
+        )
+        self.docket_coa1.save()
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory()
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id="texas_coa01",
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+        )
+
+        result = merge_texas_docket_originating_court(
+            self.docket_coa1, docket_data
+        )
+
+        assert result.create is False
+        assert result.success is True
+
+        self.docket_coa1.refresh_from_db()
+        updated_info = self.docket_coa1.originating_court_information
+        assert updated_info is not None
+        assert updated_info.docket_number == originating_court["case"]
+        assert updated_info.court_reporter == originating_court["reporter"]
+        assert updated_info.assigned_to_str == originating_court["judge"]
+
+    def test_merge_texas_case_transfers_appellate_court_from_trial(self):
+        """Can we create a CaseTransfer for an appellate court case?"""
+        texas_district = CourtFactory.create(id="txdistct6")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            court_type="texas_district",
+            district=5,
+            case="2023-12345",
+        )
+        docket_data = TexasCourtOfAppealsDocketFactory(
+            court_id="texas_coa01",
+            docket_number=self.docket_number_coa1,
+            date_filed=date(2025, 1, 15),
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.filter(
+            destination_court=self.texas_coa1,
+            destination_docket_id=self.docket_number_coa1,
+        )
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.origin_court.id == "txdistct6"
+        assert transfer.origin_docket_id == "2023-12345"
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+        assert transfer.transfer_date == date(2025, 1, 15)
+
+    def test_merge_texas_case_transfers_appellate_with_workload_transfer(
+        self,
+    ):
+        """Can we create CaseTransfer for appellate case with work sharing?"""
+        texas_district = CourtFactory.create(id="txdistct6")
+        texas_coa2 = CourtFactory.create(id="texas_coa2")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            court_type="texas_district",
+            district=5,
+            case="2023-12345",
+        )
+        transfer_from = TexasTransferFromDictFactory(
+            court_id="texas_coa02",
+            origin_docket="02-24-00999-CV",
+            date=date(2025, 1, 10),
+        )
+        docket_data = TexasCourtOfAppealsDocketFactory(
+            court_id="texas_coa01",
+            docket_number=self.docket_number_coa1,
+            date_filed=date(2025, 1, 15),
+            originating_court=originating_court,
+            transfer_from=transfer_from,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.filter(
+            destination_court=self.texas_coa1,
+            destination_docket_id=self.docket_number_coa1,
+        )
+        assert transfers.count() == 2
+
+        appeal_transfer = transfers.get(transfer_type=CaseTransfer.APPEAL)
+        assert appeal_transfer.origin_court.id == "txdistct6"
+        assert appeal_transfer.origin_docket_id == "2023-12345"
+
+        workload_transfer = transfers.get(transfer_type=CaseTransfer.WORKLOAD)
+        assert workload_transfer.origin_court == texas_coa2
+        assert workload_transfer.origin_docket_id == "02-24-00999-CV"
+
+    def test_merge_texas_case_transfers_supreme_court(self):
+        """Can we create a CaseTransfer for a Supreme Court case?"""
+        docket_sc = DocketFactory.create(
+            court=self.texas_sc, docket_number="25-0100"
+        )
+
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id="texas_coa01",
+            case_number=self.docket_number_coa1,
+        )
+        docket_data = TexasSupremeCourtDocketFactory(
+            docket_number="25-0100",
+            date_filed=date(2025, 1, 15),
+            originating_court=TexasOriginatingDistrictCourtDictFactory(
+                court_type="texas_district",
+                district=5,
+            ),
+            appeals_court=appeals_court,
+        )
+
+        result = merge_texas_case_transfers(docket_sc, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.filter(
+            destination_court=self.texas_sc,
+            destination_docket_id="25-0100",
+        )
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.origin_court == self.texas_coa1
+        assert transfer.origin_docket_id == self.docket_number_coa1
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+        assert transfer.transfer_date == date(2025, 1, 15)
+
+    def test_merge_texas_case_transfers_cca_from_appellate(self):
+        """Can we create a CaseTransfer for CCA from appellate court?"""
+        docket_cca = DocketFactory.create(
+            court=self.texas_cca, docket_number="PD-0100-25"
+        )
+
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id="texas_coa01",
+            case_number=self.docket_number_coa1,
+        )
+        docket_data = TexasCourtOfCriminalAppealsDocketFactory(
+            docket_number="PD-0100-25",
+            date_filed=date(2025, 1, 15),
+            originating_court=TexasOriginatingDistrictCourtDictFactory(
+                court_type="texas_district",
+                district=5,
+            ),
+            appeals_court=appeals_court,
+        )
+
+        result = merge_texas_case_transfers(docket_cca, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.filter(
+            destination_court=self.texas_cca,
+            destination_docket_id="PD-0100-25",
+        )
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.origin_court == self.texas_coa1
+        assert transfer.origin_docket_id == self.docket_number_coa1
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+
+    def test_merge_texas_case_transfers_cca_death_penalty_direct_appeal(
+        self,
+    ):
+        """Can we handle death penalty direct appeals to CCA?"""
+        docket_cca = DocketFactory.create(
+            court=self.texas_cca, docket_number="AP-76,000"
+        )
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id="texas_coscca",
+            docket_number="AP-76,000",
+            originating_court=originating_court,
+            appeals_court=None,
+        )
+
+        result = merge_texas_case_transfers(docket_cca, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.filter(
+            destination_court=self.texas_cca,
+            destination_docket_id="AP-76,000",
+        )
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.origin_court.id == "txdistct6"
+        assert transfer.origin_docket_id == originating_court["case"]
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+
+    def test_merge_texas_case_transfers_no_trial_court_info(self):
+        """Do we handle appellate cases without trial court info?"""
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            court_type="texas_unknown",
+            district=None,
+            case="",
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id="texas_coa01",
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+
+        transfers = CaseTransfer.objects.filter(
+            destination_court=self.texas_coa1,
+            destination_docket_id=self.docket_number_coa1,
+        )
+        assert transfers.count() == 0
+
+    def test_merge_texas_case_transfers_duplicate_handling(self):
+        """Do we properly handle duplicate CaseTransfer objects?"""
+        texas_district = CourtFactory.create(id="txdistct6")
+
+        CaseTransfer.objects.create(
+            origin_court=texas_district,
+            origin_docket_id="2023-12345",
+            destination_court=self.texas_coa1,
+            destination_docket_id=self.docket_number_coa1,
+            transfer_date=date(2025, 1, 15),
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            court_type="texas_district",
+            district=5,
+            case="2023-12345",
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id="texas_coa01",
+            docket_number=self.docket_number_coa1,
+            date_filed=date(2025, 1, 15),
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is False
+
+        transfers = CaseTransfer.objects.filter(
+            destination_court=self.texas_coa1,
+            destination_docket_id=self.docket_number_coa1,
+        )
+        assert transfers.count() == 1
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

@@ -128,3 +128,63 @@ class TexasDocumentFactory(DjangoModelFactory):
 
     class Meta:
         model = TexasDocument
+
+
+class TexasAppellateCourtInfoDictFactory(DictFactory):
+    """Factory for appeals_court field in Texas final court dockets."""
+
+    court_id = Faker(
+        "random_element",
+        elements=(
+            "texas_coa01",
+            "texas_coa02",
+            "texas_coa14",
+            "texas_unknown",
+        ),
+    )
+    case_number = Faker("federal_district_docket_number")
+    case_url = Faker("url")
+    disposition = Faker("pystr")
+    district = Faker("pystr")
+    justice = Faker("Name")
+    opinion_cite = Faker("citation")
+
+
+class TexasAppellateTransferDictFactory(DictFactory):
+    """Factory for transfer_from field in Texas appellate dockets."""
+
+    court_id = Faker(
+        "random_element",
+        elements=("texas_coa01", "texas_coa02", "texas_coa14"),
+    )
+    origin_docket = Faker("federal_district_docket_number")
+    date = Faker("date_object")
+
+
+class TexasCourtOfAppealsDocketDictFactory(TexasCommonDataDictFactory):
+    """Factory for Texas Court of Appeals docket data."""
+
+    court_type = "texas_appellate"
+    court_id = Faker(
+        "random_element",
+        elements=("texas_coa01", "texas_coa02", "texas_coa14"),
+    )
+    transfer_from = LazyAttribute(
+        lambda d: TexasAppellateTransferDictFactory.create()
+        if random.random() < 0.1
+        else None
+    )
+    transfer_to = LazyAttribute(
+        lambda d: TexasAppellateTransferDictFactory.create()
+        if random.random() < 0.1
+        else None
+    )
+
+
+class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
+    """Factory for Texas Supreme Court and Court of Criminal Appeals docket data."""
+
+    court_type = "texas_final"
+    court_id = Faker(
+        "random_element", elements=("texas_cossup", "texas_coscca")
+    )

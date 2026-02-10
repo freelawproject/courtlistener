@@ -3773,14 +3773,15 @@ def merge_texas_docket_originating_court(
     :param docket_data: The docket data from Juriscraper.
     :return: The result of the merge operation."""
     originating_court_information = docket.originating_court_information
-    originating_court_data = docket_data["trial_court"]
+    originating_court_data = docket_data["originating_court"]
     created = False
     if not originating_court_information:
         created = True
-        originating_court_information = OriginatingCourtInformation(
-            docket_number=originating_court_data["case"],
-        )
+        originating_court_information = OriginatingCourtInformation()
 
+    originating_court_information.docket_number = (
+        originating_court_data["case"],
+    )
     originating_court_information.court_reporter = originating_court_data[
         "reporter"
     ]
