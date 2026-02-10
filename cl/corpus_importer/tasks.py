@@ -3520,14 +3520,10 @@ def merge_texas_document(
         needs_update = (
             str(texas_document.media_version_id)
             != input_document["media_version_id"]
+            or not texas_document.filepath_local
         )
 
-    if (
-        created
-        or str(texas_document.media_version_id)
-        != input_document["media_version_id"]
-        or not texas_document.filepath_local
-    ):
+    if needs_update:
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
         texas_document.document_url = input_document["document_url"]

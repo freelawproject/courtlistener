@@ -2362,6 +2362,7 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+        pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
         for document in documents:
             document.filepath_local = "a"
@@ -2400,6 +2401,7 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+        pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
         for document in documents:
             document.filepath_local = "a"
