@@ -3810,7 +3810,7 @@ def merge_texas_case_transfers(
         # be populated by an appellate docket later on.
         transfer = CaseTransfer(
             destination_court=docket.court,
-            destination_docket_id=docket.docket_number,
+            destination_docket_number=docket.docket_number,
             transfer_date=docket_data["date_filed"],
             transfer_type=CaseTransfer.APPEAL,
         )
@@ -3833,7 +3833,7 @@ def merge_texas_case_transfers(
                     transfer.origin_court = Court.objects.get(
                         pk=trial_court_id
                     )
-                    transfer.origin_docket_id = docket_data[
+                    transfer.origin_docket_number = docket_data[
                         "originating_court"
                     ]["case"]
                 else:
@@ -3844,10 +3844,10 @@ def merge_texas_case_transfers(
                     return MergeResult.failed()
             else:
                 transfer.origin_court = Court.objects.get(pk=appeals_court_id)
-                transfer.origin_docket_id = appeals_court["case_number"]
+                transfer.origin_docket_number = appeals_court["case_number"]
         elif docket_data["court_id"] == CourtID.SUPREME_COURT:
             transfer.origin_court = Court.objects.get(pk=appeals_court_id)
-            transfer.origin_docket_id = appeals_court["case_number"]
+            transfer.origin_docket_number = appeals_court["case_number"]
         else:
             logger.error(
                 "Unrecognized Texas final court ID %s while creating CaseTransfer",
@@ -3861,9 +3861,11 @@ def merge_texas_case_transfers(
             transfers.append(
                 CaseTransfer(
                     origin_court=Court.objects.get(pk=trial_court_id),
-                    origin_docket_id=docket_data["originating_court"]["case"],
+                    origin_docket_number=docket_data["originating_court"][
+                        "case"
+                    ],
                     destination_court=docket.court,
-                    destination_docket_id=docket.docket_number,
+                    destination_docket_number=docket.docket_number,
                     transfer_date=docket_data["date_filed"],
                     transfer_type=CaseTransfer.APPEAL,
                 )
@@ -3876,11 +3878,11 @@ def merge_texas_case_transfers(
                             docket_data["transfer_from"]["court_id"]
                         )
                     ),
-                    origin_docket_id=docket_data["transfer_from"][
+                    origin_docket_number=docket_data["transfer_from"][
                         "origin_docket"
                     ],
                     destination_court=docket.court,
-                    destination_docket_id=docket.docket_number,
+                    destination_docket_number=docket.docket_number,
                     # The "date" field of transfers is not always set, but when it is, it seems to match date filed.
                     transfer_date=docket_data["date_filed"],
                     transfer_type=CaseTransfer.WORKLOAD,
@@ -3899,9 +3901,9 @@ def merge_texas_case_transfers(
     for transfer in transfers:
         _, created = CaseTransfer.objects.get_or_create(
             origin_court=transfer.origin_court,
-            origin_docket_id=transfer.origin_docket_id,
+            origin_docket_number=transfer.origin_docket_number,
             destination_court=transfer.destination_court,
-            destination_docket_id=transfer.destination_docket_id,
+            destination_docket_number=transfer.destination_docket_number,
             transfer_date=transfer.transfer_date,
             transfer_type=transfer.transfer_type,
         )
@@ -3909,17 +3911,17 @@ def merge_texas_case_transfers(
             any_created = True
             logger.info(
                 "Created CaseTransfer object from docket %s in court %s to docket %s in court %s",
-                transfer.origin_docket_id,
+                transfer.origin_docket_number,
                 transfer.origin_court.pk,
-                transfer.destination_docket_id,
+                transfer.destination_docket_number,
                 transfer.destination_court.pk,
             )
         else:
             logger.warning(
                 "CaseTransfer object from docket %s in court %s to docket %s in court %s already exists",
-                transfer.origin_docket_id,
+                transfer.origin_docket_number,
                 transfer.origin_court.pk,
-                transfer.destination_docket_id,
+                transfer.destination_docket_number,
                 transfer.destination_court.pk,
             )
 
