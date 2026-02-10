@@ -75,7 +75,7 @@ originatingcourtinformation_fields='(
 	       id, date_created, date_modified, docket_number, assigned_to_str,
 	       ordering_judge_str, court_reporter, date_disposed, date_filed, date_judgment,
 	       date_judgment_eod, date_filed_noa, date_received_coa, assigned_to_id,
-	       ordering_judge_id
+	       ordering_judge_id, docket_number_raw
 	       )'
 originatingcourtinformation_csv_filename="originating-court-information-$(date -I).csv"
 
@@ -421,7 +421,7 @@ export BULK_DB_NAME=courtlistener
 export PGPASSWORD=\$BULK_DB_PASSWORD
 
 echo "Loading schema to database: $schema_filename"
-psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER"
+psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER" --dbname "\$BULK_DB_NAME"
 
 EOF
 

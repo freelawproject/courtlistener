@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import operator
+import pickle
 import re
 import time
 import traceback
@@ -33,8 +34,10 @@ from elasticsearch_dsl.utils import AttrDict, AttrList
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.courts import lookup_child_courts_cache
+from cl.lib.crypto import sha256
 from cl.lib.date_time import midnight_pt
 from cl.lib.microservice_utils import microservice
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -2664,6 +2667,22 @@ def build_search_feed_query(
     return s
 
 
+def process_feed_query_results(
+    response: Response, cd: CleanData, jurisdiction: bool
+) -> None:
+    """Process feed query results by applying highlighting and limiting hits.
+
+    :param response: The Elasticsearch DSL response.
+    :param cd: The query CleanedData.
+    :param jurisdiction: Whether this is a jurisdiction query.
+    :return: None. The function modifies the response in place.
+    """
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        if not jurisdiction:
+            limit_inner_hits(cd, response, cd["type"])
+    set_results_highlights(response, cd["type"])
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
@@ -2671,7 +2690,7 @@ def do_es_feed_query(
     jurisdiction: bool = False,
     exclude_docs_for_empty_field: str = "",
 ) -> Response | list:
-    """Execute an Elasticsearch query for podcasts.
+    """Execute an Elasticsearch query for feeds with optional micro-caching.
 
     :param search_query: Elasticsearch DSL Search object
     :param cd: The query CleanedData
@@ -2683,17 +2702,51 @@ def do_es_feed_query(
     :return: The Elasticsearch DSL response.
     """
 
+    # Check micro-cache if enabled
+    if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
+        # Create cache parameters from cleaned data
+        cache_params = cd.copy()
+        cache_params["rows"] = rows
+        cache_params["jurisdiction"] = jurisdiction
+        if exclude_docs_for_empty_field:
+            cache_params["exclude_field"] = exclude_docs_for_empty_field
+
+        # Generate cache key
+        sorted_params = dict(sorted(cache_params.items()))
+        params_hash = sha256(pickle.dumps(sorted_params))
+
+        cache = get_s3_cache("default")
+        cache_key = make_s3_cache_key(
+            f"search_feed_cache:{params_hash}",
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+        # Try to retrieve from cache
+        cached_results = cache.get(cache_key)
+        if cached_results:
+            response = pickle.loads(cached_results)
+            # Process cached results
+            process_feed_query_results(response, cd, jurisdiction)
+            return response
+
+    # Execute ES query if not cached
     s = build_search_feed_query(
         search_query, cd, jurisdiction, exclude_docs_for_empty_field
     )
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
-    if cd["type"] == SEARCH_TYPES.OPINION:
-        # Merge the text field for Opinions.
-        if not jurisdiction:
-            limit_inner_hits(cd, response, cd["type"])
 
-    set_results_highlights(response, cd["type"])
+    # Cache the raw response before processing if caching is enabled
+    if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
+        serialized_data = pickle.dumps(response)
+        cache.set(
+            cache_key,
+            serialized_data,
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+
+    # Process results
+    process_feed_query_results(response, cd, jurisdiction)
+
     return response
 
 
