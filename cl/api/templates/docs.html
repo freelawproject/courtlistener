@@ -9,7 +9,7 @@
 <div class="hidden-xs col-sm-2 col-md-3"></div>
 <div class="col-xs-12 col-sm-8 col-md-6">
   <h1 class="text-center v-offset-below-3">CourtListener APIs, Webhooks, and Bulk Legal&nbsp;Data</h1>
-  <p>We currently have five major services available on CourtListener:
+  <p>We currently have six major services available on CourtListener:
   </p>
   <ol>
     <li>
@@ -27,6 +27,10 @@
     </li>
     <li>
       <p>If you want to subscribe to events on CourtListener, we recommend our <a href="{% url "webhooks_docs" %}">webhooks service</a>, which works as a bi-directional API &mdash; It can push data to you.
+      </p>
+    </li>
+    <li>
+      <p><em>Coming soon:</em> If you use AI assistants like Claude or ChatGPT, our <a href="{% url "mcp_help" %}">MCP server</a> will allow them to access CourtListener data directly.
       </p>
     </li>
     <li>
@@ -80,6 +84,16 @@
       <td class="align-middle">Subscribe to Events</td>
       <td class="align-middle">Medium</td>
       <td class="align-middle">Complex</td>
+    </tr>
+    <tr>
+      <td><a href="{% url "mcp_help" %}"
+             class="btn btn-lg btn-info btn-block">MCP Server</a>
+        <em class="small text-muted">Coming soon</em></td>
+      <td class="align-middle">Fast</td>
+      <td class="align-middle">Good</td>
+      <td class="align-middle">Filters &amp;<br> Joins</td>
+      <td class="align-middle">Short</td>
+      <td class="align-middle">Easy</td>
     </tr>
     <tr>
       <td><a href="https://free.law/data-consulting/"
