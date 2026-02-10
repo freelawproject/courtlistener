@@ -1582,6 +1582,10 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         self.assertIn("The input is too long to process.", r.data["detail"])
 
 
+@override_settings()
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functional")
+@override_flag("ui_flag_for_o_es", active=True)
+@override_flag("citing_and_related_enabled", active=True)
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1833,6 +1837,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     @override_flag("store-search-queries", active=True)
+    @override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functions")
     def test_basic_homepage_search_and_signin_and_signout(self) -> None:
         wait = WebDriverWait(self.browser, 1)
 
@@ -1997,6 +2002,7 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
 
 @override_flag("store-search-api-queries", active=True)
 @override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_save_search_query")
 class SaveSearchQueryTest(TestCase):
     def setUp(self) -> None:
         self.client = Client()

@@ -1,14 +1,18 @@
 import datetime
 
+from django import forms
 from django.template import Context
 from django.test import RequestFactory, SimpleTestCase
 
 from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
     get_full_host,
+    get_item,
     granular_date,
     humanize_number,
+    render_field_with_id,
 )
+from cl.custom_filters.templatetags.svg_tags import svg
 from cl.custom_filters.templatetags.text_filters import (
     naturalduration,
     oxford_join,
@@ -18,6 +22,7 @@ from cl.people_db.models import (
     GRANULARITY_MONTH,
     GRANULARITY_YEAR,
 )
+from cl.search.forms import CorpusSearchForm
 
 
 class TestOxfordJoinFilter(SimpleTestCase):
@@ -105,6 +110,13 @@ class TestNaturalDuration(SimpleTestCase):
 
 class DummyObject:
     pass
+
+
+class SimpleForm(forms.Form):
+    """Helper form for testing get_item and render_field_with_id"""
+
+    name = forms.CharField()
+    email = forms.EmailField()
 
 
 class TestExtras(SimpleTestCase):
@@ -224,3 +236,174 @@ class TestExtras(SimpleTestCase):
                     expected,
                     msg=f"Number formatted incorrectly. Input: {value} - Result: {result} - Expected: {expected}",
                 )
+
+    def test_get_item_with_various_types(self):
+        """Test get_item retrieves values from different object types
+
+        Validates:
+        - Dict key access (string keys, returns value or empty string)
+        - List index access (integer indices, returns item or empty string)
+        - Form field access (returns BoundField object)
+        - Invalid key handling (None returns empty string)
+        """
+        # Test with dict
+        test_dict = {"foo": "bar", "num": 123}
+        self.assertEqual(get_item(test_dict, "foo"), "bar")
+        self.assertEqual(get_item(test_dict, "num"), 123)
+        self.assertEqual(get_item(test_dict, "missing"), "")
+
+        # Test with list
+        test_list = ["a", "b", "c"]
+        self.assertEqual(get_item(test_list, 0), "a")
+        self.assertEqual(get_item(test_list, 2), "c")
+        self.assertEqual(get_item(test_list, 10), "")
+
+        # Test with form
+        form = SimpleForm()
+        name_field = get_item(form, "name")
+        self.assertIsNotNone(name_field)
+        self.assertEqual(name_field.name, "name")
+
+        # Test with invalid key type
+        self.assertEqual(get_item(test_dict, None), "")
+
+    def test_render_field_with_custom_id(self):
+        """Test render_field_with_id renders form fields with custom IDs
+
+        Validates:
+        - Custom ID attribute is applied to rendered HTML
+        - Field name attribute is preserved
+        - Field type attribute is correct (text, email, etc.)
+        - Default Django ID (id_fieldname) is NOT present
+        - Works with form_prefix pattern (desktop_namespace_field)
+        """
+        form = SimpleForm()
+
+        # Test text input with custom ID
+        rendered = render_field_with_id(form["name"], "custom_name_id")
+        self.assertIn('id="custom_name_id"', rendered)
+        self.assertIn('name="name"', rendered)
+        self.assertIn('type="text"', rendered)
+
+        # Test email input with custom ID
+        rendered = render_field_with_id(form["email"], "my_email_field")
+        self.assertIn('id="my_email_field"', rendered)
+        self.assertIn('name="email"', rendered)
+        self.assertIn('type="email"', rendered)
+
+        # Test with prefix-style ID (like in our form_prefix pattern)
+        rendered = render_field_with_id(form["name"], "desktop_opinions_name")
+        self.assertIn('id="desktop_opinions_name"', rendered)
+
+        # Ensure default ID is NOT present when custom ID is provided
+        rendered = render_field_with_id(form["name"], "custom_id")
+        self.assertNotIn('id="id_name"', rendered)
+
+    def test_render_field_with_corpus_search_form(self):
+        """Test render_field_with_id works with actual CorpusSearchForm
+
+        Validates all field types used in corpus search:
+        - TextInput fields (case_name, docket_number, etc.)
+        - Select/ChoiceField (dob_state, selection_method, etc.)
+        - CheckboxInput (available_only)
+
+        Ensures custom IDs are applied and default Django IDs are removed.
+        """
+        form = CorpusSearchForm()
+
+        # Test TextInput fields
+        text_fields = [
+            "case_name",
+            "docket_number",
+            "judge",
+            "citation",
+            "party_name",
+            "atty_name",
+            "name",
+            "school",
+            "appointer",
+        ]
+
+        for field_name in text_fields:
+            with self.subTest(field=field_name):
+                custom_id = f"test_{field_name}_id"
+                rendered = render_field_with_id(form[field_name], custom_id)
+                self.assertIn(f'id="{custom_id}"', rendered)
+                self.assertIn(f'name="{field_name}"', rendered)
+                # Ensure default Django ID is not present
+                self.assertNotIn(f'id="id_{field_name}"', rendered)
+
+        # Test Select/ChoiceField
+        select_fields = [
+            "dob_state",
+            "selection_method",
+            "political_affiliation",
+        ]
+
+        for field_name in select_fields:
+            with self.subTest(field=field_name):
+                custom_id = f"mobile_judges_{field_name}"
+                rendered = render_field_with_id(form[field_name], custom_id)
+                self.assertIn(f'id="{custom_id}"', rendered)
+                self.assertIn(f'name="{field_name}"', rendered)
+                self.assertIn("<select", rendered)
+
+        # Test CheckboxInput
+        checkbox_id = "desktop_recap_available_only"
+        rendered = render_field_with_id(form["available_only"], checkbox_id)
+        self.assertIn(f'id="{checkbox_id}"', rendered)
+        self.assertIn('name="available_only"', rendered)
+        self.assertIn('type="checkbox"', rendered)
+
+    def test_get_item_with_corpus_search_form(self):
+        """Test get_item filter works with actual CorpusSearchForm
+
+        Validates field access for all field types in corpus search:
+        - Text fields return BoundField with correct name
+        - Select fields return BoundField with correct name
+        - Checkbox fields return BoundField with correct name
+        - Non-existent fields return empty string
+        """
+        form = CorpusSearchForm()
+
+        # Test accessing various field types
+        case_name_field = get_item(form, "case_name")
+        self.assertIsNotNone(case_name_field)
+        self.assertEqual(case_name_field.name, "case_name")
+
+        # Test select field
+        dob_state_field = get_item(form, "dob_state")
+        self.assertIsNotNone(dob_state_field)
+        self.assertEqual(dob_state_field.name, "dob_state")
+
+        # Test checkbox field
+        available_field = get_item(form, "available_only")
+        self.assertIsNotNone(available_field)
+        self.assertEqual(available_field.name, "available_only")
+
+        # Test non-existent field
+        missing_field = get_item(form, "non_existent_field")
+        self.assertEqual(missing_field, "")
+
+
+class TestSvgTag(SimpleTestCase):
+    """Tests for the svg template tag."""
+
+    def test_svg_renders_without_escaping(self) -> None:
+        """Ensure svg tag returns unescaped SVG markup."""
+        result = svg("heart")
+        # Should contain actual SVG tags, not HTML-escaped versions
+        self.assertIn("<svg", result)
+        self.assertNotIn("&lt;svg", result)
+
+    def test_svg_not_found_in_debug(self) -> None:
+        """Missing SVG returns error message in debug mode."""
+        with self.settings(DEBUG=True):
+            result = svg("nonexistent_svg_that_does_not_exist")
+            self.assertIn("not found", result)
+
+    def test_svg_not_found_in_production(self) -> None:
+        """Missing SVG returns empty string in production."""
+        with self.settings(DEBUG=False):
+            result = svg("nonexistent_svg_that_does_not_exist")
+            self.assertEqual(result, "")

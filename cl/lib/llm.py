@@ -1,4 +1,7 @@
+from typing import IO
+
 import instructor
+from openai import OpenAI
 from pydantic import BaseModel
 
 
@@ -53,3 +56,25 @@ def call_llm(
         response_model=response_model,
     )
     return response
+
+
+def call_llm_transcription(
+    audio: tuple[str, IO[bytes]],
+    api_key: str,
+    model: str = "gpt-4o-transcribe",
+) -> str:
+    """Call an LLM transcription service with a given base64 encoded audio file.
+
+    The OPENAI_API_KEY environment variable must be set.
+
+    Currently only supports OpenAI transcription models, but may be extended to support other options in the future.
+
+    :param audio: Audio file to transcribe, as a binary IO stream.
+    :param api_key: OpenAI transcription API key
+    :param model: The OpenAI transcription model to use.
+    :return: The transcription text."""
+    client = OpenAI(api_key=api_key)
+
+    return client.audio.transcriptions.create(
+        model=model, file=audio, response_format="text"
+    )

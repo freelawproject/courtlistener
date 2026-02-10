@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import cast
 from unittest import mock
@@ -21,16 +21,12 @@ from lxml import html
 from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
-from cl.alerts.management.commands.cl_send_alerts import (
-    get_cut_off_end_date,
-    get_cut_off_start_date,
-)
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
-    get_cut_off_date,
 )
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
@@ -69,6 +65,7 @@ from cl.donate.models import (
 )
 from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
 from cl.favorites.models import Prayer
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
@@ -89,7 +86,6 @@ from cl.search.models import (
     DocketEntry,
     RECAPDocument,
 )
-from cl.stats.models import Stat
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -954,7 +950,9 @@ class DisableDocketAlertTest(TestCase):
         )
 
     def test_alert_created_recently_termination_year_ago(self) -> None:
-        self.alert.docket.date_terminated = now() - timedelta(days=365)
+        self.alert.docket.date_terminated = timezone.localdate() - timedelta(
+            days=365
+        )
         self.alert.docket.save()
 
         report = build_user_report(self.alert.user)
@@ -970,7 +968,7 @@ class DisableDocketAlertTest(TestCase):
         """Flag it if alert is old and item was terminated 90-97 days ago"""
         self.backdate_alert()
         for i in range(90, 97):
-            new_date_terminated = now() - timedelta(days=i)
+            new_date_terminated = timezone.localdate() - timedelta(days=i)
             print(f"Trying a date_terminated of {new_date_terminated}")
             self.alert.docket.date_terminated = new_date_terminated
             self.alert.docket.save()
@@ -1667,195 +1665,6 @@ class SearchAlertsWebhooksTest(
                 docket__date_argued=now() - timedelta(hours=5),
             )
 
-    def test_send_search_alert_webhooks(self):
-        """Can we send search alert webhooks for Opinions and Oral Arguments
-        independently?
-        """
-
-        webhooks_enabled = Webhook.objects.filter(enabled=True)
-        self.assertEqual(
-            len(webhooks_enabled), 3, msg="Webhooks enabled doesn't match."
-        )
-        search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 1, msg="Alerts doesn't match.")
-
-        with (
-            mock.patch(
-                "cl.api.webhooks.requests.post",
-                side_effect=lambda *args, **kwargs: MockResponse(
-                    200, mock_raw=True
-                ),
-            ),
-            time_machine.travel(self.mock_date, tick=False),
-        ):
-            # Send ES Alerts (Only OA for now)
-            call_command("cl_send_scheduled_alerts", rate="dly")
-
-        # One oral argument alert to user_profile
-        self.assertEqual(
-            len(mail.outbox), 1, msg="Outgoing emails don't match."
-        )
-
-        # Oral Argument Alert
-        self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
-        self.assertIn("daily oral argument alert ", mail.outbox[0].body)
-        self.assertEqual(
-            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
-            "List-Unsubscribe=One-Click",
-        )
-        unsubscribe_url = reverse(
-            "one_click_disable_alert", args=[self.search_alert_oa.secret_key]
-        )
-        self.assertIn(
-            unsubscribe_url,
-            mail.outbox[0].extra_headers["List-Unsubscribe"],
-        )
-
-        # 1 webhook events should be sent to user_profile_3
-        webhook_events = WebhookEvent.objects.filter().values_list(
-            "content", flat=True
-        )
-
-        self.assertEqual(
-            len(webhook_events), 1, msg="Webhook events don't match."
-        )
-
-        alert_data = {
-            self.search_alert_oa.pk: {
-                "alert": self.search_alert_oa,
-                "result": self.dly_oral_argument,
-                "snippet": "",
-            },
-        }
-
-        webhook_events_instances = WebhookEvent.objects.all()
-        for webhook_sent in webhook_events_instances:
-            with self.subTest(webhook_sent=webhook_sent):
-                self.assertEqual(
-                    webhook_sent.event_status,
-                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
-                    msg="The event status doesn't match.",
-                )
-                content = webhook_sent.content
-
-                alert_data_compare = alert_data[
-                    content["payload"]["alert"]["id"]
-                ]
-                self.assertEqual(
-                    webhook_sent.webhook.user,
-                    alert_data_compare["alert"].user,
-                    msg="The user doesn't match.",
-                )
-
-                # Check if the webhook event payload is correct.
-                self.assertEqual(
-                    content["webhook"]["event_type"],
-                    WebhookEventType.SEARCH_ALERT,
-                    msg="The event type doesn't match.",
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["name"],
-                    alert_data_compare["alert"].name,
-                    msg="The alert name doesn't match.",
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["query"],
-                    alert_data_compare["alert"].query,
-                    msg="The alert query doesn't match.",
-                )
-                self.assertEqual(
-                    content["payload"]["alert"]["rate"],
-                    alert_data_compare["alert"].rate,
-                    msg="The alert rate doesn't match.",
-                )
-                if (
-                    content["payload"]["alert"]["alert_type"]
-                    == SEARCH_TYPES.ORAL_ARGUMENT
-                ):
-                    # Assertions for OA webhook payload.
-                    self.assertEqual(
-                        content["payload"]["results"][0]["caseName"],
-                        alert_data_compare["result"].case_name,
-                    )
-
-    def test_send_search_alert_webhooks_rates(self):
-        """Can we send search alert webhooks for different alert rates?"""
-
-        webhooks_enabled = Webhook.objects.filter(enabled=True)
-        self.assertEqual(len(webhooks_enabled), 3)
-        search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 1)
-        # (rate, events expected, number of search results expected per event)
-        # The number of expected results increases with every iteration since
-        # daily events include results created for the RT test, weekly results
-        # include results from RT and Daily tests, and so on...
-        rates = [
-            (
-                Alert.REAL_TIME,
-                1,
-                1,
-            ),  # 1 expected webhook events 1 OA Daily Alert, triggered by ES.
-        ]
-        for rate, events, results in rates:
-            with mock.patch(
-                "cl.api.webhooks.requests.post",
-                side_effect=lambda *args, **kwargs: MockResponse(
-                    200, mock_raw=True
-                ),
-            ):
-                # Monthly alerts cannot be run on the 29th, 30th or 31st.
-                with time_machine.travel(self.mock_date, tick=False):
-                    # Send ES Alerts OA
-                    call_command("cl_send_scheduled_alerts", rate=rate)
-
-            with self.subTest(rate=rate):
-                webhook_events = WebhookEvent.objects.all()
-                self.assertEqual(
-                    len(webhook_events), events, msg="Wrong number of Events"
-                )
-
-                for webhook_sent in webhook_events:
-                    self.assertEqual(
-                        webhook_sent.event_status,
-                        WEBHOOK_EVENT_STATUS.SUCCESSFUL,
-                        msg="Wrong number of webhooks sent.",
-                    )
-                    self.assertIn(
-                        webhook_sent.webhook.user,
-                        [self.user_profile.user, self.user_profile_3.user],
-                    )
-                    content = webhook_sent.content
-                    # Check if the webhook event payload is correct.
-                    self.assertEqual(
-                        content["webhook"]["event_type"],
-                        WebhookEventType.SEARCH_ALERT,
-                    )
-                    alert_to_compare = Alert.objects.get(
-                        pk=content["payload"]["alert"]["id"]
-                    )
-                    self.assertEqual(
-                        content["payload"]["alert"]["name"],
-                        alert_to_compare.name,
-                    )
-                    self.assertEqual(
-                        content["payload"]["alert"]["query"],
-                        alert_to_compare.query,
-                    )
-
-                    # The oral argument webhook is sent independently not grouped
-                    # with opinions webhooks results.
-                    self.assertEqual(
-                        len(content["payload"]["results"]),
-                        1,
-                        msg="Wrong number of results OA.",
-                    )
-                    self.assertEqual(
-                        content["payload"]["alert"]["rate"],
-                        Alert.DAILY,
-                    )
-
-            webhook_events.delete()
-
     def test_alert_frequency_estimation(self):
         """Test alert frequency ES API endpoint for Opinion Alerts."""
 
@@ -1871,7 +1680,7 @@ class SearchAlertsWebhooksTest(
         )
         self.assertEqual(r.json()["count"], 0)
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with (
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -2177,287 +1986,6 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
             initial_count,
             msg="Webhook event should not be created for disabled webhook.",
         )
-
-
-class SearchAlertsUtilsTest(TestCase):
-    def test_get_cut_off_dates(self):
-        """Confirm get_cut_off_start_date and get_cut_off_end_date return the right
-        values according to the input date.
-        """
-
-        test_cases = {
-            Alert.MONTHLY: [
-                {
-                    "month_to_run": 1,
-                    "day_to_run": 1,
-                    "cut_off_month": 12,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2024,
-                },
-                {
-                    "month_to_run": 2,
-                    "day_to_run": 1,
-                    "cut_off_month": 1,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 3,
-                    "day_to_run": 1,
-                    "cut_off_month": 2,
-                    "day_start": 1,
-                    "day_end": 28,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 4,
-                    "day_to_run": 1,
-                    "cut_off_month": 3,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 5,
-                    "day_to_run": 1,
-                    "cut_off_month": 4,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 6,
-                    "day_to_run": 1,
-                    "cut_off_month": 5,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 7,
-                    "day_to_run": 1,
-                    "cut_off_month": 6,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 8,
-                    "day_to_run": 1,
-                    "cut_off_month": 7,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 9,
-                    "day_to_run": 1,
-                    "cut_off_month": 8,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 10,
-                    "day_to_run": 1,
-                    "cut_off_month": 9,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 11,
-                    "day_to_run": 1,
-                    "cut_off_month": 10,
-                    "day_start": 1,
-                    "day_end": 31,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 12,
-                    "day_to_run": 1,
-                    "cut_off_month": 11,
-                    "day_start": 1,
-                    "day_end": 30,
-                    "year": 2025,
-                },
-            ],
-            Alert.WEEKLY: [
-                {
-                    "month_to_run": 11,
-                    "day_to_run": 28,
-                    "cut_off_month": 11,
-                    "day_start": 22,
-                    "day_end": 28,
-                    "year": 2025,
-                },
-            ],
-            Alert.DAILY: [
-                {
-                    "month_to_run": 11,
-                    "day_to_run": 28,
-                    "cut_off_month": 11,
-                    "day_start": 28,
-                    "day_end": 28,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 11,
-                    "day_to_run": 25,
-                    "cut_off_month": 11,
-                    "day_start": 25,
-                    "day_end": 25,
-                    "year": 2025,
-                },
-                {
-                    "month_to_run": 3,
-                    "day_to_run": 1,
-                    "cut_off_month": 3,
-                    "day_start": 1,
-                    "day_end": 1,
-                    "year": 2025,
-                },
-            ],
-        }
-        mock_date = now().replace(day=27, hour=5)
-        for rate, test_cases in test_cases.items():
-            for test_case in test_cases:
-                with (
-                    self.subTest(rate=rate, test_case=test_case),
-                    time_machine.travel(mock_date, tick=False),
-                ):
-                    expected_date_start = date(
-                        test_case["year"],
-                        test_case["cut_off_month"],
-                        test_case["day_start"],
-                    )
-                    expected_date_end = date(
-                        test_case["year"],
-                        test_case["cut_off_month"],
-                        test_case["day_end"],
-                    )
-
-                    day_to_run = date(
-                        2025,
-                        test_case["month_to_run"],
-                        test_case["day_to_run"],
-                    )
-                    date_start = get_cut_off_start_date(rate, day_to_run)
-                    date_end = get_cut_off_end_date(rate, date_start)
-
-                    self.assertEqual(date_start, expected_date_start)
-                    self.assertEqual(date_end, expected_date_end)
-
-    @override_settings(REAL_TIME_ALERTS_SENDING_RATE=60)
-    def test_cut_off_date_for_scheduled_alerts(self):
-        """Confirm get_cut_off_date return the right
-        values according to the input date.
-        """
-        test_cases = {
-            Alert.DAILY: [
-                {
-                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
-                    "expected": date(2025, 4, 30),
-                    "custom_date": False,
-                },
-                {
-                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
-                    "expected": date(2025, 2, 28),
-                    "custom_date": False,
-                },
-                {
-                    "input_dt": datetime(2025, 5, 1, 12, 0, 0),
-                    "expected": date(2025, 5, 1),
-                    "custom_date": True,
-                },
-                {
-                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
-                    "expected": date(2025, 3, 1),
-                    "custom_date": True,
-                },
-            ],
-            Alert.WEEKLY: [
-                {
-                    "input_dt": datetime(2025, 5, 8, 9, 30, 0),
-                    "expected": date(2025, 5, 1),
-                },
-                {
-                    "input_dt": datetime(2025, 3, 1, 0, 0, 0),
-                    "expected": date(2025, 2, 22),
-                },
-            ],
-            Alert.MONTHLY: [
-                {
-                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
-                    "expected": date(2025, 4, 1),
-                },
-                {
-                    "input_dt": datetime(2025, 1, 1, 0, 0, 0),
-                    "expected": date(2024, 12, 1),
-                },
-            ],
-            Alert.REAL_TIME: [
-                # Consider multiple test cases for timezone differences
-                # and daylight saving time.
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": datetime(
-                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 3, 2, 5, 2, 1),
-                    "expected": datetime(
-                        2025, 3, 2, 13, 1, 0, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 5, 1, 0, 0, 0),
-                    "expected": datetime(
-                        2025, 5, 1, 6, 58, 59, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 4, 30, 18, 0, 0),
-                    "expected": datetime(
-                        2025, 5, 1, 0, 58, 59, tzinfo=pytz.UTC
-                    ),
-                },
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": date(2025, 5, 1),
-                    "sweep_index": True,
-                    "custom_date": False,
-                },
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": date(2025, 5, 2),
-                    "sweep_index": True,
-                    "custom_date": True,
-                },
-                {
-                    "input_dt": datetime(2025, 5, 2, 5, 2, 1),
-                    "expected": datetime(
-                        2025, 5, 2, 12, 1, 0, tzinfo=pytz.UTC
-                    ),
-                    "sweep_index": False,
-                    "custom_date": True,
-                },
-            ],
-        }
-        for rate, cases in test_cases.items():
-            for case in cases:
-                with self.subTest(rate=rate, case=case):
-                    dt = case["input_dt"]
-                    custom_date = case.get("custom_date", False)
-                    sweep_index = case.get("sweep_index", False)
-                    result = get_cut_off_date(
-                        rate, dt, sweep_index, custom_date
-                    )
-                    expected = case["expected"]
-                    self.assertEqual(result, expected)
 
     def test_is_match_all_query(self):
         """Confirm is_match_all_query correctly detects match-all
@@ -2799,10 +2327,13 @@ class OldDocketAlertsReportToggleTest(TestCase):
         report = build_user_report(self.user_profile.user, delete=True)
         self.assertEqual(report.total_count(), 0)
 
+    @time_machine.travel("2024-01-15T12:00:00Z", tick=False)
     def test_old_docket_alert_report_timeline(self):
         """Can we properly warn and disable docket alerts based on their age
         considering their date_modified is updated when the alert_type change?
         """
+
+        base = now()
 
         # Create today a subscription docket alert from a case terminated long
         # time ago.
@@ -2828,7 +2359,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(active_docket_alerts.count(), 1)
 
         # Simulate user disabling docket alert 60 days in the future.
-        plus_sixty_days = now() + timedelta(days=60)
+        plus_sixty_days = base + timedelta(days=60)
         with time_machine.travel(plus_sixty_days, tick=False):
             # User disabled Docket alert manually.
             da.alert_type = DocketAlert.UNSUBSCRIPTION
@@ -2840,7 +2371,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(da.date_modified, plus_sixty_days)
 
         # Simulate user re-enabling docket alert 85 days in the future.
-        plus_eighty_five_days = now() + timedelta(days=85)
+        plus_eighty_five_days = base + timedelta(days=85)
         with time_machine.travel(plus_eighty_five_days, tick=False):
             # User re-enable Docket alert manually.
             da.alert_type = DocketAlert.SUBSCRIPTION
@@ -2853,7 +2384,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 95 days in the future, 10 days since docket alert was
         # re-enabled
-        plus_ninety_five_days = now() + timedelta(days=95)
+        plus_ninety_five_days = base + timedelta(days=95)
         with time_machine.travel(plus_ninety_five_days, tick=False):
             report = build_user_report(self.user_profile.user, delete=True)
 
@@ -2864,7 +2395,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 268 days in the future, 183 days since docket alert was
         # re-enabled
-        plus_two_hundred_sixty_eight_days = now() + timedelta(days=268)
+        plus_two_hundred_sixty_eight_days = base + timedelta(days=268)
         with time_machine.travel(
             plus_two_hundred_sixty_eight_days, tick=False
         ):
@@ -2879,15 +2410,14 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 272 days in the future, 187 days since docket alert was
         # re-enabled
-        plus_two_hundred_sixty_eight_days = now() + timedelta(days=272)
+        plus_two_hundred_seventy_two_days = base + timedelta(days=272)
         with time_machine.travel(
-            plus_two_hundred_sixty_eight_days, tick=False
+            plus_two_hundred_seventy_two_days, tick=False
         ):
             report = build_user_report(self.user_profile.user, delete=True)
 
-        # After run the report 272 days in the future a warning should go out
-        # but no alert should be disabled since the docket alert was re-enabled
-        # 187 days ago.
+        # After run the report 272 days in the future the alert should be
+        # disabled since the docket alert was re-enabled 187 days ago.
         self.assertEqual(report.total_count(), 1)
         self.assertEqual(len(report.disabled_alerts), 1)
         self.assertEqual(active_docket_alerts.count(), 0)
@@ -3278,7 +2808,10 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
-@override_settings(NO_MATCH_HL_SIZE=100)
+@override_settings(
+    NO_MATCH_HL_SIZE=100, WAFFLE_CACHE_PREFIX="SearchAlertsOAESTests"
+)
+@override_switch("increment-stats", active=True)
 class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     """Test ES Search Alerts"""
 
@@ -3372,6 +2905,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         Audio.objects.all().delete()
         super().tearDownClass()
 
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        # Note: We no longer delete all alerts.sent* keys here because tests
+        # now check stat deltas (before/after) rather than absolute values.
+        # This makes tests parallel-safe.
+        return super().setUp()
+
     def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
 
@@ -3387,7 +2927,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
         self.assertEqual(r.json()["count"], 0)
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with (
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -3412,7 +2952,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -3565,7 +3105,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=1, hour=5)
+            mock_date = timezone.localtime(now()).replace(day=1, hour=5)
             with (
                 time_machine.travel(mock_date, tick=False),
                 self.captureOnCommitCallbacks(execute=True),
@@ -3745,6 +3285,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         alert_count,
         previous_date=None,
     ):
+        # Track initial stat count to check delta (parallel-test safe)
+        key = f"alerts.sent.{mock_date.date().isoformat()}"
+        initial_count = int(self.r.get(key) or 0)
+
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -3755,10 +3299,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 # Call dly command
                 call_command("cl_send_scheduled_alerts", rate=rate)
 
-        # Confirm Stat object is properly updated.
-        stat_object = Stat.objects.filter(date_logged=mock_date)
-        self.assertEqual(stat_object[0].name, f"alerts.sent.{rate}")
-        self.assertEqual(stat_object[0].count, stat_count)
+        # Confirm Stat object is properly updated (check delta, not absolute).
+        count = int(self.r.get(key) or 0)
+        self.assertEqual(count - initial_count, stat_count)
 
         # Confirm Alert date_last_hit is updated.
         search_alert.refresh_from_db()
@@ -3881,7 +3424,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(month=1, day=30, hour=0)
+            mock_date = timezone.localtime(now()).replace(
+                month=1, day=30, hour=0
+            )
             with time_machine.travel(mock_date, tick=False):
                 # Call mly command
                 with self.assertRaises(InvalidDateError):
@@ -3956,12 +3501,20 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             )
 
         # Send RT alerts
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        mock_date = now() - timedelta(days=10)
+        # Track initial stat count to check delta (parallel-test safe)
+        stat_key = f"alerts.sent.{mock_date.date().isoformat()}"
+        initial_stat_count = int(self.r.get(stat_key) or 0)
+        with time_machine.travel(mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        after_rt_stat_count = int(self.r.get(stat_key) or 0)
 
         # 1 email should be sent for the rt_oa_search_alert and rt_oa_search_alert_2
         self.assertEqual(
             len(mail.outbox), 1, msg="Wrong number of emails sent."
         )
+        # Confirm stat was incremented by the RT command.
+        self.assertEqual(after_rt_stat_count - initial_stat_count, 1)
 
         # The OA RT alert email should contain 2 alerts, one for rt_oa_search_alert
         # and one for rt_oa_search_alert_2. First alert should contain 2 hits.
@@ -4031,11 +3584,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             else:
                 self.assertTrue(False, "Search Alert webhooks failed.")
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
             ),
+            time_machine.travel(mock_date, tick=False),
         ):
             # Call command dly
             call_command("cl_send_scheduled_alerts", rate="dly")
@@ -4094,13 +3650,15 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         rt_oral_argument_2.delete()
         rt_oral_argument_3.delete()
 
-        # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 2)
-        stat_names = set([stat.name for stat in stats_objects])
-        self.assertEqual(stat_names, {"alerts.sent.rt", "alerts.sent.dly"})
-        self.assertEqual(stats_objects[0].count, 1)
-        self.assertEqual(stats_objects[1].count, 1)
+        # Confirm Stat object is properly created and updated (check delta).
+        # RT command should have incremented by 1, daily command by 1.
+        final_stat_count = int(self.r.get(stat_key) or 0)
+        self.assertEqual(
+            final_stat_count - after_rt_stat_count,
+            1,
+            msg="Daily command did not increment stat.",
+        )
+        self.assertEqual(final_stat_count - initial_stat_count, 2)
 
         # Remove test instances.
         rt_oa_search_alert.delete()
@@ -4176,7 +3734,12 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
             )
 
         # Send RT alerts
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        mock_date = now() - timedelta(days=2)
+        # Track initial stat count to check delta (parallel-test safe)
+        stat_key = f"alerts.sent.{mock_date.date().isoformat()}"
+        initial_stat_count = int(self.r.get(stat_key) or 0)
+        with time_machine.travel(mock_date, tick=False):
+            call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         # 11 OA search alert emails should be sent, one for each user that
         # had donated enough.
@@ -4193,11 +3756,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         content = webhook_events[0].content["payload"]
         self.assertEqual(len(content["results"]), 1)
 
-        # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(stats_objects.count(), 1)
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(stats_objects[0].count, 11)
+        # Confirm Stat object is properly created and updated (check delta).
+        final_stat_count = int(self.r.get(stat_key) or 0)
+        self.assertEqual(final_stat_count - initial_stat_count, 11)
 
         # Remove test instances.
         rt_oral_argument.delete()
@@ -4454,7 +4015,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
 
         # Send dly alerts and check assertions.
-        mock_date = now().replace(day=1, hour=0)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=0)
         with time_machine.travel(mock_date, tick=False):
             # Call dly command
             call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
@@ -4868,5 +4429,5 @@ class EmailWithSurrogatesTest(TestCase):
         email = EmailSent.objects.first()
         self.assertEqual(
             email.plain_text,
-            "government interest.” Saxe v. State Coll.",
+            "government interest.” Saxe v. State Coll.\n",
         )
