@@ -5,23 +5,31 @@
 </p>
 <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request:
 </p>
-<pre class="pre-scrollable">curl -v \
+<c-code>
+curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version=version %}"</pre>
+  "{% get_full_host %}{% url "docket-list" version=version %}"
+
+</c-code>
 <p>To look up a particular docket, use its ID:</p>
-<pre class="pre-scrollable">curl -v \
+<c-code>
+curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-detail" version=version pk="4214664" %}"</pre>
+  "{% get_full_host %}{% url "docket-detail" version=version pk="4214664" %}"
+
+</c-code>
 <p>The response you get will not list the docket entries, parties, or attorneys for the docket (doing so doesn't scale), but will have many other metadata fields:
 </p>
-<pre class="pre-scrollable tall">{
+<c-code>
+{
   "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/4214664/",
   "id": 4214664,
   "court": "https://www.courtlistener.com/api/rest/{{ version }}/courts/dcd/",
   "court_id": "dcd",
   "original_court_info": null,
   "idb_data": null,
+  "bankruptcy_information": null,
   "clusters": [],
   "audio_files": [],
   "assigned_to": "https://www.courtlistener.com/api/rest/{{ version }}/people/1124/",
@@ -69,4 +77,6 @@
     "https://www.courtlistener.com/api/rest/{{ version }}/tag/1316/"
   ],
   "panel": []
-}</pre>
+}
+
+</c-code>

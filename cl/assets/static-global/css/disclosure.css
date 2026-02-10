@@ -1,0 +1,113 @@
+/* Disclosure page styles */
+
+/* Disclosure Table Viewer */
+.disclosure-page .fa-exclamation-triangle {
+  font-size: 100px;
+}
+
+/* Typeahead search results styling */
+.judge-pic {
+  margin-top: 10px;
+  min-width: 64px;
+  min-height: 64px;
+  max-width: 250px;
+}
+
+.tr-results {
+  width: 100%;
+  background: rgba(255, 255, 255, 0);
+  border-bottom: 1px solid lightgrey;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.tr-results:last-child {
+  border-bottom: 0;
+}
+
+.table-instant-results {
+  box-shadow: 3px 3px 6px #8b8b8b;
+  margin-top: 5px;
+  width: 100%;
+  border-radius: 10px;
+  background: white;
+  overflow: hidden;
+}
+
+#main-query-box .table-instant-results {
+  border-radius: 10px;
+  background: white;
+  width: 100%;
+}
+
+#main-query-box {
+  text-align: center;
+}
+
+#id_disclosures_search {
+  border-radius: 4px;
+}
+
+.table-instant-results > tbody {
+  background: white;
+  border-radius: 10px;
+}
+
+tr.tr-results:hover,
+tr.tr-results.active {
+  background-color: whitesmoke;
+  border-radius: 10px !important;
+}
+
+tr.tr-results > td {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0);
+}
+
+.disclosure-result-link,
+.disclosure-result-link:hover,
+.disclosure-result-link:focus,
+.disclosure-result-link:visited {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: black;
+}
+
+.disclosure-result-link h4,
+.disclosure-result-link i {
+  color: inherit;
+}
+
+.disclosure-result-link .gray {
+  color: gray;
+}
+
+td.table-data-portrait {
+  max-height: 50px;
+}
+
+.missing-judge {
+  font-size: 40px;
+  border: 1px solid;
+  margin: 0;
+  padding: 12px;
+}
+
+.judge-name {
+  font-size: 20px;
+}
+
+.search-input-judges {
+  width: 75%;
+  position: relative;
+  margin: 0 auto;
+}
+
+#disclosure-search-results {
+  position: absolute;
+  width: 100%;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+}

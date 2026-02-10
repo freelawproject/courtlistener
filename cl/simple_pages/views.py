@@ -345,7 +345,7 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
                 "state": await fetch_data(Court.STATE_JURISDICTIONS),
                 "territory": await fetch_data(Court.TERRITORY_JURISDICTIONS),
                 "international": await fetch_data(
-                    Court.INTERNATIONAL, group_by_state=False
+                    [Court.INTERNATIONAL], group_by_state=False
                 ),
                 "tribal": await fetch_data(
                     Court.TRIBAL_JURISDICTIONS, group_by_state=False
@@ -432,7 +432,7 @@ async def contact(
             default_from = settings.DEFAULT_FROM_EMAIL
             subject = form.email_subject()
             body = form.render_email_body(
-                user_agent=request.META.get("HTTP_USER_AGENT", "Unknown")
+                user_agent=request.headers.get("user-agent", "Unknown")
             )
 
             message = EmailMessage(

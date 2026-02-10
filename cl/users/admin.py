@@ -8,7 +8,7 @@ from django.db.models import Model
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
-from cl.api.admin import WebhookInline
+from cl.api.admin import APIThrottleInline, WebhookInline
 from cl.donate.admin import (
     DonationInline,
     MonthlyDonationInline,
@@ -21,6 +21,7 @@ from cl.lib.admin import (
     AdminTweaksMixin,
     generate_admin_links,
 )
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
@@ -64,6 +65,7 @@ admin.site.unregister(User)
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     form = CustomUserChangeForm  # optimize queryset for user_permissions field
     change_form_template = "admin/user_change_form.html"
+    readonly_fields = ("api_calls_count",)
     inlines = (
         UserProfileInline,
         DonationInline,
@@ -76,6 +78,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         NeonMembershipInline,
         TokenInline,
         WebhookInline,
+        APIThrottleInline,
     )
     list_display = (
         "username",
@@ -97,6 +100,21 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "email",
         "pk",
     )
+
+    def api_calls_count(self, obj):
+        r = get_redis_interface("STATS")
+        total = 0
+        if obj.id is None:
+            # New user, no API usage, bail.
+            return total
+
+        for api_prefix in ["v3", "v4"]:
+            count = r.zscore(f"api:{api_prefix}.user.counts", obj.id)
+            if count:
+                total += int(count)
+        return total
+
+    api_calls_count.short_description = "API Calls Count"
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         """Add links to related event admin pages filtered by user/profile."""

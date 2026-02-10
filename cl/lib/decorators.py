@@ -5,6 +5,7 @@ from collections.abc import Callable
 from functools import wraps
 from hashlib import md5
 from math import ceil
+from typing import Any, TypeVar
 from urllib.parse import urlparse
 
 from asgiref.sync import iscoroutinefunction, sync_to_async
@@ -13,7 +14,99 @@ from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
 from django.utils.cache import patch_response_headers
 
+from cl.lib.redis_utils import get_redis_interface
+
 logger = logging.getLogger(__name__)
+
+# In-memory cache for tiered_cache decorator (per-process, fastest tier)
+# Data model: {cache_key: (expiry_timestamp, cached_value)}
+# - cache_key: string built from function module, name, and arguments
+# - expiry_timestamp: float (time.time() + timeout) when the entry expires
+# - cached_value: the return value of the decorated function
+_memory_cache: dict[str, tuple[float, Any]] = {}
+
+T = TypeVar("T")
+
+
+def tiered_cache(
+    timeout: int,
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
+    """Tiered caching decorator: memory -> Django cache (Redis) -> function.
+
+    Implements a three-tier caching strategy for optimal performance:
+    - Tier 1: In-memory dict (fastest, per-process)
+    - Tier 2: Django cache backend (Redis, shared across processes)
+    - Tier 3: Execute the wrapped function (slowest, e.g., DB query)
+
+    The memory cache is checked first for speed, then Redis for cross-process
+    sharing, and finally the function is called if neither has the value.
+
+    The Redis cache timeout is set to 1 second less than the memory cache to
+    prevent a race condition where the memory cache could be refreshed from
+    Redis just before Redis expires, giving memory the full timeout again.
+
+    :param timeout: Cache timeout in seconds for the memory tier.
+    :return: Decorated function with tiered caching.
+
+    Example:
+        @tiered_cache(timeout=300)
+        def get_expensive_data(key: str) -> dict:
+            return expensive_db_query(key)
+    """
+
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> T:
+            # Build cache key from function name and arguments
+            key_parts = [func.__module__, func.__name__]
+            key_parts.extend(str(arg) for arg in args)
+            key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
+            cache_key = f"tiered:{':'.join(key_parts)}"
+
+            current_time = time.time()
+
+            # Tier 1: Check in-memory cache
+            if cache_key in _memory_cache:
+                expiry, value = _memory_cache[cache_key]
+                if current_time < expiry:
+                    return value
+                # Expired, remove from memory
+                del _memory_cache[cache_key]
+
+            # Tier 2: Check Django cache (Redis)
+            redis_cache = caches["default"]
+            value = redis_cache.get(cache_key)
+            if value is not None:
+                # Store in memory cache for faster subsequent access
+                _memory_cache[cache_key] = (current_time + timeout, value)
+                return value
+
+            # Tier 3: Call the function
+            value = func(*args, **kwargs)
+
+            # Store in both caches (Redis gets 1 second less to prevent race)
+            redis_cache.set(cache_key, value, timeout - 1)
+            _memory_cache[cache_key] = (current_time + timeout, value)
+
+            return value
+
+        return wrapper
+
+    return decorator
+
+
+def clear_tiered_cache() -> None:
+    """Clear both tiers of the tiered cache (memory and Redis).
+
+    Useful for testing or when you need to force a refresh.
+    """
+    # Clear memory tier
+    _memory_cache.clear()
+    # Clear Redis tier (all keys with tiered: prefix)
+    r = get_redis_interface("CACHE")
+    keys = list(r.scan_iter(match=":1:tiered:*"))
+    if keys:
+        r.delete(*keys)
 
 
 def retry(
