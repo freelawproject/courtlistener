@@ -2032,7 +2032,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             docket=DocketFactory(source=Docket.HARVARD),
             sub_opinions__data=[
                 {
-                    "type": "010combined",
+                    "type": "020lead",
                     "xml_harvard": "<p>Lorem ipsum dolor sit amet, consectetur "
                     "adipiscing elit. Nullam quis elit sed dui "
                     "interdum feugiat.</p>",

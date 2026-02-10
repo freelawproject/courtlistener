@@ -33,6 +33,22 @@ FILED_TAGS = [
     "affirmed and opinion filed",
     "dismissed and opinion filed",
     "decided and entered",
+    "memorandum opinion filed",
+    "memorandum opinion delivered and filed",
+    "granted",
+    "affirmed",
+    "submitted and decided",
+    "affirmed and memorandum opinion filed",
+    "memorandum filed",
+    "modified opinion filed",
+    "opinion modified and refiled",
+    "opinion filed on",
+    "opinion on merits filed",
+    "opinion delivered and filed on",
+    "order delivered and filed",
+    "date filed",
+    "opinion filed in",
+    "affirmed opinion filed",
 ]
 DECIDED_TAGS = ["decided", "date decided", "decided on", "decided date"]
 ARGUED_TAGS = [
@@ -538,7 +554,7 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
         )
 
         # We use opinion index to ensure that all footnotes are linked to the
-        # corresponding opinion
+        # corresponding opinion (when a case has multiple opinions)
         for ref in foot_references:
             if (match := re.search(r"[*\d]+", ref)) is not None:
                 f_num = match.group()
