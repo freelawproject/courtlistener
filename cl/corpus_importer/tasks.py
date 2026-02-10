@@ -3649,7 +3649,7 @@ def merge_texas_docket_entry(
         docket.pk,
     )
     document_results = [
-        merge_texas_document(input_docket_entry, document)
+        merge_texas_document(docket_entry, document)
         for document in input_docket_entry["attachments"]
     ]
 
@@ -3722,7 +3722,7 @@ def texas_js_court_id_to_court_id(js_court_id: str) -> str:
     if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
         return "texcrimapp"
     # Court of appeals
-    appellate_number = str(int(js_court_id[len("texas_") :]))
+    appellate_number = str(int(js_court_id[len("texas_coa") :]))
     if appellate_number == "13":
         appellate_number = "13A"
     return f"txctapp{appellate_number}"
@@ -3745,7 +3745,7 @@ def texas_originating_court_to_court_id(
         if district_number:
             if district_number > 1:
                 district_number = district_number + 1
-            return f"txdistct{district_number}"
+            return f"texdistct{district_number}"
         return "texdistct"
     if court_type == "texas_business":
         return "texbizct"
@@ -3816,14 +3816,14 @@ def merge_texas_case_transfers(
         )
 
         appeals_court = docket_data["appeals_court"]
-        if appeals_court["court_id"] == CourtID.UNKNOWN:
-            appeals_court_id = "texapp"
-        else:
-            appeals_court_id = texas_js_court_id_to_court_id(
-                appeals_court["court_id"]
-            )
 
         if docket_data["court_id"] == CourtID.COURT_OF_CRIMINAL_APPEALS:
+            if appeals_court["court_id"] == CourtID.UNKNOWN:
+                appeals_court_id = "texapp"
+            else:
+                appeals_court_id = texas_js_court_id_to_court_id(
+                    appeals_court["court_id"]
+                )
             # Death penalty cases are automatically appealed to the CCA so the
             # appellate court may be missing.
             appeals_court = docket_data["appeals_court"]
@@ -3846,6 +3846,12 @@ def merge_texas_case_transfers(
                 transfer.origin_court = Court.objects.get(pk=appeals_court_id)
                 transfer.origin_docket_number = appeals_court["case_number"]
         elif docket_data["court_id"] == CourtID.SUPREME_COURT:
+            if appeals_court["court_id"] == CourtID.UNKNOWN:
+                appeals_court_id = "texapp"
+            else:
+                appeals_court_id = texas_js_court_id_to_court_id(
+                    appeals_court["court_id"]
+                )
             transfer.origin_court = Court.objects.get(pk=appeals_court_id)
             transfer.origin_docket_number = appeals_court["case_number"]
         else:
@@ -3925,9 +3931,7 @@ def merge_texas_case_transfers(
                 transfer.destination_court.pk,
             )
 
-    return MergeResult(
-        success=True, created=any_created, updated=False, pk=None
-    )
+    return MergeResult(success=True, create=any_created, update=False, pk=None)
 
 
 def generate_texas_appellate_brief_flags(

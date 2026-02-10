@@ -147,7 +147,7 @@ class TexasAppellateCourtInfoDictFactory(DictFactory):
     case_url = Faker("url")
     disposition = Faker("pystr")
     district = Faker("pystr")
-    justice = Faker("Name")
+    justice = Faker("name")
     opinion_cite = Faker("citation")
 
 
@@ -194,6 +194,7 @@ class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
     """Factory for Texas Supreme Court and Court of Criminal Appeals docket data."""
 
     court_type = "texas_final"
+    appeals_court = SubFactory(TexasAppellateCourtInfoDictFactory)
     court_id = Faker(
         "random_element",
         elements=(

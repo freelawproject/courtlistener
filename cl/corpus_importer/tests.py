@@ -2849,7 +2849,7 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_case_transfers_appellate_court_from_trial(self):
         """Can we create a CaseTransfer for an appellate court case?"""
-        texas_district = CourtFactory.create(id="txdistct6")
+        texas_district = CourtFactory.create(id="texdistct6")
 
         originating_court = TexasOriginatingDistrictCourtDictFactory(
             court_type="texas_district",
@@ -2875,7 +2875,7 @@ class TexasMergerTest(TestCase):
         )
         assert transfers.count() == 1
         transfer = transfers.first()
-        assert transfer.origin_court.id == "txdistct6"
+        assert transfer.origin_court == texas_district
         assert transfer.origin_docket_number == "2023-12345"
         assert transfer.transfer_type == CaseTransfer.APPEAL
         assert transfer.transfer_date == date(2025, 1, 15)
@@ -2884,8 +2884,8 @@ class TexasMergerTest(TestCase):
         self,
     ):
         """Can we create CaseTransfer for appellate case with work sharing?"""
-        texas_district = CourtFactory.create(id="txdistct6")
-        texas_coa2 = CourtFactory.create(id="texas_coa2")
+        texas_district = CourtFactory.create(id="texdistct6")
+        texas_coa2 = CourtFactory.create(id="txctapp2")
 
         originating_court = TexasOriginatingDistrictCourtDictFactory(
             court_type="texas_district",
@@ -2917,7 +2917,7 @@ class TexasMergerTest(TestCase):
         assert transfers.count() == 2
 
         appeal_transfer = transfers.get(transfer_type=CaseTransfer.APPEAL)
-        assert appeal_transfer.origin_court.id == "txdistct6"
+        assert appeal_transfer.origin_court == texas_district
         assert appeal_transfer.origin_docket_number == "2023-12345"
 
         workload_transfer = transfers.get(transfer_type=CaseTransfer.WORKLOAD)
@@ -3056,7 +3056,7 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_case_transfers_duplicate_handling(self):
         """Do we properly handle duplicate CaseTransfer objects?"""
-        texas_district = CourtFactory.create(id="txdistct6")
+        texas_district = CourtFactory.create(id="texdistct6")
 
         CaseTransfer.objects.create(
             origin_court=texas_district,
