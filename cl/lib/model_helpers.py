@@ -1,8 +1,10 @@
 import os
 import re
 from collections.abc import Callable
+from pathlib import Path
 
 from django.core.exceptions import ValidationError
+from django.db import models
 from django.utils.text import get_valid_filename, slugify
 from django.utils.timezone import now
 
@@ -12,6 +14,7 @@ from cl.lib.string_utils import normalize_dashes, trunc
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
+scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
 
 
 def is_docket_number(value: str) -> bool:
@@ -57,7 +60,20 @@ def clean_docket_number(docket_number: str | None) -> str:
     if len(bankr_m) == 1:
         return bankr_m[0]
 
+    # Match SCOTUS docket numbers.
+    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
+    if len(scotus_a_m) == 1:
+        return scotus_a_m[0]
+
     return ""
+
+
+def make_appellate_bankr_number_core(cleaned_docket_number: str) -> str | None:
+    bankr_m = re.search(appellate_bankr_d_num_regex, cleaned_docket_number)
+    if bankr_m:
+        # Pad to six characters because some courts have a LOT of bankruptcies
+        return f"{bankr_m.group(1)}{int(bankr_m.group(2)):06d}"
+    return None
 
 
 def make_docket_number_core(docket_number: str | None) -> str:
@@ -90,10 +106,32 @@ def make_docket_number_core(docket_number: str | None) -> str:
     if district_m:
         return f"{district_m.group(1)}{int(district_m.group(2)):05d}"
 
-    bankr_m = re.search(appellate_bankr_d_num_regex, cleaned_docket_number)
-    if bankr_m:
-        # Pad to six characters because some courts have a LOT of bankruptcies
-        return f"{bankr_m.group(1)}{int(bankr_m.group(2)):06d}"
+    if bankr_n_core := make_appellate_bankr_number_core(cleaned_docket_number):
+        return bankr_n_core
+
+    return ""
+
+
+def make_scotus_docket_number_core(docket_number: str | None) -> str:
+    """Normalize SCOTUS docket numbers like 16A985.
+
+    :param docket_number: The docket number to condense.
+    :return: empty string if no change possible, or the condensed version if it
+    worked. Note that all values returned are strings. We cannot return an int
+    because that'd strip leading zeroes, which we need.
+    """
+    if not docket_number:
+        return ""
+
+    cleaned_docket_number = clean_docket_number(docket_number)
+
+    if bankr_n_core := make_appellate_bankr_number_core(cleaned_docket_number):
+        return bankr_n_core
+
+    scouts_a_m = re.search(scotus_d_a_num_regex, cleaned_docket_number)
+    if scouts_a_m:
+        year, serial = scouts_a_m.groups()
+        return f"{year}A{int(serial):05d}"
 
     return ""
 
@@ -145,7 +183,11 @@ def base_recap_path(instance, filename, base_dir):
 
 def make_pdf_path(instance, filename, thumbs=False):
     from cl.lasc.models import LASCPDF
-    from cl.search.models import ClaimHistory, RECAPDocument
+    from cl.search.models import (
+        ClaimHistory,
+        RECAPDocument,
+        ScotusDocketMetadata,
+    )
 
     if isinstance(instance, RECAPDocument):
         root = "recap"
@@ -161,6 +203,10 @@ def make_pdf_path(instance, filename, thumbs=False):
         file_name = f"gov.ca.lasc.{instance.docket_number}.{instance.document_id}.{slug}.pdf"
 
         return os.path.join(root, file_name)
+    elif isinstance(instance, ScotusDocketMetadata):
+        slug = slugify(Path(filename).stem)
+        file_name = f"gov.scotus.{slug}.pdf"
+        return str(Path("scotus") / "qp" / file_name)
     else:
         raise ValueError(
             f"Unknown model type in make_pdf_path function: {type(instance)}"
@@ -517,6 +563,48 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
     """
     # If no match is found, return empty str
     return ""
+
+
+FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
+    r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def document_model(model: type[models.Model]) -> type[models.Model]:
+    """
+    Decorator for Django models to use docstrings to populate unset
+    help_text and db_comment field attributes.
+    """
+    model_fields: dict[str, models.Field] = dict(
+        [(field.name, field) for field in model._meta.local_fields]
+    )
+    docstring = model.__doc__
+    if docstring is None:
+        return model
+    ivar_docs = [
+        (match.group(1).strip(), match.group(2).strip())
+        for match in FIELD_DOCSTRING_EXTRACTION_RE.finditer(docstring)
+    ]
+    field_docs = dict(
+        [
+            (field_name, docstring.replace("\n", " "))
+            for field_name, docstring in ivar_docs
+            if field_name in model_fields
+        ]
+    )
+
+    for field_name, field in model_fields.items():
+        if field_name not in field_docs:
+            continue
+
+        doc = field_docs[field_name]
+        if not field.help_text:
+            field.help_text = doc
+        if not field.db_comment:
+            field.db_comment = doc
+
+    return model
 
 
 class CSVExportMixin:

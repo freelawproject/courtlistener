@@ -52,11 +52,6 @@ router.register(r"tag", search_views.TagViewSet, basename="tag")
 # People & Entities
 router.register(r"people", people_views.PersonViewSet, basename="person")
 router.register(
-    r"disclosure-typeahead",
-    people_views.PersonDisclosureViewSet,
-    basename="disclosuretypeahead",
-)
-router.register(
     r"positions", people_views.PositionViewSet, basename="position"
 )
 router.register(
@@ -297,6 +292,14 @@ urlpatterns = [
             extra_context={"private": False},
         ),
         name="alert_api_help",
+    ),
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v4)/)?tags/$",
+        views.VersionedTemplateView.as_view(
+            template_name="tag-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="tag_api_help",
     ),
     re_path(
         r"^help/api/rest/(?:(?P<version>v[34])/)?fields/$",

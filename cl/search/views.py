@@ -1,7 +1,6 @@
 from datetime import date
 from urllib.parse import quote
 
-from asgiref.sync import async_to_sync
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -170,10 +169,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
         # No parameters --> Homepage.
-        if flag_is_active(request, "increment-stats"):
-            if not is_bot(request):
-                async_to_sync(tally_stat)("search.homepage_loaded")
-
         # Ensure we get nothing from the future.
         mutable_GET = request.GET.copy()  # Makes it mutable
         mutable_GET["filed_before"] = date.today()
@@ -251,9 +246,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
     else:
         # Just a regular search
-        if flag_is_active(request, "increment-stats"):
-            if not is_bot(request):
-                async_to_sync(tally_stat)("search.results")
+        if not is_bot(request):
+            tally_stat(
+                "search.results",
+                prometheus_handler_key="search.queries.keyword.web",
+            )
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(
@@ -290,14 +287,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
 
 @never_cache
-def advanced(request: HttpRequest) -> HttpResponse:
+def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
     render_dict = {"private": False}
+    courts = courts_in_use = Court.objects.filter(in_use=True)
 
-    # I'm not thrilled about how this is repeating URLs in a view.
-    if request.path == reverse("advanced_o"):
-        courts = Court.objects.filter(in_use=True)
-        obj_type = SEARCH_TYPES.OPINION
-        search_form = SearchForm({"type": obj_type}, courts=courts)
+    if search_type == SEARCH_TYPES.OPINION:
+        search_form = SearchForm({"type": search_type}, courts=courts)
         render_dict["search_form"] = search_form
         # Needed b/c of facet values.
         search_query = OpinionClusterDocument.search()
@@ -306,7 +301,7 @@ def advanced(request: HttpRequest) -> HttpResponse:
         )
         search_form.is_valid()
         cd = search_form.cleaned_data
-        search_form = _clean_form({"type": obj_type}, cd, courts)
+        search_form = _clean_form({"type": search_type}, cd, courts)
         # Merge form with courts.
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
@@ -320,31 +315,23 @@ def advanced(request: HttpRequest) -> HttpResponse:
             }
         )
         return TemplateResponse(request, "advanced.html", render_dict)
-    else:
-        courts = courts_in_use = Court.objects.filter(in_use=True)
-        if request.path == reverse("advanced_r"):
-            obj_type = SEARCH_TYPES.RECAP
-            courts_in_use = Court.federal_courts.all_pacer_courts()
-        elif request.path == reverse("advanced_oa"):
-            obj_type = SEARCH_TYPES.ORAL_ARGUMENT
-        elif request.path == reverse("advanced_p"):
-            obj_type = SEARCH_TYPES.PEOPLE
-        else:
-            raise NotImplementedError(f"Unknown path: {request.path}")
 
-        search_form = SearchForm({"type": obj_type}, courts=courts)
-        courts, court_count_human, court_count = merge_form_with_courts(
-            courts_in_use, search_form
-        )
-        render_dict.update(
-            {
-                "search_form": search_form,
-                "courts": courts,
-                "court_count_human": court_count_human,
-                "court_count": court_count,
-            }
-        )
-        return render(request, "advanced.html", render_dict)
+    if search_type == SEARCH_TYPES.RECAP:
+        courts_in_use = Court.federal_courts.all_pacer_courts()
+
+    search_form = SearchForm({"type": search_type}, courts=courts)
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts_in_use, search_form
+    )
+    render_dict.update(
+        {
+            "search_form": search_form,
+            "courts": courts,
+            "court_count_human": court_count_human,
+            "court_count": court_count,
+        }
+    )
+    return render(request, "advanced.html", render_dict)
 
 
 @waffle_flag("parenthetical-search")

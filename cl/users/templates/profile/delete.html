@@ -34,7 +34,7 @@
       <li>All of <a href="{% url "profile_notes" %}">your notes</a> ({{ request.user.notes.count }}).</li>
     {% endif %}
     {% if non_deleted_map_count > 0 %}
-      <li>All of your <a href="{% url "view_visualizations" %}">network visualizations</a> ({{ non_deleted_map_count }}).</li>
+      <li>All of your network visualizations ({{ non_deleted_map_count }}).</li>
     {% endif %}
   {% if request.user.webhooks.count > 0 %}
       <li>All of your <a href="{% url "view_webhooks" %}">webhooks and webhook events</a> ({{ request.user.webhooks.count }}).</li>
