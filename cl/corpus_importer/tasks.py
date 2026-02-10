@@ -57,20 +57,17 @@ from juriscraper.pacer import (
 )
 from juriscraper.pacer.reports import BaseReport
 from juriscraper.state.texas import (
-    TexasAppealsCourt,
     TexasCaseEvent,
     TexasCaseParty,
     TexasCourtOfCriminalAppealsDocket,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
     TexasSupremeCourtDocket,
-    TexasTrialCourt,
 )
 from juriscraper.state.texas.common import (
     CourtID,
     TexasAppellateBrief,
     TexasCaseDocument,
-    TexasCommonData,
 )
 from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
 from openai import (
@@ -112,7 +109,6 @@ from cl.corpus_importer.utils import (
     create_docket_entry_sequence_numbers,
     is_appellate_court,
     is_long_appellate_document_number,
-    juriscraper_to_cl_court_id,
     make_iquery_probing_key,
     mark_ia_upload_needed,
 )
