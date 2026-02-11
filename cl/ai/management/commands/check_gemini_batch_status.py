@@ -57,7 +57,7 @@ from django.db import transaction
 from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
-from cl.ai.models import LLMProvider, LLMRequest, TaskStatus
+from cl.ai.models import LLMProvider, LLMRequest, LLMTaskStatusChoices
 from cl.lib.command_utils import VerboseCommand
 
 logger = logging.getLogger(__name__)
@@ -100,9 +100,9 @@ def process_succeeded_request(
                 continue
 
             task.status = (
-                TaskStatus.SUCCEEDED
+                LLMTaskStatusChoices.SUCCEEDED
                 if res["status"] == "SUCCEEDED"
-                else TaskStatus.FAILED
+                else LLMTaskStatusChoices.FAILED
             )
             task.error_message = res["error_message"] or ""
             if res.get("raw_result"):
@@ -127,12 +127,12 @@ def process_succeeded_request(
                     )
             task.save()
 
-        request.status = TaskStatus.FINISHED
+        request.status = LLMTaskStatusChoices.FINISHED
         request.completed_tasks = request.tasks.filter(
-            status=TaskStatus.SUCCEEDED
+            status=LLMTaskStatusChoices.SUCCEEDED
         ).count()
         request.failed_tasks = request.tasks.filter(
-            status=TaskStatus.FAILED
+            status=LLMTaskStatusChoices.FAILED
         ).count()
         request.date_completed = now()
         request.save()
@@ -148,10 +148,10 @@ def process_failed_request(request: LLMRequest, job_state_name: str) -> None:
         ``JOB_STATE_FAILED``) included in task error messages.
     """
     with transaction.atomic():
-        request.status = TaskStatus.FAILED
+        request.status = LLMTaskStatusChoices.FAILED
         request.date_completed = now()
         for task in request.tasks.all():
-            task.status = TaskStatus.FAILED
+            task.status = LLMTaskStatusChoices.FAILED
             task.error_message = (
                 f"Batch job failed with state: {job_state_name}"
             )
@@ -202,7 +202,7 @@ def handle_request(
         )
         sentry_sdk.capture_exception(e)
 
-        request.status = TaskStatus.FAILED
+        request.status = LLMTaskStatusChoices.FAILED
         request.date_completed = now()
         request.save()
 
@@ -223,7 +223,7 @@ class Command(VerboseCommand):
 
         pending_requests = LLMRequest.objects.filter(
             is_batch=True,
-            status=TaskStatus.IN_PROGRESS,
+            status=LLMTaskStatusChoices.IN_PROGRESS,
             provider=LLMProvider.GEMINI,
         )
         logger.info(

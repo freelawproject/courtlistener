@@ -753,7 +753,7 @@ class SendGeminiBatchesTest(TestCase):
         # Assertions
         self.assertEqual(LLMRequest.objects.count(), 1)
         llm_request = LLMRequest.objects.first()
-        self.assertEqual(llm_request.status, TaskStatus.IN_PROGRESS)
+        self.assertEqual(llm_request.status, LLMTaskStatusChoices.IN_PROGRESS)
         self.assertEqual(llm_request.total_tasks, 3)
         self.assertEqual(llm_request.batch_id, "batches/test123abc")
         self.assertEqual(llm_request.provider, LLMProvider.GEMINI)
@@ -764,7 +764,7 @@ class SendGeminiBatchesTest(TestCase):
         self.assertEqual(LLMTask.objects.count(), 3)
         for task in LLMTask.objects.all():
             self.assertEqual(task.request, llm_request)
-            self.assertEqual(task.task, Task.SCAN_EXTRACTION)
+            self.assertEqual(task.task, LLMTaskChoices.SCAN_EXTRACTION)
             self.assertTrue(task.llm_key.startswith("scan-batch-"))
 
         # Verify API calls
@@ -1025,7 +1025,7 @@ class SendGeminiBatchesTest(TestCase):
         # Verify request was created but marked as FAILED
         self.assertEqual(LLMRequest.objects.count(), 1)
         llm_request = LLMRequest.objects.first()
-        self.assertEqual(llm_request.status, TaskStatus.FAILED)
+        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FAILED)
 
     @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
     @patch.dict(
@@ -1131,7 +1131,7 @@ class CheckGeminiBatchStatusTest(TestCase):
             is_batch=True,
             provider=LLMProvider.GEMINI,
             api_model_name="gemini-2.5-pro",
-            status=TaskStatus.IN_PROGRESS,
+            status=LLMTaskStatusChoices.IN_PROGRESS,
             batch_id=batch_id,
             total_tasks=num_tasks,
         )
@@ -1142,9 +1142,9 @@ class CheckGeminiBatchStatusTest(TestCase):
             # Use the same format as in mock results: scan-batch-{pk}-{index}
             task = LLMTask.objects.create(
                 request=llm_request,
-                task=Task.SCAN_EXTRACTION,
+                task=LLMTaskChoices.SCAN_EXTRACTION,
                 llm_key=f"scan-batch-{llm_request.pk}-{i}",
-                status=TaskStatus.IN_PROGRESS,  # Set to IN_PROGRESS to match request status
+                status=LLMTaskStatusChoices.IN_PROGRESS,  # Set to IN_PROGRESS to match request status
             )
             tasks.append(task)
 
@@ -1219,7 +1219,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Check LLMRequest status
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, TaskStatus.FINISHED)
+        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FINISHED)
         self.assertEqual(llm_request.completed_tasks, 3)
         self.assertEqual(llm_request.failed_tasks, 0)
         self.assertIsNotNone(llm_request.date_completed)
@@ -1228,7 +1228,7 @@ class CheckGeminiBatchStatusTest(TestCase):
         # Check all tasks
         for task in tasks:
             task.refresh_from_db()
-            self.assertEqual(task.status, TaskStatus.SUCCEEDED)
+            self.assertEqual(task.status, LLMTaskStatusChoices.SUCCEEDED)
             self.assertEqual(task.error_message, "")
             self.assertTrue(task.response_file)
 
@@ -1294,21 +1294,21 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Assertions
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, TaskStatus.FINISHED)
+        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FINISHED)
         self.assertEqual(llm_request.completed_tasks, 2)
         self.assertEqual(llm_request.failed_tasks, 1)
 
         # Check individual tasks
         tasks[0].refresh_from_db()
-        self.assertEqual(tasks[0].status, TaskStatus.SUCCEEDED)
+        self.assertEqual(tasks[0].status, LLMTaskStatusChoices.SUCCEEDED)
         self.assertEqual(tasks[0].error_message, "")
 
         tasks[1].refresh_from_db()
-        self.assertEqual(tasks[1].status, TaskStatus.FAILED)
+        self.assertEqual(tasks[1].status, LLMTaskStatusChoices.FAILED)
         self.assertEqual(tasks[1].error_message, "API error occurred")
 
         tasks[2].refresh_from_db()
-        self.assertEqual(tasks[2].status, TaskStatus.SUCCEEDED)
+        self.assertEqual(tasks[2].status, LLMTaskStatusChoices.SUCCEEDED)
         self.assertEqual(tasks[2].error_message, "")
 
     @patch(
@@ -1353,13 +1353,15 @@ class CheckGeminiBatchStatusTest(TestCase):
 
                 # Check LLMRequest
                 llm_request.refresh_from_db()
-                self.assertEqual(llm_request.status, TaskStatus.FAILED)
+                self.assertEqual(
+                    llm_request.status, LLMTaskStatusChoices.FAILED
+                )
                 self.assertIsNotNone(llm_request.date_completed)
 
                 # Check all tasks marked as failed with state in error message
                 for task in tasks:
                     task.refresh_from_db()
-                    self.assertEqual(task.status, TaskStatus.FAILED)
+                    self.assertEqual(task.status, LLMTaskStatusChoices.FAILED)
                     self.assertIn(state_name, task.error_message)
 
     @patch(
@@ -1403,11 +1405,15 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Assertions
         running_request.refresh_from_db()
-        self.assertEqual(running_request.status, TaskStatus.IN_PROGRESS)
+        self.assertEqual(
+            running_request.status, LLMTaskStatusChoices.IN_PROGRESS
+        )
         self.assertIsNone(running_request.date_completed)
 
         succeeded_request.refresh_from_db()
-        self.assertEqual(succeeded_request.status, TaskStatus.FINISHED)
+        self.assertEqual(
+            succeeded_request.status, LLMTaskStatusChoices.FINISHED
+        )
         self.assertIsNotNone(succeeded_request.date_completed)
 
     @patch(
@@ -1443,7 +1449,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Should catch the error and leave request IN_PROGRESS
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, TaskStatus.IN_PROGRESS)
+        self.assertEqual(llm_request.status, LLMTaskStatusChoices.IN_PROGRESS)
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"
@@ -1479,7 +1485,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Should mark request as FAILED
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, TaskStatus.FAILED)
+        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FAILED)
         self.assertIsNotNone(llm_request.date_completed)
 
     @patch(
@@ -1530,13 +1536,13 @@ class CheckGeminiBatchStatusTest(TestCase):
         self.assertEqual(mock_wrapper.get_job.call_count, 3)
 
         request1.refresh_from_db()
-        self.assertEqual(request1.status, TaskStatus.FINISHED)
+        self.assertEqual(request1.status, LLMTaskStatusChoices.FINISHED)
 
         request2.refresh_from_db()
-        self.assertEqual(request2.status, TaskStatus.FAILED)
+        self.assertEqual(request2.status, LLMTaskStatusChoices.FAILED)
 
         request3.refresh_from_db()
-        self.assertEqual(request3.status, TaskStatus.IN_PROGRESS)
+        self.assertEqual(request3.status, LLMTaskStatusChoices.IN_PROGRESS)
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"
@@ -1588,15 +1594,15 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Request should still be marked as finished
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, TaskStatus.FINISHED)
+        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FINISHED)
 
         # First task should be updated
         tasks[0].refresh_from_db()
-        self.assertEqual(tasks[0].status, TaskStatus.SUCCEEDED)
+        self.assertEqual(tasks[0].status, LLMTaskStatusChoices.SUCCEEDED)
 
         # Second task should remain in progress (no matching key)
         tasks[1].refresh_from_db()
-        self.assertEqual(tasks[1].status, TaskStatus.IN_PROGRESS)
+        self.assertEqual(tasks[1].status, LLMTaskStatusChoices.IN_PROGRESS)
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"
@@ -1645,6 +1651,6 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Task should still be marked as succeeded
         tasks[0].refresh_from_db()
-        self.assertEqual(tasks[0].status, TaskStatus.SUCCEEDED)
+        self.assertEqual(tasks[0].status, LLMTaskStatusChoices.SUCCEEDED)
         # Response file should be saved (as .txt instead of .json)
         self.assertTrue(tasks[0].response_file)

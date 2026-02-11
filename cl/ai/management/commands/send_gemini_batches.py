@@ -141,10 +141,10 @@ from cl.ai.models import (
     LLMProvider,
     LLMRequest,
     LLMTask,
+    LLMTaskChoices,
+    LLMTaskStatusChoices,
     Prompt,
     PromptTypes,
-    Task,
-    TaskStatus,
 )
 from cl.lib.command_utils import VerboseCommand
 
@@ -171,7 +171,6 @@ def get_s3_file_list(
     :param bucket_name: Optional bucket name (defaults to AWS_STORAGE_BUCKET_NAME)
     :param file_extension: File extension to filter (e.g., ".pdf", ".txt")
     :yields: (filename, file_content_bytes, s3_key)
-    :raises CommandError: If S3 access fails or bucket is not allowed
     """
     # Use settings for credentials and bucket
     bucket = bucket_name or settings.AWS_STORAGE_BUCKET_NAME
@@ -262,6 +261,209 @@ def get_s3_file_list(
         raise CommandError(f"AWS SDK error: {e}")
 
 
+def validate_inputs(
+    options: dict,
+) -> tuple[str, Prompt, Prompt]:
+    """Validate command options and return resolved inputs.
+
+    Checks that the Gemini model is supported, that the
+    ``GEMINI_BATCH_API_KEY`` environment variable is set, and that the
+    supplied prompt IDs correspond to existing ``Prompt`` objects with the
+    correct types.
+
+    :param options: Parsed command-line options dictionary.
+    :returns: A tuple of (batch_api_key, system_prompt, user_prompt).
+    """
+    model = options["model"]
+    if model not in SUPPORTED_GEMINI_MODELS:
+        raise CommandError(
+            f"Invalid Gemini model '{model}'. "
+            f"Supported models: {', '.join(sorted(SUPPORTED_GEMINI_MODELS))}"
+        )
+
+    env = environ.FileAwareEnv()
+    batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
+    if not batch_api_key:
+        raise CommandError(
+            "GEMINI_BATCH_API_KEY environment variable is required. "
+            "This should be separate from GEMINI_API_KEY to allow "
+            "different API keys for different tasks."
+        )
+
+    try:
+        system_prompt = Prompt.objects.get(
+            pk=options["system_prompt"], prompt_type=PromptTypes.SYSTEM
+        )
+        user_prompt = Prompt.objects.get(
+            pk=options["user_prompt"], prompt_type=PromptTypes.USER
+        )
+    except Prompt.DoesNotExist:
+        raise CommandError("Invalid system or user prompt ID provided.")
+
+    return batch_api_key, system_prompt, user_prompt
+
+
+def fetch_files_and_create_tasks(
+    llm_request: LLMRequest,
+    s3_path: str,
+    bucket: str,
+    store_files: bool,
+) -> tuple[list[dict], list[str]]:
+    """Iterate S3 files, create ``LLMTask`` objects, and stage temp files.
+
+    For each PDF found via :func:`get_s3_file_list`, an ``LLMTask`` is
+    created and the file content is either stored in CourtListener storage
+    or referenced by S3 key.  A temporary local copy is also written for
+    later upload to the Google GenAI Files API.
+
+    On failure the *llm_request* is deleted so no partial state is left
+    behind.
+
+    :param llm_request: The parent request all tasks belong to.
+    :param s3_path: S3 prefix containing files to process.
+    :param bucket: S3 bucket name.
+    :param store_files: When ``True``, duplicate files into CL storage;
+        otherwise only store the S3 key reference.
+    :returns: A tuple of (tasks_data, temp_files) where *tasks_data* is a
+        list of dicts with ``llm_key`` and ``input_file_path`` keys, and
+        *temp_files* is a list of temporary file paths to clean up later.
+    """
+    logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
+    tasks_data: list[dict] = []
+    temp_files: list[str] = []
+
+    try:
+        for filename, file_content, s3_key in get_s3_file_list(
+            s3_path=s3_path,
+            bucket_name=bucket,
+            file_extension=".pdf",
+        ):
+            llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
+            task = LLMTask.objects.create(
+                request=llm_request,
+                task=LLMTaskChoices.SCAN_EXTRACTION,
+                llm_key=llm_key,
+            )
+
+            if store_files:
+                task.input_file.save(filename, ContentFile(file_content))
+                logger.info(f"  - Stored file: {filename}")
+            else:
+                task.input_file.name = s3_key
+                task.save()
+                logger.info(f"  - Referenced S3 file: {s3_key}")
+
+            temp_file = tempfile.NamedTemporaryFile(
+                delete=False, suffix=os.path.splitext(filename)[1]
+            )
+            temp_file.write(file_content)
+            temp_file.close()
+            temp_files.append(temp_file.name)
+
+            tasks_data.append(
+                {"llm_key": llm_key, "input_file_path": temp_file.name}
+            )
+
+    except CommandError:
+        llm_request.delete()
+        raise
+
+    llm_request.total_tasks = len(tasks_data)
+    llm_request.save()
+    logger.info(f"Created {llm_request.total_tasks} LLMTask objects.")
+
+    return tasks_data, temp_files
+
+
+def submit_batch(
+    llm_request: LLMRequest,
+    batch_api_key: str,
+    tasks_data: list[dict],
+    system_prompt: Prompt,
+    user_prompt: Prompt,
+    cache_name: str,
+) -> str:
+    """Prepare and execute the Gemini batch job.
+
+    Initialises a :class:`GoogleGenAIBatchWrapper`, prepares the individual
+    requests from *tasks_data*, and submits the batch.  On success the
+    ``batch_id`` is persisted on the *llm_request*.
+
+    If a ``ValueError`` (configuration error) or unexpected ``Exception``
+    occurs, the *llm_request* is marked as ``FAILED`` and the error is
+    reported.
+
+    :param llm_request: The parent request to associate the batch with.
+    :param batch_api_key: Google GenAI batch API key.
+    :param tasks_data: List of dicts with ``llm_key`` and
+        ``input_file_path`` keys produced by
+        :func:`fetch_files_and_create_tasks`.
+    :param system_prompt: The system ``Prompt`` object.
+    :param user_prompt: The user ``Prompt`` object.
+    :param cache_name: Stable display name for the system-prompt cache.
+    :returns: The batch ID assigned by the provider.
+    """
+    try:
+        logger.info("Initializing Google GenAI wrapper...")
+        wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
+
+        logger.info("Preparing batch requests...")
+        prepared_requests = wrapper.prepare_batch_requests(
+            tasks_data, user_prompt.text
+        )
+
+        logger.info("Executing batch job...")
+        batch_id = wrapper.execute_batch(
+            model_name=llm_request.api_model_name,
+            requests=prepared_requests,
+            system_prompt=system_prompt.text,
+            cache_display_name=cache_name,
+            batch_display_name=llm_request.name or f"Request-{llm_request.pk}",
+        )
+
+        llm_request.batch_id = batch_id
+        llm_request.save()
+
+        logger.info(f"Batch job sent to provider. Batch ID: {batch_id}")
+        return batch_id
+
+    except ValueError as e:
+        llm_request.status = LLMTaskStatusChoices.FAILED
+        llm_request.save()
+        logger.warning(
+            f"Configuration error for request {llm_request.pk}: {e}"
+        )
+        raise CommandError(f"Configuration error: {e}")
+    except Exception as e:
+        llm_request.status = LLMTaskStatusChoices.FAILED
+        llm_request.save()
+        logger.exception(
+            f"Unexpected error creating batch for request {llm_request.pk}"
+        )
+        sentry_sdk.capture_exception(e)
+        raise CommandError(f"Failed to create batch job: {e}")
+
+
+def cleanup_temp_files(temp_files: list[str]) -> None:
+    """Remove temporary files created for Google GenAI upload.
+
+    Logs a warning for any file that cannot be removed (except when the
+    file has already been deleted).
+
+    :param temp_files: List of temporary file paths to delete.
+    """
+    logger.info("Cleaning up temporary files...")
+    for temp_file_path in temp_files:
+        try:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        except OSError as e:
+            if e.errno != 2:  # errno.ENOENT
+                logger.warning(
+                    f"Failed to remove temp file {temp_file_path}: {e}"
+                )
+
+
 class Command(VerboseCommand):
     help = "Create and submit Google Gemini batch requests for files stored in S3."
 
@@ -318,159 +520,38 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         logger.info("Starting new Gemini batch request process...")
 
-        # 1. Get and validate arguments
-        s3_path = options["path"]
         model = options["model"]
+        s3_path = options["path"]
         request_name = options["request_name"] or f"Batch for {s3_path}"
         cache_name = options["cache_name"]
+        bucket = options.get("bucket") or settings.AWS_STORAGE_BUCKET_NAME
+        store_files = options["store_input_files"]
 
-        # Validate Gemini model
-        if model not in SUPPORTED_GEMINI_MODELS:
-            raise CommandError(
-                f"Invalid Gemini model '{model}'. "
-                f"Supported models: {', '.join(sorted(SUPPORTED_GEMINI_MODELS))}"
-            )
+        batch_api_key, system_prompt, user_prompt = validate_inputs(options)
 
-        # Get GEMINI_BATCH_API_KEY from environment
-        env = environ.FileAwareEnv()
-        batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
-        if not batch_api_key:
-            raise CommandError(
-                "GEMINI_BATCH_API_KEY environment variable is required. "
-                "This should be separate from GEMINI_API_KEY to allow "
-                "different API keys for different tasks."
-            )
-
-        # 2. Fetch Prompts
-        try:
-            system_prompt = Prompt.objects.get(
-                pk=options["system_prompt"], prompt_type=PromptTypes.SYSTEM
-            )
-            user_prompt = Prompt.objects.get(
-                pk=options["user_prompt"], prompt_type=PromptTypes.USER
-            )
-        except Prompt.DoesNotExist:
-            raise CommandError("Invalid system or user prompt ID provided.")
-
-        # 3. Create Django Model objects
         llm_request = LLMRequest.objects.create(
             name=request_name,
             is_batch=True,
             provider=LLMProvider.GEMINI,
             api_model_name=model,
-            status=TaskStatus.IN_PROGRESS,
+            status=LLMTaskStatusChoices.IN_PROGRESS,
             date_started=now(),
         )
         llm_request.prompts.set([system_prompt, user_prompt])
         logger.info(f"Created LLMRequest with ID: {llm_request.pk}")
 
-        # 4. Fetch PDF files from S3 and create tasks
-        bucket = options.get("bucket") or settings.AWS_STORAGE_BUCKET_NAME
-        logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
-        tasks_data = []
-        temp_files = []
-        store_files = options["store_input_files"]
+        tasks_data, temp_files = fetch_files_and_create_tasks(
+            llm_request, s3_path, bucket, store_files
+        )
 
         try:
-            for filename, file_content, s3_key in get_s3_file_list(
-                s3_path=s3_path,
-                bucket_name=options.get("bucket"),
-                file_extension=".pdf",  # Hardcoded to PDF only
-            ):
-                # e.g. scan-batch-1-197a40aadcbe
-                llm_key = (
-                    f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
-                )
-                task = LLMTask.objects.create(
-                    request=llm_request,
-                    task=Task.SCAN_EXTRACTION,
-                    llm_key=llm_key,
-                )
-
-                # Store file in CourtListener storage or just reference S3 path
-                if store_files:
-                    # Option 1: Duplicate to CourtListener storage
-                    task.input_file.save(filename, ContentFile(file_content))
-                    logger.info(f"  - Stored file: {filename}")
-                else:
-                    # Option 2: Just set the S3 key reference (no duplication)
-                    task.input_file.name = s3_key
-                    task.save()
-                    logger.info(f"  - Referenced S3 file: {s3_key}")
-
-                # Create temporary file for upload to Google GenAI
-                temp_file = tempfile.NamedTemporaryFile(
-                    delete=False, suffix=os.path.splitext(filename)[1]
-                )
-                temp_file.write(file_content)
-                temp_file.close()
-                temp_files.append(temp_file.name)
-
-                tasks_data.append(
-                    {"llm_key": llm_key, "input_file_path": temp_file.name}
-                )
-
-        except CommandError:
-            # Clean up created request if S3 fails
-            llm_request.delete()
-            raise
-
-        llm_request.total_tasks = len(tasks_data)
-        llm_request.save()
-        logger.info(f"Created {llm_request.total_tasks} LLMTask objects.")
-
-        # 5. Use the decoupled wrapper to prepare and execute the batch
-        try:
-            logger.info("Initializing Google GenAI wrapper...")
-            wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
-
-            logger.info("Preparing batch requests...")
-            prepared_requests = wrapper.prepare_batch_requests(
-                tasks_data, user_prompt.text
+            submit_batch(
+                llm_request,
+                batch_api_key,
+                tasks_data,
+                system_prompt,
+                user_prompt,
+                cache_name,
             )
-
-            logger.info("Executing batch job...")
-            batch_id = wrapper.execute_batch(
-                model_name=llm_request.api_model_name,
-                requests=prepared_requests,
-                system_prompt=system_prompt.text,
-                cache_display_name=cache_name,
-                batch_display_name=llm_request.name
-                or f"Request-{llm_request.pk}",
-            )
-
-            llm_request.batch_id = batch_id
-            llm_request.save()
-
-            logger.info(f"Batch job sent to provider. Batch ID: {batch_id}")
-
-        except ValueError as e:
-            # Google API initialization or configuration errors
-            llm_request.status = TaskStatus.FAILED
-            llm_request.save()
-            logger.warning(
-                f"Configuration error for request {llm_request.pk}: {e}"
-            )
-            raise CommandError(f"Configuration error: {e}")
-        except Exception as e:
-            # Unexpected errors during batch creation - report to Sentry
-            llm_request.status = TaskStatus.FAILED
-            llm_request.save()
-            logger.exception(
-                f"Unexpected error creating batch for request {llm_request.pk}"
-            )
-            sentry_sdk.capture_exception(e)
-            raise CommandError(f"Failed to create batch job: {e}")
         finally:
-            # Clean up temporary files
-            logger.info("Cleaning up temporary files...")
-            for temp_file_path in temp_files:
-                try:
-                    if os.path.exists(temp_file_path):
-                        os.remove(temp_file_path)
-                except OSError as e:
-                    # Only warn if it's not a "file doesn't exist" error
-                    if e.errno != 2:  # errno.ENOENT
-                        logger.warning(
-                            f"Failed to remove temp file {temp_file_path}: {e}"
-                        )
+            cleanup_temp_files(temp_files)
