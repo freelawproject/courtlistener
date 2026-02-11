@@ -48,7 +48,7 @@ curl -v \
 
   <c-layout-with-navigation.section id="docket-endpoint">
     <h3>Dockets <small> — <code>{% url "docket-list" version=version %}</code></small></h3>
-    {% include "includes/docket-endpoint.html" %}
+    <c-docket-endpoint></c-docket-endpoint>
   </c-layout-with-navigation.section>
 
   <c-support-plea-banner />
