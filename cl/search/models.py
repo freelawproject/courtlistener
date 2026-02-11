@@ -49,7 +49,7 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.storage import IncrementingAWSMediaStorage
+from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
@@ -2428,7 +2428,7 @@ class OpinionCluster(AbstractDateTimeModel):
     filepath_pdf_scan = models.FileField(
         help_text="The case PDF from the Scanning Project",
         upload_to=make_upload_path,
-        storage=IncrementingAWSMediaStorage(),
+        storage=S3PrivateUUIDStorage(),
         blank=True,
     )
     arguments = models.TextField(

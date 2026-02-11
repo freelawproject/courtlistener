@@ -19,21 +19,6 @@ ALTER TABLE "search_opinioncluster" ALTER COLUMN "filepath_pdf_scan" DROP DEFAUL
 ALTER TABLE "search_opinioncluster" ADD COLUMN "filepath_xml_scan" varchar(100) DEFAULT '' NOT NULL;
 ALTER TABLE "search_opinioncluster" ALTER COLUMN "filepath_xml_scan" DROP DEFAULT;
 --
--- Add field filepath_pdf_scan to opinionclusterevent
---
-ALTER TABLE "search_opinionclusterevent" ADD COLUMN "filepath_pdf_scan" varchar(100) DEFAULT '' NOT NULL;
-ALTER TABLE "search_opinionclusterevent" ALTER COLUMN "filepath_pdf_scan" DROP DEFAULT;
---
--- Add field filepath_xml_scan to opinionclusterevent
---
-ALTER TABLE "search_opinionclusterevent" ADD COLUMN "filepath_xml_scan" varchar(100) DEFAULT '' NOT NULL;
-ALTER TABLE "search_opinionclusterevent" ALTER COLUMN "filepath_xml_scan" DROP DEFAULT;
---
--- Add field xml_scanning to opinionevent
---
-ALTER TABLE "search_opinionevent" ADD COLUMN "xml_scanning" text DEFAULT '' NOT NULL;
-ALTER TABLE "search_opinionevent" ALTER COLUMN "xml_scanning" DROP DEFAULT;
---
 -- Alter field source on docket
 --
 -- (no-op)
