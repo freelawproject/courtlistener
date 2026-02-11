@@ -11,10 +11,10 @@ from cl.ai.models import (
     LLMProvider,
     LLMRequest,
     LLMTask,
+    LLMTaskChoices,
+    LLMTaskStatusChoices,
     Prompt,
     PromptTypes,
-    Task,
-    TaskStatus,
 )
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.tests.cases import SimpleTestCase, TestCase
@@ -40,7 +40,7 @@ class AiModelsTest(TestCase):
             is_batch=True,
             provider=LLMProvider.GEMINI,
             api_model_name="gemini-2.5-pro",
-            status=TaskStatus.UNPROCESSED,
+            status=LLMTaskStatusChoices.UNPROCESSED,
         )
         llm_request.prompts.add(prompt)
         self.assertEqual(LLMRequest.objects.count(), 1)
@@ -48,14 +48,14 @@ class AiModelsTest(TestCase):
 
         llm_task = LLMTask.objects.create(
             request=llm_request,
-            task=Task.CASENAME,
+            task=LLMTaskChoices.CASENAME,
             content_object=self.docket,
             llm_key="test-key-1",
         )
         self.assertEqual(LLMTask.objects.count(), 1)
         self.assertEqual(llm_task.request, llm_request)
         self.assertEqual(llm_task.content_object, self.docket)
-        self.assertEqual(llm_task.status, TaskStatus.UNPROCESSED)
+        self.assertEqual(llm_task.status, LLMTaskStatusChoices.UNPROCESSED)
 
 
 class GoogleGenAIBatchWrapperTest(SimpleTestCase):
