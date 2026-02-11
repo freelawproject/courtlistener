@@ -47,11 +47,13 @@ EXAMPLE OUTPUT:
 
 import json
 import logging
+from typing import Any
 
 import environ
 import sentry_sdk
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
+from django.db import transaction
 from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
@@ -60,13 +62,156 @@ from cl.lib.command_utils import VerboseCommand
 
 logger = logging.getLogger(__name__)
 
+COMPLETED_STATES = {
+    "JOB_STATE_SUCCEEDED",
+    "JOB_STATE_FAILED",
+    "JOB_STATE_CANCELLED",
+    "JOB_STATE_EXPIRED",
+}
+
+
+def process_succeeded_request(
+    wrapper: GoogleGenAIBatchWrapper, request: LLMRequest, job: Any
+) -> None:
+    """Download results from a succeeded batch job and update all tasks.
+
+    Wrapped in an atomic transaction so a partial failure rolls back cleanly.
+
+    :param wrapper: Google GenAI batch wrapper used to download results.
+    :param request: The LLMRequest whose batch job succeeded.
+    :param job: The batch job object returned by the provider API.
+    """
+    jsonl_content = wrapper.download_results(job)
+    processed_results = wrapper.process_results(jsonl_content)
+
+    with transaction.atomic():
+        batch_id_short = request.batch_id.split("/")[-1]
+        timestamp = now().strftime("%Y%m%d_%H%M%S")
+        response_filename = f"batch_{batch_id_short}_{timestamp}.jsonl"
+        request.batch_response_file.save(
+            response_filename,
+            ContentFile(jsonl_content.encode("utf-8")),
+        )
+
+        tasks_to_update = {task.llm_key: task for task in request.tasks.all()}
+        for res in processed_results:
+            task = tasks_to_update.get(res["key"])
+            if not task:
+                continue
+
+            task.status = (
+                TaskStatus.SUCCEEDED
+                if res["status"] == "SUCCEEDED"
+                else TaskStatus.FAILED
+            )
+            task.error_message = res["error_message"] or ""
+            if res.get("raw_result"):
+                try:
+                    task.response_file.save(
+                        f"{task.llm_key}_result.json",
+                        ContentFile(
+                            json.dumps(
+                                res["raw_result"],
+                                indent=2,
+                                ensure_ascii=False,
+                            ).encode("utf-8")
+                        ),
+                    )
+                except (TypeError, ValueError) as e:
+                    logger.warning(
+                        f"Could not serialize JSON for task {task.llm_key}: {e}"
+                    )
+                    task.response_file.save(
+                        f"{task.llm_key}_result.txt",
+                        ContentFile(str(res["raw_result"]).encode("utf-8")),
+                    )
+            task.save()
+
+        request.status = TaskStatus.FINISHED
+        request.completed_tasks = request.tasks.filter(
+            status=TaskStatus.SUCCEEDED
+        ).count()
+        request.failed_tasks = request.tasks.filter(
+            status=TaskStatus.FAILED
+        ).count()
+        request.date_completed = now()
+        request.save()
+
+
+def process_failed_request(request: LLMRequest, job_state_name: str) -> None:
+    """Mark a request and all its tasks as FAILED.
+
+    Wrapped in an atomic transaction so all updates succeed or fail together.
+
+    :param request: The LLMRequest to mark as failed.
+    :param job_state_name: The terminal job state name (e.g.
+        ``JOB_STATE_FAILED``) included in task error messages.
+    """
+    with transaction.atomic():
+        request.status = TaskStatus.FAILED
+        request.date_completed = now()
+        for task in request.tasks.all():
+            task.status = TaskStatus.FAILED
+            task.error_message = (
+                f"Batch job failed with state: {job_state_name}"
+            )
+            task.save()
+        request.save()
+
+
+def handle_request(
+    wrapper: GoogleGenAIBatchWrapper, request: LLMRequest
+) -> None:
+    """Check a single request's batch job status and process results.
+
+    Routes to the appropriate handler based on job state. Catches
+    ``ValueError`` (from download errors) and generic ``Exception``
+    (reported to Sentry) to ensure one failing request doesn't stop
+    processing of subsequent requests.
+
+    :param wrapper: Google GenAI batch wrapper used to query job status.
+    :param request: The in-progress LLMRequest to check.
+    """
+    try:
+        job = wrapper.get_job(request.batch_id)
+
+        if job.state.name not in COMPLETED_STATES:
+            logger.info(
+                f"  - Job state is '{job.state.name}'. Skipping for now."
+            )
+            return
+
+        if job.state.name == "JOB_STATE_SUCCEEDED":
+            logger.info(
+                "  - Job succeeded. Downloading and processing results..."
+            )
+            process_succeeded_request(wrapper, request, job)
+        else:
+            logger.info(
+                f"  - Job ended with non-success state: {job.state.name}"
+            )
+            process_failed_request(request, job.state.name)
+
+    except ValueError as e:
+        logger.warning(
+            f"ValueError downloading results for request {request.pk}: {e}"
+        )
+    except Exception as e:
+        logger.exception(
+            f"Unexpected error in check_gemini_batch_status for request {request.pk}"
+        )
+        sentry_sdk.capture_exception(e)
+
+        request.status = TaskStatus.FAILED
+        request.date_completed = now()
+        request.save()
+
 
 class Command(VerboseCommand):
     help = "Check the status of in-progress Google Gemini batch jobs and download results when complete."
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        # Get GEMINI_BATCH_API_KEY from environment
         env = environ.FileAwareEnv()
         batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
         if not batch_api_key:
@@ -93,119 +238,6 @@ class Command(VerboseCommand):
             logger.info(
                 f"Checking status for request: {request.pk} ({request.batch_id})"
             )
-            try:
-                job = wrapper.get_job(request.batch_id)
-
-                completed_states = {
-                    "JOB_STATE_SUCCEEDED",
-                    "JOB_STATE_FAILED",
-                    "JOB_STATE_CANCELLED",
-                    "JOB_STATE_EXPIRED",
-                }
-                if job.state.name not in completed_states:
-                    logger.info(
-                        f"  - Job state is '{job.state.name}'. Skipping for now."
-                    )
-                    continue
-
-                if job.state.name == "JOB_STATE_SUCCEEDED":
-                    logger.info(
-                        "  - Job succeeded. Downloading and processing results..."
-                    )
-                    jsonl_content = wrapper.download_results(job)
-                    processed_results = wrapper.process_results(jsonl_content)
-
-                    # Create meaningful filename with batch_id and timestamp
-                    batch_id_short = request.batch_id.split("/")[-1]
-                    timestamp = now().strftime("%Y%m%d_%H%M%S")
-                    response_filename = (
-                        f"batch_{batch_id_short}_{timestamp}.jsonl"
-                    )
-                    request.batch_response_file.save(
-                        response_filename,
-                        ContentFile(jsonl_content.encode("utf-8")),
-                    )
-
-                    tasks_to_update = {
-                        task.llm_key: task for task in request.tasks.all()
-                    }
-                    for res in processed_results:
-                        task = tasks_to_update.get(res["key"])
-                        if not task:
-                            continue
-
-                        task.status = (
-                            TaskStatus.SUCCEEDED
-                            if res["status"] == "SUCCEEDED"
-                            else TaskStatus.FAILED
-                        )
-                        task.error_message = res["error_message"] or ""
-                        if res.get("raw_result"):
-                            try:
-                                # Use proper JSON serialization instead of str()
-                                task.response_file.save(
-                                    f"{task.llm_key}_result.json",
-                                    ContentFile(
-                                        json.dumps(
-                                            res["raw_result"],
-                                            indent=2,
-                                            ensure_ascii=False,
-                                        ).encode("utf-8")
-                                    ),
-                                )
-                            except (TypeError, ValueError) as e:
-                                # JSON serialization failed - fall back to string
-                                logger.warning(
-                                    f"Could not serialize JSON for task {task.llm_key}: {e}"
-                                )
-                                task.response_file.save(
-                                    f"{task.llm_key}_result.txt",
-                                    ContentFile(
-                                        str(res["raw_result"]).encode("utf-8")
-                                    ),
-                                )
-                        task.save()
-
-                    request.status = TaskStatus.FINISHED
-                    request.completed_tasks = request.tasks.filter(
-                        status=TaskStatus.SUCCEEDED
-                    ).count()
-                    request.failed_tasks = request.tasks.filter(
-                        status=TaskStatus.FAILED
-                    ).count()
-                    request.date_completed = now()
-
-                else:  # Failed, Cancelled, or Expired
-                    logger.info(
-                        f"  - Job ended with non-success state: {job.state.name}"
-                    )
-                    request.status = TaskStatus.FAILED
-                    request.date_completed = now()
-                    # Mark all tasks as failed with descriptive error
-                    for task in request.tasks.all():
-                        task.status = TaskStatus.FAILED
-                        task.error_message = (
-                            f"Batch job failed with state: {job.state.name}"
-                        )
-                        task.save()
-
-                request.save()
-
-            except ValueError as e:
-                # Specific handling for download_results errors
-                logger.warning(
-                    f"ValueError downloading results for request {request.pk}: {e}"
-                )
-            except Exception as e:
-                # Unexpected error - log, report to Sentry, mark as failed
-                logger.exception(
-                    f"Unexpected error in check_gemini_batch_status for request {request.pk}"
-                )
-                sentry_sdk.capture_exception(e)
-
-                # Mark request as failed to prevent infinite retries
-                request.status = TaskStatus.FAILED
-                request.date_completed = now()
-                request.save()
+            handle_request(wrapper, request)
 
         logger.info("Finished checking all pending requests.")
