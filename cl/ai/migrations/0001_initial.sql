@@ -25,7 +25,6 @@ ALTER TABLE "ai_llmtask" ADD CONSTRAINT "ai_llmtask_content_type_id_8d14a327_fk_
 ALTER TABLE "ai_llmtask" ADD CONSTRAINT "ai_llmtask_request_id_80ee2b0f_fk_ai_llmrequest_id" FOREIGN KEY ("request_id") REFERENCES "ai_llmrequest" ("id") DEFERRABLE INITIALLY DEFERRED;
 CREATE INDEX "ai_llmtask_date_created_1c75ad5f" ON "ai_llmtask" ("date_created");
 CREATE INDEX "ai_llmtask_date_modified_d8083f72" ON "ai_llmtask" ("date_modified");
-CREATE INDEX "ai_llmtask_content_type_id_8d14a327" ON "ai_llmtask" ("content_type_id");
 CREATE INDEX "ai_llmtask_request_id_80ee2b0f" ON "ai_llmtask" ("request_id");
 CREATE INDEX "ai_llmtask_content_49d7d1_idx" ON "ai_llmtask" ("content_type_id", "object_id");
 COMMIT;

@@ -148,36 +148,21 @@ def make_path(root: str, filename: str) -> str:
 
 
 def make_llm_task_input_file_path(instance, filename: str) -> str:
-    """Create a date-based path for LLMTask input files.
-
-    Ensures the filename is unique by prepending the task's primary key.
-
-    Example: llm-tasks/2026/01/15/101-scan_file.pdf
-    """
-    unique_filename = f"{instance.pk}-{filename}"
-    return make_path("llm-tasks", unique_filename)
+    """Example: llm-tasks/2026/01/15/101.pdf"""
+    ext = os.path.splitext(filename)[1]
+    return make_path("llm-tasks", f"{instance.pk}{ext}")
 
 
 def make_llm_request_response_file_path(instance, filename: str) -> str:
-    """Create a date-based path for LLMRequest response files.
-
-    Ensures the filename is unique by prepending the request's primary key.
-
-    Example: llm-requests/2026/01/15/1-batch_response.jsonl
-    """
-    unique_filename = f"{instance.pk}-{filename}"
-    return make_path("llm-requests", unique_filename)
+    """Example: llm-requests/2026/01/15/1.jsonl"""
+    ext = os.path.splitext(filename)[1]
+    return make_path("llm-requests", f"{instance.pk}{ext}")
 
 
 def make_llm_task_response_file_path(instance, filename: str) -> str:
-    """Create a date-based path for LLMTask response files.
-
-    Ensures the filename is unique by prepending the task's primary key.
-
-    Example: llm-tasks/responses/2026/01/15/101-result.json
-    """
-    unique_filename = f"{instance.pk}-{filename}"
-    return make_path("llm-tasks/responses", unique_filename)
+    """Example: llm-tasks/responses/2026/01/15/101.json"""
+    ext = os.path.splitext(filename)[1]
+    return make_path("llm-tasks/responses", f"{instance.pk}{ext}")
 
 
 def make_lasc_path(instance, filename):

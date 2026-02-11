@@ -8,7 +8,7 @@ from cl.lib.model_helpers import (
     make_llm_task_response_file_path,
 )
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.storage import IncrementingAWSMediaStorage
+from cl.lib.storage import S3PrivateLLMStorage
 
 
 class LLMProvider(models.IntegerChoices):
@@ -19,7 +19,7 @@ class LLMProvider(models.IntegerChoices):
     ANTHROPIC = 3, "Anthropic"
 
 
-class Task(models.IntegerChoices):
+class LLMTaskChoices(models.IntegerChoices):
     """LLM Task choices"""
 
     SCAN_EXTRACTION = 1, "Extract text from scan"
@@ -28,14 +28,14 @@ class Task(models.IntegerChoices):
     CLEAN_DOCKET_NUMBERS = 4, "Clean Docket Numbers"
 
 
-class TaskStatus(models.IntegerChoices):
+class LLMTaskStatusChoices(models.IntegerChoices):
     """LLM Task status choices"""
 
     UNPROCESSED = 0, "Unprocessed"
     IN_PROGRESS = 1, "In Progress"
-    SUCCEEDED = 2, "Succeeded"
+    SUCCEEDED = 2, "LLM response received"
     FAILED = 3, "Failed"
-    FINISHED = 4, "Finished"
+    FINISHED = 4, "LLM response processed"
 
 
 class PromptTypes(models.IntegerChoices):
@@ -115,8 +115,8 @@ class LLMRequest(AbstractDateTimeModel):
     )
     status = models.SmallIntegerField(
         help_text="The current status of the request",
-        choices=TaskStatus,
-        default=TaskStatus.UNPROCESSED,
+        choices=LLMTaskStatusChoices,
+        default=LLMTaskStatusChoices.UNPROCESSED,
     )
     prompts = models.ManyToManyField(
         Prompt,
@@ -172,7 +172,7 @@ class LLMRequest(AbstractDateTimeModel):
     batch_response_file = models.FileField(
         help_text="The batch response file from the LLM provider (e.g., a JSONL file)",
         upload_to=make_llm_request_response_file_path,
-        storage=IncrementingAWSMediaStorage(),
+        storage=S3PrivateLLMStorage(),
         max_length=1000,
         blank=True,
     )
@@ -196,18 +196,18 @@ class LLMTask(AbstractDateTimeModel):
 
     status = models.SmallIntegerField(
         help_text="The current status of the task",
-        choices=TaskStatus,
-        default=TaskStatus.UNPROCESSED,
+        choices=LLMTaskStatusChoices,
+        default=LLMTaskStatusChoices.UNPROCESSED,
     )
 
     llm_key = models.CharField(
         max_length=255,
-        help_text="A unique identifier for this task, used to map results back from a batch job.",
+        help_text="A unique identifier from the LLM provider for this task, used to map results back from a batch job.",
     )
 
     task = models.SmallIntegerField(
         help_text="The specific type of operation this task represents.",
-        choices=Task,
+        choices=LLMTaskChoices,
     )
 
     retry_count = models.SmallIntegerField(
@@ -223,7 +223,7 @@ class LLMTask(AbstractDateTimeModel):
     input_file = models.FileField(
         help_text="The input file to be processed (PDF, text, etc.)",
         upload_to=make_llm_task_input_file_path,
-        storage=IncrementingAWSMediaStorage(),
+        storage=S3PrivateLLMStorage(),
         max_length=1000,
         blank=True,
     )
@@ -234,7 +234,7 @@ class LLMTask(AbstractDateTimeModel):
     response_file = models.FileField(
         help_text="Full response from the LLM provider stored as a file",
         upload_to=make_llm_task_response_file_path,
-        storage=IncrementingAWSMediaStorage(),
+        storage=S3PrivateLLMStorage(),
         max_length=1000,
         blank=True,
     )
@@ -263,6 +263,7 @@ class LLMTask(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+        db_index=False,
     )
     object_id = models.PositiveIntegerField(
         help_text="ID of the related object",
