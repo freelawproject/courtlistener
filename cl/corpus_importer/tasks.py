@@ -3970,6 +3970,10 @@ def generate_texas_appellate_brief_flags(
     return flags
 
 
+@app.task(
+    max_retries=5,
+    ignore_result=True,
+)
 def merge_texas_docket(
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
@@ -4115,3 +4119,19 @@ def merge_texas_docket(
         success=success,
         pk=docket.pk,
     )
+
+
+@app.task(
+    bind=True,
+    max_retries=5,
+    ignore_result=True,
+)
+def parse_texas_docket(
+    self: Task, bucket: str, s3_key: str
+) -> (
+    TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket
+    | None
+):
+    raise NotImplementedError
