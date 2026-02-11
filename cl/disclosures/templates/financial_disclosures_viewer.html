@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+{% load disclosure_tags %}
+
+{% block title %}Financial Disclosures for {{ person.name_full }} – CourtListener.com{% endblock %}
+{% block og_title %}Financial Disclosures for {{ person.name_full }} – CourtListener.com{% endblock %}
+{% block description %}View financial disclosure documents for Judge {{ person.name_full }}.{% endblock %}
+{% block og_description %}View financial disclosure documents for Judge {{ person.name_full }}.{% endblock %}
+
+{% block navbar-fd %}active{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block head %}
+  <link rel="stylesheet" href="{% static 'css/disclosure.css' %}">
+{% endblock %}
+
+{% block footer-scripts %}
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="v-offset-below-3 v-offset-above-3">
+  {# Main Content #}
+  <div class="col-md-9">
+    <h1 class="text-center">
+      Financial Disclosures for J.&nbsp;
+      <a href="{% url 'view_person' person.pk person.slug %}">{{ person.name_full }}</a>
+    </h1>
+
+    {# Year Tabs #}
+    <ul class="nav nav-tabs v-offset-below-2 v-offset-above-3" role="tablist">
+      {% for disc in all_disclosures %}
+        <li role="presentation" {% if disc.id == disclosure.id %}class="active"{% endif %}>
+          <a href="{% url 'financial_disclosures_viewer' person.pk disc.id person.slug %}">
+            <i class="fa fa-file-text-o gray"></i>&nbsp; {{ disc.year }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+
+    {# Tab Content #}
+    <div class="tabcontent">
+      {% if disclosure.has_been_extracted %}
+        {# Agreements Table #}
+        {% if disclosure.agreements.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Agreements
+            <a href="/api/rest/v4/agreements/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Dates</th>
+                <th>Parties and Terms</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.agreements.all %}
+              <tr>
+                <td></td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/agreement/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.date_raw }}</td>
+                <td>{{ item.parties_and_terms }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Positions Table #}
+        {% if disclosure.positions.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Positions
+            <a href="/api/rest/v4/disclosure-positions/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Position</th>
+                <th>Organization</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.positions.all %}
+              <tr>
+                <td></td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/position/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.position }}</td>
+                <td>{{ item.organization_name }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Reimbursements Table #}
+        {% if disclosure.reimbursements.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Reimbursements
+            <a href="/api/rest/v4/reimbursements/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Dates</th>
+                <th>Location</th>
+                <th>Source</th>
+                <th>Purpose</th>
+                <th>Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.reimbursements.all %}
+              <tr>
+                <td></td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/reimbursement/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.date_raw }}</td>
+                <td>{{ item.location }}</td>
+                <td>{{ item.source }}</td>
+                <td>{{ item.purpose }}</td>
+                <td>{{ item.items_paid_or_provided }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Non-Investment Income Table #}
+        {% if disclosure.non_investment_incomes.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Non-Investment Income
+            <a href="/api/rest/v4/non-investment-incomes/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Dates</th>
+                <th>Source</th>
+                <th>Income Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.non_investment_incomes.all %}
+              <tr>
+                <td></td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/noninvestmentincome/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.date_raw }}</td>
+                <td>{{ item.source_type }}</td>
+                <td>{{ item.income_amount }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Spousal Income Table #}
+        {% if disclosure.spouse_incomes.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Spousal Income
+            <a href="/api/rest/v4/spouse-incomes/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Date</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.spouse_incomes.all %}
+              <tr>
+                <td></td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/spouseincome/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.date_raw }}</td>
+                <td>{{ item.source_type }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Gifts Table #}
+        {% if disclosure.gifts.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Gifts
+            <a href="/api/rest/v4/gifts/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Source</th>
+                <th>Value</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.gifts.all %}
+              <tr>
+                <td>
+                  {% if item.redacted %}<i class="fa fa-file-excel-o black" title="Redaction present"></i>{% endif %}
+                </td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/gift/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.source }}</td>
+                <td>{{ item.value }}</td>
+                <td>{{ item.description }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Debts Table #}
+        {% if disclosure.debts.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Debts
+            <a href="/api/rest/v4/debts/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Creditor Name</th>
+                <th>Description</th>
+                <th>Value Code</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.debts.all %}
+              <tr>
+                <td>
+                  {% if item.redacted %}<i class="fa fa-file-excel-o black" title="Redaction present"></i>{% endif %}
+                </td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/debt/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.creditor_name }}</td>
+                <td>{{ item.description }}</td>
+                <td>
+                  {{ item.value_code|gross_value_display }}
+                  {% if item.value_code|is_failed_extraction %}<i class="fa fa-eye-slash black" title="Failed extraction"></i>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Investments Table #}
+        {% if disclosure.investments.all %}
+        <div class="table-responsive v-offset-below-3">
+          <h3>
+            Investments
+            <a href="/api/rest/v4/investments/?financial_disclosure__id={{ disclosure.id }}" title="View API data">
+              <i class="fa fa-code gray pull-right"></i>
+            </a>
+          </h3>
+          <table class="table table-striped table-bordered table-hover">
+            <thead>
+              <tr>
+                <th></th>
+                {% if user.is_staff %}<th>Admin</th>{% endif %}
+                <th>Description</th>
+                <th>Gross Val. Code</th>
+                <th>Gross Val. Method</th>
+                <th>Income Code</th>
+                <th>Income Type</th>
+                <th>Trans. Type</th>
+                <th>Trans. Date</th>
+                <th>Trans. Value</th>
+                <th>Trans. Gain</th>
+                <th>Trans. Partner</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in disclosure.investments.all %}
+              <tr>
+                <td>
+                  {% if item.page_number %}
+                    <a href="{{ disclosure.filepath.url }}#page={{ item.page_number }}" title="Go to PDF page">
+                      <i class="fa fa-file-text-o gray"></i>
+                    </a>
+                  {% endif %}
+                  {% if item.redacted %}<i class="fa fa-file-excel-o black" title="Redaction present"></i>{% endif %}
+                </td>
+                {% if user.is_staff %}
+                <td><a href="/admin/disclosures/investment/{{ item.id }}/"><i class="fa fa-pencil gray"></i></a></td>
+                {% endif %}
+                <td>{{ item.description }}</td>
+                <td>
+                  {{ item.gross_value_code|gross_value_display }}
+                  {% if item.gross_value_code|is_failed_extraction %}<i class="fa fa-eye-slash black" title="Failed extraction"></i>{% endif %}
+                </td>
+                <td>
+                  {{ item.gross_value_method|valuation_method_display }}
+                  {% if item.gross_value_method|is_failed_extraction %}<i class="fa fa-eye-slash black" title="Failed extraction"></i>{% endif %}
+                </td>
+                <td>
+                  {{ item.income_during_reporting_period_code|income_gain_display }}
+                  {% if item.income_during_reporting_period_code|is_failed_extraction %}<i class="fa fa-eye-slash black" title="Failed extraction"></i>{% endif %}
+                </td>
+                <td>{{ item.income_during_reporting_period_type }}</td>
+                <td>{{ item.transaction_during_reporting_period }}</td>
+                <td>{{ item.transaction_date_raw }}</td>
+                <td>
+                  {{ item.transaction_value_code|gross_value_display }}
+                  {% if item.transaction_value_code|is_failed_extraction %}<i class="fa fa-eye-slash black" title="Failed extraction"></i>{% endif %}
+                </td>
+                <td>
+                  {{ item.transaction_gain_code|income_gain_display }}
+                  {% if item.transaction_gain_code|is_failed_extraction %}<i class="fa fa-eye-slash black" title="Failed extraction"></i>{% endif %}
+                </td>
+                <td>{{ item.transaction_partner }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {# Addendum #}
+        {% if disclosure.addendum_content_raw %}
+        <h3>Addendum</h3>
+        <article>{{ disclosure.addendum_content_raw }}</article>
+        {% endif %}
+
+      {% else %}
+        {# Extraction failed #}
+        <div class="text-center v-offset-above-4 disclosure-page">
+          <i class="fa fa-exclamation-triangle gray fa-3x"></i>
+          <h1>Table extraction failed.</h1>
+          <p>
+            <a href="{{ disclosure.filepath.url }}">Click here to view the disclosure as a PDF document</a>
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Sidebar #}
+  <div class="col-md-3">
+    {# Admin Panel #}
+    {% if user.is_staff %}
+    <div class="v-offset-below-4">
+      <h3>
+        <span>Admin <i class="fa fa-key red pull-right"></i></span>
+      </h3>
+      <hr>
+      <a href="/admin/disclosures/financialdisclosure/{{ disclosure.id }}/">Disclosure Admin Page</a>
+    </div>
+    {% endif %}
+
+    {# Thumbnail/Download #}
+    {% if disclosure.thumbnail %}
+    <div class="v-offset-below-4">
+      <h3>
+        <span>
+          Download
+          <a href="/api/rest/v4/financial-disclosures/{{ disclosure.id }}/">
+            <i class="fa fa-code gray pull-right"></i>
+          </a>
+        </span>
+      </h3>
+      <hr>
+      <a href="{{ disclosure.filepath.url }}">
+        <img src="{{ disclosure.thumbnail.url }}"
+             alt="Disclosure document thumbnail"
+             class="img-responsive thumbnail shadow img-thumbnail judge-pic"
+             width="100%">
+      </a>
+    </div>
+    {% endif %}
+
+    {# Notes #}
+    <div class="v-offset-below-4">
+      <h3>
+        <span>Notes <i class="fa fa-sticky-note-o pull-right"></i></span>
+      </h3>
+      <hr>
+      <span>The data in this file was extracted with OCR technology and may contain typos.</span>
+      <ul class="v-offset-above-2 v-offset-below-2">
+        <li><i class="fa fa-file-text-o gray"></i> Links to the PDF row (if possible).</li>
+        <li><i class="fa fa-file-excel-o black"></i> The row may contain a redaction.</li>
+        <li><i class="fa fa-eye-slash black"></i> Indicates failed extraction in the cell.</li>
+      </ul>
+      <p>
+        You can read more about financial disclosures at the
+        <a href="https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf">
+          Guide to Judiciary Policy on Ethics and Judicial Conduct
+        </a>, or the official
+        <a href="https://free.law/pdf/disclosure-filing-instructions-2021.pdf">
+          Filing Instructions for Judicial Officers and Employees
+        </a>.
+      </p>
+      <p>
+        Please report any security or privacy concerns to
+        <a href="mailto:security@free.law">security@free.law</a>.
+      </p>
+    </div>
+
+    {# Support #}
+    <div id="support">
+      <h3>
+        <span>Support FLP <i class="fa fa-heart-o red pull-right"></i></span>
+      </h3>
+      <p class="v-offset-above-1">
+        CourtListener is a project of
+        <a href="https://free.law" target="_blank" rel="noreferrer">Free Law Project</a>,
+        a federally-recognized 501(c)(3) non-profit. We rely on donations for our financial security.
+      </p>
+      <p>Please support our work with a donation.</p>
+      <p>
+        <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger btn-lg btn-block">
+          Donate Now
+        </a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
