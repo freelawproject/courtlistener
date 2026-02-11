@@ -3,6 +3,7 @@ from django.core.management.base import CommandParser
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.api.factories import WebhookEventWithParentsFactory
 from cl.audio.factories import AudioWithParentsFactory
+from cl.disclosures.factories import PersonWithDisclosuresFactory
 from cl.favorites.factories import PrayerFactory
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
@@ -42,6 +43,7 @@ FACTORIES = {
     # People DB app
     200: PersonFactory,
     201: PersonWithChildrenFactory,
+    202: PersonWithDisclosuresFactory,
     # Users
     300: UserFactory,
     # Citations

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
@@ -62,6 +63,7 @@ from cl.tests.cases import (
 )
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
+from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -4011,3 +4013,48 @@ class RegisterViewTest(TestCase):
         self.assertIsNotNone(form, "Expected 'form' in template context")
         # The username field should display an error.
         self.assertIn("username", form.errors)
+
+
+class UserAdminApiCallsCountTest(TestCase):
+    """Tests for UserAdmin.api_calls_count.
+
+    Fixes COURTLISTENER-C5S: DataError when visiting /admin/auth/user/add/
+    because obj.id is None for unsaved users.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    def setUp(self) -> None:
+        self.user_admin = UserAdmin(model=User, admin_site=admin.site)
+
+    def test_api_calls_count_returns_zero_for_unsaved_user(self) -> None:
+        """api_calls_count should return 0 when obj.id is None."""
+        unsaved_user = User()
+        result = self.user_admin.api_calls_count(unsaved_user)
+        self.assertEqual(result, 0)
+
+    @patch("cl.users.admin.get_redis_interface")
+    def test_api_calls_count_sums_v3_and_v4(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """api_calls_count should sum scores from both v3 and v4 keys."""
+        mock_redis = MagicMock()
+        mock_redis.zscore.side_effect = lambda key, _: (
+            5.0 if "v3" in key else 10.0
+        )
+        mock_get_redis.return_value = mock_redis
+        result = self.user_admin.api_calls_count(self.user)
+        self.assertEqual(result, 15)
+
+    @patch("cl.users.admin.get_redis_interface")
+    def test_api_calls_count_handles_no_redis_data(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """api_calls_count should return 0 when Redis has no data."""
+        mock_redis = MagicMock()
+        mock_redis.zscore.return_value = None
+        mock_get_redis.return_value = mock_redis
+        result = self.user_admin.api_calls_count(self.user)
+        self.assertEqual(result, 0)
