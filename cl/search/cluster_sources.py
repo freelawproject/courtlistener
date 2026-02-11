@@ -136,7 +136,6 @@ class ClusterSources:
         (DIRECT_COURT_INPUT, "direct court input"),
         (ANON_2020, "2020 anonymous database"),
         (ANON_2020_M_HARVARD, "2020 anonymous database merged with Harvard"),
-        (COURT_M_HARVARD, "court website merged with Harvard"),
         (
             COURT_M_RESOURCE_M_HARVARD,
             "court website merged with public.resource.org and Harvard",
@@ -153,6 +152,10 @@ class ClusterSources:
         (
             LAWBOX_M_RESOURCE_M_HARVARD,
             "Lawbox merged with public.resource.org and with Harvard",
+        ),
+        (
+            LAWBOX_M_COURT_RESOURCE_M_HARVARD,
+            "Lawbox merged with court website, public.resource.org and Harvard",
         ),
         (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
         (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),

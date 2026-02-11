@@ -311,13 +311,13 @@ class ModelTest(TestCase):
         self.op_c = OpinionContent.objects.create(
             opinion=self.op,
             content=op_content,
-            source=OpinionContent.FLP_XML,
+            source=OpinionContent.FLP_SCANNING,
             extraction_type=OpinionContent.LLM,
         )
 
         self.assertEqual(self.op_c.opinion, self.op)
         self.assertEqual(self.op_c.content, op_content)
-        self.assertEqual(self.op_c.source, OpinionContent.FLP_XML)
+        self.assertEqual(self.op_c.source, OpinionContent.FLP_SCANNING)
         self.assertEqual(self.op_c.extraction_type, OpinionContent.LLM)
 
     def test_opinion_content_str(self):
@@ -336,7 +336,7 @@ class ModelTest(TestCase):
         self.op_c = OpinionContent.objects.create(
             opinion=self.op,
             content="test content",
-            source=OpinionContent.FLP_XML,
+            source=OpinionContent.FLP_SCANNING,
             extraction_type=OpinionContent.LLM,
         )
         self.assertEqual(

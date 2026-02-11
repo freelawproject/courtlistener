@@ -3293,20 +3293,20 @@ class OpinionContent(AbstractDateTimeModel):
     """
 
     SCRAPERS = 1
-    XML_HARVARD = 2
-    HTML_ANON_2020 = 3
+    HARVARD_CAP = 2
+    ANON_2020 = 3
     COLUMBIA_ARCHIVE = 4
     LAWBOX = 5
     RECAP = 6
-    FLP_XML = 7
+    FLP_SCANNING = 7
     SOURCES = (
         (SCRAPERS, "Got from juriscraper"),
-        (XML_HARVARD, "Got from CAP"),
-        (HTML_ANON_2020, "Got from 2020 Anon archive"),
-        (COLUMBIA_ARCHIVE, "Got from Columbia import"),
+        (HARVARD_CAP, "Got from the Harvard Case Law Access Project"),
+        (ANON_2020, "Got from 2020 anonymous database"),
+        (COLUMBIA_ARCHIVE, "Got from Columbia archive"),
         (LAWBOX, "Got from Lawbox"),
         (RECAP, "Free opinions on RECAP"),
-        (FLP_XML, "FLP XML"),
+        (FLP_SCANNING, "Got from FLP Scanning Project"),
     )
 
     DEFAULT = 0
@@ -3335,15 +3335,12 @@ class OpinionContent(AbstractDateTimeModel):
         choices=SOURCES,
     )
     extraction_type = models.SmallIntegerField(
-        help_text="Source of the opinions content",
+        help_text="Method used to extract the opinion content",
         choices=EXTRACTION_METHOD,
     )
 
     def __str__(self) -> str:
-        try:
-            return f"{getattr(self, 'pk', None)} - {self.opinion.cluster.case_name}"
-        except AttributeError:
-            return f"Orphan opinion with ID: {self.pk}"
+        return f"{self.pk} - {self.opinion.cluster.case_name}"
 
 
 class OpinionsCited(models.Model):
