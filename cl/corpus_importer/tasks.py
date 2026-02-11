@@ -3486,11 +3486,11 @@ def merge_scotus_docket_entry(
         de.date_filed = date_filed
         de.save()
 
-    # Merge attachments
-    attachments = input_docket_entry["attachments"]
-    for document in attachments:
-        merge_scotus_document(de, document)
-    return de_created, de.pk
+        # Merge attachments
+        attachments = input_docket_entry["attachments"]
+        for document in attachments:
+            merge_scotus_document(de, document)
+        return de_created, de.pk
 
 
 def add_scotus_docket_entries(

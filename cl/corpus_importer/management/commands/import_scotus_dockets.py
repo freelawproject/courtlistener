@@ -90,8 +90,6 @@ class Command(VerboseCommand):
             )
             logger.info("Auto-resuming from row %s.", start_row)
 
-        total_rows = inventory_rows - start_row
-
         throttle = CeleryThrottle(
             min_items=options["throttle_min_items"],
             queue_name=ingesting_queue,
@@ -117,12 +115,7 @@ class Command(VerboseCommand):
                 time.sleep(delay)
 
                 if row_idx % 100 == 0:
-                    processed = row_idx - start_row
-                    progress = (
-                        f" ({processed / total_rows:.1%})"
-                        if total_rows
-                        else ""
-                    )
+                    progress = f" ({row_idx / inventory_rows:.1%})"
                     logger.info(
                         "Scheduled %s rows %s. Current row: %s.",
                         row_idx,
