@@ -1,0 +1,31 @@
+***************************************
+Bad Redactions Detected in RECAP Document
+***************************************
+
+X-Ray has detected text visible under redaction boxes in a RECAP document.
+This indicates a failed redaction that may expose sensitive information.
+
+Document Details
+----------------
+- RECAPDocument ID: {{ rd_id }}
+- Docket: {{ docket_name }}
+- Court: {{ court }}
+- Document Number: {{ document_number }}
+
+Bad Redactions Found
+--------------------
+{% for page, issues in redactions.items %}
+Page {{ page }}:
+{% for issue in issues %}  - Text: "{{ issue.text }}"
+    Bounding Box: {{ issue.bbox }}
+{% endfor %}
+{% endfor %}
+
+View document: {{ document_url }}
+
+************************
+This message brought to you by the 501(c)(3) non-profit Free Law Project
+
+ - X-Ray Project: https://free.law/projects/x-ray/
+
+ - Donate: https://donate.free.law/forms/supportflp
