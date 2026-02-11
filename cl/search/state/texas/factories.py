@@ -81,7 +81,7 @@ class TexasDocumentFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=25)
     media_id = Faker("uuid4")
     media_version_id = Faker("uuid4")
-    document_url = Faker("url")
+    url = Faker("url")
 
     class Meta:
         model = TexasDocument

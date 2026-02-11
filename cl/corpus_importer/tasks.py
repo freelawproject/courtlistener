@@ -3398,7 +3398,7 @@ def download_texas_document_pdf(
         self.request.chain = None
         return None
 
-    url = texas_document.document_url
+    url = texas_document.url
     logger.info(
         "Texas PDF download: Fetching PDF for TexasDocument %s from %s",
         texas_document_pk,
@@ -3455,7 +3455,7 @@ def merge_texas_document(
         defaults={
             "description": input_document["description"],
             "media_version_id": input_document["media_version_id"],
-            "document_url": input_document["document_url"],
+            "url": input_document["document_url"],
         },
     )
 
@@ -3467,7 +3467,7 @@ def merge_texas_document(
     ):
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
-        texas_document.document_url = input_document["document_url"]
+        texas_document.url = input_document["document_url"]
         texas_document.save()
         chain(
             download_texas_document_pdf.si(texas_document.pk),
