@@ -46,6 +46,7 @@ class ClusterSources:
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
     RECAP = "G"
     SCANNING_PROJECT = "S"
+    DIRECT_COURT_INPUT_M_SCANNING_PROJECT = "DS"
     COURT_M_SCANNING_PROJECT = "CS"
     PUBLIC_RESOURCE_M_SCANNING_PROJECT = "RS"
     LAWBOX_M_SCANNING_PROJECT = "LS"
@@ -54,12 +55,14 @@ class ClusterSources:
     BRAD_HEATH_ARCHIVE_M_SCANNING_PROJECT = "HS"
     COLUMBIA_ARCHIVE_M_SCANNING_PROJECT = "ZS"
     ANON_2020_M_SCANNING_PROJECT = "QS"
+    ANON_2020_M_HARVARD_M_SCANNING_PROJECT = "QUS"
     HARVARD_M_SCANNING_PROJECT = "US"
     COURT_M_RESOURCE_M_SCANNING_PROJECT = "CRS"
     LAWBOX_M_COURT_M_SCANNING_PROJECT = "LCS"
     LAWBOX_M_RESOURCE_M_SCANNING_PROJECT = "LRS"
     LAWBOX_M_COURT_RESOURCE_M_SCANNING_PROJECT = "LCRS"
     COLUMBIA_M_INTERNET_ARCHIVE_M_SCANNING_PROJECT = "ZAS"
+    COLUMBIA_M_BRAD_HEATH_ARCHIVE_M_SCANNING_PROJECT = "ZHS"
     COLUMBIA_M_DIRECT_COURT_INPUT_M_SCANNING_PROJECT = "ZDS"
     COLUMBIA_M_COURT_M_SCANNING_PROJECT = "ZCS"
     COLUMBIA_M_LAWBOX_COURT_M_SCANNING_PROJECT = "ZLCS"
@@ -201,6 +204,10 @@ class ClusterSources:
             "scanning project",
         ),
         (
+            DIRECT_COURT_INPUT_M_SCANNING_PROJECT,
+            "direct court input merged with scanning project",
+        ),
+        (
             COURT_M_SCANNING_PROJECT,
             "court website merged with scanning project",
         ),
@@ -229,6 +236,10 @@ class ClusterSources:
             ANON_2020_M_SCANNING_PROJECT,
             "2020 anonymous database merged with scanning project",
         ),
+        (
+            ANON_2020_M_HARVARD_M_SCANNING_PROJECT,
+            "2020 anonymous database merged with Harvard and scanning project",
+        ),
         (HARVARD_M_SCANNING_PROJECT, "Harvard merged with scanning project"),
         (
             COURT_M_RESOURCE_M_SCANNING_PROJECT,
@@ -249,6 +260,10 @@ class ClusterSources:
         (
             COLUMBIA_M_INTERNET_ARCHIVE_M_SCANNING_PROJECT,
             "columbia merged with internet archive and scanning project",
+        ),
+        (
+            COLUMBIA_M_BRAD_HEATH_ARCHIVE_M_SCANNING_PROJECT,
+            "columbia merged with brad heath archive and scanning project",
         ),
         (
             COLUMBIA_M_DIRECT_COURT_INPUT_M_SCANNING_PROJECT,
