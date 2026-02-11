@@ -123,16 +123,9 @@
   .input-text {
     @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
   }
-  /* Use to resize code elements within h3 */
-  .text-display-xxs {
-    font-size: 18px;
-    line-height: 28px;
-  }
   /* Screenshots used in Help pages */
   .screenshot {
-    border-radius: 16px;
-    display: block;
-    max-width: 100%;
+    @apply rounded-2xl block max-w-full;
   }
 
   /* ----------- THIRD PARTY OVERRIDES ----------- */
