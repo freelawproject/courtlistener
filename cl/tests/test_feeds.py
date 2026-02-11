@@ -11,6 +11,7 @@ from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.audio.factories import AudioWithParentsFactory
 from cl.search.factories import (
     CourtFactory,
     OpinionClusterWithParentsFactory,
@@ -38,6 +39,18 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             jurisdiction="F",
             has_opinion_scraper=True,
             has_oral_argument_scraper=False,
+        )
+        ca1_court = CourtFactory.create(
+            id="ca1",
+            position=101.0,
+            citation_string="1st Cir.",
+            short_name="First Circuit",
+            full_name="Court of Appeals for the First Circuit",
+            in_use=True,
+            url="http://www.ca1.uscourts.gov/",
+            jurisdiction="F",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=True,
         )
 
         bonvini_cluster_1 = OpinionClusterWithParentsFactory.create(
@@ -68,6 +81,19 @@ class FeedsFunctionalTest(BaseSeleniumTest):
             cluster=bonvini_cluster_2,
             plain_text="Another opinion about bonvini.",
             local_path="search/opinion_pdf_image_based.pdf",
+        )
+        AudioWithParentsFactory.create(
+            docket__court=ca1_court,
+            docket__source=Docket.DEFAULT,
+            docket__docket_number="15-1442",
+            case_name="Ander v. Leo",
+            case_name_full="Ander v Leo (Full Name)",
+            case_name_short="Ander v Leo (Short Name)",
+            source="C",
+            processing_complete=True,
+            local_path_mp3="mp3/2014/06/09/ander_v._leo.mp3",
+            local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
+            duration=15,
         )
 
         super().setUp()
