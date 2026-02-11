@@ -61,7 +61,7 @@
 
   <c-layout-with-navigation.section id="docket-endpoint">
     <h3>Dockets <small> — <code>{% url "docket-list" version=version %}</code></small></h3>
-    {% include "includes/docket-endpoint.html" %}
+    <c-docket-endpoint></c-docket-endpoint>
     <p>The name of a docket can change in response to the outside world, but the names of clusters do not change. Therefore, we have <code>case_name</code> fields on both the docket and the cluster.</p>
     <p>For example, a suit filed against the EPA administrator might be captioned <em>Petroleum Co. v. Regan</em>. That would go into the case name fields of the docket and any decisions that were issued. But if the administrator resigns before the case is resolved, the docket would get a new case name, <em>Petroleum Co. v. New Administrator</em>, while the case name fields on the clusters would not change.</p>
     <p>For more information, see the <a class="text-primary-600" href="{% url "field_api_help" %}#case-names">advanced help on case names</a>.</p>
