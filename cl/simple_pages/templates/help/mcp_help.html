@@ -84,7 +84,7 @@
   <h2 id="features">Planned Features</h2>
   <p>Our MCP server will provide tools that map to CourtListener's comprehensive <a href="{% url "rest_docs" %}">REST APIs</a>, giving AI assistants the same powerful search and data access capabilities available to developers.
   </p>
-  <p>We want to build an MCP server that meets your needs. If you have ideas for features, use cases, or specific tools you would like to see, please share them in our <a href="https://github.com/freelawproject/foresight/discussions/88" target="_blank" rel="nofollow">GitHub discussion</a>. You can also vote on existing suggestions to help us prioritize development.
+  <p>We want to build an MCP server that meets your needs. If you have ideas for features, use cases, or specific tools you would like to see, please share them in our <a href="https://github.com/freelawproject/foresight/discussions/88" target="_blank" rel="nofollow">GitHub discussion</a>. You can also vote on existing suggestions to help us prioritize development. The MCP server and its underlying Python SDK are being developed at <a href="https://github.com/freelawproject/courtlistener-api-client" target="_blank" rel="nofollow">courtlistener-api-client</a>.
   </p>
 
   <h3 id="search-tools">Search Tools</h3>
@@ -114,7 +114,7 @@
   "mcpServers": {
     "courtlistener": {
       "command": "uvx",
-      "args": ["--from", "courtlistener-mcp", "courtlistener-mcp"],
+      "args": ["--from", "courtlistener", "courtlistener-mcp"],
       "env": {
         "COURTLISTENER_API_TOKEN": "your-api-token"
       }
