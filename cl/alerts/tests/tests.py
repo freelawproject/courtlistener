@@ -935,13 +935,25 @@ class DocketAlertTest(TestCase):
 class DisableDocketAlertTest(TestCase):
     """Do old docket alerts get disabled or alerted properly?"""
 
-    fixtures = ["test_court.json"]
-
     @classmethod
     def setUpTestData(cls) -> None:
+        test_court = CourtFactory.create(
+            id="test",
+            position=0.0,
+            citation_string="Test",
+            short_name="Testing Supreme Court",
+            full_name="Testing Supreme Court",
+            in_use=True,
+            url="https://www.courtlistener.com/",
+            jurisdiction="F",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=False,
+        )
         cls.alert = DocketAlertWithParentsFactory(
             docket__source=Docket.RECAP,
             docket__date_terminated="2020-01-01",
+            docket__court=test_court,
+            docket__appeal_from=test_court,
         )
 
     def backdate_alert(self) -> None:
@@ -1027,9 +1039,34 @@ class UnlimitedAlertsTest(TestCase):
 
 
 class AlertSeleniumTest(BaseSeleniumTest):
-    fixtures = ["test_court.json"]
-
     def setUp(self) -> None:
+        CourtFactory.create(
+            id="test",
+            position=0.0,
+            citation_string="Test",
+            short_name="Testing Supreme Court",
+            full_name="Testing Supreme Court",
+            in_use=True,
+            url="https://www.courtlistener.com/",
+            jurisdiction="F",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=False,
+        )
+        CourtFactory.create(
+            id="ca1",
+            position=101.0,
+            citation_string="1st Cir.",
+            short_name="First Circuit",
+            full_name="Court of Appeals for the First Circuit",
+            in_use=True,
+            url="http://www.ca1.uscourts.gov/",
+            jurisdiction="F",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=True,
+        )
+
+        super().setUp()
+
         # Set up some handy variables
         self.async_client = AsyncClient()
         self.alert_params = {
@@ -1041,7 +1078,6 @@ class AlertSeleniumTest(BaseSeleniumTest):
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_edit_alert(self) -> None:
