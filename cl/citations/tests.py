@@ -704,6 +704,8 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
 
 
 class CitationObjectTest(ESIndexTestCase, TestCase):
+    fixtures: list = []
+
     @classmethod
     def setUpTestData(cls) -> None:
         cls.rebuild_index("search.OpinionCluster")
@@ -1744,6 +1746,8 @@ class CitationFeedTest(
 
 class CitationCommandTest(ESIndexTestCase, TestCase):
     """Test a variety of the ways that find_citations can be called."""
+
+    fixtures: list = []
 
     @classmethod
     def setUpTestData(cls) -> None:
