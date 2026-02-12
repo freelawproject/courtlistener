@@ -483,10 +483,10 @@ class IngestionTest(TestCase):
 
     def test_text_based_pdf(self) -> None:
         """Can we ingest a text based pdf file?"""
-        txt_opinion = Opinion.objects.get(pk=self.pdf_opinion.pk)
-        extract_opinion_content(txt_opinion.pk, ocr_available=False)
-        txt_opinion.refresh_from_db()
-        self.assertIn("tarrant", txt_opinion.plain_text.lower())
+        pdf_opinion = Opinion.objects.get(pk=self.pdf_opinion.pk)
+        extract_opinion_content(pdf_opinion.pk, ocr_available=False)
+        pdf_opinion.refresh_from_db()
+        self.assertIn("tarrant", pdf_opinion.plain_text.lower())
 
     def test_html_content_extraction(self) -> None:
         """Can we ingest an html file?"""
