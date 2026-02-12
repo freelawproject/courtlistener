@@ -60,16 +60,21 @@ from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
     TexasCourtOfCriminalAppealsDocket,
+    TexasCourtOfCriminalAppealsScraper,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
     TexasSupremeCourtDocket,
+    TexasSupremeCourtScraper,
 )
 from juriscraper.state.texas.common import (
     CourtID,
     TexasAppellateBrief,
     TexasCaseDocument,
 )
-from juriscraper.state.texas.court_of_appeals import TexasCourtOfAppealsDocket
+from juriscraper.state.texas.court_of_appeals import (
+    TexasCourtOfAppealsDocket,
+    TexasCourtOfAppealsScraper,
+)
 from openai import (
     APIConnectionError,
     APIError,
@@ -100,6 +105,7 @@ from cl.citations.tasks import (
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
+from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
@@ -115,7 +121,7 @@ from cl.corpus_importer.utils import (
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
-from cl.lib.decorators import retry
+from cl.lib.decorators import retry, time_call
 from cl.lib.llm import call_llm
 from cl.lib.microservice_utils import (
     doc_page_count_service,
@@ -3974,6 +3980,7 @@ def generate_texas_appellate_brief_flags(
     max_retries=5,
     ignore_result=True,
 )
+@time_call
 def merge_texas_docket(
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
@@ -4126,12 +4133,34 @@ def merge_texas_docket(
     max_retries=5,
     ignore_result=True,
 )
+@time_call
 def parse_texas_docket(
-    self: Task, bucket: str, s3_key: str
+    self: Task, content: bytes, headers: dict[str, str], meta: TexasDocketMeta
 ) -> (
     TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket
     | None
 ):
-    raise NotImplementedError
+    """Uses Juriscraper to parse bytes into a Texas docket object.
+
+    :param self: The Celery task.
+    :param content: Bytes string to parse.
+    :param headers: The response headers to the scraper.
+    :param meta: Docket metadata.
+    :return: The parsed docket or `None` if parsing failed."""
+    if meta.court_code == "cossup":
+        parser = TexasSupremeCourtScraper()
+    elif meta.court_code == "coscca":
+        parser = TexasCourtOfCriminalAppealsScraper()
+    elif meta.court_code.startswith("coa"):
+        parser = TexasCourtOfAppealsScraper(meta.court_code)
+    else:
+        logger.error(
+            "Unrecognized Texas court type %s. Cannot parse.", meta.court_code
+        )
+        self.request.chain = None
+        return None
+
+    parser._parse_text(content.decode("utf-8"))
+    return parser.data
