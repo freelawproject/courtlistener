@@ -148,32 +148,24 @@ curl -v \
             delete the others.
         </li>
         <li>Clusters removed or sealed by court order.</li>
-        <li>
-            Non-opinion documents (such as error pages or opinion listing
-            pages) incorrectly ingested as opinion clusters.
-        </li>
     </ul>
 
     <p>
-        When a cluster is deleted and redirected, its <code>cluster_id</code> is
-        stored as a <code>deleted_cluster_id</code>, and a redirection record
-        points to the surviving cluster. This ensures no dead links and allows
-        clients to maintain persistent references even across merges or data
-        corrections.
-    </p>
-
-    <p>
-        In some cases, a cluster is deleted with no redirection target. This
-        happens when the content was not a valid opinion (e.g., an error page or
-        court listing page that was incorrectly scraped). The cluster is simply
-        removed and no redirect is created.
+        When a cluster is redirected for version, duplicate, or consolidation
+        reasons, requesting the old <code>cluster_id</code> returns an
+        <strong>HTTP 301</strong> response pointing to the surviving cluster.
+        For clusters removed by court order (sealed), requests return an
+        <strong>HTTP 410 Gone</strong> status with no redirection target.
     </p>
 
     <p>
         <strong>Note:</strong> Cluster redirection data is not yet exposed via the
         REST API. Replication clients should be aware that an old
         <code>cluster_id</code> may internally redirect to a different, newer
-        cluster, or may no longer exist at all.
+        cluster. In some cases (e.g., error pages or court listing pages
+        incorrectly ingested as opinions), clusters are simply deleted with
+        no redirection record, and the old <code>cluster_id</code> will no
+        longer exist.
     </p>
   </c-layout-with-navigation.section>
 
