@@ -46,6 +46,7 @@ class ClusterSources:
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
     RECAP = "G"
     SCANNING_PROJECT = "S"
+    RECAP_M_SCANNING_PROJECT = "GS"
     DIRECT_COURT_INPUT_M_SCANNING_PROJECT = "DS"
     COURT_M_SCANNING_PROJECT = "CS"
     PUBLIC_RESOURCE_M_SCANNING_PROJECT = "RS"
@@ -202,6 +203,10 @@ class ClusterSources:
         (
             SCANNING_PROJECT,
             "scanning project",
+        ),
+        (
+            RECAP_M_SCANNING_PROJECT,
+            "recap merged with scanning project",
         ),
         (
             DIRECT_COURT_INPUT_M_SCANNING_PROJECT,
