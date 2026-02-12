@@ -8,8 +8,9 @@ from django.core.management import call_command
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.dateformat import format
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from elasticsearch_dsl import Q, connections
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
@@ -69,7 +70,6 @@ from cl.search.models import Docket, RECAPDocument
 from cl.search.tasks import (
     index_docket_parties_in_es,
 )
-from cl.stats.models import Stat
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
@@ -79,6 +79,8 @@ from cl.users.factories import UserProfileWithParentsFactory
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_sweep",
 )
+@override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPAlertsSweepIndexTest")
 class RECAPAlertsSweepIndexTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
@@ -86,10 +88,17 @@ class RECAPAlertsSweepIndexTest(
     RECAP Alerts Sweep Index Tests
     """
 
+    @staticmethod
+    def rebuild_percolator_index():
+        RECAPPercolator._index._name = "recap_percolator_sweep"
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+
         # runs early each day. Use minus two hours to prevent errors caused by
         # Daylight Saving Time transitions.
         date_now = midnight_pt(now().date()) - datetime.timedelta(hours=2)
@@ -126,10 +135,15 @@ class RECAPAlertsSweepIndexTest(
 
     def setUp(self):
         self.r = get_redis_interface("CACHE")
+        self.r_stats = get_redis_interface("STATS")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
             self.r.delete(*keys)
+
+        stat_keys = self.r_stats.keys("alerts.sent.*")
+        if stat_keys:
+            self.r_stats.delete(*stat_keys)
 
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
@@ -1885,7 +1899,7 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Send scheduled Monthly alerts and check assertions.
-        current_date = now().replace(day=1, hour=8)
+        current_date = localtime(now()).replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
             call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
             alerts_runtime_naive = datetime.datetime.now()
@@ -2077,9 +2091,7 @@ class RECAPAlertsSweepIndexTest(
         are properly send by the sweep index without duplicating alerts.
         """
         # Rename percolator index for this test to avoid collisions.
-        RECAPPercolator._index._name = "recap_percolator_sweep"
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        self.rebuild_percolator_index()
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
@@ -2151,14 +2163,9 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(
-            stats_objects.count(), 1, "Wrong number of stats objects."
-        )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 1, "Wrong number of stats alerts sent."
-        )
+        key = f"alerts.sent.{now().date().isoformat()}"
+        count = int(self.r_stats.get(key) or 0)
+        self.assertEqual(count, 1, "Wrong number of stats alerts sent.")
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -2310,18 +2317,8 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Confirm Stat object is properly updated.
-        self.assertEqual(
-            stats_objects.count(), 2, "Wrong number of stats objects."
-        )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 2, "Wrong number of stats alerts sent."
-        )
-        self.assertEqual(stats_objects[1].name, "alerts.sent.dly")
-        self.assertEqual(
-            stats_objects[1].count, 0, "Wrong number of stats alerts sent."
-        )
-
+        count = int(self.r_stats.get(key) or 0)
+        self.assertEqual(count, 2, "Wrong number of stats objects.")
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:
@@ -2684,6 +2681,7 @@ class RECAPAlertsPercolatorTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+
         date_now = midnight_pt(now().date())
         cls.mock_date = date_now.replace(
             hour=20, minute=0, second=0, microsecond=0

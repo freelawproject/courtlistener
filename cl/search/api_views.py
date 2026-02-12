@@ -26,6 +26,7 @@ from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
+    BankruptcyInformationSerializer,
     CourtSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
@@ -66,6 +67,7 @@ from cl.search.filters import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
+    BankruptcyInformation,
     ClusterRedirection,
     Court,
     Docket,
@@ -96,6 +98,40 @@ class OriginatingCourtInformationViewSet(
         "date_modified",
     ]
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
+
+
+class BankruptcyInformationViewSet(
+    NoFilterCacheListMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
+    serializer_class = BankruptcyInformationSerializer
+    permission_classes = [
+        DjangoModelPermissions,
+        V3APIPermission,
+    ]
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
+    queryset = (
+        BankruptcyInformation.objects.select_related("docket")
+        .only(
+            "id",
+            "date_created",
+            "date_modified",
+            "date_converted",
+            "date_last_to_file_claims",
+            "date_last_to_file_govt",
+            "date_debtor_dismissed",
+            "chapter",
+            "trustee_str",
+            "docket__id",
+        )
+        .order_by("-id")
+    )
 
 
 class DocketViewSet(
@@ -134,6 +170,7 @@ class DocketViewSet(
             "referred_to",
             "originating_court_information",
             "idb_data",
+            "bankruptcy_information",
         )
         .prefetch_related("panel", "clusters", "audio_files", "tags")
         .order_by("-id")

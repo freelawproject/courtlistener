@@ -1305,7 +1305,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         """Confirm the timestamp fielded filter works properly"""
 
         mock_date = now().replace(
-            day=29, hour=0, minute=0, second=0, microsecond=0
+            day=28, hour=0, minute=0, second=0, microsecond=0
         )
         with (
             time_machine.travel(mock_date, tick=False),

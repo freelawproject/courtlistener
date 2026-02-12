@@ -40,15 +40,19 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.model_helpers import (
     CSVExportMixin,
+    document_model,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_pdf_path,
     make_recap_path,
+    make_scotus_docket_number_core,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.docket_sources import DocketSources
+from cl.search.state.texas.models import *
 from cl.users.models import User
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -299,6 +303,14 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     docket_number = models.TextField(
         help_text="The docket number in the lower court.", blank=True
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     assigned_to = models.ForeignKey(
         "people_db.Person",
         help_text="The judge the case was assigned to.",
@@ -358,6 +370,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     date_received_coa = models.DateField(
         help_text="The date the case was received at the court of appeals.",
+        blank=True,
+        null=True,
+    )
+    date_rehearing_denied = models.DateField(
+        help_text="The date the petition for rehearing was denied at the "
+        "lower court.",
         blank=True,
         null=True,
     )
@@ -831,8 +849,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
-            self.docket_number_core = make_docket_number_core(
-                self.docket_number
+            self.docket_number_core = (
+                make_scotus_docket_number_core(self.docket_number)
+                if self.court_id == "scotus"
+                else make_docket_number_core(self.docket_number)
             )
 
         if self.source in self.RECAP_SOURCES():
@@ -1923,6 +1943,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             )
             | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
             end_date__isnull=True,
+            in_use=True,
         ).exclude(pk="scotus")
 
     def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
@@ -1937,14 +1958,14 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         )
 
-    def appellate_pacer_courts(self) -> models.QuerySet:
+    def appellate_courts(self) -> models.QuerySet:
         return self.filter(
             Q(jurisdiction=Court.FEDERAL_APPELLATE)
             |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
-        ).exclude(pk="scotus")
+        )
 
     def bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
@@ -3896,3 +3917,189 @@ class ClusterRedirection(models.Model):
                 cluster=cluster_to_keep,
                 reason=reason,
             )
+
+
+@pghistory.track()
+class ScotusDocketMetadata(AbstractDateTimeModel):
+    """Supreme Court-specific metadata associated with a docket.
+
+    These fields capture information that only applies to SCOTUS cases, so we
+    keep them in a separate model instead of adding them directly to the Docket
+    namespace.
+    """
+
+    docket = models.OneToOneField(
+        "search.Docket",
+        help_text="The docket this SCOTUS metadata applies to.",
+        related_name="scotus_metadata",
+        on_delete=models.CASCADE,
+    )
+    capital_case = models.BooleanField(
+        help_text="Whether this SCOTUS case is a capital case.",
+        default=False,
+    )
+    date_discretionary_court_decision = models.DateField(
+        help_text="The date of the Court's discretionary decision.",
+        blank=True,
+        null=True,
+    )
+    linked_with = models.CharField(
+        help_text=(
+            "Field describing any other docket(s) this case is "
+            "linked with, as shown on the SCOTUS docket."
+        ),
+        max_length=1000,
+        blank=True,
+    )
+    questions_presented_url = models.CharField(
+        help_text="URL to the 'Questions Presented' page or document, if available.",
+        max_length=1000,
+        blank=True,
+    )
+    questions_presented_file = models.FileField(
+        help_text="A local copy of the 'Questions Presented' document."
+        "The path is AWS S3 where the file is saved.",
+        upload_to=make_pdf_path,
+        storage=IncrementingAWSMediaStorage(),
+        max_length=1000,
+        blank=True,
+    )
+
+    def __str__(self) -> str:
+        return f"SCOTUS metadata for docket {self.docket_id}"
+
+    class Meta:
+        verbose_name = "SCOTUS Docket Metadata"
+        verbose_name_plural = "SCOTUS Docket Metadata"
+
+
+@pghistory.track()
+@document_model
+class CaseTransfer(AbstractDateTimeModel):
+    """
+    Represents any transfer of a docket between two courts whether that be
+    an appeal, workload balancing, or docket merging.
+
+    :ivar origin_court: The court this transfer originates from.
+    :ivar origin_docket: The docket this transfer originates from.
+    :ivar destination_court: The court the docket is being transferred to.
+    :ivar destination_docket: The case docket in the destination court.
+    :ivar transfer_date: The date this transfer occurred.
+    :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
+    """
+
+    APPEAL = 0
+    WORKLOAD = 1
+    MERGE = 2
+    JURISDICTION = 3
+    transfer_type_choices = {
+        # Appeal from a lower court to a higher court.
+        APPEAL: "Appeal",
+        # Transfer between courts at the same level to balance workload
+        WORKLOAD: "Workload",
+        # Merging of two or more related cases
+        MERGE: "Merge",
+        # Transfer to move a case into a different jurisdiction for some reason
+        JURISDICTION: "Jurisdiction",
+    }
+    origin_court = models.ForeignKey(
+        "search.Court",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_origin_court",
+    )
+    origin_docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_origin_docket",
+    )
+    destination_court = models.ForeignKey(
+        "search.Court",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_destination_court",
+    )
+    destination_docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_destination_docket",
+    )
+    transfer_date = models.DateField()
+    transfer_type = models.SmallIntegerField(
+        choices=transfer_type_choices.items(),
+    )
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
+    """
+    Represents a docket entry in a SCOTUS docket.
+
+    :ivar docket: The Docket this entry is associated with.
+    :ivar entry_number: Entry number on the SCOTUS Docket page.
+    :ivar description: For appellate brief events, a short description of
+    the brief.
+    :ivar date_filed: The date that SCOTUS indicates this entry was filed.
+    :ivar sequence_number: CL-generated field to keep entries in the same
+    order they appear in SCOTUS. Concatenation of filing date (in ISO format)
+    and the index in the SCOTUS table.
+    """
+
+    docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+    )
+    entry_number = models.IntegerField(
+        null=True,
+        blank=True,
+    )
+    description = models.TextField(blank=True)
+    date_filed = models.DateField(
+        null=True,
+        blank=True,
+    )
+    sequence_number = models.CharField(
+        max_length=16,
+    )
+
+    class Meta:
+        ordering = ["-sequence_number"]
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
+    """
+    Represents an attachment to a SCOTUS docket entry.
+
+    :ivar docket_entry: The Docket this document is associated with.
+    :ivar description: The description of this file in SCOTUS.
+    :ivar document_number: The document number on the docket page in SCOTUS.
+    :ivar attachment_number: The attachment number on the docket page in SCOTUS.
+    :ivar url: The download URL that SCOTUS provided for this document.
+    """
+
+    docket_entry = models.ForeignKey(
+        SCOTUSDocketEntry, on_delete=models.CASCADE
+    )
+    description = models.TextField(blank=True)
+    document_number = models.IntegerField(
+        blank=True,
+        null=True,
+    )
+    attachment_number = models.SmallIntegerField(
+        blank=True,
+        null=True,
+    )
+    url = models.URLField()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["document_number"]),
+            models.Index(fields=["filepath_local"]),
+        ]
+        unique_together = (
+            "docket_entry",
+            "document_number",
+            "attachment_number",
+        )
+        ordering = ("document_number", "attachment_number")

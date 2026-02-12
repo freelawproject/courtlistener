@@ -174,7 +174,107 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 
 
 @override_flag("use_new_design", True)
-@patch("cl.lib.redis_utils.get_redis_interface")
+@override_settings(WAFFLE_CACHE_PREFIX="test_corpus_search_form_waffle")
+class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
+    """Tests for corpus search form rendering and accessibility."""
+
+    @classmethod
+    def setUpTestData(cls):
+        """Fetch the homepage once and share across all tests"""
+        super().setUpTestData()
+        cls.response = cls.client_class().get(reverse("show_results"))
+        cls.html = cls.response.content.decode()
+        cls.tree = lhtml.fromstring(cls.html)
+
+    def test_unique_form_field_ids(self):
+        """Test that form fields have unique IDs across desktop and mobile forms"""
+        tree = self.tree
+
+        # Test common fields that appear in multiple fieldsets
+        common_fields = ["case_name", "docket_number", "judge"]
+        namespaces = ["opinions", "recap", "oral_arguments", "judges"]
+
+        for field in common_fields:
+            for namespace in namespaces:
+                # Check desktop ID exists
+                desktop_id = f"desktop_{namespace}_{field}"
+                desktop_inputs = tree.xpath(f'//input[@id="{desktop_id}"]')
+
+                # Check mobile ID exists
+                mobile_id = f"mobile_{namespace}_{field}"
+                mobile_inputs = tree.xpath(f'//input[@id="{mobile_id}"]')
+
+                # Some fields may not exist in all namespaces
+                # But if they exist, they should be unique
+                if desktop_inputs:
+                    self.assertEqual(
+                        len(desktop_inputs),
+                        1,
+                        f"Desktop ID {desktop_id} should appear exactly once, found {len(desktop_inputs)}",
+                    )
+
+                if mobile_inputs:
+                    self.assertEqual(
+                        len(mobile_inputs),
+                        1,
+                        f"Mobile ID {mobile_id} should appear exactly once, found {len(mobile_inputs)}",
+                    )
+
+    def test_no_duplicate_ids_in_dom(self):
+        """Test no duplicate ID attributes exist anywhere in the DOM
+
+        Comprehensive check that validates HTML uniqueness constraint for ID
+        attributes across the entire rendered page. This catches any duplicate
+        IDs regardless of source (forms, components, static elements).
+
+        This is the primary regression test for the duplicate ID bug.
+        """
+        tree = self.tree
+
+        # Get all elements with id attribute
+        all_ids = tree.xpath("//*[@id]/@id")
+
+        # Find duplicates
+        id_counts = {}
+        for id_value in all_ids:
+            id_counts[id_value] = id_counts.get(id_value, 0) + 1
+
+        duplicates = {
+            id_val: count for id_val, count in id_counts.items() if count > 1
+        }
+
+        self.assertEqual(
+            duplicates,
+            {},
+            f"Found duplicate IDs in the DOM: {duplicates}",
+        )
+
+    def test_label_for_matches_input_id(self):
+        """Test label 'for' attributes correctly reference existing input IDs
+
+        Validates accessibility: every <label for="..."> must have exactly one
+        matching element with that ID. Ensures the unique ID solution didn't
+        break label/input associations.
+        """
+        tree = self.tree
+
+        # Get all labels with 'for' attribute
+        labels = tree.xpath("//label[@for]")
+
+        for label in labels:
+            label_for = label.get("for")
+            # Find the corresponding input/select/textarea
+            matching_inputs = tree.xpath(f'//*[@id="{label_for}"]')
+
+            self.assertEqual(
+                len(matching_inputs),
+                1,
+                f"Label with for='{label_for}' should have exactly one matching element, found {len(matching_inputs)}",
+            )
+
+
+@override_flag("use_new_design", True)
+@patch("cl.search.utils.get_redis_interface")
 @override_settings(WAFFLE_CACHE_PREFIX="test_homepage_stats_waffle")
 class HomepageStatsTest(
     RECAPSearchTestCase,
@@ -240,13 +340,26 @@ class HomepageStatsTest(
 
     def test_last_ten_days_aggregates(self, mock_get_redis):
         """Ensure only last 10 days stats appear in HTML."""
-        mock_get_redis.return_value.mget.return_value = [None] * 10
-
         now = timezone.now()
-        # In-window
-        Stat.objects.create(name="alerts.sent.email", count=3, date_logged=now)
-        Stat.objects.create(name="search.results", count=9, date_logged=now)
-        # Out-of-window
+        date_today = now.date().isoformat()
+
+        # Mock Redis to return stats for today only (in-window)
+        def mock_mget(*keys):
+            results = []
+            for key in keys:
+                if f"alerts.sent.{date_today}" in key:
+                    results.append(b"3")  # Redis returns bytes
+                elif f"search.results.{date_today}" in key:
+                    results.append(b"9")  # Redis returns bytes
+                elif f"api:v4.d:{date_today}.count" in key:
+                    results.append(b"0")
+                else:
+                    results.append(None)  # Out-of-window dates return None
+            return results
+
+        mock_get_redis.return_value.mget.side_effect = mock_mget
+
+        # Create old stats in DB (out-of-window) - these should be ignored
         Stat.objects.create(
             name="alerts.sent.email",
             count=300,

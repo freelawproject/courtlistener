@@ -81,14 +81,16 @@ class ExportSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     def test_can_flatten_nested_results(self) -> None:
         """checks `fetch_es_results_for_csv` correctly handles and flattens
         nested results."""
-        # this query should match both docket records indexed
-        query = "type=r&q=12-1235 OR Jackson"
+        # This query matches both docket records from RECAPSearchTestCase.
+        # Using "SUBPOENAS SERVED" which is unique to the test factory data
+        # (case_name="SUBPOENAS SERVED ON" and "SUBPOENAS SERVED OFF").
+        query = 'type=r&q="SUBPOENAS SERVED"'
         results, _ = fetch_es_results_for_csv(
             QueryDict(query.encode(), mutable=True), SEARCH_TYPES.RECAP
         )
         # We expect 3 results because:
-        #   - Docket 21-bk-1234 has 2 associated documents.
-        #   - Docket 12-1235 has 1 associated document.
+        #   - Docket 1:21-bk-1234 has 2 associated documents (rd, rd_att).
+        #   - Docket 12-1235 has 1 associated document (rd_2).
         #
         # The `fetch_es_results_for_csv` helper function should:
         #   - Flatten the results.

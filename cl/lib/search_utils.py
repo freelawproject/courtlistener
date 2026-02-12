@@ -10,15 +10,18 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
+from waffle import flag_is_active
 
 from cl.citations.match_citations_queries import es_get_query_citation
 from cl.citations.utils import get_citation_depth_between_clusters
+from cl.lib.bot_detector import is_bot
 from cl.lib.crypto import sha256
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
@@ -63,6 +66,7 @@ from cl.search.models import (
     OpinionCluster,
     SearchQuery,
 )
+from cl.stats.metrics import record_prometheus_metric
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -102,7 +106,7 @@ def make_get_string(
 
 
 def merge_form_with_courts(
-    courts: dict,
+    courts: QuerySet[Court],
     search_form: SearchForm,
 ) -> tuple[dict[str, list], str, str]:
     """Merges the courts dict with the values from the search form.
@@ -259,6 +263,12 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :param search_results: the dict returned by `do_es_search` function
     :return None
     """
+    if not flag_is_active(request, "store-search-queries"):
+        # Do not store search queries
+        return
+
+    if is_bot(request):
+        return
     is_error = search_results.get("error")
     is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
@@ -297,6 +307,12 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
+    if not flag_is_active(request, "store-search-api-queries"):
+        # Do not store search queries
+        return
+
+    if is_bot(request):
+        return
     is_semantic = has_semantic_params(request.GET)
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
@@ -310,6 +326,10 @@ def store_search_api_query(
         if is_semantic
         else SearchQuery.KEYWORD,
     )
+    prometheus_key = (
+        f"search.queries.{'semantic' if is_semantic else 'keyword'}.api"
+    )
+    record_prometheus_metric(prometheus_key, 1)
 
 
 class CachedESSearchResults(TypedDict):
@@ -536,6 +556,7 @@ def do_es_search(
     facet: bool = True,
     cache_key: str | None = None,
     is_csv_export: bool = False,
+    courts: QuerySet[Court] | None = None,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -548,11 +569,13 @@ def do_es_search(
     is set or used. Results are saved for six hours.
     :param is_csv_export: Indicates if the data being processed is intended for
     an export process.
+    :param courts: QuerySet of courts used in the jurisdiction picker.
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
+    if courts is None:
+        courts = Court.objects.filter(in_use=True)
     paged_results = None
-    courts = Court.objects.filter(in_use=True)
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
@@ -683,7 +706,7 @@ def do_es_search(
                     search_form,
                 )
 
-    courts, court_count_human, court_count = merge_form_with_courts(
+    courts_dict, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
     search_summary_str = search_form.as_text(court_count_human)
@@ -702,7 +725,7 @@ def do_es_search(
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
         "error": error,
-        "courts": courts,
+        "courts": courts_dict,
         "court_count_human": court_count_human,
         "court_count": court_count,
         "query_citation": query_citation,

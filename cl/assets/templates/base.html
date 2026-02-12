@@ -82,11 +82,10 @@
 <div class="container round-bottom">
   {% block header %}
   <header class="row">
-    {% include 'includes/dismissible_nav_banner.html' with variant="info" responsive=True cookie_sleep_duration=14 link="https://donate.free.law/forms/cltestimonial" cookie_name="testimonial_banner" button_text="Tell us your story!" button_emoji='<i class="fa fa-heart-o"></i>' text="Has CourtListener helped you?" %}
     <!-- Donate Banner -->
-    {% if FUNDRAISING_MODE %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
-    {% endif %}
+    {% flag "donate_banner" %}
+      {% include 'includes/dismissible_nav_banner.html' with responsive=True cookie_sleep_duration=3 link="https://donate.free.law/forms/supportcl" cookie_name="2025_eoy_banner" button_text="Donate Today" text="Donate before December 31 and tell us how CourtListener helped you—your support and your story power the future of open law." title="You built today’s CourtListener. Help build what&nbsp;comes&nbsp;next." %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
@@ -215,9 +214,6 @@
                      tabindex="102">Look Up Citations</a>
                 </li>
                 <li>
-                  <a href="{% url "mapper_homepage" %}" tabindex="102">Citation Visualizations</a>
-                </li>
-                <li>
                   <a href="{% url "coverage_opinions" %}" tabindex="103">About this Collection</a>
                 </li>
                 <li>
@@ -302,7 +298,7 @@
                  data-toggle="dropdown">Financial Disclosures&nbsp;<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_fd" %}" tabindex="501">Search Financial Disclosures</a>
+                  <a href="{% url "financial_disclosures_home" %}" tabindex="501">Search Financial Disclosures</a>
                 </li>
                 <li>
                   <a href="{% url "coverage_fds" %}" tabindex="502">About this Collection</a>
