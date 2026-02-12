@@ -230,26 +230,47 @@
     </p>
 
     <ul>
-        <li>Duplicate clusters being merged</li>
-        <li>Clusters replaced by a newer version of the same opinion</li>
-        <li>Clusters removed or sealed by court order</li>
+        <li>Duplicate clusters being merged.</li>
+        <li>
+            New versions of an existing opinion incorrectly identified as
+            separate clusters. When corrected, the opinions are consolidated
+            into a single cluster, the oldest is marked as a version of the
+            newer one, and the extra clusters are deleted.
+        </li>
+        <li>
+            Opinions from the same case (lead opinion, dissent, concurrence)
+            spread across different clusters because courts published them as
+            separate files. When corrected, we keep a single cluster and
+            delete the others.
+        </li>
+        <li>Clusters removed or sealed by court order.</li>
+        <li>
+            Non-opinion documents (such as error pages or opinion listing
+            pages) incorrectly ingested as opinion clusters.
+        </li>
     </ul>
 
     <p>
-        When a cluster is removed, its <code>cluster_id</code> is stored as a
-        <code>deleted_cluster_id</code>, and a redirection is created that points to the
-        new surviving cluster. This ensures no dead links and allows clients to maintain
-        persistent references even across merges or data corrections.
+        When a cluster is deleted and redirected, its <code>cluster_id</code> is
+        stored as a <code>deleted_cluster_id</code>, and a redirection record
+        points to the surviving cluster. This ensures no dead links and allows
+        clients to maintain persistent references even across merges or data
+        corrections.
     </p>
 
+    <p>
+        In some cases, a cluster is deleted with no redirection target. This
+        happens when the content was not a valid opinion (e.g., an error page or
+        court listing page that was incorrectly scraped). The cluster is simply
+        removed and no redirect is created.
+    </p>
 
     <p>
         <strong>Note:</strong> Cluster redirection data is not yet exposed via the
         REST API. Replication clients should be aware that an old
         <code>cluster_id</code> may internally redirect to a different, newer
-        cluster.
+        cluster, or may no longer exist at all.
     </p>
-
 
 
   <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>

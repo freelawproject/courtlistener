@@ -17,6 +17,7 @@
       {'href': '#docket-endpoint', 'text': 'Dockets'},
       {'href': '#cluster-endpoint', 'text': 'Clusters'},
       {'href': '#opinion-endpoint', 'text': 'Opinions'},
+      {'href': '#cluster-redirections', 'text': 'Cluster Redirections'},
       {'href': '#court-endpoint', 'text': 'Courts'},
     ]},
     {'href': '#examples', 'text': 'API Examples', 'children': [
@@ -115,6 +116,65 @@ curl -v \
       <p>Whichever field you choose, please use <a class="text-primary-600" href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> to omit unnecessary fields. This will make your system faster and ease the load on ours.</p>
     </li>
   </ul>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="cluster-redirections">
+    <h4>Opinion Cluster Redirections (Coming Soon to API)</h4>
+
+    <p>
+        CourtListener maintains a policy of preserving persistent URLs for all opinion
+        clusters. Even when a cluster becomes obsolete, its original
+        <code>cluster_id</code> is never removed. Instead, an internal
+        <code>ClusterRedirection</code> record maps the obsolete cluster to the current,
+        active one.
+    </p>
+
+    <p>
+        Clusters may be removed or consolidated for several reasons, including:
+    </p>
+
+    <ul>
+        <li>Duplicate clusters being merged.</li>
+        <li>
+            New versions of an existing opinion incorrectly identified as
+            separate clusters. When corrected, the opinions are consolidated
+            into a single cluster, the oldest is marked as a version of the
+            newer one, and the extra clusters are deleted.
+        </li>
+        <li>
+            Opinions from the same case (lead opinion, dissent, concurrence)
+            spread across different clusters because courts published them as
+            separate files. When corrected, we keep a single cluster and
+            delete the others.
+        </li>
+        <li>Clusters removed or sealed by court order.</li>
+        <li>
+            Non-opinion documents (such as error pages or opinion listing
+            pages) incorrectly ingested as opinion clusters.
+        </li>
+    </ul>
+
+    <p>
+        When a cluster is deleted and redirected, its <code>cluster_id</code> is
+        stored as a <code>deleted_cluster_id</code>, and a redirection record
+        points to the surviving cluster. This ensures no dead links and allows
+        clients to maintain persistent references even across merges or data
+        corrections.
+    </p>
+
+    <p>
+        In some cases, a cluster is deleted with no redirection target. This
+        happens when the content was not a valid opinion (e.g., an error page or
+        court listing page that was incorrectly scraped). The cluster is simply
+        removed and no redirect is created.
+    </p>
+
+    <p>
+        <strong>Note:</strong> Cluster redirection data is not yet exposed via the
+        REST API. Replication clients should be aware that an old
+        <code>cluster_id</code> may internally redirect to a different, newer
+        cluster, or may no longer exist at all.
+    </p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="court-endpoint">
