@@ -8,7 +8,7 @@ from lxml.etree import XMLSyntaxError
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
-from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import Docket, RECAPDocument
 
 
@@ -42,7 +42,7 @@ def extract_unextracted_rds(
     for chunk in batched(rd_needs_extraction.iterator(), chunk_size):
         throttle.maybe_wait()
         processed_count += len(chunk)
-        extract_recap_pdf.si(list(chunk)).set(queue=queue).apply_async()
+        extract_pdf_document.si(list(chunk)).set(queue=queue).apply_async()
         sys.stdout.write(
             f"\rProcessed {processed_count}/{count} ({processed_count * 1.0 / count:.0%})"
         )
