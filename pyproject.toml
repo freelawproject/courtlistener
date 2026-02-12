@@ -138,6 +138,9 @@ dev = [
   "responses>=0.25.8",
 ]
 
+[tool.setuptools]
+packages = ["cl"]
+
 [tool.ruff]
 line-length = 79
 lint.extend-safe-fixes = [
