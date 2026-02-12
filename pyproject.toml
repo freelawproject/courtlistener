@@ -138,8 +138,9 @@ dev = [
   "responses>=0.25.8",
 ]
 
-[tool.setuptools]
-packages = ["cl"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cl*"]
 
 [tool.ruff]
 line-length = 79
