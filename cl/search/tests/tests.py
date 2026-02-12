@@ -313,6 +313,7 @@ class ModelTest(TestCase):
             content=op_content,
             source=OpinionContent.FLP_SCANNING,
             extraction_type=OpinionContent.LLM,
+            is_main_version=True,
         )
 
         self.assertEqual(self.op_c.opinion, self.op)
@@ -338,6 +339,7 @@ class ModelTest(TestCase):
             content="test content",
             source=OpinionContent.FLP_SCANNING,
             extraction_type=OpinionContent.LLM,
+            is_main_version=True,
         )
         self.assertEqual(
             str(self.op_c),
