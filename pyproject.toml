@@ -12,7 +12,6 @@ classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Natural Language :: English",
   "Operating System :: OS Independent",
-  "License :: OSI Approved :: GNU Affero General Public License v3",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.13",
   "Intended Audience :: Developers",
@@ -21,7 +20,7 @@ classifiers = [
 urls.Home = "https://www.courtlistener.com/"
 urls.Repository = "https://github.com/freelawproject/courtlistener"
 urls.Documentation = "https://github.com/freelawproject/courtlistener/wiki"
-license = " AGPL-3.0-only"
+license = "AGPL-3.0-only"
 license-files = [ "LICENSE.txt" ]
 
 dependencies = [
