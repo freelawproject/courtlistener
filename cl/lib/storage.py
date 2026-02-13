@@ -125,6 +125,10 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
     bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
     file_overwrite = True
 
+    def __init__(self, naming_strategy=get_name_by_incrementing, **settings):
+        self.naming_strategy = naming_strategy
+        super().__init__(**settings)
+
     def get_object_parameters(self, name: str) -> dict[str, str]:
         params = self.object_parameters.copy()
         params["StorageClass"] = "GLACIER_IR"
@@ -135,8 +139,7 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
         name: str,
         max_length: int | None = None,
     ) -> str:
-        return get_name_by_incrementing(self, name, max_length)
-
+        return self.naming_strategy(self, name, max_length)
 
 class HarvardPDFStorage(S3Boto3Storage):
     """S3 file storage for Harvard PDFs."""
