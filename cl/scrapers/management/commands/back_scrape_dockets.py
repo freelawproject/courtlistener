@@ -18,7 +18,7 @@ from juriscraper.state.BaseStateScraper import BaseStateScraper
 
 from cl.lib.command_utils import logger
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.storage import S3GlacierInstantRetrievalStorage
+from cl.lib.storage import S3GlacierInstantRetrievalStorage, clobbering_get_name
 
 REDIS_AUTORESUME_KEY = "scraper:TAMES:end-date"
 
@@ -241,7 +241,7 @@ def save_docket_response(
         case_meta: Optional metadata dict from the scraper (e.g., case_number,
             date_filed, etc.) to save alongside the response
     """
-    storage = S3GlacierInstantRetrievalStorage()
+    storage = S3GlacierInstantRetrievalStorage(naming_strategy=clobbering_get_name)
 
     # Docket number with non-s3-safe characters replaced with a _
     case_number = re.sub(
