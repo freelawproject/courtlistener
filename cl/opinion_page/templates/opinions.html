@@ -30,9 +30,7 @@
     <div class="col-sm-3 opinion-sidebar hidden-print" id="sidebar">
         <div class="top-section">
             {# show the admin tools if applicable #}
-            {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket
-               or perms.search.view_opinioncluster or perms.search.change_opinioncluster or perms.search.delete_opinioncluster
-               or perms.search.view_opinion or perms.search.change_opinion or perms.search.delete_opinion %}
+            {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket or perms.search.view_opinioncluster or perms.search.change_opinioncluster or perms.search.delete_opinioncluster or perms.search.view_opinion or perms.search.change_opinion or perms.search.delete_opinion %}
                 <div class="sidebar-section">
                     <h3><span>Admin</span></h3>
                     <p>
