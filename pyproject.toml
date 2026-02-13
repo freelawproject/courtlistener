@@ -112,7 +112,7 @@ dependencies = [
   "django-cotton>=2.6.0",
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=8.0",
-  "juriscraper>=2.7.6",
+  "juriscraper>=2.7.7",
   "instructor>=1.14.1",
   "django-s3-express-cache>=0.1.0",
   "zohocrmsdk8-0==4.0.0",
