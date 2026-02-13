@@ -2207,10 +2207,7 @@ class TexasMergerTest(TestCase):
             str(created_document.media_version_id)
             == input_document["media_version_id"]
         )
-        assert (
-            str(created_document.document_url)
-            == input_document["document_url"]
-        )
+        assert str(created_document.url) == input_document["document_url"]
 
         self.download_task_mock.assert_called_once_with(created_document.pk)
 
@@ -2225,7 +2222,7 @@ class TexasMergerTest(TestCase):
             description=input_document["description"],
             media_id=input_document["media_id"],
             media_version_id=input_document["media_version_id"],
-            document_url=input_document["document_url"],
+            url=input_document["document_url"],
         )
         current_document.filepath_local = "a"
         current_document.save()
@@ -2246,9 +2243,7 @@ class TexasMergerTest(TestCase):
             str(result_document.media_version_id)
             == input_document["media_version_id"]
         )
-        assert (
-            str(result_document.document_url) == input_document["document_url"]
-        )
+        assert str(result_document.url) == input_document["document_url"]
 
         self.download_task_mock.assert_not_called()
 
@@ -2266,7 +2261,7 @@ class TexasMergerTest(TestCase):
             description=old_document["description"],
             media_id=old_document["media_id"],
             media_version_id=old_document["media_version_id"],
-            document_url=old_document["document_url"],
+            url=old_document["document_url"],
         )
 
         # Run the function
@@ -2286,9 +2281,7 @@ class TexasMergerTest(TestCase):
             str(result_document.media_version_id)
             == input_document["media_version_id"]
         )
-        assert (
-            str(result_document.document_url) == input_document["document_url"]
-        )
+        assert str(result_document.url) == input_document["document_url"]
 
         self.download_task_mock.assert_called_once_with(current_document.pk)
 
@@ -2324,7 +2317,7 @@ class TexasMergerTest(TestCase):
         document = TexasDocument.objects.get(pk=result.pk)
 
         self.assertEqual(response.call_count, 1)
-        self.assertEqual(document.document_url, input_document["document_url"])
+        self.assertEqual(document.url, input_document["document_url"])
         self.assertTrue(document.filepath_local)
         self.assertIn("UNITED", document.plain_text)
 
@@ -2752,7 +2745,7 @@ class TexasMergerTest(TestCase):
 
         pdf_response = responses.add_callback(
             responses.GET,
-            texas_document.document_url,
+            texas_document.url,
             callback=get_test_pdf,
         )
 
@@ -2779,7 +2772,7 @@ class TexasMergerTest(TestCase):
     def test_download_texas_document_pdf_download_failure(self):
         """Do we handle a failed PDF download gracefully?"""
         texas_document = TexasDocumentFactory.create(
-            document_url="https://example.com/sample.pdf",
+            url="https://example.com/sample.pdf",
         )
 
         # Mock failed PDF download

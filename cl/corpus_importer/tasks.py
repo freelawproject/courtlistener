@@ -61,6 +61,8 @@ from juriscraper.state.texas import (
     TexasCaseParty,
     TexasCourtOfCriminalAppealsDocket,
     TexasCourtOfCriminalAppealsScraper,
+    TexasOriginatingAppellateCourt,
+    TexasOriginatingDistrictCourt,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
     TexasSupremeCourtDocket,
@@ -3413,7 +3415,7 @@ def download_texas_document_pdf(
         self.request.chain = None
         return None
 
-    url = texas_document.document_url
+    url = texas_document.url
     logger.info(
         "Texas PDF download: Fetching PDF for TexasDocument %s from %s",
         texas_document_pk,
@@ -3532,7 +3534,7 @@ def merge_texas_document(
     if needs_update:
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
-        texas_document.document_url = input_document["document_url"]
+        texas_document.url = input_document["document_url"]
         texas_document.save()
         chain(
             download_texas_document_pdf.si(texas_document.pk),
@@ -3736,7 +3738,7 @@ def texas_js_court_id_to_court_id(js_court_id: str) -> str:
 
 
 def texas_originating_court_to_court_id(
-    court_data: TexasOriginatingCourt,
+    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
 ) -> str | None:
     """Attempts to translate Juriscraper Texas originating court data to a
     CourtListener Court ID.
