@@ -197,6 +197,10 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
     )
 
 
+async def mcp_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "help/mcp_help.html", {"private": False})
+
+
 async def build_court_dicts(courts: QuerySet) -> list[dict[str, str]]:
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
@@ -345,7 +349,7 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
                 "state": await fetch_data(Court.STATE_JURISDICTIONS),
                 "territory": await fetch_data(Court.TERRITORY_JURISDICTIONS),
                 "international": await fetch_data(
-                    Court.INTERNATIONAL, group_by_state=False
+                    [Court.INTERNATIONAL], group_by_state=False
                 ),
                 "tribal": await fetch_data(
                     Court.TRIBAL_JURISDICTIONS, group_by_state=False

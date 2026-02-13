@@ -1588,6 +1588,10 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         self.assertIn("The input is too long to process.", r.data["detail"])
 
 
+@override_settings()
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functional")
+@override_flag("ui_flag_for_o_es", active=True)
+@override_flag("citing_and_related_enabled", active=True)
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
