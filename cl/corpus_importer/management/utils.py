@@ -204,14 +204,16 @@ class CorpusImporterCommand(VerboseCommand, ABC):
         )
 
         with open(inventory_path, encoding="utf-8") as f:
-            reader = self.transform_inventory_iterator(csv.reader(f))
+            download_inputs = self.transform_inventory_iterator(csv.reader(f))
             if options["test_random"]:
                 logger.warning(
                     "In testing mode. Randomly selecting rows from the inventory file."
                 )
-                reader = filter(lambda _: random.random() < 0.01, reader)
+                download_inputs = filter(
+                    lambda _: random.random() < 0.001, download_inputs
+                )
             for row_idx, download_args in islice(
-                enumerate(reader), start_row, None
+                enumerate(download_inputs), start_row, None
             ):
                 throttle.maybe_wait()
                 chain(

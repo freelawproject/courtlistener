@@ -1,6 +1,6 @@
 import json
 from collections.abc import Iterable
-from itertools import batched
+from pathlib import Path
 
 import botocore.exceptions
 
@@ -43,7 +43,7 @@ def _texas_corpus_download_task(
       response headers, and docket metadata."""
     storage = AWSMediaStorage(bucket_name=docket[0])
     logger.info(
-        "Downloading HTML file from S3: (Bucket: %s; Path: %s)",
+        "Downloading docket HTML from S3: (Bucket: %s; Path: %s)",
         docket[0],
         docket[1],
     )
@@ -51,12 +51,20 @@ def _texas_corpus_download_task(
         content = f.read()
 
     storage = AWSMediaStorage(bucket_name=docket_headers[0])
-    logger.info("Downloading docket headers from S3: %s", docket_headers[1])
+    logger.info(
+        "Downloading docket headers from S3: (Bucket: %s; Path: %s)",
+        docket_headers[0],
+        docket_headers[1],
+    )
     with storage.open(docket_headers[1], "r") as f:
         headers = json.load(f)
 
     storage = AWSMediaStorage(bucket_name=docket_meta[0])
-    logger.info("Downloading docket meta from S3: %s", docket_meta[1])
+    logger.info(
+        "Downloading docket meta from S3: (Bucket: %s; Path: %s)",
+        docket_meta[0],
+        docket_meta[1],
+    )
     with storage.open(docket_meta[1], "r") as f:
         meta = TexasDocketMeta.model_validate_json(f.read())
 
@@ -69,25 +77,32 @@ class Command(CorpusImporterCommand):
     compose_redis_key = "texas_docket_import:log"
 
     @staticmethod
-    def inventory_row_batch_to_download(
-        batch: tuple[list[str], ...],
-    ) -> tuple[tuple[str, str], tuple[str, str], tuple[str, str]]:
-        """Extracts S3 buckets and paths from a batch of three entries from the
-        Texas inventory file. These will point to: the docket HTML, the docket
-        response headers, and metadata about the docket."""
-        return (
-            (batch[0][0].strip(), batch[0][1].strip()),
-            (batch[1][0].strip(), batch[1][1].strip()),
-            (batch[2][0].strip(), batch[2][1].strip()),
-        )
-
-    @staticmethod
     def transform_inventory_iterator(
         csv_reader: Iterable[list[str]],
     ) -> Iterable[tuple[tuple[str, str], tuple[str, str], tuple[str, str]]]:
-        return map(
-            Command.inventory_row_batch_to_download, batched(csv_reader, 3)
+        html_rows = filter(
+            lambda r: Path(r[1]).suffix == ".html",
+            map(lambda r: (r[0].strip(), r[1].strip()), csv_reader),
         )
+
+        previous_key_stem = None
+        for html_row in html_rows:
+            html_bucket, html_key = html_row
+            html_path = Path(html_key)
+            docket_name = html_path.stem
+            if previous_key_stem and docket_name.startswith(previous_key_stem):
+                continue
+            else:
+                previous_key_stem = docket_name
+            header_key = str(
+                html_path.with_name(f"{docket_name}_headers.json")
+            )
+            meta_key = str(html_path.with_name(f"{docket_name}_meta.json"))
+            yield (
+                (html_bucket, html_key),
+                (html_bucket, header_key),
+                (html_bucket, meta_key),
+            )
 
     @staticmethod
     def download_task() -> app.Task:
