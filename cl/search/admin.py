@@ -33,6 +33,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SearchQuery,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.search.utils import seal_documents
 from cl.visualizations.models import SCOTUSMap
 
@@ -577,3 +578,69 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+class TexasDocumentInline(admin.StackedInline):
+    model = TexasDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(TexasDocument)
+class TexasDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "media_version_id",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = (
+        "Search by Texas Document media version ID (exact match)."
+    )
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(TexasDocketEntry)
+class TexasDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (TexasDocumentInline,)
+    search_help_text = (
+        "Search TexasDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "appellate_brief",
+        "get_trunc_description",
+        "get_trunc_remarks",
+        "disposition",
+        "date_filed",
+        "entry_type",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Texas docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
+
+    @admin.display(description="Remarks")
+    def get_trunc_remarks(self, obj):
+        return trunc(obj.remarks, 35, ellipsis="...")

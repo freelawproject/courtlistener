@@ -4,11 +4,15 @@ from unittest import mock
 from unittest.mock import call, patch
 
 import eyecite
+import httpx
 import pytest
+import requests
+import responses
 import time_machine
 from bs4 import BeautifulSoup
 from celery.exceptions import Retry
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
@@ -18,6 +22,9 @@ from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.state.texas import (
+    TexasCaseParty,
+)
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -75,8 +82,14 @@ from cl.corpus_importer.signals import (
 )
 from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
+    download_texas_document_pdf,
     generate_ia_json,
     get_and_save_free_document_report,
+    merge_texas_docket_entry,
+    merge_texas_document,
+    merge_texas_documents,
+    merge_texas_parties,
+    normalize_texas_parties,
     probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
@@ -86,6 +99,7 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    create_docket_entry_sequence_numbers,
     get_start_of_quarter,
     merge_case_names,
     merge_docket_numbers,
@@ -110,7 +124,14 @@ from cl.people_db.lookup_utils import (
     find_all_judges,
     find_just_name,
 )
-from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    Party,
+    PartyType,
+    Position,
+    Role,
+)
 from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
@@ -118,6 +139,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
     get_recap_documents_pray_and_pay,
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
+from cl.recap.tests.tests import mock_bucket_open
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.cluster_sources import ClusterSources
@@ -141,6 +163,13 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+from cl.search.state.texas.factories import (
+    TexasCaseDocumentDictFactory,
+    TexasDocketEntryDictFactory,
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
+)
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
@@ -148,6 +177,22 @@ from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+class UtilsTest(SimpleTestCase):
+    def test_create_docket_entry_sequence_numbers(self):
+        """Do we generate sequence numbers correctly?"""
+        entry_1 = {"date": date.fromisoformat("2025-01-02")}
+        entry_2 = {"date": date.fromisoformat("2025-01-02")}
+        entry_3 = {"date": date.fromisoformat("2025-01-03")}
+
+        output = create_docket_entry_sequence_numbers(
+            [entry_1, entry_3, entry_2]
+        )
+        assert len(output) == 3
+        assert output[0] == "2025-01-02.001"
+        assert output[1] == "2025-01-03.001"
+        assert output[2] == "2025-01-02.002"
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -2085,6 +2130,648 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             mock_logger.info.assert_called_with(
                 f"Cluster id: {cluster.id} already merged"
             )
+
+
+class TexasMergerTest(TestCase):
+    def setUp(self):
+        """Set up texas merger tests"""
+        self.download_task_patch = patch(
+            "cl.corpus_importer.tasks.download_texas_document_pdf.si"
+        )
+        self.download_task_mock = self.download_task_patch.start()
+        self.extract_pdf_document_patch = patch(
+            "cl.recap.tasks.extract_pdf_document.s"
+        )
+        self.extract_pdf_document_mock = (
+            self.extract_pdf_document_patch.start()
+        )
+        self.download_pdf_patch = patch(
+            "cl.corpus_importer.tasks.download_pdf_in_stream"
+        )
+        self.download_pdf_mock = self.download_pdf_patch.start()
+
+    @classmethod
+    def setUpTestData(cls):
+        """Create test data for Texas merger tests"""
+        cls.texas_sc = CourtFactory.create(id="texas_sc")
+        cls.texas_cca = CourtFactory.create(id="texas_cca")
+        cls.texas_coa1 = CourtFactory.create(id="texas_coa1")
+        cls.docket_number_coa1 = "01-25-00011-CV"
+        cls.docket_coa1 = DocketFactory.create(
+            court=cls.texas_coa1, docket_number=cls.docket_number_coa1
+        )
+        cls.docket_coa1_entry = TexasDocketEntryFactory.create(
+            docket=cls.docket_coa1,
+        )
+
+    def tearDown(self):
+        """Tear down patches"""
+        self.download_task_patch.stop()
+        self.extract_pdf_document_patch.stop()
+        self.download_pdf_patch.stop()
+
+    def test_merge_texas_document_new_document(self):
+        """Can we correctly add a new attachment to an existing docket entry?"""
+        docket_entry = self.docket_coa1_entry
+
+        input_document = TexasCaseDocumentDictFactory()
+
+        # Run the function
+        result = merge_texas_document(docket_entry, input_document)
+
+        # Assertions
+        assert result == (True, True, result[2])
+        try:
+            created_document = TexasDocument.objects.get(pk=result[2])
+        except ObjectDoesNotExist:
+            created_document = None
+        assert created_document is not None
+        assert created_document.docket_entry_id == docket_entry.id
+        assert created_document.description == input_document["description"]
+        assert str(created_document.media_id) == input_document["media_id"]
+        assert (
+            str(created_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert str(created_document.url) == input_document["document_url"]
+
+        self.download_task_mock.assert_called_once_with(created_document.pk)
+
+    def test_merge_texas_document_existing_document_no_update(self):
+        """Can we correctly handle an existing document with no update needed?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocumentDictFactory()
+
+        # Create an existing and up to date attachment
+        current_document = TexasDocumentFactory.create(
+            docket_entry=docket_entry,
+            description=input_document["description"],
+            media_id=input_document["media_id"],
+            media_version_id=input_document["media_version_id"],
+            url=input_document["document_url"],
+        )
+        current_document.filepath_local = "a"
+        current_document.save()
+
+        # Run the function
+        result = merge_texas_document(docket_entry, input_document)
+
+        # Assertions
+        assert result == (False, True, current_document.pk)
+        result_document = TexasDocument.objects.get(pk=result[2])
+        assert result_document is not None
+        assert result_document.docket_entry_id == docket_entry.id
+        assert result_document.description == input_document["description"]
+        assert str(result_document.media_id) == input_document["media_id"]
+        assert (
+            str(result_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert str(result_document.url) == input_document["document_url"]
+
+        self.download_task_mock.assert_not_called()
+
+    def test_merge_texas_document_existing_document_update(self):
+        """Can we correctly update an existing document with new version?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocumentDictFactory()
+        old_document = TexasCaseDocumentDictFactory(
+            media_id=input_document["media_id"],
+        )
+
+        # Create an attachment
+        current_document = TexasDocumentFactory.create(
+            docket_entry=docket_entry,
+            description=old_document["description"],
+            media_id=old_document["media_id"],
+            media_version_id=old_document["media_version_id"],
+            url=old_document["document_url"],
+        )
+
+        # Run the function
+        result = merge_texas_document(docket_entry, input_document)
+
+        # Assertions
+        assert result == (True, True, current_document.pk)
+        result_document = TexasDocument.objects.get(pk=result[2])
+        assert result_document is not None
+        assert result_document.docket_entry_id == docket_entry.id
+        assert result_document.description == input_document["description"]
+        assert str(result_document.media_id) == input_document["media_id"]
+        assert (
+            str(result_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert str(result_document.url) == input_document["document_url"]
+
+        self.download_task_mock.assert_called_once_with(current_document.pk)
+
+    @responses.activate
+    def test_merge_texas_document_plaintext_extraction(self):
+        """
+        Ensure plaintext extraction is triggered by `merge_texas_document`.
+        """
+        # Stop the mocks just for this test
+        self.download_task_patch.stop()
+        self.extract_pdf_document_patch.stop()
+        self.download_pdf_patch.stop()
+
+        input_document = TexasCaseDocumentDictFactory()
+
+        # Slight optimization for the failure case where the merger fails to
+        # request a PDF
+        def get_test_pdf(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+                return 200, {"Content-Type": "application/pdf"}, f.read()
+
+        response = responses.add_callback(
+            responses.GET,
+            input_document["document_url"],
+            callback=get_test_pdf,
+        )
+
+        docket_entry = self.docket_coa1_entry
+        (_, _, pk) = merge_texas_document(docket_entry, input_document)
+        docket_entry.refresh_from_db()
+        document = TexasDocument.objects.get(pk=pk)
+
+        self.assertEqual(response.call_count, 1)
+        self.assertEqual(document.url, input_document["document_url"])
+        self.assertTrue(document.filepath_local)
+        self.assertIn("UNITED", document.plain_text)
+
+    def test_merge_texas_documents(self):
+        """Can we correctly handle multiple documents?"""
+        docket_entry = self.docket_coa1_entry
+        existing_document = TexasCaseDocumentDictFactory()
+        current_attachment = TexasDocumentFactory.create(
+            docket_entry=docket_entry,
+            description=existing_document["description"],
+            media_id=existing_document["media_id"],
+            media_version_id=existing_document["media_version_id"],
+            url=existing_document["document_url"],
+        )
+        current_attachment.filepath_local = "a"
+        current_attachment.save()
+        input_documents = [
+            TexasCaseDocumentDictFactory(),
+            existing_document,
+        ]
+
+        result = merge_texas_documents(docket_entry, input_documents)
+
+        assert len(result) == 2
+        assert result[0] == (True, True, result[0][2])
+        assert result[1] == (False, True, current_attachment.pk)
+
+    def test_merge_texas_docket_entry_new_entry(self):
+        """Can we correctly handle a docket entry?"""
+        docket_entry = TexasDocketEntryDictFactory(
+            attachments=[TexasCaseDocumentDictFactory()],
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.000", True, docket_entry
+        )
+
+        assert output == (True, True, output[2])
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == docket_entry["type"]
+        assert created_docket_entry.description == docket_entry["description"]
+        assert created_docket_entry.date_filed == docket_entry["date"]
+        n_attachments = TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).count()
+        assert n_attachments == 1
+        assert self.extract_pdf_document_mock.call_count == 1
+
+    def test_merge_texas_docket_entry_no_update(self):
+        """Can we correctly handle a docket entry update noop?"""
+        js_docket_entry = TexasDocketEntryDictFactory()
+
+        (_, _, pk) = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+        )
+        documents = TexasDocument.objects.filter(docket_entry_id=pk)
+        for document in documents:
+            document.filepath_local = "a"
+            document.save()
+        # Reset call count
+        self.extract_pdf_document_mock.reset_mock()
+
+        # noop
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+        )
+
+        assert output == (False, True, output[2])
+        assert output[2] == pk
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == js_docket_entry["type"]
+        assert (
+            created_docket_entry.description == js_docket_entry["description"]
+        )
+        assert created_docket_entry.date_filed == js_docket_entry["date"]
+        n_attachments = TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).count()
+        assert n_attachments == len(js_docket_entry["attachments"])
+        assert self.extract_pdf_document_mock.call_count == 0
+
+    def test_merge_texas_docket_entry_add_document(self):
+        """Can we correctly add a new document to an existing docket entry?"""
+        js_docket_entry = TexasDocketEntryDictFactory()
+        initial_n_attachments = len(js_docket_entry["attachments"])
+
+        (_, _, pk) = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+        )
+        documents = TexasDocument.objects.filter(docket_entry_id=pk)
+        for document in documents:
+            document.filepath_local = "a"
+            document.save()
+        # Reset call count
+        self.extract_pdf_document_mock.reset_mock()
+
+        js_docket_entry["attachments"].append(TexasCaseDocumentDictFactory())
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+        )
+
+        assert output == (True, True, output[2])
+        assert output[2] == pk
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == js_docket_entry["type"]
+        assert (
+            created_docket_entry.description == js_docket_entry["description"]
+        )
+        assert created_docket_entry.date_filed == js_docket_entry["date"]
+        n_attachments = TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).count()
+        assert n_attachments == initial_n_attachments + 1
+        assert self.extract_pdf_document_mock.call_count == 1
+
+    def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
+        """When multiple entries match by date/type/brief, use the one with matching sequence number."""
+        # Create two entries with same date, type, and appellate_brief
+        existing_entry_1 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-02"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-02.000",
+            description="First entry",
+        )
+        existing_entry_2 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-02"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-02.001",
+            description="Second entry",
+        )
+
+        js_docket_entry = TexasDocketEntryDictFactory(
+            attachments=[],
+            description="Updated description",
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+
+        # Should match the second entry by sequence number
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.001", True, js_docket_entry
+        )
+
+        assert output == (False, True, existing_entry_2.pk)
+        updated_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert updated_entry.description == "Updated description"
+        assert updated_entry.sequence_number == "2025-01-02.001"
+        # Ensure the first entry was not modified
+        existing_entry_1.refresh_from_db()
+        assert existing_entry_1.description == "First entry"
+
+    def test_merge_texas_docket_entry_single_match_updates_entry(self):
+        """When exactly one entry matches by date/type/brief, update it even
+        with different sequence number."""
+        existing_entry = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-04"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-04.000",
+            description="Original description",
+        )
+
+        js_docket_entry = TexasDocketEntryDictFactory(
+            attachments=[],
+            description="Updated description",
+            date=date.fromisoformat("2025-01-04"),
+            type="Brief",
+        )
+
+        # Should update existing entry and change its sequence number
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-04.001", True, js_docket_entry
+        )
+
+        assert output == (False, True, existing_entry.pk)
+        updated_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert updated_entry.description == "Updated description"
+        assert updated_entry.sequence_number == "2025-01-04.001"
+
+    def test_merge_texas_docket_entry_multiple_matches_without_sequence(self):
+        """When multiple entries match by date/type/brief but none match sequence, create a new entry."""
+        # Create two entries with same date, type, and appellate_brief
+        existing_entry_1 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-03"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-03.000",
+            description="First entry",
+        )
+        existing_entry_2 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-03"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-03.001",
+            description="Second entry",
+        )
+
+        js_docket_entry = TexasDocketEntryDictFactory(
+            attachments=[],
+            description="New third entry",
+            date=date.fromisoformat("2025-01-03"),
+            type="Brief",
+        )
+
+        # Should create a new entry since no sequence number matches
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-03.002", True, js_docket_entry
+        )
+
+        assert output[0] is True  # created
+        assert output[1] is True  # success
+        assert output[2] not in (existing_entry_1.pk, existing_entry_2.pk)
+        new_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert new_entry.description == "New third entry"
+        assert new_entry.sequence_number == "2025-01-03.002"
+        # Ensure existing entries were not modified
+        existing_entry_1.refresh_from_db()
+        existing_entry_2.refresh_from_db()
+        assert existing_entry_1.description == "First entry"
+        assert existing_entry_2.description == "Second entry"
+
+    def test_merge_single_party_with_attorney(self):
+        """Can we merge a single party with an attorney?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Test Party",
+                type="Appellant",
+                representatives=["Test Attorney"],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check party was created
+        assert Party.objects.filter(name="Test Party").exists()
+        party = Party.objects.get(name="Test Party")
+
+        # Check party type was associated with docket
+        assert PartyType.objects.filter(
+            docket=self.docket_coa1, party=party, name="Appellant"
+        ).exists()
+
+        # Check attorney was created
+        assert Attorney.objects.filter(name="Test Attorney").exists()
+
+        # Check role was created linking party, attorney, and docket
+        assert Role.objects.filter(
+            docket=self.docket_coa1,
+            party=party,
+            attorney__name="Test Attorney",
+        ).exists()
+
+    def test_merge_multiple_parties(self):
+        """Can we merge multiple parties?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Appellant Party",
+                type="Appellant",
+                representatives=["Appellant Attorney"],
+            ),
+            TexasCaseParty(
+                name="Appellee Party",
+                type="Appellee",
+                representatives=[
+                    "Appellee Attorney One",
+                    "Appellee Attorney Two",
+                ],
+            ),
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check both parties were created
+        assert Party.objects.filter(name="Appellant Party").exists()
+        assert Party.objects.filter(name="Appellee Party").exists()
+
+        # Check all attorneys were created
+        assert Attorney.objects.filter(name="Appellant Attorney").exists()
+        assert Attorney.objects.filter(name="Appellee Attorney One").exists()
+        assert Attorney.objects.filter(name="Appellee Attorney Two").exists()
+
+        # Check correct number of roles
+        assert Role.objects.filter(docket=self.docket_coa1).count() == 3
+
+    def test_merge_party_without_representatives(self):
+        """Can we merge a party that has no representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Pro Se Party",
+                type="Appellant",
+                representatives=[],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check party was created
+        assert Party.objects.filter(name="Pro Se Party").exists()
+
+        # Check party type exists
+        party = Party.objects.get(name="Pro Se Party")
+        assert PartyType.objects.filter(
+            docket=self.docket_coa1, party=party, name="Appellant"
+        ).exists()
+
+        # No attorneys should be created for this party
+        assert (
+            Role.objects.filter(docket=self.docket_coa1, party=party).count()
+            == 0
+        )
+
+    def test_merge_empty_parties_preserves_existing(self):
+        """Does merging empty parties preserve existing party data?"""
+        # First add some parties
+        initial_parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Existing Party",
+                type="Appellant",
+                representatives=["Existing Attorney"],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, initial_parties)
+        initial_party_count = self.docket_coa1.parties.count()
+
+        # Now merge empty list
+        merge_texas_parties(self.docket_coa1, [])
+
+        # Existing parties should be preserved
+        assert self.docket_coa1.parties.count() == initial_party_count
+
+    def test_normalize_single_party_no_representatives(self):
+        """Can we normalize a party without representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="John Doe",
+                type="Appellant",
+                representatives=[],
+            )
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 1
+        assert result[0]["name"] == "John Doe"
+        assert result[0]["type"] == "Appellant"
+        assert result[0]["date_terminated"] is None
+        assert result[0]["extra_info"] == ""
+        assert result[0]["attorneys"] == []
+
+    def test_normalize_single_party_with_representatives(self):
+        """Can we normalize a party with multiple representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Jane Smith",
+                type="Appellee",
+                representatives=[
+                    "Attorney One",
+                    "Attorney Two",
+                    "Attorney Three",
+                ],
+            )
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 1
+        assert result[0]["name"] == "Jane Smith"
+        assert result[0]["type"] == "Appellee"
+        assert len(result[0]["attorneys"]) == 3
+
+        # First attorney should be lead
+        assert result[0]["attorneys"][0]["name"] == "Attorney One"
+        assert result[0]["attorneys"][0]["contact"] == "Attorney One"
+        assert result[0]["attorneys"][0]["roles"] == ["LEAD_ATTORNEY"]
+
+        # Subsequent attorneys should have UNKNOWN role
+        assert result[0]["attorneys"][1]["name"] == "Attorney Two"
+        assert result[0]["attorneys"][1]["roles"] == ["UNKNOWN"]
+        assert result[0]["attorneys"][2]["name"] == "Attorney Three"
+        assert result[0]["attorneys"][2]["roles"] == ["UNKNOWN"]
+
+    def test_normalize_multiple_parties(self):
+        """Can we normalize multiple parties?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Petitioner Corp",
+                type="Petitioner",
+                representatives=["Lead Counsel"],
+            ),
+            TexasCaseParty(
+                name="Respondent LLC",
+                type="Respondent",
+                representatives=["Defense Attorney", "Co-Counsel"],
+            ),
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 2
+
+        assert result[0]["name"] == "Petitioner Corp"
+        assert result[0]["type"] == "Petitioner"
+        assert len(result[0]["attorneys"]) == 1
+        assert result[0]["attorneys"][0]["roles"] == ["LEAD_ATTORNEY"]
+
+        assert result[1]["name"] == "Respondent LLC"
+        assert result[1]["type"] == "Respondent"
+        assert len(result[1]["attorneys"]) == 2
+
+    def test_normalize_empty_parties_list(self):
+        """Can we handle an empty parties list?"""
+        result = normalize_texas_parties([])
+        assert result == []
+
+    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
+    @responses.activate
+    def test_download_texas_document_pdf_success(self, pcs_mock):
+        """Can we successfully download a PDF for a TexasDocument?"""
+        self.download_pdf_patch.stop()
+        texas_document = TexasDocumentFactory.create()
+
+        def get_test_pdf(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+                return 200, {"Content-Type": "application/pdf"}, f.read()
+
+        pdf_response = responses.add_callback(
+            responses.GET,
+            texas_document.url,
+            callback=get_test_pdf,
+        )
+
+        pcs_mock.return_value = httpx.Response(200, text="1")
+
+        result = download_texas_document_pdf(texas_document.pk)
+
+        assert result is not None
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local is not None
+        assert texas_document.page_count == 1
+        assert pdf_response.call_count == 1
+        assert pcs_mock.call_count == 1
+
+    def test_download_texas_document_pdf_document_not_found(self):
+        """Do we handle a missing TexasDocument gracefully?"""
+        non_existent_pk = 99999
+
+        result = download_texas_document_pdf(non_existent_pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_not_called()
+
+    def test_download_texas_document_pdf_download_failure(self):
+        """Do we handle a failed PDF download gracefully?"""
+        texas_document = TexasDocumentFactory.create(
+            url="https://example.com/sample.pdf",
+        )
+
+        # Mock failed PDF download
+        self.download_pdf_mock.return_value.__enter__.return_value = None
+
+        result = download_texas_document_pdf(texas_document.pk)
+
+        assert result is None
+        self.download_pdf_mock.assert_called_once_with(
+            "https://example.com/sample.pdf", texas_document.pk, "texas_"
+        )
+        texas_document.refresh_from_db()
+        assert not texas_document.filepath_local
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
