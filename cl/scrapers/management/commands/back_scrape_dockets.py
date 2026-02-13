@@ -57,7 +57,7 @@ class RateLimitedRequestManager:
     This wraps HTTP request handling with:
     - Rate limiting (configurable requests per second)
     - Automatic retry on 403 Forbidden with exponential backoff
-    - Session management with default Juriscraper headers
+    - Session management with Chrome headers
 
     Attributes:
         session: The requests Session used for HTTP requests
@@ -87,11 +87,28 @@ class RateLimitedRequestManager:
             self.session: requests.Session | None = session
         else:
             self.session = requests.Session()
+            # Match more closely a chrome browser
             self.session.headers.update(
                 {
-                    "User-Agent": "Juriscraper",
-                    "Cache-Control": "no-cache, max-age=0, must-revalidate",
-                    "Pragma": "no-cache",
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/145.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": (
+                        "text/html,application/xhtml+xml,"
+                        "application/xml;q=0.9,image/avif,"
+                        "image/webp,image/apng,*/*;q=0.8,"
+                        "application/signed-exchange;v=b3;q=0.7"
+                    ),
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "sec-ch-ua": (
+                        '"Chromium";v="145", "Not:A-Brand";v="99"'
+                    ),
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": '"macOS"',
+                    "Upgrade-Insecure-Requests": "1",
                 }
             )
 
@@ -127,8 +144,7 @@ class RateLimitedRequestManager:
 
         elapsed = time.monotonic() - self._last_request_time
         if elapsed < self._min_interval:
-            sleep_time = self._min_interval - elapsed
-            time.sleep(sleep_time)
+            time.sleep(self._min_interval - elapsed)
 
     def _request_with_retry(
         self,
@@ -177,11 +193,14 @@ class RateLimitedRequestManager:
                 response.raise_for_status()
 
             logger.warning(
-                "Received 403 Forbidden for %s. Backing off for %d seconds (total: %d/%d)",
+                "Received 403 Forbidden for %s. Backing off for %d seconds (total: %d/%d). "
+                "Response headers: %s Body (first 500 chars): %s",
                 url,
                 backoff,
                 total_wait,
                 self.max_backoff_seconds,
+                dict(response.headers),
+                response.text[:500],
             )
             time.sleep(backoff)
             total_wait += backoff
@@ -234,6 +253,7 @@ def save_docket_response(
     scraper_class_name: str,
     case_meta: dict,
     court_id: str = "unknown_court",
+    skip_meta: bool = False,
 ) -> None:
     """Store docket scraper response content and headers in S3.
 
@@ -261,8 +281,8 @@ def save_docket_response(
     headers_json = json.dumps(dict(response.headers), indent=4)
     storage.save(f"{base_name}_headers.json", ContentFile(headers_json))
 
-    # Save case metadata if provided
-    if case_meta is not None:
+    # Save case metadata if provided (skipped when batching handles meta separately)
+    if case_meta is not None and not skip_meta:
         meta_json = json.dumps(case_meta, indent=4, default=str)
         storage.save(f"{base_name}_meta.json", ContentFile(meta_json))
 
@@ -283,6 +303,69 @@ def save_search_response_factory(scraper_class_name: str):
         storage.save(path, ContentFile(response.content))
 
     return save_search_reponse
+
+
+def parse_date_filed(date_str: str | None) -> date | None:
+    """Parse a date_filed string in '%m/%d/%Y' format to a date object."""
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%m/%d/%Y").date()
+    except ValueError:
+        logger.warning("Failed to parse date_filed: %s", date_str)
+        return None
+
+
+def save_batch_meta(
+    cases: list[dict],
+    scraper_class_name: str,
+) -> str | None:
+    """Save batch metadata as a JSONL file to S3, named by date range.
+
+    Args:
+        cases: List of case metadata dicts.
+        scraper_class_name: Name of the scraper class.
+
+    Returns:
+        The S3 path where the file was saved, or None if cases is empty.
+    """
+    if not cases:
+        return None
+
+    storage = S3GlacierInstantRetrievalStorage(
+        naming_strategy=clobbering_get_name
+    )
+
+    parsed_dates = [
+        d
+        for case in cases
+        if (d := parse_date_filed(case.get("date_filed")))
+    ]
+
+    if parsed_dates:
+        earliest = min(parsed_dates).isoformat()
+        latest = max(parsed_dates).isoformat()
+    else:
+        earliest = "unknown"
+        latest = "unknown"
+
+    path = (
+        f"responses/dockets/{scraper_class_name}/batches/"
+        f"{earliest}_to_{latest}_meta.jsonl"
+    )
+
+    lines = [json.dumps(case, default=str) for case in cases]
+    content = "\n".join(lines) + "\n"
+    storage.save(path, ContentFile(content.encode("utf-8")))
+
+    logger.info(
+        "Saved batch meta (%d cases, %s to %s) to %s",
+        len(cases),
+        earliest,
+        latest,
+        path,
+    )
+    return path
 
 
 class Command(BaseCommand):
@@ -335,6 +418,18 @@ class Command(BaseCommand):
             default=False,
             action="store_true",
             help="Auto resume the command using the last end-date stored in redis. ",
+        )
+        parser.add_argument(
+            "--sleep",
+            default=10,
+            type=int,
+            help="After every 100 entries, pause for this many minutes",
+        )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=100,
+            help="Number of cases to collect before writing a batch meta JSONL file and fetching case pages (default: 100)",
         )
 
     def handle(self, *args, **options):
@@ -405,9 +500,6 @@ class Command(BaseCommand):
         search_rm_args = {
             "requests_per_second": options["search_rate"],
             "max_backoff_seconds": options["max_backoff"],
-            "all_response_fn": save_search_response_factory(
-                scraper_class_name
-            ),
         }
 
         case_rm_args = {
@@ -416,6 +508,7 @@ class Command(BaseCommand):
             # We are manually processing the saves here since we can do it with a bit more info
         }
 
+        sleep_minutes = options.get("sleep")
         with (
             RateLimitedRequestManager(
                 **search_rm_args
@@ -442,55 +535,111 @@ class Command(BaseCommand):
                 end_date,
             )
 
+            batch_size = options["batch_size"]
             case_count = 0
+            current_batch: list[dict] = []
+
             for case in scraper.backfill(courts, (start_date, end_date)):
-                case_url = case.get("case_url")
-                if not case_url:
+                if not case.get("case_url"):
                     logger.warning("Case without case_url: %s", case)
                     continue
 
-                # Extract court_id from case data if available
-                court_id = case.get("court_code") or "unknown_court"
-                # Fetch and save the case page
-                try:
-                    case_response = case_request_manager.get(case_url)
-                    save_docket_response(
-                        case_response,
-                        scraper_class_name,
-                        dict(case),
-                        court_id,
-                    )
-                    case_count += 1
+                current_batch.append(dict(case))
+                if len(current_batch) < batch_size:
+                    continue
 
-                    if case_count % 100 == 0:
-                        logger.info("Processed %d cases", case_count)
-                        # TAMES search defaults to descending by date
-                        # checkpoint every 100/case-rate seconds
-                        if auto_resume and not case.get("date_filed"):
-                            logger.warning(
-                                f"No case date, no checkpoint:{case}"
-                            )
-                        if auto_resume and case.get("date_filed"):
-                            try:
-                                latest_date = datetime.strptime(
-                                    case.get("date_filed"), "%m/%d/%Y"
-                                ).date()
-                                set_last_checkpoint(latest_date)
-                                logger.info("Checkpointed at %s", latest_date)
-                            except ValueError:
-                                logger.warning(
-                                    "Failed to save checkpoint for (date_filed=%s). Using prior checkpoint.",
-                                    case.get("date_filed"),
-                                )
+                case_count += self._process_batch(
+                    current_batch,
+                    scraper_class_name,
+                    case_request_manager,
+                    auto_resume,
+                    sleep_minutes,
+                    case_count,
+                )
+                self._checkpoint_and_sleep(
+                    case_count, case, auto_resume, sleep_minutes
+                )
 
-                except requests.RequestException as e:
-                    logger.error(
-                        "Failed to fetch case URL %s: %s", case_url, e
-                    )
+                current_batch = []
+
+            # Final partial batch
+            if current_batch:
+                case_count += self._process_batch(
+                    current_batch,
+                    scraper_class_name,
+                    case_request_manager,
+                    auto_resume,
+                    sleep_minutes,
+                    case_count,
+                )
 
             logger.info(
                 "Backfill complete. Processed %d cases total.", case_count
             )
+
+    def _process_batch(
+        self,
+        batch: list[dict],
+        scraper_class_name: str,
+        case_request_manager: RateLimitedRequestManager,
+        auto_resume: bool,
+        sleep_minutes: int,
+        case_count_before: int,
+    ) -> int:
+        """Save batch meta JSONL, then fetch and save each case's HTML + headers.
+
+        Returns the number of cases successfully fetched.
+        """
+        # The following line can be uncommented to save batches of case meta.
+        # save_batch_meta(batch, scraper_class_name)
+
+        fetched = 0
+        for case in batch:
+            case_url = case.get("case_url")
+            if not case_url:
+                continue
+
+            court_id = case.get("court_code") or "unknown_court"
+            try:
+                case_response = case_request_manager.get(case_url)
+                save_docket_response(
+                    case_response,
+                    scraper_class_name,
+                    case,
+                    court_id,
+                    skip_meta=False,
+                )
+                fetched += 1
+                running_count = case_count_before + fetched
+            except requests.RequestException as e:
+                logger.error(
+                    "Failed to fetch case URL %s: %s", case_url, e
+                )
+        return fetched
+
+    def _checkpoint_and_sleep(
+        self,
+        case_count: int,
+        case: dict,
+        auto_resume: bool,
+        sleep_minutes: int,
+    ) -> None:
+        """Checkpoint to Redis and sleep at every batch boundary."""
+
+        logger.info("Processed %d cases", case_count)
+
+        if auto_resume:
+            if parsed := parse_date_filed(case.get("date_filed")):
+                set_last_checkpoint(parsed)
+                logger.info("Checkpointed at %s", parsed)
+            else:
+                logger.warning(
+                    "No parseable date_filed, no checkpoint: %s", case
+                )
+
+        if sleep_minutes > 0:
+            logger.info("Sleeping %d minutes", sleep_minutes)
+            time.sleep(sleep_minutes * 60)
 
     def _parse_date(self, date_str: str) -> date:
         """Parse a date string in various formats.
