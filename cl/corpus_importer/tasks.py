@@ -3461,7 +3461,7 @@ class MergeResult[T = int](NamedTuple):
     """The primary key of the created or updated object."""
 
     @staticmethod
-    def created(pk: T) -> MergeResult[T]:
+    def created[S](pk: S) -> MergeResult[S]:
         """Shorthand for the result of a successful creation operation.
 
         :param pk: The primary key of the created object.
@@ -3469,7 +3469,7 @@ class MergeResult[T = int](NamedTuple):
         return MergeResult(create=True, update=False, success=True, pk=pk)
 
     @staticmethod
-    def updated(pk: T) -> MergeResult[T]:
+    def updated[S](pk: S) -> MergeResult[S]:
         """Shorthand for the result of a successful update operation.
 
         :param pk: The primary key of the updated object.
@@ -3477,14 +3477,16 @@ class MergeResult[T = int](NamedTuple):
         return MergeResult(create=False, update=True, success=True, pk=pk)
 
     @staticmethod
-    def failed() -> MergeResult[T]:
+    def failed[S]() -> MergeResult[S]:
         """Shorthand for the result of a failed merge operation.
 
         :return: The constructed MergeResult object."""
-        return MergeResult(create=False, update=False, success=False, pk=None)
+        return MergeResult[S](
+            create=False, update=False, success=False, pk=None
+        )
 
     @staticmethod
-    def unnecessary(pk: T) -> MergeResult[T]:
+    def unnecessary[S](pk: S) -> MergeResult[S]:
         """Shorthand for the result of a unnecessary merge operation.
 
         :return: The constructed MergeResult object."""
@@ -3982,7 +3984,7 @@ def generate_texas_appellate_brief_flags(
     max_retries=5,
     ignore_result=True,
 )
-@time_call
+@time_call(logger)
 def merge_texas_docket(
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
@@ -4135,7 +4137,7 @@ def merge_texas_docket(
     max_retries=5,
     ignore_result=True,
 )
-@time_call
+@time_call(logger)
 def parse_texas_docket(
     self: Task, content: bytes, headers: dict[str, str], meta: TexasDocketMeta
 ) -> (

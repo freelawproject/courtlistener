@@ -11,6 +11,7 @@ from cl.corpus_importer.management.utils import (
 )
 from cl.corpus_importer.tasks import merge_texas_docket, parse_texas_docket
 from cl.lib.command_utils import logger
+from cl.lib.decorators import time_call
 from cl.lib.storage import AWSMediaStorage
 
 
@@ -24,6 +25,7 @@ from cl.lib.storage import AWSMediaStorage
     retry_backoff=10,
     ignore_result=True,
 )
+@time_call(logger)
 def _texas_corpus_download_task(
     docket: tuple[str, str],
     docket_headers: tuple[str, str],
