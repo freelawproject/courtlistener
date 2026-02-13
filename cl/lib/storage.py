@@ -141,6 +141,7 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
     ) -> str:
         return self.naming_strategy(self, name, max_length)
 
+
 class HarvardPDFStorage(S3Boto3Storage):
     """S3 file storage for Harvard PDFs."""
 
