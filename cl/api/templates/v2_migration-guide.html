@@ -63,14 +63,16 @@
     <h2>Support</h2>
     <p>Questions about this migration can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" class="underline" target="_blank" rel="noopener noreferrer">to our GitHub Discussions forum</a> or to our <a href="{% url "contact" %}" class="text-primary-600">contact form</a>.</p>
     <p>We prefer that questions be posted in the forum so they can help others. If you are a private organization posting to that forum, we will avoid sharing details about your organization.</p>
-    <a href="https://github.com/freelawproject/courtlistener/discussions"
-       target="_blank"
-       rel="noopener noreferrer"
-       class="btn-primary">Ask in GitHub Discussions</a>
-    <a href="{% url "contact" %}"
-       target="_blank"
-       rel="noopener noreferrer"
-       class="btn-primary">Send us a Private Message</a>
+    <div class="flex items-start gap-4">
+      <a href="https://github.com/freelawproject/courtlistener/discussions"
+         target="_blank"
+         rel="noopener noreferrer"
+         class="btn-primary">Ask in GitHub Discussions</a>
+      <a href="{% url "contact" %}"
+         target="_blank"
+         rel="noopener noreferrer"
+         class="btn-primary">Send us a Private Message</a>
+    </div>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="timeline-changes">
