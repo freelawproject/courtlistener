@@ -60,6 +60,8 @@ from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
     TexasCourtOfCriminalAppealsDocket,
+    TexasOriginatingAppellateCourt,
+    TexasOriginatingDistrictCourt,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
     TexasSupremeCourtDocket,
@@ -3730,7 +3732,7 @@ def texas_js_court_id_to_court_id(js_court_id: str) -> str:
 
 
 def texas_originating_court_to_court_id(
-    court_data: TexasOriginatingCourt,
+    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
 ) -> str | None:
     """Attempts to translate Juriscraper Texas originating court data to a
     CourtListener Court ID.
