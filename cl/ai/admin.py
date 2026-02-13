@@ -33,14 +33,14 @@ class LLMTaskInline(admin.TabularInline):
     fields = (
         "status",
         "llm_key",
-        "task",
+        "task_type",
         "error_message",
         "date_created",
     )
     readonly_fields = (
         "status",
         "llm_key",
-        "task",
+        "task_type",
         "error_message",
         "date_created",
     )
