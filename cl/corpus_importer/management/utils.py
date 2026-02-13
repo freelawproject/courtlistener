@@ -1,15 +1,16 @@
 import csv
+import random
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import date
 from itertools import islice
 from typing import final
 
 import botocore.exceptions
 from celery import chain
 from django.conf import settings
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from cl.celery_init import app
 from cl.lib.celery_utils import CeleryThrottle
@@ -24,7 +25,7 @@ from cl.lib.storage import AWSMediaStorage
 class TexasDocketMeta(BaseModel):
     case_number: str
     case_url: str
-    date_filed: datetime
+    date_filed: date
     style: str
     v: str
     case_type: str
@@ -34,6 +35,10 @@ class TexasDocketMeta(BaseModel):
     trial_court: str
     appellate_court: str
     court_code: str
+
+    @field_validator("date_filed", mode="before")
+    def date_filed_validator(cls, v):
+        return date(*(time.strptime(v, "%m/%d/%Y")[0:3]))
 
 
 @app.task(
@@ -140,6 +145,12 @@ class CorpusImporterCommand(VerboseCommand, ABC):
             default=False,
             help="Resume from last row stored in Redis.",
         )
+        parser.add_argument(
+            "--test-random",
+            type=bool,
+            default=False,
+            help="Randomly select rows from the inventory file to import.",
+        )
 
     @staticmethod
     def download_task() -> app.Task:
@@ -192,8 +203,13 @@ class CorpusImporterCommand(VerboseCommand, ABC):
             queue_name=ingesting_queue,
         )
 
-        with open(inventory_path) as f:
+        with open(inventory_path, encoding="utf-8") as f:
             reader = self.transform_inventory_iterator(csv.reader(f))
+            if options["test_random"]:
+                logger.warning(
+                    "In testing mode. Randomly selecting rows from the inventory file."
+                )
+                reader = filter(lambda _: random.random() < 0.01, reader)
             for row_idx, download_args in islice(
                 enumerate(reader), start_row, None
             ):

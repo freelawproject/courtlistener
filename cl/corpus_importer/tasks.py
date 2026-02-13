@@ -4139,7 +4139,7 @@ def merge_texas_docket(
 )
 @time_call(logger)
 def parse_texas_docket(
-    self: Task, content: bytes, headers: dict[str, str], meta: TexasDocketMeta
+    self: Task, i: tuple[bytes, dict[str, str], TexasDocketMeta]
 ) -> (
     TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
@@ -4149,10 +4149,12 @@ def parse_texas_docket(
     """Uses Juriscraper to parse bytes into a Texas docket object.
 
     :param self: The Celery task.
-    :param content: Bytes string to parse.
-    :param headers: The response headers to the scraper.
-    :param meta: Docket metadata.
+    :param i: Tuple with the following entries:
+      - Bytes string to parse.
+      - The response headers to the scraper.
+      - Docket metadata.
     :return: The parsed docket or `None` if parsing failed."""
+    content, headers, meta = i
     if meta.court_code == "cossup":
         parser = TexasSupremeCourtScraper()
     elif meta.court_code == "coscca":

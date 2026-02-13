@@ -27,6 +27,7 @@ from cl.lib.storage import AWSMediaStorage
 )
 @time_call(logger)
 def _texas_corpus_download_task(
+    self: app.Task,
     docket: tuple[str, str],
     docket_headers: tuple[str, str],
     docket_meta: tuple[str, str],
@@ -41,16 +42,20 @@ def _texas_corpus_download_task(
     :return: Tuple with entries: Bytes of downloaded file, dictionary with
       response headers, and docket metadata."""
     storage = AWSMediaStorage(bucket_name=docket[0])
-    logger.info("Downloading HTML file from S3: %s", docket[1])
+    logger.info(
+        "Downloading HTML file from S3: (Bucket: %s; Path: %s)",
+        docket[0],
+        docket[1],
+    )
     with storage.open(docket[1], "rb") as f:
         content = f.read()
 
-    storage = AWSMediaStorage(bucket=docket_headers[0])
+    storage = AWSMediaStorage(bucket_name=docket_headers[0])
     logger.info("Downloading docket headers from S3: %s", docket_headers[1])
     with storage.open(docket_headers[1], "r") as f:
         headers = json.load(f)
 
-    storage = AWSMediaStorage(bucket=docket_meta[0])
+    storage = AWSMediaStorage(bucket_name=docket_meta[0])
     logger.info("Downloading docket meta from S3: %s", docket_meta[1])
     with storage.open(docket_meta[1], "r") as f:
         meta = TexasDocketMeta.model_validate_json(f.read())
