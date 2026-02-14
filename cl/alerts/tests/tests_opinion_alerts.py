@@ -12,7 +12,11 @@ from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.alerts.factories import AlertFactory
-from cl.alerts.models import Alert
+from cl.alerts.models import (
+    SCHEDULED_ALERT_HIT_STATUS,
+    Alert,
+    ScheduledAlertHit,
+)
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -38,6 +42,7 @@ from cl.search.documents import OpinionDocument, OpinionPercolator
 from cl.search.factories import (
     CitationWithParentsFactory,
     OpinionClusterFactory,
+    OpinionClusterWithParentsFactory,
     OpinionFactory,
 )
 from cl.search.models import SEARCH_TYPES
@@ -937,6 +942,65 @@ class OpinionAlertsPercolatorTest(
         self.assertIn(
             f"{unsubscribe_path}{'?' if query_string else ''}{query_string}",
             mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+
+    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=4)
+    def test_can_limit_scheduled_alert_hits(self, mock_prefix) -> None:
+        """Test that we can limit the number of hits included in a scheduled
+        alert email.
+        """
+
+        # Create a daily opinion alert with a broad query that will match
+        # all the opinions we create below
+        with self.captureOnCommitCallbacks(execute=True):
+            alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.DAILY,
+                name="Test Match All Opinion",
+                query="&highlight=on&semantic=true",
+                alert_type=SEARCH_TYPES.OPINION,
+            )
+
+        # Create 100 opinion clusters (each with one opinion) to trigger
+        # the alert many times and verify the limit is enforced
+        with self.captureOnCommitCallbacks(execute=True):
+            for i in range(100):
+                cluster = OpinionClusterWithParentsFactory.create(
+                    case_name_full=f"Test v. Lorem {i}",
+                    case_name_short=f"America {i}",
+                    syllabus=f"some rando syllabus {i}",
+                    date_filed=datetime.date(1895, 6, 9),
+                    procedural_history=f"some rando history {i}",
+                    source="C",
+                    judges=f"David {i}",
+                    case_name=f"Bank of America v. Lorem {i}",
+                    slug=f"case-name-cluster-{i}",
+                    precedential_status="Published",
+                    nature_of_suit="copyright",
+                )
+                opinion = OpinionFactory.create(
+                    extracted_by_ocr=False,
+                    author=self.person_2,
+                    plain_text=f"Curabitur id lorem vel {i}",
+                    cluster=cluster,
+                    local_path=f"test/search/opinion_doc_{i}.doc",
+                    per_curiam=False,
+                    type="020lead",
+                )
+                self._percolate_opinion_doc(opinion)
+
+        # Verify that only SCHEDULED_ALERT_HITS_LIMIT (4) distinct clusters
+        # were stored as scheduled hits, not all 100.
+        self.assertEqual(
+            ScheduledAlertHit.objects.filter(
+                alert_id=alert.id,
+                user_id=self.user_profile.user_id,
+                hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+            )
+            .only("object_id")
+            .distinct("object_id")
+            .count(),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
         )
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=3)

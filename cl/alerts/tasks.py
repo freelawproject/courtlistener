@@ -665,7 +665,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                     r, alert_triggered_id, "o", document_content_copy["id"]
                 )
                 object_id = document_content_copy["cluster_id"]
-                child_document = True
+                child_document = False
             case _:
                 raise NotImplementedError(
                     "Percolator response processing not supported for: %s",
