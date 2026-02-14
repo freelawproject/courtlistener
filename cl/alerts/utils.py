@@ -61,7 +61,7 @@ from cl.search.types import (
     SearchAlertHitType,
 )
 
-COMMON_QUERY_PARAMS = {"type", "order_by"}
+COMMON_QUERY_PARAMS = {"type", "order_by", "semantic", "highlight"}
 
 
 @dataclass
