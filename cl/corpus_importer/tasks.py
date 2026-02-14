@@ -4139,7 +4139,7 @@ def merge_texas_docket(
 )
 @time_call(logger)
 def parse_texas_docket(
-    self: Task, i: tuple[bytes, dict[str, str], TexasDocketMeta]
+    self: Task, i: tuple[bytes, TexasDocketMeta]
 ) -> (
     TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
@@ -4154,19 +4154,28 @@ def parse_texas_docket(
       - The response headers to the scraper.
       - Docket metadata.
     :return: The parsed docket or `None` if parsing failed."""
-    content, headers, meta = i
-    if meta.court_code == "cossup":
-        parser = TexasSupremeCourtScraper()
-    elif meta.court_code == "coscca":
-        parser = TexasCourtOfCriminalAppealsScraper()
-    elif meta.court_code.startswith("coa"):
-        parser = TexasCourtOfAppealsScraper(meta.court_code)
-    else:
-        logger.error(
-            "Unrecognized Texas court type %s. Cannot parse.", meta.court_code
-        )
-        self.request.chain = None
-        return None
+    content, meta = i
+    try:
+        if meta.court_code == "cossup":
+            parser = TexasSupremeCourtScraper()
+        elif meta.court_code == "coscca":
+            parser = TexasCourtOfCriminalAppealsScraper()
+        elif meta.court_code.startswith("coa"):
+            parser = TexasCourtOfAppealsScraper(meta.court_code)
+        else:
+            logger.error(
+                "Unrecognized Texas court type %s. Cannot parse.",
+                meta.court_code,
+            )
+            self.request.chain = None
+            return None
 
-    parser._parse_text(content.decode("utf-8"))
-    return parser.data
+        parser._parse_text(content.decode("utf-8"))
+        return parser.data
+    except Exception as e:
+        self.request.chain = None
+        logger.error(
+            "Encountered error parsing Texas docket at URL %s: %s",
+            meta.case_url,
+            str(e),
+        )
