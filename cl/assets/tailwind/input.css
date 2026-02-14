@@ -127,6 +127,9 @@
   .screenshot {
     @apply rounded-2xl block max-w-full;
   }
+  .subtext {
+    @apply text-xs text-greyscale-700;
+  }
 
   /* ----------- THIRD PARTY OVERRIDES ----------- */
 
