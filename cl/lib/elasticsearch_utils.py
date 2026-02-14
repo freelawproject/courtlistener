@@ -1616,26 +1616,6 @@ def build_child_docs_query(
     return Q(query_dict)
 
 
-def get_only_status_facets(
-    search_query: Search, search_form: SearchForm
-) -> list[BoundField]:
-    """Create a useful facet variable to use in a template
-
-    This method creates an Elasticsearch query with the status aggregations
-    and sets the size to 0 to ensure that no documents are returned.
-    :param search_query: The Elasticsearch search query object.
-    :param search_form: The form displayed in the user interface
-    """
-    search_query = search_query.extra(size=0)
-    # filter out opinions and get just the clusters
-    search_query = search_query.query(
-        Q("bool", must=Q("match", cluster_child="opinion_cluster"))
-    )
-    search_query.aggs.bucket("status", A("terms", field="status.raw"))
-    response = search_query.execute()
-    return make_es_stats_variable(search_form, response)
-
-
 def get_facet_dict_for_search_query(
     search_query: Search, cd: CleanData, search_form: SearchForm
 ):
