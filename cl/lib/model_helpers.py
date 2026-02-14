@@ -2,6 +2,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
+from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -147,21 +148,36 @@ def make_path(root: str, filename: str) -> str:
 
 
 def make_llm_task_input_file_path(instance, filename: str) -> str:
-    """Example: llm-tasks/2026/01/15/101.pdf"""
+    """Falls back to uuid4 when instance.pk is None (unsaved instance)
+
+    Example: llm-tasks/2026/01/15/101.pdf
+    Example: llm-tasks/2026/01/15/a3b2c1d4e5f6.pdf
+    """
     ext = os.path.splitext(filename)[1]
-    return make_path("llm-tasks", f"{instance.pk}{ext}")
+    name = instance.pk or uuid4().hex
+    return make_path("llm-tasks", f"{name}{ext}")
 
 
 def make_llm_request_response_file_path(instance, filename: str) -> str:
-    """Example: llm-requests/2026/01/15/1.jsonl"""
+    """Falls back to uuid4 when instance.pk is None (unsaved instance)
+
+    Example: llm-requests/2026/01/15/1.jsonl
+    Example: llm-requests/2026/01/15/a3b2c1d4e5f6.jsonl
+    """
     ext = os.path.splitext(filename)[1]
-    return make_path("llm-requests", f"{instance.pk}{ext}")
+    name = instance.pk or uuid4().hex
+    return make_path("llm-requests", f"{name}{ext}")
 
 
 def make_llm_task_response_file_path(instance, filename: str) -> str:
-    """Example: llm-tasks/responses/2026/01/15/101.json"""
+    """Falls back to uuid4 when instance.pk is None (unsaved instance)
+
+    Example: llm-tasks/responses/2026/01/15/101.json
+    Example: llm-tasks/responses/2026/01/15/a3b2c1d4e5f6.json
+    """
     ext = os.path.splitext(filename)[1]
-    return make_path("llm-tasks/responses", f"{instance.pk}{ext}")
+    name = instance.pk or uuid4().hex
+    return make_path("llm-tasks/responses", f"{name}{ext}")
 
 
 def make_lasc_path(instance, filename):
