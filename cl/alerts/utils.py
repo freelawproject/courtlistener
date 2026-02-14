@@ -416,6 +416,11 @@ def scheduled_alert_hits_limit_reached(
     """Check if the alert hits limit has been reached for a specific alert-user
      combination.
 
+    For child documents (RECAPDocument, Opinion), two limits are checked:
+        1. Per-parent limit: caps child hits per parent object.
+        2. Global alert limit: caps distinct parent objects per alert.
+    If either limit is reached, returns True.
+
     :param alert_pk: The alert_id.
     :param user_pk: The user_id.
     :param content_type: The related content_type.
@@ -424,50 +429,47 @@ def scheduled_alert_hits_limit_reached(
     :return: True if the limit has been reached, otherwise False.
     """
 
-    if child_document and content_type:
-        # To limit child hits in case, count ScheduledAlertHits related to the
-        # alert, user and parent document.
-        hits_count = ScheduledAlertHit.objects.filter(
-            alert_id=alert_pk,
-            user_id=user_pk,
-            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-            content_type=content_type,
-            object_id=object_id,
-        ).count()
-        # Only RECAP documents use child_document=True
-        hits_limit = settings.RECAP_CHILD_HITS_PER_RESULT + 1
-    else:
-        # To limit hits in an alert count ScheduledAlertHits related to the
-        # alert and user.
-        hits_count = (
-            ScheduledAlertHit.objects.filter(
-                alert_id=alert_pk,
-                user_id=user_pk,
-                hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-                content_type=content_type,
-            )
-            .only("object_id")
-            .distinct("object_id")
-        ).count()
-        hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT
+    base_filter = ScheduledAlertHit.objects.filter(
+        alert_id=alert_pk,
+        user_id=user_pk,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+        content_type=content_type,
+    )
 
-    if hits_count >= hits_limit:
-        if child_document:
-            logger.info(
+    # Child-specific per-parent limit
+    if child_document and content_type:
+        child_hits_count = base_filter.filter(object_id=object_id).count()
+        is_opinion_hit = content_type.model == "opinion"
+        child_hits_limit = (
+            settings.OPINION_HITS_PER_RESULT
+            if is_opinion_hit
+            else settings.RECAP_CHILD_HITS_PER_RESULT
+        ) + 1
+
+        if child_hits_count >= child_hits_limit:
+            log_fn = logger.error if is_opinion_hit else logger.info
+            log_fn(
                 "Skipping child hit for Alert ID: %s and object_id %s, there "
                 "are %s child hits stored for this alert-instance.",
                 alert_pk,
                 object_id,
-                hits_count,
+                child_hits_count,
             )
-        else:
-            logger.info(
-                "Skipping hit for Alert ID: %s, there are %s hits stored for "
-                "this alert.",
-                alert_pk,
-                hits_count,
-            )
+            return True
+
+    # Global alert limit
+    global_hits_count = (
+        base_filter.only("object_id").distinct("object_id").count()
+    )
+    if global_hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
+        logger.info(
+            "Skipping hit for Alert ID: %s, there are %s distinct hits stored "
+            "for this alert.",
+            alert_pk,
+            global_hits_count,
+        )
         return True
+
     return False
 
 
