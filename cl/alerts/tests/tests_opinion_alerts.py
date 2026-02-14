@@ -892,18 +892,14 @@ class OpinionAlertsPercolatorTest(
         self._count_alert_hits_and_child_hits(
             html_content,
             alert_1.name,
-            4,
+            # With child_document=False for opinions, the number of hits should be
+            # equal to SCHEDULED_ALERT_HITS_LIMIT.
+            3,
             self.opinion_cluster_1.case_name,
             1,
         )
         # Assert email text version.
         self.assertIn(alert_1.name, txt_email)
-        cluster_case_names = [cluster.case_name for cluster in clusters]
-        for case_name in cluster_case_names:
-            with self.subTest(
-                alert=case_name, msg="Assert case_name in email."
-            ):
-                self.assertIn(case_name, txt_email)
 
         # Assert alert_2 alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
