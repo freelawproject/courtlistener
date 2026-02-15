@@ -103,9 +103,7 @@ class RateLimitedRequestManager:
                     ),
                     "Accept-Language": "en-US,en;q=0.9",
                     "Accept-Encoding": "gzip, deflate, br",
-                    "sec-ch-ua": (
-                        '"Chromium";v="145", "Not:A-Brand";v="99"'
-                    ),
+                    "sec-ch-ua": ('"Chromium";v="145", "Not:A-Brand";v="99"'),
                     "sec-ch-ua-mobile": "?0",
                     "sec-ch-ua-platform": '"macOS"',
                     "Upgrade-Insecure-Requests": "1",
@@ -337,9 +335,7 @@ def save_batch_meta(
     )
 
     parsed_dates = [
-        d
-        for case in cases
-        if (d := parse_date_filed(case.get("date_filed")))
+        d for case in cases if (d := parse_date_filed(case.get("date_filed")))
     ]
 
     if parsed_dates:
@@ -612,9 +608,7 @@ class Command(BaseCommand):
                 fetched += 1
                 running_count = case_count_before + fetched
             except requests.RequestException as e:
-                logger.error(
-                    "Failed to fetch case URL %s: %s", case_url, e
-                )
+                logger.error("Failed to fetch case URL %s: %s", case_url, e)
         return fetched
 
     def _checkpoint_and_sleep(
