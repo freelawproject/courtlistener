@@ -439,23 +439,27 @@ def scheduled_alert_hits_limit_reached(
     # Child-specific per-parent limit
     if child_document and content_type:
         child_hits_count = base_filter.filter(object_id=object_id).count()
-        is_opinion_hit = content_type.model == "opinion"
-        child_hits_limit = (
-            settings.OPINION_HITS_PER_RESULT
-            if is_opinion_hit
-            else settings.RECAP_CHILD_HITS_PER_RESULT
-        ) + 1
-
-        if child_hits_count >= child_hits_limit:
-            log_fn = logger.error if is_opinion_hit else logger.info
-            log_fn(
-                "Skipping child hit for Alert ID: %s and object_id %s, there "
-                "are %s child hits stored for this alert-instance.",
-                alert_pk,
-                object_id,
-                child_hits_count,
-            )
-            return True
+        if child_hits_count > 0:
+            # Parent case already scheduled. Only enforce per-parent
+            # child limit.
+            is_opinion_hit = content_type.model == "opinion"
+            child_hits_limit = (
+                settings.OPINION_HITS_PER_RESULT
+                if is_opinion_hit
+                else settings.RECAP_CHILD_HITS_PER_RESULT
+            ) + 1
+            if child_hits_count >= child_hits_limit:
+                log_fn = logger.error if is_opinion_hit else logger.info
+                log_fn(
+                    "Skipping child hit for Alert ID: %s and object_id %s, there "
+                    "are %s child hits stored for this alert-instance.",
+                    alert_pk,
+                    object_id,
+                    child_hits_count,
+                )
+                return True
+            # Child limit not reached, allow this hit.
+            return False
 
     # Global alert limit
     global_hits_count = (

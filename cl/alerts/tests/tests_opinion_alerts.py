@@ -1,4 +1,5 @@
 import datetime
+import random
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -45,7 +46,7 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionFactory,
 )
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Opinion
 from cl.search.tasks import percolate_document
 from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
@@ -940,7 +941,7 @@ class OpinionAlertsPercolatorTest(
             mail.outbox[0].extra_headers["List-Unsubscribe"],
         )
 
-    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=4)
+    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=4, OPINION_HITS_PER_RESULT=3)
     def test_can_limit_scheduled_alert_hits(self, mock_prefix) -> None:
         """Test that we can limit the number of hits included in a scheduled
         alert email.
@@ -957,10 +958,10 @@ class OpinionAlertsPercolatorTest(
                 alert_type=SEARCH_TYPES.OPINION,
             )
 
-        # Create 100 opinion clusters (each with one opinion) to trigger
-        # the alert many times and verify the limit is enforced
+        clusters = []
+        # Create 4 opinion clusters (each with one opinion) to trigger the alert.
         with self.captureOnCommitCallbacks(execute=True):
-            for i in range(100):
+            for i in range(4):
                 cluster = OpinionClusterWithParentsFactory.create(
                     case_name_full=f"Test v. Lorem {i}",
                     case_name_short=f"America {i}",
@@ -981,22 +982,108 @@ class OpinionAlertsPercolatorTest(
                     cluster=cluster,
                     local_path=f"test/search/opinion_doc_{i}.doc",
                     per_curiam=False,
-                    type="020lead",
+                    type=Opinion.LEAD,
                 )
+                clusters.append(cluster)
                 self._percolate_opinion_doc(opinion)
 
-        # Verify that only SCHEDULED_ALERT_HITS_LIMIT (4) distinct clusters
-        # were stored as scheduled hits, not all 100.
+        scheduled_hits = ScheduledAlertHit.objects.filter(
+            alert_id=alert.id,
+            user_id=self.user_profile.user_id,
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+        )
+
+        # Verify that the number of scheduled hits is equal to the number of
+        # cluster created. Global limit reached.
         self.assertEqual(
-            ScheduledAlertHit.objects.filter(
-                alert_id=alert.id,
-                user_id=self.user_profile.user_id,
-                hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-            )
-            .only("object_id")
-            .distinct("object_id")
-            .count(),
+            scheduled_hits.only("object_id").distinct("object_id").count(),
             settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+
+        # Adds a 5th cluster — should be skipped by the global limit.
+        with self.captureOnCommitCallbacks(execute=True):
+            extra_cluster = OpinionClusterWithParentsFactory.create(
+                case_name_full="Test v. Lorem Extra",
+                case_name_short="America Extra",
+                syllabus="some rando syllabus extra",
+                date_filed=datetime.date(1895, 6, 9),
+                procedural_history="some rando history extra",
+                source="C",
+                judges="David Extra",
+                case_name="Bank of America v. Lorem Extra",
+                slug="case-name-cluster-extra",
+                precedential_status="Published",
+                nature_of_suit="copyright",
+            )
+            extra_opinion = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person_2,
+                plain_text="Curabitur id lorem vel extra",
+                cluster=extra_cluster,
+                local_path="test/search/opinion_doc_extra.doc",
+                per_curiam=False,
+                type=Opinion.LEAD,
+            )
+            self._percolate_opinion_doc(extra_opinion)
+
+        # Still 4 distinct clusters, the 5th was rejected.
+        self.assertEqual(
+            scheduled_hits.only("object_id").distinct("object_id").count(),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+
+        # Add a second opinion to each existing cluster. Even though the global
+        # limit is reached, child hits for existing clusters are allowed.
+        with self.captureOnCommitCallbacks(execute=True):
+            for i, cluster in enumerate(clusters):
+                extra_opinion = OpinionFactory.create(
+                    extracted_by_ocr=False,
+                    author=self.person_2,
+                    plain_text=f"Curabitur id lorem vel extra {i}",
+                    cluster=cluster,
+                    local_path=f"test/search/opinion_doc_extra_{i}.doc",
+                    per_curiam=False,
+                    type=Opinion.DISSENT,
+                )
+                self._percolate_opinion_doc(extra_opinion)
+
+        # Distinct clusters unchanged; total hits doubled (2 per cluster).
+        self.assertEqual(
+            scheduled_hits.only("object_id").distinct("object_id").count(),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+        self.assertEqual(scheduled_hits.count(), 8)
+
+        # Add 3 more opinions to each cluster to hit the per-parent limit. Each
+        # cluster currently has 2 hits; adding 3 more would bring it to 5, but
+        # OPINION_HITS_PER_RESULT+1=4 caps it at 4.
+        with self.captureOnCommitCallbacks(execute=True):
+            for j in range(3):
+                random_type = random.choice(
+                    [c[0] for c in Opinion.OPINION_TYPES]
+                )
+                for i, cluster in enumerate(clusters):
+                    extra_opinion = OpinionFactory.create(
+                        extracted_by_ocr=False,
+                        author=self.person_2,
+                        plain_text=f"Curabitur id lorem vel extra {i} {j}",
+                        cluster=cluster,
+                        local_path=f"test/search/opinion_doc_extra_{i}_{j}.doc",
+                        per_curiam=False,
+                        type=random_type,
+                    )
+                    self._percolate_opinion_doc(extra_opinion)
+
+        # Distinct clusters still 4; total hits capped at
+        # SCHEDULED_ALERT_HITS_LIMIT * (OPINION_HITS_PER_RESULT + 1)
+        self.assertEqual(
+            scheduled_hits.only("object_id").distinct("object_id").count(),
+            settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+        self.assertEqual(
+            scheduled_hits.count(),
+            settings.SCHEDULED_ALERT_HITS_LIMIT
+            * (settings.OPINION_HITS_PER_RESULT + 1),
         )
 
     @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=3)
