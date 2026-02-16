@@ -19,7 +19,6 @@ class JurisdictionPodcast(JurisdictionFeed):
         "the CourtListener.com initiative. Not an official podcast."
     )
     subtitle = description
-    summary = description
     iTunes_name = "Free Law Project"
     iTunes_email = "feeds@courtlistener.com"
     iTunes_image_url = f"{static('png/producer-2000x2000.png')}"
