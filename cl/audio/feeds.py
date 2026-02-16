@@ -127,8 +127,10 @@ class SearchPodcast(JurisdictionPodcast):
         search_form = SearchForm(request.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            courts = [v for k, v in cd.items() if k.startswith("court_")]
-            selected = sum(1 for v in courts if v)
+            courts: list[bool] = [
+                v for k, v in cd.items() if k.startswith("court_")
+            ]
+            selected = courts.count(True)
             court_count_human = (
                 "All" if selected == len(courts) else str(selected)
             )
