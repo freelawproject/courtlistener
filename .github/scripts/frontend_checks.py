@@ -271,16 +271,36 @@ def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def check_placeholder_text(lines: list[str]) -> list[tuple[int, str]]:
-    """Flag TODO, TBD, FIXME, Lorem ipsum."""
+    """Flag TODO, TBD, FIXME, Lorem ipsum outside of comments."""
     results = []
     pattern = re.compile(
         r"\bTODO\b|\bTBD\b|\bFIXME\b|Lorem ipsum", re.IGNORECASE
     )
-    comment_re = re.compile(r"(<!--.*?-->|\{#.*?#\})")
+    inline_comment_re = re.compile(r"(<!--.*?-->|\{#.*?#\})")
 
+    in_html_comment = False
+    in_django_comment = False
     for i, line in enumerate(lines, 1):
-        # Strip out comments before checking
-        cleaned = comment_re.sub("", line)
+        # Track multiline HTML comments (<!-- ... -->)
+        if "<!--" in line and "-->" not in line:
+            in_html_comment = True
+            continue
+        if in_html_comment:
+            if "-->" in line:
+                in_html_comment = False
+            continue
+
+        # Track Django block comments ({% comment %} ... {% endcomment %})
+        if "{% comment %}" in line:
+            in_django_comment = True
+            continue
+        if in_django_comment:
+            if "{% endcomment %}" in line:
+                in_django_comment = False
+            continue
+
+        # Strip single-line comments before checking
+        cleaned = inline_comment_re.sub("", line)
         m = pattern.search(cleaned)
         if m:
             results.append(
