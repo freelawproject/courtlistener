@@ -433,7 +433,6 @@ def scheduled_alert_hits_limit_reached(
         alert_id=alert_pk,
         user_id=user_pk,
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-        content_type=content_type,
     )
 
     # Child-specific per-parent limit
