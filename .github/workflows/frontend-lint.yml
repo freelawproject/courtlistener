@@ -1,0 +1,35 @@
+name: Frontend Checks
+
+on:
+  pull_request:
+    paths:
+      - '**/*.html'
+      - 'cl/assets/tailwind/input.css'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Get changed files
+        id: changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} --name-status > changed_files.txt
+
+      - name: Run frontend checks
+        run: |
+          python .github/scripts/frontend_checks.py \
+            --repo-root . \
+            --format github \
+            --changed-files changed_files.txt
