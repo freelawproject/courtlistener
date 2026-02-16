@@ -578,7 +578,7 @@ def run_checks(
     # This runs outside the per-file loop because the legacy file may
     # not be in the PR's changed files at all.
     for v2_path in changed_v2_templates:
-        legacy_path = _legacy_counterpart(v2_path)
+        legacy_path = _swap_template_prefix(v2_path, add_v2=False)
         if legacy_path is None:
             continue
         abs_legacy = repo_root / legacy_path
@@ -599,21 +599,63 @@ def run_checks(
                 )
             )
 
+    # Reverse sync check: if a legacy template with sync notice is
+    # modified, the v2_ counterpart should also be modified.
+    changed_legacy_templates = {
+        f for f in changed_files if is_legacy_template(f)
+    }
+    for legacy_path in changed_legacy_templates:
+        v2_path = _swap_template_prefix(legacy_path, add_v2=True)
+        if v2_path is None or v2_path in changed_v2_templates:
+            continue
+        abs_v2 = repo_root / v2_path
+        if not abs_v2.is_file():
+            continue
+        abs_legacy = repo_root / legacy_path
+        try:
+            content = abs_legacy.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if "use_new_design waffle flag" not in content:
+            continue
+        findings.append(
+            Finding(
+                legacy_path,
+                1,
+                "check_v2_counterpart_updated",
+                WARN,
+                f"Legacy template with sync notice was modified but "
+                f"v2_ counterpart ({v2_path}) was not — ensure both "
+                f"templates stay in sync",
+            )
+        )
+
     return findings
 
 
-def _legacy_counterpart(v2_path: str) -> str | None:
-    """Return the legacy template path for a v2_ template, or None.
+def _swap_template_prefix(path: str, *, add_v2: bool) -> str | None:
+    """Swap between legacy and v2_ template paths.
 
-    Example:
-        v2_:    cl/simple_pages/templates/v2_help/alert_help.html
-        legacy: cl/simple_pages/templates/help/alert_help.html
+    Examples:
+        add_v2=True:  templates/help/foo.html → templates/v2_help/foo.html
+        add_v2=False: templates/v2_help/foo.html → templates/help/foo.html
     """
-    marker = "templates/v2_"
-    i = v2_path.find(marker)
-    if i == -1:
+    p = Path(path)
+    parts = list(p.parts)
+    try:
+        idx = parts.index("templates")
+    except ValueError:
         return None
-    return v2_path[:i] + "templates/" + v2_path[i + len(marker) :]
+    if idx + 1 >= len(parts):
+        return None
+    subdir = parts[idx + 1]
+    if add_v2:
+        parts[idx + 1] = f"v2_{subdir}"
+    else:
+        if not subdir.startswith("v2_"):
+            return None
+        parts[idx + 1] = subdir.removeprefix("v2_")
+    return str(Path(*parts))
 
 
 # ---------------------------------------------------------------------------
