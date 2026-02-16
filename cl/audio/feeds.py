@@ -115,7 +115,46 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
 
 
 class SearchPodcast(JurisdictionPodcast):
-    title = "CourtListener.com Custom Oral Argument Podcast"
+    def _get_search_summary(self, request):
+        """Build a human-readable search summary from GET params.
+
+        Caches on the request to avoid re-parsing the form in
+        title/description/subtitle.
+        """
+        if hasattr(request, "_summary_cache"):
+            return request._summary_cache
+
+        summary = ""
+        search_form = SearchForm(request.GET)
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
+            courts = [v for k, v in cd.items() if k.startswith("court_")]
+            selected = sum(1 for v in courts if v)
+            court_count_human = (
+                "All" if selected == len(courts) else str(selected)
+            )
+            summary = search_form.as_text(court_count_human)
+
+        request._summary_cache = summary
+        return summary
+
+    def title(self, obj):
+        if summary := self._get_search_summary(obj):
+            return f"{summary} — CourtListener Oral Arguments"
+        return "CourtListener.com Custom Oral Argument Podcast"
+
+    def description(self, obj):
+        if summary := self._get_search_summary(obj):
+            return (
+                f"Oral arguments matching: {summary}. "
+                "A custom podcast by Free Law Project via "
+                "CourtListener.com."
+            )
+        return (
+            "A chronological podcast of oral arguments with improved "
+            "files and meta data. Hosted by Free Law Project through "
+            "the CourtListener.com initiative."
+        )
 
     def get_object(self, request, get_string):
         return request
