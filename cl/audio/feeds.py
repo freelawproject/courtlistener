@@ -157,6 +157,9 @@ class SearchPodcast(JurisdictionPodcast):
             "the CourtListener.com initiative."
         )
 
+    def subtitle(self, obj):
+        return self.description(obj)
+
     def get_object(self, request, get_string):
         return request
 
