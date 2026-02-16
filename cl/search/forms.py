@@ -686,9 +686,6 @@ class SearchForm(forms.Form):
             # ...except precedential
             cleaned_data[default_status] = True
 
-        cleaned_data["_court_count"] = len(court_bools)
-        cleaned_data["_stat_count"] = len(stat_bools)
-
         # 4. Strip any whitespace, otherwise it crashes.
         for k, v in cleaned_data.items():
             if isinstance(v, str):
