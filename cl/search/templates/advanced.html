@@ -174,10 +174,7 @@
                                         {% if facet_field.value %}checked="checked"{% endif %}>
                                 <label
                                         for="id_{{ facet_field.html_name }}"
-                                        class="pointer {% if facet_field.count == 0 %}gray{% endif %}">
-                                    <div>{{ facet_field.label }}&nbsp;{% if facet_field.count != None %}<span
-                                            class="gray small">({{ facet_field.count|intcomma }}){% endif %}</span>
-                                    </div>
+                                        class="pointer">{{ facet_field.label }}
                                 </label>
                             </div>
                         {% endfor %}
