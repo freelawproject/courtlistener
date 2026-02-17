@@ -3977,7 +3977,7 @@ def merge_texas_docket(
     with transaction.atomic():
         docket_number = docket_data["docket_number"]
         try:
-            docket = find_docket_object(
+            docket = async_to_sync(find_docket_object)(
                 court_id=court.pk,
                 pacer_case_id=None,
                 docket_number=docket_number,
