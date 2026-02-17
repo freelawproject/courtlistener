@@ -51,6 +51,35 @@ def is_input_css(path: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Multiline tag helper
+# ---------------------------------------------------------------------------
+
+
+def _get_full_tag(lines: list[str], line_idx: int) -> str:
+    """Reconstruct the full opening HTML tag surrounding a given line.
+
+    Given a 0-based line index where a match was found, searches backward
+    for the ``<`` that opens the tag and forward for the closing ``>``.
+    Returns the concatenated content of all lines that make up the tag.
+    """
+    # Search backward for the opening <
+    start = line_idx
+    for j in range(line_idx, -1, -1):
+        if "<" in lines[j]:
+            start = j
+            break
+
+    # Search forward for the closing >
+    end = line_idx
+    for j in range(line_idx, len(lines)):
+        if ">" in lines[j]:
+            end = j
+            break
+
+    return " ".join(lines[start : end + 1])
+
+
+# ---------------------------------------------------------------------------
 # Individual check functions
 #
 # Each returns a list of (line_number, message) tuples.
@@ -61,8 +90,6 @@ def is_input_css(path: str) -> bool:
 def check_tabnabbing(lines: list[str]) -> list[tuple[int, str]]:
     """target="_blank" must have rel with noopener or noreferrer."""
     results = []
-    # Match opening tags that may span multiple lines — but for simplicity
-    # we check line-by-line and handle the common single-line case.
     target_blank_re = re.compile(r'target\s*=\s*["\']_blank["\']')
     rel_safe_re = re.compile(
         r'rel\s*=\s*["\'][^"\']*(?:noopener|noreferrer)[^"\']*["\']'
@@ -70,7 +97,8 @@ def check_tabnabbing(lines: list[str]) -> list[tuple[int, str]]:
 
     for i, line in enumerate(lines, 1):
         if target_blank_re.search(line):
-            if not rel_safe_re.search(line):
+            full_tag = _get_full_tag(lines, i - 1)
+            if not rel_safe_re.search(full_tag):
                 results.append(
                     (
                         i,
@@ -251,15 +279,8 @@ def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
     class_re = re.compile(r"\bclass\s*=")
     for i, line in enumerate(lines, 1):
         for m in a_tag_re.finditer(line):
-            # Get the rest of the tag on this line
-            tag_start = m.start()
-            # Find the closing > on this line (simplification)
-            close = line.find(">", tag_start)
-            if close == -1:
-                tag_content = line[tag_start:]
-            else:
-                tag_content = line[tag_start:close]
-            if not class_re.search(tag_content):
+            full_tag = _get_full_tag(lines, i - 1)
+            if not class_re.search(full_tag):
                 results.append(
                     (
                         i,
@@ -328,6 +349,10 @@ def check_hardcoded_ids(lines: list[str]) -> list[tuple[int, str]]:
         for m in id_re.finditer(line):
             value = m.group(1)
             if not dynamic_re.search(value):
+                # Check the full tag for x-bind:id on a different line
+                full_tag = _get_full_tag(lines, i - 1)
+                if xbind_re.search(full_tag):
+                    continue
                 results.append(
                     (
                         i,
