@@ -2881,7 +2881,7 @@ class TexasMergerTest(TestCase):
         assert transfer.origin_court == texas_district
         assert transfer.origin_docket_number == originating_court["case"]
         assert transfer.transfer_type == CaseTransfer.APPEAL
-        assert transfer.transfer_date == date(2025, 1, 15)
+        assert transfer.transfer_date == docket_data["date_filed"]
 
     def test_merge_texas_case_transfers_appellate_with_workload_transfer(
         self,
