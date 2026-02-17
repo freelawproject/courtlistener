@@ -123,7 +123,7 @@ class TestHandleDocketNumberRawCleaning(TestCase):
         )
 
         docket.docket_number_raw = "12--1234-ag"
-        docket.save(update_fields=["docket_number_raw"])
+        docket.save()
         self.assertEqual(
             docket.docket_number, "12-1234-AG", "Docket number doesn't match"
         )
@@ -186,7 +186,7 @@ class TestHandleDocketNumberRawCleaning(TestCase):
 
         docket.court = self.court_scotus
         docket.docket_number_raw = "Docket Nos. 12-1234-ag, 1235_"
-        docket.save(update_fields=["court", "docket_number_raw"])
+        docket.save()
         self.assertEqual(
             docket.docket_number,
             "12-1234",

@@ -2040,7 +2040,7 @@ def get_bankr_claims_registry(
     logger.info("Querying claims information for %s", logging_id)
     report = ClaimsRegister(map_cl_to_pacer_id(d.court_id), s)
     try:
-        report.query(d.pacer_case_id, d.docket_number)
+        report.query(d.pacer_case_id, d.docket_number_raw)
     except (RequestException, ReadTimeoutError) as exc:
         if self.request.retries == self.max_retries:
             self.request.chain = None
@@ -3028,7 +3028,7 @@ def recap_document_into_opinions(
         return task_data
 
     if jurisdiction == Court.FEDERAL_DISTRICT:
-        if "cv" not in docket.docket_number.lower():
+        if "cv" not in docket.docket_number_raw.lower():
             logger.info("Skipping non-civil opinion in district court")
             return task_data
 

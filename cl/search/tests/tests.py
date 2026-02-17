@@ -3912,7 +3912,7 @@ class DocketSignalTest(TestCase):
 
             self.assertTrue(mocked_cleaner.called)
 
-    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=False)
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
     def test_signal_does_not_trigger_when_value_is_the_same(self):
         """Verify cleaning does not run if the field did not change"""
         dn = "2023-cv-00001"

@@ -849,11 +849,11 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if self.docket_number and not self.docket_number_core:
+        if self.docket_number_raw and not self.docket_number_core:
             self.docket_number_core = (
-                make_scotus_docket_number_core(self.docket_number)
+                make_scotus_docket_number_core(self.docket_number_raw)
                 if self.court_id == "scotus"
-                else make_docket_number_core(self.docket_number)
+                else make_docket_number_core(self.docket_number_raw)
             )
 
         if self.source in self.RECAP_SOURCES():

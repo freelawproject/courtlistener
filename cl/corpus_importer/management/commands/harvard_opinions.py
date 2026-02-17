@@ -506,11 +506,14 @@ def add_new_case(
                 docket.save()
         except OperationalError as e:
             if "exceeds maximum" in str(e):
+                # need to populate the docket number for tests to pass until we
+                # activate the docket_number_raw cleaning flag
                 docket.docket_number = (
                     "{}, See Corrections for full Docket Number".format(
                         trunc(docket_string, length=5000, ellipsis="...")
                     )
                 )
+                docket.docket_number_raw = data["docket_number"]
                 docket.save()
                 long_data["correction"] = (
                     f"{data['docket_number']} <br> {long_data['correction']}"

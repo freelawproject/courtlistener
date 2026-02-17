@@ -376,7 +376,9 @@ def merge_opinion_clusters(
                 opinion_cluster, harvard_data["docket_number"]
             )
             if updated_docket_number:
-                opinion_cluster.docket.docket_number = updated_docket_number
+                opinion_cluster.docket.docket_number_raw = (
+                    updated_docket_number
+                )
                 opinion_cluster.docket.save()
 
             case_names_to_update = merge_case_names(

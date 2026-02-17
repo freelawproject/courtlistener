@@ -1862,7 +1862,7 @@ def create_or_merge_from_idb_chunk(idb_chunk):
                 docket_number_core=idb_row.docket_number,
                 court=idb_row.district,
             )
-            .exclude(docket_number__icontains="cr")
+            .exclude(docket_number_raw__icontains="cr")
             .exclude(case_name__icontains="sealed")
             .exclude(case_name__icontains="suppressed")
             .exclude(case_name__icontains="search warrant")
@@ -1902,7 +1902,13 @@ def update_docket_from_hidden_api(data):
         return None
 
     d = Docket.objects.get(pk=data["pass_through"])
-    d.docket_number = data["docket_number"]
+
+    # need to populate the docket number for tests to pass until we
+    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # the clean docket_number_raw value once cleaning is activated
+    if not d.docket_number:
+        d.docket_number = data["docket_number"]
+    d.docket_number_raw = data["docket_number"] or d.docket_number_raw
     d.pacer_case_id = data["pacer_case_id"]
     try:
         d.save()
@@ -2397,7 +2403,7 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
         # We lack the pacer_case_id either on the docket or from the
         # submission. Look it up.
         docket_number = fq.docket_number or getattr(
-            fq.docket, "docket_number", None
+            fq.docket, "docket_number_raw", None
         )
 
         report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)

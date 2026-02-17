@@ -393,7 +393,10 @@ async def update_docket_metadata(
     """
     d = update_case_names(d, docket_data["case_name"])
     await mark_ia_upload_needed(d, save_docket=False)
-    # only overwrite if it's empty
+
+    # need to populate the docket number for tests to pass until we
+    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # the clean docket_number_raw value once cleaning is activated
     if not d.docket_number:
         d.docket_number = docket_data["docket_number"]
 
