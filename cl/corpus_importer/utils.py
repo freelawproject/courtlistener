@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import itertools
 import math
 import random
@@ -20,6 +22,11 @@ from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.state.texas import (
+    TexasOriginatingAppellateCourt,
+    TexasOriginatingDistrictCourt,
+)
+from juriscraper.state.texas.common import CourtID, CourtType
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
@@ -1293,33 +1300,53 @@ def create_docket_entry_sequence_numbers(
     return sequence_numbers
 
 
-def juriscraper_to_cl_court_id(js_court_id: str) -> str | None:
-    """Converts a court ID from Juriscraper to the court ID used in the
-    database. Utility function for a lot of if statements basically.
-
-    :param js_court_id: The court ID from Juriscraper.
-    :return: The ID of this court in the database or `None` if the Juriscraper
-    ID was not recognized."""
-    if js_court_id.startswith("texas_"):
-        js_texas_court_id = js_court_id[len("texas_") :]
-
-        if js_texas_court_id.startswith("coa"):
-            coa_number = int(js_texas_court_id[len("coa") :])
-            # TODO 13A and B (for some reason)
-            return f"txctapp{coa_number}"
-        if js_texas_court_id == "coscca":
-            return "texcrimapp"
-        if js_texas_court_id == "cossup":
-            return "tex"
-        logger.error("Unrecognized Texas court ID: %s", js_court_id)
-        return None
-    logger.error("Unrecognized court ID: %s", js_court_id)
-    return None
-
-
 @dataclass
 class DownloadPDFResult:
     """Result of a PDF download operation."""
 
     success: bool
     sha1: str | None = None
+
+
+def texas_js_court_id_to_court_id(js_court_id: str) -> str:
+    """Translates a Juriscraper Texas court ID to a CourtListener Court ID.
+
+    :param js_court_id: The court ID extracted from Juriscraper.
+    :return: The corresponding Court ID."""
+    if js_court_id == CourtID.SUPREME_COURT.value:
+        return "tex"
+    if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+        return "texcrimapp"
+    # Court of appeals
+    appellate_number = str(int(js_court_id[len("texas_coa") :]))
+    if appellate_number == "13":
+        appellate_number = "13A"
+    return f"txctapp{appellate_number}"
+
+
+def texas_originating_court_to_court_id(
+    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
+) -> str | None:
+    """Attempts to translate Juriscraper Texas originating court data to a
+    CourtListener Court ID.
+
+    :param court_data: The originating court data from Juriscraper.
+    :return: The matching Court ID or None if no court could be found."""
+    court_type = court_data["court_type"]
+    if court_type == CourtType.APPELLATE.value:
+        return texas_js_court_id_to_court_id(court_data["court_id"])
+    if court_type == CourtType.DISTRICT.value:
+        district_number = court_data["district"]
+        if district_number:
+            if district_number > 1:
+                district_number = district_number + 1
+            return f"texdistct{district_number}"
+        return "texdistct"
+    if court_type == CourtType.BUSINESS.value:
+        return "texbizct"
+    if court_type == CourtType.MUNICIPAL.value:
+        return "texctyct"
+    if court_type == CourtType.PROBATE.value:
+        return "texprobct"
+    # County, justice, and unknown court types
+    return None

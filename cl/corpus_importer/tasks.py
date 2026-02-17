@@ -61,8 +61,6 @@ from juriscraper.state.texas import (
     TexasCaseParty,
     TexasCourtOfCriminalAppealsDocket,
     TexasCourtOfCriminalAppealsScraper,
-    TexasOriginatingAppellateCourt,
-    TexasOriginatingDistrictCourt,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
     TexasSupremeCourtDocket,
@@ -70,7 +68,6 @@ from juriscraper.state.texas import (
 )
 from juriscraper.state.texas.common import (
     CourtID,
-    CourtType,
     TexasAppellateBrief,
     TexasCaseDocument,
 )
@@ -120,6 +117,8 @@ from cl.corpus_importer.utils import (
     is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
+    texas_js_court_id_to_court_id,
+    texas_originating_court_to_court_id,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
@@ -3724,50 +3723,6 @@ def merge_texas_parties(
     return MergeResult(create=False, update=False, success=True, pk=None)
 
 
-def texas_js_court_id_to_court_id(js_court_id: str) -> str:
-    """Translates a Juriscraper Texas court ID to a CourtListener Court ID.
-
-    :param js_court_id: The court ID extracted from Juriscraper.
-    :return: The corresponding Court ID."""
-    if js_court_id == CourtID.SUPREME_COURT.value:
-        return "tex"
-    if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
-        return "texcrimapp"
-    # Court of appeals
-    appellate_number = str(int(js_court_id[len("texas_coa") :]))
-    if appellate_number == "13":
-        appellate_number = "13A"
-    return f"txctapp{appellate_number}"
-
-
-def texas_originating_court_to_court_id(
-    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
-) -> str | None:
-    """Attempts to translate Juriscraper Texas originating court data to a
-    CourtListener Court ID.
-
-    :param court_data: The originating court data from Juriscraper.
-    :return: The matching Court ID or None if no court could be found."""
-    court_type = court_data["court_type"]
-    if court_type == CourtType.APPELLATE.value:
-        return texas_js_court_id_to_court_id(court_data["court_id"])
-    if court_type == CourtType.DISTRICT.value:
-        district_number = court_data["district"]
-        if district_number:
-            if district_number > 1:
-                district_number = district_number + 1
-            return f"texdistct{district_number}"
-        return "texdistct"
-    if court_type == CourtType.BUSINESS.value:
-        return "texbizct"
-    if court_type == CourtType.MUNICIPAL.value:
-        return "texctyct"
-    if court_type == CourtType.PROBATE.value:
-        return "texprobct"
-    # County, justice, and unknown court types
-    return None
-
-
 def merge_texas_docket_originating_court(
     docket: Docket,
     docket_data: TexasCourtOfAppealsDocket
@@ -3957,6 +3912,13 @@ def generate_texas_appellate_brief_flags(
     """Generates a list of booleans indicating whether the corresponding entry
     in the list of TexasCaseEvents is in the list of TexasAppellateBriefs.
 
+    The "Appellate Briefs" table in TAMES appears to always be a subset of the
+    case events table. Therefore, we simply use the case events table to
+    generate docket entries and set an "appellate_brief" flag to indicate
+    whether the entry appears in the appellate briefs table. This method
+    generates those flags given the list of case events and the list of
+    appellate briefs.
+
     :param case_events: A list of TexasCaseEvent objects.
     :param appellate_briefs: A list of TexasAppellateBrief objects.
     :return: A list of booleans indicating whether the corresponding entry is
@@ -3998,9 +3960,6 @@ def merge_texas_docket(
         pk=texas_js_court_id_to_court_id(docket_data["court_id"])
     )
     with transaction.atomic():
-        Docket.objects.select_for_update().get(
-            docket_number=docket_data["docket_number"], court_id=court.pk
-        )
         docket_number = docket_data["docket_number"]
         try:
             docket = Docket.objects.get(
