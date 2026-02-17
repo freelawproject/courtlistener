@@ -2,7 +2,6 @@ import datetime
 import re
 from collections import OrderedDict
 
-import waffle
 from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -552,7 +551,7 @@ class SearchForm(forms.Form):
     #     Failure to do that will result in the query being processed correctly
     #     (search results are all good), but the form on the UI won't be
     #     cleaned up for the user, making things rather confusing.
-    #  3. We do some cleanup work in elasticsearch_utils.make_es_stats_variable().
+    #  3. We do some cleanup work in search_utils.fetch_facets().
     #     The work that's done there is used to check or un-check the boxes in
     #     the sidebar, so if you tweak how they work you'll need to tweak this
     #     function.
@@ -687,20 +686,13 @@ class SearchForm(forms.Form):
             # ...except precedential
             cleaned_data[default_status] = True
 
-        cleaned_data["_court_count"] = len(court_bools)
-        cleaned_data["_stat_count"] = len(stat_bools)
-
         # 4. Strip any whitespace, otherwise it crashes.
         for k, v in cleaned_data.items():
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
 
         should_disable_knn_search = (
-            not settings.KNN_SEARCH_ENABLED
-            or not self.request
-            or not waffle.flag_is_active(
-                self.request, "enable_semantic_search"
-            )
+            not settings.KNN_SEARCH_ENABLED or not self.request
         )
         if should_disable_knn_search:
             cleaned_data["semantic"] = False
@@ -1133,6 +1125,14 @@ class CorpusSearchForm(forms.Form):
         ),
     )
     cause.as_str_types = [SEARCH_TYPES.RECAP]
+
+    available_only = forms.BooleanField(
+        label="Only show results with PDFs",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(),
+    )
+    available_only.as_str_types = [SEARCH_TYPES.RECAP]
 
 
 def clean_up_date_formats(

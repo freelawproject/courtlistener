@@ -1,16 +1,21 @@
+import json
 import os
+from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
-from unittest import TestCase, mock
+from unittest import mock
+from unittest.mock import MagicMock, patch
 
+import responses
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
-from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
+from juriscraper.lib.exceptions import UnexpectedContentTypeError
+from responses import matchers
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -22,16 +27,17 @@ from cl.citations.models import UnmatchedCitation
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
+from cl.people_db.factories import PersonFactory
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
     SingleDuplicateError,
-    UnexpectedContentTypeError,
 )
 from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
+    delete_duplicates,
     update_from_text,
 )
 from cl.scrapers.management.commands.merge_opinion_versions import (
@@ -40,15 +46,16 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
 )
 from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import (
-    extract_doc_content,
+    extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
+    process_scotus_captcha_transcription,
+    subscribe_to_scotus_updates,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
     case_names_are_too_different,
     check_duplicate_ingestion,
-    get_binary_content,
     get_existing_docket,
     get_extension,
     update_or_create_docket,
@@ -285,7 +292,6 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                             msg="The source does not match.",
                         )
 
-    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
@@ -360,6 +366,54 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site = test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
 
+    @patch(
+        "cl.scrapers.management.commands.cl_scrape_opinions.Command.get_opinions_content"
+    )
+    def test_scrape_multiple_opinions_per_cluster(
+        self, patched_get_opinions_content
+    ):
+        """Test if we can ingest multiple opinions per opinion cluster"""
+        # Define two opinions for the same cluster
+        op1 = {
+            "download_urls": "https://example.com/op1.pdf",
+            "types": Opinion.LEAD,
+        }
+        op2 = {
+            "download_urls": "https://example.com/op2.pdf",
+            "types": Opinion.DISSENT,
+        }
+        returned_cluster = {
+            "docket_numbers": "123-456",
+            "case_names": "Multiple Opinion Case",
+            "case_dates": date(2023, 1, 1),
+            "precedential_statuses": "Published",
+            "date_filed_is_approximate": False,
+            "blocked_statuses": False,
+            "sub_opinions": [op1, op2],
+        }
+        patched_get_opinions_content.return_value = [
+            (op1, b"111", "111"),
+            (op2, b"222", "222"),
+        ]
+
+        mock_site = MagicMock()
+        mock_site.__iter__.return_value = [returned_cluster]
+        mock_site.court_id = "test"
+        mock_site.url = "111"
+        mock_site.hash = "234"
+
+        cl_scrape_opinions.Command().scrape_court(mock_site)
+
+        # a single cluster with 2 sub opinions was created
+        clusters = OpinionCluster.objects.filter(
+            docket__docket_number="123-456"
+        )
+        self.assertEqual(clusters.count(), 1)
+        cluster = clusters.first()
+
+        opinions = Opinion.objects.filter(cluster=cluster)
+        self.assertEqual(opinions.count(), 2)
+
 
 class IngestionTest(TestCase):
     fixtures = [
@@ -381,42 +435,42 @@ class IngestionTest(TestCase):
     def test_doc_content_extraction(self) -> None:
         """Can we ingest a doc file?"""
         doc_opinion = Opinion.objects.get(pk=1)
-        extract_doc_content(doc_opinion.pk, ocr_available=False)
+        extract_opinion_content(doc_opinion.pk, ocr_available=False)
         doc_opinion.refresh_from_db()
         self.assertIn("indiana", doc_opinion.plain_text.lower())
 
     def test_image_based_pdf(self) -> None:
         """Can we ingest an image based pdf file?"""
         image_opinion = Opinion.objects.get(pk=2)
-        extract_doc_content(image_opinion.pk, ocr_available=True)
+        extract_opinion_content(image_opinion.pk, ocr_available=True)
         image_opinion.refresh_from_db()
         self.assertIn("intelligence", image_opinion.plain_text.lower())
 
     def test_text_based_pdf(self) -> None:
         """Can we ingest a text based pdf file?"""
         txt_opinion = Opinion.objects.get(pk=3)
-        extract_doc_content(txt_opinion.pk, ocr_available=False)
+        extract_opinion_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("tarrant", txt_opinion.plain_text.lower())
 
     def test_html_content_extraction(self) -> None:
         """Can we ingest an html file?"""
         html_opinion = Opinion.objects.get(pk=4)
-        extract_doc_content(html_opinion.pk, ocr_available=False)
+        extract_opinion_content(html_opinion.pk, ocr_available=False)
         html_opinion.refresh_from_db()
         self.assertIn("reagan", html_opinion.html.lower())
 
     def test_wpd_content_extraction(self) -> None:
         """Can we ingest a wpd file?"""
         wpd_opinion = Opinion.objects.get(pk=5)
-        extract_doc_content(wpd_opinion.pk, ocr_available=False)
+        extract_opinion_content(wpd_opinion.pk, ocr_available=False)
         wpd_opinion.refresh_from_db()
         self.assertIn("greene", wpd_opinion.html.lower())
 
     def test_txt_content_extraction(self) -> None:
         """Can we ingest a txt file?"""
         txt_opinion = Opinion.objects.get(pk=6)
-        extract_doc_content(txt_opinion.pk, ocr_available=False)
+        extract_opinion_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
 
@@ -731,9 +785,8 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = ["text/html"]
         self.assertRaises(
             UnexpectedContentTypeError,
-            get_binary_content,
+            self.site.download_content,
             "/dummy/url/",
-            self.site,
         )
 
     @mock.patch("requests.Session.get")
@@ -743,13 +796,13 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = ["application/pdf"]
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
 
             self.mock_response.headers = {
                 "Content-Type": "application/pdf;charset=utf-8"
             }
             mock_get.return_value = self.mock_response
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
     @mock.patch("requests.Session.get")
@@ -759,7 +812,7 @@ class ScraperContentTypeTest(TestCase):
         self.site.expected_content_types = None
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = get_binary_content("/dummy/url/", self.site)
+            _ = self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
 
@@ -807,8 +860,8 @@ class ScrapeCitationsTest(TestCase):
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
         with (
             mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
-            mock.patch(
-                f"{cmd}.get_binary_content", return_value="placeholder"
+            mock.patch.object(
+                self.mock_site, "download_content", return_value="placeholder"
             ),
         ):
             cl_back_scrape_citations.Command().scrape_court(self.mock_site)
@@ -977,7 +1030,9 @@ class UpdateFromTextCommandTest(TestCase):
             ),
             plain_text="""Docket Number: 2020-12
             Disposition: Affirmed
-            2020 VT 11""",
+            2020 VT 11
+            Originating Court Docket Number: 18-2222
+            """,
         )
         self.opinion_2020_unpub = OpinionFactory(
             cluster=OpinionClusterFactory(
@@ -1076,6 +1131,11 @@ class UpdateFromTextCommandTest(TestCase):
             "13",
             "Unpublished docket should not be modified",
         )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.originating_court_information.docket_number,
+            "18-2222",
+            "Originating Court Information was not created",
+        )
 
 
 class CommandInputTest(TestCase):
@@ -1111,7 +1171,8 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         cls.rebuild_index("search.OpinionCluster")
         cls.rebuild_index("search.Docket")
 
-    def test_merge_versions_by_download_url(self):
+    @patch("cl.lib.es_signal_processor.compute_single_opinion_embeddings.si")
+    def test_merge_versions_by_download_url(self, compute_embeddings_mock):
         """Can we merge opinion versions and delete ES documents correctly?
 
         This a end to end test. It's testing
@@ -1177,14 +1238,14 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
         main_citation = CitationWithParentsFactory.create(
-            cluster=main_cluster, volume=10000, reporter="U.S.", page="1"
+            cluster=main_cluster, volume="10000", reporter="U.S.", page="1"
         )
         repeated_citation = CitationWithParentsFactory.create(
-            cluster=cluster2, volume=10000, reporter="U.S.", page="1"
+            cluster=cluster2, volume="10000", reporter="U.S.", page="1"
         )
         new_citation = CitationWithParentsFactory.create(
             cluster=cluster2,
-            volume=20,
+            volume="20",
             reporter="Nev.",
             page="20",
             type=Citation.STATE,
@@ -1286,6 +1347,13 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             type=1,
         )
 
+        # Test Opinion.joined_by merging
+        person1 = PersonFactory()
+        person2 = PersonFactory()
+        main_opinion.joined_by.add(person1)
+        version.joined_by.add(person1)
+        version.joined_by.add(person2)
+
         # Check that elasticsearch docs exist before the merging
         self.assertTrue(
             OpinionClusterDocument.exists(id=cluster2.id),
@@ -1347,6 +1415,12 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             author_str,
             "Opinion.author_str was not updated in the main object",
         )
+        self.assertEqual(
+            main_opinion.joined_by.count(),
+            2,
+            "Opinion.joined_by was not updated",
+        )
+
         self.assertEqual(
             unrelated_opinion.main_version_id,
             None,
@@ -1603,3 +1677,444 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             ).exists(),
             "Existing re-direction was not re-assigned to new cluster",
         )
+
+    def test_loose_text_similarity_merging(self):
+        """Can we attempt merges with a loose text similarity threshold?"""
+        court_id = "nev"
+        court = CourtFactory.create(id=court_id)
+        docket_number = "CV-22222"
+        main_docket = DocketFactory.create(
+            court=court, docket_number=docket_number
+        )
+        download_url = "http://somethingelse.court/111.pdf"
+
+        version_candidate = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something else...",
+            html="",
+            author_str="Some Author",
+            sha1="yyy",
+        )
+
+        opinion = OpinionFactory.create(
+            cluster=OpinionClusterFactory(
+                docket=main_docket, source=SOURCES.COURT_WEBSITE
+            ),
+            download_url=download_url,
+            plain_text="something...",
+            html="",
+            author_str="Another Author",
+            sha1="xxx",
+        )
+        base_path = "cl.scrapers.management.commands.merge_opinion_versions"
+        with (
+            mock.patch(
+                f"{base_path}.get_text_similarity"
+            ) as patched_get_text_similarity,
+            mock.patch(
+                f"{base_path}.merge_opinion_versions"
+            ) as patched_merge_opinion_versions,
+        ):
+            patched_get_text_similarity.return_value = (False, True, 0.75, 0.8)
+            merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
+            # assert that merging was attempted
+            patched_get_text_similarity.assert_called()
+            patched_merge_opinion_versions.assert_called()
+
+        version_candidate.refresh_from_db()
+        self.assertTrue(
+            version_candidate.main_version_id is None,
+            "Loose versioning should not pass when metadata differs ",
+        )
+
+
+class DeleteDuplicatesTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        nev = CourtFactory.create(id="nev")
+        docket_number = "11111"
+        docket = DocketFactory.create(court=nev, docket_number=docket_number)
+        docket2 = DocketFactory.create(court=nev, docket_number=docket_number)
+        same_cluster_fields = {
+            "docket": docket,
+            "source": SOURCES.COURT_WEBSITE,
+            "case_name": "something",
+            "case_name_full": "something full",
+            "precedential_status": "Precedential",
+            "date_filed": "2019-01-01",
+        }
+        cls.hash = "xxxxxxxx"
+        same_opinion_fields = {
+            "author": None,
+            "plain_text": "Something....",
+            "sha1": cls.hash,
+            "download_url": "https://something.com/a_pdf.pdf",
+        }
+        cls.author = "Some author"  # to check metadata propagation
+
+        cls.cluster_to_delete_id = 976123
+        cluster_to_delete = OpinionClusterFactory.create(
+            id=cls.cluster_to_delete_id, **same_cluster_fields
+        )
+        cls.should_delete = OpinionFactory.create(
+            cluster=cluster_to_delete,
+            author_str=cls.author,
+            **same_opinion_fields,
+        )
+
+        # the factories will create different values which will stop the merge
+        cls.should_not_merge = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(
+                docket=docket2, source=SOURCES.COURT_WEBSITE
+            ),
+            **same_opinion_fields,
+        )
+
+        # the same, but with a different hash
+        cls.different_hash_cluster_id = 123976
+        cls.different_hash_cluster = OpinionClusterFactory.create(
+            id=cls.different_hash_cluster_id, **same_cluster_fields
+        )
+        opinion_fields = {**same_opinion_fields}
+        opinion_fields["sha1"] = "yyyyyyyyy"
+        cls.different_hash_duplicate = OpinionFactory.create(
+            cluster=cls.different_hash_cluster, **opinion_fields
+        )
+
+        cls.cluster_to_keep = OpinionClusterFactory.create(
+            **same_cluster_fields
+        )
+        cls.op_to_keep = OpinionFactory.create(
+            cluster=cls.cluster_to_keep, **same_opinion_fields
+        )
+
+        # for text comparison
+        coloctapp = CourtFactory.create(id="coloctapp")
+        dn = "2222"
+        docket = DocketFactory.create(court=coloctapp, docket_number=dn)
+        same_cluster_fields["docket"] = docket
+
+        # make sure we only delete identical opinions, after timestamp cleaning
+        cls.timestamped_op_do_not_delete = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="yyy",
+            plain_text="Something 20 Dec 2024 21:06:18 Something else",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+        cls.timestamped_op_to_delete = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="xxx",
+            plain_text="Something 19 Dec 2024 21:06:18",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+        cls.timestamped_op_to_keep = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="zzzz",
+            plain_text="Something 01 Jan 2024 01:06:18",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+
+    def test_same_hash_duplicate_deletion(self):
+        """Test that we can delete same hash duplicates
+
+        - confirm deletion
+        - confirm ClusterDuplication is created, with proper values
+        - abort deletion if something doesn't match
+        """
+        stats = defaultdict(lambda: 0)
+        delete_duplicates.delete_same_hash_duplicates(
+            stats, [SOURCES.COURT_WEBSITE]
+        )
+
+        try:
+            self.should_delete.refresh_from_db()
+            self.fail("`should_delete` should be deleted as a duplicate")
+        except Opinion.DoesNotExist:
+            pass
+
+        self.op_to_keep.refresh_from_db()
+        self.assertEqual(
+            self.op_to_keep.author_str,
+            self.author,
+            "metadata was not propagated",
+        )
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=self.cluster_to_delete_id,
+                cluster=self.cluster_to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "ClusterRedirection with proper values was not created",
+        )
+
+        try:
+            self.should_not_merge.refresh_from_db()
+        except Opinion.DoesNotExist:
+            self.fail("`should_not_merge` should still exist")
+
+    def test_cleanup_content_method(self):
+        """Can we delete different hash duplicates using the `cleanup_content` method"""
+        stats = defaultdict(lambda: 0)
+        site = test_opinion_scraper.Site()
+        with mock.patch(
+            "cl.scrapers.management.commands.delete_duplicates.get_cleaned_content_hash"
+        ) as patched_get_cleaned_content_hash:
+            patched_get_cleaned_content_hash.return_value = self.hash
+            delete_duplicates.delete_cleaned_up_content_duplicates(
+                stats, "nev", site
+            )
+
+        try:
+            self.different_hash_cluster.refresh_from_db()
+            self.fail(
+                "`different_hash_cluster` should be deleted as a duplicate"
+            )
+        except OpinionCluster.DoesNotExist:
+            pass
+
+        try:
+            self.different_hash_duplicate.refresh_from_db()
+            self.fail(
+                "`different_hash_duplicate` should be deleted as a duplicate"
+            )
+        except Opinion.DoesNotExist:
+            pass
+
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=self.different_hash_cluster_id,
+                cluster=self.cluster_to_keep,
+                reason=ClusterRedirection.DUPLICATE,
+            ).exists(),
+            "ClusterRedirection with proper values was not created",
+        )
+
+    def test_delete_by_text_comparison(self):
+        """Test that we can delete opinions by text comparison"""
+        stats = defaultdict(lambda: 0)
+
+        delete_duplicates.delete_by_text_comparison(stats, "coloctapp")
+
+        try:
+            self.timestamped_op_to_delete.refresh_from_db()
+            self.fail("Timestamped opinion should be deleted")
+        except Opinion.DoesNotExist:
+            pass
+
+        try:
+            self.timestamped_op_do_not_delete.refresh_from_db()
+        except Opinion.DoesNotExist:
+            self.fail("Should not delete an opinion with different text")
+
+        try:
+            delete_duplicates.delete_by_text_comparison(stats, "scotus")
+            self.fail("Should raise error due to unsupported court")
+        except ValueError:
+            pass
+
+
+class SubscribeToSCOTUSTest(TestCase):
+    def setUp(self):
+        self.scotus = CourtFactory.create(id="scotus")
+        self.docket_number = "25-260"
+        self.docket_scotus = DocketFactory.create(
+            court=self.scotus, docket_number=self.docket_number
+        )
+        self.docket_pk = self.docket_scotus.pk
+
+        self.test_asset_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "scrapers"
+            / "test_assets"
+            / "scotus_subscription"
+        )
+
+    def add_response(self, file_name: str, **kwargs):
+        with open(
+            self.test_asset_dir / f"{file_name}.headers.json", "rb"
+        ) as f:
+            headers = json.load(f)
+
+        content_type = headers["Content-Type"]
+        body_extension = content_type.split(";")[0].split("/")[-1]
+        if (
+            "Content-Encoding" in headers
+            and headers["Content-Encoding"] == "gzip"
+        ):
+            body_extension = f"{body_extension}.gz"
+
+        with open(
+            self.test_asset_dir / f"{file_name}.body.{body_extension}", "rb"
+        ) as f:
+            body = f.read()
+
+        response = responses.Response(headers=headers, body=body, **kwargs)
+        responses.add(response)
+        return response
+
+    def test_transcription_cleaning(self):
+        messy = "RoMeo Juleett.; 5 Seven- .Three"
+        clean = process_scotus_captcha_transcription(messy)
+        self.assertEqual(clean, "rj573")
+
+    @responses.activate
+    @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")
+    @mock.patch("cl.scrapers.tasks.call_llm_transcription")
+    @mock.patch("cl.lib.celery_utils.get_task_wait")
+    def test_subscription_task(
+        self, mock_wait: MagicMock, mock_transcription: MagicMock
+    ):
+        scotus_root = "https://file.supremecourt.gov"
+        form_url = (
+            f"{scotus_root}/CaseNotification?caseNumber={self.docket_number}"
+        )
+        subscription_email = "scotus@recap.email"
+        captcha_solution = "mo9su"
+        captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
+        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"
+        mock_wait.return_value = 0
+        mock_transcription.return_value = " ".join(
+            [c for c in captcha_solution]
+        )
+
+        self.add_response(
+            "1_get",
+            url=form_url,
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "2_post",
+            url=f"{scotus_root}/Captcha/Reset",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "3_get",
+            url=f"{scotus_root}/Captcha/audio?captchaId={captcha_id}",
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "4_post",
+            url=f"{scotus_root}/Captcha/validate",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                        "captchaId": captcha_id,
+                        "captcha": captcha_solution,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "5_post",
+            url=f"{scotus_root}/CaseNotification/Subscribe",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "CaseNumber": self.docket_number,
+                        "Email": subscription_email,
+                        "btnRestart": "Enter another email",
+                        "btnSearch": "Return to Search",
+                        "WebDocketUrl": f"https://www.supremecourt.gov/search.aspx?filename=/docket/DocketFiles/html/Public/{self.docket_number}.html",
+                        "captcha": captcha_solution,
+                        "SubscribeButton": "Subscribe",
+                        "btnCancel": "Cancel",
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+
+        subscribe_to_scotus_updates.delay(self.docket_pk).get()
+        self.assertEqual(
+            len(mock_transcription.mock_calls),
+            1,
+            "Should have requested exactly 1 transcription",
+        )
+
+
+class SetOrderingKeysTest(SimpleTestCase):
+    def test_set_ordering_keys(self):
+        """Test if set_ordering_keys correctly assigns ordering_key to multiple opinions"""
+        opinions_content = [
+            (
+                {"types": "030concurrence", "download_urls": "url1"},
+                b"",
+                "sha1",
+            ),
+            ({"types": "020lead", "download_urls": "url2"}, b"", "sha2"),
+            ({"types": "040dissent", "download_urls": "url3"}, b"", "sha3"),
+            (
+                {"types": "030concurrence", "download_urls": "url4"},
+                b"",
+                "sha4",
+            ),
+        ]
+
+        cl_scrape_opinions.set_ordering_keys(opinions_content)
+
+        # Expected order based on types and original index:
+        # 020lead (index 1) -> 1
+        # 030concurrence (index 0) -> 2
+        # 030concurrence (index 3) -> 3
+        # 040dissent (index 2) -> 4
+
+        self.assertEqual(opinions_content[1][0]["ordering_key"], 1)
+        self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
+        self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
+        self.assertEqual(opinions_content[2][0]["ordering_key"], 4)

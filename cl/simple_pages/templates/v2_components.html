@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load svg_tags %}
+{% load static svg_tags %}
 
 {% block title %}Components Library - CourtListener.com{% endblock %}
 
@@ -12,6 +12,7 @@
         {'href': '#code-block', 'text': 'Code blocks'},
         {'href': '#two-column-list', 'text': 'Two column list'},
         {'href': '#eyebrow', 'text': 'Eyebrow'},
+        {'href': '#banner', 'text': 'Banner'},
         {'href': '#copy', 'text': 'Copy to clipboard'},
       ]},
       {'href': '#layout-components', 'text': 'Layout components', 'children': [
@@ -180,6 +181,109 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-eyebrow&gt;CourtListener&lt;/c-eyebrow>
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# BANNER #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="banner">
+    <h2 class="mt-6 mb-3">Banner</h2>
+    <h4 class="mt-3">Demo</h4>
+    <c-banner
+      size="basis-1/2"
+      eyebrow_text="RECAP Suite"
+      title_text="Turning PACER Around Since 2009"
+      paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
+      :buttons="[
+          {
+            'style': 'btn-primary',
+            'name': 'Install now',
+            'options': [
+              {
+                'name': 'Add to Chrome',
+                'href': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
+                'icon': 'logos/chrome'
+              }, {
+                'name': 'Add to Edge',
+                'href': '/recap/edge',
+                'icon': 'logos/edge'
+              }
+            ]
+          }, {
+              'style': 'btn-outline',
+              'name': 'Learn more'
+          }
+        ]"
+        image_source="{%  static 'png/recap_search_container.png' %}"
+        image_alt=""
+    ></c-banner>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>size</code></c-slot>
+        <c-slot name="description">Tailwind style determining fraction of banner space to use</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>eyebrow_text</code></c-slot>
+        <c-slot name="description">Eyebrow content</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>title_text</code></c-slot>
+        <c-slot name="description">Title content</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>paragraph_text</code></c-slot>
+        <c-slot name="description">Paragraph content</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>buttons</code></c-slot>
+        <c-slot name="description">List of dicts of button properties</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>image_source</code></c-slot>
+        <c-slot name="description">URL for image</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>image_alt</code></c-slot>
+        <c-slot name="description">Alt text for image</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-banner
+      size="basis-1/2"
+      eyebrow_text="RECAP Suite"
+      title_text="Turning PACER Around Since 2009"
+      paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
+     :buttons="[
+          {
+            'style': 'btn-primary',
+            'name': 'Install now',
+            'options': [
+              {
+                'name': 'Add to Chrome',
+                'href': 'https://chromewebstore.google.com/detail/recap/oiillickanjlaeghobeeknbddaonmjnc',
+                'icon': 'logos/chrome'
+              }, {
+                'name': 'Add to Edge',
+                'href': '/recap/edge',
+                'icon': 'logos/edge'
+              }
+            ]
+          }, {
+              'style': 'btn-outline',
+              'name': 'Learn more'
+          }
+        ]"
+        image_source="{%  static 'png/recap_search_container.png' %}"
+        image_alt=""
+      &gt;
+    &lt;/c-banner>
       </c-code>
     </c-expansion-panel>
   </section>
@@ -545,6 +649,13 @@ Sample code here.
       </c-library.item>
 
       <c-library.item optional only>
+        <c-slot name="label"><code>align</code></c-slot>
+        <c-slot name="description">
+          Default is to align table contents to the left. Use <code>center</code> to align everything in the middle. Use <code>data-center</code> to keep the first column left, but center the rest of the table.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
         <c-slot name="label"><code>footer</code></c-slot>
         <c-slot name="description">
           List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
@@ -569,6 +680,7 @@ Sample code here.
       <c-code>
 &lt;c-data-table
   safe
+  align="data-center"
   caption="Usage example of data table component"
   :columns="[
     {'label': 'First header', 'field': 'first'},

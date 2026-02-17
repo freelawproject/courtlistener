@@ -171,7 +171,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         print("✓")
         is_html = "text/html" in r["content-type"]
         if r["content-type"] and is_html:
-            self.assert_page_title_in_html(r.content)
+            self.assert_page_title_in_html(r.content.decode())
 
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
@@ -184,7 +184,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
-            {"viewname": "contribute"},
             {"viewname": "replication_docs"},
             {"viewname": "terms"},
             {"viewname": "robots"},
@@ -199,6 +198,8 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "advanced_search"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
+            {"viewname": "mcp_help"},
+            {"viewname": "citegeist_help"},
             # API help pages
             {"viewname": "case_law_api_help"},
             {"viewname": "citation_api_help"},
@@ -243,8 +244,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "profile_notes"},
             {"viewname": "profile_search_alerts"},
             {"viewname": "profile_docket_alerts"},
-            {"viewname": "view_visualizations"},
-            {"viewname": "view_deleted_visualizations"},
             {"viewname": "password_change"},
             {"viewname": "delete_account"},
             {"viewname": "take_out"},

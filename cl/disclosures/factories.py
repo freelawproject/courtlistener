@@ -1,4 +1,4 @@
-from factory import Faker
+from factory import Faker, RelatedFactory, SubFactory, post_generation
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyInteger
 
@@ -12,6 +12,8 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
+from cl.people_db.factories import PersonFactory, PositionFactory
+from cl.search.factories import CourtFactory
 
 
 class InvestmentFactory(DjangoModelFactory):
@@ -65,3 +67,27 @@ class FinancialDisclosureFactory(DjangoModelFactory):
     year = Faker("year")
     page_count = FuzzyInteger(50)
     sha1 = Faker("sha1")
+
+
+class PersonWithDisclosuresFactory(PersonFactory):
+    """Creates a person (judge) with financial disclosures and investments."""
+
+    positions = RelatedFactory(
+        PositionFactory,
+        factory_related_name="person",
+        court=SubFactory(CourtFactory),
+    )
+
+    @post_generation
+    def disclosures(self, create, extracted, **kwargs):
+        if not create:
+            return
+        # Create two years of disclosures with investments
+        for year in [2023, 2022]:
+            disclosure = FinancialDisclosureFactory(
+                person=self,
+                year=year,
+                has_been_extracted=True,
+            )
+            # Add some investments to each disclosure
+            InvestmentFactory.create_batch(3, financial_disclosure=disclosure)

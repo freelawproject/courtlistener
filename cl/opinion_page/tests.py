@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import AnonymousUser, Group, User
+from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
@@ -26,8 +26,10 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import RelatedFactory
+from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
+from cl.favorites.models import GenericCount
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -46,7 +48,6 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    es_get_citing_and_related_clusters_with_cache,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
@@ -121,6 +122,7 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
+@override_flag("citing_and_related_enabled", True)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -199,28 +201,6 @@ class OpinionPageLoadTest(
         response = await self.async_client.get(path)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn("33 state 1", response.content.decode())
-
-    async def test_es_get_citing_clusters_with_cache(self) -> None:
-        """Does es_get_citing_and_related_clusters_with_cache return the
-        correct clusters citing and the total cites count?
-        """
-
-        request = AsyncRequestFactory().get("/")
-        result = await es_get_citing_and_related_clusters_with_cache(
-            self.o_cluster_3, request
-        )
-        clusters = result.citing_clusters
-        count = result.citing_cluster_count
-
-        c_list_names = [c["caseName"] for c in clusters]
-        expected_clusters = [
-            self.o_cluster_1.case_name,
-            self.o_cluster_2.case_name,
-            self.o_cluster_4.case_name,
-        ]
-        # Compare expected clusters citing and total count.
-        self.assertEqual(set(c_list_names), set(expected_clusters))
-        self.assertEqual(count, len(expected_clusters))
 
 
 class ViewRecapDocumentTest(TestCase):
@@ -798,8 +778,8 @@ class CitationRedirectorTest(TestCase):
         volume_next, volume_previous = await get_prev_next_volumes(
             "COA", "2017"
         )
-        self.assertEqual(volume_previous, 2016)
-        self.assertEqual(volume_next, 2018)
+        self.assertEqual(volume_previous, "2016")
+        self.assertEqual(volume_next, "2018")
 
         # Delete previous
         await test_obj.adelete()
@@ -809,7 +789,7 @@ class CitationRedirectorTest(TestCase):
             "COA", "2017"
         )
         self.assertEqual(volume_previous, None)
-        self.assertEqual(volume_next, 2018)
+        self.assertEqual(volume_next, "2018")
 
         # Create new test data
         await sync_to_async(CitationWithParentsFactory.create)(
@@ -833,6 +813,58 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
+
+        # Create new test data
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="71",
+            reporter="A.F.T.R.2d (RIA)",
+            page="4114",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Jane v. Doe",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="71A",
+            reporter="A.F.T.R.2d (RIA)",
+            page="3011",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Foo v. Bar",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="72",
+            reporter="A.F.T.R.2d (RIA)",
+            page="6029",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Bar v. Foo",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "A.F.T.R.2d (RIA)", "71A"
+        )
+        self.assertEqual(volume_previous, "71")
+        self.assertEqual(volume_next, "72")
 
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
@@ -911,7 +943,7 @@ class CitationRedirectorTest(TestCase):
 
     async def test_can_filter_out_non_case_law_citation(self):
         chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=22, reporter="U.S.", page="444", type=1
+            volume="22", reporter="U.S.", page="444", type=1
         )
         r = await self.async_client.post(
             reverse("citation_homepage"),
@@ -1264,12 +1296,13 @@ class DocketSitemapTest(SitemapTest):
             date_filed=datetime.date.today(),
         )
         # Included b/c many views
-        DocketFactory.create(
+        docket = DocketFactory.create(
             source=Docket.RECAP,
             blocked=False,
-            view_count=50,
             date_filed=datetime.date.today() - datetime.timedelta(days=60),
         )
+        label = f"d.{docket.pk}:view"
+        GenericCount.objects.create(label=label, value=50)
         # Excluded b/c blocked
         DocketFactory.create(
             source=Docket.RECAP,
@@ -1813,7 +1846,7 @@ class UploadPublication(TestCase):
 class TestBlockSearchItemAjax(TestCase):
     @classmethod
     def setUpTestData(cls):
-        # User admin
+        # User admin (superuser)
         cls.admin = UserProfileWithParentsFactory.create(
             user__username="admin",
             user__password=make_password("password"),
@@ -1830,6 +1863,28 @@ class TestBlockSearchItemAjax(TestCase):
             case_name="Fisher v. SD Protection Inc.",
             date_filed=date(2020, 1, 1),
         )
+
+        # User with only view permissions
+        cls.viewer = UserProfileWithParentsFactory(
+            user__username="block_viewer",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        view_perms = Permission.objects.filter(
+            codename__in=["view_docket", "view_opinioncluster"]
+        )
+        cls.viewer.user.user_permissions.add(*view_perms)
+
+        # User with only change_docket, no change_opinioncluster permission
+        cls.docket_only = UserProfileWithParentsFactory(
+            user__username="block_docket_only",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        docket_perms = Permission.objects.filter(
+            codename__in=["view_docket", "change_docket"]
+        )
+        cls.docket_only.user.user_permissions.add(*docket_perms)
 
     async def test_return_404_for_invalid_type(self) -> None:
         """is it returning 404 for invalid types?"""
@@ -1886,6 +1941,253 @@ class TestBlockSearchItemAjax(TestCase):
 
         await self.cluster.arefresh_from_db()
         self.assertTrue(self.cluster.blocked)
+
+    async def test_block_item_denied_without_permission(self) -> None:
+        """Users without change_docket should get a 403 when trying
+        to block"""
+        client = AsyncClient()
+        await client.aforce_login(user=self.viewer.user)
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_block_cluster_denied_without_cluster_permission(
+        self,
+    ) -> None:
+        """Users with change_docket but not change_opinioncluster should
+        get a 403 when trying to block a cluster using Block Cluster and
+        Docket button"""
+        client = AsyncClient()
+        await client.aforce_login(user=self.docket_only.user)
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.pk, "type": "cluster"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_block_docket_allowed_with_permission(self) -> None:
+        """Users with change_docket should be able to block a docket."""
+        client = AsyncClient()
+        await client.aforce_login(user=self.docket_only.user)
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+
+class TestAdminButtonsVisibility(TestCase):
+    """Test that admin buttons are shown or hidden based on user permissions
+    across the opinion, docket, and RECAP document pages."""
+
+    @classmethod
+    def setUpTestData(cls):
+        court = CourtFactory(id="ca3")
+        cls.docket = DocketFactory(
+            court=court, source=Docket.RECAP, case_name="Foo v. Bar"
+        )
+        cls.de = DocketEntryFactory(docket=cls.docket)
+        cls.rd = RECAPDocumentFactory(docket_entry=cls.de)
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory(
+            docket=DocketFactory(court=court, case_name="Jane v. Doe"),
+            case_name="Jane v. Doe",
+            date_filed=date(2020, 1, 1),
+        )
+
+        # User with view only permissions
+        cls.viewer = UserProfileWithParentsFactory(
+            user__username="viewer",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        view_perms = Permission.objects.filter(
+            codename__in=[
+                "view_docket",
+                "view_opinioncluster",
+                "view_opinion",
+                "view_docketentry",
+                "view_recapdocument",
+            ]
+        )
+        cls.viewer.user.user_permissions.add(*view_perms)
+
+        # User with view + change permissions
+        cls.editor = UserProfileWithParentsFactory(
+            user__username="editor",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        change_perms = Permission.objects.filter(
+            codename__in=[
+                "view_docket",
+                "change_docket",
+                "view_opinioncluster",
+                "change_opinioncluster",
+                "view_opinion",
+                "change_opinion",
+                "view_docketentry",
+                "change_docketentry",
+                "view_recapdocument",
+                "change_recapdocument",
+            ]
+        )
+        cls.editor.user.user_permissions.add(*change_perms)
+
+        # User with only docket permissions
+        cls.docket_only = UserProfileWithParentsFactory(
+            user__username="docket_only",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        docket_perms = Permission.objects.filter(
+            codename__in=["view_docket", "change_docket"]
+        )
+        cls.docket_only.user.user_permissions.add(*docket_perms)
+
+    def _get_opinion_url(self):
+        return reverse(
+            "view_case",
+            args=[self.cluster.pk, self.cluster.slug],
+        )
+
+    def _get_docket_url(self):
+        return reverse(
+            "view_docket",
+            args=[self.docket.pk, self.docket.slug],
+        )
+
+    def _get_recap_doc_url(self):
+        return reverse(
+            "view_recap_document",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": self.rd.document_number,
+                "slug": self.docket.slug,
+            },
+        )
+
+    def _admin_url(self, route, pk):
+        """Build a resolved admin URL for assertion checks."""
+        return reverse(f"admin:{route}", args=[pk])
+
+    async def test_opinion_page_viewer_sees_admin_buttons(self) -> None:
+        """Users with view permissions should see Docket, Cluster,
+        and Opinion buttons but not the Block button."""
+        await self.async_client.aforce_login(self.viewer.user)
+        r = await self.async_client.get(self._get_opinion_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.cluster.docket.pk
+        )
+        cluster_edit_url = self._admin_url(
+            "search_opinioncluster_change", self.cluster.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, cluster_edit_url)
+        self.assertContains(r, "/admin/search/opinion/")
+        self.assertNotContains(r, "block-item")
+
+    async def test_opinion_page_editor_sees_block_button(self) -> None:
+        """Users with change permissions should see the Block button."""
+        await self.async_client.aforce_login(self.editor.user)
+        r = await self.async_client.get(self._get_opinion_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.cluster.docket.pk
+        )
+        cluster_edit_url = self._admin_url(
+            "search_opinioncluster_change", self.cluster.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, cluster_edit_url)
+        self.assertContains(r, "block-item")
+
+    async def test_opinion_page_docket_only_sees_docket_button(self) -> None:
+        """Users with only docket permissions should see the Docket
+        button but not Cluster, Opinion, or Block buttons."""
+        await self.async_client.aforce_login(self.docket_only.user)
+        r = await self.async_client.get(self._get_opinion_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.cluster.docket.pk
+        )
+        cluster_edit_url = self._admin_url(
+            "search_opinioncluster_change", self.cluster.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertNotContains(r, cluster_edit_url)
+        self.assertNotContains(r, "/admin/search/opinion/")
+        self.assertNotContains(r, "block-item")
+
+    async def test_docket_page_viewer_sees_edit_no_block(self) -> None:
+        """Users with view-only permissions should see Edit Docket but
+        not the Block button."""
+        await self.async_client.aforce_login(self.viewer.user)
+        r = await self.async_client.get(self._get_docket_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertNotContains(r, "block-item")
+
+    async def test_docket_page_editor_sees_block_button(self) -> None:
+        """Users with change_docket should see the Block button."""
+        await self.async_client.aforce_login(self.editor.user)
+        r = await self.async_client.get(self._get_docket_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, "block-item")
+
+    async def test_recap_page_viewer_sees_admin_buttons(self) -> None:
+        """Users with view permissions should see Docket, Docket Entry,
+        and RECAP Document buttons."""
+        await self.async_client.aforce_login(self.viewer.user)
+        r = await self.async_client.get(self._get_recap_doc_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        de_edit_url = self._admin_url("search_docketentry_change", self.de.pk)
+        rd_edit_url = self._admin_url(
+            "search_recapdocument_change", self.rd.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, de_edit_url)
+        self.assertContains(r, rd_edit_url)
+
+    async def test_recap_page_editor_sees_all_buttons(self) -> None:
+        """Users with change permissions should see all buttons."""
+        await self.async_client.aforce_login(self.editor.user)
+        r = await self.async_client.get(self._get_recap_doc_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        de_edit_url = self._admin_url("search_docketentry_change", self.de.pk)
+        rd_edit_url = self._admin_url(
+            "search_recapdocument_change", self.rd.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, de_edit_url)
+        self.assertContains(r, rd_edit_url)
+
+    async def test_recap_page_docket_only_sees_docket_button(self) -> None:
+        """Users with only docket permissions should see the Docket
+        button but not Docket Entry or RECAP Document buttons."""
+        await self.async_client.aforce_login(self.docket_only.user)
+        r = await self.async_client.get(self._get_recap_doc_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        de_edit_url = self._admin_url("search_docketentry_change", self.de.pk)
+        rd_edit_url = self._admin_url(
+            "search_recapdocument_change", self.rd.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertNotContains(r, de_edit_url)
+        self.assertNotContains(r, rd_edit_url)
 
 
 class DocketEntryFileDownload(TestCase):

@@ -2,7 +2,7 @@ import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import eyecite
@@ -12,8 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Exists, IntegerField, OuterRef, Prefetch, QuerySet
-from django.db.models.functions import Cast
+from django.db.models import Exists, OuterRef, Prefetch, QuerySet
 from django.http import (
     HttpRequest,
     HttpResponseRedirect,
@@ -58,6 +57,7 @@ from cl.favorites.utils import (
     get_prayer_counts_in_bulk,
 )
 from cl.lib.auth import group_required
+from cl.lib.bot_detector import is_bot
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
@@ -67,6 +67,7 @@ from cl.lib.search_utils import do_es_search, make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
+from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
@@ -94,6 +95,7 @@ from cl.search.models import (
     Citation,
     Court,
     Docket,
+    Opinion,
     OpinionCluster,
     OpinionsCitedByRECAPDocument,
     Parenthetical,
@@ -409,7 +411,7 @@ async def view_docket(
     return TemplateResponse(request, "docket.html", context)
 
 
-@cache_page_ignore_params(300)
+@cache_page_ignore_params(300, cache_alias="s3")
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
@@ -955,9 +957,33 @@ async def setup_opinion_context(
     return context
 
 
-async def get_opinions_base_queryset() -> QuerySet:
+async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
+    """Prepare a cluster queryset with common prefetchs to prevent extra
+    queries
+
+    :param sub_opinions_prefetch: a plain string which identifies a prefetch
+        path. If it's value is "no_text_fields", it will get the sub_opinions
+        without their big text fields, for performance improvements
+    :return: the queryset
+    """
+    if sub_opinions_prefetch == "no_text_fields":
+        prefetch = Prefetch(
+            "sub_opinions",
+            Opinion.objects.defer(
+                "html_with_citations",
+                "html",
+                "plain_text",
+                "xml_harvard",
+                "html_lawbox",
+                "html_columbia",
+                "html_anon_2020",
+            ),
+        )
+    else:
+        prefetch = Prefetch(sub_opinions_prefetch)  # type: ignore[arg-type]
+
     return OpinionCluster.objects.prefetch_related(
-        "sub_opinions__opinions_cited", "citations"
+        prefetch, "citations"
     ).select_related("docket__court")
 
 
@@ -998,6 +1024,11 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     if "HX-Request" not in request.headers:
         return HttpResponse("")
 
+    if is_bot(request):
+        return await sync_to_async(render)(
+            request, "includes/opinion_tabs.html", {"cluster": None}
+        )
+
     cluster = await OpinionCluster.objects.filter(pk=pk).afirst()
     if not cluster:
         return await sync_to_async(render)(
@@ -1010,7 +1041,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o_es"
     )
-
     # Default count when flag is disabled
     cited_by_count = 0
     related_cases_count = 0
@@ -1018,7 +1048,8 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     if ui_flag_for_o_es:
         # Flag enabled, query ES to get counts
         sub_opinion_pks = [
-            str(opinion.pk) async for opinion in cluster.sub_opinions.all()
+            str(opinion.pk)
+            async for opinion in cluster.sub_opinions.all().only("pk")
         ]
         cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
         related_cases_count = await es_related_case_count(
@@ -1059,7 +1090,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     :return: The old or new opinion HTML
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("sub_opinions"), pk=pk
     )
     return await render_opinion_view(request, cluster, "opinions")
 
@@ -1076,7 +1107,7 @@ async def view_opinion_pdf(
     :return: Opinion PDF tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("no_text_fields"), pk=pk
     )
     return await render_opinion_view(request, cluster, "pdf")
 
@@ -1093,7 +1124,8 @@ async def view_opinion_authorities(
     :return: Table of Authorities tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("sub_opinions__opinions_cited"),
+        pk=pk,
     )
 
     additional_context = {
@@ -1116,7 +1148,7 @@ async def view_opinion_cited_by(
     :return: Cited By tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("sub_opinions__opinions_cited"), pk=pk
     )
     cited_query = await es_get_cited_clusters_with_cache(cluster, request)
     additional_context = {
@@ -1140,7 +1172,7 @@ async def view_opinion_summaries(
     :return: Summaries tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("no_text_fields"), pk=pk
     )
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
     parenthetical_groups = [
@@ -1179,7 +1211,7 @@ async def view_opinion_related_cases(
     :return: Related Cases tab
     """
     cluster: OpinionCluster = await aget_object_or_404(
-        await get_opinions_base_queryset(), pk=pk
+        await get_opinions_queryset("no_text_fields"), pk=pk
     )
     related_cluster_object = await es_get_related_clusters_with_cache(
         cluster, request
@@ -1207,7 +1239,7 @@ async def throw_404(request: HttpRequest, context: dict) -> HttpResponse:
 
 async def get_prev_next_volumes(
     reporter: str, volume: str
-) -> tuple[int | None, int | None]:
+) -> tuple[str | None, str | None]:
     """Get the volume before and after the current one.
 
     :param reporter: The reporter where the volume is found
@@ -1215,17 +1247,20 @@ async def get_prev_next_volumes(
     :return Tuple of the volume number we have prior to the selected one, and
     of the volume number after it.
     """
-    volumes = [
+    raw_volumes = [
         vol
         async for vol in Citation.objects.filter(reporter=reporter)
-        .annotate(as_integer=Cast("volume", IntegerField()))
-        .values_list("as_integer", flat=True)
+        .values_list("volume", flat=True)
         .distinct()
-        .order_by("as_integer")
     ]
-    index = volumes.index(int(volume))
-    volume_previous = volumes[index - 1] if index > 0 else None
-    volume_next = volumes[index + 1] if index + 1 < len(volumes) else None
+
+    # Use human sort for volume strings, e.g. 77, 78, 78a, 78b, 79
+    sorted_volumes = cast(list[str], human_sort(raw_volumes))
+    index = sorted_volumes.index(volume)
+    volume_previous = sorted_volumes[index - 1] if index > 0 else None
+    volume_next = (
+        sorted_volumes[index + 1] if index + 1 < len(sorted_volumes) else None
+    )
     return volume_next, volume_previous
 
 
@@ -1258,14 +1293,17 @@ async def reporter_or_volume_handler(
 
     if volume is None:
         # Show all the volumes for the case
-        volumes_in_reporter = (
-            Citation.objects.filter(reporter=reporter)
-            .order_by("reporter", "volume")
+        raw_volumes = [
+            vol
+            async for vol in Citation.objects.filter(reporter=reporter)
             .values_list("volume", flat=True)
             .distinct()
-        )
+        ]
 
-        if not await volumes_in_reporter.aexists():
+        # Human sort the volumes found for a given reporter
+        volumes_in_reporter = human_sort(raw_volumes)
+
+        if not volumes_in_reporter:
             return await throw_404(
                 request,
                 {
@@ -1586,43 +1624,56 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
 
 @ensure_csrf_cookie
 async def block_item(request: HttpRequest) -> HttpResponse:
-    """Block an item from search results using AJAX"""
-    user = await request.auser()  # type: ignore[attr-defined]
-    if is_ajax(request) and user.is_superuser:  # type: ignore[union-attr]
-        obj_type = request.POST["type"]
-        pk = request.POST["id"]
-
-        if obj_type not in ["docket", "cluster"]:
-            return HttpResponseBadRequest(
-                "This view can not handle the provided type"
-            )
-
-        cluster: OpinionCluster | None = None
-        if obj_type == "cluster":
-            # Block the cluster
-            cluster = await aget_object_or_404(OpinionCluster, pk=pk)
-            if cluster is not None:
-                cluster.blocked = True
-                cluster.date_blocked = now()
-                await cluster.asave()
-
-        docket_pk = (
-            pk
-            if obj_type == "docket"
-            else cluster.docket_id
-            if cluster is not None
-            else None
-        )
-        if not docket_pk:
-            return HttpResponse("It worked")
-
-        d: Docket = await aget_object_or_404(Docket, pk=docket_pk)
-        d.blocked = True
-        d.date_blocked = now()
-        await d.asave()
-
-        return HttpResponse("It worked")
-    else:
+    """Block an item from search results using AJAX."""
+    if not is_ajax(request):
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request"
         )
+
+    user = await request.auser()  # type: ignore[attr-defined]
+    obj_type = request.POST["type"]
+    pk = request.POST["id"]
+
+    if obj_type not in ["docket", "cluster"]:
+        return HttpResponseBadRequest(
+            "This view can not handle the provided type"
+        )
+
+    has_change_docket = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+        "search.change_docket"
+    )
+    if not has_change_docket:
+        raise PermissionDenied("You lack permission to block this item.")
+
+    if obj_type == "cluster":
+        has_change_cluster = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+            "search.change_opinioncluster"
+        )
+        if not has_change_cluster:
+            raise PermissionDenied("You lack permission to block this item.")
+
+    cluster: OpinionCluster | None = None
+    if obj_type == "cluster":
+        # Block the cluster
+        cluster = await aget_object_or_404(OpinionCluster, pk=pk)
+        if cluster is not None:
+            cluster.blocked = True
+            cluster.date_blocked = now()
+            await cluster.asave()
+
+    docket_pk = (
+        pk
+        if obj_type == "docket"
+        else cluster.docket_id
+        if cluster is not None
+        else None
+    )
+    if not docket_pk:
+        return HttpResponse("It worked")
+
+    d: Docket = await aget_object_or_404(Docket, pk=docket_pk)
+    d.blocked = True
+    d.date_blocked = now()
+    await d.asave()
+
+    return HttpResponse("It worked")

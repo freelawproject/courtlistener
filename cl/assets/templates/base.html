@@ -83,12 +83,8 @@
   {% block header %}
   <header class="row">
     <!-- Donate Banner -->
-    {% if FUNDRAISING_MODE %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
-    {% endif %}
-    <!-- Oral Arguments Transcript Banner -->
-    {% flag "transcript_feature" %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2025/07/31/oral-argument-transcripts/" cookie_name="oa_transcripts_banner" button_text="Learn more here!" variant="info" text="📣 Transcripts for Oral Arguments are now live!<br><br><strong>Search and set alerts for anything said in court</strong> right here in CourtListener &mdash; we've got the largest collection of Oral Arguments audio on the internet! Transcripts are available just minutes after courts share audio." %}
+    {% flag "donate_banner" %}
+      {% include 'includes/dismissible_nav_banner.html' with responsive=True cookie_sleep_duration=3 link="https://donate.free.law/forms/supportcl" cookie_name="2025_eoy_banner" button_text="Donate Today" text="Donate before December 31 and tell us how CourtListener helped you—your support and your story power the future of open law." title="You built today’s CourtListener. Help build what&nbsp;comes&nbsp;next." %}
     {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
@@ -218,9 +214,6 @@
                      tabindex="102">Look Up Citations</a>
                 </li>
                 <li>
-                  <a href="{% url "mapper_homepage" %}" tabindex="102">Citation Visualizations</a>
-                </li>
-                <li>
                   <a href="{% url "coverage_opinions" %}" tabindex="103">About this Collection</a>
                 </li>
                 <li>
@@ -291,7 +284,7 @@
                   <a href="{% url "advanced_p" %}" tabindex="401">Search Judges</a>
                 </li>
                 <li>
-                  <a href="https://free.law/projects/judge-db" tabindex="404">About this Collection</a>
+                  <a href="https://free.law/datasets#judges-db" tabindex="404">About this Collection</a>
                 </li>
                 <li>
                   <a href="{% url "judge_api_help" %}" tabindex="405">API</a>
@@ -305,7 +298,7 @@
                  data-toggle="dropdown">Financial Disclosures&nbsp;<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_fd" %}" tabindex="501">Search Financial Disclosures</a>
+                  <a href="{% url "financial_disclosures_home" %}" tabindex="501">Search Financial Disclosures</a>
                 </li>
                 <li>
                   <a href="{% url "coverage_fds" %}" tabindex="502">About this Collection</a>
@@ -408,7 +401,7 @@
               <a href="https://free.law/data-consulting/" tabindex="11009">Data Services</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "contribute" %}" tabindex="11010">Contribute</a>
+              <a href="https://free.law/volunteer" tabindex="11010">Contribute</a>
             </div>
           </div>
 

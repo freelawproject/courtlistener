@@ -2,6 +2,7 @@ import argparse
 import datetime
 import inspect
 import math
+import random
 import time
 from collections.abc import Callable
 from typing import cast
@@ -31,7 +32,7 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
 from cl.lib.types import OptionsType
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import Court, RECAPDocument
 
 
@@ -335,6 +336,7 @@ def get_pdfs(
                 f"before starting the next cycle."
             )
             time.sleep(1)
+
         logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
@@ -351,8 +353,12 @@ def get_pdfs(
             delete_pacer_row.s(row.pk).set(queue=q),
         )
 
-        c.apply_async()
+        # we accept same hash RecapDocuments; but we don't want duplicates in
+        # Opinions. Introduce some time variability between consecutive tasks
+        # to help the hash checks in `recap_document_into_opinions` work
+        c.apply_async(countdown=random.uniform(3, 10))
         completed += 1
+
         if completed % 1000 == 0:
             logger.info(
                 f"Sent {completed}/{count} tasks to celery for {task_name} so far."
@@ -375,7 +381,9 @@ def ocr_available(queue: str) -> None:
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
-        extract_recap_pdf.si(pk, ocr_available=True).set(queue=q).apply_async()
+        extract_pdf_document.si(pk, ocr_available=True).set(
+            queue=q
+        ).apply_async()
         if i % 1000 == 0:
             logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
 

@@ -18,11 +18,13 @@ from cl.people_db.models import (
     Role,
 )
 from cl.recap.models import PacerFetchQueue, ProcessingQueue
+from cl.scrapers.exceptions import MergingError
 from cl.scrapers.models import PACERMobilePageData
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
     SOURCES,
     BankruptcyInformation,
+    Citation,
     Claim,
     ClusterRedirection,
     Docket,
@@ -33,28 +35,41 @@ from cl.search.models import (
     OpinionCluster,
     OpinionClusterNonParticipatingJudges,
     OpinionClusterPanel,
+    OpinionJoinedBy,
     OpinionsCited,
     Parenthetical,
 )
 from cl.search.tasks import remove_document_from_es_index
 
-MIN_SEQUENCE_SIMILARITY = 0.9
+MIN_SEQUENCE_SIMILARITY_STRICT = 0.9
+MIN_SEQUENCE_SIMILARITY_LOOSE = 0.7
 DRY_RUN = False
 
 
-def explain_version_differences(opinions: list[Opinion | int]) -> None:
+def explain_version_differences(
+    opinions: list[Opinion | int],
+    text_field: str = "plain_text",
+    verbose: bool = False,
+) -> None:
     """Debugging function to inspect version differences
 
     :param opinions: a list of Opinion objects or ids
+    :param text_field: the field that holds the opinion's content
+    :param verbose: pass True to print all the differences between texts
     :return None
     """
     if isinstance(opinions[0], int):
         opinions = [
             Opinion.objects.get(id=opinion_id) for opinion_id in opinions
         ]
+    id_to_op = {op.id: op for op in opinions}
 
     text_combinations = itertools.combinations(
-        [(opinion.id, opinion.plain_text.strip()) for opinion in opinions], 2
+        [
+            (opinion.id, getattr(opinion, text_field).strip())
+            for opinion in opinions
+        ],
+        2,
     )
     for (op1, text1), (op2, text2) in text_combinations:
         if text1 == text2:
@@ -67,17 +82,29 @@ def explain_version_differences(opinions: list[Opinion | int]) -> None:
         prev_key = ""
         diff = ""
         print(f"Difference between {op1} {op2}")
-        for index, i in enumerate(differ.compare(text1, text2)):
-            if i[0] in "-+?":
-                if prev_index == index - 1 and prev_key == i[0]:
-                    diff += i[-1]
-                else:
+        base_cl_url = "https://www.courtlistener.com/opinion/"
+        print(f"{base_cl_url}{id_to_op[op1].cluster_id}/x/")
+        print(f"{base_cl_url}{id_to_op[op2].cluster_id}/x/")
+
+        if verbose:
+            for index, i in enumerate(differ.compare(text1, text2)):
+                if i[0] in "-+?":
+                    if not prev_index or (
+                        prev_index == index - 1 and prev_key == i[0]
+                    ):
+                        diff += i[-1]
+                    else:
+                        print(
+                            f"difference at index {index} is {prev_key} {repr(diff)}"
+                        )
+                        diff = ""
+                    prev_key = i[0]
+                    prev_index = index
+                elif diff:
                     print(
                         f"difference at index {index} is {prev_key} {repr(diff)}"
                     )
                     diff = ""
-                prev_key = i[0]
-                prev_index = index
 
         sm = SequenceMatcher(None, text1, text2)
         print("SequenceMatcher.ratio(text1, text2)", sm.ratio())
@@ -86,34 +113,44 @@ def explain_version_differences(opinions: list[Opinion | int]) -> None:
 
 
 models_that_reference_docket = [
-    (DocketAlert, "docket"),
-    (Audio, "docket"),
-    (DocketTags, "docket"),
-    (Note, "docket_id"),
-    (AttorneyOrganizationAssociation, "docket"),
-    (PartyType, "docket"),  # UNIQUE CONSTRAINT(docket_id, party_id, name)
+    # (model, related name to the docket, unique together field)
+    (DocketAlert, "docket", "user_id"),
+    (Audio, "docket", None),
+    (DocketTags, "docket", None),
+    (Note, "docket_id", "user_id"),
     (
-        Role,
+        AttorneyOrganizationAssociation,
         "docket",
-    ),  # UNIQUE CONSTRAINT, btree (party_id, attorney_id, role, docket_id, date_action)
-    (PacerFetchQueue, "docket"),
-    (ProcessingQueue, "docket"),
-    (PACERMobilePageData, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id)
-    (BankruptcyInformation, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id)
-    (Claim, "docket"),
-    (DocketPanel, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id, person_id)
-    (DocketEntry, "docket"),
-    (DocketTag, "docket"),  # UNIQUE CONSTRAINT, btree (docket_id, tag_id)
-    (OpinionCluster, "docket"),
+        ("attorney_organization_id", "attorney_id"),
+    ),
+    (PartyType, "docket", ("party_id", "name")),
+    (Role, "docket", ("party_id", "attorney_id", "date_action", "role")),
+    (PacerFetchQueue, "docket", None),
+    (ProcessingQueue, "docket", None),
+    (PACERMobilePageData, "docket", "docket_id"),
+    (BankruptcyInformation, "docket", "docket_id"),
+    (Claim, "docket", None),
+    (DocketPanel, "docket", "person_id"),
+    (DocketEntry, "docket", None),
+    (DocketTag, "docket", "tag_id"),
+    (OpinionCluster, "docket", None),
 ]
 
-# related names are not standard
+
 models_that_reference_cluster = [
-    (Note, "cluster_id"),
-    (Opinion, "cluster"),
-    (OpinionClusterPanel, "opinioncluster"),
-    (OpinionClusterNonParticipatingJudges, "opinioncluster"),
+    # (model, related name to the cluster, unique together field)
+    (
+        Note,
+        "cluster_id",
+        "user_id",
+    ),
+    (Opinion, "cluster", None),
+    (OpinionClusterPanel, "opinioncluster", "person_id"),
+    (OpinionClusterNonParticipatingJudges, "opinioncluster", "person_id"),
+    (Citation, "cluster", ("reporter", "page", "volume")),
 ]
+
+models_that_reference_opinion = [(OpinionJoinedBy, "opinion", "person_id")]
 
 
 def get_separator(name: str) -> str:
@@ -200,6 +237,8 @@ docket_fields_to_merge = [
     "referred_to",
     "referred_to_str",
     "panel_str",
+    # panel and non_participating_judges taken care of via
+    # `update_referencing_objects`
     "date_last_index",
     "date_cert_granted",
     "date_cert_denied",
@@ -287,6 +326,54 @@ def get_query_from_url(url: str, url_filter: str) -> Q:
     return Q(download_url=url) | Q(download_url=extra_query)
 
 
+def group_opinions_by_url(query: Q) -> QuerySet:
+    """Get duplicate candidates queryset by grouping opinions by `download_url`
+
+    :param query: a Q object to filter the opinions
+    :return: the opinion groups queryset
+    """
+    qs = (
+        Opinion.objects.filter(query)
+        .exclude(Q(download_url="") | Q(download_url__isnull=True))
+        .values("download_url")
+        .annotate(
+            number_of_rows=Count("download_url"),
+            number_of_hashes=Count("sha1", distinct=True),
+        )
+        .order_by()
+        # compute the number of  distinct hashes to prevent colliding with
+        # actual duplicates, which will be handled in another command
+        .filter(number_of_rows__gte=2, number_of_hashes__gte=2)
+    )
+    return qs
+
+
+def get_same_url_opinions(
+    opinion_group: dict, seen_urls: set
+) -> QuerySet | None:
+    """Given a URL, get a queryset for all opinions with that URL
+
+    :param opinion_group: a dictionary with a 'download_url' key
+    :param seen_urls: a set to keep track of seen URLs.
+        Useful to skip urls we have already processed
+    :return: a queryset or None
+    """
+    standard_url = opinion_group["download_url"].replace("https", "http")
+    if standard_url in seen_urls:
+        return
+
+    seen_urls.add(standard_url)
+    download_url_query = get_query_from_url(
+        opinion_group["download_url"], "exact"
+    )
+    return (
+        Opinion.objects.filter(download_url_query)
+        .filter(cluster__source=SOURCES.COURT_WEBSITE)
+        .select_related("cluster", "cluster__docket")
+        .order_by("-date_created")
+    )
+
+
 def clean_opinion_text(opinion: Opinion) -> str:
     """Remove noise (HTML tags or extra whitespace) from an opinion's text
 
@@ -299,41 +386,59 @@ def clean_opinion_text(opinion: Opinion) -> str:
     return re.sub(r"\s+", " ", opinion.plain_text)
 
 
-def text_is_similar(text1: str, text2: str) -> bool:
+def get_text_similarity(text1: str, text2: str) -> tuple[bool, float, float]:
     """Check if the text from both opinions is the same or very similar
+
+    A single character difference yields a 0.999 ratio
+    A single word difference may reduce the similarity a few points,
+    depending on how long the sequence is, and if it is an addition/removal
+    or a correction. In general, a 0.9 MIN value should tolerate a difference
+    of a few words between versions, which is what we expect
+    Note that this in sensible to argument order, so we retry with inverted
+    order if the first run fails
 
     :param text1: a cleaned opinion's text
     :param text2: another cleaned opinion's text
+    :return: a tuple with:
+        True in the first member if any of the text similarity ratios was
+            greater than the strict threshold
+        True in the second member if any of the ratios was greater than the
+            loose threshold
+        the ratios in the third and fourth member
     """
     if text1 == text2:
-        return True
+        return True, True, 1.0, 1.0
 
-    # a single character difference yields a 0.999 ratio
-    # a single word difference may reduce the similarity a few points,
-    # depending on how long the sequence is, and if it is an addition/removal
-    # or a correction. In general, a 0.9 MIN value should tolerate a difference
-    # of a few words between versions, which is what we expect
-    # Note that this in sensible to argument order, so we retry with inverted
-    # order if the first run fails
-    sm = SequenceMatcher(None, text1, text2)
-    ratio = sm.ratio()
-    if ratio < MIN_SEQUENCE_SIMILARITY:
-        return (
-            SequenceMatcher(None, text2, text1).ratio()
-            >= MIN_SEQUENCE_SIMILARITY
-        )
-    return ratio >= MIN_SEQUENCE_SIMILARITY
+    ratio2 = 1.0
+
+    ratio1 = SequenceMatcher(None, text1, text2).ratio()
+    if ratio1 >= MIN_SEQUENCE_SIMILARITY_STRICT:
+        return True, True, ratio1, ratio2
+
+    ratio2 = SequenceMatcher(None, text2, text1).ratio()
+
+    if ratio2 >= MIN_SEQUENCE_SIMILARITY_STRICT:
+        return True, True, ratio1, ratio2
+
+    return (
+        False,
+        ratio1 > MIN_SEQUENCE_SIMILARITY_LOOSE
+        or ratio2 > MIN_SEQUENCE_SIMILARITY_LOOSE,
+        ratio1,
+        ratio2,
+    )
 
 
 def update_referencing_objects(
-    main_object: OpinionCluster | Docket,
-    version_object: OpinionCluster | Docket,
-):
+    main_object: Docket | OpinionCluster | Opinion,
+    version_object: Docket | OpinionCluster | Opinion,
+) -> None:
     """Make all objects referencing to `version_object` point to `main_object`
 
-    This way, prevent cascade deletion. Some of these may fail due to
-    unique constraints; this will break the whole update. Let's let this
-    happen so we can debug, and control it later
+    This way, prevent cascade deletion. Unique constraints are handled:
+    - no constraints, a naive update is performed
+    - there is a single key constraint (like JoinedBy -> Opinion)
+    - there are multiple key constraints (like Citation -> OpinionCluster)
 
     :param main_object: the main version OpinionCluster or Docket
     :param version_object: the secondary version OpinionCluster or Docket
@@ -342,32 +447,80 @@ def update_referencing_objects(
         referencing_models = models_that_reference_cluster
     elif isinstance(main_object, Docket):
         referencing_models = models_that_reference_docket
-    else:
-        return
+    elif isinstance(main_object, Opinion):
+        referencing_models = models_that_reference_opinion
 
-    for model, related_name in referencing_models:
+    for model, related_name, unique_together in referencing_models:
         filter_query = {related_name: version_object}
-        update_query = {related_name: main_object}
+        update_query = existing_for_main_object_query = {
+            related_name: main_object
+        }
 
-        qs = model.objects.filter(**filter_query)
-        if qs.exists():
-            logger.info(
-                "Updating related %s for %s %s",
-                model._meta.model_name,
-                main_object._meta.model_name,
-                main_object.id,
+        related_to_version_qs = model.objects.filter(**filter_query)
+        if not related_to_version_qs.exists():
+            continue
+
+        logger.info(
+            "Updating related %s for %s %s",
+            model._meta.model_name,
+            main_object._meta.model_name,
+            main_object.id,
+        )
+        if not unique_together:
+            related_to_version_qs.update(**update_query)
+            continue
+
+        if isinstance(unique_together, str):
+            existing_for_main = (
+                model.objects.filter(**existing_for_main_object_query)
+                .only(unique_together)
+                .values_list(unique_together, flat=True)
             )
-            qs.update(**update_query)
+            exclude_query = {f"{unique_together}__in": existing_for_main}
+
+            # for the objects that point to the version, exclude the ids that
+            # already point to main; update the rest. When the version is
+            # deleted the stragglers will be cascade deleted
+            related_to_version_qs.exclude(**exclude_query).update(
+                **update_query
+            )
+            continue
+
+        # final case, we need to compare over many unique together fields
+        related_to_version = related_to_version_qs.only(
+            *[f for f in unique_together] + ["id"]
+        )
+        related_to_main = model.objects.filter(
+            **existing_for_main_object_query
+        ).only(*unique_together)
+        main_objects = {
+            tuple(getattr(obj, field) for field in unique_together)
+            for obj in related_to_main
+        }
+
+        for obj in related_to_version:
+            if (
+                tuple(getattr(obj, field) for field in unique_together)
+                in main_objects
+            ):
+                continue
+
+            # use .save to trigger signals. Useful for `Citation`
+            setattr(obj, related_name, main_object)
+            obj.save()
 
 
 def merge_metadata(
     main_object: Opinion | OpinionCluster | Docket,
     version_object: Opinion | OpinionCluster | Docket,
+    error_on_diff: bool = False,
 ) -> bool:
     """Merge `fields_to_merge` from `version_object` into `main_object`
 
     :param main_object: the main OpinionCluster or Opinion or Docket
     :param version_object: the secondary version Opinion, or its OpinionCluster
+    :param error_on_diff: raise an exception if there is an unexpected difference
+
     :return: True if the main object was updated and needs to be saved
     """
     if main_object.id == version_object.id:
@@ -378,7 +531,6 @@ def merge_metadata(
             ("author_str", merge_judge_names),
             "author",
             "per_curiam",
-            "joined_by",
             ("joined_by_str", merge_judge_names),
             "html_lawbox",
             "html_columbia",
@@ -414,8 +566,10 @@ def merge_metadata(
                 changed = True
                 continue
 
-            logger.warning(
-                "Unexpected difference in %s: '%s' '%s'. %s: %s, %s",
+            warning_template = (
+                "Unexpected difference in %s: '%s' '%s'. %s: %s, %s"
+            )
+            warning_values = (
                 field,
                 main_value,
                 version_value,
@@ -423,6 +577,10 @@ def merge_metadata(
                 main_object.id,
                 version_object.id,
             )
+            if error_on_diff:
+                raise MergingError(warning_template % warning_values)
+
+            logger.warning(warning_template, *warning_values)
         elif version_value:
             setattr(main_object, field, version_value)
             changed = True
@@ -470,10 +628,13 @@ def delete_version_related_objects(version: Opinion) -> None:
         Parenthetical.objects.filter(described_opinion_id=version.id).delete()
 
     version.unmatched_citations.all().delete()
+    version.citing_documents.all().delete()
 
 
 def merge_opinion_versions(
-    main_opinion: Opinion, version_opinion: Opinion
+    main_opinion: Opinion,
+    version_opinion: Opinion,
+    strict_merging: bool = False,
 ) -> None:
     """Merge the version opinion and related objects into the main opinion
 
@@ -483,12 +644,16 @@ def merge_opinion_versions(
 
     :param main_opinion: the main version
     :param version_opinion: the secondary version
+    :param strict_merging: all metadata fields should be the same on the
+        opinion and cluster for the merge to succeed
     :return None
     """
     logger.info("Merging %s %s", main_opinion, version_opinion)
-    update_main_opinion = merge_metadata(main_opinion, version_opinion)
+    update_main_opinion = merge_metadata(
+        main_opinion, version_opinion, strict_merging
+    )
     updated_main_cluster = merge_metadata(
-        main_opinion.cluster, version_opinion.cluster
+        main_opinion.cluster, version_opinion.cluster, strict_merging
     )
     version_cluster = version_opinion.cluster
 
@@ -496,8 +661,6 @@ def merge_opinion_versions(
     version_docket = version_opinion.cluster.docket
     is_same_docket = main_docket.id == version_docket.id
     updated_main_docket = merge_metadata(main_docket, version_docket)
-
-    main_citations = {str(c) for c in main_opinion.cluster.citations.all()}
 
     with transaction.atomic():
         if update_main_opinion:
@@ -507,16 +670,11 @@ def merge_opinion_versions(
         if updated_main_docket:
             main_opinion.cluster.docket.save()
 
+        update_referencing_objects(main_opinion, version_opinion)
+
         update_referencing_objects(main_opinion.cluster, version_cluster)
         if not is_same_docket:
             update_referencing_objects(main_docket, version_docket)
-
-        # update the cluster_id to prevent the version cluster deletion cascade
-        for version_citation in version_cluster.citations.all():
-            if str(version_citation) in main_citations:
-                continue
-            version_citation.cluster_id = main_opinion.cluster.id
-            version_citation.save()
 
         version_opinion.cluster_id = main_opinion.cluster.id
         version_opinion.main_version = main_opinion
@@ -567,20 +725,8 @@ def merge_versions_by_download_url(
     else:
         query = Q()
 
-    qs = (
-        Opinion.objects.filter(query)
-        .filter(cluster__source=SOURCES.COURT_WEBSITE)
-        .exclude(Q(download_url="") | Q(download_url__isnull=True))
-        .values("download_url")
-        .annotate(
-            number_of_rows=Count("download_url"),
-            # compute the number of  distinct hashes to prevent colliding with
-            # actual duplicates, which are not versions
-            number_of_hashes=Count("sha1", distinct=True),
-        )
-        .order_by()
-        .filter(number_of_rows__gte=2, number_of_hashes__gte=2)
-    )
+    query = query & Q(cluster__source=SOURCES.COURT_WEBSITE)
+    qs = group_opinions_by_url(query)
 
     # The groups queryset will look like
     # {'download_url': 'https://caseinfo.nvsupremecourt...',
@@ -591,25 +737,17 @@ def merge_versions_by_download_url(
         if limit and len(seen_urls) > limit:
             break
 
-        standard_url = group["download_url"].replace("https", "http")
-        if standard_url in seen_urls:
+        versions_queryset = get_same_url_opinions(group, seen_urls).exclude(
+            main_version__isnull=False
+        )
+        if versions_queryset is None:
             continue
-        seen_urls.add(standard_url)
 
-        logger.info("Processing group %s", group)
-
-        query = get_query_from_url(group["download_url"], "exact")
         # keep the latest opinion as the main version
         # exclude opinions that already have a main_version. If that main
         # version is a version of the current document, they will be updated
         # transitively
-        main, *versions = (
-            Opinion.objects.filter(query)
-            .filter(cluster__source=SOURCES.COURT_WEBSITE)
-            .exclude(main_version__isnull=False)
-            .select_related("cluster", "cluster__docket")
-            .order_by("-date_created")
-        )
+        main, *versions = versions_queryset
         merge_versions_by_text_similarity(main, versions, stats)
         stats["seen_urls"] = len(seen_urls)
 
@@ -619,6 +757,11 @@ def merge_versions_by_download_url(
 def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     """
     Make sure that the dockets have at least the same court_id and docket number
+
+    Special case: For New York courts, skip the docket number check since newer
+    versions may not have a docket number in the opinion text, which would
+    otherwise prevent versioning from working.
+
 
     :param docket: the main docket
     :param version_docket: the version docket
@@ -633,6 +776,13 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     if docket.court_id != version_docket.court_id:
         logger.error(log_template, "court_id", docket.id, version_docket.id)
         return False
+
+    # Special case for NY courts: allow versioning without matching docket numbers
+    # when at least one docket number is empty.
+    if docket.court_id.startswith("ny") and (
+        not docket.docket_number or not version_docket.docket_number
+    ):
+        return True
 
     if docket.docket_number != version_docket.docket_number:
         logger.error(
@@ -670,11 +820,27 @@ def merge_versions_by_text_similarity(
             continue
 
         version_text = clean_opinion_text(version)
-        if text_is_similar(main_text, version_text):
+        text_is_strictly_similar, text_is_loosely_similar, ratio1, ratio2 = (
+            get_text_similarity(main_text, version_text)
+        )
+
+        if text_is_strictly_similar or text_is_loosely_similar:
+            if text_is_loosely_similar:
+                stats["loose text similarity"] += 1
+
             stats["success"] += 1
             if DRY_RUN:
                 continue
-            merge_opinion_versions(main_opinion, version)
+
+            # if the text_is_loosely_similar, all opinion and cluster metadata
+            # fields must be the same for 2 versions to be merged
+            try:
+                merge_opinion_versions(
+                    main_opinion, version, not text_is_strictly_similar
+                )
+            except MergingError:
+                stats["merging error"] += 1
+                continue
 
             if not version.versions.exists():
                 continue
@@ -691,6 +857,7 @@ def merge_versions_by_text_similarity(
                 "Opinions grouped by URL have dissimilar text. Main: %s. Version %s",
                 main_opinion.id,
                 version.id,
+                extra={"ratio1": ratio1, "ratio2": ratio2},
             )
 
 

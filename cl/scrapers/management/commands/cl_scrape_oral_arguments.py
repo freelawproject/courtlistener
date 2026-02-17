@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from juriscraper.lib.string_utils import CaseNameTweaker
 
-from cl.alerts.models import RealTimeQueue
+from cl import settings
 from cl.audio.models import Audio
 from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import logger
@@ -21,11 +21,10 @@ from cl.scrapers.management.commands import cl_scrape_opinions
 from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
-    get_binary_content,
     get_extension,
     update_or_create_docket,
 )
-from cl.search.models import SEARCH_TYPES, SOURCES, Court, Docket
+from cl.search.models import SOURCES, Court, Docket
 
 cnt = CaseNameTweaker()
 
@@ -50,10 +49,6 @@ def save_everything(
 
     for candidate in candidate_judges:
         af.panel.add(candidate)
-    if not backscrape:
-        RealTimeQueue.objects.create(
-            item_type=SEARCH_TYPES.ORAL_ARGUMENT, item_pk=af.pk
-        )
 
 
 @transaction.atomic
@@ -121,7 +116,9 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
-        content = get_binary_content(item["download_urls"], site)
+        content = site.download_content(
+            item["download_urls"], media_root=settings.MEDIA_ROOT
+        )
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         sha1_hash = sha1(force_bytes(content))

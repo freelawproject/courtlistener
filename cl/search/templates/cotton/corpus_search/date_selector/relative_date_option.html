@@ -1,0 +1,19 @@
+<c-vars value />
+
+<li
+  data-value="{{ value }}"
+  role="option"
+  x-bind:id="relativeOptionId"
+  x-on:click="selectRelativeDate"
+  x-on:keydown.space="selectRelativeDate"
+  x-on:keydown.enter="selectRelativeDate"
+  x-bind:aria-selected="isSelectedRelativeDate"
+  tabindex="0"
+  class="w-full h-10 flex items-center py-[1px] px-1.5 focus-visible:outline-none focus:ring-2 focus:ring-primary-600"
+>
+  <span
+    class="w-full py-2.5 px-2 hover:bg-greyscale-100 rounded-md font-medium text-sm text-greyscale-600 pointer-events-auto cursor-pointer"
+  >
+    {{ slot }}
+  </span>
+</li>

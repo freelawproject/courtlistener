@@ -6,9 +6,13 @@ from django.urls import reverse
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.permissions import (
+    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
@@ -22,6 +26,7 @@ from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_renderers import SafeXMLRenderer
 from cl.search.api_serializers import (
+    BankruptcyInformationSerializer,
     CourtSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
@@ -41,6 +46,7 @@ from cl.search.api_serializers import (
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
     V3RECAPDocumentESResultSerializer,
+    VectorSerializer,
 )
 from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
@@ -61,6 +67,7 @@ from cl.search.filters import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     SEARCH_TYPES,
+    BankruptcyInformation,
     ClusterRedirection,
     Court,
     Docket,
@@ -93,6 +100,40 @@ class OriginatingCourtInformationViewSet(
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
 
 
+class BankruptcyInformationViewSet(
+    NoFilterCacheListMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
+    serializer_class = BankruptcyInformationSerializer
+    permission_classes = [
+        DjangoModelPermissions,
+        V3APIPermission,
+    ]
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
+    queryset = (
+        BankruptcyInformation.objects.select_related("docket")
+        .only(
+            "id",
+            "date_created",
+            "date_modified",
+            "date_converted",
+            "date_last_to_file_claims",
+            "date_last_to_file_govt",
+            "date_debtor_dismissed",
+            "chapter",
+            "trustee_str",
+            "docket__id",
+        )
+        .order_by("-id")
+    )
+
+
 class DocketViewSet(
     LoggingMixin,
     NoFilterCacheListMixin,
@@ -102,7 +143,7 @@ class DocketViewSet(
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -129,6 +170,7 @@ class DocketViewSet(
             "referred_to",
             "originating_court_information",
             "idb_data",
+            "bankruptcy_information",
         )
         .prefetch_related("panel", "clusters", "audio_files", "tags")
         .order_by("-id")
@@ -232,7 +274,7 @@ class OpinionClusterViewSet(
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (
@@ -303,7 +345,7 @@ class OpinionViewSet(
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     # keep the order as in `settings.rest_framework.DEFAULT_RENDERER_CLASSES`
@@ -438,52 +480,113 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         },
     }
 
+    def execute_es_search(self, cleaned_data, request) -> Response:
+        """
+        Execute Elasticsearch search for the given cleaned data and request
+        object.
+
+        :param cleaned_data: Validated and cleaned data from the request query
+            parameters.
+        :param request: The request object.
+        :return: Response object with paginated search results or validation
+            errors.
+        """
+        search_type = cleaned_data["type"]
+        supported_search_type = self.supported_search_types.get(search_type)
+        if not supported_search_type:
+            raise NotFound(detail="Search type not found or not supported.")
+        search_query = supported_search_type["document_class"].search()
+
+        paginator = ESCursorPagination()
+        cleaned_data["request_date"] = (
+            paginator.initialize_context_from_request(request, search_type)
+        )
+        highlighting_fields = {}
+        main_query, child_docs_query = do_es_api_query(
+            search_query,
+            cleaned_data,
+            highlighting_fields,
+            SEARCH_HL_TAG,
+            request.version,
+        )
+        es_list_instance = api_utils.CursorESList(
+            main_query, child_docs_query, None, None, cleaned_data, request
+        )
+        results_page, cached_response = paginator.paginate_queryset(
+            es_list_instance, request
+        )
+
+        # Avoid displaying the extra document used to determine if more
+        # documents remain.
+        results_page = api_utils.limit_api_results_to_page(
+            results_page, paginator.cursor, cached_response
+        )
+
+        serializer_class = supported_search_type["serializer_class"]
+        serializer = serializer_class(
+            results_page, many=True, context={"request": request}
+        )
+        return paginator.get_paginated_response(
+            serializer.data, cached_response
+        )
+
     def list(self, request, *args, **kwargs):
         search_form = SearchForm(request.GET, request=request)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            search_type = cd["type"]
+            return self.execute_es_search(cd, request)
 
-            supported_search_type = self.supported_search_types.get(
-                search_type
-            )
-            if not supported_search_type:
-                raise NotFound(
-                    detail="Search type not found or not supported."
-                )
-            search_query = supported_search_type["document_class"].search()
-
-            paginator = ESCursorPagination()
-            cd["request_date"] = paginator.initialize_context_from_request(
-                request, search_type
-            )
-            highlighting_fields = {}
-            main_query, child_docs_query = do_es_api_query(
-                search_query,
-                cd,
-                highlighting_fields,
-                SEARCH_HL_TAG,
-                request.version,
-            )
-            es_list_instance = api_utils.CursorESList(
-                main_query, child_docs_query, None, None, cd, request
-            )
-            results_page = paginator.paginate_queryset(
-                es_list_instance, request
-            )
-
-            # Avoid displaying the extra document used to determine if more
-            # documents remain.
-            results_page = api_utils.limit_api_results_to_page(
-                results_page, paginator.cursor
-            )
-
-            serializer_class = supported_search_type["serializer_class"]
-            serializer = serializer_class(
-                results_page, many=True, context={"request": request}
-            )
-            return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
             search_form.errors, status=HTTPStatus.BAD_REQUEST
         )
+
+    def create(self, request, *args, **kwargs):
+        # Validate query parameters (from URL) and request body (JSON)
+        query_params = SearchForm(request.GET, request=request)
+        request_body = VectorSerializer(data=request.data)
+        if not all([query_params.is_valid(), request_body.is_valid()]):
+            # Merge validation errors from both sources
+            combined_errors = query_params.errors | request_body.errors
+            return response.Response(
+                combined_errors, status=HTTPStatus.BAD_REQUEST
+            )
+
+        # Extract validated data
+        cd = query_params.cleaned_data
+        data = request_body.validated_data
+        # Restrict semantic search to supported types (currently only OPINION).
+        if cd["type"] not in [SEARCH_TYPES.OPINION]:
+            raise ValidationError(
+                {
+                    "type": [
+                        f"Unsupported search type '{cd['type']}'. "
+                        f"Semantic search is only supported for type '{SEARCH_TYPES.OPINION}'."
+                    ]
+                }
+            )
+        # Enforce semantic search flag in query params
+        if not cd["semantic"]:
+            raise ValidationError(
+                {
+                    "semantic": [
+                        "Semantic search requires `semantic=true` in the query string."
+                    ]
+                }
+            )
+        # Ensure the request body includes a valid embedding/vector
+        if not data:
+            raise ValidationError(
+                {
+                    "embedding": [
+                        (
+                            "You must provide an embedding vector in the request body when "
+                            "using semantic search."
+                        )
+                    ]
+                }
+            )
+
+        # Attach embedding to query params and run the actual ES query
+        cd["embedding"] = data["embedding"]
+        return self.execute_es_search(cd, request)

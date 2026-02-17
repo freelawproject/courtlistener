@@ -8,8 +8,9 @@
 
 <header
   x-data="header"
-  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:h-[102px] max-md:h-18 {% endif %}flex justify-between items-center gap-4 px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
+  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:max-h-[--desktop-header-height] max-md:h-18 {% endif %} px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
 >
+<div class="capped-width flex justify-between items-center gap-4">
   <a href="#main" class="skip-link">Skip to main content</a>
   <a href="#footer" class="skip-link">Skip to footer</a>
 
@@ -19,7 +20,7 @@
         <button
           type="button"
           x-on:click="toggleSupportMenu"
-          class="btn-primary z-10"
+          class="btn-primary z-10 hover:shadow-md"
           aria-controls="header-support-menu"
           aria-haspopup="menu"
           x-bind:aria-expanded="supportMenuExpanded"
@@ -50,7 +51,7 @@
           x-transition:leave="transition ease-in duration-100"
           x-transition:leave-start="opacity-100"
           x-transition:leave-end="opacity-0"
-          class="z-20 absolute left-0 top-14 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+          class="z-20 absolute left-0 top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
           role="menu"
         >
           <li
@@ -82,17 +83,60 @@
     </div>
 
     {# DESKTOP SEARCH BAR #}
-    <c-corpus-search class="w-full h-12 hidden md:flex" only>
+    <c-corpus-search :request="request" class="w-full h-12 hidden md:flex" only>
+    <div class="contents h-fit" x-trap.noscroll.inert="advancedFiltersExpandedDesktop">
       <c-corpus-search.scope
         class="!rounded-r-none text-greyscale-600"
-        menu_class="left-0 top-14 w-55 text-md font-cooper text-greyscale-800"
+        menu_class="left-0 top-12 w-55 text-md font-cooper text-greyscale-800"
         item_class="py-1.5"
         only
       />
-      <c-corpus-search.input :request="request" only/>
+      <c-corpus-search.input :request="request" only>
+        {#    Advanced Filters Trigger Button    #}
+        <button
+          class="btn-outline max-h-9 bg-white max-lg:px-2 aria-expanded:bg-greyscale-200 aria-expanded:ring-greyscale-300 aria-expanded:ring-2"
+          aria-label="Toggle advanced filters panel open/closed"
+          type="button"
+          x-on:click="toggleAdvancedFiltersDesktop"
+          x-bind:aria-expanded="advancedFiltersExpandedDesktop"
+          aria-haspopup="dialog"
+          aria-controls="advanced-filters-panel"
+        >
+          {% svg "funnel" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
+          <span class="max-lg:hidden">Filters</span>
+        </button>
+      </c-corpus-search.input>
+
+      {#   Search Button   #}
       <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
         {% svg "magnifier" class="text-white" aria_hidden="true" %}
       </c-corpus-search.button>
+
+      {#  Advanced Filters Overlay  #}
+      <div
+        class="fixed w-screen h-screen bg-greyscale-600/40 inset-x-0 top-26 z-10"
+        x-show="advancedFiltersExpandedDesktop"
+        x-on:click="toggleAdvancedFiltersDesktop"
+        x-transition.opacity.duration.200ms
+        aria-hidden="true"
+      ></div>
+      {#   Advanced Filters Panel   #}
+      <div
+        id="advanced-filters-panel"
+        role="dialog"
+        aria-labelledby="advanced-filters-title"
+        class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 md:overflow-visible overflow-auto max-h-[--desktop-header-filters-height]"
+        x-show="advancedFiltersExpandedDesktop"
+        x-on:keyup.esc.window="closeAdvancedFiltersDesktopIfOpen"
+        x-collapse.duration.250ms
+      >
+        <div class="capped-width">
+          <h2 id="advanced-filters-title" class="sr-only">Advanced filters</h2>
+          <c-corpus-search.filters :request="request" :search_form="search_form" form_prefix="desktop" only/>
+        </div>
+      </div>
+    </div>
+
     </c-corpus-search>
   {% endif %}
 
@@ -101,7 +145,7 @@
     {# MOBILE SEARCH TRIGGER + DIALOG #}
     {% if variant != "homepage" %}
       <c-corpus-search class="md:hidden" only>
-        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" only>
+        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" form_prefix="mobile" only>
           <c-slot name="trigger_button">
             <c-dialog.trigger-button>
               {% svg "magnifier" class="text-greyscale-400 w-5 h-5" %}
@@ -117,7 +161,7 @@
         <button
           id="header-profile-trigger"
           x-on:click="openProfileMenu"
-          class="bg-white btn-outline text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
+          class="bg-white btn-outline hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
           type="button"
           aria-haspopup="menu"
           aria-controls="header-profile-menu"
@@ -193,17 +237,6 @@
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
               <a
-                href="{% url "view_visualizations" %}"
-                role="menuitem"
-                aria-label="Go to Visualizations page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "graph_up" aria_hidden="true" class="text-greyscale-400" %}
-                Visualizations
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
                 href="{% url "view_api" %}"
                 role="menuitem"
                 aria-label="Go to Developer Tools page"
@@ -275,4 +308,5 @@
       </div>
     {% endif %}
   </div>
+</div>
 </header>

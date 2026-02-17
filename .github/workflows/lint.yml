@@ -10,20 +10,20 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           # Once codebase is updated, this can easily be changed to any specific version.
           python-version: "3.13"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          version: "0.7.x"
+          version: "0.9.x"
 
-      - uses: pre-commit/action@v3.0.0
+      - uses: pre-commit/action@v3.0.1
 
       - name: Install dependencies
         run: uv sync
@@ -77,4 +77,8 @@ jobs:
           cl/search/management/commands/cl_index_parent_and_child_docs.py \
           cl/search/management/commands/sweep_indexer.py \
           cl/search/management/commands/pacer_bulk_fetch.py \
-          cl/search/management/commands/generate_opinion_embeddings.py
+          cl/search/management/commands/generate_opinion_embeddings.py \
+          cl/search/management/commands/llm_clean_docket_number_daemon.py \
+          cl/search/docket_number_cleaner.py \
+          cl/search/management/commands/clean_docket_number_raw.py \
+          cl/scrapers/management/commands/back_scrape_dockets.py \

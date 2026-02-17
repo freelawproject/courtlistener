@@ -6,10 +6,10 @@ from cl.simple_pages.views import (
     advanced_search,
     alert_help,
     broken_email_help,
+    citegeist_help,
     components,
     contact,
     contact_thanks,
-    contribute,
     coverage,
     coverage_fds,
     coverage_oa,
@@ -21,6 +21,7 @@ from cl.simple_pages.views import (
     help_home,
     latest_terms,
     markdown_help,
+    mcp_help,
     old_terms,
     podcasts,
     prayer_help,
@@ -35,7 +36,6 @@ urlpatterns = [
     path("faq/", faq, name="faq"),  # type: ignore[arg-type]
     path("feeds/", feeds, name="feeds_info"),  # type: ignore[arg-type]
     path("podcasts/", podcasts, name="podcasts"),  # type: ignore[arg-type]
-    path("contribute/", contribute, name="contribute"),  # type: ignore[arg-type]
     path("contact/", contact, name="contact"),  # type: ignore[arg-type]
     path("contact/thanks/", contact_thanks, name="contact_thanks"),  # type: ignore[arg-type]
     # Help pages
@@ -62,10 +62,12 @@ urlpatterns = [
     path("help/delete-account/", delete_help, name="delete_help"),  # type: ignore[arg-type]
     path("help/tags-notes/", tag_notes_help, name="tag_notes_help"),  # type: ignore[arg-type]
     path("help/search-operators/", advanced_search, name="advanced_search"),  # type: ignore[arg-type]
+    path("help/citegeist/", citegeist_help, name="citegeist_help"),  # type: ignore[arg-type]
     path("help/recap/email/", recap_email_help, name="recap_email_help"),  # type: ignore[arg-type]
     path("help/broken-email/", broken_email_help, name="broken_email_help"),  # type: ignore[arg-type]
     path("help/pray-and-pay/", prayer_help, name="pray_and_pay_help"),  # type: ignore[arg-type]
     path("help/relative-dates/", relative_dates, name="relative_dates"),  # type: ignore[arg-type]
+    path("help/mcp/", mcp_help, name="mcp_help"),  # type: ignore[arg-type]
     # Added 2018-10-23
     path(
         "search/advanced-techniques/",

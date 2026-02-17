@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static extras humanize %}
 
-{% block title %}REST API, v4.2 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v4.3 &ndash; CourtListener.com{% endblock %}
 {% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 {% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
@@ -16,7 +16,7 @@
   <div class="col-xs-12 hidden-md hidden-lg">
     <h4 class="v-offset-below-2">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "help_home" %}">Back to Help</a>
+      <a href="{% url "api_index" %}">Back to API Home</a>
     </h4>
   </div>
 
@@ -24,7 +24,7 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h1 id="about">REST API &ndash; v4.2</h1>
+    <h1 id="about">REST API &ndash; v4.3</h1>
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
@@ -406,11 +406,11 @@
     </ol>
 
     <h3 id="rates">Rate Limits</h3>
-    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.
+    <p>Our APIs allow 5,000 queries per hour to authenticated users. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.
     </p>
     <p>To debug throttling issues:</p>
     <ol>
-      <li>Try browsing the API while logged into the website. If this works and your code fails, it usually means that your token authentication is not configured properly, and your code is getting throttled as an anonymous user, not according to your token.
+      <li>Try browsing the API while logged into Courtlistener. If this works and your code fails, it usually means that your token authentication is not configured properly, and your code is getting throttled as an anonymous user, not according to your token.
       </li>
       <li>Review your recent API usage by looking in your <a href="{% url "view_api" %}#usage">profile</a>, but remember that it will show stats for the browsable API as well.
       </li>
@@ -469,6 +469,15 @@
       <a href="{% url "recap_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
+    <h3 id="pray-and-pay-api">Pray and Pay API</h3>
+    <p>Request PACER documents that are not yet available in the RECAP Archive. When another user purchases a document you've prayed for, you'll be notified automatically.
+    </p>
+    <p>Use this API to programmatically create and manage prayer requests.
+    </p>
+    <p>
+      <a href="{% url "recap_api_help" %}#pray-and-pay-api" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
     <h3 id="search-api">Search API</h3>
     <p>CourtListener allows you to search across hundreds of millions of items with advanced fields and operators. Use this API to automate the CourtListener search engine.
     </p>
@@ -517,6 +526,12 @@
     <p>CourtListener is a scalable system for sending alerts by email or <a href="{% url "webhooks_getting_started" %}">webhook</a> based on search queries or for particular cases. Use these APIs to create, modify, list, and delete alerts.</p>
     <p>
       <a href="{% url "alert_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+    </p>
+
+    <h3 id="tags">Tag APIs</h3>
+    <p>Use these APIs to create, organize, and manage tags on dockets. Tags help you organize and share collections of cases.</p>
+    <p>
+      <a href="{% url "tag_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
     </p>
 
     <h3 id="visualizations">Visualization APIs</h3>

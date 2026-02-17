@@ -15,11 +15,8 @@
 <div class="hidden-xs hidden-sm col-md-3">{% include "includes/operators_quick_list.html" %}</div>
 <div class="col-xs-12 col-md-8 col-lg-6">
   <h1>Advanced Query Techniques and&nbsp;Operators</h1>
-  <p>CourtListener supports highly advanced Boolean queries. These allow you to build a complex search that can be run across our entire corpus: from Case Law and the RECAP Archive, to Financial Disclosures and fully searchable Oral Arguments transcripts.
+  <p>CourtListener's search engine is powered by the <a href="{% url "citegeist_help" %}">Citegeist&trade; relevance engine</a>, which supports highly advanced Boolean operators. These allow you to build a complex search that can be run across our entire corpus: from Case Law and the RECAP Archive, to Financial Disclosures and fully searchable Oral Arguments transcripts.
   </p>
-  <p>These operators are all powered by the syntax of the Lucene search engine using the eDisMax query parser. More details about these operators use can be found on <a href="https://lucene.apache.org/java/3_4_0/queryparsersyntax.html">Lucene's help page</a>.
-  </p>
-
   <p>If you would like assistance crafting a query, <a href="{% url "contact" %}">let us know</a>. We can sometimes help.
   </p>
 
@@ -82,7 +79,7 @@
   </p>
 
   <h3>Range Queries: <code>[ ]</code></h3>
-  <p>Ranges can be queried by using brackets. For example, a search for <code>[1939 TO 1945]</code> would find all cases that contained the numbers 1939 to 1945, inclusive. Range queries can also be fielded, allowing searches like <code>citation:([22 TO 23] F2)</code>, which would find all cases from volumes 22 and 23 of the second series of the Federal Reporter. In range queries, the word 'TO' must be uppercase.
+  <p>Ranges can be queried by using brackets. For example, a search for <code>[1939 TO 1945]</code> would find all cases that contained the numbers 1939 to 1945, inclusive. Range queries can also be fielded, allowing searches like <code>citation:([22 TO 23] F2)</code>, which would find all cases from volumes 22 and 23 of the second series of the Federal Reporter. In range queries, an asterisk can be used to indicate no upper or lower limit, for example <code>page_count:[200 TO *]</code> would find all items with more than 200 pages. The word 'TO' must be uppercase.
   </p>
 
   <h3>Date Queries</h3>

@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% load extras static humanize %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_citation-lookup-api-vlatest.html                    ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}Citation Lookup and Verification API – CourtListener.com{% endblock %}
 {% block og_title %}Citation Lookup and Verification API – CourtListener.com{% endblock %}
 {% block description %}Trained on over 50 million citations going back centuries, our citation lookup API can translate a citation you have to a link on our site, or it can serve as a guardrail to help identify and prevent hallucinated citations.{% endblock %}
@@ -55,7 +68,7 @@
   <p class="lead v-offset-above-3">Use this API to look up citations in CourtListener's database of {{ cite_count|intcomma }} citations.</p>
   <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
   </p>
-  <p>This API uses <a href="https://free.law/projects/eyecite">Eyecite</a>, a tool we developed with <a href="https://lil.law.harvard.edu/">Harvard Library Innovation Lab</a> to parse legal citations. To develop Eyecite, we analyzed more than 50 million citations going back more than two centuries. We believe we have identified every reporter abbreviation in American case law and that there is no case law citation that Eyecite cannot properly parse and interpret.
+  <p>This API uses <a href="https://free.law/open-source-tools#eyecite">Eyecite</a>, a tool we developed with <a href="https://lil.law.harvard.edu/">Harvard Library Innovation Lab</a> to parse legal citations. To develop Eyecite, we analyzed more than 50 million citations going back more than two centuries. We believe we have identified every reporter abbreviation in American case law and that there is no case law citation that Eyecite cannot properly parse and interpret.
   </p>
   <p>This API uses the same authentication and serialization methods as the rest of the CourtListener APIs. It does not support filtering, pagination, ordering, or field selection.
   </p>

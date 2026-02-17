@@ -1,30 +1,23 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date
 from urllib.parse import quote
 
-from asgiref.sync import async_to_sync
-from cache_memoize import cache_memoize
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import HttpResponseRedirect, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+from waffle import flag_is_active
 from waffle.decorators import waffle_flag
 
 from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
-from cl.audio.models import Audio
-from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
-from cl.lib.elasticsearch_utils import get_only_status_facets
 from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import (
     do_es_search,
     make_get_string,
@@ -33,68 +26,38 @@ from cl.lib.search_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.search.documents import OpinionClusterDocument
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court, Opinion
+from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
-from cl.stats.models import Stat
+from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
 from cl.stats.utils import tally_stat
-from cl.visualizations.models import SCOTUSMap
 
 
-@cache_memoize(5 * 60)
-def get_homepage_stats():
-    """Get any stats that are displayed on the homepage and return them as a
-    dict
-    """
-    r = get_redis_interface("STATS")
-    ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
-    last_ten_days = [
-        f"api:v3.d:{(date.today() - timedelta(days=x)).isoformat()}.count"
-        for x in range(0, 10)
-    ]
-    homepage_data = {
-        "alerts_in_last_ten": Stat.objects.filter(
-            name__contains="alerts.sent", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
-        "queries_in_last_ten": Stat.objects.filter(
-            name="search.results", date_logged__gte=ten_days_ago
-        ).aggregate(Sum("count"))["count__sum"],
-        "opinions_in_last_ten": Opinion.objects.filter(
-            date_created__gte=ten_days_ago
-        ).count(),
-        "oral_arguments_in_last_ten": Audio.objects.filter(
-            date_created__gte=ten_days_ago
-        ).count(),
-        "api_in_last_ten": sum(
-            [
-                int(result)
-                for result in r.mget(*last_ten_days)
-                if result is not None
-            ]
-        ),
-        "users_in_last_ten": User.objects.filter(
-            date_joined__gte=ten_days_ago
-        ).count(),
-        "days_of_oa": naturalduration(
-            Audio.objects.aggregate(Sum("duration"))["duration__sum"],
-            as_dict=True,
-        )["d"],
-        "viz_in_last_ten": SCOTUSMap.objects.filter(
-            date_published__gte=ten_days_ago, published=True
-        ).count(),
-        "visualizations": SCOTUSMap.objects.filter(
-            published=True, deleted=False
-        )
-        .annotate(Count("clusters"))
-        .filter(
-            # Ensures that we only show good stuff on homepage
-            clusters__count__gt=10,
-        )
-        .order_by("-date_published", "-date_modified", "-date_created")[:1],
+@never_cache
+def new_homepage(request: HttpRequest) -> HttpResponse:
+    render_dict = {
+        **get_v2_homepage_stats(),
         "private": False,  # VERY IMPORTANT!
     }
-    return homepage_data
+    return TemplateResponse(request, "homepage.html", render_dict)
+
+
+@never_cache
+def home_router(request: HttpRequest) -> HttpResponse:
+    """
+    This is a router view to determine which view to use for a given request depending
+    on the waffle flag `use_new_design`.
+
+    - When the flag is inactive, we use the legacy `show_results` view as-is.
+    - When the flag is active, we determine the view based on request params/method.
+    """
+    if not flag_is_active(request, "use_new_design"):
+        return show_results(request)
+
+    if request.method == "GET" and len(request.GET) == 0:
+        return new_homepage(request)
+
+    return show_results(request)
 
 
 @never_cache
@@ -204,9 +167,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
     # This is a GET request: Either a search or the homepage
     if len(request.GET) == 0:
         # No parameters --> Homepage.
-        if not is_bot(request):
-            async_to_sync(tally_stat)("search.homepage_loaded")
-
         # Ensure we get nothing from the future.
         mutable_GET = request.GET.copy()  # Makes it mutable
         mutable_GET["filed_before"] = date.today()
@@ -258,6 +218,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
         return TemplateResponse(request, "homepage.html", render_dict)
 
+    search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
     # This is a GET with parameters
     # User placed a search or is trying to edit an alert
     if edit_alert:
@@ -284,14 +245,17 @@ def show_results(request: HttpRequest) -> HttpResponse:
     else:
         # Just a regular search
         if not is_bot(request):
-            async_to_sync(tally_stat)("search.results")
+            tally_stat(
+                "search.results",
+                prometheus_handler_key="search.queries.keyword.web",
+            )
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(
             initial={
                 "query": get_string,
                 "rate": "dly",
-                "alert_type": request.GET.get("type", SEARCH_TYPES.OPINION),
+                "alert_type": search_type,
                 "original_alert_type": request.GET.get(
                     "type", SEARCH_TYPES.OPINION
                 ),
@@ -299,7 +263,13 @@ def show_results(request: HttpRequest) -> HttpResponse:
             user=request.user,
         )
 
-    search_results = do_es_search(request.GET.copy())
+    if search_type == SEARCH_TYPES.RECAP:
+        search_results = do_es_search(
+            request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
+        )
+    else:
+        search_results = do_es_search(request.GET.copy())
+
     render_dict.update(search_results)
     store_search_query(request, search_results)
 
@@ -315,63 +285,48 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
 
 @never_cache
-def advanced(request: HttpRequest) -> HttpResponse:
+def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
     render_dict = {"private": False}
+    courts = courts_in_use = Court.objects.filter(in_use=True)
 
-    # I'm not thrilled about how this is repeating URLs in a view.
-    if request.path == reverse("advanced_o"):
-        courts = Court.objects.filter(in_use=True)
-        obj_type = SEARCH_TYPES.OPINION
-        search_form = SearchForm({"type": obj_type}, courts=courts)
+    if search_type == SEARCH_TYPES.OPINION:
+        search_form = SearchForm({"type": search_type}, courts=courts)
         render_dict["search_form"] = search_form
-        # Needed b/c of facet values.
-        search_query = OpinionClusterDocument.search()
-        facet_results = get_only_status_facets(
-            search_query, render_dict["search_form"]
-        )
         search_form.is_valid()
         cd = search_form.cleaned_data
-        search_form = _clean_form({"type": obj_type}, cd, courts)
-        # Merge form with courts.
+        search_form = _clean_form({"type": search_type}, cd, courts)
+        facet_fields = [
+            f for f in search_form if f.html_name.startswith("stat_")
+        ]
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
         )
         render_dict.update(
             {
-                "facet_fields": facet_results,
+                "facet_fields": facet_fields,
                 "courts": courts,
                 "court_count_human": court_count_human,
                 "court_count": court_count,
             }
         )
         return TemplateResponse(request, "advanced.html", render_dict)
-    else:
-        courts = courts_in_use = Court.objects.filter(in_use=True)
-        if request.path == reverse("advanced_r"):
-            obj_type = SEARCH_TYPES.RECAP
-            courts_in_use = courts.filter(
-                pacer_court_id__isnull=False, end_date__isnull=True
-            ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
-        elif request.path == reverse("advanced_oa"):
-            obj_type = SEARCH_TYPES.ORAL_ARGUMENT
-        elif request.path == reverse("advanced_p"):
-            obj_type = SEARCH_TYPES.PEOPLE
-        else:
-            raise NotImplementedError(f"Unknown path: {request.path}")
 
-        search_form = SearchForm({"type": obj_type}, courts=courts)
-        courts, court_count_human, court_count = merge_form_with_courts(
-            courts_in_use, search_form
-        )
-        render_dict.update(
-            {
-                "search_form": search_form,
-                "courts": courts,
-                "court_count_human": court_count_human,
-                "court_count": court_count,
-            }
-        )
-        return render(request, "advanced.html", render_dict)
+    if search_type == SEARCH_TYPES.RECAP:
+        courts_in_use = Court.federal_courts.all_pacer_courts()
+
+    search_form = SearchForm({"type": search_type}, courts=courts)
+    courts, court_count_human, court_count = merge_form_with_courts(
+        courts_in_use, search_form
+    )
+    render_dict.update(
+        {
+            "search_form": search_form,
+            "courts": courts,
+            "court_count_human": court_count_human,
+            "court_count": court_count,
+        }
+    )
+    return render(request, "advanced.html", render_dict)
 
 
 @waffle_flag("parenthetical-search")

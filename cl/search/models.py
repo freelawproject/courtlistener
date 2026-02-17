@@ -38,17 +38,21 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
+from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
     CSVExportMixin,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_pdf_path,
     make_recap_path,
+    make_scotus_docket_number_core,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.docket_sources import DocketSources
+from cl.search.state.texas.models import *
 from cl.users.models import User
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -299,6 +303,14 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     docket_number = models.TextField(
         help_text="The docket number in the lower court.", blank=True
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     assigned_to = models.ForeignKey(
         "people_db.Person",
         help_text="The judge the case was assigned to.",
@@ -358,6 +370,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
     )
     date_received_coa = models.DateField(
         help_text="The date the case was received at the court of appeals.",
+        blank=True,
+        null=True,
+    )
+    date_rehearing_denied = models.DateField(
+        help_text="The date the petition for rehearing was denied at the "
+        "lower court.",
         blank=True,
         null=True,
     )
@@ -602,6 +620,14 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         db_index=True,
     )
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            "with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
@@ -823,8 +849,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
-            self.docket_number_core = make_docket_number_core(
-                self.docket_number
+            self.docket_number_core = (
+                make_scotus_docket_number_core(self.docket_number)
+                if self.court_id == "scotus"
+                else make_docket_number_core(self.docket_number)
             )
 
         if self.source in self.RECAP_SOURCES():
@@ -1570,9 +1598,9 @@ class RECAPDocument(
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
-            from cl.scrapers.tasks import extract_recap_pdf
+            from cl.scrapers.tasks import extract_pdf_document
 
-            tasks.append(extract_recap_pdf.si(self.pk))
+            tasks.append(extract_pdf_document.si(self.pk))
 
         if len(tasks) > 0:
             chain(*tasks)()
@@ -1915,6 +1943,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             )
             | Q(pk__in=["cit", "jpml", "uscfc", "cavc"]),
             end_date__isnull=True,
+            in_use=True,
         ).exclude(pk="scotus")
 
     def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
@@ -1929,14 +1958,14 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         )
 
-    def appellate_pacer_courts(self) -> models.QuerySet:
+    def appellate_courts(self) -> models.QuerySet:
         return self.filter(
             Q(jurisdiction=Court.FEDERAL_APPELLATE)
             |
             # Court of Appeals for Veterans Claims uses appellate PACER
             Q(pk__in=["cavc"]),
             end_date__isnull=True,
-        ).exclude(pk="scotus")
+        )
 
     def bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
@@ -1965,7 +1994,12 @@ class FederalCourtsQuerySet(models.QuerySet):
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
-    as needed."""
+    as needed.
+
+    Note that a Courthouse object should be created alongside each new Court.
+    Even if this is not enforced by the data model, there is some logic tied
+    to that relation. Examples in `find_citations` and `coverage_utils`
+    """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
     # work
@@ -2752,15 +2786,21 @@ class OpinionCluster(AbstractDateTimeModel):
         #    list.
         #  - QuerySets are lazy by default, so we need to call list() on the
         #    queryset object to evaluate it here and now.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [
-                    list(sub_opinion.opinions_cited.all().only("pk"))
-                    for sub_opinion in self.sub_opinions.all()
-                ],
-                [],
+        #  - We explicitly exclude self (self.pk) from the results to avoid
+        #    a cluster being listed as its own authority.
+        return (
+            OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
+                    [
+                        list(sub_opinion.opinions_cited.all().only("pk"))
+                        for sub_opinion in self.sub_opinions.all()
+                    ],
+                    [],
+                )
             )
-        ).order_by("-citation_count", "-date_filed")
+            .exclude(pk=self.pk)
+            .order_by("-citation_count", "-date_filed")
+        )
 
     async def aauthorities(self):
         """Returns a queryset that can be used for querying and caching
@@ -2773,20 +2813,26 @@ class OpinionCluster(AbstractDateTimeModel):
         #    list.
         #  - QuerySets are lazy by default, so we need to call list() on the
         #    queryset object to evaluate it here and now.
-        return OpinionCluster.objects.filter(
-            sub_opinions__in=sum(
-                [
+        #  - We explicitly exclude self (self.pk) from the results to avoid
+        #    a cluster being listed as its own authority.
+        return (
+            OpinionCluster.objects.filter(
+                sub_opinions__in=sum(
                     [
-                        i
-                        async for i in sub_opinion.opinions_cited.all().only(
-                            "pk"
-                        )
-                    ]
-                    async for sub_opinion in self.sub_opinions.all()
-                ],
-                [],
+                        [
+                            i
+                            async for i in sub_opinion.opinions_cited.all().only(
+                                "pk"
+                            )
+                        ]
+                        async for sub_opinion in self.sub_opinions.all()
+                    ],
+                    [],
+                )
             )
-        ).order_by("-citation_count", "-date_filed")
+            .exclude(pk=self.pk)
+            .order_by("-citation_count", "-date_filed")
+        )
 
     @property
     def parentheticals(self):
@@ -2975,7 +3021,7 @@ class BaseCitation(models.Model):
             "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
-    volume = models.SmallIntegerField(help_text="The volume of the reporter")
+    volume = models.TextField(help_text="The volume of the reporter")
     reporter = models.TextField(
         help_text="The abbreviation for the reporter",
         # To generate lists of volumes for a reporter we need everything in a
@@ -3004,7 +3050,7 @@ class BaseCitation(models.Model):
 
 
 @pghistory.track()
-class Citation(BaseCitation):
+class Citation(BaseCitation, AbstractDateTimeModel):
     """A citation to an OpinionCluster"""
 
     cluster = models.ForeignKey(
@@ -3306,6 +3352,7 @@ class Opinion(AbstractDateTimeModel):
             "html_anon_2020",
             "html",
             "plain_text",
+            "html_with_citations",
             "sha1",
             "ordering_key",
         ]
@@ -3747,6 +3794,12 @@ class SearchQuery(models.Model):
         (ELASTICSEARCH, "Elasticsearch"),
         (SOLR, "Solr"),
     )
+    KEYWORD = 1
+    SEMANTIC = 2
+    QUERY_MODES = (
+        (KEYWORD, "Keyword"),
+        (SEMANTIC, "Semantic"),
+    )
     user = models.ForeignKey(
         User,
         help_text="The user who performed this search query.",
@@ -3774,6 +3827,11 @@ class SearchQuery(models.Model):
     )
     engine = models.SmallIntegerField(
         help_text="The engine that executed the search", choices=ENGINES
+    )
+    query_mode = models.SmallIntegerField(
+        help_text="Whether the query used keyword or semantic search.",
+        choices=QUERY_MODES,
+        default=KEYWORD,
     )
     date_created = models.DateTimeField(
         help_text="Datetime when the record was created.",
@@ -3859,3 +3917,189 @@ class ClusterRedirection(models.Model):
                 cluster=cluster_to_keep,
                 reason=reason,
             )
+
+
+@pghistory.track()
+class ScotusDocketMetadata(AbstractDateTimeModel):
+    """Supreme Court-specific metadata associated with a docket.
+
+    These fields capture information that only applies to SCOTUS cases, so we
+    keep them in a separate model instead of adding them directly to the Docket
+    namespace.
+    """
+
+    docket = models.OneToOneField(
+        "search.Docket",
+        help_text="The docket this SCOTUS metadata applies to.",
+        related_name="scotus_metadata",
+        on_delete=models.CASCADE,
+    )
+    capital_case = models.BooleanField(
+        help_text="Whether this SCOTUS case is a capital case.",
+        default=False,
+    )
+    date_discretionary_court_decision = models.DateField(
+        help_text="The date of the Court's discretionary decision.",
+        blank=True,
+        null=True,
+    )
+    linked_with = models.CharField(
+        help_text=(
+            "Field describing any other docket(s) this case is "
+            "linked with, as shown on the SCOTUS docket."
+        ),
+        max_length=1000,
+        blank=True,
+    )
+    questions_presented_url = models.CharField(
+        help_text="URL to the 'Questions Presented' page or document, if available.",
+        max_length=1000,
+        blank=True,
+    )
+    questions_presented_file = models.FileField(
+        help_text="A local copy of the 'Questions Presented' document."
+        "The path is AWS S3 where the file is saved.",
+        upload_to=make_pdf_path,
+        storage=IncrementingAWSMediaStorage(),
+        max_length=1000,
+        blank=True,
+    )
+
+    def __str__(self) -> str:
+        return f"SCOTUS metadata for docket {self.docket_id}"
+
+    class Meta:
+        verbose_name = "SCOTUS Docket Metadata"
+        verbose_name_plural = "SCOTUS Docket Metadata"
+
+
+@pghistory.track()
+@document_model
+class CaseTransfer(AbstractDateTimeModel):
+    """
+    Represents any transfer of a docket between two courts whether that be
+    an appeal, workload balancing, or docket merging.
+
+    :ivar origin_court: The court this transfer originates from.
+    :ivar origin_docket: The docket this transfer originates from.
+    :ivar destination_court: The court the docket is being transferred to.
+    :ivar destination_docket: The case docket in the destination court.
+    :ivar transfer_date: The date this transfer occurred.
+    :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
+    """
+
+    APPEAL = 0
+    WORKLOAD = 1
+    MERGE = 2
+    JURISDICTION = 3
+    transfer_type_choices = {
+        # Appeal from a lower court to a higher court.
+        APPEAL: "Appeal",
+        # Transfer between courts at the same level to balance workload
+        WORKLOAD: "Workload",
+        # Merging of two or more related cases
+        MERGE: "Merge",
+        # Transfer to move a case into a different jurisdiction for some reason
+        JURISDICTION: "Jurisdiction",
+    }
+    origin_court = models.ForeignKey(
+        "search.Court",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_origin_court",
+    )
+    origin_docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_origin_docket",
+    )
+    destination_court = models.ForeignKey(
+        "search.Court",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_destination_court",
+    )
+    destination_docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+        related_name="case_transfer_destination_docket",
+    )
+    transfer_date = models.DateField()
+    transfer_type = models.SmallIntegerField(
+        choices=transfer_type_choices.items(),
+    )
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
+    """
+    Represents a docket entry in a SCOTUS docket.
+
+    :ivar docket: The Docket this entry is associated with.
+    :ivar entry_number: Entry number on the SCOTUS Docket page.
+    :ivar description: For appellate brief events, a short description of
+    the brief.
+    :ivar date_filed: The date that SCOTUS indicates this entry was filed.
+    :ivar sequence_number: CL-generated field to keep entries in the same
+    order they appear in SCOTUS. Concatenation of filing date (in ISO format)
+    and the index in the SCOTUS table.
+    """
+
+    docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+    )
+    entry_number = models.IntegerField(
+        null=True,
+        blank=True,
+    )
+    description = models.TextField(blank=True)
+    date_filed = models.DateField(
+        null=True,
+        blank=True,
+    )
+    sequence_number = models.CharField(
+        max_length=16,
+    )
+
+    class Meta:
+        ordering = ["-sequence_number"]
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
+    """
+    Represents an attachment to a SCOTUS docket entry.
+
+    :ivar docket_entry: The Docket this document is associated with.
+    :ivar description: The description of this file in SCOTUS.
+    :ivar document_number: The document number on the docket page in SCOTUS.
+    :ivar attachment_number: The attachment number on the docket page in SCOTUS.
+    :ivar url: The download URL that SCOTUS provided for this document.
+    """
+
+    docket_entry = models.ForeignKey(
+        SCOTUSDocketEntry, on_delete=models.CASCADE
+    )
+    description = models.TextField(blank=True)
+    document_number = models.IntegerField(
+        blank=True,
+        null=True,
+    )
+    attachment_number = models.SmallIntegerField(
+        blank=True,
+        null=True,
+    )
+    url = models.URLField()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["document_number"]),
+            models.Index(fields=["filepath_local"]),
+        ]
+        unique_together = (
+            "docket_entry",
+            "document_number",
+            "attachment_number",
+        )
+        ordering = ("document_number", "attachment_number")

@@ -27,7 +27,7 @@ class FakeDocketReport:
             "docket_number": DOCKET_NUMBER,
             "case_name": CASE_NAME,
             "pacer_case_id": "104490",
-            "court_id": "scotus",
+            "court_id": "cacd",
             "date_filed": date(2018, 6, 9),
             "docket_entries": [
                 {

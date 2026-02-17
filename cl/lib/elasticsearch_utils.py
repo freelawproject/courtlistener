@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import operator
+import pickle
 import re
 import time
 import traceback
@@ -18,7 +19,6 @@ from django.core.paginator import Page
 from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
 from django.db.models.functions import Substr
-from django.forms.boundfield import BoundField
 from django.http.request import QueryDict
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
@@ -33,8 +33,10 @@ from elasticsearch_dsl.utils import AttrDict, AttrList
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.courts import lookup_child_courts_cache
+from cl.lib.crypto import sha256
 from cl.lib.date_time import midnight_pt
 from cl.lib.microservice_utils import microservice
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -78,6 +80,8 @@ from cl.search.constants import (
     api_child_highlight_map,
     cardinality_query_unique_ids,
     date_decay_relevance_types,
+    jurisdiction_relevance_multipliers,
+    opinion_boosts_es,
     recap_boosts_es,
 )
 from cl.search.exception import (
@@ -1010,7 +1014,7 @@ def build_custom_function_score_for_date(
     return query
 
 
-def build_decay_relevance_score(
+def build_custom_relevance_score(
     query: QueryString | str,
     date_field: str,
     scale: int,
@@ -1019,10 +1023,15 @@ def build_decay_relevance_score(
     boost_mode: str = "multiply",
     min_score: float = 0.0,
     default_current_date: datetime.date | None = None,
+    jurisdiction_relevancy: bool = False,
 ) -> QueryString:
     """
-    Build a decay relevance score query for Elasticsearch that adjusts the
-    relevance of documents based on a date field.
+    Build a custom relevance score query for Elasticsearch that adjusts
+    document relevance based on two criteria:
+     - Apply decay relevance using a date field.
+     - Adjust jurisdiction relevance for Case Law search based on the Opinion
+     Court jurisdiction hierarchy, according to multiplier factors defined in
+     jurisdiction_relevance_multipliers.
 
     :param query: The Elasticsearch query string or QueryString object.
     :param date_field: The date field used to compute the relevance decay.
@@ -1035,6 +1044,8 @@ def build_decay_relevance_score(
     :param min_score: The minimum score where the decay function stabilizes.
     :param default_current_date: The default current date to use for computing
      a stable decay relevance score across pagination in the V4 Search API.
+    :param jurisdiction_relevancy: Whether to apply jurisdiction relevance,
+    which is currently supported only for Case Law Search.
     :return:  The modified QueryString object with applied function score.
     """
 
@@ -1043,12 +1054,15 @@ def build_decay_relevance_score(
         if default_current_date
         else None
     )
+
     query = Q(
         "function_score",
         query=query,
         script_score={
             "script": {
                 "source": f"""
+
+                    // Date decay relevance for all supported search types.
                     long now;
                     if (params.default_current_time != null) {{
                             now = params.default_current_time;  // Use 'default_current_time' if provided
@@ -1075,8 +1089,37 @@ def build_decay_relevance_score(
                     def diff = Math.abs(docDate - now);
                     // Score: exp( λ * max(0, |docDate - now|) )
                     def decay_score = Math.exp(lambda * diff);
+
                     // Adjust the decay score to have a minimum value
-                    return min_score + ((1 - min_score) * decay_score);
+                    double date_relevance_score = min_score + ((1.0 - min_score) * decay_score);
+
+                    // Tune the influence of date_relevance_score based on
+                    // DATE_DECAY_FACTOR
+                    double tuned_date_decay_factor = (1 - {settings.DATE_DECAY_BOOST}) + (date_relevance_score * {settings.DATE_DECAY_BOOST});
+
+                    // Jurisdiction relevance only for Case Law Search.
+                    if ((boolean)params.jurisdiction_relevancy) {{
+                        String courtId = doc['court_id.raw'].value;
+                        // Default factor for SCOTUS and for docs with no
+                        // court_jurisdiction set.
+                        double jurisdiction_factor = 1.0;
+                        if (doc['court_jurisdiction'].size() > 0) {{
+                            String jurisdictionCode = doc['court_jurisdiction'].value;
+                            // Get jurisdiction factor for non-SCOTUS courts.
+                            if (!courtId.equals("scotus")) {{
+                                if (params.jurisdiction_multipliers.containsKey(jurisdictionCode)) {{
+                                    jurisdiction_factor = (double)params.jurisdiction_multipliers.get(jurisdictionCode);
+                                }}
+                            }}
+                        }}
+
+                    // Tune the influence of jurisdiction_factor based on
+                    // JURISDICTION_FACTOR
+                    double tuned_jurisdiction_factor = (1 - {settings.JURISDICTION_BOOST}) + (jurisdiction_factor * {settings.JURISDICTION_BOOST});
+                    return tuned_date_decay_factor * tuned_jurisdiction_factor;
+                    }}
+
+                    return tuned_date_decay_factor;
                     """,
                 "params": {
                     "default_missing_date": default_missing_date,
@@ -1084,6 +1127,8 @@ def build_decay_relevance_score(
                     "decay": decay,
                     "min_score": min_score,
                     "default_current_time": default_current_time,
+                    "jurisdiction_relevancy": jurisdiction_relevancy,
+                    "jurisdiction_multipliers": jurisdiction_relevance_multipliers,
                 },
             },
         },
@@ -1404,12 +1449,7 @@ def build_es_base_query(
             child_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "type",
-                        "text",
-                        "caseName.exact",
-                        "docketNumber",
-                    ],
+                    list(opinion_boosts_es.keys()),
                 ),
             )
             child_query_fields = {"opinion": child_fields}
@@ -1573,46 +1613,6 @@ def build_child_docs_query(
             )
 
     return Q(query_dict)
-
-
-def get_only_status_facets(
-    search_query: Search, search_form: SearchForm
-) -> list[BoundField]:
-    """Create a useful facet variable to use in a template
-
-    This method creates an Elasticsearch query with the status aggregations
-    and sets the size to 0 to ensure that no documents are returned.
-    :param search_query: The Elasticsearch search query object.
-    :param search_form: The form displayed in the user interface
-    """
-    search_query = search_query.extra(size=0)
-    # filter out opinions and get just the clusters
-    search_query = search_query.query(
-        Q("bool", must=Q("match", cluster_child="opinion_cluster"))
-    )
-    search_query.aggs.bucket("status", A("terms", field="status.raw"))
-    response = search_query.execute()
-    return make_es_stats_variable(search_form, response)
-
-
-def get_facet_dict_for_search_query(
-    search_query: Search, cd: CleanData, search_form: SearchForm
-):
-    """Create facets variables to use in a template omitting the stat_ filter
-    so the facets counts consider cluster for all status.
-
-    :param search_query: The Elasticsearch search query object.
-    :param cd: The user input CleanedData
-    :param search_form: The form displayed in the user interface
-    """
-
-    cd["just_facets_query"] = True
-    es_queries = build_es_base_query(search_query, cd)
-    search_query = es_queries.search_query
-    search_query.aggs.bucket("status", A("terms", field="status.raw"))
-    search_query = search_query.extra(size=0)
-    response = search_query.execute()
-    return make_es_stats_variable(search_form, response)
 
 
 def build_es_main_query(
@@ -2096,7 +2096,7 @@ def merge_unavailable_fields_on_parent_document(
             #    This represents document_number 1 that has been converted to an attachment.
 
             appellate_court_ids = (
-                Court.federal_courts.appellate_pacer_courts().values_list(
+                Court.federal_courts.appellate_courts().values_list(
                     "pk", flat=True
                 )
             )
@@ -2298,7 +2298,7 @@ def clean_count_query(search_query: Search) -> SearchDSL:
 
 
 def fetch_es_results(
-    get_params: QueryDict,
+    clean_params: dict,
     search_query: Search,
     child_docs_count_query: Search | None,
     page: int = 1,
@@ -2306,7 +2306,7 @@ def fetch_es_results(
 ) -> tuple[Response | list, int, bool, int | None, int | None]:
     """Fetch elasticsearch results with pagination.
 
-    :param get_params: The user get params.
+    :param clean_params: The user’s cleaned search parameters.
     :param search_query: Elasticsearch DSL Search object
     :param child_docs_count_query: The ES Search object to perform the count
     for child documents if required, otherwise None.
@@ -2331,7 +2331,7 @@ def fetch_es_results(
         )
         main_doc_count_query = clean_count_query(search_query)
 
-        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        search_type = clean_params.get("type", SEARCH_TYPES.OPINION)
         parent_unique_field = cardinality_query_unique_ids[search_type]
         main_doc_count_query = build_cardinality_count(
             main_doc_count_query, parent_unique_field
@@ -2363,7 +2363,7 @@ def fetch_es_results(
             )
 
         query_time = main_response.took
-        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        search_type = clean_params.get("type", SEARCH_TYPES.OPINION)
         if (
             main_response.aggregations
             and search_type == SEARCH_TYPES.PARENTHETICAL
@@ -2373,7 +2373,7 @@ def fetch_es_results(
         return main_response, query_time, error, parent_total, child_total
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
-            "Error loading search page with request: %s", dict(get_params)
+            "Error loading search page with request: %s", dict(clean_params)
         )
         logger.warning("Error was: %s", e)
         if settings.DEBUG is True:
@@ -2626,6 +2626,22 @@ def build_search_feed_query(
     return s
 
 
+def process_feed_query_results(
+    response: Response, cd: CleanData, jurisdiction: bool
+) -> None:
+    """Process feed query results by applying highlighting and limiting hits.
+
+    :param response: The Elasticsearch DSL response.
+    :param cd: The query CleanedData.
+    :param jurisdiction: Whether this is a jurisdiction query.
+    :return: None. The function modifies the response in place.
+    """
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        if not jurisdiction:
+            limit_inner_hits(cd, response, cd["type"])
+    set_results_highlights(response, cd["type"])
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
@@ -2633,7 +2649,7 @@ def do_es_feed_query(
     jurisdiction: bool = False,
     exclude_docs_for_empty_field: str = "",
 ) -> Response | list:
-    """Execute an Elasticsearch query for podcasts.
+    """Execute an Elasticsearch query for feeds with optional micro-caching.
 
     :param search_query: Elasticsearch DSL Search object
     :param cd: The query CleanedData
@@ -2645,17 +2661,51 @@ def do_es_feed_query(
     :return: The Elasticsearch DSL response.
     """
 
+    # Check micro-cache if enabled
+    if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
+        # Create cache parameters from cleaned data
+        cache_params = cd.copy()
+        cache_params["rows"] = rows
+        cache_params["jurisdiction"] = jurisdiction
+        if exclude_docs_for_empty_field:
+            cache_params["exclude_field"] = exclude_docs_for_empty_field
+
+        # Generate cache key
+        sorted_params = dict(sorted(cache_params.items()))
+        params_hash = sha256(pickle.dumps(sorted_params))
+
+        cache = get_s3_cache("default")
+        cache_key = make_s3_cache_key(
+            f"search_feed_cache:{params_hash}",
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+        # Try to retrieve from cache
+        cached_results = cache.get(cache_key)
+        if cached_results:
+            response = pickle.loads(cached_results)
+            # Process cached results
+            process_feed_query_results(response, cd, jurisdiction)
+            return response
+
+    # Execute ES query if not cached
     s = build_search_feed_query(
         search_query, cd, jurisdiction, exclude_docs_for_empty_field
     )
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
-    if cd["type"] == SEARCH_TYPES.OPINION:
-        # Merge the text field for Opinions.
-        if not jurisdiction:
-            limit_inner_hits(cd, response, cd["type"])
 
-    set_results_highlights(response, cd["type"])
+    # Cache the raw response before processing if caching is enabled
+    if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
+        serialized_data = pickle.dumps(response)
+        cache.set(
+            cache_key,
+            serialized_data,
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+
+    # Process results
+    process_feed_query_results(response, cd, jurisdiction)
+
     return response
 
 
@@ -2722,7 +2772,7 @@ def apply_custom_score_to_main_query(
     if is_valid_custom_score_field and api_version == "v4":
         # Applies a custom function score to sort Documents based on
         # a date field. This serves as a workaround to enable the use of the
-        # search_after cursor for pagination on documents with a None dates.
+        # search_after cursor for pagination on documents with None dates.
         query = build_custom_function_score_for_date(
             query,
             child_order_by,
@@ -2733,13 +2783,14 @@ def apply_custom_score_to_main_query(
         main_order_by == "score desc"
         and cd["type"] in valid_decay_relevance_types
     ):
+        jurisdiction_relevancy = cd["type"] == SEARCH_TYPES.OPINION
         default_current_date = cd.get("request_date")
         decay_settings = valid_decay_relevance_types[cd["type"]]
         date_field = str(decay_settings["field"])
         scale = int(decay_settings["scale"])
         decay = float(decay_settings["decay"])
         min_score = float(decay_settings["min_score"])
-        query = build_decay_relevance_score(
+        query = build_custom_relevance_score(
             query,
             date_field,
             scale=scale,
@@ -2747,12 +2798,15 @@ def apply_custom_score_to_main_query(
             boost_mode=boost_mode,
             min_score=min_score,
             default_current_date=default_current_date,
+            jurisdiction_relevancy=jurisdiction_relevancy,
         )
     return query
 
 
 def build_semantic_query(
-    text_query: str, filters: list[QueryString | Range]
+    text_query: str,
+    filters: list[QueryString | Range],
+    embedding: list[float] | None = None,
 ) -> tuple[str, list[Query]]:
     """
     Build a hybrid Elasticsearch query using both exact keyword matching and
@@ -2762,6 +2816,8 @@ def build_semantic_query(
         phrases for exact matching.
     :param filters: A list of filter clauses to apply as pre-filtering to the
         semantic KNN search query.
+    :param embedding: Optional precomputed embedding vector. If not provided,
+        the function generates embeddings from the `text_query`.
     :return: A two-tuple:
         - keyword_query: A string representing the AND-joined quoted phrases, if any.
         - semantic_query: A list of Elasticsearch Q objects, including the KNN vector search
@@ -2775,21 +2831,23 @@ def build_semantic_query(
 
     # Join extracted phrases to form a keyword query string
     keyword_query = " ".join([f'"{s}"' for s in exact_keywords])
+    if not embedding:
+        # Remove quotes from the query to prepare for embedding
+        cleaned_text_query = text_query.replace('"', "")
 
-    # Remove quotes from the query to prepare for embedding
-    cleaned_text_query = text_query.replace('"', "")
+        # Enforce character limit to avoid exceeding embedding constraints
+        if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
+            raise InputTooLongError(QueryType.QUERY_STRING)
 
-    # Enforce character limit to avoid exceeding embedding constraints
-    if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
-        raise InputTooLongError(QueryType.QUERY_STRING)
-
-    # Generate embedding vector using external microservice
-    embedding_request = async_to_sync(microservice)(
-        service="inception-query",
-        data=json.dumps({"text": cleaned_text_query}),
-    )
-    embedding_request.raise_for_status()
-    vectors = embedding_request.json()["embedding"]
+        # Generate embedding vector using external microservice
+        embedding_request = async_to_sync(microservice)(
+            service="inception-query",
+            data=json.dumps({"text": cleaned_text_query}),
+        )
+        embedding_request.raise_for_status()
+        vectors = embedding_request.json()["embedding"]
+    else:
+        vectors = embedding
 
     # If exact keyword query exists, build and add full-text query to results
     # This enables hybrid search by combining keyword and semantic results
@@ -2828,6 +2886,23 @@ def build_semantic_query(
     return keyword_query, semantic_query
 
 
+def has_semantic_params(get_params: QueryDict | CleanData) -> bool:
+    """Check if parameters represent a valid semantic search query.
+
+    :param get_params: A QueryDict or CleanData object containing the
+    search parameters.
+    :return: True if the user enabled semantic search, the search type supports
+    it, and the query has content to generate an embedding or an embedding
+    is provided.
+    """
+    return bool(
+        get_params.get("semantic", False)
+        and (get_params.get("q", "") or get_params.get("embedding", None))
+        and get_params.get("type", SEARCH_TYPES.OPINION)
+        in [SEARCH_TYPES.OPINION]
+    )
+
+
 def build_full_join_es_queries(
     cd: CleanData,
     child_query_fields: dict[str, list[str]],
@@ -2853,15 +2928,7 @@ def build_full_join_es_queries(
 
     q_should = []
     has_text_query = False
-    # True if the user explicitly enabled semantic search and the search type
-    # supports it
-    semantic_search_enabled = cd.get("semantic", False) and cd["type"] in [
-        SEARCH_TYPES.OPINION
-    ]
-
-    # True if semantic search is enabled and the query has content to generate
-    # an embedding
-    has_valid_semantic_query = semantic_search_enabled and cd.get("q", "")
+    has_valid_semantic_query = has_semantic_params(cd)
     keyword_text_query = ""
     match cd["type"]:
         case (
@@ -2925,10 +2992,10 @@ def build_full_join_es_queries(
             child_text_query = [mlt_query]
         else:
             string_query = cd.get("q", "")
+            embeddings = cd.get("embedding", None)
             if has_valid_semantic_query:
                 keyword_text_query, child_text_query = build_semantic_query(
-                    string_query,
-                    child_filters,
+                    string_query, child_filters, embeddings
                 )
                 if not keyword_text_query:
                     child_filters = []
@@ -3211,44 +3278,6 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
         result["joined_by_ids"] = opinion["joined_by_ids"]
         result["court_exact"] = opinion["joined_by_ids"]
         result["status_exact"] = result["status"]
-
-
-def make_es_stats_variable(
-    search_form: SearchForm,
-    results: Page | Response,
-) -> list[BoundField]:
-    """Create a useful facet variable for use in a template
-
-    :param search_form: The form displayed in the user interface
-    :param results: The Page or Response containing the results to add the
-    status aggregations.
-    """
-
-    facet_fields = []
-    try:
-        if isinstance(results, Page):
-            aggregations = results.paginator.aggregations.to_dict()  # type: ignore
-            buckets = aggregations["status"]["buckets"]
-        else:
-            buckets = results.aggregations.status.buckets
-        facet_values = {group["key"]: group["doc_count"] for group in buckets}
-    except (KeyError, AttributeError):
-        facet_values = {}
-
-    for field in search_form:
-        if not field.html_name.startswith("stat_"):
-            continue
-
-        try:
-            count = facet_values[field.html_name.replace("stat_", "")]
-        except KeyError:
-            # Happens when a field is iterated on that doesn't exist in the
-            # facets variable
-            count = 0
-
-        field.count = count
-        facet_fields.append(field)
-    return facet_fields
 
 
 def do_es_api_query(

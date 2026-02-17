@@ -24,9 +24,14 @@ from cl.corpus_importer.utils import (
     is_long_appellate_document_number,
     mark_ia_upload_needed,
 )
+from cl.lib.courts import find_court_object_by_name
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.model_helpers import clean_docket_number, make_docket_number_core
+from cl.lib.model_helpers import (
+    clean_docket_number,
+    make_docket_number_core,
+    make_scotus_docket_number_core,
+)
 from cl.lib.pacer import (
     get_blocked_status,
     map_cl_to_pacer_id,
@@ -64,6 +69,7 @@ from cl.search.models import (
     DocketEntry,
     OriginatingCourtInformation,
     RECAPDocument,
+    ScotusDocketMetadata,
     Tag,
 )
 from cl.search.tasks import index_docket_parties_in_es
@@ -147,7 +153,11 @@ async def find_docket_object(
     # Attempt several lookups of decreasing specificity. Note that
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
-    docket_number_core = make_docket_number_core(docket_number)
+    docket_number_core = (
+        make_scotus_docket_number_core(docket_number)
+        if court_id == "scotus"
+        else make_docket_number_core(docket_number)
+    )
     lookups = []
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
@@ -384,6 +394,7 @@ async def update_docket_metadata(
     d = update_case_names(d, docket_data["case_name"])
     await mark_ia_upload_needed(d, save_docket=False)
     d.docket_number = docket_data["docket_number"] or d.docket_number
+    d.docket_number_raw = docket_data["docket_number"] or d.docket_number_raw
     d.pacer_case_id = d.pacer_case_id or docket_data.get("pacer_case_id")
     d.date_filed = docket_data.get("date_filed") or d.date_filed
     d.date_last_filing = (
@@ -895,6 +906,8 @@ async def add_docket_entries(
     rds_updated = []
     content_updated = False
     calculate_recap_sequence_numbers(docket_entries, d.court_id)
+
+    is_scotus = d.court_id == "scotus"
     known_filing_dates = [d.date_last_filing]
     for docket_entry in docket_entries:
         response = await get_or_make_docket_entry(d, docket_entry)
@@ -935,8 +948,9 @@ async def add_docket_entries(
         # the pacer_doc_id field if it's blank. If we can't find it, create it
         # or throw an error.
         params = {"docket_entry": de}
-        if not docket_entry["document_number"] and docket_entry.get(
-            "short_description"
+        short_description = docket_entry.get("short_description")
+        if short_description and (
+            not docket_entry["document_number"] or is_scotus
         ):
             params["description"] = docket_entry["short_description"]
 
@@ -959,7 +973,6 @@ async def add_docket_entries(
         # docket sheet a second+ time.
 
         appellate_court_id_exists = await ais_appellate_court(d.court_id)
-        appellate_rd_att_exists = False
         if de_created is False and appellate_court_id_exists:
             # In existing appellate entry merges, check if the entry has at
             # least one attachment.
@@ -973,6 +986,12 @@ async def add_docket_entries(
             get_params = deepcopy(params)
             if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
+            if is_scotus:
+                # SCOTUS documents don't have a pacer_doc_id, so use the
+                # document_number instead to match the document.
+                get_params["document_number"] = (
+                    docket_entry.get("document_number") or ""
+                )
             if de_created is False:
                 # Try to match the RD regardless of the document_type.
                 del get_params["document_type"]
@@ -1053,6 +1072,10 @@ async def add_docket_entries(
                 None,
                 attachments,
                 False,
+                False,
+                False,
+                d.docket_number_core,
+                rd.description,
             )
 
     known_filing_dates = set(filter(None, known_filing_dates))
@@ -1678,6 +1701,9 @@ async def merge_attachment_page_data(
     attachment_dicts: list[dict[str, int | str]],
     debug: bool = False,
     is_acms_attachment: bool = False,
+    subdocket_replication: bool = False,
+    docket_number_core: int | None = None,
+    description: str | None = None,
 ) -> tuple[list[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
 
@@ -1690,6 +1716,11 @@ async def merge_attachment_page_data(
     attachment.
     :param debug: Whether to do saves during this process.
     :param is_acms_attachment: Whether the attachments come from ACMS.
+    :param subdocket_replication: Whether this process is related to subdocket replication.
+    :param docket_number_core: Optional. Used as a unique identifier to match
+    SCOTUS dockets that do not have a pacer_case_id.
+    :param description: Optional. The main document description used to match
+    SCOTUS documents that do not have a pacer_doc_id.
     :return: A list of RECAPDocuments modified or created during the process,
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
@@ -1701,6 +1732,11 @@ async def merge_attachment_page_data(
         "pacer_doc_id": pacer_doc_id,
         "docket_entry__docket__court": court,
     }
+    is_scotus = court.pk == "scotus"
+    if is_scotus:
+        params["document_number"] = document_number
+        params["docket_entry__docket__docket_number_core"] = docket_number_core
+        params["description"] = description
     if pacer_case_id:
         params["docket_entry__docket__pacer_case_id"] = pacer_case_id
     try:
@@ -1799,9 +1835,9 @@ async def merge_attachment_page_data(
     # We got the right item. Update/create all the attachments for
     # the docket entry.
     de = main_rd.docket_entry
-    if document_number is None:
-        # Bankruptcy or Appellate attachment page. Use the document number from
-        # the Main doc
+    if document_number is None or subdocket_replication:
+        # Bankruptcy or Appellate attachment page or attachment page being
+        # replicated to subdockets. Use the document number from the Main doc
         document_number = main_rd.document_number
 
     if debug:
@@ -1828,9 +1864,10 @@ async def merge_attachment_page_data(
     for attachment in attachment_dicts:
         sanity_checks = [
             attachment.get("attachment_number") is not None,
-            # Missing on sealed items.
-            attachment.get("pacer_doc_id", False),
         ]
+        if not is_scotus:
+            # Missing on sealed items.
+            sanity_checks.append(attachment.get("pacer_doc_id", False))
         if not all(sanity_checks):
             continue
 
@@ -1847,11 +1884,14 @@ async def merge_attachment_page_data(
         # to an attachment. In ACMS attachment pages, all the documents use the
         # same pacer_doc_id, so we need to make sure only one is matched to the
         # main RD, while the remaining ones are created separately.
-        if (
-            court_is_appellate
-            and attachment["pacer_doc_id"] == main_rd.pacer_doc_id
-            and not main_rd_to_att
-        ):
+        main_rd_condition = (
+            attachment["pacer_doc_id"] == main_rd.pacer_doc_id
+            if not is_scotus
+            else attachment["attachment_number"] == 1
+            # att #1 is the main document in SCOTUS
+        )
+
+        if court_is_appellate and main_rd_condition and not main_rd_to_att:
             main_rd_to_att = True
             main_rd.document_type = RECAPDocument.ATTACHMENT
             main_rd.attachment_number = attachment["attachment_number"]
@@ -1875,7 +1915,10 @@ async def merge_attachment_page_data(
             except RECAPDocument.DoesNotExist:
                 try:
                     doc_id_params = deepcopy(params)
-                    doc_id_params.pop("attachment_number", None)
+                    if not is_scotus:
+                        # att number is required to match attachments in SCOTUS
+                        # dockets since we don't have a pacer_doc_id
+                        doc_id_params.pop("attachment_number", None)
                     del doc_id_params["document_type"]
                     doc_id_params["pacer_doc_id"] = attachment["pacer_doc_id"]
                     if (
@@ -1963,7 +2006,8 @@ async def merge_attachment_page_data(
                 pass
         await rd.asave()
 
-    if not is_acms_attachment:
+    if not is_acms_attachment and not is_scotus:
+        # There is no pacer_doc_id in SCOTUS dockets to clean up duplicates
         await clean_duplicate_attachment_entries(de, attachment_dicts)
     await mark_ia_upload_needed(de.docket, save_docket=True)
     await process_orphan_documents(
@@ -2118,3 +2162,141 @@ def process_case_query_report(
         ContentFile(report_text.encode()),
     )
     return None
+
+
+def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
+    """Add sequential attachment numbers and pacer_doc_id to SCOTUS attachments.
+
+    :param docket_entries: A list of docket entry dictionaries.
+    :return: None. The input list is changed in place.
+    """
+
+    for entry in docket_entries:
+        main_doc_short_desc = ""
+        attachments = entry.get("attachments") or []
+        entry["pacer_doc_id"] = ""
+
+        for idx, attachment in enumerate(attachments, start=1):
+            if idx == 1:
+                main_doc_short_desc = attachment["description"]
+            attachment["attachment_number"] = idx
+            attachment["pacer_doc_id"] = ""
+
+        if not attachments:
+            entry["attachments"] = None
+
+        entry["short_description"] = main_doc_short_desc
+
+
+def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
+    """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
+
+    This will create or update the Docket row for the SCOTUS and
+    then create or update the related ScotusDocketMetadata instance.
+
+    :param report_data: A dictionary containing parsed SCOTUS docket data.
+    :return: The created or updated Docket instance.
+    """
+    with transaction.atomic():
+        court = Court.objects.get(pk="scotus")
+        docket_number = report_data["docket_number"]
+        if not docket_number:
+            raise ValueError(
+                "Docket number can't be missing in SCOTUS dockets."
+            )
+
+        case_name = report_data.get("case_name") or ""
+        date_filed = report_data.get("date_filed")
+        lower_court_name = report_data.get("lower_court")
+
+        d = async_to_sync(find_docket_object)(
+            court.pk,
+            None,
+            docket_number,
+            None,
+            None,
+            None,
+        )
+
+        d.source = Docket.SCRAPER
+        d.docket_number = docket_number
+        d.docket_number_raw = docket_number
+        d.case_name = case_name if case_name else d.case_name
+        d.date_filed = date_filed if date_filed else d.date_filed
+        d.appeal_from_str = (
+            lower_court_name if lower_court_name else d.appeal_from_str
+        )
+        if lower_court_name:
+            lower_court = find_court_object_by_name(
+                lower_court_name, bankruptcy=False
+            )
+            d.appeal_from = (
+                lower_court if lower_court is not None else d.appeal_from
+            )
+
+        lower_court_case_numbers = report_data.get("lower_court_case_numbers")
+        lower_court_case_numbers_raw = report_data.get(
+            "lower_court_case_numbers_raw"
+        )
+        lower_court_decision_date = report_data.get(
+            "lower_court_decision_date"
+        )
+        lower_court_rehearing_denied_date = report_data.get(
+            "lower_court_rehearing_denied_date"
+        )
+        if (
+            lower_court_case_numbers
+            or lower_court_decision_date
+            or lower_court_rehearing_denied_date
+        ):
+            oci = d.originating_court_information
+            # Create originating_court_information if missing
+            oci = OriginatingCourtInformation() if not oci else oci
+
+            oci.docket_number = (
+                ", ".join(lower_court_case_numbers)
+                if lower_court_case_numbers
+                else oci.docket_number
+            )
+            oci.docket_number_raw = (
+                lower_court_case_numbers_raw
+                if lower_court_case_numbers_raw
+                else oci.docket_number_raw
+            )
+            oci.date_judgment = (
+                lower_court_decision_date
+                if lower_court_decision_date
+                else oci.date_judgment
+            )
+            oci.date_rehearing_denied = (
+                lower_court_rehearing_denied_date
+                if lower_court_rehearing_denied_date
+                else oci.date_rehearing_denied
+            )
+            oci.save()
+            d.originating_court_information = oci
+        d.save()
+
+        # Merge ScotusDocketMetadata
+        defaults = {
+            "capital_case": bool(report_data.get("capital_case")),
+            "date_discretionary_court_decision": report_data.get(
+                "discretionary_court_decision"
+            ),
+        }
+        if links := report_data.get("links"):
+            defaults["linked_with"] = links
+
+        if qp_url := report_data.get("questions_presented"):
+            defaults["questions_presented_url"] = qp_url
+
+        ScotusDocketMetadata.objects.update_or_create(
+            docket=d,
+            defaults=defaults,
+        )
+
+    # Docket entries merger:
+    enrich_scotus_attachments(report_data["docket_entries"])
+    async_to_sync(add_docket_entries)(d, report_data["docket_entries"])
+
+    return d

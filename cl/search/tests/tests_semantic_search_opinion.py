@@ -1,4 +1,5 @@
 import json
+from http import HTTPStatus
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,9 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Document
+from waffle.testutils import override_flag
 
+from cl.lib.search_index_utils import index_documents_in_bulk
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.factories import (
     CourtFactory,
@@ -19,7 +22,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion
+from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion, SearchQuery
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
@@ -137,6 +140,79 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
                     id=ES_CHILD_ID(opinion.pk).OPINION
                 ).embeddings
             )
+
+    @mock.patch(
+        "cl.search.tasks.index_documents_in_bulk",
+        wraps=index_documents_in_bulk,
+    )
+    def test_cl_index_embeddings_skip_versioned_opinion(
+        self, bulk_index_mock
+    ) -> None:
+        """Ensure versioned opinions are skipped during embeddings indexing."""
+        # Create two opinions: one main and one versioned
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2 = OpinionFactory(
+                cluster=self.opinion_cluster_2,
+                html_columbia=("<p>Sed ut perspiciatis</p>"),
+            )
+            opinion_3 = OpinionFactory(
+                cluster=self.opinion_cluster_2,
+                html_columbia=("<p>Sed ut perspiciatis</p>"),
+                main_version=opinion_2,
+            )
+
+        # Assert initial state
+        self.assertEqual(
+            OpinionDocument.get(
+                id=ES_CHILD_ID(opinion_2.pk).OPINION
+            ).embeddings,
+            [],
+        )
+        # Versioned opinion should not exist in Elasticsearch
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_3.pk).OPINION)
+        )
+
+        # Single opinion processing: versioned opinion should NOT trigger bulk
+        # indexing
+        with mock.patch(
+            "cl.search.tasks.AWSMediaStorage.open",
+            side_effect=mock_read_from_s3,
+        ):
+            call_command(
+                "cl_index_embeddings",
+                batch_size=1,
+                indexing_queue="celery",
+                start_id=opinion_3.id,
+            )
+
+        bulk_index_mock.assert_not_called()
+
+        # processing a batch including a versioned opinion should trigger bulk
+        # indexing but the versioned opinion itself should not be added to
+        # Elasticsearch
+        with mock.patch(
+            "cl.search.tasks.AWSMediaStorage.open",
+            side_effect=mock_read_from_s3,
+        ):
+            call_command(
+                "cl_index_embeddings",
+                batch_size=2,
+                indexing_queue="celery",
+                start_id=0,
+            )
+
+        # Assert main opinion now has embeddings
+        self.assertTrue(
+            OpinionDocument.get(
+                id=ES_CHILD_ID(opinion_2.pk).OPINION
+            ).embeddings,
+        )
+
+        # Assert versioned opinion is still not indexed
+        self.assertFalse(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion_3.pk).OPINION)
+        )
 
     def test_cl_index_embeddings_from_inventory(self):
         """Test cl_index_embeddings command using an S3 inventory file."""
@@ -322,6 +398,8 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         )
         return r
 
+    @override_flag("store-search-api-queries", active=True)
+    @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
     def test_can_perform_a_regular_semantic_query(
         self, inception_mock
     ) -> None:
@@ -334,6 +412,10 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         # Perform search and check that exactly two results are returned
         search_params = {"q": self.situational_query, "semantic": True}
         r = self._test_api_results_count(search_params, 2, "semantic query")
+
+        # Ensure a SearchQuery row was logged with SEMANTIC querymode
+        last_query = SearchQuery.objects.last()
+        self.assertEqual(last_query.query_mode, SearchQuery.SEMANTIC)
 
         content = r.content.decode()
         # Check that the expected clusters appear in the results
@@ -502,3 +584,101 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
                             opinion["snippet"],
                             record.plain_text[: settings.NO_MATCH_HL_SIZE],
                         )
+
+    def test_can_reject_post_request_when_semantic_flag_missing(
+        self, inception_mock
+    ) -> None:
+        """Should reject POST request if `semantic=true` is not in query params."""
+        r = self.client.post(
+            reverse("search-list", kwargs={"version": "v4"}),
+            data=self.situational_query_vectors,
+            format="json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        data = r.json()
+        self.assertIn("semantic", data)
+        self.assertEqual(
+            data["semantic"][0],
+            "Semantic search requires `semantic=true` in the query string.",
+        )
+
+    def test_can_reject_post_request_when_embedding_missing(
+        self, inception_mock
+    ):
+        """Should reject request if semantic search is requested without an embedding."""
+        api_url = reverse("search-list", kwargs={"version": "v4"})
+        r = self.client.post(
+            f"{api_url}",
+            data={},
+            format="json",
+            query_params={"semantic": True},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        data = r.json()
+        self.assertIn("embedding", data)
+        self.assertEqual(
+            data["embedding"][0],
+            "You must provide an embedding vector in the request body when using semantic search.",
+        )
+
+    def test_rejects_request_with_unsupported_type(self, inception_mock):
+        """Should return an error if semantic search is requested with an unsupported type."""
+        api_url = reverse("search-list", kwargs={"version": "v4"})
+
+        # Send a valid vector but with an unsupported type
+        r = self.client.post(
+            f"{api_url}",
+            data=self.situational_query_vectors,
+            format="json",
+            query_params={"semantic": True, "type": "r"},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        data = r.json()
+        self.assertIn("type", data)
+        error_message = data["type"][0]
+        self.assertIn("Unsupported search type 'r'", error_message)
+        self.assertIn(
+            "Semantic search is only supported for type", error_message
+        )
+
+    def test_valid_post_request_skips_computing_embeddings(
+        self, inception_mock
+    ):
+        """Should pass query params and embedding to Elasticsearch query runner."""
+        api_url = reverse("search-list", kwargs={"version": "v4"})
+        r = self.client.post(
+            f"{api_url}",
+            data=self.situational_query_vectors,
+            format="json",
+            query_params={"semantic": True},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(r.data["results"]), 2)
+
+        content = r.content.decode()
+        # Check that the expected clusters appear in the results
+        self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Check the inception microservice was not called
+        inception_mock.assert_not_called()
+
+        # mock a hybrid search query
+        r = self.client.post(
+            f"{api_url}",
+            data=self.situational_query_vectors,
+            format="json",
+            query_params={"semantic": True, "q": self.hybrid_query},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(r.data["results"]), 3)
+
+        content = r.content.decode()
+        # Should include the two opinions with embeddings
+        self.assertIn(f'"cluster_id":{self.opinion_2.cluster.id}', content)
+        self.assertIn(f'"cluster_id":{self.opinion_3.cluster.id}', content)
+
+        # Should also include the keyword-only match (no embeddings)
+        self.assertIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)

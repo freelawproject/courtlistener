@@ -1,25 +1,27 @@
 {% comment %}
   This template renders a dismissible nav banner that fills the horizontal space
-  available and takes up to four keyword arguments described below:
+  available and takes the keyword arguments described below:
 
   Parameters:
+    - title (optional): Title of the banner displayed in uppercase above the main text.
     - text: Text of the banner.
     - link: The URL for the button.
     - cookie_name: Name of the cookie used to remember if the user has already
     dismissed the banner. This prevents them from seeing the same message
     repeatedly.
-    - single_row (optional): A Boolean flag that, when set to True for medium
-    and large resolutions, condenses the banner into a single line of text
-    with a button positioned to the right. Defaults to False.
+    - cookie_sleep_duration (optional): Number of days to snooze the banner after the
+    user has dismissed it. Defaults to 20.
+    - responsive (optional): When `True`, text and button are in a row in larger screens,
+    and in a column in smaller ones. When `False`, layout is always the same, with the
+    button below the text.
     - button_text (optional): Text for the button. Defaults to "Learn More".
     - button_emoji (optional): An Idiomatic Text element (<i></i>) to display
     inside the button.
-    - emoji (optional): An HTML entity code (e.g., &#128077;) to insert an
-    emoji next to the banner message.
     - variant (optional): Changes the color of the banner. Accepted values:
       - `warning` (yellow)
       - `info` (blue)
       - `success` (green)
+      - `primary` (white background, blue button)
       - `danger` (red, DEFAULT)
 
   It's advisable to wrap this template within an if tag and use the parent element to add
@@ -35,29 +37,36 @@
 {% endcomment %}
 
 {% if cookie_name  not in request.COOKIES %}
-<div class="navbar navbar-default subnav alert-{% if variant %}{{ variant }}{% else %}danger{% endif %} alert-dismissible" role="navigation">
-  <div class="container-fluid">
-    <div class="row">
-      <div class="col-xs-12">
-        <button type="button" class="close"
-                data-cookie-name="{{cookie_name}}"
-                data-duration="20"
-                aria-label="Close">
-            <span aria-hidden="true"
-                  class="x-large">&times;</span></button>
-      </div>
+  <div
+    class="flex flex-column align-items-center{% if responsive %} flex-md-row{% endif %} alert-{% if variant %}{{ variant }}{% else %}danger{% endif %}"
+    style="border: 2px solid lightgray; padding-left: 4rem; padding-right: 2.5rem; padding-block: 2rem; position: relative; gap: 1.5rem"
+    data-dismissible-alert
+  >
+    {# Banner text #}
+    <div style="flex-grow: 1">
+      <p class="text-uppercase">{{ title }}</p>
+      <p class="lead" style="margin: 0;">{{text}}</p>
     </div>
-    <div class="row flex flex-column {% if single_row %}flex-sm-row{% endif %} align-items-center justify-content-between">
-      <div class="col-xs-12 {% if single_row %}col-sm-10{% endif %} navbar-text lead">
-        <p>{% if emoji %}{{emoji}}{% endif %} {{text}}</p>
-      </div>
-      <div class="{% if single_row %}col-xs-2{% else %}col-xs-12{% endif %} flex justify-content-center justify-content-sm-end {% if not single_row %}second-row-btn{% endif %}">
-        <a href="{{link}}"
-            class="btn btn-{% if variant %}{{ variant }}{% else %}danger{% endif %} btn-lg hidden-xs">{% if button_emoji %}{{button_emoji}}{% endif %}&nbsp;{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
-        <a href="{{link}}"
-            class="btn btn-{% if variant %}{{ variant }}{% else %}danger{% endif %} btn-sm hidden-sm hidden-md hidden-lg">{% if button_emoji %}{{button_emoji}}&nbsp;{% endif %}{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
-      </div>
-    </div>
+    {# CTA Button #}
+    <a
+      href="{{link}}"
+      class="btn btn-{% if variant %}{{ variant }}{% else %}danger{% endif %} btn-lg"
+      style="flex-grow: 0"
+    >
+      {% if button_emoji %}<span aria-hidden="true">{{button_emoji}}&nbsp;</span>{% endif %}
+      {% if button_text %}{{button_text}}{% else %}Learn More{% endif %}
+    </a>
+
+    {# Close button #}
+    <button
+      type="button"
+      class="close {% if responsive %}absolute-max-md{% else %}absolute{% endif %}"
+      style="right: 1.4rem; top: 0.5rem; padding: 1rem"
+      data-cookie-name="{{cookie_name}}"
+      data-duration="{% if cookie_sleep_duration %}{{ cookie_sleep_duration }}{% else %}20{% endif %}"
+      aria-label="Close"
+    >
+      <span aria-hidden="true" class="x-large" style="line-height: 0.5; height: 25px">&times;</span>
+    </button>
   </div>
-</div>
 {% endif %}

@@ -4,7 +4,10 @@ from datetime import datetime
 from django.db import transaction
 
 from cl.lib.command_utils import ScraperCommand, logger
-from cl.scrapers.tasks import extract_doc_content, update_document_from_text
+from cl.scrapers.tasks import (
+    extract_opinion_content,
+    update_document_from_text,
+)
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
@@ -38,10 +41,9 @@ def rerun_extract_from_text(
             opinion.id,
         )
         stats["No text to extract from"] += 1
-        extract_doc_content(
+        extract_opinion_content(
             pk=opinion.pk,
             ocr_available=True,
-            citation_jitter=True,
             juriscraper_module=juriscraper_module,
         )
         return
@@ -65,6 +67,14 @@ def rerun_extract_from_text(
             return
 
         logger.info("Processing opinion %s", opinion.id)
+
+        if changes.get("OriginatingCourtInformation"):
+            opinion.cluster.docket.originating_court_information.save()
+            logger.info(
+                "OriginatingCourtInformation created or updated with data %s",
+                changes["OriginatingCourtInformation"],
+            )
+            stats["OriginatingCourtInformation"] += 1
 
         # Check if changes exist before saving, to prevent unnecessary DB queries
         if changes.get("Docket"):
@@ -115,6 +125,7 @@ class Command(ScraperCommand):
         "OpinionCluster": 0,
         "Opinion": 0,
         "Citation": 0,
+        "OriginatingCourtInformation": 0,
         "No text to extract from": 0,
         "No metadata extracted": 0,
         "Error": 0,

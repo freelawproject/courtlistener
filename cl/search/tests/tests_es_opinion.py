@@ -1,6 +1,10 @@
 import datetime
+import json
 from http import HTTPStatus
+from pathlib import Path
+from typing import Any
 from unittest import mock
+from unittest.mock import ANY, MagicMock
 
 import pytz
 import time_machine
@@ -22,9 +26,10 @@ from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
+from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
-from cl.lib.elasticsearch_utils import do_es_api_query
+from cl.lib.elasticsearch_utils import build_es_base_query, do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -66,12 +71,16 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    SearchQuery,
 )
 from cl.search.tasks import (
     es_save_document,
     index_related_cites_fields,
     update_children_docs_by_query,
     update_es_document,
+)
+from cl.search.tests.test_generate_opinion_embeddings import (
+    FakeS3IntelligentTieringStorage,
 )
 from cl.tests.cases import (
     CountESTasksTestCase,
@@ -1168,7 +1177,7 @@ class OpinionV4APISearchTest(
             )
             opinion_cluster.panel.add(person)
             citation_1 = CitationWithParentsFactory.create(
-                volume=33,
+                volume="33",
                 reporter="state",
                 page="1",
                 type=1,
@@ -1218,6 +1227,8 @@ class OpinionV4APISearchTest(
                 self.assertEqual(r.data["results"][0][field], [])
 
 
+@override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinions_es_search")
 class OpinionsESSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -1360,6 +1371,10 @@ class OpinionsESSearchTest(
         r = await self._test_article_count(search_params, 1, "text_query")
         self.assertIn("Honda", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
+
+        # Ensure a SearchQuery row was logged with KEYWORD querymode
+        last_query = await SearchQuery.objects.alast()
+        self.assertEqual(last_query.query_mode, SearchQuery.KEYWORD)
 
         # Search by court_id
         search_params = {"q": "ca1"}
@@ -1734,6 +1749,53 @@ class OpinionsESSearchTest(
             "stat_Unknown": 0,
         }
         assert_facet_fields(r.context["facet_fields"], expected_values)
+
+    @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
+    async def test_facet_counts_caching(self) -> None:
+        """Are facet counts cached and reused across status changes?"""
+        # Delete facet cache entries that earlier tests may have populated.
+        r = get_redis_interface("CACHE")
+        if keys := r.keys("*facet_counts_cache:*"):
+            r.delete(*keys)
+
+        def get_facet_dict(facet_fields):
+            return {f.name: f.count for f in facet_fields}
+
+        # Patch build_es_base_query where fetch_facets calls it (the
+        # local name in search_utils) so we only count facet queries.
+        with mock.patch(
+            "cl.lib.search_utils.build_es_base_query",
+            wraps=build_es_base_query,
+        ) as mock_facet_query:
+            # First request: facet cache miss → 1 facet query.
+            r = await self.async_client.get(
+                reverse("show_results"), {"q": "*", "stat_Published": "on"}
+            )
+            first_facets = get_facet_dict(r.context["facet_fields"])
+            self.assertEqual(first_facets["stat_Published"], 4)
+            self.assertEqual(first_facets["stat_Errata"], 1)
+            self.assertEqual(mock_facet_query.call_count, 1)
+
+            # Second request with a different status filter should hit
+            # the facet cache → 0 facet queries.
+            mock_facet_query.reset_mock()
+            r = await self.async_client.get(
+                reverse("show_results"), {"q": "*", "stat_Errata": "on"}
+            )
+            second_facets = get_facet_dict(r.context["facet_fields"])
+            self.assertEqual(first_facets, second_facets)
+            self.assertEqual(mock_facet_query.call_count, 0)
+
+            # A different text query should miss the facet cache
+            # (different cache key) → 1 facet query.
+            mock_facet_query.reset_mock()
+            r = await self.async_client.get(
+                reverse("show_results"),
+                {"q": "some rando syllabus", "stat_Published": "on"},
+            )
+            third_facets = get_facet_dict(r.context["facet_fields"])
+            self.assertEqual(third_facets["stat_Published"], 3)
+            self.assertEqual(mock_facet_query.call_count, 1)
 
     async def test_citation_ordering_by_citation_count(self) -> None:
         """Can the results be re-ordered by citation count?"""
@@ -2156,7 +2218,7 @@ class OpinionsESSearchTest(
             OpinionFactory.create(cluster=cluster, plain_text="")
             OpinionFactory.create(cluster=cluster, plain_text="")
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -2187,7 +2249,7 @@ class OpinionsESSearchTest(
             )
             OpinionFactory.create(cluster=cluster_2, plain_text="")
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -2225,7 +2287,7 @@ class OpinionsESSearchTest(
                 date_filed=datetime.date(2024, 8, 23),
             )
             CitationWithParentsFactory.create(
-                volume=31,
+                volume="31",
                 reporter="Pa. D. & C.",
                 page="445",
                 type=2,
@@ -2372,6 +2434,14 @@ class OpinionSearchDecayRelevancyTest(
         # Rebuild the Opinion index
         cls.rebuild_index("search.OpinionCluster")
 
+        cls.court_1 = CourtFactory(
+            id="ca1",
+            full_name="First Circuit",
+            jurisdiction="F",
+            citation_string="1st Cir.",
+            url="http://www.ca1.uscourts.gov/",
+        )
+
         # Same keywords but different dateFiled
         cls.opinion_old = OpinionClusterFactory.create(
             case_name="Keyword Match",
@@ -2384,6 +2454,7 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-old",
             precedential_status="Published",
             docket=DocketFactory(
+                court_id=cls.court_1.pk,
                 case_name="Base Docket",
                 docket_number="1:21-bk-1235",
                 source=Docket.HARVARD,
@@ -2405,6 +2476,7 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-recent",
             precedential_status="Published",
             docket=DocketFactory(
+                court_id=cls.court_1.pk,
                 case_name="Base Docket",
                 docket_number="1:21-bk-1236",
                 source=Docket.HARVARD,
@@ -2427,6 +2499,7 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-high-rel",
             precedential_status="Published",
             docket=DocketFactory(
+                court_id=cls.court_1.pk,
                 case_name="Base Docket",
                 docket_number="1:21-bk-1237",
                 source=Docket.HARVARD,
@@ -2448,6 +2521,7 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-low-rel",
             precedential_status="Published",
             docket=DocketFactory(
+                court_id=cls.court_1.pk,
                 case_name="Base Docket",
                 docket_number="1:21-bk-1238",
                 source=Docket.HARVARD,
@@ -2470,6 +2544,7 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-high-rel-old",
             precedential_status="Published",
             docket=DocketFactory(
+                court_id=cls.court_1.pk,
                 case_name="Base Docket",
                 docket_number="1:21-bk-1239",
                 source=Docket.HARVARD,
@@ -2493,6 +2568,7 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-low-rel-new",
             precedential_status="Published",
             docket=DocketFactory(
+                court_id=cls.court_1.pk,
                 case_name="Base Docket",
                 docket_number="1:21-bk-1241",
                 source=Docket.HARVARD,
@@ -2625,7 +2701,280 @@ class OpinionSearchDecayRelevancyTest(
             self._test_results_ordering(test, "cluster_id", version="v3")
 
 
+class OpinionSearchJurisdictionRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """
+    Opinion Search Jurisdiction Relevance Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Rebuild the Opinion index
+        cls.rebuild_index("search.OpinionCluster")
+
+        cls.scotus = CourtFactory(
+            id="scotus",
+            full_name="Supreme Court of the United states",
+            jurisdiction="F",
+            citation_string="SCOTUS",
+        )
+
+        cls.federal_appellate = CourtFactory(
+            id="ca1",
+            full_name="First Circuit",
+            jurisdiction="F",
+            citation_string="1st Cir.",
+            url="http://www.ca1.uscourts.gov/",
+        )
+        cls.federal_bankruptcy = CourtFactory(
+            id="cacb",
+            full_name="California Central District Court",
+            jurisdiction="FB",
+            citation_string="cacb",
+        )
+        cls.international = CourtFactory(
+            id="cit",
+            full_name="Court of International Trade",
+            jurisdiction="I",
+            citation_string="cit",
+        )
+
+        cls.opinion_scotus = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2018, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-old",
+            precedential_status="Published",
+            docket=DocketFactory(
+                court_id=cls.scotus.pk,
+                case_name="Base Docket",
+                docket_number="1:21-bk-1235",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_scotus = OpinionFactory.create(
+            cluster=cls.opinion_scotus,
+            plain_text="Highly Relevant Keywords",
+            author_str="",
+        )
+
+        cls.opinion_federal_appellate = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2018, 2, 23),
+            procedural_history="More Highly Relevant Keywords Relevant Keywords",
+            source="C",
+            judges="Highly Relevant Keywords",
+            attorneys="More Highly Relevant Keywords Relevant Keywords",
+            nature_of_suit="Highly Relevant Keywords",
+            posture="Highly Relevant Keywords",
+            slug="opinion-recent",
+            precedential_status="Published",
+            docket=DocketFactory(
+                court_id=cls.federal_appellate.pk,
+                case_name="Base Docket",
+                docket_number="1:21-bk-1236",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_fa = OpinionFactory.create(
+            cluster=cls.opinion_federal_appellate,
+            plain_text="Highly Relevant Keywords Lorem Ipsum Highly Relevant Keywords",
+            author_str="",
+        )
+        cls.opinion_federal_bankruptcy = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2018, 2, 23),
+            procedural_history="More Highly Relevant Keywords Relevant Keywords",
+            source="C",
+            judges="Highly Relevant Keywords",
+            attorneys="More Highly Relevant Keywords Relevant Keywords",
+            nature_of_suit="Highly Relevant Keywords",
+            posture="Highly Relevant Keywords",
+            slug="opinion-high-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                court_id=cls.federal_bankruptcy.pk,
+                case_name="Base Docket",
+                docket_number="1:21-bk-1237",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_fd = OpinionFactory.create(
+            cluster=cls.opinion_federal_bankruptcy,
+            plain_text="Highly Relevant Keywords Lorem Ipsum Highly Relevant Keywords",
+            author_str="",
+        )
+
+        cls.opinion_international = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2025, 2, 23),
+            procedural_history="More Highly Relevant Keywords Relevant Keywords",
+            source="C",
+            judges="Highly Relevant Keywords",
+            attorneys="More Highly Relevant Keywords Relevant Keywords",
+            nature_of_suit="Highly Relevant Keywords",
+            posture="Highly Relevant Keywords",
+            slug="opinion-high-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                court_id=cls.international.pk,
+                case_name="Base Docket",
+                docket_number="1:21-bk-1260",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_i = OpinionFactory.create(
+            cluster=cls.opinion_international,
+            plain_text="Highly Relevant Keywords Lorem Ipsum Highly Relevant Keywords",
+            author_str="",
+        )
+
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+        cls.test_cases = [
+            {
+                "name": "Same keywords, different jurisdiction",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_scotus.docket.docket_number,
+                    cls.opinion_federal_appellate.docket.docket_number,
+                    cls.opinion_federal_bankruptcy.docket.docket_number,
+                    cls.opinion_international.docket.docket_number,
+                ],
+                "expected_order": [  # API
+                    cls.opinion_scotus.pk,
+                    cls.opinion_federal_appellate.pk,
+                    cls.opinion_federal_bankruptcy.pk,
+                    cls.opinion_international.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy same, different jurisdiction",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    cls.opinion_federal_appellate.docket.docket_number,
+                    cls.opinion_scotus.docket.docket_number,
+                    cls.opinion_federal_bankruptcy.docket.docket_number,
+                    cls.opinion_international.docket.docket_number,
+                ],
+                "expected_order": [  # API
+                    cls.opinion_federal_appellate.pk,
+                    cls.opinion_scotus.pk,
+                    cls.opinion_federal_bankruptcy.pk,
+                    cls.opinion_international.pk,
+                ],
+            },
+        ]
+
+        cls.tune_factor_case = {
+            "name": "Same keywords, different jurisdiction. Tune boost factor.",
+            "search_params": {
+                "q": "Match",
+                "order_by": "score desc",
+                "type": SEARCH_TYPES.OPINION,
+            },
+            "expected_order_frontend": [
+                cls.opinion_international.docket.docket_number,
+                cls.opinion_scotus.docket.docket_number,
+                cls.opinion_federal_appellate.docket.docket_number,
+                cls.opinion_federal_bankruptcy.docket.docket_number,
+            ],
+            "expected_order": [  # API
+                cls.opinion_international.pk,
+                cls.opinion_scotus.pk,
+                cls.opinion_federal_appellate.pk,
+                cls.opinion_federal_bankruptcy.pk,
+            ],
+        }
+
+    def test_relevancy_jurisdiction_scoring_frontend(self) -> None:
+        """Test jurisdiction relevancy scoring for Opinion search Frontend"""
+
+        for test in self.test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test['name']}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test jurisdiction decay scoring for Opinion search V4 API"""
+
+        for test in self.test_cases:
+            self._test_results_ordering(test, "cluster_id")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test jurisdiction decay scoring for Opinion search V3 API"""
+
+        for test in self.test_cases:
+            self._test_results_ordering(test, "cluster_id", version="v3")
+
+    @override_settings(JURISDICTION_BOOST=0.1)
+    def test_tune_jurisdiction_factor_frontend(self) -> None:
+        """Test tuning the jurisdiction boost for Opinion search Frontend
+        JURISDICTION_BOOST = 0.1
+        This means that the jurisdiction weight is less significant, so the
+        date decay relevance becomes more important.
+        """
+
+        r = async_to_sync(self._test_article_count)(
+            self.tune_factor_case["search_params"],
+            len(self.tune_factor_case["expected_order_frontend"]),
+            f"Failed count {self.tune_factor_case['name']}",
+        )
+        self._assert_order_in_html(
+            r.content.decode(),
+            self.tune_factor_case["expected_order_frontend"],
+        )
+
+    @override_settings(JURISDICTION_BOOST=0.1)
+    def test_tune_jurisdiction_factor_api(self) -> None:
+        """Test tuning the jurisdiction boost for Opinion search API
+        JURISDICTION_BOOST = 0.1
+        This means that the jurisdiction weight is less significant, so the
+        date decay relevance becomes more important.
+        """
+
+        self._test_results_ordering(self.tune_factor_case, "cluster_id")
+
+
 @override_settings(RELATED_MLT_MINTF=1)
+@override_settings(WAFFLE_CACHE_PREFIX="test_related_search_test")
+@override_flag("citing_and_related_enabled", active=True)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -2770,15 +3119,15 @@ class RelatedSearchTest(
         ]
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
                 "Debbas v. Franklin",
             ),
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/",
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
                 "Voutila v. Bonvini",
             ),
         ]
@@ -2816,15 +3165,15 @@ class RelatedSearchTest(
 
         expected_related_cases = [
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/",
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
                 "Voutila v. Bonvini",
             ),
             (
-                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/",
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
                 "case name cluster 3",
             ),
         ]
@@ -2864,15 +3213,15 @@ class RelatedSearchTest(
         ]
         expected_related_cases = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
                 "Debbas v. Franklin",
             ),
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/",
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
                 "case name cluster 3",
             ),
         ]
@@ -3028,15 +3377,15 @@ class RelatedSearchTest(
         ]
         expected_related_cases = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
                 "Debbas v. Franklin",
             ),
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/",
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
                 "Voutila v. Bonvini",
             ),
         ]
@@ -3307,6 +3656,7 @@ class IndexOpinionDocumentsCommandTest(
         self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
 
+@override_settings(ENABLE_EMBEDDING_COMPUTATION=True)
 class EsOpinionsIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
 ):
@@ -3984,7 +4334,7 @@ class EsOpinionsIndexingTest(
 
         # Add lexis citation to the cluster
         lexis_citation = CitationWithParentsFactory.create(
-            volume=10,
+            volume="10",
             reporter="Yeates",
             page="4",
             type=6,
@@ -4007,7 +4357,7 @@ class EsOpinionsIndexingTest(
 
         # Add neutral citation to the cluster
         neutral_citation = CitationWithParentsFactory.create(
-            volume=16,
+            volume="16",
             reporter="Yeates",
             page="58",
             type=8,
@@ -4103,6 +4453,205 @@ class EsOpinionsIndexingTest(
         o_2_doc = OpinionDocument.get(id=ES_CHILD_ID(o_2.pk).OPINION)
         self.assertEqual(o_2_doc.text, "Lorem html ipsum control chars .")
         o_c.docket.delete()
+
+    def _get_mock_for_inception(self, vectors: dict[str, Any] | None = None):
+        """Return a mocked Inception response with the given vectors."""
+        inception_response = MagicMock()
+        inception_response.is_success = True
+        inception_response.json.return_value = vectors
+        return inception_response
+
+    @mock.patch("cl.search.tasks.download_embedding")
+    @mock.patch("cl.search.tasks.S3IntelligentTieringStorage")
+    @mock.patch("cl.search.tasks.microservice")
+    def test_updating_text_field_computes_embeddings(
+        self, inception_mock, mock_aws_media_storage, mock_download_embeddings
+    ) -> None:
+        """Confirm updates to text field trigger embeddings generation."""
+        cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text secret word for queries",
+            cluster=cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+
+        # Mock the response from the microservice
+        test_dir = (
+            Path(settings.INSTALL_ROOT) / "cl" / "search" / "test_assets"
+        )
+        with open(
+            test_dir / "opinion_1_embeddings.json", encoding="utf-8"
+        ) as f:
+            expected_embeddings = json.load(f)
+        inception_mock.return_value = self._get_mock_for_inception(
+            expected_embeddings
+        )
+        fake_storage = FakeS3IntelligentTieringStorage()
+        mock_aws_media_storage.return_value = fake_storage
+
+        mock_download_embeddings.return_value = expected_embeddings
+
+        # Opinion should exist in ES but without embeddings initially
+        self.assertTrue(
+            OpinionDocument.exists(id=ES_CHILD_ID(opinion.pk).OPINION)
+        )
+        o = OpinionDocument.get(id=ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertFalse(o.embeddings)
+
+        # Updating a non-text field (type and per_curiam) should not call
+        # the microservice
+        opinion.type = Opinion.COMBINED
+        opinion.save()
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.type, o_type_index_map.get(Opinion.COMBINED))
+        self.assertEqual(es_doc.type_text, "Combined Opinion")
+        inception_mock.assert_not_called()
+        mock_aws_media_storage.assert_not_called()
+        mock_download_embeddings.assert_not_called()
+
+        opinion.per_curiam = True
+        opinion.save()
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.per_curiam, True)
+        inception_mock.assert_not_called()
+        mock_aws_media_storage.assert_not_called()
+        mock_download_embeddings.assert_not_called()
+
+        # Updating `html_with_citations` should trigger embeddings generation
+        opinion.html_with_citations = "HTML with citations content" * 100
+        opinion.save()
+
+        inception_mock.assert_called_once_with(
+            service="inception-text", data=opinion.clean_text
+        )
+        mock_aws_media_storage.assert_called_once()
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertEqual(es_doc.embeddings, expected_embeddings["embeddings"])
+
+        # check the cache entry is removed after updating the ES document
+        self.assertFalse(cache.has_key(f"embeddings:o_{opinion.pk}"))
+
+    @mock.patch("cl.search.tasks.logging.error")
+    @mock.patch("cl.search.tasks.download_embedding")
+    @mock.patch("cl.search.tasks.microservice")
+    def test_missing_embeddings_log_error(
+        self, inception_mock, download_mock, logger_mock
+    ):
+        cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text secret word for queries",
+            cluster=cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+
+        # Mock the response from the microservice
+        inception_response_mock = MagicMock
+        inception_response_mock.is_success = False
+        inception_mock.return_value = inception_response_mock
+
+        # Simulate embeddings not found
+        download_mock.return_value = None
+
+        # Updating `html_with_citations` should trigger embeddings generation
+        opinion.html_with_citations = "HTML with citations content" * 100
+        opinion.per_curiam = True
+        opinion.save()
+
+        # Verify the microservice was called with the cleaned opinion text
+        inception_mock.assert_called_once_with(
+            service="inception-text", data=opinion.clean_text
+        )
+
+        # Verify download lookup for the opinion embeddings was attempted
+        download_mock.assert_called_with(ANY, opinion.pk)
+
+        # Verify that we log an error if embeddings are missing
+        logger_mock.assert_called()
+
+        # Ensure ES document still gets updated even without embeddings
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertTrue(es_doc.per_curiam)
+        self.assertFalse(es_doc.embeddings)
+
+    @mock.patch("cl.search.tasks.download_embedding")
+    @mock.patch("cl.search.tasks.microservice")
+    def test_skip_computing_embedding_for_opinion_below_token_threshold(
+        self, inception_mock, download_mock
+    ):
+        """Check embeddings are not computed for opinions that fall below the token threshold."""
+        cluster = OpinionClusterFactory.create(
+            case_name_full="Paul Debbas v. Franklin",
+            case_name_short="Debbas",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 8, 14),
+            procedural_history="some rando history",
+            source="C",
+            case_name="Debbas v. Franklin",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            citation_count=4,
+            docket=self.docket,
+        )
+        opinion = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=self.person,
+            plain_text="my plain text secret word for queries",
+            cluster=cluster,
+            local_path="test/search/opinion_doc.doc",
+            per_curiam=False,
+            type="020lead",
+        )
+
+        # Simulate missing embeddings
+        download_mock.return_value = None
+
+        # Saving the opinion should not trigger embedding generation
+        opinion.html_with_citations = "<div></div>"
+        opinion.per_curiam = True
+        opinion.save()
+
+        # Verify the embedding microservice was not called
+        inception_mock.assert_not_called()
+
+        # Ensure ES document was still updated without embeddings
+        es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
+        self.assertTrue(es_doc.per_curiam)
+        self.assertFalse(es_doc.embeddings)
 
 
 class OpinionFeedTest(

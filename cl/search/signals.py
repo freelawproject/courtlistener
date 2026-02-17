@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models.signals import post_save
@@ -18,6 +20,9 @@ from cl.people_db.models import (
     PoliticalAffiliation,
     Position,
     School,
+)
+from cl.search.docket_number_cleaner import (
+    clean_docket_number_raw_and_update_redis_cache,
 )
 from cl.search.documents import (
     AudioDocument,
@@ -42,7 +47,9 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.settings import DEVELOPMENT, TESTING
 
+logger = logging.getLogger(__name__)
 # This field mapping is used to define which fields should be updated in the
 # Elasticsearch index document when they change in the DB. The outer keys
 # represent the actions that will trigger signals:
@@ -451,6 +458,7 @@ o_field_mapping = {
                 "html_anon_2020": ["text"],
                 "html": ["text"],
                 "plain_text": ["text"],
+                "html_with_citations": ["text"],
                 "sha1": ["sha1"],
                 "ordering_key": ["ordering_key"],
             },
@@ -634,3 +642,41 @@ def update_court_cache(sender, instance: Court, created: bool, **kwargs):
     instance is created or updated.
     """
     cache.delete(get_cache_key_for_court_list())
+
+
+@receiver(
+    post_save,
+    sender=Court,
+    dispatch_uid="handle_new_court_needs_courthouse",
+)
+def update_court_cache(sender, instance: Court, created: bool, **kwargs):
+    """
+    A new courthouse should be created alongside a new court. Send a warning
+    to Sentry for someone to look at it
+    """
+    if TESTING or DEVELOPMENT:
+        return
+
+    if created:
+        logger.error("Create a courthouse for new court '%s'", instance.id)
+
+
+@receiver(
+    post_save,
+    sender=Docket,
+    dispatch_uid="handle_docket_number_raw_cleaning",
+)
+def handle_docket_number_raw_cleaning(
+    sender, instance: Docket, created=False, update_fields=None, **kwargs
+):
+    if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
+        # Only perform cleaning if enabled
+        return
+
+    # Only clean if the docket was was non-recap source and newly created or docket_number_raw has changed
+    changed = bool(
+        update_fields and not created and "docket_number_raw" in update_fields
+    )
+    non_recap_sources = instance.source != Docket.RECAP
+    if (created or changed) and non_recap_sources:
+        clean_docket_number_raw_and_update_redis_cache(instance)

@@ -19,7 +19,7 @@ DATABASES = {
         "NAME": env("DB_NAME", default="courtlistener"),
         "USER": env("DB_USER", default="postgres"),
         "PASSWORD": env("DB_PASSWORD", default="postgres"),
-        "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
+        "CONN_MAX_AGE": 0,
         "HOST": env("DB_HOST", default="cl-postgres"),
         "OPTIONS": {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
@@ -37,7 +37,7 @@ if env("DB_REPLICA_HOST", default=""):
         "PASSWORD": env("DB_REPLICA_PASSWORD", default="postgres"),
         "HOST": env("DB_REPLICA_HOST", default=""),
         "PORT": "",
-        "CONN_MAX_AGE": env("DB_REPLICA_CONN_MAX_AGE", default=0),
+        "CONN_MAX_AGE": 0,
         "OPTIONS": {
             "sslmode": env("DB_REPLICA_SSL_MODE", default="prefer"),
         },
@@ -61,6 +61,14 @@ CACHES = {
         "OPTIONS": {"MAX_ENTRIES": 2.5e5},
     },
 }
+
+DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
+if not DEVELOPMENT:
+    CACHES["s3"] = {
+        "BACKEND": "django_s3_express_cache.S3ExpressCacheBackend",
+        "LOCATION": "com-courtlistener-cache--usw2-az1--x-s3",
+    }
+
 # This sets Redis as the session backend. This is often advised against, but we
 # have pretty good persistency in Redis, so it's fairly well backed up.
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
@@ -71,7 +79,6 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 INSTALL_ROOT = Path(__file__).resolve().parents[2]
 STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 DEBUG = env.bool("DEBUG", default=True)
-DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 MEDIA_ROOT = env("MEDIA_ROOT", default=INSTALL_ROOT / "cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
@@ -115,6 +122,7 @@ TEMPLATES = [
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -130,6 +138,8 @@ MIDDLEWARE = [
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
     "pghistory.middleware.HistoryMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
+    "cl.lib.sqlcommenter.SqlCommenter",
 ]
 
 ROOT_URLCONF = "cl.urls"
@@ -143,6 +153,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.humanize",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.sessions",
     "django.contrib.sites",
     "django.contrib.sitemaps",
@@ -154,6 +165,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
+    "django_prometheus",
     "storages",
     "waffle",
     "admin_cursor_paginator",
@@ -241,7 +253,6 @@ MESSAGE_TAGS = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
-FORMS_URLFIELD_ASSUME_HTTPS = True
 
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle
@@ -249,3 +260,5 @@ SILENCED_SYSTEM_CHECKS = [
     # Don't warn about HSTS being used
     "security.W004",
 ]
+
+PROMETHEUS_METRIC_NAMESPACE = "cl_django"

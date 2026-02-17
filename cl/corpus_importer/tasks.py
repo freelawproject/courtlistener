@@ -1,25 +1,29 @@
 import copy
+import hashlib
 import logging
 import os
 import re
 import shutil
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import IO, Any
 
+import environ
 import eyecite
 import internetarchive as ia
 import requests
 from asgiref.sync import async_to_sync
-from celery import Task
+from celery import Task, chain
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile, File
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
@@ -36,6 +40,7 @@ from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
     ACMSAttachmentPage,
+    ACMSDocketReport,
     AppellateAttachmentPage,
     AppellateDocketReport,
     AttachmentPage,
@@ -49,6 +54,24 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
+from juriscraper.state.texas import (
+    TexasCaseEvent,
+    TexasCaseParty,
+    TexasSupremeCourtAppellateBrief,
+    TexasSupremeCourtCaseEvent,
+)
+from juriscraper.state.texas.common import (
+    TexasAppellateBrief,
+    TexasCaseDocument,
+)
+from openai import (
+    APIConnectionError,
+    APIError,
+    ConflictError,
+    InternalServerError,
+    RateLimitError,
+)
+from pydantic import ValidationError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
 from requests.exceptions import (
@@ -56,8 +79,10 @@ from requests.exceptions import (
     HTTPError,
     ReadTimeout,
     RequestException,
+    Timeout,
 )
 from rest_framework.renderers import JSONRenderer
+from sentry_sdk import capture_exception
 from urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
@@ -68,7 +93,10 @@ from cl.citations.tasks import (
 )
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
+from cl.corpus_importer.llm_models import CaseNameExtractionResponse
+from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.utils import (
+    DownloadPDFResult,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
@@ -81,7 +109,11 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
-from cl.lib.microservice_utils import microservice
+from cl.lib.llm import call_llm
+from cl.lib.microservice_utils import (
+    doc_page_count_service,
+    microservice,
+)
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -108,6 +140,7 @@ from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_claims_to_docket,
+    add_parties_and_attorneys,
     add_tags_to_objs,
     find_docket_object,
     make_recap_sequence_number,
@@ -123,7 +156,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf_base
+from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
@@ -134,12 +167,16 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    ScotusDocketMetadata,
     Tag,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 logger = logging.getLogger(__name__)
+
+env = environ.FileAwareEnv()
 
 
 def increment_failure_count(obj: Audio | Docket | RECAPDocument) -> None:
@@ -736,7 +773,7 @@ def get_and_process_free_pdf(
 
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
-    async_to_sync(extract_recap_pdf_base)(
+    async_to_sync(extract_pdf_document_base)(
         rd.pk, ocr_available=False, check_if_needed=False
     )
     return {"result": result, "rd_pk": rd.pk}
@@ -2125,6 +2162,32 @@ def save_attachment_pq_from_text(
     return pq.pk
 
 
+def download_acms_pdf_by_rd(
+    court_id: str,
+    acms_entry_id: str,
+    acms_doc_id: str,
+    session_data: SessionData,
+) -> tuple[Response | None, str]:
+    """Download a PDF document from ACMS given its entry and document IDs.
+
+    :param court_id: The court ID,
+    :param acms_entry_id: The ACMS docket entry ID.
+    :param acms_doc_id: The ACMS document ID to download.
+    :param session_data: A SessionData object containing the session's cookies
+        and proxy information.
+    :return: A two-tuple of requests.Response object usually containing a PDF,
+    or None if that wasn't possible, and a string representing the error if
+    there was one.
+    """
+    pacer_court_id = map_cl_to_pacer_id(court_id)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
+    report = ACMSDocketReport(pacer_court_id, s)
+    r, r_msg = report.download_pdf(acms_entry_id, acms_doc_id)
+    return r, r_msg
+
+
 def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
@@ -2400,10 +2463,7 @@ def update_rd_metadata(
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         rd.sha1 = sha1(pdf_bytes)
-        response = async_to_sync(microservice)(
-            service="page-count",
-            item=rd,
-        )
+        response = async_to_sync(doc_page_count_service)(rd)
         if response.is_success:
             rd.page_count = int(response.text)
         assert isinstance(rd.page_count, (int | type(None))), (
@@ -2612,7 +2672,7 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     # Skip OCR for now. It'll happen in a second step.
-    async_to_sync(extract_recap_pdf_base)(rd.pk, ocr_available=False)
+    async_to_sync(extract_pdf_document_base)(rd.pk, ocr_available=False)
 
 
 @app.task(
@@ -2970,9 +3030,9 @@ def recap_document_into_opinions(
             logger.info("Skipping non-civil opinion in district court")
             return task_data
 
-    ops = Opinion.objects.filter(sha1=recap_document.sha1)
-    if ops.count() > 0:
-        logger.info("Skipping previously imported opinion: %s", ops[0].id)
+    hash_exists_qs = Opinion.objects.filter(sha1=recap_document.sha1)
+    if hash_exists_qs.exists():
+        logger.info("Skipping existing hash %s", recap_document.sha1)
         return task_data
 
     response = extract_recap_document_for_opinions(rd=recap_document)
@@ -2994,6 +3054,11 @@ def recap_document_into_opinions(
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
         logger.info("No citation found for rd: %s", recap_document.id)
+        return task_data
+
+    # repeat the check just before object creation
+    if hash_exists_qs.exists():
+        logger.info("Skipping existing hash %s", recap_document.sha1)
         return task_data
 
     with transaction.atomic():
@@ -3021,6 +3086,9 @@ def recap_document_into_opinions(
             cluster.id,
         )
 
+    # Update case name using llm
+    classify_case_name_by_llm.delay(cluster.pk, recap_document_id)
+
     if not skip_citation_finding:
         find_citations_and_parentheticals_for_opinion_by_pks.delay(
             [opinion.pk]
@@ -3028,3 +3096,566 @@ def recap_document_into_opinions(
 
     # Return input task data to preserve the chain in scrape_pacer_free_opinion
     return task_data
+
+
+@app.task(
+    bind=True,
+    max_retries=5,
+    retry_backoff=True,
+    autoretry_for=(
+        RateLimitError,
+        APIConnectionError,
+        ConflictError,
+        InternalServerError,
+        APIError,
+    ),
+    retry_kwargs={"max_retries": 5},
+)
+def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
+    """Use LLM to extract and verify the correct case name for an opinion ingested from Recap
+
+    This task fetches an OpinionCluster instance, extracts the first 2000 characters of the first
+    related sub_opinion's text, and obtains the docket title from the associated docket
+    object. It sends this data to a shared LLM call function using a cached prompt template
+
+    Upon receiving the LLM json response, it verifies if the document is an opinion and extracts
+    normalized case name information. If valid, it updates the OpinionCluster object with the
+    extracted case name.
+
+    :param self: The Celery task instance
+    :param cluster_pk: Primary key of the OpinionCluster object to process
+    :param recap_document_id: RECAPDocument id
+    """
+
+    OPENAI_CASE_LAW_INFERENCE_KEY = env(
+        "OPENAI_CASE_LAW_INFERENCE_KEY", default=None
+    )
+
+    cluster = OpinionCluster.objects.prefetch_related("sub_opinions").get(
+        pk=cluster_pk
+    )
+    sub_opinion = cluster.sub_opinions.all().first()
+
+    if not sub_opinion or not sub_opinion.plain_text:
+        logger.error(
+            "No content extracted to find case names for cluster_id=%s, recap_document_id=%s",
+            cluster_pk,
+            recap_document_id,
+        )
+        return
+
+    try:
+        llm_response = call_llm(
+            system_prompt=CASE_NAME_EXTRACT_SYSTEM,
+            user_prompt=sub_opinion.plain_text[:2000],
+            response_model=CaseNameExtractionResponse,
+            max_completion_tokens=300,
+            api_key=OPENAI_CASE_LAW_INFERENCE_KEY,
+        )
+    except ValidationError as e:
+        logger.error(
+            "LLM - Response validation error for cluster_id=%s, recap_document_id=%s",
+            cluster_pk,
+            recap_document_id,
+            extra={
+                "validation_errors": e.errors(),
+                "fingerprint": ["llm-casenames-validation-error"],
+            },
+        )
+        return
+    except Exception as e:
+        # Only expect to get instructor exceptions here to track them
+        capture_exception(e)
+        raise
+
+    if not isinstance(llm_response, CaseNameExtractionResponse):
+        # Added this to avoid mypy errors
+        logger.error("LLM - Invalid response type: %s", type(llm_response))
+        return
+
+    llm_case_name = llm_response.case_name or ""
+    llm_case_name_full = llm_response.case_name_full or ""
+
+    if not llm_case_name and not llm_case_name_full:
+        # The LLM did not return any names, add extra data to the dict for debugging purposes
+        dict_llm_response = llm_response.model_dump()
+        dict_llm_response["recap_document_id"] = recap_document_id
+        dict_llm_response["cluster"] = cluster_pk
+        dict_llm_response["cluster_case_name"] = cluster.case_name
+        dict_llm_response["cluster_case_name_full"] = cluster.case_name_full
+        logger.error("LLM - No case name returned", dict_llm_response)
+        return
+
+    with transaction.atomic():
+        # Update cluster names
+        cluster.case_name = llm_case_name
+        cluster.case_name_full = llm_case_name_full
+        cluster.save()
+        logger.info(
+            "Case names successfully updated https://www.courtlistener.com/opinion/%s/decision/",
+            cluster.id,
+        )
+
+
+def is_pdf(response: Response) -> bool:
+    """Check if a `requests.Response` object wraps a PDF file using the
+    "Content-Type" header.
+
+    :param response: The `requests.Response` object to check.
+    :return: Whether the response is a PDF file."""
+    return (
+        response.headers.get("Content-Type", "")
+        # MIME types are case-insensitive
+        # (https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types)
+        .lower()
+        .startswith("application/pdf")
+    )
+
+
+@contextmanager
+def download_pdf_in_stream(
+    url: str,
+    identifier: str | int,
+    temp_prefix: str = "scotus_",
+) -> Iterator[tuple[IO[bytes], str] | None]:
+    """Download a PDF in stream and yield a temporary file to avoid using too
+    much memory
+
+    :param url: The URL to download the PDF from
+    :param identifier: An identifier for logging (docket_id, rd.pk, etc.)
+    :param temp_prefix: Prefix for the temporary file name
+    :yields: A NamedTemporaryFile positioned at the beginning, or None if
+    the response is not a PDF
+    """
+
+    @retry(
+        (ConnectionError, Timeout),
+        tries=3,
+        delay=0.25,
+        backoff=1,
+    )
+    def download_to_file(tmp_file):
+        tmp_file.seek(0)
+        # Clear any partial content from previous attempt
+        tmp_file.truncate()
+        hasher = hashlib.sha1()
+        with requests.get(
+            url,
+            stream=True,
+            timeout=60,
+            headers={"User-Agent": "Free Law Project"},
+        ) as response:
+            response.raise_for_status()
+            if not is_pdf(response):
+                logger.warning(
+                    "PDF download: Expected application/pdf for %s from %s; aborting.",
+                    identifier,
+                    url,
+                )
+                return DownloadPDFResult(success=False)
+            for chunk in response.iter_content(chunk_size=8 * 1024):
+                if chunk:
+                    tmp_file.write(chunk)
+                    hasher.update(chunk)
+            tmp_file.flush()
+            tmp_file.seek(0)
+            return DownloadPDFResult(success=True, sha1=hasher.hexdigest())
+
+    with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
+        result = download_to_file(tmp)
+        yield (tmp, result.sha1) if result.success else None
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        ConnectionError,
+        Timeout,
+    ),
+    max_retries=5,
+    ignore_result=True,
+)
+def download_qp_scotus_pdf(self, docket_id: int) -> None:
+    """Download and store the SCOTUS 'Questions Presented' PDF for a docket.
+
+    This task looks up the Docket and its ScotusDocketMetadata, extracts the
+    questions_presented_url, validates that the response is a PDF, and stores
+    it in the questions_presented_file field.
+
+    :param: docket_id: The related Docket ID
+    :return: None
+    """
+    try:
+        docket = Docket.objects.get(pk=docket_id)
+    except Docket.DoesNotExist:
+        logger.warning(
+            "SCOTUS PDF download: Docket %s does not exist; skipping.",
+            docket_id,
+        )
+        return None
+
+    scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
+
+    qp_url = scotus_meta.questions_presented_url
+    if not qp_url:
+        logger.info(
+            "SCOTUS PDF download: No questions_presented_url for docket %s.",
+            docket_id,
+        )
+        return None
+
+    # Avoid re-downloading if we already have a file.
+    if scotus_meta.questions_presented_file:
+        logger.info(
+            "SCOTUS PDF download: questions_presented_file already present "
+            "for docket %s; skipping.",
+            docket_id,
+        )
+        return None
+
+    logger.info(
+        "SCOTUS PDF download: Fetching Questions Presented PDF for docket %s "
+        "from %s",
+        docket_id,
+        qp_url,
+    )
+    try:
+        with requests.get(
+            qp_url,
+            stream=True,
+            timeout=60,
+            headers={"User-Agent": "Free Law Project"},
+        ) as response:
+            response.raise_for_status()
+            if not is_pdf(response):
+                logger.warning(
+                    "SCOTUS PDF download: Expected application/pdf for docket %s "
+                    "from %s; aborting.",
+                    docket_id,
+                    qp_url,
+                )
+                return None
+            with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
+                # Download the PDF into a tmp file to avoid using too much memory
+                for chunk in response.iter_content(chunk_size=8 * 1024):
+                    if chunk:
+                        tmp.write(chunk)
+
+                # Ensure the buffer is flushed to disk before reading the file
+                tmp.flush()
+                # Move the file pointer to the beginning so it reads the whole file
+                tmp.seek(0)
+
+                filename = f"{docket_id}-qp.pdf"
+                scotus_meta.questions_presented_file.save(
+                    filename,
+                    File(tmp),
+                    save=True,
+                )
+            logger.info(
+                "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
+                docket_id,
+            )
+    except RequestException as exc:
+        if self.request.retries == self.max_retries:
+            logger.warning(
+                "SCOTUS PDF download: Unable to download %s for docket %s. "
+                "Exception was: %s",
+                qp_url,
+                docket_id,
+                str(exc),
+            )
+            return None
+        logger.info(
+            "SCOTUS PDF download: Ran into a RequestException. Retrying."
+        )
+        raise self.retry(exc=exc)
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+    # No retries because download_pdf_in_stream already has retry logic
+)
+def download_texas_document_pdf(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Download a PDF and return its path.
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance to
+    update the attachment for.
+
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed."""
+    try:
+        texas_document = TexasDocument.objects.get(pk=texas_document_pk)
+    except TexasDocument.DoesNotExist:
+        logger.warning(
+            "Texas document PDF download: TexasDocument %s does not exist; skipping.",
+            texas_document_pk,
+        )
+        self.request.chain = None
+        return None
+
+    url = texas_document.url
+    logger.info(
+        "Texas PDF download: Fetching PDF for TexasDocument %s from %s",
+        texas_document_pk,
+        url,
+    )
+
+    with download_pdf_in_stream(url, texas_document.pk, "texas_") as result:
+        if result is None:
+            logger.error(
+                "Failed to download attachment PDF for TexasDocument %s from URL %s.",
+                texas_document.pk,
+                url,
+            )
+            self.request.chain = None
+            return None
+        tmp, sha1_hash = result
+        filename = (
+            f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
+        )
+        downloaded_file = File(tmp)
+        texas_document.filepath_local.save(
+            filename, downloaded_file, save=False
+        )
+        texas_document.file_size = downloaded_file.size
+        texas_document.sha1 = sha1_hash
+        response = async_to_sync(doc_page_count_service)(texas_document)
+        if response.is_success:
+            texas_document.page_count = int(response.text)
+        texas_document.save()
+        return texas_document_pk
+
+
+def merge_texas_document(
+    docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
+) -> tuple[bool, bool, int]:
+    """Merge a single TexasCaseDocument object into CL.
+
+    Checks if the document exists, creating a TexasDocument object if it does
+    not. Then, if the document is new or has changed (media_version_id is
+    different, fetch the attachment PDF, store it, compute metadata, and
+    mark the document as available.
+
+    :param docket_entry: The docket entry this attachment belongs to.
+    :param input_document: The attachment to merge.
+    :return: Tuple with entries
+    - Flag indicating whether a document needed to be created or updated
+    - Flag indicating whether the update operation was successful or not
+    applicable
+    - Primary key of the TexasDocument object which matches the input document
+    """
+    (texas_document, created) = TexasDocument.objects.get_or_create(
+        media_id=input_document["media_id"],
+        docket_entry=docket_entry,
+        defaults={
+            "description": input_document["description"],
+            "media_version_id": input_document["media_version_id"],
+            "url": input_document["document_url"],
+        },
+    )
+
+    if (
+        created
+        or str(texas_document.media_version_id)
+        != input_document["media_version_id"]
+        or not texas_document.filepath_local
+    ):
+        texas_document.description = input_document["description"]
+        texas_document.media_version_id = input_document["media_version_id"]
+        texas_document.url = input_document["document_url"]
+        texas_document.save()
+        chain(
+            download_texas_document_pdf.si(texas_document.pk),
+            extract_pdf_document.s(
+                check_if_needed=False, model_name="search.TexasDocument"
+            ),
+        ).apply_async()
+        return True, True, texas_document.pk
+
+    return False, True, texas_document.pk
+
+
+def merge_texas_documents(
+    docket_entry: TexasDocketEntry,
+    documents: list[TexasCaseDocument],
+) -> list[tuple[bool, bool, int]]:
+    """Merges a list of Texas docket entry attachments into CL.
+
+    :param docket_entry: The docket entry this attachment belongs to.
+    :param documents: List of TexasCaseDocument attached to this docket entry.
+    :return: List of tuples with the following entries:
+    - A flag indicating whether the document needed to be created or updated,
+    - A flag indicating which is set to True when the document was successfully
+    created or updated or when an update was unnecessary,
+    - The primary key of the updated TexasDocument object."""
+    output = [
+        merge_texas_document(docket_entry, document) for document in documents
+    ]
+
+    return output
+
+
+@transaction.atomic
+def merge_texas_docket_entry(
+    docket: Docket,
+    sequence_number: str,
+    appellate_brief: bool,
+    input_docket_entry: TexasCaseEvent
+    | TexasAppellateBrief
+    | TexasSupremeCourtCaseEvent
+    | TexasSupremeCourtAppellateBrief,
+) -> tuple[bool, bool, int]:
+    """Merges a Texas docket entry into CL.
+
+    :param docket: The docket this entry belongs to.
+    :param sequence_number: The sequence number of the docket entry.
+    :param appellate_brief: Whether the docket entry is an appellate brief.
+    :param input_docket_entry: The docket entry being merged.
+    :return: Tuple with the following entries
+    - A flag indicating whether the docket entry or an attached document needed
+    to be created or updated,
+    - A flag which is set to true when the create/update operations are all
+    either successful or unnecessary,
+    - The primary key of the updated TexasDocketEntry object."""
+    logger.info(
+        "Merging TexasDocketEntry with sequence number %s into Docket %s",
+        sequence_number,
+        docket.pk,
+    )
+    Docket.objects.select_for_update().get(pk=docket.pk)
+    docket_entries = TexasDocketEntry.objects.filter(
+        docket=docket,
+        date_filed=input_docket_entry["date"],
+        entry_type=input_docket_entry["type"],
+        appellate_brief=appellate_brief,
+    )
+
+    try:
+        docket_entry = docket_entries.get()
+    except TexasDocketEntry.DoesNotExist:
+        logger.info(
+            "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
+            sequence_number,
+            docket.pk,
+        )
+        docket_entry = TexasDocketEntry(
+            docket=docket,
+            date_filed=input_docket_entry["date"],
+            entry_type=input_docket_entry["type"],
+            appellate_brief=appellate_brief,
+        )
+        created = True
+    except TexasDocketEntry.MultipleObjectsReturned:
+        # More filtering needed
+        matching_sequence_number = docket_entries.filter(
+            sequence_number=sequence_number
+        ).first()
+        logger.info(
+            "Multiple matching TexasDocketEntries found for sequence number %s on Docket %s.",
+            sequence_number,
+            docket.pk,
+        )
+        if matching_sequence_number:
+            logger.info(
+                "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+                sequence_number,
+                docket.pk,
+            )
+            docket_entry = matching_sequence_number
+            created = False
+        else:
+            logger.error(
+                "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
+                sequence_number,
+                docket.pk,
+            )
+            docket_entry = TexasDocketEntry(
+                docket=docket,
+                date_filed=input_docket_entry["date"],
+                entry_type=input_docket_entry["type"],
+                appellate_brief=appellate_brief,
+            )
+            created = True
+    else:
+        logger.info(
+            "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+            sequence_number,
+            docket.pk,
+        )
+        created = False
+
+    docket_entry.sequence_number = sequence_number
+    docket_entry.description = input_docket_entry.get("description", "")
+    docket_entry.disposition = input_docket_entry.get("disposition", "")
+    docket_entry.remarks = input_docket_entry.get("remarks", "")
+    logger.info(
+        "Saving TexasDocketEntry %s on Docket %s",
+        docket_entry.pk,
+        docket.pk,
+    )
+    docket_entry.save()
+
+    logger.info(
+        "Merging attachments for TexasDocketEntry %s on Docket %s",
+        docket_entry.pk,
+        docket.pk,
+    )
+    document_results = merge_texas_documents(
+        docket_entry, input_docket_entry["attachments"]
+    )
+
+    return (
+        created or any(r[0] for r in document_results),
+        all(r[1] for r in document_results),
+        docket_entry.pk,
+    )
+
+
+def normalize_texas_parties(
+    parties: list[TexasCaseParty],
+) -> list[dict[str, Any]]:
+    """Transform Texas court party data to PACER-like format.
+
+    This allows reuse of the existing add_parties_and_attorneys() method for
+    Texas court data.
+
+    :param parties: List of party dicts in Texas format.
+    :returns: List of party dicts in PACER-like format compatible with
+    add_parties_and_attorneys()
+    """
+    return [
+        {
+            "name": party["name"],
+            "type": party["type"],
+            "date_terminated": None,
+            "extra_info": "",
+            "attorneys": [
+                {
+                    "name": attorney,
+                    "contact": attorney,
+                    "roles": ["LEAD_ATTORNEY"] if i == 0 else ["UNKNOWN"],
+                }
+                for i, attorney in enumerate(party["representatives"])
+            ],
+        }
+        for party in parties
+    ]
+
+
+def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
+    """Merge Texas case parties and attorneys into the given docket.
+
+    This function takes a docket and a list of parties associated with a Texas
+    case, normalizes the parties into a PACER-like format, and incorporates
+    them along with their associated attorneys into the docket using
+    add_parties_and_attorneys().
+
+    :param docket: The docket to which parties and attorneys should be added.
+    :param parties: The parties involved in the Texas case.
+    """
+    add_parties_and_attorneys(docket, normalize_texas_parties(parties))

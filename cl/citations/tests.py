@@ -65,7 +65,11 @@ from cl.citations.utils import (
     make_get_citations_kwargs,
 )
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import (
+    ES_CHILD_ID,
+    OpinionClusterDocument,
+    ParentheticalGroupDocument,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -89,6 +93,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.search.tasks import index_parent_and_child_docs
 from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
@@ -789,6 +794,23 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
+        # It includes a self citation in the title (like lawbox opinions)
+        cls.citation5a = CitationWithParentsFactory.create(
+            volume="123",
+            reporter="U.S.",
+            page="123",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=cls.court_scotus),
+                case_name="Bush v. Gore",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="123 U.S. 123 Bush v. Gore America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                ),
+            ),
+        )
+
         cls.citation6 = CitationWithParentsFactory.create(
             volume="114",
             reporter="F.3d",
@@ -967,7 +989,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_1_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=307,
+                volume="307",
                 reporter="Ill. Dec.",
                 page=312,
                 type=Citation.STATE,
@@ -976,7 +998,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_2_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=203,
+                volume="203",
                 reporter="N.J.",
                 page=92,
                 type=Citation.STATE,
@@ -985,7 +1007,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_3_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=172,
+                volume="172",
                 reporter="A.3d",
                 page=459,
                 type=Citation.STATE_REGIONAL,
@@ -1454,6 +1476,30 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                         1,
                     )
 
+    def test_opinionscited_no_self_creation(self) -> None:
+        """Make sure no OpinionsCited have been created when self citation is included in opinion
+        content from cluster"""
+        opinion5a = Opinion.objects.get(cluster__pk=self.citation5a.cluster_id)
+
+        citing = opinion5a
+        find_citations_and_parentheticals_for_opinion_by_pks.delay(
+            [opinion5a.pk]
+        )
+
+        # Verify that self citation is in opinion text
+        citation_str = f"{self.citation5a.volume} {self.citation5a.reporter} {self.citation5a.page}"
+        self.assertIn(
+            citation_str,
+            opinion5a.plain_text,
+            "Self citation is not in plain text object",
+        )
+
+        # Verify no OpinionsCited was created to self opinion form same cluster
+        results = OpinionsCited.objects.filter(cited_opinion=citing)
+        self.assertEqual(
+            results.count(), 0, "OpinionsCited created to self opinion"
+        )
+
     def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
         citing = Opinion.objects.get(cluster__pk=self.citation4.cluster_id)
         cited = Opinion.objects.get(cluster__pk=self.citation1.cluster_id)
@@ -1619,6 +1665,25 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cited_count,
             new_count,
             "citation_count was update even when update was disabled",
+        )
+
+    def test_citation_string_volume(self) -> None:
+        """Can we store volume numbers with letters or additional characters?"""
+
+        self.alphanumeric_citation = CitationWithParentsFactory.create(
+            volume="71A",
+            reporter="A.F.T.R.2d (RIA)",
+            page="3011",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=self.court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date(2025, 7, 31),
+            ),
+        )
+
+        self.assertEqual(self.alphanumeric_citation.volume, "71A")
+        self.assertEqual(
+            str(self.alphanumeric_citation), "71A A.F.T.R.2d (RIA) 3011"
         )
 
 
@@ -2602,9 +2667,9 @@ class CitationLookUpApiTest(
     ) -> None:
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=1, reporter="Handy", page="150", type=1)
+        )(volume="1", reporter="Handy", page="150", type=1)
         haw_citation = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=1, reporter="Haw.", page="150", type=1
+            volume="1", reporter="Haw.", page="150", type=1
         )
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2821,7 +2886,7 @@ class CitationLookUpApiTest(
     ) -> None:
         la_rue_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=139, reporter="U.S.", page="601", type=1)
+        )(volume="139", reporter="U.S.", page="601", type=1)
 
         text_citation = (
             "the majority of the court was of opinion that the transfer of the "
@@ -3074,6 +3139,24 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=3)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
+    async def test_can_filter_out_citation_with_string_volume(
+        self, cache_key_mock
+    ):
+        """Can we filter using a citation with a character in the volume?"""
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": ("71A A.F.T.R.2d (RIA) 4660")},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(
+            first_citation["citation"], "71A A.F.T.R.2d (RIA) 4660"
+        )
+
 
 class UnmatchedCitationTest(TransactionTestCase):
     """Test UnmatchedCitation model and related logic"""
@@ -3223,6 +3306,28 @@ class UnmatchedCitationTest(TransactionTestCase):
             "Incorrect number of citations saved",
         )
 
+    def test_saving_volume_string(self) -> None:
+        """Can we save volume numbers with letters or additional characters?"""
+
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
+        eyecite_citations = get_citations(
+            """71A A.F.T.R.2d (RIA) 3011""",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        handle_unmatched_citations(opinion, eyecite_citations, {})
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=opinion).all()
+        )
+        self.assertEqual(
+            len(unmatched_citations),
+            1,
+            "Incorrect number of citations saved",
+        )
+        self.assertEqual(
+            str(unmatched_citations[0]), "71A A.F.T.R.2d (RIA) 3011"
+        )
+
 
 class TasksTest(TestCase):
     """Test citations tasks"""
@@ -3343,11 +3448,15 @@ class CountCitationsTest(TestCase):
         docket = DocketFactory.create(court=court)
 
         # 1 cluster with 0 citations to it
-        cls.cluster1 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cls.cluster1 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_000
+        )
         cluster1_opinion = OpinionFactory(cluster=cls.cluster1)
 
         # 1 cluster with 2 subopinions, each with one citation to it
-        cls.cluster2 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cls.cluster2 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_001
+        )
         cluster2_opinion1 = OpinionFactory(cluster=cls.cluster2)
         cluster2_opinion2 = OpinionFactory(cluster=cls.cluster2)
 
@@ -3363,7 +3472,9 @@ class CountCitationsTest(TestCase):
         )
 
         # 1 cluster with 1 sub opinion, and 3 citations to it
-        cls.cluster3 = OpinionClusterFactory(docket=docket, citation_count=0)
+        cls.cluster3 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_002
+        )
         cluster3_opinion = OpinionFactory(cluster=cls.cluster3)
 
         OpinionsCited.objects.create(
@@ -3387,6 +3498,8 @@ class CountCitationsTest(TestCase):
         call_command(
             "count_citations",
             count_from_opinions_cited=True,
+            start_cluster_id=1_000_000,
+            end_cluster_id=1_001_000,
         )
         self.cluster1.refresh_from_db()
         self.cluster2.refresh_from_db()
@@ -3398,3 +3511,64 @@ class CountCitationsTest(TestCase):
             "Count should be 2, 1 per each subopinion",
         )
         self.assertEqual(self.cluster3.citation_count, 3, "Count should be 3")
+
+
+class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("search.OpinionCluster")
+
+    def test_cite_count_reindex(self):
+        """Can we update OpinionClusterDocument.citeCount?"""
+        cite_count = 10
+        cluster = OpinionClusterWithChildrenAndParentsFactory.create(
+            citation_count=cite_count
+        )
+        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+        doc = OpinionClusterDocument.get(id=cluster.id)
+        self.assertEqual(doc.citeCount, cite_count)
+
+        # make a change that won't be catched by signals
+        OpinionCluster.objects.filter(id=cluster.id).update(
+            citation_count=cite_count + 1
+        )
+
+        call_command(
+            "reindex_es_cite_fields",
+            reindex_target="citeCount",
+            start_id=cluster.id - 10,
+            end_id=cluster.id + 10,
+        )
+
+        doc = OpinionClusterDocument.get(id=cluster.id)
+        self.assertEqual(doc.citeCount, cite_count + 1)
+
+    def test_cites_reindex(self):
+        """Can we update the OpinionDocument.cites field?"""
+        cluster = OpinionClusterWithChildrenAndParentsFactory.create()
+        opinion = cluster.sub_opinions.first()
+        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+
+        another_cluster = OpinionClusterWithChildrenAndParentsFactory.create()
+        another_opinion = another_cluster.sub_opinions.first()
+
+        created = OpinionsCited.objects.create(
+            citing_opinion=another_opinion, cited_opinion=another_opinion
+        )
+        # prevent triggering the signal using .update
+        OpinionsCited.objects.filter(id=created.id).update(
+            citing_opinion=opinion
+        )
+
+        doc = OpinionClusterDocument.get(id=ES_CHILD_ID(opinion.id).OPINION)
+        self.assertFalse(another_opinion.id in doc["cites"])
+
+        call_command(
+            "reindex_es_cite_fields",
+            reindex_target="cites",
+            start_id=opinion.id - 10,
+            end_id=opinion.id + 10,
+        )
+        doc = OpinionClusterDocument.get(id=ES_CHILD_ID(opinion.id).OPINION)
+        self.assertTrue(another_opinion.id in doc["cites"])

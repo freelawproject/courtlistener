@@ -1,5 +1,18 @@
 {% extends "base.html" %}
-{% load extras %}
+{% load extras %}{% load waffle_tags %}
+
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_search-api-docs-vlatest.html                        ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
 
 {% block title %}Legal Search API – CourtListener.com{% endblock %}
 {% block og_title %}Legal Search API – CourtListener.com{% endblock %}
@@ -34,6 +47,7 @@
       <li><a href="#usage">Basic Usage</a></li>
       <li><a href="#understanding">Understanding</a></li>
       <ul>
+        <li><a href="#semantic-search">Semantic Search</a></li>
         <li><a href="#type">Result Types</a></li>
         <li><a href="#ordering">Ordering</a></li>
         <li><a href="#filtering">Filtering</a></li>
@@ -51,7 +65,7 @@
   <h1 id="about">Legal Search&nbsp;API</h1>
   <h2><code>{% url "search-list" version=version %}</code></h2>
   <p class="lead v-offset-above-3">Use this API to search case law, PACER data, judges, and oral argument audio recordings.</p>
-  <p>To get the most out of this API, see our <a href="{% url "coverage" %}">coverage</a> and <a href="{% url "advanced_search" %}">advanced operators</a>, and <a href="{% url "relative_dates" %}">relative date queries</a> documentation.
+  <p>To get the most out of this API, see our <a href="{% url "coverage" %}">coverage</a>, <a href="{% url "advanced_search" %}">advanced operators</a>, and <a href="{% url "relative_dates" %}">relative date queries</a> documentation.
   </p>
 
   <h2 id="usage">Basic Usage</h2>
@@ -141,6 +155,42 @@
   <p>This means that it does not use the same approach to ordering, filtering, or field definitions as our other APIs, and sending an HTTP <code>OPTIONS</code> request won't be useful.
   </p>
 
+  <p>CourtListener's search results are powered by the <a href="{% url "citegeist_help" %}">Citegeist&trade; Relevancy Engine</a>, which supports both keyword search and semantic search.
+  </p>
+  <p>Semantic search makes it possible to query the case law database using plain language queries, instead of keywords. It can be a better tool for untrained users, while keyword search provides a powerful ranking system with deep pagination that may be more familiar to attorneys.
+  </p>
+  <p>For a deeper treatment of the pros and cons of these systems, please read <a href="{% url "citegeist_help" %}">our help page on Citegeist</a>.
+  </p>
+
+  <h3 id="semantic-search">Semantic Search vs. Keyword Search</h3>
+  <p>By default, API requests will be handled by our keyword search engine.</p>
+  <p>To use semantic search instead, special <code>GET</code> parameters or <code>POST</code> requests are needed. Whether to use <code>GET</code> or <code>POST</code> depends on the privacy requirements of your application:
+  </p>
+  <ul>
+    <li>
+      <p><strong>GET</strong> — If you are able to send search queries to CourtListener, using a <code>GET</code> request is best and simplest.
+      </p>
+      <p>To use semantic search with a <code>GET</code> request, add <code>semantic=true</code> to your request, and you will place a semantic query instead of a keyword query. It's that simple.
+      </p>
+    </li>
+    <li>
+      <p><strong>POST</strong> — If regulatory or privacy requirements prevent you from sending search queries to CourtListener — or if you just prefer a more private approach — we have another solution.
+      </p>
+      <p>When you use a <code>GET</code> request, we receive the query, embed it on our system and calculate results. If you use a <code>POST</code> request, you can do the embedding in your system and send us <em>only</em> the resulting embedding, instead of sending the query.
+      </p>
+      <p>To <code>POST</code> pre-computed embeddings to this endpoint, include a JSON body in the POST request:
+      </p>
+      <pre class="scrollable">{
+  "embedding": [0.123, 0.456, -0.789, ...]
+}</pre>
+      <p>The <code>embedding</code> key in your request body is a list of floating-point numbers representing a vector of your query. It should have a length of 768 dimensions and is required for <code>POST</code> requests.
+      </p>
+      <p>To calculate embeddings, we recommend our <a href="https://github.com/freelawproject/inception">Inception microservice</a>. For it to work properly, you will need to use <a href="https://free.law/2025/03/11/semantic-search">our fine-tuned model</a>.
+      </p>
+    </li>
+  </ul>
+  <p>Semantic search is only available for the case law search engine.</p>
+
   <h3 id="type">Setting the Result <code>type</code></h3>
   <p>The most important parameter in this API is <code>type</code>. This parameter sets the type of object you are querying:
   </p>
@@ -188,7 +238,9 @@
   <h3 id="ordering">Ordering Results</h3>
   <p>Each search <code>type</code> can be sorted by certain fields. These are available on the front end in the ordering drop down, which sets the <code>order_by</code> parameter.
   </p>
-  <p>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order. For example if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.
+  <p>Our <a href="{% url "citegeist_help" %}">Citegeist&trade; Relevancy Engine</a> sorts results when you order by relevancy. It uses a combination of factors to provide the most important results first.
+  </p>
+  <p>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order. For example, if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.
   </p>
 
 
@@ -260,7 +312,9 @@
 
 
   <h2 id="monitoring">Monitoring a Query for New&nbsp;Results</h2>
-  <p>To monitor queries for new results, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or webhook events when there are new results.
+  <p>All query results are cached for ten minutes. This provides instant responses to front-end users who frequently refresh or paginate results.
+  </p>
+  <p>Because of this, we do not recommend polling as a mechanism for monitoring queries for new results. Instead, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or <a href="{% url "webhooks_docs" %}">webhook events</a> when there are new hits.
   </p>
 
   {% include "includes/donate_footer_plea.html" %}

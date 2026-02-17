@@ -10,12 +10,13 @@ import time_machine
 from asgiref.sync import async_to_sync
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
+from django.contrib import admin, messages
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.test import Client, override_settings
+from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
@@ -25,8 +26,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
+from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
     simplify_estimated_count,
@@ -44,6 +47,7 @@ from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
+from cl.search.admin import OpinionClusterAdmin
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -61,11 +65,14 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterFactory,
     OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.llm_models import CleanDocketNumber, DocketItem
+from cl.search.management.commands import populate_docket_number_raw
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
@@ -77,6 +84,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -90,9 +98,9 @@ from cl.search.models import (
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import get_with_wait
-from cl.users.factories import UserProfileWithParentsFactory
+from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class ModelTest(TestCase):
@@ -110,7 +118,7 @@ class ModelTest(TestCase):
         self.o = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
         self.c = Citation.objects.create(
             cluster=self.oc,
-            volume=22,
+            volume="22",
             reporter="U.S.",
             page=44,
             type=Citation.FEDERAL,
@@ -1574,6 +1582,10 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         self.assertIn("The input is too long to process.", r.data["detail"])
 
 
+@override_settings()
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functional")
+@override_flag("ui_flag_for_o_es", active=True)
+@override_flag("citing_and_related_enabled", active=True)
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1824,6 +1836,8 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         self.assertTrue(second_count > first_count)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    @override_flag("store-search-queries", active=True)
+    @override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functions")
     def test_basic_homepage_search_and_signin_and_signout(self) -> None:
         wait = WebDriverWait(self.browser, 1)
 
@@ -1986,6 +2000,9 @@ class OpinionSearchFunctionalTest(BaseSeleniumTest):
         )
 
 
+@override_flag("store-search-api-queries", active=True)
+@override_flag("store-search-queries", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_save_search_query")
 class SaveSearchQueryTest(TestCase):
     def setUp(self) -> None:
         self.client = Client()
@@ -2170,7 +2187,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
-            volume=22,
+            volume="22",
             reporter="F.2d",
             page="44",
         )
@@ -2190,7 +2207,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.FEDERAL,
-            volume=22,
+            volume="22",
             reporter="U.S.",
             page="44",
         )
@@ -2207,7 +2224,7 @@ class CaptionTest(TestCase):
         await Citation.objects.acreate(
             cluster=cluster,
             type=Citation.NEUTRAL,
-            volume=22,
+            volume="22",
             reporter="IL",
             page="44",
         )
@@ -2217,16 +2234,19 @@ class CaptionTest(TestCase):
         # A list of citations ordered properly
         cs = [
             Citation(
-                volume=22, reporter="IL", page="44", type=Citation.NEUTRAL
+                volume="22", reporter="IL", page="44", type=Citation.NEUTRAL
             ),
             Citation(
-                volume=22, reporter="U.S.", page="44", type=Citation.FEDERAL
+                volume="22", reporter="U.S.", page="44", type=Citation.FEDERAL
             ),
             Citation(
-                volume=22, reporter="S. Ct.", page="33", type=Citation.FEDERAL
+                volume="22",
+                reporter="S. Ct.",
+                page="33",
+                type=Citation.FEDERAL,
             ),
             Citation(
-                volume=22,
+                volume="22",
                 reporter="Alt.",
                 page="44",
                 type=Citation.STATE_REGIONAL,
@@ -3521,3 +3541,320 @@ class OpinionQuerySetWithBestTextTest(TestCase):
 
         self.assertEqual(o_plain_text.best_text, "Plain text fallback")
         self.assertEqual(o_plain_text.best_text_source, "plain_text")
+
+
+class AdminActionsTest(TestCase):
+    def setUp(self):
+        self.site = admin.site
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.factory = RequestFactory()
+        cls.court_1 = CourtFactory(id="nyappdiv")
+        cls.court_2 = CourtFactory(id="ca6")
+
+        cls.cluster_1 = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_1,
+                case_name="Lorem v. Ipsum",
+                case_name_full="Lorem v. Ipsum",
+            ),
+            case_name="Lorem v. Ipsum",
+            date_filed=datetime.date.today(),
+            judges="Doe",
+        )
+
+        cls.docket_1 = DocketFactory(
+            court=cls.court_2,
+            source=Docket.HARVARD_AND_RECAP,
+        )
+        cls.de_1 = DocketEntryFactory(
+            docket=cls.docket_1,
+            entry_number=23,
+            date_filed=datetime.date(2015, 8, 4),
+            description="Main Document",
+        )
+        cls.cluster_2 = OpinionClusterFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            docket=cls.docket_1,
+            date_filed=datetime.date(2024, 8, 23),
+            case_name="Foo v. Bar",
+            source="U",
+        )
+
+        cls.user_1 = UserFactory()
+
+        cls.cluster_3 = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_1,
+                case_name="Lorem v. Ipsum",
+                case_name_full="Lorem v. Ipsum",
+            ),
+            case_name="Lorem v. Ipsum",
+            date_filed=datetime.date.today(),
+            judges="Doe",
+        )
+
+        # The docket from the associated clusted has an user tag
+        cls.tag_1_user_1 = UserTagFactory(user=cls.user_1, name="tag_1_user_1")
+        cls.tag_1_user_1.dockets.add(cls.cluster_3.docket.pk)
+
+        # The cluster has an user note
+        cls.note_cluster_3_user_1 = NoteFactory(
+            user=cls.user_1,
+            cluster_id=cls.cluster_3,
+            notes="Note Test",
+        )
+
+    def test_seal_cluster_action(self):
+        """Test seal_clusters action in OpinionCluster admin page"""
+        # Test 1: Can we seal cluster without any blockages and create redirection?
+
+        cluster_pk = self.cluster_1.pk
+        docket_pk = self.cluster_1.docket.pk
+
+        # Call seal_clusters action.
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        clusters_admin.message_user = mock.Mock()
+        url = reverse("admin:search_opinioncluster_changelist")
+        request = self.factory.post(url)
+
+        queryset = OpinionCluster.objects.filter(pk=cluster_pk)
+        clusters_admin.seal_clusters(request, queryset)
+
+        # Check sealed correctly
+        clusters_admin.message_user.assert_called_once_with(
+            request,
+            "Sealed 1 cluster(s).",
+            messages.SUCCESS,
+        )
+        # Check docket has been removed
+        docket = Docket.objects.filter(pk=docket_pk)
+        self.assertEqual(
+            docket.count(),
+            0,
+            msg="Docket has not been removed after sealing the cluster.",
+        )
+        # Check cluster redirection has been created
+        redirection = ClusterRedirection.objects.filter(
+            reason=ClusterRedirection.SEALED,
+            deleted_cluster_id=cluster_pk,
+            cluster=None,
+        )
+        self.assertEqual(
+            redirection.count(),
+            1,
+            msg="Got incorrect number of ClusterRedirection results",
+        )
+        clusters_admin.message_user.reset_mock()
+
+        # Test 2: Can we seal a cluster but not removing the docket and create redirection?
+        cluster2_pk = self.cluster_2.pk
+        docket2_pk = self.cluster_2.docket.pk
+
+        queryset = OpinionCluster.objects.filter(pk=cluster2_pk)
+        clusters_admin.seal_clusters(request, queryset)
+
+        # Check sealed correctly
+        clusters_admin.message_user.assert_called_once_with(
+            request,
+            "Sealed 1 cluster(s).",
+            messages.SUCCESS,
+        )
+
+        # Check that docket has not been removed
+        docket = Docket.objects.filter(pk=docket2_pk)
+        self.assertEqual(
+            docket.count(),
+            1,
+            msg="Docket shouldn't have been removed after sealing the cluster.",
+        )
+
+        # Check that the cluster redirection was still created.
+        redirection = ClusterRedirection.objects.filter(
+            reason=ClusterRedirection.SEALED,
+            deleted_cluster_id=cluster2_pk,
+            cluster=None,
+        )
+        self.assertEqual(
+            redirection.count(),
+            1,
+            msg="Got more or less ClusterRedirection results",
+        )
+        clusters_admin.message_user.reset_mock()
+
+        # Test 3: Can we block seal if something is related to cluster? No, user related information exists
+        cluster3_pk = self.cluster_3.pk
+
+        queryset = OpinionCluster.objects.filter(pk=cluster3_pk)
+        clusters_admin.seal_clusters(request, queryset)
+
+        # Check cannot be sealed
+        clusters_admin.message_user.assert_called_once_with(
+            request,
+            f'ERROR: Problem sealing cluster id: {cluster3_pk} - <a href="/admin/search/opinioncluster/blocking-confirmation/{cluster3_pk}/" target="_blank">View Dependencies</a>',
+            messages.WARNING,
+        )
+
+        # Check blocking objects:
+        get_blocking_relations = clusters_admin.get_blocking_relations(
+            self.cluster_3
+        )
+
+        user_tag_qs = get_blocking_relations.get("favorites.UserTag")
+        self.assertTrue(user_tag_qs.exists())
+        self.assertIn(self.tag_1_user_1, user_tag_qs)
+
+        note_qs = get_blocking_relations.get("favorites.Note")
+        self.assertTrue(note_qs.exists())
+        self.assertIn(self.note_cluster_3_user_1, note_qs)
+
+
+class PopulateDocketNumberRawCommandTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.dn = "1111"
+        cls.docket = DocketFactory(docket_number=cls.dn, docket_number_raw="")
+
+    def test_populate_docket_number_raw(self):
+        """Does the command properly copies docket_number_raw into docket number?"""
+        populate_docket_number_raw.Command().handle(
+            start_id=self.docket.id,
+            end_id=self.docket.id + 10,
+        )
+        self.docket.refresh_from_db()
+        self.assertEqual(
+            self.docket.docket_number_raw,
+            self.dn,
+            "docket number raw was not updated",
+        )
+
+        self.assertTrue(
+            self.docket.events.all().last() is None,
+            "pghistory event saving should be disabled by `populate_docket_number_raw`",
+        )
+
+        # see that regular pghistory trigger behavior is still working
+        self.docket.docket_number = "xxxx"
+        self.docket.save()
+        self.assertTrue(
+            self.docket.events.all().last() is not None,
+            "Event saving trigger is not working",
+        )
+
+
+@mock.patch.dict(
+    "os.environ", {"DOCKET_NUMBER_CLEANING_API_KEY": "123"}, clear=True
+)
+@mock.patch(
+    "cl.search.docket_number_cleaner.get_redis_key_prefix",
+    return_value="docket_number_cleaning_daemon_test",
+)
+@override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+class LLMCleanDocketNumberTests(TransactionTestCase):
+    def setUp(self):
+        self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        self.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
+        self.court_canb = CourtFactory(id="canb", jurisdiction="FB")
+        self.docket_1 = DocketFactory(
+            court=self.court_scotus,
+            docket_number_raw="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
+            docket_number="Docket numbers 12-1234-ag, 13-5678-pr, 14-9010",
+            source=Docket.DEFAULT,
+        )
+        self.docket_2 = DocketFactory(
+            court=self.court_scotus,
+            docket_number_raw="Cases 512 to 514",
+            docket_number="Cases 512 to 514",
+            source=Docket.DEFAULT,
+        )
+        self.docket_3 = DocketFactory(
+            court=self.court_ca1,
+            docket_number_raw="Cases 12-1234 to 12-1236",
+            docket_number="Cases 12-1234 to 12-1236",
+            source=Docket.DEFAULT,
+        )
+        self.docket_4 = DocketFactory(
+            court=self.court_canb,
+            docket_number_raw="Docket Nos. 567-569",
+            docket_number="Docket Nos. 567-569",
+            source=Docket.DEFAULT,
+        )
+
+        self.model_response = CleanDocketNumber(
+            docket_numbers=[
+                DocketItem(
+                    unique_id=str(self.docket_1.id),
+                    cleaned_nums=["12-1234-AG", "13-5678-PR", "14-9010"],
+                ),
+                DocketItem(
+                    unique_id=str(self.docket_2.id),
+                    cleaned_nums=["512", "513", "514"],
+                ),
+                DocketItem(
+                    unique_id=str(self.docket_3.id),
+                    cleaned_nums=["12-1234", "12-1235", "12-1236"],
+                ),
+            ]
+        )
+
+        self.expected = {
+            self.docket_1.id: "12-1234-AG; 13-5678-PR; 14-9010",
+            self.docket_2.id: "512; 513; 514",
+            self.docket_3.id: "12-1234; 12-1235; 12-1236",
+            self.docket_4.id: "Docket Nos. 567-569",  # No change expected for non-Fed_Appellate dockets
+        }
+
+        self.r = get_redis_interface("CACHE")
+        self.key_to_clean = "docket_number_cleaning_daemon_test:llm_batch"
+        if self.key_to_clean:
+            self.r.delete(self.key_to_clean)
+            self.r.sadd(self.key_to_clean, self.docket_1.id)
+            self.r.sadd(self.key_to_clean, self.docket_2.id)
+            self.r.sadd(self.key_to_clean, self.docket_3.id)
+            self.r.sadd(self.key_to_clean, self.docket_4.id)
+
+        super().setUp()
+
+    @mock.patch("cl.search.docket_number_cleaner.call_llm")
+    def test_llm_clean_docket_number_daemon(
+        self, mock_call_llm, mock_get_redis_key_prefix
+    ):
+        """Test the llm_clean_docket_number_daemon command in testing mode."""
+        mock_call_llm.side_effect = [
+            self.model_response,  # First mini model response
+            self.model_response,  # Second mini model response
+        ]
+
+        with mock.patch("cl.lib.decorators.time.sleep") as mock_sleep:
+            call_command(
+                "llm_clean_docket_number_daemon",
+                testing_iterations=1,
+            )
+
+        # Verify that docket numbers were updated correctly
+        for docket in [
+            self.docket_1,
+            self.docket_2,
+            self.docket_3,
+            self.docket_4,
+        ]:
+            docket.refresh_from_db()
+            self.assertEqual(
+                docket.docket_number,
+                self.expected[docket.id],
+                "docket number mismatch",
+            )
+
+        # Verify that Redis set should contain docket_4 only
+        self.assertEqual(
+            self.r.scard(self.key_to_clean),
+            1,
+            "Redis cache count should be 1 after processing",
+        )
+
+        self.assertEqual(
+            self.r.smembers(self.key_to_clean),
+            {str(self.docket_4.id)},
+            "Redis cache set should contain docket_4 only",
+        )

@@ -1,4 +1,6 @@
-{% load widget_tweaks svg_tags %}
+{% load svg_tags %}
+
+<c-vars search_form form_prefix/>
 
 <div class="pt-2 pb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-end">
   <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
@@ -6,11 +8,11 @@
     <input name="court" class="border border-greyscale-200 rounded-lg h-10 py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-primary-600">
   </div>
 
-  <c-corpus-search.filters.opinions :search_form="search_form" only />
+  <c-corpus-search.filters.opinions :search_form="search_form" :request="request" :form_prefix="form_prefix" only />
 
-  <c-corpus-search.filters.recap :search_form="search_form" only />
+  <c-corpus-search.filters.recap :search_form="search_form" :request="request" :form_prefix="form_prefix" only />
 
-  <c-corpus-search.filters.oral-arguments :search_form="search_form" only />
+  <c-corpus-search.filters.oral-arguments :search_form="search_form" :request="request" :form_prefix="form_prefix" only />
 
-  <c-corpus-search.filters.judges :search_form="search_form" only />
+  <c-corpus-search.filters.judges :search_form="search_form" :request="request" :form_prefix="form_prefix" only />
 </div>

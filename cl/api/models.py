@@ -1,12 +1,81 @@
+import re
 import uuid
 from http import HTTPStatus
 
 import pghistory
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
+
+# Pattern: digits, slash, then valid time unit (s/m/h/d or full words)
+RATE_PATTERN = re.compile(r"^\d+/(s|m|h|d|sec|min|second|minute|hour|day)$")
+
+
+class ThrottleType(models.IntegerChoices):
+    API = 1, "API"
+    CITATION_LOOKUP = 2, "Citation Lookup"
+
+
+@pghistory.track()
+class APIThrottle(AbstractDateTimeModel):
+    """Override rate limits or block specific users for API endpoints."""
+
+    user: models.ForeignKey[User, User] = models.ForeignKey(
+        User,
+        help_text="The user whose throttle rate is being overridden.",
+        related_name="api_throttles",
+        on_delete=models.CASCADE,
+    )
+    throttle_type: models.SmallIntegerField = models.SmallIntegerField(
+        help_text="The type of throttle being overridden.",
+        choices=ThrottleType.choices,
+    )
+    blocked: models.BooleanField = models.BooleanField(
+        help_text="If True, the user is blocked from making requests. "
+        "Takes precedence over rate.",
+        default=False,
+    )
+    rate: models.CharField = models.CharField(
+        help_text="The rate limit (e.g., '100/hour', '1000/day'). "
+        "Required if not blocked.",
+        max_length=20,
+        blank=True,
+    )
+    notes: models.TextField = models.TextField(
+        help_text="Admin notes about why this override exists.",
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "throttle_type"],
+                name="unique_user_throttle_type",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        throttle_type = self.get_throttle_type_display()
+        if self.blocked:
+            return f"{self.user.username} blocked ({throttle_type})"
+        return f"{self.user.username} at {self.rate} ({throttle_type})"
+
+    def clean(self) -> None:
+        super().clean()
+        if not self.blocked and not self.rate:
+            raise ValidationError(
+                {"rate": "Rate is required when user is not blocked."}
+            )
+        if self.rate and not RATE_PATTERN.match(self.rate):
+            raise ValidationError(
+                {
+                    "rate": f"Invalid rate format: {self.rate}. "
+                    "Use format like '100/hour', '1000/day', '60/min'."
+                }
+            )
 
 
 class WebhookEventType(models.IntegerChoices):
@@ -14,6 +83,7 @@ class WebhookEventType(models.IntegerChoices):
     SEARCH_ALERT = 2, "Search Alert"
     RECAP_FETCH = 3, "Recap Fetch"
     OLD_DOCKET_ALERTS_REPORT = 4, "Old Docket Alerts Report"
+    PRAY_AND_PAY = 5, "Pray And Pay Alert"
 
 
 class WebhookVersions(models.IntegerChoices):
@@ -43,7 +113,7 @@ class Webhook(AbstractDateTimeModel):
     )
     event_type: models.IntegerField = models.IntegerField(
         help_text="The event type that triggers the webhook.",
-        choices=WebhookEventType.choices,
+        choices=WebhookEventType,
     )
     url: models.URLField = models.URLField(
         help_text="The URL that receives a POST request from the webhook.",
@@ -55,7 +125,7 @@ class Webhook(AbstractDateTimeModel):
     )
     version: models.IntegerField = models.IntegerField(
         help_text="The specific version of the webhook provisioned.",
-        choices=WebhookVersions.choices,
+        choices=WebhookVersions,
         default=WebhookVersions.v1,
     )
     failure_count: models.IntegerField = models.IntegerField(

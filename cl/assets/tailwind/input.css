@@ -1,3 +1,4 @@
+@import '../static-global/css/third_party/flatpickr.css';
 @import 'fonts.css';
 
 @tailwind base;
@@ -10,8 +11,11 @@
     --mobile-main-padding: theme(spacing.4);
     --padded-full-width: calc(100vw - (2 * var(--mobile-main-padding)));
     --corpus-search-height: theme(spacing.12);
+    --desktop-header-height: theme(spacing.26);
+    --desktop-header-filters-height: calc(100svh - var(--desktop-header-height));
     --mobile-dialog-header-height: theme(spacing.18);
     --mobile-dialog-panel-height: calc(100vh - var(--mobile-dialog-header-height));
+    --content-max-width: 1280px;
   }
   code {
     @apply font-sans text-sm bg-brand-100 text-brand-600 border border-brand-300 rounded-[2px] px-1;
@@ -66,6 +70,15 @@
   input[type="checkbox"]::before {
     mask: url("/static/svg/check_thick.svg") no-repeat center/contain;
   }
+  input[type="radio"] {
+    @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded-full border border-greyscale-300;
+    @apply checked:border-primary-600 checked:bg-primary-600;
+    @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-primary-600/60;
+    @apply disabled:border-greyscale-300 disabled:bg-greyscale-100 forced-colors:appearance-auto; /* disabled + a11y */
+    @apply before:absolute before:inset-0 before:m-auto before:w-2 before:h-2 before:rounded-full before:bg-white; /* inner dot container (pseudo) */
+    @apply before:scale-0 checked:before:scale-100 before:transform before:duration-200 transition-colors; /* animate inner dot */
+    @apply disabled:checked:before:bg-greyscale-400; /* disabled + checked dot color */
+  }
 }
 
 @tailwind components;
@@ -74,12 +87,10 @@
   .alert {
     @apply px-4 py-3 text-sm rounded-[10px] border;
   }
-
   .alert-warning {
-    @apply alert text-yellow-700 bg-yellow-100 border-yellow-500;
+    @apply alert text-greyscale-950 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
   }
-
-   .alert-danger {
+  .alert-danger {
     @apply alert bg-red-100 text-red-700 border-red-500;
   }
   .btn {
@@ -89,7 +100,7 @@
     @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus-visible:ring-4 focus-visible:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400;
   }
   .btn-outline {
-    @apply btn text-greyscale-700 hover:bg-greyscale-100 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:border-greyscale-200 disabled:text-greyscale-400;
+    @apply btn bg-white text-greyscale-700 hover:bg-greyscale-400 hover:text-white border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-300 disabled:border-greyscale-200 disabled:text-greyscale-400;
   }
   .btn-dark {
     @apply btn text-white bg-greyscale-900 hover:bg-greyscale-800 outline-none focus-visible:ring-4 focus-visible:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200;
@@ -112,6 +123,76 @@
   .input-text {
     @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
   }
+  /* Screenshots used in Help pages */
+  .screenshot {
+    @apply rounded-2xl block max-w-full;
+  }
+
+  /* ----------- THIRD PARTY OVERRIDES ----------- */
+
+  .flatpickr-calendar.animate {
+    @apply rounded-xl outline outline-1 outline-greyscale-200 w-fit shadow-md py-5 flex flex-col gap-3;
+    @apply min-w-80 max-w-80 before:hidden after:hidden;
+  }
+  .flatpickr-calendar.animate:not(.open) {
+    @apply pointer-events-none hidden;
+  }
+  .flatpickr-calendar.animate .flatpickr-months {
+    @apply relative min-w-full max-w-full px-6;
+  }
+  .flatpickr-calendar.animate .flatpickr-innerContainer {
+    @apply min-w-full max-w-full flex justify-center;
+  }
+  .flatpickr-calendar.animate .flatpickr-current-month {
+    @apply p-0;
+  }
+  .flatpickr-calendar.animate .dayContainer {
+    @apply gap-y-1 gap-x-0 justify-center;
+  }
+  .flatpickr-calendar.animate .numInputWrapper {
+    @apply h-full inset-y-0;
+  }
+  .flatpickr-calendar.animate .numInput.cur-year {
+    @apply font-sans font-semibold text-md;
+  }
+  .flatpickr-calendar.animate select.flatpickr-monthDropdown-months {
+    @apply appearance-none min-w-0 w-max max-w-max h-9 -mr-0.5;
+    @apply text-center font-sans font-semibold text-md;
+  }
+  .flatpickr-day.nextMonthDay.selected,
+  .flatpickr-day.prevMonthDay.selected,
+  .flatpickr-day.today.selected,
+  .flatpickr-day.selected {
+    @apply bg-primary-600 hover:bg-primary-700 border-none hover:text-white after:bg-greyscale-25;
+  }
+  .flatpickr-calendar.animate .flatpickr-weekdays {
+    @apply justify-center;
+  }
+  .flatpickr-calendar.animate .flatpickr-weekdaycontainer {
+    @apply justify-center max-w-full;
+  }
+  .flatpickr-calendar.animate .flatpickr-weekday {
+    @apply text-greyscale-700 text-sm font-medium font-sans max-w-[39px];
+  }
+  .flatpickr-day.today {
+    @apply text-sm bg-greyscale-100 relative hover:bg-greyscale-200 hover:text-greyscale-800 border-none flex flex-col justify-center items-center leading-none;
+    @apply after:w-[5px] after:h-[5px] after:rounded-full after:bg-primary-600 after:absolute after:bottom-1;
+  }
+  .flatpickr-calendar.animate .flatpickr-next-month,
+  .flatpickr-calendar.animate .flatpickr-prev-month {
+    mask: url("/static/svg/chevron.svg") no-repeat center/contain;
+    @apply bg-greyscale-500 hover:bg-greyscale-600 block;
+  }
+  .flatpickr-calendar.animate .flatpickr-next-month svg,
+  .flatpickr-calendar.animate .flatpickr-prev-month svg {
+    @apply hidden;
+  }
+  .flatpickr-calendar.animate .flatpickr-next-month {
+    @apply -rotate-90 right-6;
+  }
+  .flatpickr-calendar.animate .flatpickr-prev-month {
+    @apply rotate-90 left-6;
+  }
 }
 
 @tailwind utilities;
@@ -123,7 +204,11 @@
   .lead {
     @apply text-xl text-greyscale-700 font-normal;
   }
-  .focus-container {
+  .focus-container { /** provides focus state when a child input is focused */
     @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
+    @apply [&:has(select:focus)]:outline [&:has(select:focus)]:outline-2 [&:has(select:focus)]:outline-primary-600 flex;
+  }
+  .capped-width {
+    @apply w-full max-w-[--content-max-width] mx-auto;
   }
 }

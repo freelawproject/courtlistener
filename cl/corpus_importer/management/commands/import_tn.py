@@ -15,7 +15,7 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
     make_objects,
     save_everything,
 )
-from cl.scrapers.tasks import extract_doc_content
+from cl.scrapers.tasks import extract_opinion_content
 from cl.search.models import SOURCES, Court, Docket, Opinion
 
 
@@ -121,26 +121,24 @@ def import_tn_corpus(
             )
 
         # oci - originating_court_information is always `None`` for this import
-        docket, opinion, cluster, citations, oci = make_objects(
+        docket, opinions, cluster, citations, oci = make_objects(
             make_item(case),
             courts[case["court"]],
-            sha1_hash,
-            pdf_data,
+            [(make_item(case), pdf_data, sha1_hash)],
         )
 
         save_everything(
             items={
                 "docket": docket,
-                "opinion": opinion,
+                "opinions": opinions,
                 "cluster": cluster,
                 "citations": citations,
             }
         )
 
-        extract_doc_content.delay(
-            opinion.pk,
+        extract_opinion_content.delay(
+            opinions[0].pk,
             ocr_available=ocr_available,
-            citation_jitter=True,
         )
         logging.info(
             "Successfully added Tennessee object cluster: %s", cluster.id

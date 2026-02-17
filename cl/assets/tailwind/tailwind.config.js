@@ -35,6 +35,7 @@ module.exports = {
         15: '3.75rem', // 60px
         18: '4.5rem', // 72px
         21: '5.25rem', // 84px
+        26: '6.5rem', // 104px
         35: '8.75rem', // 140px
         41: '10.25rem', // 164px
         42: '10.5rem', // 168px
@@ -87,6 +88,9 @@ module.exports = {
           50: '#FFFAEB',
           400: '#FDB022',
         },
+        amber: {
+          450: '#FDB022',
+        },
         blue: {
           700: '#004EEB',
         },
@@ -103,6 +107,7 @@ module.exports = {
         lg: ['18px', '28px'],
         'lg-cooper': ['18px', '26px'],
         xl: ['20px', '28px'],
+        'display-xxs': ['18px', '28px'],
         'display-xs': ['24px', '32px'],
         'display-sm': ['30px', '38px'],
         'display-sm-cooper': ['28px', '44px'],

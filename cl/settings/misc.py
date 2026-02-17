@@ -46,7 +46,6 @@ GOOGLE_AUTH = {
 ##############
 # Super Misc #
 ##############
-FUNDRAISING_MODE = env("FUNDRAISING_MODE", default=False)
 
 # Key for Follow the Money API
 FTM_KEY = env("FTM_KEY", default="")
@@ -65,4 +64,11 @@ CAP_R2_BUCKET_NAME = env("CAP_R2_BUCKET_NAME", default="cap-static")
 # Webhooks
 WEBHOOK_V1_DEPRECATION_DATE = env(
     "WEBHOOK_V1_DEPRECATION_DATE", default="2024-11-18"
+)
+
+# OCR extraction
+# Minimum number of characters between common headers to consider that the page
+# does not need OCR.
+CHARS_THRESHOLD_OCR_PER_PAGE = env.int(
+    "CHARS_THRESHOLD_OCR_PER_PAGE", default=200
 )

@@ -9,7 +9,6 @@ import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import admin
-from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -23,6 +22,7 @@ from rest_framework.serializers import CharField
 from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    build_search_feed_query,
     compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
@@ -62,6 +62,7 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
+from cl.search.api_utils import CursorESList
 from cl.search.api_views import SearchV4ViewSet
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
@@ -122,6 +123,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
+
+    @staticmethod
+    def _clean_micro_cache():
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_test:*")
+        if keys:
+            r.delete(*keys)
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -2751,18 +2759,21 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Shouldn't be a response
         self.assertIsNone(r)
 
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_test:",
+    )
     @mock.patch("cl.lib.search_utils.fetch_es_results")
     @override_settings(
         RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
     )
-    async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
+    async def test_micro_cache_for_search_results(
+        self, mock_fetch_es, mock_cache_key
+    ) -> None:
         """Assert micro-cache for search results behaves properly."""
 
         # Clean search_results_cache before starting the test.
-        r = get_redis_interface("CACHE")
-        keys = r.keys("search_results_cache")
-        if keys:
-            r.delete(*keys)
+        self._clean_micro_cache()
 
         mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
             *args, **kwargs
@@ -2884,7 +2895,61 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 0, "filter + text query")
         # fetch_es_results is called this time; the cache is not used.
         self.assertEqual(mock_fetch_es.call_count, 5)
-        cache.clear()
+        self._clean_micro_cache()
+
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_test:",
+    )
+    @mock.patch("cl.lib.search_utils.fetch_es_results")
+    async def test_search_micro_cache_ignore_invalid_params(
+        self, mock_fetch_es, mock_cache_key
+    ) -> None:
+        """Confirm that invalid search parameters are ignored when caching a
+        Search Frontend request.
+        """
+
+        mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
+            *args, **kwargs
+        )
+        self._clean_micro_cache()
+
+        # Initial request.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = await self._test_article_count(
+            search_params, 2, "filter + text query"
+        )
+        self.assertEqual(
+            mock_fetch_es.call_count, 1, "Wrong number of query calls."
+        )
+
+        # Same request with an additional invalid parameter.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "fake_param": "fake",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = await self._test_article_count(
+            search_params, 2, "filter + text query"
+        )
+        # The request ignores the invalid parameter, so the cache key remains the same
+        # and the response is retrieved from the cache.
+        self.assertEqual(
+            mock_fetch_es.call_count, 1, "Wrong number of query calls."
+        )
+        self._clean_micro_cache()
 
     def test_uses_exact_version_for_case_name_field(self) -> None:
         """Confirm that stemming and synonyms are disabled on the case_name
@@ -3026,7 +3091,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Add docket with no document
         mock_date = now().replace(
-            day=29, hour=0, minute=0, second=0, microsecond=0
+            day=28, hour=0, minute=0, second=0, microsecond=0
         )
         with (
             time_machine.travel(mock_date, tick=False),
@@ -4358,6 +4423,13 @@ class RECAPSearchAPIV4Test(
             index_docket_parties_in_es.delay(cls.de_api.docket.pk)
 
     @staticmethod
+    def _clean_micro_cache():
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_api_test:*")
+        if keys:
+            r.delete(*keys)
+
+    @staticmethod
     def mock_merge_unavailable_fields_on_parent_document(*args, **kwargs):
         """Mock function that first deletes a specific RECAPDocument
         and then calls the original merge function with the provided arguments.
@@ -5496,6 +5568,219 @@ class RECAPSearchAPIV4Test(
             docket_1.delete()
             docket_3.delete()
 
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.search.api_utils.get_micro_cache_key",
+        return_value="search_results_cache_api_test:",
+    )
+    @mock.patch(
+        "cl.search.api_utils.CursorESList.perform_es_query",
+        autospec=True,
+        wraps=CursorESList.perform_es_query,
+    )
+    def test_recap_micro_cache_for_search_api(
+        self, mock_es_query, mock_cache_key
+    ) -> None:
+        """Assert micro-cache for search API results behaves properly."""
+
+        self._clean_micro_cache()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 0",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 1",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2023, 2, 23),
+            )
+            docket_1 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 2",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2022, 2, 23),
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+
+        # Page 1
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+
+        p1_first_result_id = r.data["results"][0]["docket_id"]
+        self.assertEqual(mock_es_query.call_count, 1)
+
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertIn("<mark>", r.data["results"][0]["caseName"])
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+
+        first_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # Page 2
+        r = self.client.get(next_page)
+        p2_first_result_id = r.data["results"][0]["docket_id"]
+        self.assertEqual(mock_es_query.call_count, 2)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+
+        second_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(second_page_ids & first_page_ids)
+
+        # Page 3
+        r = self.client.get(next_page)
+        p3_first_result_id = r.data["results"][0]["docket_id"]
+        self.assertEqual(mock_es_query.call_count, 3)
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertFalse(r.data["next"])
+
+        third_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(second_page_ids & third_page_ids)
+
+        # Cached requests.
+        # Page 3
+        r = self.client.get(next_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        previous_page = r.data["previous"]
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertFalse(r.data["next"])
+        self.assertTrue(previous_page)
+        cached_third_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+        # Confirm that the content and order match in the cached response.
+        self.assertEqual(third_page_ids, cached_third_page_ids)
+        self.assertEqual(p3_first_result_id, r.data["results"][0]["docket_id"])
+
+        # Page 2
+        r = self.client.get(previous_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        previous_page = r.data["previous"]
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertTrue(r.data["next"])
+        self.assertTrue(previous_page)
+        cached_second_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+
+        # Confirm that the content and order match in the cached response.
+        self.assertEqual(p2_first_result_id, r.data["results"][0]["docket_id"])
+        self.assertEqual(second_page_ids, cached_second_page_ids)
+
+        # Page 1
+        r = self.client.get(previous_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertIn("<mark>", r.data["results"][0]["caseName"])
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertTrue(r.data["next"])
+        self.assertFalse(r.data["previous"])
+        cached_first_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+
+        # Confirm that the content and order match in the cached response.
+        self.assertEqual(first_page_ids, cached_first_page_ids)
+        self.assertEqual(p1_first_result_id, r.data["results"][0]["docket_id"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0.delete()
+            docket_1.delete()
+            docket.delete()
+
+        self._clean_micro_cache()
+
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.search.api_utils.get_micro_cache_key",
+        return_value="search_results_cache_api_test:",
+    )
+    @mock.patch(
+        "cl.search.api_utils.CursorESList.perform_es_query",
+        autospec=True,
+        wraps=CursorESList.perform_es_query,
+    )
+    def test_search_micro_cache_ignore_invalid_params(
+        self, mock_es_query, mock_cache_key
+    ) -> None:
+        """Confirm that invalid search parameters are ignored when caching a
+        Search API request.
+        """
+        self._clean_micro_cache()
+
+        # Initial request.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(
+            mock_es_query.call_count, 1, "Wrong number of query calls."
+        )
+
+        # Same request with an additional invalid parameter.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "fake_param": "fake",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        # The request ignores the invalid parameter, so the cache key remains the same
+        # and the response is retrieved from the cache.
+        self.assertEqual(
+            len(r.data["results"]),
+            2,
+        )
+        self.assertEqual(
+            mock_es_query.call_count, 1, "Wrong number of query calls."
+        )
+        self._clean_micro_cache()
+
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_more_docs_field(self) -> None:
         """Test the more_docs fields to be shown properly when a docket has
@@ -6277,6 +6562,12 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
+    def setUp(self):
+        r = get_redis_interface("CACHE")
+        keys = r.keys("*search_feed_cache:*")
+        if keys:
+            r.delete(*keys)
+
     def test_do_recap_search_feed_have_content(self) -> None:
         """Can we make a RECAP Search Feed?"""
         with self.captureOnCommitCallbacks(execute=True):
@@ -6553,6 +6844,141 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "Invalid search syntax. Please check your request and try again.",
             response.content.decode(),
         )
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=True)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_cache_hit(self, mock_build_query: mock.Mock) -> None:
+        """Can we cache RECAP feed results and retrieve them on subsequent
+        requests?
+        """
+        mock_build_query.side_effect = build_search_feed_query
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+
+        # First request - results will be cached
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        # Second request with same parameters should return cached results
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should NOT be called again (cache hit)
+        self.assertEqual(
+            mock_build_query.call_count,
+            1,
+            msg="build_search_feed_query should only be called once when cache hits",
+        )
+
+        # Responses should be identical
+        self.assertEqual(response_1.content, response_2.content)
+
+        # Verify content is valid feed XML
+        xml_tree = etree.fromstring(response_2.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = xml_tree.xpath("//atom:entry", namespaces=namespaces)
+        self.assertGreater(len(entries), 0, msg="Feed should contain entries")
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=True)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_cache_miss_on_different_params(
+        self, mock_build_query: mock.Mock
+    ) -> None:
+        """Does cache miss when parameters change?"""
+
+        # Set up the mock to call the real function
+        mock_build_query.side_effect = build_search_feed_query
+
+        params_1 = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+        params_2 = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Leave to File",
+        }
+
+        # First request
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params_1,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        # Second request with different parameters should not hit same cache
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params_2,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should be called again (cache miss)
+        self.assertEqual(
+            mock_build_query.call_count,
+            2,
+            msg="build_search_feed_query should be called twice for different parameters",
+        )
+
+        # Responses should be different
+        self.assertNotEqual(response_1.content, response_2.content)
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=False)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_no_cache_when_disabled(
+        self, mock_build_query: mock.Mock
+    ) -> None:
+        """Does caching not occur when ELASTICSEARCH_API_MICRO_CACHE_ENABLED
+        is False?
+        """
+        # Set up the mock to call the real function
+        mock_build_query.side_effect = build_search_feed_query
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+
+        # Make two requests - caching should be disabled
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should be called again (no cache)
+        self.assertEqual(
+            mock_build_query.call_count,
+            2,
+            msg="build_search_feed_query should be called twice when caching disabled",
+        )
+
+        # Both responses should still be identical (same query)
+        # but they are generated independently without cache
+        self.assertEqual(response_1.content, response_2.content)
+
+        # Verify content is valid feed XML
+        xml_tree = etree.fromstring(response_2.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = xml_tree.xpath("//atom:entry", namespaces=namespaces)
+        self.assertGreater(len(entries), 0, msg="Feed should contain entries")
 
 
 class IndexDocketRECAPDocumentsCommandTest(
@@ -6873,8 +7299,8 @@ class IndexDocketRECAPDocumentsCommandTest(
         child_count = len(article[0].xpath(".//h4"))
         self.assertEqual(2, child_count)
 
-    @mock.patch("cl.search.admin.delete_from_ia")
-    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    @mock.patch("cl.search.utils.delete_from_ia")
+    @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_re_index_recap_documents_sealed(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
@@ -8371,8 +8797,8 @@ class RECAPIndexingTest(
         docket_doc_no_parties.delete()
         docket_with_no_parties_no_separator.delete()
 
-    @mock.patch("cl.search.admin.delete_from_ia")
-    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    @mock.patch("cl.search.utils.delete_from_ia")
+    @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_seal_documents_action(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):

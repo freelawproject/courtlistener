@@ -52,6 +52,7 @@ from cl.alerts.utils import (
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
 from cl.corpus_importer.tasks import (
+    download_acms_pdf_by_rd,
     download_pacer_pdf_by_rd,
     download_pdf_by_magic_number,
     get_att_report_by_rd,
@@ -71,7 +72,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.microservice_utils import microservice
+from cl.lib.microservice_utils import doc_page_count_service
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     ProxyPacerSession,
@@ -116,8 +117,8 @@ from cl.recap.utils import (
     sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
-    extract_recap_pdf,
-    extract_recap_pdf_base,  # noqa: F401
+    extract_pdf_document,
+    extract_pdf_document_base,  # noqa: F401
 )
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import index_docket_parties_in_es
@@ -136,12 +137,14 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         docket = await process_recap_docket(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
         sub_docket_att_page_pks = await find_subdocket_att_page_rds(pq.pk)
-        for pq_pk in sub_docket_att_page_pks:
-            await process_recap_attachment(pq_pk)
+        for pq_pk, subdocket_replication in sub_docket_att_page_pks:
+            await process_recap_attachment(
+                pq_pk, subdocket_replication=subdocket_replication
+            )
     elif pq.upload_type == UPLOAD_TYPE.PDF:
         sub_docket_pdf_pks = await find_subdocket_pdf_rds(pq.pk)
-        for pq_pk in sub_docket_pdf_pks:
-            await process_recap_pdf(pq_pk)
+        for pq_pk, subdocket_replication in sub_docket_pdf_pks:
+            await process_recap_pdf(pq_pk, subdocket_replication)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         docket = await process_recap_docket_history_report(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
@@ -193,7 +196,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
             rd_pk = fq.recap_document_id
             c = chain(
                 fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
-                extract_recap_pdf.si(rd_pk),
+                extract_pdf_document.si(rd_pk),
                 mark_fq_successful.si(fq.pk),
             )
         case _:
@@ -269,10 +272,11 @@ async def mark_pq_status(
     return pq.status, getattr(pq, message_property_name)
 
 
-async def process_recap_pdf(pk):
+async def process_recap_pdf(pk, subdocket_replication: bool = False):
     """Process an uploaded PDF from the RECAP API endpoint.
 
     :param pk: The PK of the processing queue item you want to work on.
+    :param subdocket_replication: Whether this task is related to subdocket replication.
     :return: A RECAPDocument object that was created or updated.
     """
     """Save a RECAP PDF to the database."""
@@ -408,14 +412,20 @@ async def process_recap_pdf(pk):
     # Avoid updating the document_number from the PQ if this upload belongs
     # to a court that doesn't use regular numbering. See issue:
     # https://github.com/freelawproject/courtlistener/issues/2877
-    if not await ais_appellate_court(
-        court_id
-    ) or not is_long_appellate_document_number(rd.document_number):
+    # Avoid updating document_number, attachment_number, and document_type
+    # from PQ if this task is part of a subdocket replication. In subdockets,
+    # this metadata may differ even when the document is the same.
+    if (
+        not await ais_appellate_court(court_id)
+        or not is_long_appellate_document_number(rd.document_number)
+    ) and not subdocket_replication:
         rd.document_number = str(pq.document_number)
-    # We update attachment_number and document_type in case the
-    # RECAPDocument didn't have the actual document yet.
-    rd.attachment_number = pq.attachment_number
-    rd.document_type = document_type
+
+    if not subdocket_replication:
+        # We update attachment_number and document_type in case the
+        # RECAPDocument didn't have the actual document yet.
+        rd.attachment_number = pq.attachment_number
+        rd.document_type = document_type
 
     # Do the file, finally.
     try:
@@ -451,10 +461,7 @@ async def process_recap_pdf(pk):
                 )
 
             # Do page count and extraction
-            response = await microservice(
-                service="page-count",
-                item=rd,
-            )
+            response = await doc_page_count_service(rd)
             if response.is_success:
                 rd.page_count = int(response.text)
                 assert isinstance(rd.page_count, (int | type(None))), (
@@ -479,7 +486,7 @@ async def process_recap_pdf(pk):
     if not existing_document and not pq.debug:
         await sync_to_async(
             chain(
-                extract_recap_pdf.si(rd.pk),
+                extract_pdf_document.si(rd.pk),
             ).apply_async
         )()
 
@@ -733,12 +740,13 @@ async def get_att_data_from_pq(
 
 async def find_subdocket_att_page_rds(
     pk: int,
-) -> list[int]:
+) -> list[tuple[int, bool]]:
     """Look for RECAP Documents that belong to subdockets, and create a PQ
     object for each additional attachment page that requires processing.
 
     :param pk: Primary key of the processing queue item.
-    :return: A list of ProcessingQueue pks to process.
+    :return: A two-tuple containing a list of ProcessingQueue pks to process,
+    and a boolean indicating whether the PQ belongs to subdocket replication.
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -751,8 +759,10 @@ async def find_subdocket_att_page_rds(
     main_rds = get_main_rds(pq.court_id, pacer_doc_id).exclude(
         docket_entry__docket__pacer_case_id=pq.pacer_case_id
     )
+
+    subdocket_replication = False
     pqs_to_process_pks = [
-        pq.pk
+        (pq.pk, subdocket_replication)
     ]  # Add the original pq to the list of pqs to process
     original_file_content = text.encode("utf-8")
     original_file_name = pq.filepath_local.name
@@ -774,55 +784,64 @@ async def find_subdocket_att_page_rds(
             )
         )
 
+    subdocket_replication = True
     if pqs_to_create:
         pqs_created = await ProcessingQueue.objects.abulk_create(pqs_to_create)
-        pqs_to_process_pks.extend([pq.pk for pq in pqs_created])
+        pqs_to_process_pks.extend(
+            [(pq.pk, subdocket_replication) for pq in pqs_created]
+        )
 
     return pqs_to_process_pks
 
 
 async def find_subdocket_pdf_rds(
     pk: int,
-) -> list[int]:
+) -> list[tuple[int, bool]]:
     """Look for RECAP Documents that belong to subdockets, and create a PQ
     object for each additional PDF upload that requires processing.
 
     :param pk: Primary key of the processing queue item.
-    :return: A list of ProcessingQueue pks to process.
+    :return: A two-tuple containing a list of ProcessingQueue pks to process,
+    and a boolean indicating whether the PQ belongs to subdocket replication.
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
-    main_rds = get_main_rds(pq.court_id, pq.pacer_doc_id).exclude(
+    main_rds_qs = get_main_rds(pq.court_id, pq.pacer_doc_id).exclude(
         is_available=True
     )
-    pqs_to_process_pks = [
-        pq.pk
-    ]  # Add the original pq to the list of pqs to process
 
+    subdocket_replication = False
     if await ais_appellate_court(pq.court_id):
         # Abort the process for appellate documents. Subdockets cannot be found
         # in appellate cases.
-        return pqs_to_process_pks
+        return [(pq.pk, subdocket_replication)]
 
     if pq.pacer_case_id:
         # If pq already has a pacer_case_id, exclude it from the queryset.
-        main_rds = main_rds.exclude(
+        main_rds_qs = main_rds_qs.exclude(
             docket_entry__docket__pacer_case_id=pq.pacer_case_id
         )
 
-    pdf_binary_content = pq.filepath_local.read()
+    main_rds = [rd async for rd in main_rds_qs]
+    remaining_rds = main_rds
+    if not pq.pacer_case_id and main_rds:
+        # If the original PQ does not have a pacer_case_id,
+        # assign it a pacer_case_id from one of the matched RDs
+        # to ensure the RD lookup in process_recap_pdf succeeds.
+        first_rd, remaining_rds = main_rds[0], main_rds[1:]
+        pq.pacer_case_id = first_rd.docket_entry.docket.pacer_case_id
+        await pq.asave()
+        # Return subdocket_replication=True to prevent updating the RECAPDocument
+        # using PQ metadata, since the pacer_case_id is unknown.
+        subdocket_replication = True
+
+    pqs_to_process_pks = [
+        (pq.pk, subdocket_replication)
+    ]  # Add the original pq to the list of pqs to process
 
     pqs_to_create = []
-    main_rds = [rd async for rd in main_rds]
-    for i, main_rd in enumerate(main_rds):
-        if i == 0 and not pq.pacer_case_id:
-            # If the original PQ does not have a pacer_case_id,
-            # assign it a pacer_case_id from one of the matched RDs
-            # to ensure the RD lookup in process_recap_pdf succeeds.
-            pq.pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
-            await pq.asave()
-            continue
-
+    pdf_binary_content = pq.filepath_local.read()
+    for main_rd in remaining_rds:
         main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
         # Create additional pqs for each subdocket case found.
         pqs_to_create.append(
@@ -840,9 +859,12 @@ async def find_subdocket_pdf_rds(
             )
         )
 
+    subdocket_replication = True
     if pqs_to_create:
         pqs_created = await ProcessingQueue.objects.abulk_create(pqs_to_create)
-        pqs_to_process_pks.extend([pq.pk for pq in pqs_created])
+        pqs_to_process_pks.extend(
+            [(pq.pk, subdocket_replication) for pq in pqs_created]
+        )
 
     return pqs_to_process_pks
 
@@ -851,6 +873,7 @@ async def process_recap_attachment(
     pk: int,
     tag_names: list[str] | None = None,
     document_number: int | None = None,
+    subdocket_replication: bool = False,
 ) -> tuple[int, str, list[RECAPDocument]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
@@ -859,6 +882,7 @@ async def process_recap_attachment(
     modified in this function.
     :param document_number: The main RECAP document number. If provided use it
     to merge the attachments instead of using the one from the attachment page.
+    :param subdocket_replication: Whether this process is related to subdocket replication.
     :return: Tuple indicating the status of the processing and a related
     message
     """
@@ -884,6 +908,7 @@ async def process_recap_attachment(
             text,
             att_data["attachments"],
             pq.debug,
+            subdocket_replication=subdocket_replication,
         )
     except RECAPDocument.MultipleObjectsReturned:
         msg = (
@@ -1951,11 +1976,6 @@ def fetch_pacer_doc_by_rd_base(
         self.request.chain = None
         return
 
-    if rd.is_acms_document():
-        msg = "ACMS documents are not currently supported"
-        mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
-        return
-
     session_data = get_pacer_cookie_from_cache(fq.user_id)
     if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
@@ -1965,15 +1985,24 @@ def fetch_pacer_doc_by_rd_base(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
+    court_id = rd.docket_entry.docket.court_id
     try:
-        r, r_msg = download_pacer_pdf_by_rd(
-            rd.pk,
-            pacer_case_id,
-            pacer_doc_id,
-            session_data,
-            magic_number,
-            de_seq_num=de_seq_num,
-        )
+        if rd.is_acms_document():
+            r, r_msg = download_acms_pdf_by_rd(
+                court_id=court_id,
+                acms_entry_id=rd.pacer_doc_id,
+                acms_doc_id=rd.acms_document_guid,
+                session_data=session_data,
+            )
+        else:
+            r, r_msg = download_pacer_pdf_by_rd(
+                rd.pk,
+                pacer_case_id,
+                pacer_doc_id,
+                session_data,
+                magic_number,
+                de_seq_num=de_seq_num,
+            )
     except (requests.RequestException, HTTPError):
         msg = "Failed to get PDF from network."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
@@ -1990,8 +2019,6 @@ def fetch_pacer_doc_by_rd_base(
             fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
         )
         raise self.retry(exc=exc)
-
-    court_id = rd.docket_entry.docket.court_id
 
     pdf_bytes = None
     if r:
@@ -2104,7 +2131,7 @@ def fetch_pacer_doc_by_rd_and_mark_fq_completed(
     ignore_result=True,
 )
 @transaction.atomic
-def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
+def fetch_attachment_page(self: Task, fq_pk: int) -> list[tuple[int, bool]]:
     """Fetch a PACER attachment page by rd_pk
 
     This is very similar to process_recap_attachment, except that it manages
@@ -2112,7 +2139,9 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
 
     :param self: The celery task
     :param fq_pk: The PK of the RECAP Fetch Queue to update.
-    :return: A list of PQ IDs that require replication to sub-dockets.
+    :return: A two-tuple containing a list of ProcessingQueue pks to replicate
+    to subdockcets and a boolean indicating whether the PQ belongs to subdocket
+    replication.
     """
 
     fq = PacerFetchQueue.objects.get(pk=fq_pk)
@@ -2278,17 +2307,26 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> list[int]:
     ignore_result=True,
 )
 def replicate_fq_att_page_to_subdocket_rds(
-    self: Task, pq_ids_to_process: list[int]
+    self: Task, pq_ids_to_process: list[tuple[int, bool] | int]
 ) -> None:
     """Replicate Attachment page to subdocket RECAPDocuments.
 
     :param self: The celery task
-    :param pq_ids_to_process: A list of PQ IDs that require replication to sub-dockets.
+    :param pq_ids_to_process: A two-tuple containing a list of ProcessingQueue
+    pks to process, and a boolean indicating whether the PQ belongs to subdocket
+    replication.
     :return: None
     """
 
     for pq_pk in pq_ids_to_process:
-        async_to_sync(process_recap_attachment)(pq_pk)
+        # TODO: Remove backward compatibility logic once this is deployed.
+        if isinstance(pq_pk, tuple):
+            pq, subdocket_replication = pq_pk
+            async_to_sync(process_recap_attachment)(
+                pq, subdocket_replication=subdocket_replication
+            )
+        else:
+            async_to_sync(process_recap_attachment)(pq_pk)
 
 
 @app.task(
@@ -3576,5 +3614,5 @@ def process_recap_email(
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
         process_recap_email.si(epq.pk, user.pk),
-        extract_recap_pdf.s(),
+        extract_pdf_document.s(),
     ).apply_async()

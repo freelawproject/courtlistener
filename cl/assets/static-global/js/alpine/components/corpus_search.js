@@ -6,6 +6,9 @@ const fieldsetIdSeeds = {
 };
 
 document.addEventListener('alpine:init', () => {
+  /** STORE
+   * Values are shared across component instances.
+   * */
   Alpine.store('corpusSearch', {
     scopeMenuExpanded: false,
     selected: 'Case Law',
@@ -42,19 +45,22 @@ document.addEventListener('alpine:init', () => {
       return this.searchScopes[index];
     },
   });
+
+  /** DATA
+   * Each component instance has its own values.
+   * */
   Alpine.data('search', () => ({
+    ...createUtils(),
     advancedFiltersExpanded: false,
+    advancedFiltersExpandedDesktop: false,
     get scopeMenuExpanded() {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
     get selectedScope() {
-      return this.$store.corpusSearch.selected;
+      return this.$store.corpusSearch.selectedScope;
     },
     get keywordQuery() {
       return this.$store.corpusSearch.keywordQuery;
-    },
-    get selectedScopeType() {
-      return this.$store.corpusSearch.selectedScope.type;
     },
     get searchScopes() {
       return this.$store.corpusSearch.searchScopes;
@@ -117,6 +123,14 @@ document.addEventListener('alpine:init', () => {
     updateKeyword(event) {
       this.$store.corpusSearch.keywordQuery = event.target.value;
     },
+    toggleAdvancedFiltersDesktop() {
+      this.advancedFiltersExpandedDesktop = !this.advancedFiltersExpandedDesktop;
+    },
+    closeAdvancedFiltersDesktopIfOpen() {
+      if (this.advancedFiltersExpandedDesktop) {
+        this.advancedFiltersExpandedDesktop = false;
+      }
+    },
     toggleAdvancedFilters() {
       this.advancedFiltersExpanded = !this.advancedFiltersExpanded;
     },
@@ -139,6 +153,10 @@ document.addEventListener('alpine:init', () => {
       this.$store.corpusSearch.selected = this.$el.dataset?.scope;
       this.closeScopeMenu();
     },
+
+    /**
+     * Enable fieldset for selected scope, and disable the rest.
+     *  */
     updateFieldsets(newSelected) {
       const updateFieldset = (scope) => {
         const fieldsetId = this.$id(scope.fieldset);
@@ -149,16 +167,27 @@ document.addEventListener('alpine:init', () => {
       };
       this.searchScopes.forEach((scope) => updateFieldset(scope));
     },
+
+    /**
+     * Disable empty fields to avoid unnecessary query params in search.
+     * Also disable inputs that are within the form but flagged to be ignored (e.g. date selector radio buttons to select date type)
+     *  */
     onSubmit() {
-      Array.from(this.$el.elements).forEach((el) => {
-        const isInput = ['INPUT', 'SELECT'].includes(el.tagName);
-        if (isInput && !el.value.trim()) {
+      const formInputs = Array.from(this.$el.elements).filter((el) => ['INPUT', 'SELECT'].includes(el.tagName));
+      formInputs.forEach((el) => {
+        const isEmpty = !el.value.trim();
+        const shouldIgnore = el.dataset?.ignoreInput === 'true';
+        if (isEmpty || shouldIgnore) {
           el.setAttribute('disabled', 'disabled');
         }
       });
     },
+
     init() {
-      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal));
+      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal.label));
+      this.onBreakpointChange(() => {
+        this.advancedFiltersExpandedDesktop = false;
+      });
     },
   }));
 });

@@ -31,6 +31,29 @@
   <h1 id="about">REST API Change Log</h1>
   <ul>
     <li>
+      <p><strong>v4.4</strong> — Adds bankruptcy information support. This release introduces:</p>
+      <ul>
+        <li>A new <code>bankruptcy_information</code> field in the <a href="{% url "pacer_api_help" %}#docket-endpoint">/dockets</a> endpoint that links to detailed bankruptcy metadata when available.</li>
+        <li>A new <a href="{% url "pacer_api_help" %}#bankruptcy-information-endpoint">/bankruptcy-information</a> endpoint providing access to bankruptcy-specific data including chapter, trustee information, and key dates.</li>
+      </ul>
+    </li>
+    <li>
+      <p><strong>v4.3</strong> — Enhances security by enforcing authentication in V4 API endpoints. Anonymous requests
+        now receive a <code>401 Unauthorized</code> response. This change affects the following endpoints:
+      <ul>
+        <!-- Search -->
+        <li>
+          <a href="{% url "pacer_api_help" %}#docket-endpoint">/dockets</a>
+        </li>
+        <li>
+          <a href="{% url "case_law_api_help" %}#cluster-endpoint">/opinion-clusters</a>
+        </li>
+        <li>
+          <a href="{% url "case_law_api_help" %}#opinion-endpoint">/opinions</a>
+        </li>
+      </ul>
+    </li>
+    <li>
       <p><strong>v4.2</strong> — Enhances support for <a href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> in nested resources via the <code>fields</code> and <code>omit</code> parameters to reduce payload size and improve response times. Clients can now select nested fields (e.g. <code>fields=educations__date_modified</code>) or
         exclude them (e.g. <code>omit=recap_documents__plain_text</code>), allowing fine-grained control over serialized nested data.
       (<a href="https://github.com/freelawproject/courtlistener/issues/5748">Issue #5748</a>, <a

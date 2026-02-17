@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% load extras %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_judge-api-docs-vlatest.html                         ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}Judge APIs for Federal and State Judges and Justices – CourtListener.com{% endblock %}
 {% block og_title %}Judge APIs for Federal and State Judges and Justices – CourtListener.com{% endblock %}
 
@@ -57,7 +70,7 @@
   </p>
   <p>This data set is person-centric. All data links back to a particular person.
   </p>
-  <p>To learn more about this data, see <a href="https://free.law/projects/judge-db">our page about it on Free.law</a>.
+  <p>To learn more about this data, see <a href="https://free.law/datasets#judges-db">our page about it on Free.law</a>.
   </p>
   <p>The available APIs include:</p>
   <ul>
@@ -112,7 +125,7 @@
       </p>
     </li>
     <li>
-      <p>The <code>has_photo</code> field indicates whether we have a photo for the judge in <a href="https://free.law/projects/judge-pics">our database of judge portraits</a>.
+      <p>The <code>has_photo</code> field indicates whether we have a photo for the judge in <a href="https://free.law/datasets#judges-portraits">our database of judge portraits</a>.
       </p>
     </li>
     <li>

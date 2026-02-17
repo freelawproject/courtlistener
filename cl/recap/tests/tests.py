@@ -111,6 +111,7 @@ from cl.recap.models import (
 from cl.recap.tasks import (
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
+    download_acms_pdf_by_rd,
     download_pacer_pdf_by_rd,
     fetch_appellate_docket,
     fetch_pacer_doc_by_rd,
@@ -1437,7 +1438,7 @@ class ReplicateRecapUploadsTest(TestCase):
             ],
             pacer_doc_id="04505578697",
             pacer_case_id="104491",
-            document_number="1",
+            document_number="2",
         )
         cls.de_data_2 = DocketEntriesDataFactory(
             docket_entries=[
@@ -1611,31 +1612,54 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
         att_1_data = self.att_data_2["attachments"][0]
-        att_2_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][1]
 
+        d_1_1_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_1_2_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_1_2_attachment.attachment_number,
             att_2_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_2_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_2_1_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_2_1_attachment.document_number,
+            self.att_data_2["document_number"],
+        )
+
+        d_2_2_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_2_attachment.attachment_number,
             att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_2_attachment.document_number,
+            self.att_data_2["document_number"],
         )
 
         # Assert the number of PQs created to process the additional subdocket RDs.
@@ -1737,7 +1761,7 @@ class ReplicateRecapUploadsTest(TestCase):
             msg="Didn't get the expected docket ID.",
         )
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_upload(self, mock_extract):
         """Can we duplicate a PDF document upload from a subdocket case to the
         corresponding RD across all related dockets?
@@ -1785,7 +1809,8 @@ class ReplicateRecapUploadsTest(TestCase):
                     uploader=self.user,
                     pacer_case_id=pacer_case_id,
                     pacer_doc_id="04505578697",
-                    document_number=1,
+                    document_number=5,
+                    attachment_number=2,
                     upload_type=UPLOAD_TYPE.PDF,
                     filepath_local=self.f,
                 )
@@ -1813,6 +1838,36 @@ class ReplicateRecapUploadsTest(TestCase):
                 self.assertTrue(main_d_1_rd.filepath_local)
                 self.assertTrue(main_d_2_rd.filepath_local)
                 self.assertTrue(main_d_3_rd.filepath_local)
+
+                # The document_number is updated in the original upload according to the
+                # PQ metadata.
+                doc_number_to_compare = "1" if pacer_case_id == "" else "5"
+                self.assertEqual(
+                    main_d_2_rd.document_number, doc_number_to_compare
+                )
+                att_number_to_compare = None if pacer_case_id == "" else 2
+                doc_type = (
+                    RECAPDocument.PACER_DOCUMENT
+                    if pacer_case_id == ""
+                    else RECAPDocument.ATTACHMENT
+                )
+                self.assertEqual(
+                    main_d_2_rd.attachment_number, att_number_to_compare
+                )
+                self.assertEqual(main_d_2_rd.document_type, doc_type)
+
+                # In RDs where the document was replicated, the document_number,
+                # attachment_number and document_type must not be updated.
+                self.assertEqual(main_d_1_rd.document_number, "1")
+                self.assertEqual(main_d_1_rd.attachment_number, None)
+                self.assertEqual(
+                    main_d_1_rd.document_type, RECAPDocument.PACER_DOCUMENT
+                )
+                self.assertEqual(main_d_3_rd.document_number, "1")
+                self.assertEqual(main_d_3_rd.attachment_number, None)
+                self.assertEqual(
+                    main_d_3_rd.document_type, RECAPDocument.PACER_DOCUMENT
+                )
 
                 # Assert the number of PQs created to process the additional subdocket RDs.
                 pqs_created = ProcessingQueue.objects.all()
@@ -1849,7 +1904,7 @@ class ReplicateRecapUploadsTest(TestCase):
 
                 transaction.set_rollback(True)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_attachment_upload(
         self, mock_extract
     ):
@@ -2091,31 +2146,54 @@ class ReplicateRecapUploadsTest(TestCase):
         )
 
         att_1_data = self.att_data_2["attachments"][0]
-        att_2_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][1]
 
+        d_1_1_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_1_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_1_2_attachment = d_1_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_1_2_attachment.attachment_number,
             att_2_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_1_2_attachment.document_number,
+            main_d_1_rd.document_number,
+        )
+
+        d_2_1_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_1_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_1_attachment.attachment_number,
             att_1_data["attachment_number"],
         )
         self.assertEqual(
-            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
-            .first()
-            .attachment_number,
+            d_2_1_attachment.document_number,
+            self.att_data_2["document_number"],
+        )
+
+        d_2_2_attachment = d_2_attachments.filter(
+            pacer_doc_id=att_2_data["pacer_doc_id"]
+        ).first()
+        self.assertEqual(
+            d_2_2_attachment.attachment_number,
             att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_2_attachment.document_number,
+            self.att_data_2["document_number"],
         )
 
         # Assert the number of PQs created to process the additional subdocket RDs.
@@ -2279,7 +2357,7 @@ class ReplicateRecapUploadsTest(TestCase):
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
     )
-    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
     def test_replicate_subdocket_pdf_from_fq(
         self,
         mock_extract,
@@ -2379,7 +2457,7 @@ class ReplicateRecapUploadsTest(TestCase):
         # Confirm that the 3 PDFs have been extracted.
         self.assertEqual(mock_extract.call_count, 3)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_avoid_replication_on_pdf_available(self, mock_extract):
         """Confirm that replication for RDs where the PDF is already available is omitted"""
         # Add the docket entry to every case.
@@ -2455,14 +2533,15 @@ class RecapDocketFetchApiTest(TestCase):
     and API tests from the processing logic tests.
     """
 
-    COURT = "scotus"
-
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.district_court = CourtFactory(
+            id="cacd", jurisdiction=Court.FEDERAL_DISTRICT
+        )
         cls.user_profile = UserProfileWithParentsFactory()
         cls.docket = DocketFactory(
             source=Docket.RECAP,
-            court_id=cls.COURT,
+            court_id=cls.district_court.pk,
             pacer_case_id="104490",
             docket_number=fakes.DOCKET_NUMBER,
             case_name=fakes.CASE_NAME,
@@ -2502,7 +2581,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             docket_number=fakes.DOCKET_NUMBER,
         )
         result = do_pacer_fetch(fq)
@@ -2521,7 +2600,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             pacer_case_id="104490",
         )
         result = do_pacer_fetch(fq)
@@ -2805,7 +2884,7 @@ class RecapDocketFetchApiTest(TestCase):
         fq = PacerFetchQueue.objects.create(
             user=self.user,
             request_type=REQUEST_TYPE.DOCKET,
-            court_id=self.COURT,
+            court_id=self.district_court.pk,
             docket_number=fakes.DOCKET_NUMBER,
         )
         result = do_pacer_fetch(fq)
@@ -3173,6 +3252,32 @@ class RecapPdfFetchApiTest(TestCase):
             recap_document_id=self.appellate_rd.pk,
         )
 
+        self.acms_court = CourtFactory(
+            id="ca9", jurisdiction=Court.FEDERAL_APPELLATE
+        )
+        self.acms_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.acms_court,
+            pacer_case_id="96ddd1a0-c782-407e-9fa0-5be99d680d09",
+        )
+        self.acms_rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(
+                docket=self.acms_docket, entry_number=2
+            ),
+            document_number="2",
+            pacer_doc_id="495a4869-8683-f011-b4cc-001dd803d7d3",
+            acms_document_guid="",
+            is_available=False,
+            page_count=2,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            ocr_status=4,
+        )
+        self.acms_fq = PacerFetchQueue.objects.create(
+            user=User.objects.get(username="recap"),
+            request_type=REQUEST_TYPE.PDF,
+            recap_document_id=self.acms_rd.pk,
+        )
+
     def tearDown(self) -> None:
         RECAPDocument.objects.update(is_available=True)
         self.rd.refresh_from_db()
@@ -3186,6 +3291,10 @@ class RecapPdfFetchApiTest(TestCase):
         side_effect=clobbering_get_name,
     )
     @mock.patch(
+        "cl.recap.tasks.download_acms_pdf_by_rd",
+        wraps=download_acms_pdf_by_rd,
+    )
+    @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
         wraps=download_pacer_pdf_by_rd,
     )
@@ -3193,12 +3302,13 @@ class RecapPdfFetchApiTest(TestCase):
         "cl.corpus_importer.tasks.is_appellate_court",
         wraps=is_appellate_court,
     )
-    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
     def test_fetch_unavailable_pdf_district(
         self,
         mock_extract,
         mock_court_check,
         mock_download_method,
+        mock_acms_download_method,
         mock_get_name,
         mock_court_accessible,
         mock_get_cookies,
@@ -3226,6 +3336,7 @@ class RecapPdfFetchApiTest(TestCase):
         # Verify court validation calls with expected court ID
         court_id = self.district_court.id
         mock_court_check.assert_called_with(court_id)
+        mock_acms_download_method.assert_not_called()
 
         self.fq.refresh_from_db()
         self.rd.refresh_from_db()
@@ -3266,6 +3377,10 @@ class RecapPdfFetchApiTest(TestCase):
         side_effect=clobbering_get_name,
     )
     @mock.patch(
+        "cl.recap.tasks.download_acms_pdf_by_rd",
+        wraps=download_acms_pdf_by_rd,
+    )
+    @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
         wraps=download_pacer_pdf_by_rd,
     )
@@ -3277,6 +3392,7 @@ class RecapPdfFetchApiTest(TestCase):
         self,
         mock_court_check,
         mock_download_method,
+        mock_acms_download_method,
         mock_get_name,
         mock_court_accessible,
         mock_get_cookies,
@@ -3304,6 +3420,7 @@ class RecapPdfFetchApiTest(TestCase):
         # Verify court validation calls with expected court ID
         court_id = self.appellate_court.id
         mock_court_check.assert_called_with(court_id)
+        mock_acms_download_method.assert_not_called()
 
         self.appellate_fq.refresh_from_db()
         self.appellate_rd.refresh_from_db()
@@ -3312,26 +3429,52 @@ class RecapPdfFetchApiTest(TestCase):
         )
         self.assertTrue(self.appellate_rd.is_available)
 
-    def test_avoid_purchasing_acms_document(
-        self, mock_court_accessible, mock_get_cookies
+    @mock.patch(
+        "cl.corpus_importer.tasks.ACMSDocketReport",
+        new=fakes.FakeFreeOpinionReport,
+    )
+    @mock.patch(
+        "cl.lib.storage.get_name_by_incrementing",
+        side_effect=clobbering_get_name,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_acms_pdf_by_rd",
+        wraps=download_acms_pdf_by_rd,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pacer_pdf_by_rd",
+        wraps=download_pacer_pdf_by_rd,
+    )
+    def test_fetch_unavailable_pdf_acms(
+        self,
+        mock_download_method,
+        mock_acms_download_method,
+        mock_get_name,
+        mock_court_accessible,
+        mock_get_cookies,
     ):
-        rd_acms = RECAPDocumentFactory(
-            docket_entry=DocketEntryFactory(docket=DocketFactory()),
-            pacer_doc_id="784459c4-e2cd-ef11-b8e9-001dd804c0b4",
-        )
-        fq_acms = PacerFetchQueue.objects.create(
-            user=User.objects.get(username="recap"),
-            request_type=REQUEST_TYPE.PDF,
-            recap_document_id=rd_acms.pk,
-        )
-        fetch_pacer_doc_by_rd(rd_acms.pk, fq_acms.pk)
+        """Can we fetch a PDF from ACMS?"""
+        self.acms_rd.is_available = False
+        self.acms_rd.save()
 
-        fq_acms.refresh_from_db()
-        self.assertEqual(fq_acms.status, PROCESSING_STATUS.FAILED)
-        self.assertIn(
-            "ACMS documents are not currently supported",
-            fq_acms.message,
+        self.assertFalse(self.acms_rd.is_available)
+        result = do_pacer_fetch(self.acms_fq)
+        result.get()
+
+        # Verify that the download helper is invoked exactly once (ideal
+        # scenario) with the anticipated district record data.
+        mock_download_method.assert_not_called()
+        mock_acms_download_method.assert_called_once_with(
+            court_id=self.acms_court.pk,
+            acms_entry_id=self.acms_rd.pacer_doc_id,
+            acms_doc_id=self.acms_rd.acms_document_guid,
+            session_data=ANY,
         )
+
+        self.acms_fq.refresh_from_db()
+        self.acms_rd.refresh_from_db()
+        self.assertEqual(self.acms_fq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertTrue(self.acms_rd.is_available)
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
@@ -3770,7 +3913,7 @@ class DebugRecapUploadtest(TestCase):
         DocketEntry.objects.all().delete()
         RECAPDocument.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     @mock.patch(
         "cl.lib.storage.get_name_by_incrementing",
         side_effect=clobbering_get_name,
@@ -3885,7 +4028,7 @@ class RecapPdfTaskTest(TestCase):
     def test_pq_has_default_status(self) -> None:
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_recap_document_already_exists(self, mock_extract):
         """We already have everything"""
         # Update self.rd so it looks like it is already all good.
@@ -3931,7 +4074,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertEqual(self.pq.docket_entry_id, None)
         self.assertEqual(self.pq.recap_document_id, None)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
+    @mock.patch("cl.recap.tasks.extract_pdf_document.si")
     def test_docket_and_docket_entry_already_exist(self, mock_extract):
         """What happens if we have everything but the PDF?
 
@@ -3979,7 +4122,7 @@ class RecapPdfTaskTest(TestCase):
         self.pq.filepath_local.save(self.filename_ocr, cf)
         rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         recap_document = RECAPDocument.objects.get(pk=rd.pk)
-        self.assertEqual(needs_ocr(recap_document.plain_text), False)
+        self.assertEqual(needs_ocr(recap_document.plain_text), True)
         self.assertEqual(recap_document.ocr_status, RECAPDocument.OCR_COMPLETE)
 
 
@@ -4034,7 +4177,7 @@ class RecapZipTaskTest(TestCase):
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
+    @mock.patch("cl.recap.tasks.extract_pdf_document.si")
     def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
@@ -4387,6 +4530,10 @@ class TerminatedEntitiesTest(TestCase):
         self.assertEqual(self.d.parties.count(), count_before)
 
 
+@mock.patch(
+    "cl.recap_rss.tasks.rss_cache_prefix",
+    return_value="rss_hash_test",
+)
 class RecapMinuteEntriesTest(TestCase):
     """Can we ingest minute and numberless entries properly?"""
 
@@ -4409,6 +4556,13 @@ class RecapMinuteEntriesTest(TestCase):
             upload_type=upload_type,
         )
 
+    @classmethod
+    def clean_rss_redis_cache(cls):
+        r = get_redis_interface("CACHE")
+        key = r.keys("rss_hash_test:*")
+        if key:
+            r.delete(*key)
+
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
 
@@ -4418,8 +4572,11 @@ class RecapMinuteEntriesTest(TestCase):
             pq.filepath_local.delete()
             pq.delete()
         Docket.objects.all().delete()
+        self.clean_rss_redis_cache()
 
-    def test_all_entries_ingested_without_duplicates(self) -> None:
+    def test_all_entries_ingested_without_duplicates(
+        self, mock_rss_cache_key
+    ) -> None:
         """Are all of the docket entries ingested?"""
         expected_entry_count = 23
 
@@ -4434,7 +4591,9 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
 
-    def test_multiple_numberless_entries_multiple_times(self) -> None:
+    def test_multiple_numberless_entries_multiple_times(
+        self, mock_rss_cache_key
+    ) -> None:
         """Do we get the right number of entries when we add multiple
         numberless entries multiple times?
         """
@@ -4450,7 +4609,7 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d1.pk, d2.pk)
         self.assertEqual(d2.docket_entries.count(), expected_entry_count)
 
-    def test_appellate_cases_ok(self) -> None:
+    def test_appellate_cases_ok(self, mock_rss_cache_key) -> None:
         """Do appellate cases get ordered/handled properly?"""
         expected_entry_count = 16
         pq = self.make_pq("ca1.html", upload_type=UPLOAD_TYPE.APPELLATE_DOCKET)
@@ -4458,7 +4617,7 @@ class RecapMinuteEntriesTest(TestCase):
         d1 = Docket.objects.get(pk=returned_data["docket_pk"])
         self.assertEqual(d1.docket_entries.count(), expected_entry_count)
 
-    def test_rss_feed_ingestion(self) -> None:
+    def test_rss_feed_ingestion(self, mock_rss_cache_key) -> None:
         """Can we ingest RSS feeds without creating duplicates?"""
         court_id = "scotus"
         rss_feed = PacerRssFeed(court_id)
@@ -4484,7 +4643,9 @@ class RecapMinuteEntriesTest(TestCase):
         async_to_sync(add_docket_entries)(d, docket["docket_entries"])
         self.assertEqual(d.docket_entries.count(), expected_count)
 
-    def test_dhr_merges_separate_docket_entries(self) -> None:
+    def test_dhr_merges_separate_docket_entries(
+        self, mock_rss_cache_key
+    ) -> None:
         """Does the docket history report merge separate minute entries if
         one entry has a short description, and the other has a long
         description?
@@ -4536,7 +4697,9 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(d.docket_entries.count(), expected_item_count)
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
-    def test_appellate_rss_feed_ingestion(self, mock_enqueue_de) -> None:
+    def test_appellate_rss_feed_ingestion(
+        self, mock_enqueue_de, mock_rss_cache_key
+    ) -> None:
         """Can we ingest Appellate RSS feeds?"""
 
         court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
@@ -4553,7 +4716,7 @@ class RecapMinuteEntriesTest(TestCase):
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
     def test_appellate_merge_rss_feed_with_case_id(
-        self, mock_enqueue_de
+        self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
         """Can we merge an Appellate RSS feeds into an existing docket with
         pacer_case_id?
@@ -4580,7 +4743,7 @@ class RecapMinuteEntriesTest(TestCase):
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
     def test_appellate_merge_rss_feed_no_case_id(
-        self, mock_enqueue_de
+        self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
         """Can we merge an Appellate RSS feeds into a docket with no
         pacer_case_id?
@@ -4607,7 +4770,7 @@ class RecapMinuteEntriesTest(TestCase):
 
     @mock.patch("cl.recap_rss.tasks.enqueue_docket_alert")
     def test_retain_existing_values_in_absent_rss_fields(
-        self, mock_enqueue_de
+        self, mock_enqueue_de, mock_rss_cache_key
     ) -> None:
         """Confirm that when 'assigned_to_str' and 'referred_to_str' fields
         are not present in an RSS Feed, pre-existing values in these fields are
@@ -4635,7 +4798,9 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(docket.assigned_to_str, "John Marshall")
         self.assertEqual(docket.referred_to_str, "Sophia Clinton")
 
-    def test_avoid_deleting_short_description(self) -> None:
+    def test_avoid_deleting_short_description(
+        self, mock_rss_cache_key
+    ) -> None:
         """Test that merging identical docket entries without a
         short_description does not delete or overwrite the existing short_description
         """
@@ -4673,6 +4838,41 @@ class RecapMinuteEntriesTest(TestCase):
         rd = RECAPDocument.objects.all().first()
         self.assertEqual(d.docket_entries.count(), 1)
         self.assertEqual(rd.description, "Case termination for COA")
+
+    def test_rss_ingestion_cache(self, mock_rss_cache_key) -> None:
+        """Test that cached (already seen) RSS items are skipped during the RSS
+        ingestion process.
+        """
+        court = CourtFactory(id="ca10", jurisdiction="F")
+        rss_feed = PacerRssFeed(court.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            rss_text = f.read().decode()
+        rss_feed._parse_text(rss_text)
+        rss_data = rss_feed.data
+        rss_data_2 = deepcopy(rss_data)
+
+        with mock.patch(
+            "cl.recap_rss.tasks.find_docket_object",
+            side_effect=find_docket_object,
+        ) as mock_find_docket:
+            # First ingestion: should process all 3 items
+            merge_rss_feed_contents(rss_data, court.pk)
+            first_call_count = mock_find_docket.call_count
+            self.assertEqual(
+                first_call_count, 3, "Should process 3 items on first pass"
+            )
+            self.assertEqual(Docket.objects.count(), 3)
+
+            # Second ingestion. No entries should be processed since they are
+            # in the cache.
+            merge_rss_feed_contents(rss_data_2, court.pk)
+
+            # Assert no additional calls on second pass
+            self.assertEqual(
+                mock_find_docket.call_count,
+                first_call_count,
+                "Second pass should not attempt to resolve any dockets",
+            )
 
 
 class DescriptionCleanupTest(SimpleTestCase):
@@ -5700,6 +5900,10 @@ class RecapCriminalDataUploadTaskTest(TestCase):
 
 
 class RecapAttachmentPageTaskTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
+
     def setUp(self) -> None:
         user = User.objects.get(username="recap")
         self.filename = "cand.html"
@@ -5711,7 +5915,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         with open(att_path, "rb") as f:
             self.att = SimpleUploadedFile(self.att_filename, f.read())
         self.d = Docket.objects.create(
-            source=0, court_id="scotus", pacer_case_id="asdf"
+            source=0, court=self.court, pacer_case_id="asdf"
         )
         self.de = DocketEntry.objects.create(docket=self.d, entry_number=1)
         RECAPDocument.objects.create(
@@ -5721,7 +5925,7 @@ class RecapAttachmentPageTaskTest(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
         self.pq = ProcessingQueue.objects.create(
-            court_id="scotus",
+            court=self.court,
             uploader=user,
             upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
             filepath_local=self.att,
@@ -5947,7 +6151,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         ]
         self.assertEqual(len(rd_needs_extraction), 2)
 
-        extract_unextracted_rds("celery")
+        extract_unextracted_rds("celery", 10)
 
         rd_needs_extraction_after = [
             x.pk
@@ -5986,7 +6190,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         self.assertEqual(rd[0].sha1, "asdfasdfasdfasdfasdfasddf")
         self.assertEqual(rd[0].date_upload, date_upload)
 
-        extract_unextracted_rds("celery")
+        extract_unextracted_rds("celery", 10)
         # File related fields should be cleaned up after the failed extraction.
         self.assertEqual(rd[0].is_available, False)
         self.assertEqual(rd[0].file_size, None)
