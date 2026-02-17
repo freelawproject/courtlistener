@@ -297,6 +297,8 @@ def check_placeholder_text(lines: list[str]) -> list[tuple[int, str]]:
     pattern = re.compile(
         r"\bTODO\b|\bTBD\b|\bFIXME\b|Lorem ipsum", re.IGNORECASE
     )
+    # Only strips single-line inline comments; multiline <!-- --> blocks
+    # are handled by the in_html_comment state tracker below.
     inline_comment_re = re.compile(r"(<!--.*?-->|\{#.*?#\})")
 
     in_html_comment = False
