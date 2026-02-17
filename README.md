@@ -13,11 +13,11 @@ This repository is organized in the following way:
 
 ## Getting Involved
 
-We love volunteers and work with them regularly. If you want to help further our mission of making a better and more fair legal ecosystem, please see our volunteer information page to get started: 
+We love volunteers and work with them regularly. If you want to help further our mission of making a better and more fair legal ecosystem, please see our volunteer information page to get started:
 
 https://free.law/volunteer/
 
-Also, please note that we assign every issue to *somebody*, so if you find an issue that looks interesting, just chime in and say you want to take it over. Usually we're happy to hand things off! 
+Also, please note that we assign every issue to *somebody*, so if you find an issue that looks interesting, just chime in and say you want to take it over. Usually we're happy to hand things off!
 
 
 ## Contributing code
