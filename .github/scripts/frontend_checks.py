@@ -669,7 +669,8 @@ def format_github(findings: list[Finding]) -> str:
     for f in findings:
         level = f.severity  # "error" or "warning"
         output_lines.append(
-            f"::{level} file={f.file},line={f.line}::[{f.check}] {f.message}"
+            f"::{level} file={f.file},line={f.line}::"
+            f"{f.file}:{f.line} [{f.check}] {f.message}"
         )
     return "\n".join(output_lines)
 
