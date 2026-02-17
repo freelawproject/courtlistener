@@ -134,7 +134,9 @@ async def find_docket_object(
     federal_dn_judge_initials_assigned: str | None,
     federal_dn_judge_initials_referred: str | None,
     using: str = "default",
-) -> Docket:
+    docket_source: int = Docket.RECAP,
+    allow_create: bool = True,
+) -> Docket | None:
     """Attempt to find the docket based on the parsed docket data. If cannot be
     found, create a new docket. If multiple are found, return the oldest.
 
@@ -148,6 +150,9 @@ async def find_docket_object(
     :param federal_dn_judge_initials_referred: The judge's initials referred to
     validate the match.
     :param using: The database to use for the lookup queries.
+    :param docket_source: The source to set when creating a new docket.
+    :param allow_create: Whether to create a new docket if no matching one is
+      found
     :return The docket found or created.
     """
     # Attempt several lookups of decreasing specificity. Note that
@@ -251,10 +256,14 @@ async def find_docket_object(
                 break
     if d is None:
         # Couldn't find a docket. Return a new one.
-        return Docket(
-            source=Docket.RECAP,
-            pacer_case_id=pacer_case_id,
-            court_id=court_id,
+        return (
+            Docket(
+                source=docket_source,
+                pacer_case_id=pacer_case_id,
+                court_id=court_id,
+            )
+            if allow_create
+            else None
         )
 
     if using != "default":

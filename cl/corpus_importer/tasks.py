@@ -68,6 +68,7 @@ from juriscraper.state.texas import (
 )
 from juriscraper.state.texas.common import (
     CourtID,
+    CourtType,
     TexasAppellateBrief,
     TexasCaseDocument,
 )
@@ -3976,7 +3977,24 @@ def merge_texas_docket(
     )
     with transaction.atomic():
         docket_number = docket_data["docket_number"]
-        try:
+        docket = None
+        if docket_data["court_type"] == CourtType.APPELLATE:
+            docket = async_to_sync(find_docket_object)(
+                court_id="texapp",
+                pacer_case_id=None,
+                docket_number=docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                docket_source=Docket.SCRAPER,
+                allow_create=False,
+            )
+            if docket is not None:
+                logger.info(
+                    "Disaggregating Texas appellate docket %s", docket_number
+                )
+                docket.court = court
+        if docket is None:
             docket = async_to_sync(find_docket_object)(
                 court_id=court.pk,
                 pacer_case_id=None,
@@ -3984,33 +4002,9 @@ def merge_texas_docket(
                 federal_defendant_number=None,
                 federal_dn_judge_initials_assigned=None,
                 federal_dn_judge_initials_referred=None,
+                docket_source=Docket.SCRAPER,
+                allow_create=True,
             )
-        except Docket.DoesNotExist:
-            logger.info(
-                "Could not find docket %s in court %s. Creating new Docket.",
-                docket_number,
-                court.pk,
-            )
-            docket_created = True
-            docket = Docket(
-                court_id=court.pk,
-                docket_number=docket_number,
-            )
-        except Docket.MultipleObjectsReturned:
-            logger.error(
-                "Multiple dockets found for court %s with docket number %s. This likely indicates an error in the merging code.",
-                court.pk,
-                docket_number,
-            )
-            return MergeResult.failed()
-        else:
-            logger.info(
-                "Found existing Docket with docket number %s in court %s. Acquiring DB lock for update.",
-                docket_number,
-                court.pk,
-            )
-            docket_created = False
-            Docket.objects.select_for_update().get(pk=docket.pk)
         docket.date_filed = docket_data["date_filed"]
         docket.cause = docket_data["case_type"]
         originating_court_merge_result = merge_texas_docket_originating_court(
@@ -4023,7 +4017,7 @@ def merge_texas_docket(
                 court.pk,
             )
 
-        if docket_data["court_type"] == "texas_appellate":
+        if docket_data["court_type"] == CourtType.APPELLATE.value:
             lower_court_data = docket_data["originating_court"]
             lower_court_id = texas_originating_court_to_court_id(
                 lower_court_data
@@ -4083,15 +4077,13 @@ def merge_texas_docket(
         )
 
     create = (
-        docket_created
-        or party_merge_result.create
+        party_merge_result.create
         or originating_court_merge_result.create
         or merge_case_transfer_result.create
         or any(r.create for r in entry_merge_results)
     )
     update = (
-        not docket_created
-        or party_merge_result.update
+        party_merge_result.update
         or originating_court_merge_result.update
         or merge_case_transfer_result.update
         or any(r.update for r in entry_merge_results)

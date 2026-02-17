@@ -90,7 +90,7 @@ class TexasCommonDataDictFactory(DictFactory):
     )
     court_type = Faker(
         "random_element",
-        elements=("texas_appellate", "texas_final"),
+        elements=(CourtType.APPELLATE.value, CourtType.SUPREME.value),
     )
     # Not correct, but close enough
     docket_number = Faker("federal_district_docket_number")
@@ -176,7 +176,7 @@ class TexasAppellateTransferDictFactory(DictFactory):
 class TexasCourtOfAppealsDocketDictFactory(TexasCommonDataDictFactory):
     """Factory for Texas Court of Appeals docket data."""
 
-    court_type = "texas_appellate"
+    court_type = CourtType.APPELLATE.value
     court_id = Faker(
         "random_element",
         elements=(
@@ -200,7 +200,7 @@ class TexasCourtOfAppealsDocketDictFactory(TexasCommonDataDictFactory):
 class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
     """Factory for Texas Supreme Court and Court of Criminal Appeals docket data."""
 
-    court_type = "texas_final"
+    court_type = CourtType.SUPREME.value
     appeals_court = SubFactory(TexasAppellateCourtInfoDictFactory)
     court_id = Faker(
         "random_element",
