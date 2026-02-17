@@ -25,7 +25,7 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 from juriscraper.state.texas import (
     TexasCaseParty,
 )
-from juriscraper.state.texas.common import CourtID
+from juriscraper.state.texas.common import CourtID, CourtType
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -2859,14 +2859,11 @@ class TexasMergerTest(TestCase):
         texas_district = CourtFactory.create(id="texdistct6")
 
         originating_court = TexasOriginatingDistrictCourtDictFactory(
-            court_type="texas_district",
             district=5,
-            case="2023-12345",
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
             docket_number=self.docket_number_coa1,
-            date_filed=date(2025, 1, 15),
             originating_court=originating_court,
             transfer_from=None,
         )
@@ -2898,12 +2895,10 @@ class TexasMergerTest(TestCase):
         )
         transfer_from = TexasAppellateTransferDictFactory(
             court_id=CourtID.SECOND_COURT_OF_APPEALS.value,
-            date=date(2025, 1, 10),
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
             docket_number=self.docket_number_coa1,
-            date_filed=date(2025, 1, 15),
             originating_court=originating_court,
             transfer_from=transfer_from,
         )
@@ -3030,7 +3025,7 @@ class TexasMergerTest(TestCase):
     def test_merge_texas_case_transfers_no_trial_court_info(self):
         """Do we handle appellate cases without trial court info?"""
         originating_court = TexasOriginatingCourtDictFactory(
-            court_type="texas_unknown",
+            court_type=CourtType.UNKNOWN.value,
             case="",
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(
@@ -3059,7 +3054,6 @@ class TexasMergerTest(TestCase):
         )
 
         originating_court = TexasOriginatingDistrictCourtDictFactory(
-            court_type="texas_district",
             district=5,
             case=transfer.origin_docket_number,
         )
@@ -3083,7 +3077,6 @@ class TexasMergerTest(TestCase):
         """Does merge_texas_docket set appeal_from for appellate courts?"""
         texas_district = CourtFactory.create(id="texdistct6")
         originating_court = TexasOriginatingDistrictCourtDictFactory(
-            court_type="texas_district",
             district=5,
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(

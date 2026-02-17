@@ -5,7 +5,7 @@ import random
 from factory import DictFactory, Faker, List, SubFactory
 from factory.declarations import LazyAttribute
 from factory.django import DjangoModelFactory
-from juriscraper.state.texas.common import CourtID
+from juriscraper.state.texas.common import CourtID, CourtType
 
 from cl.search.factories import DocketFactory
 from cl.search.models import TexasDocketEntry, TexasDocument
@@ -37,16 +37,15 @@ class TexasCasePartyDictFactory(DictFactory):
 
 class TexasOriginatingCourtDictFactory(DictFactory):
     name = Faker("court_name")
-    # TODO Replace the literals with values from Juriscraper when the dependency is updated
     court_type = Faker(
         "random_element",
         elements=(
-            "texas_probate",
-            "texas_business",
-            "texas_county",
-            "texas_municipal",
-            "texas_justice",
-            "texas_unknown",
+            CourtType.PROBATE.value,
+            CourtType.BUSINESS.value,
+            CourtType.COUNTY.value,
+            CourtType.MUNICIPAL.value,
+            CourtType.JUSTICE.value,
+            CourtType.UNKNOWN.value,
         ),
     )
     county = Faker("pystr")
@@ -60,17 +59,22 @@ class TexasOriginatingCourtDictFactory(DictFactory):
 class TexasOriginatingAppellateCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
-    court_type = "texas_appellate"
+    court_type = CourtType.APPELLATE.value
     court_id = Faker(
         "random_element",
-        elements=("texas_coa01", "texas_coa02", "texas_coa14", "texas_coa15"),
+        elements=(
+            CourtID.FIRST_COURT_OF_APPEALS.value,
+            CourtID.SECOND_COURT_OF_APPEALS.value,
+            CourtID.FOURTEENTH_COURT_OF_APPEALS.value,
+            CourtID.FIFTEENTH_COURT_OF_APPEALS.value,
+        ),
     )
 
 
 class TexasOriginatingDistrictCourtDictFactory(
     TexasOriginatingCourtDictFactory
 ):
-    court_type = "texas_district"
+    court_type = CourtType.DISTRICT.value
     district = Faker("random_element", elements=list(range(1, 527)) + [None])
 
 
