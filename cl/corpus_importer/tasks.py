@@ -150,6 +150,9 @@ from cl.lib.recap_utils import (
 )
 from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
 from cl.lib.types import TaskData
+from cl.people_db.lookup_utils import (
+    lookup_judge_by_full_name_and_set_attr,
+)
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
 from cl.recap.mergers import (
@@ -3751,7 +3754,19 @@ def merge_texas_docket_originating_court(
     originating_court_information.assigned_to_str = originating_court_data[
         "judge"
     ]
-    # TODO Get judge from PeopleDB to add
+    originating_court_id = texas_originating_court_to_court_id(
+        originating_court_data
+    )
+    # Only update judge if we're able to associate them with a court.
+    if originating_court_id:
+        async_to_sync(lookup_judge_by_full_name_and_set_attr)(
+            item=originating_court_information,
+            target_field="assigned_to",
+            full_name=originating_court_data["judge"],
+            court_id=originating_court_id,
+            event_date=None,
+            require_living_judge=False,
+        )
     originating_court_information.save()
     if created:
         docket.save()
@@ -3962,8 +3977,13 @@ def merge_texas_docket(
     with transaction.atomic():
         docket_number = docket_data["docket_number"]
         try:
-            docket = Docket.objects.get(
-                court_id=court.pk, docket_number=docket_number
+            docket = find_docket_object(
+                court_id=court.pk,
+                pacer_case_id=None,
+                docket_number=docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
             )
         except Docket.DoesNotExist:
             logger.info(
