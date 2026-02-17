@@ -2007,6 +2007,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
             "type=oa&docket_number=19-1010&order_by=score+desc&stat_Published=": False,
             "q=hello": False,
             "filter=value": False,
+            "&highlight=on&semantic=true": True,
         }
 
         for query_string, expected in test_cases.items():

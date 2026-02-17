@@ -210,6 +210,38 @@ class PodcastTest(ESIndexTestCase, TestCase):
         )
         self.assertTrue(pubdate_not_present)
 
+    def test_search_podcast_has_individualized_metadata(self) -> None:
+        """Does the search podcast include query-specific title and
+        description?"""
+        params = {
+            "q": "magnitsky",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
+        response = self.client.get(
+            reverse("search_podcast", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response.status_code)
+        xml_tree = etree.fromstring(response.content)
+
+        # Title should contain the query and CourtListener branding
+        title = xml_tree.xpath("//channel/title")[0].text  # type: ignore
+        self.assertIn("magnitsky", title)
+        self.assertIn("CourtListener", title)
+
+        # Description should contain the query
+        description = xml_tree.xpath("//channel/description")[0].text  # type: ignore
+        self.assertIn("magnitsky", description)
+
+        # iTunes subtitle should also contain the query
+        subtitle = xml_tree.xpath(
+            "//channel/itunes:subtitle",
+            namespaces={
+                "itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
+            },
+        )[0].text  # type: ignore
+        self.assertIn("magnitsky", subtitle)
+
     def test_catch_es_errors(self) -> None:
         """Can we catch es errors and just render an empy podcast?"""
 
