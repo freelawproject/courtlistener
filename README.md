@@ -13,14 +13,11 @@ This repository is organized in the following way:
 
 ## Getting Involved
 
-If you want to get involved, email us with your contact info or take a look through the [issues list][issues]. There are innumerable things we need help with, but we especially are looking for help with:
+We love volunteers and work with them regularly. If you want to help further our mission of making a better and more fair legal ecosystem, please see our volunteer information page to get started: 
 
- - legal research, to fix data errors or other problems (check out the [data-quality label][dq] for some starting points)
- - fixing bugs and building features (most things are written in Python)
- - machine learning or natural language problems.
- - test writing — we always need more and better tests
+https://free.law/volunteer/
 
-In general, we're looking for all kinds of help. Get in touch if you think you have skills we could use or if you have skills you want to learn by improving CourtListener.
+Also, please note that we assign every issue to *somebody*, so if you find an issue that looks interesting, just chime in and say you want to take it over. Usually we're happy to hand things off! 
 
 
 ## Contributing code
