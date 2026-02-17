@@ -8,7 +8,11 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
+
+concurrency:
+  group: frontend-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   frontend-lint:
@@ -28,8 +32,43 @@ jobs:
           git diff --name-status origin/${{ github.base_ref }}...HEAD > changed_files.txt
 
       - name: Run frontend checks
+        id: checks
         run: |
           python .github/scripts/frontend_checks.py \
             --repo-root . \
             --format github \
-            --changed-files changed_files.txt
+            --changed-files changed_files.txt \
+            --summary-file summary.md
+
+      - name: Minimize previous bot comments
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find previous comments with our hidden marker and minimize them
+          gh api \
+            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --paginate \
+            --jq '.[] | select(.body | contains("<!-- frontend-checks-summary -->")) | .node_id' \
+          | while read -r node_id; do
+            [ -z "$node_id" ] && continue
+            gh api graphql -f query='
+              mutation {
+                minimizeComment(input: {subjectId: "'"$node_id"'", classifier: OUTDATED}) {
+                  minimizedComment { isMinimized }
+                }
+              }
+            ' > /dev/null 2>&1 || true
+          done
+
+      - name: Post PR comment
+        if: always() && hashFiles('summary.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body-file summary.md
+
+      - name: Write job summary
+        if: always() && hashFiles('summary.md') != ''
+        run: |
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"

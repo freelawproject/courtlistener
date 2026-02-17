@@ -713,6 +713,44 @@ def format_text(findings: list[Finding]) -> str:
     return "\n".join(output_lines)
 
 
+def format_summary_markdown(findings: list[Finding]) -> str:
+    """Format findings as a markdown summary for PR comments.
+
+    Groups findings by severity (errors first, then warnings) and
+    renders them in a table. Includes a hidden marker comment so the
+    workflow can identify and minimize previous bot comments.
+    """
+    lines = ["<!-- frontend-checks-summary -->"]
+    lines.append("## Frontend Checks Summary")
+    lines.append("")
+
+    errors = [f for f in findings if f.severity == FAIL]
+    warnings = [f for f in findings if f.severity == WARN]
+
+    counts = []
+    if errors:
+        counts.append(f"{len(errors)} error(s)")
+    if warnings:
+        counts.append(f"{len(warnings)} warning(s)")
+    lines.append(f"Found {', '.join(counts)}.")
+    lines.append("")
+
+    for label, group in [("Errors", errors), ("Warnings", warnings)]:
+        if not group:
+            continue
+        lines.append(f"### {label}")
+        lines.append("")
+        lines.append("| File | Line | Check | Message |")
+        lines.append("|------|------|-------|---------|")
+        for f in group:
+            # Escape pipe characters in message
+            msg = f.message.replace("|", "\\|")
+            lines.append(f"| `{f.file}` | {f.line} | {f.check} | {msg} |")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
@@ -737,6 +775,11 @@ def main() -> int:
         choices=["text", "github"],
         default="text",
         help="Output format (default: text)",
+    )
+    parser.add_argument(
+        "--summary-file",
+        default=None,
+        help="Write markdown summary to this file (only if findings exist)",
     )
     args = parser.parse_args()
 
@@ -778,6 +821,12 @@ def main() -> int:
 
     # Sort by severity (errors first), then file, then line
     findings.sort(key=lambda f: (f.severity != FAIL, f.file, f.line))
+
+    # Write markdown summary file if requested
+    if args.summary_file:
+        Path(args.summary_file).write_text(
+            format_summary_markdown(findings), encoding="utf-8"
+        )
 
     if args.format == "github":
         print(format_github(findings))
