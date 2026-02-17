@@ -1491,7 +1491,8 @@ class HarvardMergerTests(TestCase):
         self.assertEqual([1, 4, 5], list(sorted(cluster_ids)))
 
     def test_add_opinions_without_authors_in_cl(self):
-        """Can we add opinion and update authors"""
+        """Can we add opinions and update empty author_str fields via
+        the Harvard merger?"""
 
         cluster = OpinionClusterWithMultipleOpinionsFactory(
             source=SOURCES.COLUMBIA_ARCHIVE,
@@ -1515,13 +1516,13 @@ class HarvardMergerTests(TestCase):
         }
         self.read_json_func.return_value = case_data
 
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-
-        authors = list(author_query)
-
-        self.assertEqual(authors, ["", ""])
+        # Before merge: both opinions should have empty authors
+        opinions = Opinion.objects.filter(cluster_id=cluster.id).order_by(
+            "author_str"
+        )
+        self.assertEqual(
+            list(opinions.values_list("author_str", flat=True)), ["", ""]
+        )
 
         cluster_ids = OpinionCluster.objects.filter(
             docket__source__in=[
@@ -1530,30 +1531,22 @@ class HarvardMergerTests(TestCase):
             filepath_json_harvard__isnull=False,
         ).values_list("id", flat=True)
 
-        for id in cluster_ids:
-            merge_opinion_clusters(cluster_id=id)
+        for cluster_id in cluster_ids:
+            merge_opinion_clusters(cluster_id=cluster_id)
 
         cluster.refresh_from_db()
 
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-
-        authors = list(author_query)
-
+        # After merge: authors should be populated from Harvard data
+        opinions = Opinion.objects.filter(cluster_id=cluster.id).order_by(
+            "author_str"
+        )
+        self.assertEqual(opinions.count(), 2)
         self.assertEqual(
-            Opinion.objects.filter(cluster_id=cluster.id).count(),
-            2,
-            msg="Oops",
+            list(opinions.values_list("author_str", flat=True)),
+            ["Broyles", "Gardner"],
         )
-
-        self.assertNotEqual(
-            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
-        )
-
+        self.assertNotEqual(opinions[0].xml_harvard, "")
         self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
-
-        self.assertEqual(authors, ["Broyles", "Gardner"])
 
     def test_add_opinions_with_authors_in_cl(self):
         """Can we update an opinion and leave author_str alone if already
