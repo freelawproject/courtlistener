@@ -100,7 +100,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="cursor-pagination">
-    <h3>Cursor-based pagination</h3>
+    <h3>Cursor-Based Pagination</h3>
     <p>Our database-powered APIs now support cursor-based pagination. This allows you to crawl very deeply in the API. In v3, any page past 100 was blocked.</p>
   </c-layout-with-navigation.section>
 
@@ -198,7 +198,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="invalid-cursor">
-    <h3>Invalid cursor error code: 404</h3>
+    <h3>Invalid Cursor Error Code: 404</h3>
     <p>A new type of error in the v4 API is <strong>Invalid Cursor</strong> with a 404 status code.</p>
     <p>This can happen when GET parameters are changed without getting a fresh cursor parameter. To prevent this error, do not change the GET parameters while maintaining an existing cursor parameter.</p>
   </c-layout-with-navigation.section>
@@ -208,7 +208,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="enhancements-cursor-pagination">
-    <h3>Search API crawls are no longer limited to 100 pages</h3>
+    <h3>Search API Crawls Are No Longer Limited to 100 Pages</h3>
     <ul>
       <li>Deep pagination of search results is now possible.</li>
       <li>Users cannot directly jump to a specific page. Look at and follow the <code>next</code> and <code>previous</code> parameters provided in each response. Navigation of the API is exclusively through those keys in each API response.</li>
@@ -216,7 +216,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="enhancements-results-sorting">
-    <h3>Result sorting is more consistent</h3>
+    <h3>Result Sorting is More Consistent</h3>
     <ul>
       <li>When sorting the API results, we now add a tie-breaking field to all responses. This ensures that ordering is consistent even when the ordering key has identical values for multiple results.</li>
       <li>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order. For example if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.</li>
@@ -224,25 +224,25 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="enhancements-highlighting">
-    <h3>Highlighting is more consistent</h3>
+    <h3>Highlighting is More Consistent</h3>
     <ul>
       <li>When enabled, highlighting will more consistently highlight the fields in the response.</li>
     </ul>
     </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="enhancements-empty-fields">
-    <h3>Empty fields are standardized</h3>
+    <h3>Empty Fields Are Standardized</h3>
     <ul>
         <li>Empty fields are now more consistent in their response types, and follow the conventions provided by Django. This means that dates, date times, and integers return <code>null</code>, strings return an empty string, and lists return an empty array.</li>
     </ul>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="v4-backwards-incompatible-changes">
-    <h2>Backwards incompatible changes in Search API v4</h2>
+    <h2>Backwards Incompatible Changes in Search API v4</h2>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-estimated-counts">
-    <h3>High query counts are estimated</h3>
+    <h3>High Query Counts Are Estimated</h3>
     <ul>
       <li>To enhance performance, query counts above 2,000 hits are approximate. For queries exceeding this threshold, counts can be off by as much as six percent. We recommend noting this in your interface by saying something like, "About 5,000 results," instead of presenting the value as exact.</li>
     </ul>
@@ -257,14 +257,14 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-nested-keys">
-    <h3>Nested keys (documents) for <code>type=o</code> and <code>type=p</code></h3>
+    <h3>Nested Keys (Documents) for <code>type=o</code> and <code>type=p</code></h3>
     <ul>
       <li>To enhance the structure of the API, sub-opinions are now nested within clusters in case law results (<code>type=o</code>), and <code>positions</code> are nested within judges in judge results (<code>type=p</code>).</li>
     </ul>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-type-r">
-    <h3><code class="text-display-xxs">type=r</code> is now for dockets with nested documents</h3>
+    <h3><code class="text-display-xxs">type=r</code> is Now For Dockets With Nested Documents</h3>
     <ul>
       <li>To align the API results with the front end results, <code>type=r</code> no longer returns a flat list of documents. Instead, it now returns a list of dockets with up to three matching documents nested within each docket's <code>recap_documents</code> key.
       </li>
@@ -276,7 +276,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-type-rd">
-    <h3><code class="text-display-xxs">type=rd</code> is a new result type for documents</h3>
+    <h3><code class="text-display-xxs">type=rd</code> is a New Result Type For Documents</h3>
     <ul>
       <li><code>type=rd</code> returns a flat list of PACER documents, and is similar to <code>type=r</code> in v3 of the API.
         Results for this type can be queried by any docket fields except the <code>party</code> and <code>attorney</code> fields.</li>
@@ -307,14 +307,14 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-type-d">
-    <h3><code class="text-display-xxs">type=d</code> still returns dockets</h3>
+    <h3><code class="text-display-xxs">type=d</code> Still Returns Dockets</h3>
     <ul>
       <li><code>type=d</code> returns dockets without nested documents. If all you need in the response is the docket information, this response type will be significantly faster. You can query document fields with this response type even though they will not be returned.</li>
     </ul>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-removed-fields">
-    <h3>Removed fields</h3>
+    <h3>Removed Fields</h3>
     <ul>
       <li>The following fields have been removed from the case law search results (<code>type=o</code>):</li>
       <ul>
@@ -327,7 +327,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-changed-fields">
-    <h3>Changed field values</h3>
+    <h3>Changed Field Values</h3>
     <ul>
       <li>For legibility, in the case law search results (<code>type=o</code>), some <code>type</code> field values have changed:</li>
       <ul>
@@ -369,7 +369,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-date-times">
-    <h3>Dates and times</h3>
+    <h3>Dates and Times</h3>
     <ul>
       <li>All dates and times are in UTC instead of PST.</li>
       <li>Date objects are now rendered as an ISO-8601 date instead of an ISO-8601 datetime.</li>
@@ -421,7 +421,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-no-random-sorting">
-  <h3>No more random sorting</h3>
+  <h3>No More Random Sorting</h3>
     <ul>
       <li>You can no longer sort the results randomly. This was only used by developers and was difficult to support.</li>
     </ul>
@@ -437,7 +437,7 @@
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-get-params">
-    <h3>Changes to GET parameters</h3>
+    <h3>Changes to GET Parameters</h3>
     <ul>
       <li>When searching the case law status fields, the GET parameters have been changed as follows:</li>
       <ul>
