@@ -4158,3 +4158,4 @@ def parse_texas_docket(
             meta.case_url,
             str(e),
         )
+        return None
