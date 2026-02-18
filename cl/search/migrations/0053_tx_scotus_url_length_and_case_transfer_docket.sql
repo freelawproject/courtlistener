@@ -26,22 +26,22 @@ COMMENT ON COLUMN "search_casetransferevent"."origin_docket_number" IS 'The ID o
 --
 -- Alter field destination_docket on casetransfer
 --
-ALTER TABLE "search_casetransfer" ALTER COLUMN "destination_docket_id" TYPE integer;
+ALTER TABLE "search_casetransfer" ALTER COLUMN "destination_docket_id" TYPE integer, ALTER COLUMN "destination_docket_id" DROP NOT NULL;
 COMMENT ON COLUMN "search_casetransfer"."destination_docket_id" IS 'The docket object in the destination court.';
 --
 -- Alter field origin_docket on casetransfer
 --
-ALTER TABLE "search_casetransfer" ALTER COLUMN "origin_docket_id" TYPE integer;
+ALTER TABLE "search_casetransfer" ALTER COLUMN "origin_docket_id" TYPE integer, ALTER COLUMN "origin_docket_id" DROP NOT NULL;
 COMMENT ON COLUMN "search_casetransfer"."origin_docket_id" IS 'The docket object this transfer originates from.';
 --
 -- Alter field destination_docket on casetransferevent
 --
-ALTER TABLE "search_casetransferevent" ALTER COLUMN "destination_docket_id" TYPE integer;
+ALTER TABLE "search_casetransferevent" ALTER COLUMN "destination_docket_id" TYPE integer, ALTER COLUMN "destination_docket_id" DROP NOT NULL;
 COMMENT ON COLUMN "search_casetransferevent"."destination_docket_id" IS 'The docket object in the destination court.';
 --
 -- Alter field origin_docket on casetransferevent
 --
-ALTER TABLE "search_casetransferevent" ALTER COLUMN "origin_docket_id" TYPE integer;
+ALTER TABLE "search_casetransferevent" ALTER COLUMN "origin_docket_id" TYPE integer, ALTER COLUMN "origin_docket_id" DROP NOT NULL;
 COMMENT ON COLUMN "search_casetransferevent"."origin_docket_id" IS 'The docket object this transfer originates from.';
 --
 -- Alter field url on scotusdocument

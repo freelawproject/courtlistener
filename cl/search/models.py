@@ -4034,6 +4034,7 @@ class CaseTransfer(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_docket",
         blank=True,
+        null=True,
     )
     destination_court = models.ForeignKey(
         "search.Court",
@@ -4046,6 +4047,7 @@ class CaseTransfer(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_docket",
         blank=True,
+        null=True,
     )
     transfer_date = models.DateField()
     transfer_type = models.SmallIntegerField(

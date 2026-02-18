@@ -14,12 +14,12 @@ COMMENT ON COLUMN "search_casetransfer"."origin_docket_number" IS 'The ID of the
 --
 -- Alter field destination_docket on casetransfer
 --
-ALTER TABLE "search_casetransfer" ALTER COLUMN "destination_docket_id" TYPE integer;
+ALTER TABLE "search_casetransfer" ALTER COLUMN "destination_docket_id" TYPE integer, ALTER COLUMN "destination_docket_id" DROP NOT NULL;
 COMMENT ON COLUMN "search_casetransfer"."destination_docket_id" IS 'The docket object in the destination court.';
 --
 -- Alter field origin_docket on casetransfer
 --
-ALTER TABLE "search_casetransfer" ALTER COLUMN "origin_docket_id" TYPE integer;
+ALTER TABLE "search_casetransfer" ALTER COLUMN "origin_docket_id" TYPE integer, ALTER COLUMN "origin_docket_id" DROP NOT NULL;
 COMMENT ON COLUMN "search_casetransfer"."origin_docket_id" IS 'The docket object this transfer originates from.';
 --
 -- Alter field url on scotusdocument
