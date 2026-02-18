@@ -19,7 +19,6 @@ from django.core.paginator import Page
 from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
 from django.db.models.functions import Substr
-from django.forms.boundfield import BoundField
 from django.http.request import QueryDict
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
@@ -1614,46 +1613,6 @@ def build_child_docs_query(
             )
 
     return Q(query_dict)
-
-
-def get_only_status_facets(
-    search_query: Search, search_form: SearchForm
-) -> list[BoundField]:
-    """Create a useful facet variable to use in a template
-
-    This method creates an Elasticsearch query with the status aggregations
-    and sets the size to 0 to ensure that no documents are returned.
-    :param search_query: The Elasticsearch search query object.
-    :param search_form: The form displayed in the user interface
-    """
-    search_query = search_query.extra(size=0)
-    # filter out opinions and get just the clusters
-    search_query = search_query.query(
-        Q("bool", must=Q("match", cluster_child="opinion_cluster"))
-    )
-    search_query.aggs.bucket("status", A("terms", field="status.raw"))
-    response = search_query.execute()
-    return make_es_stats_variable(search_form, response)
-
-
-def get_facet_dict_for_search_query(
-    search_query: Search, cd: CleanData, search_form: SearchForm
-):
-    """Create facets variables to use in a template omitting the stat_ filter
-    so the facets counts consider cluster for all status.
-
-    :param search_query: The Elasticsearch search query object.
-    :param cd: The user input CleanedData
-    :param search_form: The form displayed in the user interface
-    """
-
-    cd["just_facets_query"] = True
-    es_queries = build_es_base_query(search_query, cd)
-    search_query = es_queries.search_query
-    search_query.aggs.bucket("status", A("terms", field="status.raw"))
-    search_query = search_query.extra(size=0)
-    response = search_query.execute()
-    return make_es_stats_variable(search_form, response)
 
 
 def build_es_main_query(
@@ -3319,44 +3278,6 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
         result["joined_by_ids"] = opinion["joined_by_ids"]
         result["court_exact"] = opinion["joined_by_ids"]
         result["status_exact"] = result["status"]
-
-
-def make_es_stats_variable(
-    search_form: SearchForm,
-    results: Page | Response,
-) -> list[BoundField]:
-    """Create a useful facet variable for use in a template
-
-    :param search_form: The form displayed in the user interface
-    :param results: The Page or Response containing the results to add the
-    status aggregations.
-    """
-
-    facet_fields = []
-    try:
-        if isinstance(results, Page):
-            aggregations = results.paginator.aggregations.to_dict()  # type: ignore
-            buckets = aggregations["status"]["buckets"]
-        else:
-            buckets = results.aggregations.status.buckets
-        facet_values = {group["key"]: group["doc_count"] for group in buckets}
-    except (KeyError, AttributeError):
-        facet_values = {}
-
-    for field in search_form:
-        if not field.html_name.startswith("stat_"):
-            continue
-
-        try:
-            count = facet_values[field.html_name.replace("stat_", "")]
-        except KeyError:
-            # Happens when a field is iterated on that doesn't exist in the
-            # facets variable
-            count = 0
-
-        field.count = count
-        facet_fields.append(field)
-    return facet_fields
 
 
 def do_es_api_query(
