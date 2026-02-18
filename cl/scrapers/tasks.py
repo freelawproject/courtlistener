@@ -17,6 +17,7 @@ from django.core.files.base import ContentFile
 from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
+from lxml import etree
 from redis import ConnectionError as RedisConnectionError
 
 from cl.audio.models import Audio
@@ -26,7 +27,11 @@ from cl.citations.tasks import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
-from cl.lib.exceptions import ScrapeFailed
+from cl.lib.exceptions import (
+    ConfigurationException,
+    ScrapeFailed,
+    SubscriptionFailure,
+)
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
@@ -893,3 +898,112 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     except Exception as e:
         logger.exception("Unexpected error during SCOTUS subscription")
         raise ScrapeFailed(str(e))
+
+
+CASEMAIL_LOGIN_URL = "https://casemail.txcourts.gov/login.aspx"
+CASEMAIL_CASE_ADD_URL = "https://casemail.txcourts.gov/CaseAdd.aspx"
+CASEMAIL_MESSAGE_XPATH = (
+    "//span[@id='ctl00_ctl00_BaseContentPlaceHolder1"
+    "_ContentPlaceHolder1_lblMessage']/font"
+)
+
+
+def _login_tames(session: requests.Session) -> None:
+    """Log in to the TAMES CaseMail system.
+
+    Fetches the login page, extracts ASP.NET hidden fields, and POSTs
+    credentials.
+
+    :param session: A requests session to authenticate.
+    :raises ConfigurationException: If credentials are not set.
+    :raises requests.RequestException: If the login request fails.
+    """
+    if not settings.TAMES_USERNAME or not settings.TAMES_PASSWORD:
+        raise ConfigurationException(
+            "TAMES_USERNAME and TAMES_PASSWORD must be set."
+        )
+
+    resp = session.get(CASEMAIL_LOGIN_URL, timeout=30)
+    resp.raise_for_status()
+
+    tree = etree.fromstring(resp.text, etree.HTMLParser())
+    payload: dict[str, str] = {}
+    for input_tag in tree.xpath("//input[@type='hidden']"):
+        if name := input_tag.get("name"):
+            payload[name] = input_tag.get("value", "")
+
+    payload.update(
+        {
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtUserName": settings.TAMES_USERNAME,
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtPassword": settings.TAMES_PASSWORD,
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$cmdLogon": "Logon",
+        }
+    )
+
+    resp = session.post(CASEMAIL_LOGIN_URL, data=payload, timeout=30)
+    resp.raise_for_status()
+
+
+@app.task(bind=True, max_retries=3, retry_backoff=10)
+def subscribe_to_tames_cases(
+    self: celery.Task,
+    cases: list[dict[str, str]],
+) -> None:
+    """Subscribe to TAMES CaseMail updates for a list of Texas court cases.
+
+    Logs in once, iterates through each case, and collects failures. If any
+    cases fail, the task retries with only the failed cases.
+
+    :param self: The Celery task.
+    :param cases: List of dicts, each with "court" and "case" keys.
+    :raises SubscriptionFailure: If login fails.
+    """
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Free Law Project"})
+
+    try:
+        _login_tames(session)
+    except requests.RequestException as exc:
+        raise SubscriptionFailure(f"TAMES login failed: {exc}")
+
+    html_parser = etree.HTMLParser()
+    failed: list[dict[str, str]] = []
+    for case in cases:
+        court = case["court"]
+        case_number = case["case"]
+        try:
+            resp = session.get(
+                CASEMAIL_CASE_ADD_URL,
+                params={
+                    "coa": court,
+                    "FullCaseNumber": case_number,
+                    "cID": court,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            tree = etree.fromstring(resp.text, html_parser)
+            messages = tree.xpath(CASEMAIL_MESSAGE_XPATH)
+            message = messages[0].text if messages else "No message found"
+            logger.info(
+                "TAMES subscription for %s/%s: %s",
+                court,
+                case_number,
+                message,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to subscribe to TAMES case %s/%s",
+                court,
+                case_number,
+                e,
+            )
+            failed.append(case)
+
+    if failed:
+        raise self.retry(
+            args=(failed,),
+            exc=SubscriptionFailure(
+                f"{len(failed)}/{len(cases)} cases failed"
+            ),
+        )
