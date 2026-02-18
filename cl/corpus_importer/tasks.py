@@ -3782,7 +3782,16 @@ def merge_texas_case_transfers(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
 ) -> MergeResult:
-    """Merge appeal and work sharing information into the given Texas docket.
+    """This method creates or updates up any `CaseTransfer` objects which point to
+    or originate from a given docket to capture appeal and work sharing
+    information.
+
+    If a `CaseTransfer` exists with the same origin and destination docket
+    numbers and court fields as one we want to create, update the origin or
+    destination docket foreign key field to point to this docket. This allows
+    us to merge `CaseTransfer` objects for which we only have partial
+    information and complete the information at a later time (or never if the
+    origin/destination is a court we don't scrape).
 
     :param docket: The docket to add the appeal information to.
     :param docket_data: The docket data from Juriscraper.
@@ -3791,7 +3800,7 @@ def merge_texas_case_transfers(
         docket_data["originating_court"]
     )
 
-    if docket_data["court_type"] == "texas_final":
+    if docket_data["court_type"] == CourtType.SUPREME.value:
         # Assume that the originating court -> appellate court transfer will
         # be populated by an appellate docket later on.
         transfer = CaseTransfer(
@@ -3849,7 +3858,7 @@ def merge_texas_case_transfers(
             )
             return MergeResult.failed()
         transfers = [transfer]
-    elif docket_data["court_type"] == "texas_appellate":
+    elif docket_data["court_type"] == CourtType.APPELLATE.value:
         transfers = []
         if trial_court_id:
             transfers.append(
@@ -3893,6 +3902,7 @@ def merge_texas_case_transfers(
 
     any_created = False
     for transfer in transfers:
+        # TODO Update once fk's are back to match docstring
         _, created = CaseTransfer.objects.get_or_create(
             origin_court=transfer.origin_court,
             origin_docket_number=transfer.origin_docket_number,
