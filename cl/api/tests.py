@@ -152,7 +152,6 @@ from cl.users.models import UserProfile
 from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class BasicAPIPageTest(ESIndexTestCase, TestCase):
     """Test the basic views"""
 
@@ -244,7 +243,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             self.assertContains(response, header)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class CoverageTests(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -379,7 +377,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
                 self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api:test_counts",
@@ -556,7 +553,6 @@ class ApiQueryCountTests(TestCase):
             )
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""
 
@@ -712,7 +708,7 @@ class ApiEventCreationTestCase(TestCase):
         )
 
 
-@override_settings(BLOCK_NEW_V3_USERS=True, BLOCK_UNKNOWN_FILTERS=True)
+@override_settings(BLOCK_NEW_V3_USERS=True)
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
     return_value="api-block-test:v3",
@@ -860,7 +856,6 @@ class BlockV3APITests(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFOrderingTests(TestCase):
     """Does ordering work generally and specifically?"""
 
@@ -931,7 +926,6 @@ class FilteringCountTestMixin:
         return r
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
     @classmethod
     def setUpTestData(cls):
@@ -1351,7 +1345,6 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)  # Bill
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
     fixtures = ["recap_docs.json"]
 
@@ -1917,7 +1910,6 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         await self.assertCountInResults(4)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
     """Test selecting only certain fields"""
 
@@ -1998,7 +1990,6 @@ def handle_database_cursor_pagination_wrapper(*args, **kwargs):
     return original_handle_database_cursor_pagination(*args, **kwargs)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class V4DRFPaginationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -2975,7 +2966,6 @@ class V4DRFPaginationTest(TestCase):
         self.assertEqual(len(data), 0)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DRFRecapPermissionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3029,7 +3019,6 @@ class DRFRecapPermissionTest(TestCase):
             print("✓")
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class WebhooksProxySecurityTest(TestCase):
     """Test Webhook proxy security"""
 
@@ -3114,7 +3103,6 @@ class WebhooksProxySecurityTest(TestCase):
         )
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class WebhooksMilestoneEventsTest(TestCase):
     """Test Webhook milestone events tracking"""
 
@@ -3314,7 +3302,6 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(await milestone_events.acount(), 0)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class CountParameterTests(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3568,7 +3555,6 @@ class TestApiUsage(SimpleTestCase):
         self.assertEqual(dates, ["2023-01-01", "2023-01-02"])
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 @patch("cl.api.utils.make_cache_key_for_no_filter_mixin")
 @mock.patch(
     "cl.api.utils.get_logging_prefix",
@@ -3641,24 +3627,6 @@ class CacheListApiResponseTest(TestCase):
         self._check_cached_request(
             path=path, params={}, cache_key=fake_cache_key
         )
-
-        # Delete the fake key after the test
-        self.cache.delete(fake_cache_key)
-
-    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
-    def test_can_ignore_invalid_filters(
-        self, mock_get_logging_prefix, mock_cache_key_method
-    ):
-        """
-        Test that a response is cached when there are invalid filters.
-        """
-        fake_cache_key = "cache_no_filter_no_pagination"
-        mock_cache_key_method.return_value = fake_cache_key
-
-        # Call the helper method to check caching behavior with invalid filters
-        path = reverse("docket-list", kwargs={"version": "v4"})
-        params = {"evil_filter": "1"}
-        self._check_cached_request(path, params, cache_key=fake_cache_key)
 
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
@@ -3813,7 +3781,6 @@ class CacheListApiResponseTest(TestCase):
         self.assertFalse(self.cache.has_key(fake_cache_key))
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class EventCountApiTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
@@ -3923,7 +3890,6 @@ class DeferredDocketEntryOnlyViewSet(
     )
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class DynamicNestedFieldsMixinTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4126,7 +4092,6 @@ class DynamicNestedFieldsMixinTests(TestCase):
         self.assertIn("tags", prefetches)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class ClusterRedirectionTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4197,7 +4162,6 @@ class ClusterRedirectionTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.GONE)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class TestOpinionViewsetXMLRendering(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -4253,7 +4217,6 @@ class TestOpinionViewsetXMLRendering(TestCase):
         self.assertFalse(str(self.good_xml_op_id) in problematic_set)
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=True)
 class BankruptcyInformationAPITests(TestCase):
     """Tests for the bankruptcy-information endpoint and the
     bankruptcy_information field on the docket endpoint.
@@ -4434,168 +4397,42 @@ class BankruptcyInformationAPITests(TestCase):
         self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
 
 
-@override_settings(BLOCK_UNKNOWN_FILTERS=False)
-class UnknownFilterParameterTests(TestCase):
-    """Tests for unknown filter parameter detection and handling."""
+class UnknownFilterParameterBlockingTests(TestCase):
+    """Integration tests for unknown filter parameter blocking."""
 
     @classmethod
     def setUpTestData(cls) -> None:
         cls.user = UserFactory()
         cls.court = CourtFactory(id="test")
 
-    def setUp(self) -> None:
-        # Clear any existing bad filter params for the test user
-        self.r = get_redis_interface("STATS")
-        self._clear_test_redis_keys()
-
-    def tearDown(self) -> None:
-        self._clear_test_redis_keys()
-
-    def _clear_test_redis_keys(self) -> None:
-        """Clear Redis keys for the test user."""
-        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
-        keys = list(self.r.scan_iter(match=pattern))
-        if keys:
-            self.r.delete(*keys)
-
-    def test_valid_filter_params_accepted(self) -> None:
-        """Verify that valid filter parameters don't store to Redis."""
-        self.client.force_login(self.user)
-        response = self.client.get(
-            reverse("court-list", kwargs={"version": "v4"}),
-            {"id": "test"},
-        )
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-        # No Redis keys should be created for valid params
-        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
-        keys = list(self.r.scan_iter(match=pattern))
-        self.assertEqual(len(keys), 0)
-
-    def test_unknown_params_stored_in_redis_when_not_blocking(self) -> None:
-        """Verify that unknown parameters are stored in Redis when
-        BLOCK_UNKNOWN_FILTERS is False.
-        """
-        self.client.force_login(self.user)
-        response = self.client.get(
-            reverse("court-list", kwargs={"version": "v4"}),
-            {"invalid_param": "value", "another_bad": "test"},
-        )
-
-        # Request should succeed (not blocked)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-        # Should have stored the unknown parameters in Redis
-        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
-        keys = list(self.r.scan_iter(match=pattern))
-        self.assertEqual(len(keys), 2)
-
-        # Verify specific keys exist
-        key_names = [k.split(":")[-1] for k in keys]
-        self.assertIn("invalid_param", key_names)
-        self.assertIn("another_bad", key_names)
-
-    @override_settings(BLOCK_UNKNOWN_FILTERS=True)
-    def test_unknown_params_blocked_when_enabled(self) -> None:
-        """Verify that unknown parameters return 400 when BLOCK_UNKNOWN_FILTERS
-        is True and that data is still logged to Redis.
-        """
+    def test_unknown_params_return_400(self) -> None:
+        """Unknown filter parameters return a 400 response."""
         self.client.force_login(self.user)
         response = self.client.get(
             reverse("court-list", kwargs={"version": "v4"}),
             {"invalid_param": "value"},
         )
-
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         data = response.json()
         self.assertIn("detail", data)
         self.assertIn("unknown_params", data)
         self.assertIn("invalid_param", data["unknown_params"])
 
-        # Verify data was ALSO logged to Redis (not just blocked)
-        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
-        keys = list(self.r.scan_iter(match=pattern))
-        self.assertEqual(len(keys), 1)
-        self.assertIn("invalid_param", keys[0])
-
     def test_framework_params_always_accepted(self) -> None:
-        """Verify that standard framework parameters are always accepted."""
-        self.client.force_login(self.user)
-        framework_params = {
-            "page": "1",
-            "order_by": "id",
-            "format": "json",
-            "fields": "id,full_name",
-            "omit": "resource_uri",
-        }
-        response = self.client.get(
-            reverse("court-list", kwargs={"version": "v4"}),
-            framework_params,
-        )
-
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        # No Redis keys should be created for framework params
-        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
-        keys = list(self.r.scan_iter(match=pattern))
-        self.assertEqual(len(keys), 0)
-
-    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
-    def test_mixed_valid_and_invalid_params(self) -> None:
-        """Verify that mixed valid/invalid params are handled correctly."""
+        """Standard framework parameters (page, order_by, etc.) are never
+        rejected."""
         self.client.force_login(self.user)
         response = self.client.get(
             reverse("court-list", kwargs={"version": "v4"}),
             {
-                "id": "test",  # valid filter param
-                "page": "1",  # valid framework param
-                "bogus_filter": "value",  # invalid
+                "page": "1",
+                "order_by": "id",
+                "format": "json",
+                "fields": "id,full_name",
+                "omit": "resource_uri",
             },
         )
-
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        # Should store only the invalid parameter in Redis
-        pattern = f"api:bad_filter_params:user:{self.user.pk}:*"
-        keys = list(self.r.scan_iter(match=pattern))
-        self.assertEqual(len(keys), 1)
-        self.assertIn("bogus_filter", keys[0])
-
-    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
-    def test_redis_stores_count_and_timestamps(self) -> None:
-        """Verify that Redis stores count and timestamp data correctly."""
-        self.client.force_login(self.user)
-
-        # Make two requests with the same bad param
-        for _ in range(2):
-            self.client.get(
-                reverse("court-list", kwargs={"version": "v4"}),
-                {"bad_param": "value"},
-            )
-
-        # Check Redis data
-        key = (
-            f"api:bad_filter_params:user:{self.user.pk}:CourtViewSet:bad_param"
-        )
-        data = self.r.hgetall(key)
-
-        self.assertEqual(int(data["count"]), 2)
-        self.assertIn("first_seen", data)
-        self.assertIn("last_seen", data)
-
-    @override_settings(BLOCK_UNKNOWN_FILTERS=False)
-    def test_anonymous_users_not_logged(self) -> None:
-        """Verify that anonymous user requests don't create Redis entries."""
-        # Don't login - make anonymous request
-        response = self.client.get(
-            reverse("court-list", kwargs={"version": "v4"}),
-            {"bad_param": "value"},
-        )
-
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        # No Redis keys should be created for anonymous users
-        # Check for any keys (anonymous would have None as user_id)
-        pattern = "api:bad_filter_params:user:None:*"
-        keys = list(self.r.scan_iter(match=pattern))
-        self.assertEqual(len(keys), 0)
 
 
 class UnknownFilterParameterUtilsTests(SimpleTestCase):
