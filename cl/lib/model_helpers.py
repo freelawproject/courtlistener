@@ -1,6 +1,7 @@
 import os
 import re
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from uuid import uuid4
 
@@ -147,37 +148,28 @@ def make_path(root: str, filename: str) -> str:
     )
 
 
-def make_llm_task_input_file_path(instance, filename: str) -> str:
-    """Falls back to uuid4 when instance.pk is None (unsaved instance)
+def _make_llm_file_path(root: str, instance, filename: str) -> str:
+    """Make a file path for LLM related uploads
 
-    Example: llm-tasks/2026/01/15/101.pdf
-    Example: llm-tasks/2026/01/15/a3b2c1d4e5f6.pdf
+    Falls back to uuid4 when instance.pk is None (unsaved instance)
+
+    :param root: The root directory for the file path.
+    :param instance: The model instance.
+    :param filename: The original filename.
+    :returns: The generated file path.
     """
-    ext = os.path.splitext(filename)[1]
+    ext = Path(filename).suffix
     name = instance.pk or uuid4().hex
-    return make_path("llm-tasks", f"{name}{ext}")
+    return make_path(root, f"{name}{ext}")
 
 
-def make_llm_request_response_file_path(instance, filename: str) -> str:
-    """Falls back to uuid4 when instance.pk is None (unsaved instance)
-
-    Example: llm-requests/2026/01/15/1.jsonl
-    Example: llm-requests/2026/01/15/a3b2c1d4e5f6.jsonl
-    """
-    ext = os.path.splitext(filename)[1]
-    name = instance.pk or uuid4().hex
-    return make_path("llm-requests", f"{name}{ext}")
-
-
-def make_llm_task_response_file_path(instance, filename: str) -> str:
-    """Falls back to uuid4 when instance.pk is None (unsaved instance)
-
-    Example: llm-tasks/responses/2026/01/15/101.json
-    Example: llm-tasks/responses/2026/01/15/a3b2c1d4e5f6.json
-    """
-    ext = os.path.splitext(filename)[1]
-    name = instance.pk or uuid4().hex
-    return make_path("llm-tasks/responses", f"{name}{ext}")
+make_llm_task_input_file_path = partial(_make_llm_file_path, "llm-tasks")
+make_llm_request_response_file_path = partial(
+    _make_llm_file_path, "llm-requests"
+)
+make_llm_task_response_file_path = partial(
+    _make_llm_file_path, "llm-tasks/responses"
+)
 
 
 def make_lasc_path(instance, filename):
