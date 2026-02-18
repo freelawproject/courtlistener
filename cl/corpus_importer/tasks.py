@@ -3398,6 +3398,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
     ignore_result=True,
     # No retries because download_pdf_in_stream already has retry logic
 )
+@throttle_task("2/s")
 def download_texas_document_pdf(
     self: Task, texas_document_pk: int
 ) -> int | None:
