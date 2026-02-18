@@ -11,6 +11,7 @@ from cl.donate import api_views as donate_views
 from cl.favorites import api_views as favorite_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
+from cl.scrapers import views as scraper_views
 from cl.search import api_views as search_views
 from cl.visualizations import api_views as viz_views
 
@@ -94,6 +95,11 @@ router.register(
 router.register(r"tags", favorite_views.UserTagViewSet, basename="UserTag")
 router.register(
     r"docket-tags", favorite_views.DocketTagViewSet, basename="DocketTag"
+)
+
+# Scrapers
+router.register(
+    "scrapers/email/state/tx/tames/alert", scraper_views.TexasEmailEndpoint
 )
 
 # Prayers
