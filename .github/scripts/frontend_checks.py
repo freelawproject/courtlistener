@@ -501,7 +501,6 @@ class Finding:
 HTML_CHECKS = [
     (check_tabnabbing, FAIL),
     (check_tabindex, FAIL),
-    (check_bare_links, WARN),
     (check_placeholder_text, WARN),
 ]
 
@@ -511,6 +510,7 @@ V2_CHECKS = [
     (check_font_awesome, FAIL),
     (check_inline_xdata, FAIL),
     (check_extends_new_base, FAIL),
+    (check_bare_links, FAIL),
     (check_include_in_v2, WARN),
     (check_xdata_without_require_script, WARN),
 ]
@@ -518,6 +518,7 @@ V2_CHECKS = [
 COTTON_CHECKS = [
     (check_alpine_shortcuts, FAIL),
     (check_inline_xdata, FAIL),
+    (check_bare_links, FAIL),
     (check_hardcoded_ids, WARN),
 ]
 
