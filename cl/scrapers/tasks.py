@@ -32,6 +32,7 @@ from cl.lib.exceptions import (
     ScrapeFailed,
     SubscriptionFailure,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
@@ -944,6 +945,9 @@ def _login_tames(session: requests.Session) -> None:
     resp.raise_for_status()
 
 
+TAMES_FAILURES_CACHE_KEY = "scraper:tames:subscription_failures"
+
+
 @app.task(bind=True, max_retries=3, retry_backoff=10)
 def subscribe_to_tames_cases(
     self: celery.Task,
@@ -954,16 +958,33 @@ def subscribe_to_tames_cases(
     Logs in once, iterates through each case, and collects failures. If any
     cases fail, the task retries with only the failed cases.
 
+    On the first run, previously cached failures are merged into the input
+    list. On the final attempt, any remaining failures are persisted to the
+    S3 cache for the next invocation.
+
     :param self: The Celery task.
     :param cases: List of dicts, each with "court" and "case" keys.
     :raises SubscriptionFailure: If login fails.
     """
+    cache = get_s3_cache("db_cache")
+    cache_key = make_s3_cache_key(TAMES_FAILURES_CACHE_KEY, None)
+
+    # On the first run, merge previously cached failures into the input list
+    if self.request.retries == 0:
+        if cached_failures := cache.get(cache_key):
+            existing = {(c["court"], c["case"]) for c in cases}
+            for failure in cached_failures:
+                if (failure["court"], failure["case"]) not in existing:
+                    cases.append(failure)
+
     session = requests.Session()
     session.headers.update({"User-Agent": "Free Law Project"})
 
     try:
         _login_tames(session)
     except requests.RequestException as exc:
+        if self.request.retries == self.max_retries:
+            cache.set(cache_key, cases, None)
         raise SubscriptionFailure(f"TAMES login failed: {exc}")
 
     html_parser = etree.HTMLParser()
@@ -1000,10 +1021,22 @@ def subscribe_to_tames_cases(
             )
             failed.append(case)
 
-    if failed:
-        raise self.retry(
-            args=(failed,),
-            exc=SubscriptionFailure(
-                f"{len(failed)}/{len(cases)} cases failed"
-            ),
+    if not failed:
+        cache.delete(cache_key)
+        return
+
+    if self.request.retries == self.max_retries:
+        cache.set(cache_key, failed, None)
+        logger.warning(
+            "TAMES subscription exhausted retries with %d failures. "
+            "Cached for next run.",
+            len(failed),
         )
+        return
+
+    raise self.retry(
+        args=(failed,),
+        exc=SubscriptionFailure(
+            f"{len(failed)}/{len(cases)} cases failed"
+        ),
+    )
