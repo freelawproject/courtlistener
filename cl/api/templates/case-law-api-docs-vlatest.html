@@ -217,54 +217,9 @@
   </ul>
 
   <section>
-    <h4 id="cluster-redirections">Opinion Cluster Redirections <span class="label label-info">Coming Soon</span></h4>
-
-    <p>
-        CourtListener maintains a policy of preserving persistent URLs for all opinion
-        clusters. Even when a cluster becomes obsolete, its original
-        <code>cluster_id</code> is never removed. Instead, an internal
-        <code>ClusterRedirection</code> record maps the obsolete cluster to the current,
-        active one.
-    </p>
-
-    <p>
-        Clusters may be removed or consolidated for several reasons, including:
-    </p>
-
-    <ul>
-        <li>Duplicate clusters being merged.</li>
-        <li>
-            New versions of an existing opinion incorrectly identified as
-            separate clusters. When corrected, the opinions are consolidated
-            into a single cluster, the oldest is marked as a version of the
-            newer one, and the extra clusters are deleted.
-        </li>
-        <li>
-            Opinions from the same case (lead opinion, dissent, concurrence)
-            spread across different clusters because courts published them as
-            separate files. When corrected, we keep a single cluster and
-            delete the others.
-        </li>
-        <li>Clusters removed or sealed by court order.</li>
-    </ul>
-
-    <p>
-        When a cluster is redirected for version, duplicate, or consolidation
-        reasons, requesting the old <code>cluster_id</code> returns an
-        <strong>HTTP 301</strong> response pointing to the surviving cluster.
-        For clusters removed by court order (sealed), requests return an
-        <strong>HTTP 410 Gone</strong> status with no redirection target.
-    </p>
-
-    <p>
-        <strong>Note:</strong> Cluster redirection data is not yet exposed via the
-        REST API. Replication clients should be aware that an old
-        <code>cluster_id</code> may internally redirect to a different, newer
-        cluster. In some cases (e.g., error pages or court listing pages
-        incorrectly ingested as opinions), clusters are simply deleted with
-        no redirection record, and the old <code>cluster_id</code> will no
-        longer exist.
-    </p>
+    <h4 id="cluster-redirections">Opinion Cluster Redirections</h4>
+    <p>When clusters are merged, deduplicated, or sealed, CourtListener preserves persistent URLs by creating redirection records. The Clusters API handles these automatically, returning <strong>HTTP 301</strong> or <strong>HTTP 410</strong> responses as appropriate.</p>
+    <p>For full details on why clusters get redirected and how different data consumers should handle them, see the <a href="{% url "cluster_redirections_help" %}">Opinion Cluster Redirections</a> help page.</p>
   </section>
 
 
