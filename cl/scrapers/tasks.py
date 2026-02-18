@@ -32,7 +32,6 @@ from cl.lib.exceptions import (
     ScrapeFailed,
     SubscriptionFailure,
 )
-from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
@@ -41,6 +40,7 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
@@ -1036,7 +1036,5 @@ def subscribe_to_tames_cases(
 
     raise self.retry(
         args=(failed,),
-        exc=SubscriptionFailure(
-            f"{len(failed)}/{len(cases)} cases failed"
-        ),
+        exc=SubscriptionFailure(f"{len(failed)}/{len(cases)} cases failed"),
     )
