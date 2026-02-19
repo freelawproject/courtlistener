@@ -1761,7 +1761,7 @@ class ReplicateRecapUploadsTest(TestCase):
             msg="Didn't get the expected docket ID.",
         )
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_upload(self, mock_extract):
         """Can we duplicate a PDF document upload from a subdocket case to the
         corresponding RD across all related dockets?
@@ -1904,7 +1904,7 @@ class ReplicateRecapUploadsTest(TestCase):
 
                 transaction.set_rollback(True)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_attachment_upload(
         self, mock_extract
     ):
@@ -2357,7 +2357,7 @@ class ReplicateRecapUploadsTest(TestCase):
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
     )
-    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
     def test_replicate_subdocket_pdf_from_fq(
         self,
         mock_extract,
@@ -2457,7 +2457,7 @@ class ReplicateRecapUploadsTest(TestCase):
         # Confirm that the 3 PDFs have been extracted.
         self.assertEqual(mock_extract.call_count, 3)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_avoid_replication_on_pdf_available(self, mock_extract):
         """Confirm that replication for RDs where the PDF is already available is omitted"""
         # Add the docket entry to every case.
@@ -3302,7 +3302,7 @@ class RecapPdfFetchApiTest(TestCase):
         "cl.corpus_importer.tasks.is_appellate_court",
         wraps=is_appellate_court,
     )
-    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
     def test_fetch_unavailable_pdf_district(
         self,
         mock_extract,
@@ -3913,7 +3913,7 @@ class DebugRecapUploadtest(TestCase):
         DocketEntry.objects.all().delete()
         RECAPDocument.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     @mock.patch(
         "cl.lib.storage.get_name_by_incrementing",
         side_effect=clobbering_get_name,
@@ -4028,7 +4028,7 @@ class RecapPdfTaskTest(TestCase):
     def test_pq_has_default_status(self) -> None:
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_recap_document_already_exists(self, mock_extract):
         """We already have everything"""
         # Update self.rd so it looks like it is already all good.
@@ -4074,7 +4074,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertEqual(self.pq.docket_entry_id, None)
         self.assertEqual(self.pq.recap_document_id, None)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
+    @mock.patch("cl.recap.tasks.extract_pdf_document.si")
     def test_docket_and_docket_entry_already_exist(self, mock_extract):
         """What happens if we have everything but the PDF?
 
@@ -4177,7 +4177,7 @@ class RecapZipTaskTest(TestCase):
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
+    @mock.patch("cl.recap.tasks.extract_pdf_document.si")
     def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
@@ -5814,7 +5814,15 @@ class ClaimsRegistryTaskTest(TestCase):
 
 
 class RecapDocketAppellateTaskTest(TestCase):
-    fixtures = ["hawaii_court.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        CourtFactory(
+            id="hid",
+            jurisdiction="SA",
+            short_name="Faked Hawaii Court",
+            full_name="Faked Hawaii Super Court",
+            in_use=False,
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")

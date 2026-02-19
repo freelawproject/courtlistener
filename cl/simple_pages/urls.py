@@ -21,6 +21,7 @@ from cl.simple_pages.views import (
     help_home,
     latest_terms,
     markdown_help,
+    mcp_help,
     old_terms,
     podcasts,
     prayer_help,
@@ -66,6 +67,7 @@ urlpatterns = [
     path("help/broken-email/", broken_email_help, name="broken_email_help"),  # type: ignore[arg-type]
     path("help/pray-and-pay/", prayer_help, name="pray_and_pay_help"),  # type: ignore[arg-type]
     path("help/relative-dates/", relative_dates, name="relative_dates"),  # type: ignore[arg-type]
+    path("help/mcp/", mcp_help, name="mcp_help"),  # type: ignore[arg-type]
     # Added 2018-10-23
     path(
         "search/advanced-techniques/",
