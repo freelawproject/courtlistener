@@ -3879,7 +3879,6 @@ def merge_texas_case_transfers(
         docket_data["originating_court"]
     )
 
-    # TODO Also need to generate reverse transfers to ensure information is complete
     if docket_data["court_type"] == CourtType.SUPREME.value:
         # Assume that the originating court -> appellate court transfer will
         # be populated by an appellate docket later on.
@@ -3916,6 +3915,10 @@ def merge_texas_case_transfers(
                     return MergeResult.failed()
             else:
                 if appeals_court["court_id"] == CourtID.UNKNOWN:
+                    logger.warning(
+                        "Found appellate court with unknown ID (docket %s)",
+                        docket.docket_number,
+                    )
                     appeals_court_id = "texapp"
                 else:
                     appeals_court_id = texas_js_court_id_to_court_id(
@@ -3925,6 +3928,10 @@ def merge_texas_case_transfers(
                 transfer.origin_docket_number = appeals_court["case_number"]
         elif docket_data["court_id"] == CourtID.SUPREME_COURT.value:
             if appeals_court["court_id"] == CourtID.UNKNOWN:
+                logger.warning(
+                    "Found appellate court with unknown ID (docket %s)",
+                    docket.docket_number,
+                )
                 appeals_court_id = "texapp"
             else:
                 appeals_court_id = texas_js_court_id_to_court_id(
@@ -3956,6 +3963,12 @@ def merge_texas_case_transfers(
                 )
             )
         if docket_data["transfer_from"]:
+            transfer_from_date = docket_data["transfer_from"]["date"]
+            if not transfer_from_date:
+                logger.warning(
+                    "Missing transfer date for workload transfer of docket %s",
+                    docket.docket_number,
+                )
             transfers.append(
                 CaseTransfer(
                     origin_court=Court.objects.get(
@@ -3969,13 +3982,13 @@ def merge_texas_case_transfers(
                     destination_court=docket.court,
                     destination_docket_number=docket.docket_number,
                     destination_docket=docket,
-                    # The "date" field of transfers is not always set, but when it is, it seems to match date filed.
-                    transfer_date=docket_data["date_filed"],
+                    # If the transfer date is absent or empty, assume it matches the filing date
+                    transfer_date=transfer_from_date
+                    if transfer_from_date
+                    else docket_data["date_filed"],
                     transfer_type=CaseTransfer.WORKLOAD,
                 )
             )
-        # Assume that the value in the "transfer_to" field will be filled in
-        # by another court.
     else:
         logger.error(
             "Unrecognized Texas court type %s while creating CaseTransfer",
@@ -4056,10 +4069,14 @@ def merge_texas_docket(
     court = Court.objects.get(
         pk=texas_js_court_id_to_court_id(docket_data["court_id"])
     )
+    docket_number = docket_data["docket_number"]
+    logger.info("Merging Texas docket %s", docket_number)
     with transaction.atomic():
-        docket_number = docket_data["docket_number"]
         docket = None
-        if docket_data["court_type"] == CourtType.APPELLATE:
+        if docket_data["court_type"] == CourtType.APPELLATE.value:
+            logger.info(
+                "Docket is appellate. Checking if disaggregation is necessary..."
+            )
             docket = async_to_sync(find_docket_object)(
                 court_id="texapp",
                 pacer_case_id=None,
@@ -4075,7 +4092,7 @@ def merge_texas_docket(
                     "Disaggregating Texas appellate docket %s", docket_number
                 )
                 docket.court = court
-        if docket is None:
+        else:
             docket = async_to_sync(find_docket_object)(
                 court_id=court.pk,
                 pacer_case_id=None,
@@ -4122,6 +4139,11 @@ def merge_texas_docket(
             )
             # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
             court_name = lower_court_data["name"]
+        logger.info(
+            "Updating lower court info with court %s (ID %s).",
+            court_name,
+            lower_court_id,
+        )
         docket.appeal_from_str = court_name
 
         docket.save()
@@ -4175,6 +4197,12 @@ def merge_texas_docket(
         and merge_case_transfer_result.success
         and all(r.success for r in entry_merge_results)
     )
+    if not success:
+        logger.error(
+            "One or more steps in Texas case merging failed for docket %s (pk %s). Please review logs.",
+            docket_number,
+            docket.pk,
+        )
 
     return MergeResult(
         create=create,
@@ -4207,6 +4235,7 @@ def parse_texas_docket(
       - Docket metadata.
     :return: The parsed docket or `None` if parsing failed."""
     content, meta = i
+    logger.info("Attempting to parse Texas docket %s...", meta.case_number)
     try:
         if meta.court_code == "cossup":
             parser = TexasSupremeCourtScraper()
@@ -4216,8 +4245,9 @@ def parse_texas_docket(
             parser = TexasCourtOfAppealsScraper(meta.court_code)
         else:
             logger.error(
-                "Unrecognized Texas court type %s. Cannot parse.",
+                "Unrecognized Texas court type %s. Cannot parse docket %s.",
                 meta.court_code,
+                meta.case_number,
             )
             self.request.chain = None
             return None
