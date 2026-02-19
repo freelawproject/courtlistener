@@ -64,18 +64,18 @@
     <h3>The <code class="text-display-xxs">absolute_url</code> Field</h3>
     <p>The <code>absolute_url</code> field shows the URL where a resource can be seen live on the site. It is absolute in the sense that it should never change and will always be backwards compatible if changes are ever needed.</p>
     <p>In some cases you might start with a URL from CourtListener, and you might want to look up the item in the API. Generally, CourtListener URLs are designed to contain an ID that can be used in the API to look it up, following a pattern like:</p>
-  <c-code>
+    <c-code>
 /$type/$id/$name-of-the-case/
-  </c-code>
-  <p>There are three sections:</p>
-  <ol>
-    <li><strong>$type</strong>: This is the type of object that has been returned, for example, "docket" indicates that you have gotten a docket as your result.</li>
-    <li><strong>$id</strong>: This is a numeric ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not always sequential, but they will never be duplicated within a document type.</li>
-    <li>
-      <p><strong>$name-of-the-case</strong>: This is the "<a class="underline" href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without affecting the page that is loaded.</p>
-      <p>Put another way, we load pages based on the <code>$id</code> and <code>$type</code>, not by the name of the case.</p>
-    </li>
-  </ol>
+    </c-code>
+    <p>There are three sections:</p>
+    <ol>
+      <li><strong>$type</strong>: This is the type of object that has been returned, for example, "docket" indicates that you have gotten a docket as your result.</li>
+      <li><strong>$id</strong>: This is a numeric ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not always sequential, but they will never be duplicated within a document type.</li>
+      <li>
+        <p><strong>$name-of-the-case</strong>: This is the "<a class="underline" href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without affecting the page that is loaded.</p>
+        <p>Put another way, we load pages based on the <code>$id</code> and <code>$type</code>, not by the name of the case.</p>
+      </li>
+    </ol>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="downloads">
