@@ -3886,6 +3886,7 @@ def merge_texas_case_transfers(
         transfer = CaseTransfer(
             destination_court=docket.court,
             destination_docket_number=docket.docket_number,
+            destination_docket=docket,
             transfer_date=docket_data["date_filed"],
             transfer_type=CaseTransfer.APPEAL,
         )
@@ -3949,6 +3950,7 @@ def merge_texas_case_transfers(
                     ],
                     destination_court=docket.court,
                     destination_docket_number=docket.docket_number,
+                    destination_docket=docket,
                     transfer_date=docket_data["date_filed"],
                     transfer_type=CaseTransfer.APPEAL,
                 )
@@ -3966,6 +3968,7 @@ def merge_texas_case_transfers(
                     ],
                     destination_court=docket.court,
                     destination_docket_number=docket.docket_number,
+                    destination_docket=docket,
                     # The "date" field of transfers is not always set, but when it is, it seems to match date filed.
                     transfer_date=docket_data["date_filed"],
                     transfer_type=CaseTransfer.WORKLOAD,
@@ -3985,8 +3988,10 @@ def merge_texas_case_transfers(
         case_transfer = CaseTransfer(
             origin_court=transfer.origin_court,
             origin_docket_number=transfer.origin_docket_number,
+            origin_docket=transfer.origin_docket,
             destination_court=transfer.destination_court,
             destination_docket_number=transfer.destination_docket_number,
+            destination_docket=transfer.destination_docket,
             transfer_date=transfer.transfer_date,
             transfer_type=transfer.transfer_type,
         )

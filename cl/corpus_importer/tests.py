@@ -2278,11 +2278,16 @@ class TexasMergerTest(TestCase):
 
         self.download_task_mock.assert_called_once_with(current_document.pk)
 
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
     @responses.activate
-    def test_merge_texas_document_plaintext_extraction(self):
+    def test_merge_texas_document_plaintext_extraction(
+        self, pcs_mock, throttle_mock
+    ):
         """
         Ensure plaintext extraction is triggered by `merge_texas_document`.
         """
+        pcs_mock.return_value = httpx.Response(200, text="1")
         # Stop the mocks just for this test
         self.download_task_patch.stop()
         self.extract_pdf_document_patch.stop()
@@ -2723,9 +2728,12 @@ class TexasMergerTest(TestCase):
         result = normalize_texas_parties([])
         assert result == []
 
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
     @responses.activate
-    def test_download_texas_document_pdf_success(self, pcs_mock):
+    def test_download_texas_document_pdf_success(
+        self, pcs_mock, throttle_mock
+    ):
         """Can we successfully download a PDF for a TexasDocument?"""
         self.download_pdf_patch.stop()
         texas_document = TexasDocumentFactory.create()
@@ -3039,23 +3047,25 @@ class TexasMergerTest(TestCase):
         """Do we properly handle duplicate CaseTransfer objects?"""
         texas_district = CourtFactory.create(id="texdistct6")
 
-        transfer = CaseTransferFactory.create(
-            origin_court=texas_district,
-            destination_court=self.texas_coa1,
-            destination_docket_number=self.docket_number_coa1,
-            transfer_type=CaseTransfer.APPEAL,
-        )
-
         originating_court = TexasOriginatingDistrictCourtDictFactory(
             district=5,
-            case=transfer.origin_docket_number,
         )
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
             docket_number=self.docket_number_coa1,
             originating_court=originating_court,
-            date_filed=transfer.transfer_date,
             transfer_from=None,
+        )
+
+        CaseTransferFactory.create(
+            origin_court=texas_district,
+            origin_docket=None,
+            origin_docket_number=originating_court["case"],
+            destination_court=self.texas_coa1,
+            destination_docket_number=self.docket_number_coa1,
+            destination_docket=self.docket_coa1,
+            transfer_date=docket_data["date_filed"],
+            transfer_type=CaseTransfer.APPEAL,
         )
 
         result = merge_texas_case_transfers(self.docket_coa1, docket_data)
