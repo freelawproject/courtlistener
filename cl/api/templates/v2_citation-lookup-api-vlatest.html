@@ -96,7 +96,7 @@ curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %
       </li>
       <li><p><code>error_message</code> — This field will contain additional details about any problems the lookup encounters.</p></li>
       <li>
-        <p><code>clusters</code> — This is a list of the CourtListener <a class="text-primary-600" href="{% url "rest_docs" %}#cluster-endpoint">cluster objects</a> that match the citation in your query. This key will contain multiple values when a citation matches more than one legal decision. This can happen when a citation is ambiguous or when multiple decisions are on a single page in a printed book (and thus share the same citation).</p>
+        <p><code>clusters</code> — This is a list of the CourtListener <a class="links" href="{% url "rest_docs" %}#cluster-endpoint">cluster objects</a> that match the citation in your query. This key will contain multiple values when a citation matches more than one legal decision. This can happen when a citation is ambiguous or when multiple decisions are on a single page in a printed book (and thus share the same citation).</p>
       </li>
     </ul>
   </c-layout-with-navigation.section>

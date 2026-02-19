@@ -19,11 +19,11 @@
     <h1>Getting Started With Webhooks</h1>
     <p class="lead">To create your first webhook, there are a handful of steps you will need to take:</p>
     <ol>
-      <li><p>Creating and receiving webhooks does not require any special access, but sooner or later you will want to have access to the RECAP API endpoints. <a class="text-primary-600" href="{% url 'contact' %}">Send us a note with your username and use case</a> to get that process started.</p></li>
-      <li><p>You need to <a class="text-primary-600" href="#receive-a-webhook">create a URL on your server</a> to receive events from CourtListener.</p></li>
-      <li><p>You need to <a class="text-primary-600" href="#setup-a-webhook">configure CourtListener to send events</a> to that URL.</p></li>
+      <li><p>Creating and receiving webhooks does not require any special access, but sooner or later you will want to have access to the RECAP API endpoints. <a class="links" href="{% url 'contact' %}">Send us a note with your username and use case</a> to get that process started.</p></li>
+      <li><p>You need to <a class="links" href="#receive-a-webhook">create a URL on your server</a> to receive events from CourtListener.</p></li>
+      <li><p>You need to <a class="links" href="#setup-a-webhook">configure CourtListener to send events</a> to that URL.</p></li>
     </ol>
-    <p>Once you have created the URL on your server and linked it up to ours, you can <a class="text-primary-600" href="#testing">send test events from CourtListener</a> and you can wait for events to be triggered. As you send test events or events are automatically triggered, they appear in the <a class="text-primary-600" href="{% url 'view_webhook_logs' 'logs' %}">logs section of your webhooks panel</a>.</p>
+    <p>Once you have created the URL on your server and linked it up to ours, you can <a class="links" href="#testing">send test events from CourtListener</a> and you can wait for events to be triggered. As you send test events or events are automatically triggered, they appear in the <a class="links" href="{% url 'view_webhook_logs' 'logs' %}">logs section of your webhooks panel</a>.</p>
     <p>Read on to learn more about setting up your first webhook.</p>
   </c-layout-with-navigation.section>
 
@@ -32,13 +32,13 @@
     <p>Webhook events are nothing more than HTTP POST requests sent to your server. To receive these events, you will need to begin by creating a URL in your application.</p>
     <p>Some requirements to consider for the URL that you create:</p>
     <ul>
-      <li><a class="text-primary-600" href="{% url 'webhooks_docs' %}#security">Our webhook system does not support authentication</a>, so the URL you create should be long and random.</li>
+      <li><a class="links" href="{% url 'webhooks_docs' %}#security">Our webhook system does not support authentication</a>, so the URL you create should be long and random.</li>
       <li>Our POST requests will come from one of two static IP addresses, <code>34.210.230.218</code> and <code>54.189.59.91</code>. We recommend only allowing traffic from these addresses.</li>
       <li>Your URL must receive POST requests and should not accept any other HTTP verbs.</li>
       <li>If you are using a web framework like Django or Ruby on Rails, the webhook URL will need to be exempted from the cross site request forgery (CSRF) protection system. If this is not done, most web frameworks will block POST requests from outside domains like ours.</li>
-      <li>To avoid <a class="text-primary-600" href="{% url 'webhooks_docs' %}#retries">timeout errors and event retries</a>, your application may need to process events asynchronously.</li>
+      <li>To avoid <a class="links" href="{% url 'webhooks_docs' %}#retries">timeout errors and event retries</a>, your application may need to process events asynchronously.</li>
       <li>Your application must respond to events with a 2xx HTTP status code or else the event will be retried.</li>
-      <li>Your application should use the <a class="text-primary-600" href="{% url 'webhooks_docs' %}#headers">Idempotency-Key included in the event headers</a> to ensure that it only processes the event once.</li>
+      <li>Your application should use the <a class="links" href="{% url 'webhooks_docs' %}#headers">Idempotency-Key included in the event headers</a> to ensure that it only processes the event once.</li>
     </ul>
     <p>Below are examples of endpoints configured in Flask and Django</p>
     <p><strong>Flask</strong></p>
@@ -70,7 +70,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
 
   <c-layout-with-navigation.section id="setup-a-webhook">
     <h2>Set Up a Webhook Endpoint in CourtListener</h2>
-    <p>To set up a webhook endpoint, begin by logging into CourtListener and going to the <a class="text-primary-600" href="{% url 'view_webhooks' %}">Webhooks panel in your profile</a>:</p>
+    <p>To set up a webhook endpoint, begin by logging into CourtListener and going to the <a class="links" href="{% url 'view_webhooks' %}">Webhooks panel in your profile</a>:</p>
     <p>
       <img src="{% static "png/webhooks-panel-v2.png" %}"
          alt="screenshot of the webhook panel"
@@ -95,7 +95,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
       <li><p>Select the Event Type for which you wish to receive events.</p></li>
       <li>
         <p>Choose the webhook version you wish to set up.</p>
-        <p>We recommend selecting the highest available version for your webhook. Refer to the <a class="text-primary-600" href="{% url "webhooks_docs" version="v2" %}#change-log">Change Log</a> for more details on webhook versions.</p>
+        <p>We recommend selecting the highest available version for your webhook. Refer to the <a class="links" href="{% url "webhooks_docs" version="v2" %}#change-log">Change Log</a> for more details on webhook versions.</p>
         <p>You can only create one Webhook endpoint for each type of event and version. Please get in touch if this limitation causes difficulty for your application.</p>
       </li>
       <li>

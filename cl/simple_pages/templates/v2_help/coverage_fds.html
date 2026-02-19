@@ -32,7 +32,7 @@
     >
     <p>Additionally, judicial nominees file financial disclosures with the Senate Judiciary Committee during the nomination process. Free Law Project <a class="underline" href="https://www.github.com/freelawproject/nomination-extractor/" target="_blank" rel="noopener noreferrer">built a machine learning model and tool</a> that could identify financial disclosures and used it to scan hundreds of thousands of pages of Senate records.
     </p>
-    <p><a class="underline" href="https://www.judicialwatch.org/" target="_blank" rel="noopener noreferrer nofollow">One other organization</a> has systematically placed disclosures online, and we have gathered their corpus as well, as described below. A news organization called ABPNews also gathered them in the late nineties, but after going out of business in 2000, <a class="underline" href="https://x.com/FreeLawProject/status/1093612415185350656" target="_blank" rel="noopener noreferrer">their records were lost to water damage</a>. If you know of other sources, <a class="text-primary-600" href="{% url "contact" %}">please get in touch</a>.
+    <p><a class="underline" href="https://www.judicialwatch.org/" target="_blank" rel="noopener noreferrer nofollow">One other organization</a> has systematically placed disclosures online, and we have gathered their corpus as well, as described below. A news organization called ABPNews also gathered them in the late nineties, but after going out of business in 2000, <a class="underline" href="https://x.com/FreeLawProject/status/1093612415185350656" target="_blank" rel="noopener noreferrer">their records were lost to water damage</a>. If you know of other sources, <a class="links" href="{% url "contact" %}">please get in touch</a>.
     </p>
     <p>In 2023, ProPublica utilized our dataset for an ambitious investigation into the Supreme Court, which led to their winning the prestigious public service Pulitzer Prize in 2024. The Pulitzer committee <a class="underline" href="https://www.propublica.org/article/pulitzer-prize-announcement-propublica-supreme-court" target="_blank" rel="noopener noreferrer">praised</a> ProPublica's "groundbreaking and ambitious reporting that pierced the thick wall of secrecy surrounding the Supreme Court." This recognition underscores the critical importance of judicial transparency and the impact of our database in supporting investigative journalism.
     </p>
@@ -71,7 +71,7 @@
 
     <p class="text-sm font-normal text-greyscale-600">* Differences in these columns are due to disclosures frequently being broken into multiple files.
     </p>
-    <p>If you know of other disclosures not already in our collection, we would <a class="text-primary-600" href="{% url "contact" %}">love to hear from you</a>. We need your help to complete this collection.</p>
+    <p>If you know of other disclosures not already in our collection, we would <a class="links" href="{% url "contact" %}">love to hear from you</a>. We need your help to complete this collection.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="enhancements">
@@ -79,7 +79,7 @@
     <p>We have dedicated considerable energy to develop <a class="underline" href="https://github.com/freelawproject/disclosure-extractor" target="_blank" rel="noopener noreferrer">a parsing system</a> for these disclosures. This system takes the disclosure, whether it’s a single-page TIFF, multi-page TIFF or PDF, scanned document or text, and converts it into machine-readable JSON data. When we first ran this system, it took weeks for our servers to parse the information from the disclosures.
     </p>
     <p>Additionally, we developed a <a class="underline" href="https://github.com/freelawproject/nomination-extractor/" target="_blank" rel="noopener noreferrer">machine learning model</a> that extracted 843 Financial Disclosure from over 250k pages of Senate hearing documents.</p>
-    <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a class="text-primary-600" href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
+    <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a class="links" href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
     </p>
 
     <ul>

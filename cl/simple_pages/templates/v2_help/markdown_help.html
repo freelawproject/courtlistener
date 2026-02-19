@@ -37,7 +37,7 @@
       <h2>Basic Formatting</h2>
       <h3>Paragraphs</h3>
       <p>The easiest thing to do in Markdown is to create paragraphs. To create paragraphs, simply press <kbd>enter</kbd> twice, like you normally do. For example, these are paragraphs from the recent Supreme Court opinion,
-        <em><a class="text-primary-600" href="/opinion/2812209/obergefell-v-hodges/">Obergefell v. Hodges</a></em>:
+        <em><a class="links" href="/opinion/2812209/obergefell-v-hodges/">Obergefell v. Hodges</a></em>:
       </p>
       <c-code>
 It would misunderstand these men and women to say they disrespect the idea of
@@ -394,7 +394,7 @@ The doctrine has a long history starting at opinion #108713.
         <p>Which creates a link to opinion #108713.</p>
         <div class="textbox">
             <p>The doctrine has a long history starting at
-               <a class="text-primary-600" href="{% url "view_case" 108713 "md" %}">opinion #108713</a>.
+               <a class="links" href="{% url "view_case" 108713 "md" %}">opinion #108713</a>.
             </p>
         </div>
         <p>Whenever the word <em>opinion</em> is followed by a pound sign and a number, it will automatically be made into a link. Upper case or lower case letters will work.
