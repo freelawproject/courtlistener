@@ -127,6 +127,9 @@
   .screenshot {
     @apply rounded-2xl block max-w-full;
   }
+  .chip {
+    @apply text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full;
+  }
 
   /* ----------- THIRD PARTY OVERRIDES ----------- */
 
