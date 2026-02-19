@@ -895,6 +895,21 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
+    def test_related_query_pagination_depth_limit(
+        self, court_cache_key_mock
+    ) -> None:
+        """Confirm that related queries have a stricter pagination limit."""
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "related:123",
+            "page": 6,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
+
     async def test_avoid_splitting_terms_on_special_chars(
         self, court_cache_key_mock
     ) -> None:

@@ -74,10 +74,19 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 logger = logging.getLogger(__name__)
 
 
-def check_pagination_depth(page_number):
-    """Check if the pagination is too deep (indicating a crawler)"""
+def check_pagination_depth(page_number: int, is_related: bool = False) -> None:
+    """Check if the pagination is too deep (indicating a crawler)
 
-    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
+    :param page_number: The requested page number.
+    :param is_related: Whether this is a related-cases query, which uses
+        a stricter pagination limit.
+    """
+    max_depth = (
+        settings.MAX_RELATED_SEARCH_PAGINATION_DEPTH
+        if is_related
+        else settings.MAX_SEARCH_PAGINATION_DEPTH
+    )
+    if page_number > max_depth:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -485,6 +494,12 @@ def fetch_and_paginate_results(
 
     search_type = clean_params["type"]
     page = int(clean_params["page"])
+
+    # Check related query pagination depth early, before cache lookups,
+    # to fully block deep pagination of expensive MLT queries.
+    is_related = bool(RELATED_PATTERN.search(clean_params.get("q", "")))
+    if is_related:
+        check_pagination_depth(page, is_related=True)
 
     # Check cache for displaying insights on the Home Page.
     if cache_key is not None:
