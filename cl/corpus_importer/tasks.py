@@ -3498,6 +3498,85 @@ class MergeResult[T = int](NamedTuple):
         return MergeResult(create=False, update=False, success=True, pk=pk)
 
 
+def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
+    """Merges a CaseTransfer object in the database by first checking if it can
+    be used to update an existing object, and if not, creating a new object (if
+    necessary).
+
+    :param case_transfer: The CaseTransfer object to be merged.
+    :return: The result of this merge attempt."""
+    logger.info(
+        "Merging CaseTransfer from docket %s in court %s to docket %s in court %s on %s with type %s.",
+        case_transfer.origin_court.pk,
+        case_transfer.origin_docket_number,
+        case_transfer.destination_court.pk,
+        case_transfer.destination_docket_number,
+        case_transfer.transfer_date.isoformat(),
+        case_transfer.transfer_type,
+    )
+    candidate_case_transfers = CaseTransfer.objects.filter(
+        origin_court=case_transfer.origin_court,
+        origin_docket_number=case_transfer.origin_docket_number,
+        destination_court=case_transfer.destination_court,
+        destination_docket_number=case_transfer.destination_docket_number,
+        transfer_date=case_transfer.transfer_date,
+        transfer_type=case_transfer.transfer_type,
+    )
+    try:
+        # Try to find an existing CaseTransfer to fill in info for.
+        if case_transfer.origin_docket:
+            existing_case_transfer = candidate_case_transfers.get(
+                origin_docket=None
+            )
+        else:
+            existing_case_transfer = candidate_case_transfers.get(
+                destination_docket=None
+            )
+    except CaseTransfer.MultipleObjectsReturned:
+        # This should never happen
+        logger.error(
+            "Found multiple matching CaseTransfer objects.",
+        )
+        return MergeResult.failed()
+    except CaseTransfer.DoesNotExist:
+        logger.info(
+            "Could not find existing transfer to update. Checking if transfer already exists..."
+        )
+        try:
+            existing_case_transfer = candidate_case_transfers.get(
+                origin_docket=case_transfer.origin_docket,
+                destination_docket=case_transfer.destination_docket,
+            )
+        except CaseTransfer.MultipleObjectsReturned:
+            # Should never happen
+            logger.error(
+                "Found multiple matching CaseTransfer objects.",
+            )
+            return MergeResult.failed()
+        except CaseTransfer.DoesNotExist:
+            logger.info(
+                "Did not find existing CaseTransfer object. Creating..."
+            )
+            case_transfer.save()
+            return MergeResult.created(case_transfer.pk)
+        logger.info(
+            "Identical CaseTransfer object already exists. Merge is unnecessary."
+        )
+        return MergeResult.unnecessary(existing_case_transfer.pk)
+    else:
+        logger.info(
+            "Updating existing CaseTransfer %s.", existing_case_transfer.pk
+        )
+        if case_transfer.origin_docket:
+            existing_case_transfer.origin_docket = case_transfer.origin_docket
+        else:
+            existing_case_transfer.destination_docket = (
+                case_transfer.destination_docket
+            )
+        existing_case_transfer.save()
+        return MergeResult.updated(existing_case_transfer.pk)
+
+
 def merge_texas_document(
     docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
 ) -> MergeResult:
@@ -3800,6 +3879,7 @@ def merge_texas_case_transfers(
         docket_data["originating_court"]
     )
 
+    # TODO Also need to generate reverse transfers to ensure information is complete
     if docket_data["court_type"] == CourtType.SUPREME.value:
         # Assume that the originating court -> appellate court transfer will
         # be populated by an appellate docket later on.
@@ -3902,8 +3982,7 @@ def merge_texas_case_transfers(
 
     any_created = False
     for transfer in transfers:
-        # TODO Update once fk's are back to match docstring
-        _, created = CaseTransfer.objects.get_or_create(
+        case_transfer = CaseTransfer(
             origin_court=transfer.origin_court,
             origin_docket_number=transfer.origin_docket_number,
             destination_court=transfer.destination_court,
@@ -3911,23 +3990,9 @@ def merge_texas_case_transfers(
             transfer_date=transfer.transfer_date,
             transfer_type=transfer.transfer_type,
         )
-        if created:
+        merge_result = merge_case_transfer(case_transfer)
+        if merge_result.create:
             any_created = True
-            logger.info(
-                "Created CaseTransfer object from docket %s in court %s to docket %s in court %s",
-                transfer.origin_docket_number,
-                transfer.origin_court.pk,
-                transfer.destination_docket_number,
-                transfer.destination_court.pk,
-            )
-        else:
-            logger.warning(
-                "CaseTransfer object from docket %s in court %s to docket %s in court %s already exists",
-                transfer.origin_docket_number,
-                transfer.origin_court.pk,
-                transfer.destination_docket_number,
-                transfer.destination_court.pk,
-            )
 
     return MergeResult(success=True, create=any_created, update=False, pk=None)
 
