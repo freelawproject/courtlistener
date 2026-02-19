@@ -106,7 +106,7 @@ jobs:
         run: >
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           ./manage.py test
-          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
+          cl --verbosity=2 ${{ matrix.tag_flags }} --parallel --xml-output /tmp/test-results
       - name: Export selenium results from docker to host
         if: failure()
         run: |
@@ -123,6 +123,25 @@ jobs:
           name: selenium-screenshots
           path: selenium-screenshots/extract
           if-no-files-found: ignore
+      - name: Export test results from docker to host
+        if: always()
+        run: docker cp 'cl-django:/tmp/test-results' courtlistener/test-results
+      - name: Save test results as Github artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: courtlistener/test-results/
+          if-no-files-found: ignore
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: Test Results (${{ matrix.tag_flags }})
+          path: test-results/*.xml
+          reporter: java-junit
+          working-directory: courtlistener
+
 
 # Cancel the current workflow (tests) for pull requests (head_ref) only. See:
 # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-a-fallback-value
