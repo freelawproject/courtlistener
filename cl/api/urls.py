@@ -97,9 +97,11 @@ router.register(
     r"docket-tags", favorite_views.DocketTagViewSet, basename="DocketTag"
 )
 
-# Scrapers
+# State content
 router.register(
-    "scrapers/email/state/tx/tames/alert", scraper_views.TexasEmailEndpoint
+    r"state/(?P<state>\w{2})/(?P<site>[^/]+)/alerts",
+    scraper_views.StateEmailEndpoint,
+    basename="StateEmail",
 )
 
 # Prayers
