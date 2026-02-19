@@ -29,7 +29,7 @@ from rest_framework.test import APIRequestFactory
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
-from cl.lib.elasticsearch_utils import do_es_api_query
+from cl.lib.elasticsearch_utils import build_es_base_query, do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -1750,6 +1750,53 @@ class OpinionsESSearchTest(
         }
         assert_facet_fields(r.context["facet_fields"], expected_values)
 
+    @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
+    async def test_facet_counts_caching(self) -> None:
+        """Are facet counts cached and reused across status changes?"""
+        # Delete facet cache entries that earlier tests may have populated.
+        r = get_redis_interface("CACHE")
+        if keys := r.keys("*facet_counts_cache:*"):
+            r.delete(*keys)
+
+        def get_facet_dict(facet_fields):
+            return {f.name: f.count for f in facet_fields}
+
+        # Patch build_es_base_query where fetch_facets calls it (the
+        # local name in search_utils) so we only count facet queries.
+        with mock.patch(
+            "cl.lib.search_utils.build_es_base_query",
+            wraps=build_es_base_query,
+        ) as mock_facet_query:
+            # First request: facet cache miss → 1 facet query.
+            r = await self.async_client.get(
+                reverse("show_results"), {"q": "*", "stat_Published": "on"}
+            )
+            first_facets = get_facet_dict(r.context["facet_fields"])
+            self.assertEqual(first_facets["stat_Published"], 4)
+            self.assertEqual(first_facets["stat_Errata"], 1)
+            self.assertEqual(mock_facet_query.call_count, 1)
+
+            # Second request with a different status filter should hit
+            # the facet cache → 0 facet queries.
+            mock_facet_query.reset_mock()
+            r = await self.async_client.get(
+                reverse("show_results"), {"q": "*", "stat_Errata": "on"}
+            )
+            second_facets = get_facet_dict(r.context["facet_fields"])
+            self.assertEqual(first_facets, second_facets)
+            self.assertEqual(mock_facet_query.call_count, 0)
+
+            # A different text query should miss the facet cache
+            # (different cache key) → 1 facet query.
+            mock_facet_query.reset_mock()
+            r = await self.async_client.get(
+                reverse("show_results"),
+                {"q": "some rando syllabus", "stat_Published": "on"},
+            )
+            third_facets = get_facet_dict(r.context["facet_fields"])
+            self.assertEqual(third_facets["stat_Published"], 3)
+            self.assertEqual(mock_facet_query.call_count, 1)
+
     async def test_citation_ordering_by_citation_count(self) -> None:
         """Can the results be re-ordered by citation count?"""
         search_params = {"q": "*", "order_by": "citeCount desc"}
@@ -2926,6 +2973,8 @@ class OpinionSearchJurisdictionRelevancyTest(
 
 
 @override_settings(RELATED_MLT_MINTF=1)
+@override_settings(WAFFLE_CACHE_PREFIX="test_related_search_test")
+@override_flag("citing_and_related_enabled", active=True)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):

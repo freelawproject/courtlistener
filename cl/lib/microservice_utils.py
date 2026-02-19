@@ -16,6 +16,7 @@ from httpx import (
 from cl.audio.models import Audio
 from cl.lib.decorators import retry
 from cl.lib.exceptions import NoSuchKey
+from cl.lib.models import AbstractPDF
 from cl.search.models import Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -39,28 +40,29 @@ def log_invalid_embedding_errors(embeddings: Any):
         )
 
 
-async def clean_up_recap_document_file(item: RECAPDocument) -> None:
-    """Clean up the RecapDocument file-related fields after detecting the file
+async def clean_up_recap_document_file(item: AbstractPDF) -> None:
+    """Clean up the document's file-related fields after detecting the file
     doesn't exist in the storage.
 
-    :param item: The RECAPDocument to work on.
+    :param item: The document to work on.
     :return: None
     """
 
-    if isinstance(item, RECAPDocument):
+    if isinstance(item, AbstractPDF):
         await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
-        item.date_upload = None
         item.file_size = None
         item.page_count = None
-        item.is_available = False
+        if isinstance(item, RECAPDocument):
+            item.date_upload = None
+            item.is_available = False
         await item.asave()
 
 
 async def microservice(
     service: str,
     method: str = "POST",
-    item: RECAPDocument | Opinion | Audio | None = None,
+    item: AbstractPDF | Opinion | Audio | None = None,
     file: BufferedReader | None = None,
     file_type: str | None = None,
     filepath: str | None = None,
@@ -96,7 +98,7 @@ async def microservice(
     # Handle our documents based on the type of model object
     # Sadly these are not uniform
     if item:
-        if isinstance(item, RECAPDocument):
+        if isinstance(item, AbstractPDF):
             try:
                 files = {
                     "file": (
@@ -158,10 +160,10 @@ async def microservice(
     backoff=2,
     logger=logger,
 )
-async def rd_page_count_service(rd: RECAPDocument) -> Response:
+async def doc_page_count_service(rd: AbstractPDF) -> Response:
     """Call page-count from doctor with retries
 
-    :param rd: the recap document to count pages
+    :param rd: the document to count pages
     :return: Response object
     """
     try:

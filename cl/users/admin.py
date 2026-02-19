@@ -104,6 +104,10 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     def api_calls_count(self, obj):
         r = get_redis_interface("STATS")
         total = 0
+        if obj.id is None:
+            # New user, no API usage, bail.
+            return total
+
         for api_prefix in ["v3", "v4"]:
             count = r.zscore(f"api:{api_prefix}.user.counts", obj.id)
             if count:

@@ -15,6 +15,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import (
     Case,
     CharField,
+    CheckConstraint,
     F,
     Prefetch,
     Q,
@@ -38,9 +39,9 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
+from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
     CSVExportMixin,
-    document_model,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
@@ -1598,9 +1599,9 @@ class RECAPDocument(
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
-            from cl.scrapers.tasks import extract_recap_pdf
+            from cl.scrapers.tasks import extract_pdf_document
 
-            tasks.append(extract_recap_pdf.si(self.pk))
+            tasks.append(extract_pdf_document.si(self.pk))
 
         if len(tasks) > 0:
             chain(*tasks)()
@@ -3980,10 +3981,30 @@ class CaseTransfer(AbstractDateTimeModel):
     Represents any transfer of a docket between two courts whether that be
     an appeal, workload balancing, or docket merging.
 
+    The `x_court` and `x_docket_number` fields must always be set and at least
+    one of `origin_docket` or `destination_docket` must be set to ensure
+    that transfers are associated with dockets in the DB. The reason for
+    (effectively) duplicating the docket number via `x_docket` and
+    `x_docket_number` is to allow populating transfers even if only one end is
+    in the DB. This allows us to track transfers from untracked courts to
+    tracked courts (e.g. appeals from trial courts) and to populate transfers
+    during the initial docket merging step independently of the order dockets
+    are merged in.
+
+    The intended way to populate this table in a merger is to:
+
+    1. Lookup if a transfer with matching origin and destination courts and\
+       docket numbers exists;
+    2. If it does, update the missing foreign key on that entry;
+    3. Otherwise, create a new entry with only origin or destination docket\
+       field set depending on which you have.
+
     :ivar origin_court: The court this transfer originates from.
-    :ivar origin_docket: The docket this transfer originates from.
+    :ivar origin_docket_number: The ID of the docket this transfer originates from.
+    :ivar origin_docket: The docket object this transfer originates from.
     :ivar destination_court: The court the docket is being transferred to.
-    :ivar destination_docket: The case docket in the destination court.
+    :ivar destination_docket_number: The ID of the case docket in the destination court.
+    :ivar destination_docket: The docket object in the destination court.
     :ivar transfer_date: The date this transfer occurred.
     :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
     """
@@ -4007,22 +4028,114 @@ class CaseTransfer(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_court",
     )
+    origin_docket_number = models.TextField()
     origin_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_docket",
+        blank=True,
+        null=True,
     )
     destination_court = models.ForeignKey(
         "search.Court",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_court",
     )
+    destination_docket_number = models.TextField()
     destination_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_docket",
+        blank=True,
+        null=True,
     )
     transfer_date = models.DateField()
     transfer_type = models.SmallIntegerField(
         choices=transfer_type_choices.items(),
     )
+
+    class Meta:
+        constraints = [
+            CheckConstraint(
+                condition=Q(origin_docket__isnull=False)
+                | Q(destination_docket__isnull=False),
+                name="docket_at_least_one_fk_set",
+            )
+        ]
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
+    """
+    Represents a docket entry in a SCOTUS docket.
+
+    :ivar docket: The Docket this entry is associated with.
+    :ivar entry_number: Entry number on the SCOTUS Docket page.
+    :ivar description: For appellate brief events, a short description of
+    the brief.
+    :ivar date_filed: The date that SCOTUS indicates this entry was filed.
+    :ivar sequence_number: CL-generated field to keep entries in the same
+    order they appear in SCOTUS. Concatenation of filing date (in ISO format)
+    and the index in the SCOTUS table.
+    """
+
+    docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+    )
+    entry_number = models.IntegerField(
+        null=True,
+        blank=True,
+    )
+    description = models.TextField(blank=True)
+    date_filed = models.DateField(
+        null=True,
+        blank=True,
+    )
+    sequence_number = models.CharField(
+        max_length=16,
+    )
+
+    class Meta:
+        ordering = ["-sequence_number"]
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
+    """
+    Represents an attachment to a SCOTUS docket entry.
+
+    :ivar docket_entry: The Docket this document is associated with.
+    :ivar description: The description of this file in SCOTUS.
+    :ivar document_number: The document number on the docket page in SCOTUS.
+    :ivar attachment_number: The attachment number on the docket page in SCOTUS.
+    :ivar url: The download URL that SCOTUS provided for this document.
+    """
+
+    docket_entry = models.ForeignKey(
+        SCOTUSDocketEntry, on_delete=models.CASCADE
+    )
+    description = models.TextField(blank=True)
+    document_number = models.IntegerField(
+        blank=True,
+        null=True,
+    )
+    attachment_number = models.SmallIntegerField(
+        blank=True,
+        null=True,
+    )
+    url = models.URLField(max_length=1000)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["document_number"]),
+            models.Index(fields=["filepath_local"]),
+        ]
+        unique_together = (
+            "docket_entry",
+            "document_number",
+            "attachment_number",
+        )
+        ordering = ("document_number", "attachment_number")

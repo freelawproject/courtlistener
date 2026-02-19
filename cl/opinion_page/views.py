@@ -6,6 +6,7 @@ from typing import Any, cast
 from urllib.parse import urlencode
 
 import eyecite
+import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -1037,14 +1038,23 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     authorities_count = await cluster.aauthority_count()
     summaries_count = await cluster.parentheticals.acount()
 
-    sub_opinion_pks = [
-        str(opinion.pk)
-        async for opinion in cluster.sub_opinions.all().only("pk")
-    ]
-    cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
-    related_cases_count = await es_related_case_count(
-        cluster.id, sub_opinion_pks
+    ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
+        request, "ui_flag_for_o_es"
     )
+    # Default count when flag is disabled
+    cited_by_count = 0
+    related_cases_count = 0
+
+    if ui_flag_for_o_es:
+        # Flag enabled, query ES to get counts
+        sub_opinion_pks = [
+            str(opinion.pk)
+            async for opinion in cluster.sub_opinions.all().only("pk")
+        ]
+        cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
+        related_cases_count = await es_related_case_count(
+            cluster.id, sub_opinion_pks
+        )
 
     # Get `tab` from request parameters (fallback to 'opinions')
     tab = request.GET.get("tab", "opinions")
@@ -1057,6 +1067,7 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         "related_cases_count": related_cases_count,
         "tab": tab,
         "is_htmx": "HX-Request" in request.headers,
+        "es_enabled": ui_flag_for_o_es,
     }
 
     download_context = await get_downloads_context(cluster)
@@ -1613,43 +1624,56 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
 
 @ensure_csrf_cookie
 async def block_item(request: HttpRequest) -> HttpResponse:
-    """Block an item from search results using AJAX"""
-    user = await request.auser()  # type: ignore[attr-defined]
-    if is_ajax(request) and user.is_superuser:  # type: ignore[union-attr]
-        obj_type = request.POST["type"]
-        pk = request.POST["id"]
-
-        if obj_type not in ["docket", "cluster"]:
-            return HttpResponseBadRequest(
-                "This view can not handle the provided type"
-            )
-
-        cluster: OpinionCluster | None = None
-        if obj_type == "cluster":
-            # Block the cluster
-            cluster = await aget_object_or_404(OpinionCluster, pk=pk)
-            if cluster is not None:
-                cluster.blocked = True
-                cluster.date_blocked = now()
-                await cluster.asave()
-
-        docket_pk = (
-            pk
-            if obj_type == "docket"
-            else cluster.docket_id
-            if cluster is not None
-            else None
-        )
-        if not docket_pk:
-            return HttpResponse("It worked")
-
-        d: Docket = await aget_object_or_404(Docket, pk=docket_pk)
-        d.blocked = True
-        d.date_blocked = now()
-        await d.asave()
-
-        return HttpResponse("It worked")
-    else:
+    """Block an item from search results using AJAX."""
+    if not is_ajax(request):
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request"
         )
+
+    user = await request.auser()  # type: ignore[attr-defined]
+    obj_type = request.POST["type"]
+    pk = request.POST["id"]
+
+    if obj_type not in ["docket", "cluster"]:
+        return HttpResponseBadRequest(
+            "This view can not handle the provided type"
+        )
+
+    has_change_docket = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+        "search.change_docket"
+    )
+    if not has_change_docket:
+        raise PermissionDenied("You lack permission to block this item.")
+
+    if obj_type == "cluster":
+        has_change_cluster = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+            "search.change_opinioncluster"
+        )
+        if not has_change_cluster:
+            raise PermissionDenied("You lack permission to block this item.")
+
+    cluster: OpinionCluster | None = None
+    if obj_type == "cluster":
+        # Block the cluster
+        cluster = await aget_object_or_404(OpinionCluster, pk=pk)
+        if cluster is not None:
+            cluster.blocked = True
+            cluster.date_blocked = now()
+            await cluster.asave()
+
+    docket_pk = (
+        pk
+        if obj_type == "docket"
+        else cluster.docket_id
+        if cluster is not None
+        else None
+    )
+    if not docket_pk:
+        return HttpResponse("It worked")
+
+    d: Docket = await aget_object_or_404(Docket, pk=docket_pk)
+    d.blocked = True
+    d.date_blocked = now()
+    await d.asave()
+
+    return HttpResponse("It worked")
