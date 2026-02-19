@@ -557,7 +557,14 @@ def fetch_and_paginate_results(
         return results, 1, False, main_total, child_total
 
     # Check pagination depth
-    check_pagination_depth(page)
+    query_string = clean_params.get("q", "")
+    is_related_query = bool(RELATED_PATTERN.search(query_string))
+    max_pagination_depth = (
+        settings.MAX_RELATED_SEARCH_PAGINATION_DEPTH
+        if is_related_query
+        else settings.MAX_SEARCH_PAGINATION_DEPTH
+    )
+    check_pagination_depth(page, max_pagination_depth)
 
     # Fetch results from ES
     hits, query_time, error, main_total, child_total = fetch_es_results(
