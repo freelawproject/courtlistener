@@ -219,7 +219,7 @@
                       <li><a href="{% url "alert_help" %}#citation-alerts">Learn More</a></li>
                     </ul>
                   </div>
-                  {% if pdf_path %}
+                  {% if download_file_path %}
                       {% include "includes/add_download_button.html" %}
                   {% endif %}
                   {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
