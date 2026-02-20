@@ -2,6 +2,7 @@ from attr import dataclass
 from django.contrib.auth.models import User
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
+from rest_framework.relations import PrimaryKeyRelatedField
 from rest_framework.response import Response
 from rest_framework.serializers import ModelSerializer
 from rest_framework.viewsets import ModelViewSet
@@ -31,7 +32,7 @@ class StateEmailProcessingQueueSerializer(ModelSerializer):
     uploader = serializers.HiddenField(
         default=serializers.CurrentUserDefault(),
     )
-    court = serializers.PrimaryKeyRelatedField(
+    court: PrimaryKeyRelatedField[Court] = serializers.PrimaryKeyRelatedField(
         queryset=Court.state_courts.all(),
         html_cutoff=500,  # Show all values in HTML view.
         required=True,
