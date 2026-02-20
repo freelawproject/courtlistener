@@ -55,21 +55,63 @@ def is_input_css(path: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _get_full_tag(lines: list[str], line_idx: int) -> str:
+def _get_full_tag(
+    lines: list[str], line_idx: int, *, col: int | None = None
+) -> str:
     """Reconstruct the full opening HTML tag surrounding a given line.
 
     Given a 0-based line index where a match was found, searches backward
     for the ``<`` that opens the tag and forward for the closing ``>``.
     Returns the concatenated content of all lines that make up the tag.
+
+    If *col* is given, the search is anchored to that column position on
+    *line_idx*: the opening ``<`` is found by scanning leftward from *col*
+    on that line (instead of checking all prior lines), and the closing
+    ``>`` is found by scanning rightward from *col*.  This prevents
+    returning the wrong tag when multiple tags share a single line.
     """
-    # Search backward for the opening <
+    if col is not None:
+        # Anchored search on the match line
+        line = lines[line_idx]
+        # Find opening < at or before col
+        open_pos = line.rfind("<", 0, col + 1)
+        if open_pos == -1:
+            # Tag opened on a previous line — fall back to line scan
+            start = line_idx
+            for j in range(line_idx - 1, -1, -1):
+                if "<" in lines[j]:
+                    start = j
+                    break
+            open_pos = 0  # include from start of matched line
+        else:
+            start = line_idx
+
+        # Find closing > at or after col
+        close_pos = line.find(">", col)
+        if close_pos != -1:
+            # Tag closes on same line
+            if start == line_idx:
+                return line[open_pos : close_pos + 1]
+            return (
+                " ".join(lines[start:line_idx]) + " " + line[: close_pos + 1]
+            )
+        # Tag continues on subsequent lines
+        end = line_idx
+        for j in range(line_idx + 1, len(lines)):
+            if ">" in lines[j]:
+                end = j
+                break
+        if start == line_idx:
+            return " ".join([line[open_pos:]] + lines[line_idx + 1 : end + 1])
+        return " ".join(lines[start : end + 1])
+
+    # Original behaviour: scan entire lines
     start = line_idx
     for j in range(line_idx, -1, -1):
         if "<" in lines[j]:
             start = j
             break
 
-    # Search forward for the closing >
     end = line_idx
     for j in range(line_idx, len(lines)):
         if ">" in lines[j]:
@@ -279,7 +321,7 @@ def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
     class_re = re.compile(r"\bclass\s*=")
     for i, line in enumerate(lines, 1):
         for m in a_tag_re.finditer(line):
-            full_tag = _get_full_tag(lines, i - 1)
+            full_tag = _get_full_tag(lines, i - 1, col=m.start())
             if not class_re.search(full_tag):
                 results.append(
                     (
@@ -304,26 +346,33 @@ def check_placeholder_text(lines: list[str]) -> list[tuple[int, str]]:
     in_html_comment = False
     in_django_comment = False
     for i, line in enumerate(lines, 1):
+        scannable = line
+
         # Track multiline HTML comments (<!-- ... -->)
-        if "<!--" in line and "-->" not in line:
-            in_html_comment = True
-            continue
         if in_html_comment:
-            if "-->" in line:
-                in_html_comment = False
-            continue
+            close_pos = line.find("-->")
+            if close_pos == -1:
+                continue  # entire line is inside comment
+            in_html_comment = False
+            scannable = line[close_pos + 3 :]
+        elif "<!--" in line and "-->" not in line:
+            in_html_comment = True
+            # Only scan the part before the comment opens
+            scannable = line[: line.index("<!--")]
 
         # Track Django block comments ({% comment %} ... {% endcomment %})
-        if "{% comment %}" in line:
-            in_django_comment = True
-            continue
         if in_django_comment:
-            if "{% endcomment %}" in line:
-                in_django_comment = False
-            continue
+            close_pos = line.find("{% endcomment %}")
+            if close_pos == -1:
+                continue  # entire line is inside comment
+            in_django_comment = False
+            scannable = line[close_pos + len("{% endcomment %}") :]
+        elif "{% comment %}" in line:
+            in_django_comment = True
+            scannable = line[: line.index("{% comment %}")]
 
         # Strip single-line comments before checking
-        cleaned = inline_comment_re.sub("", line)
+        cleaned = inline_comment_re.sub("", scannable)
         m = pattern.search(cleaned)
         if m:
             results.append(
