@@ -771,17 +771,51 @@ def set_skip_percolation_if_bankruptcy_data(
         d.skip_percolator_request = True
 
 
+def _exceeds_attorney_limit(
+    parties_data: list[dict[str, Any]], limit: int
+) -> bool:
+    """Check if total attorneys in parties data exceeds the given limit.
+
+    Stops counting early once the limit is exceeded for efficiency, since
+    parties data can be very large.
+
+    :param parties_data: A list of dicts containing the parties data.
+    :param limit: The maximum number of attorneys allowed.
+    :return: True if the total number of attorneys exceeds the limit.
+    """
+    count = 0
+    for party in parties_data:
+        count += len(party.get("attorneys", []))
+        if count > limit:
+            return True
+    return False
+
+
 def set_skip_percolation_if_parties_data(
     parties_data: list[dict[str, Any]], d: Docket
-) -> None:
+) -> bool:
     """Set skip percolation flag if parties data is present.
+
+    Since docket percolation references the existing ES document (not inline
+    content), percolating on save would just re-percolate the same document
+    without new parties data. So we always skip percolation on save when
+    parties data is present and decide whether to percolate after merging
+    based on the attorney count limit.
 
     :param parties_data: A list of dicts containing the parties data.
     :param d: The docket to be saved.
-    :return: None
+    :return: True if the docket should be percolated after merging parties,
+    False otherwise.
     """
-    if parties_data:
-        d.skip_percolator_request = True
+    if not parties_data:
+        return False
+
+    d.skip_percolator_request = True
+    if _exceeds_attorney_limit(
+        parties_data, settings.MAX_ATTORNEYS_TO_PERCOLATE
+    ):
+        return False
+    return True
 
 
 def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:

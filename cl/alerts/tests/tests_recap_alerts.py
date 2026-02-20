@@ -4395,6 +4395,174 @@ class RECAPAlertsPercolatorTest(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
 
+    @override_settings(MAX_ATTORNEYS_TO_PERCOLATE=2)
+    def test_skip_parties_percolation_when_attorneys_exceed_limit(
+        self, mock_prefix
+    ) -> None:
+        """Confirm that when the number of attorneys exceeds
+        MAX_ATTORNEYS_TO_PERCOLATE, percolation is skipped on docket
+        save and index_docket_parties_in_es is not called, so no percolation
+        happens at all.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Attorney Limit",
+                query='atty_name="John Lorem"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Parties data with 3 attorneys, exceeding the limit of 2.
+        data_over_limit = {
+            "parties": [
+                {
+                    "attorneys": [
+                        {
+                            "contact": "Lane Powell",
+                            "name": "John Lorem",
+                            "roles": [],
+                        },
+                        {
+                            "contact": "Baker & McKenzie",
+                            "name": "Jane Ipsum",
+                            "roles": [],
+                        },
+                    ],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "name": "Insurance Company",
+                    "type": "Plaintiff",
+                },
+                {
+                    "attorneys": [
+                        {
+                            "contact": "Smith & Associates",
+                            "name": "Bob Dolor",
+                            "roles": [],
+                        },
+                    ],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "name": "Bank Corp",
+                    "type": "Defendant",
+                },
+            ]
+        }
+
+        # Percolation should be skipped on docket save.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = Docket(
+                court=self.court,
+                case_name="Attorney Limit Case",
+                docket_number="1:21-bk-9999",
+                source=Docket.RECAP,
+                pacer_case_id="999888",
+            )
+            percolate_parties = set_skip_percolation_if_parties_data(
+                data_over_limit["parties"], docket
+            )
+            docket.save()
+
+        # No percolation on docket save since skip was set.
+        self.reset_and_assert_percolator_count(expected=0)
+        # set_skip_percolation_if_parties_data should return False.
+        self.assertFalse(percolate_parties)
+        # skip_percolator_request should be True.
+        self.assertTrue(docket.skip_percolator_request)
+
+        # Parties data with 2 attorneys, within the limit of 2.
+        data_within_limit = {
+            "parties": [
+                {
+                    "attorneys": [
+                        {
+                            "contact": "Lane Powell",
+                            "name": "John Lorem",
+                            "roles": [],
+                        },
+                    ],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "name": "Insurance Company",
+                    "type": "Plaintiff",
+                },
+                {
+                    "attorneys": [
+                        {
+                            "contact": "Baker & McKenzie",
+                            "name": "Jane Ipsum",
+                            "roles": [],
+                        },
+                    ],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "name": "Bank Corp",
+                    "type": "Defendant",
+                },
+            ]
+        }
+
+        # When attorneys are within the limit, percolation should be skipped
+        # on docket save and happen after merging parties.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.refresh_from_db()
+            docket.case_name = "Attorney Limit Updated"
+            percolate_parties = set_skip_percolation_if_parties_data(
+                data_within_limit["parties"], docket
+            )
+            docket.save()
+
+        # No percolation on docket save since skip was set.
+        self.reset_and_assert_percolator_count(expected=0)
+        # skip_percolator_request should be True.
+        self.assertTrue(docket.skip_percolator_request)
+        # set_skip_percolation_if_parties_data should return True.
+        self.assertTrue(percolate_parties)
+
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ):
+            add_parties_and_attorneys(docket, data_within_limit["parties"])
+            index_docket_parties_in_es.delay(docket.pk)
+
+        # Percolation is performed upon the merging of parties.
+        self.reset_and_assert_percolator_count(expected=1)
+
     def test_case_only_alerts(self, mock_prefix) -> None:
         """Confirm that case-only alerts are properly sent and that they are
         triggered only once per case. This means that if a Docket or a
