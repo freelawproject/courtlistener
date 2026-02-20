@@ -90,11 +90,11 @@ class RateLimitedRequestManager:
             # Match more closely a chrome browser
             self.session.headers.update(
                 {
-                    "User-Agent": (
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/145.0.0.0 Safari/537.36"
-                    ),
+                    "User-Agent": {
+                        "User-Agent": "Juriscraper",
+                        "Cache-Control": "no-cache, max-age=0, must-revalidate",
+                        "Pragma": "no-cache",
+                    },
                     "Accept": (
                         "text/html,application/xhtml+xml,"
                         "application/xml;q=0.9,image/avif,"
