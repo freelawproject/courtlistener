@@ -1755,6 +1755,34 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
             results[0]["attorneys"][0]["attorney_id"], self.attorney_2.pk
         )
 
+    async def test_docket_party_name_filter_no_duplicates(self) -> None:
+        """Verify filtering by party name doesn't return duplicate dockets."""
+        self.path = reverse("docket-list", kwargs={"version": "v4"})
+
+        # Create two parties with matching names on the same docket
+        attorney_1 = await Attorney.objects.aget(pk=self.attorney.pk)
+        party1 = await sync_to_async(PartyFactory)(
+            name="First Corp LLC", attorneys=[attorney_1], docket=self.docket
+        )
+
+        attorney_2 = await Attorney.objects.aget(pk=self.attorney_2.pk)
+        party2 = await sync_to_async(PartyFactory)(
+            name="Second Corp Inc", attorneys=[attorney_2], docket=self.docket
+        )
+        await sync_to_async(PartyTypeFactory.create)(
+            docket=self.docket, party=party1, name="Plaintiff"
+        )
+        await sync_to_async(PartyTypeFactory)(
+            docket=self.docket, party=party2, name="Defendant"
+        )
+
+        self.q = {
+            "id": self.docket.id,
+            "parties__name__icontains": "Corp",
+        }
+        # Should return exactly 1 result, not 2 duplicates
+        await self.assertCountInResults(1)
+
 
 class DRFSearchAppAndAudioAppApiFilterTest(
     AudioTestCase, FilteringCountTestMixin
