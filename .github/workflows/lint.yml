@@ -60,7 +60,6 @@ jobs:
           cl/api/api_permissions.py \
           cl/api/factories.py \
           cl/api/management/commands/cl_retry_webhooks.py \
-          cl/api/management/commands/notify_bad_api_filter_users.py \
           cl/api/models.py \
           cl/api/routers.py \
           cl/api/tasks.py \
