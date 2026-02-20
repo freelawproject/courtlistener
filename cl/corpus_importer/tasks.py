@@ -157,9 +157,9 @@ from cl.recap.models import (
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     ClaimHistory,
     Court,
     Docket,
@@ -3068,7 +3068,7 @@ def recap_document_into_opinions(
             case_name_short=docket.case_name_short,
             docket=docket,
             date_filed=recap_document.docket_entry.date_filed,
-            source=SOURCES.RECAP,
+            source=ClusterSources.RECAP,
             precedential_status=PRECEDENTIAL_STATUS.UNKNOWN,
         )
         opinion = Opinion.objects.create(
