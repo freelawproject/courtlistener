@@ -1,0 +1,78 @@
+{% load extras %}
+
+<c-vars columns rows longrow footer align caption="Content table" safe></c-vars>
+
+<div class="overflow-auto">
+  <table class="w-full">
+    <caption class="sr-only">{{ caption }}</caption>
+    <thead>
+    <tr class="border-none">
+      {% for column in columns %}
+        <th
+          class="text-nowrap text-sm p-2 bg-greyscale-100 text-greyscale-700 font-normal first:rounded-l-lg last:rounded-r-lg text-start">
+          {{ column.label }}
+        </th>
+      {% endfor %}
+    </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr class="border-b-greyscale-200 border-b">
+        {% for column in columns %}
+          <td class="align-middle text-sm font-normal px-2 py-4 text-start">
+            {% if safe %}
+              {{ row|get:column.field|safe }}
+            {% else %}
+              {{ row|get:column.field }}
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    {% for lr in longrow %}
+      <tr>
+        <td class="align-middle text-sm font-normal px-2 py-4 text-start">
+          {% if safe %}
+              {{ lr.first|safe }}
+            {% else %}
+              {{ lr.first }}
+          {% endif %}
+        </td>
+        <td class="align-middle text-sm font-normal px-2 py-4 text-start" colspan="{{ lr.colspan }}">
+          {% if safe %}
+              {{ lr.second|safe }}
+            {% else %}
+              {{ lr.second }}
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    {% if footer %}
+      <tfoot>
+      {% for item in footer %}
+        <tr>
+          {% for column in columns %}
+            <td class="align-top text-sm p-2
+              {% if align == "data-center" %}
+                text-center first:text-start
+              {% elif align == "center" %}
+                text-center
+              {% else %}
+                text-start
+              {% endif %}
+            ">
+              <strong>
+                {% if safe %}
+                  {{ item|get:column.field|safe }}
+                {% else %}
+                  {{ item|get:column.field }}
+                {% endif %}
+              </strong>
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tfoot>
+    {% endif %}
+  </table>
+</div>
