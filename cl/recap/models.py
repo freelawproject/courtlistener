@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
+from cl.lib.decorators import document_model
 from cl.lib.model_helpers import make_path
 from cl.lib.models import AbstractDateTimeModel, AbstractFile
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
@@ -230,12 +231,50 @@ class ProcessingQueue(AbstractDateTimeModel):
         print(self.file_contents)
 
 
+class EmailSource:
+    """
+    Possible sources for entries in the email processing queue.
+    """
+
+    PACER = 1
+    """
+    Represents email notifications from PACER.
+    """
+    SCOTUS = 2
+    """
+    Represents email notifications from SCOTUS.
+    """
+    STATE = 3
+    """
+    Represents email notifications from any state court system.
+    """
+    NAMES = (
+        (PACER, "PACER email notification."),
+        (SCOTUS, "SCOTUS email notification."),
+        (STATE, "State email notification."),
+    )
+
+
+@document_model
 class EmailProcessingQueue(AbstractDateTimeModel):
-    """Where @recap.email emails go when received by the API"""
+    """
+    Where @recap.email emails go when received by the API
+
+    :ivar uploader: The user that sent in the email for processing.
+    :ivar court: The court where the upload was from.
+    :ivar message_id: The S3 message identifier, used to pull the file in the\
+        processing tasks.
+    :ivar destination_emails: The emails that received the notification.
+    :ivar filepath: The S3 filepath to the email and receipt stored as JSON\
+        text.
+    :ivar status_message: Any errors that occurred while processing an item.
+    :ivar recap_documents: Document(s) created from the PACER email, processed\
+        as a function of this queue.
+    :ivar source: The source of this email notification.
+    """
 
     uploader = models.ForeignKey(
         User,
-        help_text="The user that sent in the email for processing.",
         related_name="recap_email_processing_queue",
         # Normal users won't be uploading things to this API. ∴, if you've
         # uploaded to it, your account is too special to delete.
@@ -243,19 +282,14 @@ class EmailProcessingQueue(AbstractDateTimeModel):
     )
     court = models.ForeignKey(
         Court,
-        help_text="The court where the upload was from",
         related_name="recap_email_processing_queue",
         on_delete=models.RESTRICT,
     )
     message_id = models.TextField(
-        help_text="The S3 message identifier, used to pull the file in the processing tasks.",
         default=None,
     )
-    destination_emails = models.JSONField(
-        help_text="The emails that received the notification.", default=list
-    )
+    destination_emails = models.JSONField(default=list)
     filepath = models.FileField(
-        help_text="The S3 filepath to the email and receipt stored as JSON text.",
         upload_to=make_recap_email_processing_queue_aws_path,
         storage=IncrementingAWSMediaStorage(),
         max_length=300,
@@ -271,13 +305,15 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         db_index=True,
     )
     status_message = models.TextField(
-        help_text="Any errors that occurred while processing an item",
         blank=True,
     )
     recap_documents = models.ManyToManyField(
         RECAPDocument,
         related_name="recap_email_processing_queue",
-        help_text="Document(s) created from the PACER email, processed as a function of this queue.",
+    )
+    source = models.SmallIntegerField(
+        choices=EmailSource.NAMES,
+        default=EmailSource.PACER,
     )
 
     def __str__(self) -> str:

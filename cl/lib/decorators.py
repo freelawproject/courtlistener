@@ -266,6 +266,7 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
     Decorator for Django models to use docstrings to populate unset
     help_text and db_comment field attributes.
     """
+    spaces_re = re.compile(r"\s+")
     model_fields: dict[str, models.Field] = dict(
         [(field.name, field) for field in model._meta.local_fields]
     )
@@ -278,7 +279,10 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
     ]
     field_docs = dict(
         [
-            (field_name, docstring.replace("\n", " "))
+            (
+                field_name,
+                spaces_re.sub(" ", docstring.replace("\n", " ")),
+            )
             for field_name, docstring in ivar_docs
             if field_name in model_fields
         ]
