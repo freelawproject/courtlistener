@@ -137,6 +137,7 @@ dev = [
   "django-debug-toolbar>=6.1.0",
   "django-tailwind[reload]~=3.9.1",
   "responses>=0.25.8",
+  "unittest-xml-reporting>=4.0.0",
 ]
 
 [tool.ruff]
