@@ -403,38 +403,34 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         ) in view.filterset_class.base_filters.items():
             filter_parts = filter_name.split("__")
             filter_name = filter_parts[0]
-            attrs = OrderedDict()
+
+            if filter_name not in filters:
+                filters[filter_name] = OrderedDict(
+                    type=filter_type.__class__.__name__,
+                    lookup_types=[],
+                )
 
             # Type
-            attrs["type"] = filter_type.__class__.__name__
+            if len(filter_parts) == 1:
+                filters[filter_name]["type"] = filter_type.__class__.__name__
 
             # Lookup fields
             if len(filter_parts) > 1:
-                # Has a lookup type (__gt, __lt, etc.)
                 lookup_type = filter_parts[1]
-                if filters.get(filter_name) is not None:
-                    # We've done a filter with this name previously, just
-                    # append the value.
-                    attrs["lookup_types"] = filters[filter_name][
-                        "lookup_types"
-                    ]
-                    attrs["lookup_types"].append(lookup_type)
-                else:
-                    attrs["lookup_types"] = [lookup_type]
+                filters[filter_name]["lookup_types"].append(lookup_type)
             else:
-                # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
                     model_name = filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
-                    attrs["lookup_types"] = (
+                    filters[filter_name]["lookup_types"] = (
                         f"See available filters for '{model_name}'"
                     )
                 else:
-                    attrs["lookup_types"] = ["exact"]
+                    filters[filter_name]["lookup_types"].append("exact")
 
             # Do choices
             choices = filter_type.extra.get("choices", False)
             if choices:
-                attrs["choices"] = [
+                filters[filter_name]["choices"] = [
                     {
                         "value": choice_value,
                         "display_name": force_str(
@@ -443,9 +439,6 @@ class SimpleMetadataWithFilters(SimpleMetadata):
                     }
                     for choice_value, choice_name in choices
                 ]
-
-            # Wrap up.
-            filters[filter_name] = attrs
 
         metadata["filters"] = filters
 
