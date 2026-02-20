@@ -272,6 +272,18 @@ class SOURCES:
         return source2
 
 
+class DocketNumberSources:
+    ORIGINAL = 0
+    AUTOMATED = 1
+    MANUAL = 2
+
+    CHOICES = (
+        (ORIGINAL, "Original from source"),
+        (AUTOMATED, "Automated cleaned using heuristics and LLM"),
+        (MANUAL, "Manually cleaned by a human"),
+    )
+
+
 @pghistory.track()
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
@@ -628,6 +640,15 @@ class Docket(AbstractDateTimeModel, DocketSources):
         ),
         blank=True,
         default="",
+    )
+    docket_number_source = models.PositiveSmallIntegerField(
+        help_text=(
+            "The source of the docket number, "
+            "whether they came from the original source, "
+            "were automatically cleaned, or were manually cleaned."
+        ),
+        choices=DocketNumberSources.CHOICES,
+        default=DocketNumberSources.ORIGINAL,
     )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
