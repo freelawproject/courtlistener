@@ -2130,7 +2130,12 @@ class TamesEmailParsingTest(SimpleTestCase):
         super().setUpClass()
         import email as email_mod
 
-        email_path = Path(__file__).parent / "test_assets" / "tames" / "notification_email.txt"
+        email_path = (
+            Path(__file__).parent
+            / "test_assets"
+            / "tames"
+            / "notification_email.txt"
+        )
         cls.msg = email_mod.message_from_string(email_path.read_text())
 
     def test_get_tames_court_from_subject(self) -> None:
