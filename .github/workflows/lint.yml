@@ -56,12 +56,15 @@ jobs:
           uv run mypy \
           --follow-imports=skip \
           --exclude 'migrations/*' \
+          cl/api/admin.py \
           cl/api/api_permissions.py \
+          cl/api/factories.py \
           cl/api/management/commands/cl_retry_webhooks.py \
           cl/api/models.py \
           cl/api/routers.py \
           cl/api/tasks.py \
           cl/api/tests.py \
+          cl/api/urls.py \
           cl/api/utils.py \
           cl/api/views.py \
           cl/api/webhooks.py \
@@ -72,8 +75,18 @@ jobs:
           cl/users/management/commands/cl_delete_old_emails.py \
           cl/users/management/commands/cl_retry_failed_email.py \
           cl/users/tasks.py \
+          cl/recap/admin.py \
+          cl/recap/constants.py \
+          cl/recap/factories.py \
+          cl/recap/filters.py \
+          cl/recap/management/commands/clean_up_docket_judges.py \
+          cl/recap/management/commands/delete_document_from_ia.py \
+          cl/recap/management/commands/import_idb.py \
+          cl/recap/management/commands/monitor_pacer_websites.py \
           cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py \
+          cl/recap/management/commands/reprocess_recap_dockets.py \
           cl/recap/utils.py \
+          cl/recap/views.py \
           cl/search/management/commands/cl_index_parent_and_child_docs.py \
           cl/search/management/commands/sweep_indexer.py \
           cl/search/management/commands/pacer_bulk_fetch.py \
@@ -81,4 +94,14 @@ jobs:
           cl/search/management/commands/llm_clean_docket_number_daemon.py \
           cl/search/docket_number_cleaner.py \
           cl/search/management/commands/clean_docket_number_raw.py \
+          cl/scrapers/admin.py \
+          cl/scrapers/DupChecker.py \
+          cl/scrapers/exceptions.py \
+          cl/scrapers/factories.py \
           cl/scrapers/management/commands/back_scrape_dockets.py \
+          cl/scrapers/management/commands/cl_back_scrape_citations.py \
+          cl/scrapers/management/commands/cl_back_scrape_opinions.py \
+          cl/scrapers/management/commands/cl_back_scrape_oral_arguments.py \
+          cl/scrapers/management/commands/cl_scrape_oral_arguments.py \
+          cl/scrapers/management/commands/refresh_scrapers_status_view.py \
+          cl/scrapers/views.py \
