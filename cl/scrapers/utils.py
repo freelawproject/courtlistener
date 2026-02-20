@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import date, datetime
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import httpx
 from asgiref.sync import async_to_sync
@@ -563,3 +563,38 @@ def update_or_create_originating_court_information(
         docket_number=lower_court_number or "",
         assigned_to_str=lower_court_judge or "",
     )
+
+def get_tames_court_from_subject(subject:str, default=None):
+    if not subject.startswith("Automated Case Update from"):
+        return default
+    return {
+        "First Court of Appeals"      :"texas_coa01",
+        "Second Court of Appeals"     :"texas_coa02",
+        "Third Court of Appeals"      :"texas_coa03",
+        "Fourth Court of Appeals"     :"texas_coa04",
+        "Fifth Court of Appeals"      :"texas_coa05",
+        "Sixth Court of Appeals"      :"texas_coa06",
+        "Seventh Court of Appeals"    :"texas_coa07",
+        "Eighth Court of Appeals"     :"texas_coa08",
+        "Ninth Court of Appeals"      :"texas_coa09",
+        "Tenth Court of Appeals"      :"texas_coa10",
+        "Eleventh Court of Appeals"   :"texas_coa11",
+        "Twelfth Court of Appeals"    :"texas_coa12",
+        "Thirteenth Court of Appeals" :"texas_coa13",
+        "Fourteenth Court of Appeals" :"texas_coa14",
+        "Fifteenth Court of Appeals"  :"texas_coa15",
+        "Court of Criminal Appeals"   :"texas_coscca",
+        "Supreme Court"               :"texas_cossup",
+    }.get(subject[27:], default)
+
+link_href = re.compile('<a href="([^"]*)">')
+def get_tames_case_from_email_body(body:str, default=None):
+    match = re.search(link_href, body)
+    if not match:
+        return default
+    link = match.group(1)
+    if not link:
+        return default
+    case_number = parse_qs(urlparse(link).query)["cn"][0]
+    return {"url":link, "case_number":case_number}
+

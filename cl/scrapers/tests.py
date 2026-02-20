@@ -58,6 +58,8 @@ from cl.scrapers.utils import (
     check_duplicate_ingestion,
     get_existing_docket,
     get_extension,
+    get_tames_case_from_email_body,
+    get_tames_court_from_subject,
     update_or_create_docket,
 )
 from cl.search.documents import (
@@ -2118,3 +2120,30 @@ class SetOrderingKeysTest(SimpleTestCase):
         self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
         self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
         self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
+
+
+class TamesEmailParsingTest(SimpleTestCase):
+    """Tests for parsing TAMES notification emails."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        import email as email_mod
+
+        email_path = Path(__file__).parent / "test_assets" / "tames" / "notification_email.txt"
+        cls.msg = email_mod.message_from_string(email_path.read_text())
+
+    def test_get_tames_court_from_subject(self) -> None:
+        court_id = get_tames_court_from_subject(self.msg["Subject"])
+        self.assertEqual(court_id, "texas_coa01")
+
+    def test_get_tames_case_from_email_body(self) -> None:
+        body = self.msg.get_payload(decode=True).decode("utf-8")
+        result = get_tames_case_from_email_body(body)
+        self.assertEqual(
+            result,
+            {
+                "url": "https://search.txcourts.gov/Case.aspx?cn=01-24-00089-CV",
+                "case_number": "01-24-00089-CV",
+            },
+        )

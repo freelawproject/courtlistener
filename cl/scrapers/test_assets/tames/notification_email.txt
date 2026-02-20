@@ -1,0 +1,100 @@
+Delivered-To: bcflptc.m@gmail.com
+Received: by 2002:a05:6400:53c6:b0:2c5:5174:ef24 with SMTP id f6csp1578188eci;
+        Fri, 20 Feb 2026 07:45:13 -0800 (PST)
+X-Received: by 2002:a05:622a:506:b0:4ee:43e1:e591 with SMTP id d75a77b69052e-5070bcb91bamr2647811cf.58.1771602195680;
+        Fri, 20 Feb 2026 07:43:15 -0800 (PST)
+ARC-Seal: i=2; a=rsa-sha256; t=1771602195; cv=pass;
+        d=google.com; s=arc-20240605;
+        b=iiwk4yWU0e6oEKY9a82n3bTwxKvqz0jGJ+ooBVc0R4gggTv1s7KlU3TylZJ4VSIed3
+         +12KqYyxjF2VszSLZQ17bsOnhwI07SUPh1DsZL2LvYHi3CQHaHnYsWS0cbj/ZxE8RalM
+         7N9B6sOsaNqpNZStQA+XydS0W1jYyYWNaP/MBt8cD5vQDHlhrqJlpyZ5f+Hngz1wTCK2
+         y3xQ7yIoaQiIN8c1GK3d95P49yCW/lbVKkA/Gm3Pn47MPa6Fndqb7R05YrRE8r/Q5Jpc
+         oSsreAlhd9sPPj06v30/8zzqJQLd0lVO8WST8p0MNzpSZQtMXOqotSLYIcHelHEY8OxX
+         cYKA==
+ARC-Message-Signature: i=2; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=mime-version:message-id:content-transfer-encoding:subject:date:to
+         :from:dkim-signature;
+        bh=ZIb07OmyoFPsKPeF+IR0iH/5tdvZywZL4kJjEoiNn2o=;
+        fh=qMYEFMoNH5oTIqzZWSUddu59AevxWhX/JhMXISnnH1M=;
+        b=OKhGPNBObxO/w3wDC0v0XVqbIy8y69IAARVRXlsCHLiZeabtaIMiLKP6Vwt5PgNRNU
+         ZsSxM2Osv5yR/JRCYnEHSZDfDFfmAo9lZYZg8Y/k6/yiUfPVox7HCL/XqbNpjU1TeO27
+         VI8iXC9KxSp+gbHfYmA5yuFUuFzD0aUfaei5hGDfBcw8sTflcxXiVfWK3DisoAht5yq/
+         6UtRHMViSetb1FNsohiT9lxMzD75foE+GRres913U75/i0fjUV5CAoJnTOCosZ0phHyg
+         BYZPVqmJm05/PL6ycHoJcHeWa9G9bHuwsfr4eNa+XmrRJfcrHYC1grdUzEREaabFm0mb
+         iBfA==;
+        dara=google.com
+ARC-Authentication-Results: i=2; mx.google.com;
+       dkim=pass header.i=@txcourts.gov header.s=selector1 header.b=L0EX9Z1m;
+       arc=pass (i=1 spf=pass spfdomain=txcourts.gov dkim=pass dkdomain=txcourts.gov dmarc=pass fromdomain=txcourts.gov);
+       spf=pass (google.com: domain of noreply-tames@txcourts.gov designates 2a01:111:f403:c101::7 as permitted sender) smtp.mailfrom=NOREPLY-TAMES@txcourts.gov;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=txcourts.gov
+Return-Path: <NOREPLY-TAMES@txcourts.gov>
+Received: from BL0PR03CU003.outbound.protection.outlook.com (mail-eastusazlp170120007.outbound.protection.outlook.com. [2a01:111:f403:c101::7])
+        by mx.google.com with ESMTPS id 6a1803df08f44-8971cda2fd0si276873446d6.230.2026.02.20.07.43.15
+        for <bcflptc.m@gmail.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Fri, 20 Feb 2026 07:43:15 -0800 (PST)
+Received-SPF: pass (google.com: domain of noreply-tames@txcourts.gov designates 2a01:111:f403:c101::7 as permitted sender) client-ip=2a01:111:f403:c101::7;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@txcourts.gov header.s=selector1 header.b=L0EX9Z1m;
+       arc=pass (i=1 spf=pass spfdomain=txcourts.gov dkim=pass dkdomain=txcourts.gov dmarc=pass fromdomain=txcourts.gov);
+       spf=pass (google.com: domain of noreply-tames@txcourts.gov designates 2a01:111:f403:c101::7 as permitted sender) smtp.mailfrom=NOREPLY-TAMES@txcourts.gov;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=txcourts.gov
+ARC-Seal: i=1; a=rsa-sha256; s=arcselector10001; d=microsoft.com; cv=none; b=YiEUzqlATetPxbt0K9xbShi3bTjTISwgjgmCLeSC5wx/QBHcUTzxUjNuBgIH2eRafZCP47rpZ6h/b07q1CGHaDE3dlPuOZutNl9A5x/01SUUU0O+OGHq5R1z57lXpa+mhF+eySaTduOxlAYPjvSEmlQ1pHPmmZV9GrIRSL8r4FVIyvZX73to/iaTe+e8BzcHtUTaazSKbckse/aFQLfz5Bmf6ImCoyc+AGNfoy2j1FR+AmcgT7DZay5RrmDgsPb8biKEujg/s67TqmKo9jcmxitthfihzGKE1roKV9Guz4mODCUHxNvkUaQsGynLh7eFIkInb2XjpdTAp95jNtaonA==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=microsoft.com; s=arcselector10001; h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-AntiSpam-MessageData-ChunkCount:X-MS-Exchange-AntiSpam-MessageData-0:X-MS-Exchange-AntiSpam-MessageData-1; bh=ZIb07OmyoFPsKPeF+IR0iH/5tdvZywZL4kJjEoiNn2o=; b=j+vGgs72eNrxaTwYHA4mVUI83sLQ2tz3ZNY8DqJvCYOjVED7v1kEw90tcFcTmRdmuvfcVHL2B06+pHHrdgVe5kWPC788hVdnh7uy5RaAQFhtXEQh/zUjkw5crtGJoelIY6nbB08dKD1aez7nacmVMdNSCnq0HL13QMQ2OpqUTdNdE7vqezHiy34VQkZ8gns3UEiWK/e2nkByzAiAct3w80sagISPiOwtYeuzbFwoMXQ/XLYe6dOF+3Pfp1RbbM/8k3qmlgyT7KwnZUpXYQP8xQQxTceuttAkgOZM5pvhNIpI1HUJI0CxJH+ok+Bcm9YXyP5lKVoy32rVKhepAKrX6g==
+ARC-Authentication-Results: i=1; mx.microsoft.com 1; spf=pass smtp.mailfrom=txcourts.gov; dmarc=pass action=none header.from=txcourts.gov; dkim=pass header.d=txcourts.gov; arc=none
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=txcourts.gov; s=selector1; h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck; bh=ZIb07OmyoFPsKPeF+IR0iH/5tdvZywZL4kJjEoiNn2o=; b=L0EX9Z1mlY4H5jUGueqIeLOdyJ1mJCWdx0sy4Uwjw+RVPyMg3Ys+nynyS4uV+RO+ygEuuL0Y/zfyc3Yuyl+ej/x0VnTI2Bh2Y5xNDKma04KlgnnyOpjgM0rHpmYyaZYBcA1BZBF/P5HZGgwH5Qzp5YrA9BYZFyNIzM7zEoKP9RP3zIQiudgxdmHRY9iZITwWrtD808qOkGPkCHBYGfjYtBQFaRdMlSh5XBFGbEEGWNbDz2GW6fxwGxxI7JvoQQZQL+j/3xz12Nfh6Ey+FzSPdg8y3D/QYJmt6HU10Y/A9UG2qV6oExnhT87AZdGQRsgJFj4CZGc51eoykfJZsDFv5g==
+Authentication-Results: dkim=none (message not signed) header.d=none;dmarc=none action=none header.from=txcourts.gov;
+Received: from CY4PR1301MB2118.namprd13.prod.outlook.com (2603:10b6:910:48::33) by CHAPR13MB7672.namprd13.prod.outlook.com (2603:10b6:610:2f6::22) with Microsoft SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9632.15; Fri, 20 Feb 2026 15:43:08 +0000
+Received: from CY4PR1301MB2118.namprd13.prod.outlook.com ([fe80::642f:91ee:e3a9:3d17]) by CY4PR1301MB2118.namprd13.prod.outlook.com ([fe80::642f:91ee:e3a9:3d17%6]) with mapi id 15.20.9632.010; Fri, 20 Feb 2026 15:43:08 +0000
+From: First Court of Appeals <noreply-tames@txcourts.gov>
+To: bcflptc.m@gmail.com
+Date: 20 Feb 2026 09:42:07 -0600
+Subject: Automated Case Update from First Court of Appeals
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: base64
+X-ClientProxiedBy: DS7P220CA0070.NAMP220.PROD.OUTLOOK.COM (2603:10b6:8:224::33) To CY4PR1301MB2118.namprd13.prod.outlook.com (2603:10b6:910:48::33)
+Return-Path: NOREPLY-TAMES@txcourts.gov
+Message-ID: <CY4PR1301MB21185C365CAE774A8872AD049A68A@CY4PR1301MB2118.namprd13.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-PublicTrafficType: Email
+X-MS-TrafficTypeDiagnostic: CY4PR1301MB2118:EE_|CHAPR13MB7672:EE_
+X-MS-Office365-Filtering-Correlation-Id: 85ab8432-3387-45df-8928-08de70969afc
+X-MS-Exchange-SenderADCheck: 1
+X-MS-Exchange-AntiSpam-Relay: 0
+X-Microsoft-Antispam: BCL:0;ARA:13230040|376014|52116014|366016|1800799024|8096899003|13003099007|38350700014;
+X-Microsoft-Antispam-Message-Info: AleN8tm+SrjVcwyAa614Ij/M9/btw01bNk0nQLDE2yooUDXx3uti0wX4xPUkSubACt7igqM5t4tn6fOQiqOWB8nRbFNlK29/7j1VTC/uuqdJOt9Odn31U+rZN14FIV2XcCxI9/FXxQD11LFGGztXpixjz+16LgwZFcDyJUIFb3sCQCZhhXk/FirBzSSVkampbNK4iFawcVldsy7UpcDub9qRjEHr9hR7kYkGh0Xfzu84premVGB0ZQ4ZE3lMeabcAIedlokkza54J1Zf9yZcsGzpxZx+VzXz78XwjKv5GhfiyGDQ5of8WgSnNp/dFVwULXboVvUkjqdzPNA1n/baJuNlNLIeDJjrkse6bW3znTWQbd1iZgvX4FNtjEtS/cMdE6dx/ubhUr1WMX9pa9JlAk416hTPpC1Jc5EEpd9Uxkq4zpm1pXKb2RLoPZFFJ4kLLU1ne+S9NuEkArdEj+Ee8+kSvpJ8JzGfIxMXEQ6RQrXi29kj2uPOBLsq13lmsBk/r+CYrgg3kvY7MgnWJAuJpHpRI0+mRrxlDzpLVcZXACm04elDhZCL6chmp7ImRgweiUSdQX9Bi4WYyh4iPLhrLl8luyqMszCu9i4Ohz6hdjHksSnKkXReqR6rNQtw9mdVymEKatgn4iJYUiSCHIaVEyqo9nNNM8JY40dvSQE9LCf7zgew372u/UQ9RsxozJWSc1hzKlGpjL7eVsYt91XSBDAHB7+LCPDLkZ5V9toxz6LyW+ILxv/qbg2p3w0Idul7SPT+R6xvBsd6aISeQCLkPONvJLyysTGuPSSysZczoicj1tzX4CjddCFB2SCC4cYUUpjko3eOAOaJjp0zwcpfM9fO6go6O8MrwfkmJQnlQjLXRwzTE63DDLoREbNIO21O+RBRZReqlvntqxB+cMJSWGuRN/8IhV8JOF/T3ESvPifJ1XQMAXzOd1cHBm/kaJy73U9vMZPXRJuH3cEPczGOY7QIITyT/V8GRp0i+TC1STP1Ap0ZqEZaRosMCDyfinUtyAalAxv6puZ5qHRAlKWRsLj1/BpLfW/rF/VYfh+U9u4a42cG7uq9+6OQCMS14j4JerkRVt/4e5uO9oq+y5r1+4n18hWNvNRMvMrloc/0wFqeh/t2s0zmgX856UVLq8wVclWsjmuUsc4edWpymXuVino4/PacqZKTOoxKTq3RhFYlt1/JCuWZe9wTAPdAocArxIx0JOQJkhAAQf/4X3JfjAdNYV4CqpyBzOl7VSTDcrUPMB/MMe9sCdUyO5tpaOHyDGbxK5NXXSfT4Iw9BI4pvto7bMZy1zVwpGnH84yW+U6V96hM0Cly9XrkKIyGpp7AMv6Se86jCVjkzNB+0Q1spyGfRel5PFquX41v59GQczNgNZAlYaggzqt3SNzSdSrX8KgAKyt6j9HQ7f0C1k43Y9JOW4OownWGNpRudsfeBWG/j/UsrUiPDkE0jZKQ69vmRsNdbrNMXPmj+nLvFLyNDRvwNFPfhSZSFihsh32jvmcUCuHXvX/mqkeJLlVBaNewiouzrTqgLIc7tnXdl406Y3DKLl2HLgh7wondyc8KO2kvjVvp318lBvUgxtI7yXxE
+X-Forefront-Antispam-Report: CIP:255.255.255.255;CTRY:;LANG:en;SCL:1;SRV:;IPV:NLI;SFV:NSPM;H:CY4PR1301MB2118.namprd13.prod.outlook.com;PTR:;CAT:NONE;SFS:(13230040)(376014)(52116014)(366016)(1800799024)(8096899003)(13003099007)(38350700014);DIR:OUT;SFP:1101;
+X-MS-Exchange-AntiSpam-MessageData-ChunkCount: 1
+X-MS-Exchange-AntiSpam-MessageData-0: sjLOovo1DYMpI16FPznn7sx1CBSGc7pD6UmO5fTjxJ+P1iuiZtOP3Mta5dcmtVEddvqvEi999HkFf5rdnZkGG4shjLw+ZT10CDHIEDkTJcR4v2UpOfDUTlKDImQ5PnLLGOF/wn3utoPpfvqeZYW93J22MV1kEgU72Jtvk4m8JzMAMQH2WxQ8c6uTIV7X0nprdteCS4mzwTDcoOKz4gI16rnx8lM7Bv5XcesWC5kb23XcyBw8GTmQzl1ikRL2qyYiy1L+Eab/xukyzE1kqVngek4ku1uyDTchaG9kHxwauTgbDSmJcunCmzMlFUKuEDwJ/J3WFnLsTETqVnbL15dVXtnpSmb0XkhSWUbPJeWKkpBPqW+G8GTjP/vWu5c40NVHswGGpSmeWSA4T1Fs45kEc21ZlTcPfkvAkuiG1FeJ/T6eHibvxlwD9lAugrXQp/0sf505qn1n8WUTQAkIdm1HkViPALavIuHufTfHrQc8qerqIKmj0mons7i90buzkDaB0EWTm3az9Mz3CzS9bP+qgGcBhgUu52LBBdOnm6j9HLiPdGmenQfWDNaPDl0QE8WNGJ4HDBzVESjHip+YgBLuHHI7ufkUgtFg5wXvLPCIIK6QnRN/fq/3UE+VtDabA9ig2YT4ru/8cyluWrtgkoMF5G/9MXnZ4x/+5Wlin8JgCXgahrekTrzdUWed34s5sToD10tjTnqSSnovFcts0b1q+E68H3Lr/VUAhow1rH9xY4gDB6anxo40DtmesC9C6cOWrP13U8NoJ+qsOgJYIuNVStNT01NyXWgpAK0sIjqgHFGiJ5+LIvE5UygW/24fd42iSfI/hpGzjf7BWtrVK0PC9uhlOMLeW1BWeEmadguhFyYF4v31Zdz8cxFnSjbDTHym2oM8DV2NxI44aBmamd0KTab5mESDxjy8HijD5c2k0HjevH5oi700txahENPNVtDXGHwt3Z4w1YNO6U1RxocHsJA8KSaPpdzpk0qmwzSUo3JOPi8NJadlToXUNgJE8RxyRVfgWfibLULh/5G+9EFzVhJTGesG4uEH6gV+bCHdX6yhaN6W7n5OUka7fUMS9CtkFvifO+JDenVbvjPbDivZKI2OE6EF2KQpEUfw/onbFCi8/OUA2AFd2SD90oMfU9K9Bk5xgsqBtyCxYXj9TGspo2oAHqy18mCVP7Wq9JnuNmHoG58E0ZhdgVWkXyTkxKTFr3jIrY7MLFYdE5T7uF9oEAwnBNBBGygxGwWnpZW1h6rzdpqyMgDfPlnyOY/VLV+WHjRfatR5vH7PQEoNNFD9Ve1MSeDspEZvknCyaNhtdTfx81PnDqdK22SP3WqH+rWZddNwqkq1hLF+TJaW4faEhLNf0BQJFtyEXWzwBRLw6jdr6FfoBedPyshotZhr3P4KyuOGr+uF6TqRxa/2dtJ6xpQ+T0/XiftNHEw+b8anyNl5PZGNHoHK4rt+aFFu/q6p4s/lOHAHphQDwGp2elYaR1uKZBVWd+Yix/vtgz37lA5p2MS60vjw6ekObpp34Zc1ZOZ5aaqKbLlxukHZjYMMROqKa3Q6shKPJtykyuJUC0cAVH0aAtuIBO2opFipOOp3o9fTYrxHUcbRX8ZVSlDy6Z0wMToQT0WxhojBdP2CRnnWwtc6IzwF13c4uUDTMGJzwqjnG9UnOC77kuSjCzN5F/rSzQ2DXs/Oq16X7JsGpKkQaBSE3681B1JRUvDmynmWeZyhKbA48f3cz7sOlEgS7CscGWJ70Lruyf2esFY+yVM=
+X-OriginatorOrg: txcourts.gov
+X-MS-Exchange-CrossTenant-Network-Message-Id: 85ab8432-3387-45df-8928-08de70969afc
+X-MS-Exchange-CrossTenant-AuthSource: CY4PR1301MB2118.namprd13.prod.outlook.com
+X-MS-Exchange-CrossTenant-AuthAs: Internal
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 20 Feb 2026 15:42:08.1467 (UTC)
+X-MS-Exchange-CrossTenant-FromEntityHeader: Hosted
+X-MS-Exchange-CrossTenant-Id: af8c2e54-e86d-4d88-835e-891b649d5bcb
+X-MS-Exchange-CrossTenant-MailboxType: HOSTED
+X-MS-Exchange-CrossTenant-UserPrincipalName: YWXR9Zp47ChzIoMGCe83YEi1OW27KbIhAg7kqXYtyv/3udNfCdAIWDgp44hcGbdYWx1b7cubvm0a/SXkoXpGdeaYbtFfqzUfFpYKvRQSvjg=
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CHAPR13MB7672
+
+PGh0bWw+DQo8aGVhZD4NCjxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0i
+dGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04Ij48L2hlYWQ+DQo8Ym9keT5UaGUgRm9sbG93aW5nIGFy
+ZSBhY3Rpb25zIHRha2VuIGJ5IHRoZSBGaXJzdCBDb3VydCBvZiBBcHBlYWxzIGluIGNhc2VzIGlu
+IHdoaWNoIHlvdSBoYXZlIHJlcXVlc3RlZCBub3RpY2UuIE9jY2FzaW9uYWxseSB5b3UgbWF5IHJl
+Y2VpdmUgZW1haWwgYWxlcnRzIHdpdGggbGlua3MgdGhhdCBkbyBub3Qgc2hvdyBhIGZpbGluZyBv
+ciBkZXZlbG9wbWVudCBpbiB0aGUgY2FzZS4gVGhlc2UgZW1haWwgYWxlcnRzIGFyZSB0cmlnZ2Vy
+ZWQgbW9zdGx5IGJ5ICdob3VzZWtlZXBpbmcnIGluIGNhc2UgZmlsZXMgYXMgY2xlcmtzIG1ha2Ug
+bWlub3IgY2hhbmdlcyBpbiB0aGUgZmlsZXMgb3IgZXZlbiBieSBzaW1wbHkgb3BlbmluZyB0aGVt
+OiA8YnI+PGJyPkNhc2UgTnVtYmVyOiAwMS0yNC0wMDA4OS1DViAgICBCaW5oIE5ndXllbiAgdnMg
+SmVhbmEgVHJhbiBhbmQgVHJ1YyBMZSwgSW5kaXZpZHVhbGx5IGFuZCBvbiBiZWhhbGYgb2YgV2ls
+Y3Jlc3QgUGFyayBUb3duaG9tZXMgT3duZXJzJnF1b3Q7IEFzc29jaWF0aW9uLCBJbmMuLCBXaWxj
+cmVzdCBQYXJrIFRvd25ob21lcyBPd25lcnMnIEFzc29jaWF0aW9uLCBJbmMuLCBhbmQgTWlrbG9z
+IEthdG88YnI+ICAgICAgPGEgaHJlZj0iaHR0cHM6Ly9zZWFyY2gudHhjb3VydHMuZ292L0Nhc2Uu
+YXNweD9jbj0wMS0yNC0wMDA4OS1DViI+aHR0cHM6Ly9zZWFyY2gudHhjb3VydHMuZ292L0Nhc2Uu
+YXNweD9jbj0wMS0yNC0wMDA4OS1DVjwvYT48YnI+PGJyPjxicj5UbyBkaXNjb250aW51ZSBhbGwg
+YXV0b21hdGVkIG1haWxpbmdzIGZyb20gVGV4YXMgQ291cnRzIE9ubGluZSwgbG9nIGludG8geW91
+ciBhY2NvdW50IGFuZCBjaGFuZ2UgdGhlIHN0YXR1cyB0byBJTkFDVElWRS4gVG8gZGlzY29udGlu
+dWUgc3BlY2lmaWMgY291cnQgb3IgY2FzZSBhdXRvbWF0ZWQgbWFpbGluZ3MgT05MWSwgbG9nIGlu
+dG8geW91ciBhY2NvdW50IGFuZCBlZGl0IHlvdXIgQ291cnQgYW5kL29yIENhc2UgTGlzdGluZ3Mg
+aW5kaXZpZHVhbGx5LjwvYm9keT48L2h0bWw+DQo=
