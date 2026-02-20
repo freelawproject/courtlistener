@@ -10,20 +10,34 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.utils import EmailProcessingQueueAPIUsers, LoggingMixin
 from cl.celery_init import app
 from cl.recap.filters import EmailProcessingQueueFilter
-from cl.recap.models import EmailProcessingQueue
+from cl.recap.models import EmailProcessingQueue, EmailSource
+from cl.recap.tasks import process_texas_email
 from cl.search.models import Court
 
 
 @dataclass
 class EmailProcessingTask:
+    """
+    Stores information about how to process an incoming state update email.
+
+    :ivar task: The task to send the email to be processed by.
+    :ivar source: The source of the email to be processed.
+    :ivar username: The username of the User to set as the uploader of the\
+        email.
+    """
+
     task: app.Task
     source: int
+    username: str
 
 
 STATE_SITE_TASK_MAP: dict[str, dict[str, EmailProcessingTask]] = {
     "tx": {
-        # TODO Update once parser is complete
-        # "tames": EmailProcessingTask(task=process_texas_email, source=EmailSources.TEXAS)
+        "tames": EmailProcessingTask(
+            task=process_texas_email,
+            source=EmailSource.STATE,
+            username="recap-email",
+        )
     }
 }
 
@@ -134,12 +148,13 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
     def perform_create(self, serializer, **kwargs):
         state = kwargs["state"]
         site = kwargs["site"]
-        texas_email_user = User.objects.get(username="recap-email")
+        processing_task_info = STATE_SITE_TASK_MAP[state][site]
+        email_user = User.objects.get(username=processing_task_info.username)
         epq = serializer.save(
+            uploader=email_user,
             message_id=self.get_message_id_from_request_data(),
             destination_emails=self.get_destination_emails_from_request_data(),
-            uploader=texas_email_user,
-            source=STATE_SITE_TASK_MAP[state][site].source,
+            source=processing_task_info.source,
         )
-        STATE_SITE_TASK_MAP[state][site].task.delay(epq.id)
+        processing_task_info.task.delay(epq.id)
         return epq

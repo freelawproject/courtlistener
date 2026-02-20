@@ -3616,3 +3616,31 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
         process_recap_email.si(epq.pk, user.pk),
         extract_pdf_document.s(),
     ).apply_async()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+        requests.ConnectionError,
+        requests.RequestException,
+        requests.ReadTimeout,
+        RedisConnectionError,
+    ),
+    max_retries=10,
+    retry_backoff=2 * 60,
+    retry_backoff_max=60 * 60,
+)
+def process_texas_email(self: Task, epq: EmailProcessingQueue) -> None:
+    """
+    Task to process an email added to the queue by the .../tx/tames/alert\
+    endpoint. If the email is a case notification email, fetch the docket page\
+    and return the scraped data. Otherwise, set an error in the processing\
+    queue indicating the email type was unrecognized.
+
+    :param self: The Celery task
+    :param epq: The EmailProcessingQueue object representing the email to\
+        process
+    """
+    raise NotImplementedError
