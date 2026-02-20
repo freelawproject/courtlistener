@@ -15,6 +15,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import (
     Case,
     CharField,
+    CheckConstraint,
     F,
     Prefetch,
     Q,
@@ -3986,10 +3987,30 @@ class CaseTransfer(AbstractDateTimeModel):
     Represents any transfer of a docket between two courts whether that be
     an appeal, workload balancing, or docket merging.
 
+    The `x_court` and `x_docket_number` fields must always be set and at least
+    one of `origin_docket` or `destination_docket` must be set to ensure
+    that transfers are associated with dockets in the DB. The reason for
+    (effectively) duplicating the docket number via `x_docket` and
+    `x_docket_number` is to allow populating transfers even if only one end is
+    in the DB. This allows us to track transfers from untracked courts to
+    tracked courts (e.g. appeals from trial courts) and to populate transfers
+    during the initial docket merging step independently of the order dockets
+    are merged in.
+
+    The intended way to populate this table in a merger is to:
+
+    1. Lookup if a transfer with matching origin and destination courts and\
+       docket numbers exists;
+    2. If it does, update the missing foreign key on that entry;
+    3. Otherwise, create a new entry with only origin or destination docket\
+       field set depending on which you have.
+
     :ivar origin_court: The court this transfer originates from.
-    :ivar origin_docket: The docket this transfer originates from.
+    :ivar origin_docket_number: The ID of the docket this transfer originates from.
+    :ivar origin_docket: The docket object this transfer originates from.
     :ivar destination_court: The court the docket is being transferred to.
-    :ivar destination_docket: The case docket in the destination court.
+    :ivar destination_docket_number: The ID of the case docket in the destination court.
+    :ivar destination_docket: The docket object in the destination court.
     :ivar transfer_date: The date this transfer occurred.
     :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
     """
@@ -4013,25 +4034,40 @@ class CaseTransfer(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_court",
     )
+    origin_docket_number = models.TextField()
     origin_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_docket",
+        blank=True,
+        null=True,
     )
     destination_court = models.ForeignKey(
         "search.Court",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_court",
     )
+    destination_docket_number = models.TextField()
     destination_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_docket",
+        blank=True,
+        null=True,
     )
     transfer_date = models.DateField()
     transfer_type = models.SmallIntegerField(
         choices=transfer_type_choices.items(),
     )
+
+    class Meta:
+        constraints = [
+            CheckConstraint(
+                condition=Q(origin_docket__isnull=False)
+                | Q(destination_docket__isnull=False),
+                name="docket_at_least_one_fk_set",
+            )
+        ]
 
 
 @pghistory.track()
@@ -4096,7 +4132,7 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         blank=True,
         null=True,
     )
-    url = models.URLField()
+    url = models.URLField(max_length=1000)
 
     class Meta:
         indexes = [
