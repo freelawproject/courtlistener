@@ -253,9 +253,7 @@ PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED = env(
 )
 
 # The maximum number of attorneys in parties data allowed for percolating a
-# docket after merging parties. If the number of attorneys exceeds this limit,
-# the docket is percolated on save instead to avoid expensive percolator
-# queries with large parties data.
+# docket after merging parties.
 MAX_ATTORNEYS_TO_PERCOLATE = env("MAX_ATTORNEYS_TO_PERCOLATE", default=100)
 
 ################################

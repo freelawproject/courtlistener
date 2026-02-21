@@ -285,7 +285,7 @@ def process_docket_data(
         add_parties_and_attorneys(d, data["parties"])
         if data["parties"]:
             # Index or re-index parties only if the docket has parties.
-            index_docket_parties_in_es.delay(d.pk)
+            index_docket_parties_in_es.delay(d.pk, avoid_percolation=True)
     return d.pk
 
 
