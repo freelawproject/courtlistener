@@ -47,6 +47,7 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    DocketDocumentPlain,
     ESOpinionDocumentPlain,
     ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
@@ -708,7 +709,15 @@ def prepare_percolator_content(
             es_document_index = AudioDocument._index._name
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
-            es_document_index = DocketDocument._index._name
+            model = apps.get_model(app_label)
+            docket = model.objects.get(pk=document_id)
+            document_content_plain = DocketDocumentPlain().prepare(docket)
+            del document_content_plain["docket_child"]
+            documents_to_percolate = (
+                document_content_plain,
+                None,
+                None,
+            )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
             model = apps.get_model(app_label)
@@ -810,11 +819,14 @@ def set_skip_percolation_if_parties_data(
     if not parties_data:
         return False
 
-    d.skip_percolator_request = True
     if _exceeds_attorney_limit(
         parties_data, settings.MAX_ATTORNEYS_TO_PERCOLATE
     ):
+        # Party limit exceeded. Do not skip percolation. The docket will be
+        # percolated without considering parties via the ES signal processor.
         return False
+
+    d.skip_percolator_request = True
     return True
 
 

@@ -1630,9 +1630,11 @@ def merge_pacer_docket_into_cl_docket(
     # Merge parties before adding docket entries, so they can access parties'
     # data when the RECAPDocuments are percolated.
     add_parties_and_attorneys(d, docket_data["parties"])
-    if percolate_parties:
-        # Index and percolate parties only if within the attorney limit.
-        index_docket_parties_in_es.delay(d.pk)
+    if docket_data["parties"]:
+        # Index parties and percolate them only if within the attorney limit.
+        index_docket_parties_in_es.delay(
+            d.pk, percolate_parties=percolate_parties
+        )
 
     items_returned, rds_created, content_updated = async_to_sync(
         add_docket_entries

@@ -902,12 +902,12 @@ def update_children_docs_by_query(
     ignore_result=True,
 )
 def index_docket_parties_in_es(
-    self: Task, docket_id: int, avoid_percolation: bool = False
+    self: Task, docket_id: int, percolate_parties: bool = True
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param docket_id: The docket ID to update in ES.
-    :param avoid_percolation: Whether to avoid percolating documents.
+    :param percolate_parties: Whether percolate parties.
     :return: None
     """
 
@@ -934,7 +934,7 @@ def index_docket_parties_in_es(
         **fields_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-    if not avoid_percolation:
+    if percolate_parties:
         # Percolate Docket after parties are up-to-date.
         chain(
             send_or_schedule_search_alerts.s(
