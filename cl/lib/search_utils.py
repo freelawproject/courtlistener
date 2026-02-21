@@ -74,10 +74,17 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 logger = logging.getLogger(__name__)
 
 
-def check_pagination_depth(page_number):
-    """Check if the pagination is too deep (indicating a crawler)"""
+def check_pagination_depth(
+    page_number: int,
+    max_depth: int = settings.MAX_SEARCH_PAGINATION_DEPTH,
+) -> None:
+    """Check if the pagination is too deep (indicating a crawler)
 
-    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
+    :param page_number: The requested page number.
+    :param max_depth: Maximum allowed pagination depth.
+    :raises PermissionDenied: If page_number exceeds max_depth.
+    """
+    if page_number > max_depth:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -550,7 +557,14 @@ def fetch_and_paginate_results(
         return results, 1, False, main_total, child_total
 
     # Check pagination depth
-    check_pagination_depth(page)
+    query_string = clean_params.get("q", "")
+    is_related_query = bool(RELATED_PATTERN.search(query_string))
+    max_pagination_depth = (
+        settings.MAX_RELATED_SEARCH_PAGINATION_DEPTH
+        if is_related_query
+        else settings.MAX_SEARCH_PAGINATION_DEPTH
+    )
+    check_pagination_depth(page, max_pagination_depth)
 
     # Fetch results from ES
     hits, query_time, error, main_total, child_total = fetch_es_results(
