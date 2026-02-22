@@ -36,6 +36,7 @@ from cl.people_db.models import (
     AttorneyOrganization,
     Person,
     Position,
+    Role,
 )
 from cl.search.constants import (
     PEOPLE_ES_HL_FIELDS,
@@ -1627,6 +1628,23 @@ class DocketDocument(
         return data
 
 
+class DocketDocumentPlain(DocketDocument):
+    def prepare_parties(self, instance):
+        out = {
+            "party_id": set(),
+            "party": set(),
+            "attorney_id": set(),
+            "attorney": set(),
+            "firm_id": set(),
+            "firm": set(),
+        }
+        atty_count = Role.objects.filter(docket=instance).distinct().count()
+        if atty_count > settings.MAX_ATTORNEYS_TO_PERCOLATE:
+            return out
+
+        return super().prepare_parties(instance)
+
+
 # Opinions
 class OpinionBaseDocument(Document):
     absolute_url = fields.KeywordField(index=False)
@@ -2382,17 +2400,20 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
             "firm": set(),
         }
 
+        docket = instance.docket_entry.docket
+        atty_count = Role.objects.filter(docket=docket).count()
+        if atty_count > settings.MAX_ATTORNEYS_TO_PERCOLATE:
+            return out
+
         # Extract only required parties values.
-        party_values = instance.docket_entry.docket.parties.values_list(
-            "pk", "name"
-        )
+        party_values = docket.parties.values_list("pk", "name")
         for pk, name in party_values.iterator():
             out["party_id"].add(pk)
             out["party"].add(name)
 
         # Extract only required attorney values.
         atty_values = (
-            Attorney.objects.filter(roles__docket=instance.docket_entry.docket)
+            Attorney.objects.filter(roles__docket=docket)
             .distinct()
             .values_list("pk", "name")
         )
@@ -2403,7 +2424,7 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         # Extract only required firm values.
         firms_values = (
             AttorneyOrganization.objects.filter(
-                attorney_organization_associations__docket=instance.docket_entry.docket
+                attorney_organization_associations__docket=docket
             )
             .distinct()
             .values_list("pk", "name")
@@ -2411,7 +2432,6 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         for pk, name in firms_values.iterator():
             out["firm_id"].add(pk)
             out["firm"].add(name)
-
         return out
 
     def prepare_docket_absolute_url(self, instance):
