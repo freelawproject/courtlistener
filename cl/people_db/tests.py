@@ -39,26 +39,13 @@ class PersonPageSearchButtons(TestCase):
         )
         content = response.content.decode()
 
-        # Case Law search button.
-        self.assertIn("Case Law Authored by Jones", content)
-        self.assertIn(
-            "Search for All Case Law Authored by Jones in CourtListener",
-            content,
-        )
+        # Section heading.
+        self.assertIn("More Resources for Jones", content)
 
-        # RECAP cases search button.
-        self.assertIn("Cases Assigned or Referred to Jones", content)
-        self.assertIn(
-            "Search for All Cases Assigned/Referred to Jones in RECAP",
-            content,
-        )
-
-        # Oral Arguments search button.
-        self.assertIn("Oral Arguments Heard by Jones", content)
-        self.assertIn(
-            "Search for All Oral Arguments Heard by Jones",
-            content,
-        )
+        # Search buttons.
+        self.assertIn("Search Case Law", content)
+        self.assertIn("Search Federal Dockets", content)
+        self.assertIn("Search Oral Arguments", content)
 
     async def test_person_search_buttons_have_nofollow(self) -> None:
         """Verify all search buttons include rel=nofollow for SEO."""

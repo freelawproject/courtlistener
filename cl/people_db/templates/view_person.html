@@ -579,57 +579,32 @@ $(document).ready(function(){
 
     <div class="row v-offset-below-3">
       <div class="col-xs-12">
-        <h3 id="authored-opinions">
-          <i class="fa-file-text-o fa gray"></i>
-          Case Law Authored by {{ person.name_last }}
-          {% if not person.date_dod and not person.dod_state and not person.dod_city %}
-            <a href="/feed/search/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}">
-              <i class="gray fa fa-rss"
-                 title="Subscribe to a feed of {{ person.name_last }}'s latest cases"></i>
-            </a>
-          {% endif %}
-        </h3>
+        <h3>More Resources for {{ person.name_last }}</h3>
         <p>
-            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Published=on&stat_Unpublished=on&stat_Errata=on&stat_Separate=on&stat_In-chambers=on&stat_Relating-to=on&stat_Unknown=on"
-               rel="nofollow"
-               class="btn btn-primary"
-            >Search for All Case Law Authored by {{ person.name_last }} in CourtListener</a>
-        </p>
-      </div>
-    </div>
-
-    <div class="row v-offset-below-3">
-      <div class="col-xs-12">
-        <h3 id="assigned-cases">
-          <i class="fa-gavel fa gray"></i>
-          Cases Assigned or Referred to {{ person.name_last }}
-        </h3>
-        <p>
-            <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc"
-               rel="nofollow"
-               class="btn btn-primary"
-            >Search for All Cases Assigned/Referred to {{ person.name_last }} in RECAP</a>
-        </p>
-      </div>
-    </div>
-
-    <div class="row v-offset-below-3">
-      <div class="col-xs-12">
-        <h3 id="oral-arguments-heard">
-          <i class="fa-volume-up fa gray"></i>
-          Oral Arguments Heard by {{ person.name_last }}
-          {% if not person.date_dod and not person.dod_state and not person.dod_city %}
-            <a href="/feed/search/?type=oa&q=panel_ids%3A{{ person.pk }}">
-              <i class="gray fa fa-podcast"
-                 title="Subscribe to a podcast of {{ person.name_last }}'s latest cases"></i>
-            </a>
-          {% endif %}
-        </h3>
-        <p>
-          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}" class="btn btn-primary"
+          <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Published=on&stat_Unpublished=on&stat_Errata=on&stat_Separate=on&stat_In-chambers=on&stat_Relating-to=on&stat_Unknown=on"
              rel="nofollow"
-          >Search for All Oral Arguments Heard by {{ person.name_last }}</a>
+             class="btn btn-primary"
+          >Search Case Law</a>
+          <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc"
+             rel="nofollow"
+             class="btn btn-primary"
+          >Search Federal Dockets</a>
+          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}"
+             rel="nofollow"
+             class="btn btn-primary"
+          >Search Oral Arguments</a>
         </p>
+        {% if not person.date_dod and not person.dod_state and not person.dod_city %}
+          <p>
+            <a href="/feed/search/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}">
+              <i class="gray fa fa-rss"></i> Case Law Feed
+            </a>
+            &middot;
+            <a href="/feed/search/?type=oa&q=panel_ids%3A{{ person.pk }}">
+              <i class="gray fa fa-podcast"></i> Oral Arguments Podcast
+            </a>
+          </p>
+        {% endif %}
       </div>
     </div>
 
