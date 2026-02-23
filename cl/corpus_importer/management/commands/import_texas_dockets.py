@@ -1,61 +1,14 @@
 from collections.abc import Iterable
 from pathlib import Path
 
-import botocore.exceptions
-
 from cl.celery_init import app
 from cl.corpus_importer.management.utils import (
     CorpusImporterCommand,
-    TexasDocketMeta,
 )
-from cl.corpus_importer.tasks import merge_texas_docket, parse_texas_docket
-from cl.lib.command_utils import logger
-from cl.lib.decorators import time_call
-from cl.lib.storage import AWSMediaStorage
-
-
-@app.task(
-    bind=True,
-    autoretry_for=(
-        botocore.exceptions.HTTPClientError,
-        botocore.exceptions.ConnectionError,
-    ),
-    max_retries=5,
-    retry_backoff=10,
-    ignore_result=True,
+from cl.corpus_importer.tasks import (
+    texas_corpus_download_task,
+    texas_ingest_docket_task,
 )
-@time_call(logger)
-def _texas_corpus_download_task(
-    self: app.Task,
-    docket: tuple[str, str],
-    docket_meta: tuple[str, str],
-) -> tuple[bytes, TexasDocketMeta]:
-    """Downloads a scraped file from S3 and returns it for parsing.
-
-    :param docket: Tuple of S3 bucket name and key where docket HTML is stored.
-    :param docket_meta: Tuple of S3 bucket name and key where docket metadata
-      is stored.
-    :return: Tuple with entries: Bytes of downloaded file, dictionary with
-      response headers, and docket metadata."""
-    storage = AWSMediaStorage(bucket_name=docket[0])
-    logger.info(
-        "Downloading docket HTML from S3: (Bucket: %s; Path: %s)",
-        docket[0],
-        docket[1],
-    )
-    with storage.open(docket[1], "rb") as f:
-        content = f.read()
-
-    storage = AWSMediaStorage(bucket_name=docket_meta[0])
-    logger.info(
-        "Downloading docket meta from S3: (Bucket: %s; Path: %s)",
-        docket_meta[0],
-        docket_meta[1],
-    )
-    with storage.open(docket_meta[1], "r") as f:
-        meta = TexasDocketMeta.model_validate_json(f.read())
-
-    return content, meta
 
 
 class Command(CorpusImporterCommand):
@@ -89,12 +42,8 @@ class Command(CorpusImporterCommand):
 
     @staticmethod
     def download_task() -> app.Task:
-        return _texas_corpus_download_task
-
-    @staticmethod
-    def parse_task() -> app.Task:
-        return parse_texas_docket
+        return texas_corpus_download_task
 
     @staticmethod
     def merge_task() -> app.Task:
-        return merge_texas_docket
+        return texas_ingest_docket_task

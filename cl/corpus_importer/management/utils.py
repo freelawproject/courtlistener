@@ -7,7 +7,6 @@ from datetime import date
 from itertools import islice
 from typing import final
 
-import botocore.exceptions
 from celery import chain
 from django.conf import settings
 from pydantic import BaseModel, field_validator
@@ -19,7 +18,6 @@ from cl.lib.indexing_utils import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.lib.storage import AWSMediaStorage
 
 
 class TexasDocketMeta(BaseModel):
@@ -41,54 +39,26 @@ class TexasDocketMeta(BaseModel):
         return date(*(time.strptime(v, "%m/%d/%Y")[0:3]))
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(
-        botocore.exceptions.HTTPClientError,
-        botocore.exceptions.ConnectionError,
-    ),
-    max_retries=5,
-    retry_backoff=10,
-    ignore_result=True,
-)
-def _corpus_download_task(bucket: str, s3_key: str) -> tuple[bytes, str, str]:
-    """Downloads a scraped file from S3 and returns it for parsing.
-
-    :param bucket: S3 bucket name.
-    :param s3_key: S3 key to download file from.
-    :return: Tuple with entries: Bytes of downloaded file, the bucket
-    parameter, and the s3_key parameter."""
-    logger.info("Downloading file from S3: %s", s3_key)
-    storage = AWSMediaStorage(bucket_name=bucket)
-    with storage.open(s3_key, "rb") as f:
-        content = f.read()
-    return content, bucket, s3_key
-
-
 class CorpusImporterCommand(VerboseCommand, ABC):
-    """Base class for `cl.corpus_importer` commands encapsulating inventory
-    file reading, celery queue interactions, and redis logging.
+    """Base class for `cl.corpus_importer` commands encapsulating inventory\
+        file reading, celery queue interactions, and redis logging.
 
-    Uses an inventory CSV from S3 to find files to parse and ingest into the
-    database. Includes ratelimiting and autoresume logic.
+    Uses an inventory CSV from S3 to find files to parse and ingest into the\
+        database. Includes ratelimiting and autoresume logic.
 
     Required methods are:
 
-    - `parse_task`: Should return a Celery task which parses a `bytes` object
-      into some usable format, typically using Juriscraper. Signature should be:
-      `task(content: bytes, bucket_name: str, s3_key: str)`, unless you manually
-      override `download_task` to return a different format.
     - `merge_task`: Should return a Celery task which takes the output of
-      `parse_task` and merges it into the database. Input should be whatever the
-      output of `parse_task` is.
+        `download_task`, parses it, and merges it into the database. Input\
+         should be whatever the output of `download_task` is.
 
     Required properties are:
 
     - `compose_redis_key`: The Redis log key to use for tracking progress.
 
     Optional methods are:
-    - `download_task`: Should return the task used to download files from S3. A
-      default implementation is provided for convenience."""
+    - `download_task`: Should return the task used to download files from S3.\
+        A default implementation is provided for convenience."""
 
     compose_redis_key: str
 
@@ -103,11 +73,6 @@ class CorpusImporterCommand(VerboseCommand, ABC):
             "--retrieval-queue",
             default="celery",
             help="Which celery queue to use for S3 retrieval.",
-        )
-        parser.add_argument(
-            "--parsing-queue",
-            default="celery",
-            help="Which celery queue to use for document parsing.",
         )
         parser.add_argument(
             "--ingesting-queue",
@@ -154,11 +119,9 @@ class CorpusImporterCommand(VerboseCommand, ABC):
 
     @staticmethod
     def download_task() -> app.Task:
-        return _corpus_download_task
+        from cl.corpus_importer.tasks import default_corpus_download_task
 
-    @staticmethod
-    @abstractmethod
-    def parse_task() -> app.Task: ...
+        return default_corpus_download_task
 
     @staticmethod
     @abstractmethod
@@ -168,14 +131,17 @@ class CorpusImporterCommand(VerboseCommand, ABC):
     def transform_inventory_iterator(
         csv_reader: Iterable[list[str]],
     ) -> Iterable:
-        """Optionally performs transformations on the inventory CSV file before
-        passing it to the download Celery task. Can be used for instance to
-        merge consecutive rows which represent the same docket into one object.
+        """
+        Optionally performs transformations on the inventory CSV file\
+            before passing it to the download Celery task. Can be used for\
+            instance to merge consecutive rows which represent the same docket\
+            into one object.
 
         :param csv_reader: The `csv.Reader` object to use to read the CSV.
-        :return: The transformed inventory CSV iterator. The item of the
-          iterable should be a list of arguments to be passed to the download
-          task."""
+
+        :return: The transformed inventory CSV iterator. The item of the\
+            iterable should be a list of arguments to be passed to the\
+            download task."""
         return map(lambda row: [row[0].strip(), row[1].strip()], csv_reader)
 
     @final
@@ -183,7 +149,6 @@ class CorpusImporterCommand(VerboseCommand, ABC):
         super().handle(*args, **options)
 
         retrieval_queue = options["retrieval_queue"]
-        parse_queue = options["parsing_queue"]
         ingesting_queue = options["ingesting_queue"]
         delay = options["delay"]
         inventory_rows = options["inventory_rows"]
@@ -220,7 +185,6 @@ class CorpusImporterCommand(VerboseCommand, ABC):
                     self.download_task()
                     .si(*download_args)
                     .set(queue=retrieval_queue),
-                    self.parse_task().s().set(queue=parse_queue),
                     self.merge_task().s().set(queue=ingesting_queue),
                 ).apply_async()
                 time.sleep(delay)

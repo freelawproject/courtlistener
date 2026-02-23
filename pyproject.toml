@@ -22,7 +22,7 @@ urls.Home = "https://www.courtlistener.com/"
 urls.Repository = "https://github.com/freelawproject/courtlistener"
 urls.Documentation = "https://github.com/freelawproject/courtlistener/wiki"
 license = " AGPL-3.0-only"
-license-files = ["LICENSE.txt"]
+license-files = [ "LICENSE.txt" ]
 
 dependencies = [
   "ada-url>=1.28.0",
@@ -112,7 +112,7 @@ dependencies = [
   "django-cotton>=2.6.0",
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=8.0",
-  "juriscraper>=2.7.7",
+  "juriscraper>=2.6.68",
   "instructor>=1.14.1",
   "django-s3-express-cache>=0.1.0",
   "zohocrmsdk8-0==4.0.0",

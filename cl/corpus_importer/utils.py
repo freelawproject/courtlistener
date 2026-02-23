@@ -1317,10 +1317,11 @@ def texas_js_court_id_to_court_id(js_court_id: str) -> str:
         return "tex"
     if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
         return "texcrimapp"
+    if js_court_id == CourtID.UNKNOWN.value:
+        logger.error("Unknown court ID: %s", js_court_id)
+        return ""
     # Court of appeals
-    appellate_number = str(int(js_court_id[len("texas_coa") :]))
-    if appellate_number == "13":
-        appellate_number = "13A"
+    appellate_number = str(int(js_court_id.removeprefix("texas_coa")))
     return f"txctapp{appellate_number}"
 
 

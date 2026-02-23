@@ -16,6 +16,7 @@ from re import Pattern
 from tempfile import NamedTemporaryFile
 from typing import IO, Any, NamedTuple
 
+import botocore.exceptions
 import environ
 import eyecite
 import internetarchive as ia
@@ -123,6 +124,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
+from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry, time_call
 from cl.lib.llm import call_llm
@@ -150,6 +152,7 @@ from cl.lib.recap_utils import (
     get_document_filename,
 )
 from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
+from cl.lib.storage import AWSMediaStorage
 from cl.lib.types import TaskData
 from cl.people_db.lookup_utils import (
     lookup_judge_by_full_name_and_set_attr,
@@ -3915,11 +3918,11 @@ def merge_texas_case_transfers(
                     return MergeResult.failed()
             else:
                 if appeals_court["court_id"] == CourtID.UNKNOWN:
-                    logger.warning(
+                    logger.error(
                         "Found appellate court with unknown ID (docket %s)",
                         docket.docket_number,
                     )
-                    appeals_court_id = "texapp"
+                    return MergeResult.failed()
                 else:
                     appeals_court_id = texas_js_court_id_to_court_id(
                         appeals_court["court_id"]
@@ -3932,7 +3935,7 @@ def merge_texas_case_transfers(
                     "Found appellate court with unknown ID (docket %s)",
                     docket.docket_number,
                 )
-                appeals_court_id = "texapp"
+                return MergeResult.failed()
             else:
                 appeals_court_id = texas_js_court_id_to_court_id(
                     appeals_court["court_id"]
@@ -3986,7 +3989,11 @@ def merge_texas_case_transfers(
                     transfer_date=transfer_from_date
                     if transfer_from_date
                     else docket_data["date_filed"],
-                    transfer_type=CaseTransfer.WORKLOAD,
+                    # Texas Government Code 73.001 (accessed 2026-02-23)
+                    transfer_type=CaseTransfer.JURISDICTION
+                    if docket_data["court_id"]
+                    == CourtID.FIFTEENTH_COURT_OF_APPEALS
+                    else CaseTransfer.WORKLOAD,
                 )
             )
     else:
@@ -4033,30 +4040,18 @@ def generate_texas_appellate_brief_flags(
     :param appellate_briefs: A list of TexasAppellateBrief objects.
     :return: A list of booleans indicating whether the corresponding entry is
     an appellate brief."""
-    if not appellate_briefs:
-        return [False] * len(case_events)
-    i = 0
+    brief_iter = iter(appellate_briefs)
+    next_brief = next(brief_iter, None)
     flags = []
-    # Assumes that appellate briefs will appear in the same order as the
-    # corresponding case events.
     for case_event in case_events:
-        if i == len(appellate_briefs):
-            flags.append(False)
-            continue
-        if case_event == appellate_briefs[i]:
+        if next_brief is not None and case_event == next_brief:
             flags.append(True)
-            i += 1
+            next_brief = next(brief_iter, None)
         else:
             flags.append(False)
-
     return flags
 
 
-@app.task(
-    max_retries=5,
-    ignore_result=True,
-)
-@time_call(logger)
 def merge_texas_docket(
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
@@ -4065,6 +4060,7 @@ def merge_texas_docket(
     """Merges scraped data from a Texas docket into the `Docket` table.
 
     :param docket_data: The scraped Texas docket data.
+
     :return: The result of the merge operation."""
     court = Court.objects.get(
         pk=texas_js_court_id_to_court_id(docket_data["court_id"])
@@ -4073,6 +4069,11 @@ def merge_texas_docket(
     logger.info("Merging Texas docket %s", docket_number)
     with transaction.atomic():
         docket = None
+        if docket_data["court_type"] == CourtType.UNKNOWN.value:
+            logger.error(
+                "Texas docket %s has unknown court type", docket_number
+            )
+            return MergeResult.failed()
         if docket_data["court_type"] == CourtType.APPELLATE.value:
             logger.info(
                 "Docket is appellate. Checking if disaggregation is necessary..."
@@ -4092,7 +4093,7 @@ def merge_texas_docket(
                     "Disaggregating Texas appellate docket %s", docket_number
                 )
                 docket.court = court
-        else:
+        if docket is None:
             docket = async_to_sync(find_docket_object)(
                 court_id=court.pk,
                 pacer_case_id=None,
@@ -4218,22 +4219,21 @@ def merge_texas_docket(
     ignore_result=True,
 )
 @time_call(logger)
-def parse_texas_docket(
-    self: Task, i: tuple[bytes, TexasDocketMeta]
-) -> (
-    TexasCourtOfAppealsDocket
-    | TexasCourtOfCriminalAppealsDocket
-    | TexasSupremeCourtDocket
-    | None
-):
-    """Uses Juriscraper to parse bytes into a Texas docket object.
+def texas_ingest_docket_task(
+    task: Task,
+    i: tuple[bytes, TexasDocketMeta],
+) -> MergeResult:
+    """
+    Task to parse and merge a Texas docket.
 
-    :param self: The Celery task.
+    :param task: The Celery task.
+
     :param i: Tuple with the following entries:
-      - Bytes string to parse.
-      - The response headers to the scraper.
-      - Docket metadata.
-    :return: The parsed docket or `None` if parsing failed."""
+    - Bytes string to parse.
+    - Docket metadata.
+
+    :return: The result of the merge operation.
+    """
     content, meta = i
     logger.info("Attempting to parse Texas docket %s...", meta.case_number)
     try:
@@ -4249,16 +4249,86 @@ def parse_texas_docket(
                 meta.court_code,
                 meta.case_number,
             )
-            self.request.chain = None
-            return None
+            task.request.chain = None
+            return MergeResult.failed()
 
         parser._parse_text(content.decode("utf-8"))
-        return parser.data
+        docket_data = parser.data
     except Exception as e:
-        self.request.chain = None
         logger.error(
             "Encountered error parsing Texas docket at URL %s: %s",
             meta.case_url,
             str(e),
         )
-        return None
+        task.request.chain = None
+        return MergeResult.failed()
+    return merge_texas_docket(docket_data)
+
+
+@app.task(
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def default_corpus_download_task(
+    bucket: str, s3_key: str
+) -> tuple[bytes, str, str]:
+    """Downloads a scraped file from S3 and returns it for parsing.
+
+    :param bucket: S3 bucket name.
+    :param s3_key: S3 key to download file from.
+    :return: Tuple with entries: Bytes of downloaded file, the bucket
+    parameter, and the s3_key parameter."""
+    logger.info("Downloading file from S3: %s", s3_key)
+    storage = AWSMediaStorage(bucket_name=bucket)
+    with storage.open(s3_key, "rb") as f:
+        content = f.read()
+    return content, bucket, s3_key
+
+
+@app.task(
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+@time_call(logger)
+def texas_corpus_download_task(
+    docket: tuple[str, str],
+    docket_meta: tuple[str, str],
+) -> tuple[bytes, TexasDocketMeta]:
+    """Downloads a scraped file from S3 and returns it for parsing.
+
+    :param docket: Tuple of S3 bucket name and key where docket HTML is stored.
+
+    :param docket_meta: Tuple of S3 bucket name and key where docket metadata\
+        is stored.
+
+    :return: Tuple with entries: Bytes of downloaded file, dictionary with\
+        response headers, and docket metadata."""
+    storage = AWSMediaStorage(bucket_name=docket[0])
+    logger.info(
+        "Downloading docket HTML from S3: (Bucket: %s; Path: %s)",
+        docket[0],
+        docket[1],
+    )
+    with storage.open(docket[1], "rb") as f:
+        content = f.read()
+
+    storage = AWSMediaStorage(bucket_name=docket_meta[0])
+    logger.info(
+        "Downloading docket meta from S3: (Bucket: %s; Path: %s)",
+        docket_meta[0],
+        docket_meta[1],
+    )
+    with storage.open(docket_meta[1], "r") as f:
+        meta = TexasDocketMeta.model_validate_json(f.read())
+
+    return content, meta
