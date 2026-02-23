@@ -72,7 +72,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.microservice_utils import rd_page_count_service
+from cl.lib.microservice_utils import doc_page_count_service
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     ProxyPacerSession,
@@ -117,8 +117,8 @@ from cl.recap.utils import (
     sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
-    extract_recap_pdf,
-    extract_recap_pdf_base,  # noqa: F401
+    extract_pdf_document,
+    extract_pdf_document_base,  # noqa: F401
 )
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
 from cl.search.tasks import index_docket_parties_in_es
@@ -196,7 +196,7 @@ def do_pacer_fetch(fq: PacerFetchQueue):
             rd_pk = fq.recap_document_id
             c = chain(
                 fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
-                extract_recap_pdf.si(rd_pk),
+                extract_pdf_document.si(rd_pk),
                 mark_fq_successful.si(fq.pk),
             )
         case _:
@@ -461,7 +461,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
                 )
 
             # Do page count and extraction
-            response = await rd_page_count_service(rd)
+            response = await doc_page_count_service(rd)
             if response.is_success:
                 rd.page_count = int(response.text)
                 assert isinstance(rd.page_count, (int | type(None))), (
@@ -486,7 +486,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
     if not existing_document and not pq.debug:
         await sync_to_async(
             chain(
-                extract_recap_pdf.si(rd.pk),
+                extract_pdf_document.si(rd.pk),
             ).apply_async
         )()
 
@@ -3614,5 +3614,5 @@ def process_recap_email(
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
         process_recap_email.si(epq.pk, user.pk),
-        extract_recap_pdf.s(),
+        extract_pdf_document.s(),
     ).apply_async()
