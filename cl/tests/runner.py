@@ -6,6 +6,7 @@ from unittest import TestLoader
 from django.test import SimpleTestCase
 from django.test.runner import DiscoverRunner
 from override_storage import override_storage
+from xmlrunner import XMLTestRunner
 
 from cl.tests.cases import (
     APITestCase,
@@ -40,10 +41,12 @@ class OurCasesTestLoader(TestLoader):
 
 class TestRunner(DiscoverRunner):
     test_loader = OurCasesTestLoader()
+    test_runner = XMLTestRunner
 
-    def __init__(self, *args, enable_logging, **kwargs):
+    def __init__(self, *args, enable_logging, xml_output=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.enable_logging = enable_logging
+        self.xml_output = xml_output
 
     @classmethod
     def add_arguments(cls, parser):
@@ -53,6 +56,11 @@ class TestRunner(DiscoverRunner):
             action="store_true",
             default=False,
             help="Display all log lines",
+        )
+        parser.add_argument(
+            "--xml-output",
+            default=None,
+            help="Directory to write JUnit XML test results to",
         )
         super().add_arguments(parser)
 
@@ -68,6 +76,25 @@ class TestRunner(DiscoverRunner):
         # This is disabled due to Django bug #36491.
         # See PR #5888 for more details.
         # parser.set_defaults(buffer=True)
+
+    def get_test_runner_kwargs(self):
+        kwargs = super().get_test_runner_kwargs()
+        if self.xml_output:
+            kwargs["output"] = self.xml_output
+        return kwargs
+
+    def run_suite(self, suite, **kwargs):
+        kwargs = self.get_test_runner_kwargs()
+        if self.xml_output:
+            runner = self.test_runner(**kwargs)
+        else:
+            # Fall back to the default TextTestRunner when no XML output
+            # is requested, preserving the original behavior.
+            runner = super().test_runner(**kwargs)
+        try:
+            return runner.run(suite)
+        finally:
+            runner = None
 
     def setup_databases(self, **kwargs):
         # Force to always delete the database if it exists

@@ -33,6 +33,7 @@ ENV \
 
 ARG BUILD_ENV=prod
 FROM build-base AS python-base
+ARG BUILD_ENV
 
 WORKDIR /opt/courtlistener
 
