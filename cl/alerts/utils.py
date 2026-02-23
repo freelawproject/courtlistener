@@ -805,11 +805,9 @@ def set_skip_percolation_if_parties_data(
 ) -> bool:
     """Set skip percolation flag if parties data is present.
 
-    Since docket percolation references the existing ES document (not inline
-    content), percolating on save would just re-percolate the same document
-    without new parties data. So we always skip percolation on save when
-    parties data is present and decide whether to percolate after merging
-    based on the attorney count limit.
+    If parties data is available and the attorney count does not exceed the
+    limit, percolation is skipped during docket save(), since percolation
+    will be scheduled after merging and indexing parties.
 
     :param parties_data: A list of dicts containing the parties data.
     :param d: The docket to be saved.

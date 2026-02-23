@@ -1629,7 +1629,11 @@ class DocketDocument(
 
 
 class DocketDocumentPlain(DocketDocument):
-    def prepare_parties(self, instance):
+    """This class is used for Docket document percolation. Here, we can
+    control whether to include parties based on
+    the MAX_ATTORNEYS_TO_PERCOLATE setting."""
+
+    def prepare_parties(self, instance: Docket) -> dict[str, set]:
         out = {
             "party_id": set(),
             "party": set(),
