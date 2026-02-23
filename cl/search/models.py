@@ -279,7 +279,7 @@ class DocketNumberSources:
 
     CHOICES = (
         (ORIGINAL, "Original from source"),
-        (AUTOMATED, "Automated cleaned using heuristics and LLM"),
+        (AUTOMATED, "Automatically cleaned using heuristics and LLM"),
         (MANUAL, "Manually cleaned by a human"),
     )
 
