@@ -674,7 +674,9 @@ async def process_recap_docket(pk):
 
     # Skip the percolator request for this save if parties data will be merged
     # afterward.
-    set_skip_percolation_if_parties_data(data["parties"], d)
+    percolate_parties = set_skip_percolation_if_parties_data(
+        data["parties"], d
+    )
     await d.asave()
 
     # Add the HTML to the docket in case we need it someday.
@@ -690,8 +692,10 @@ async def process_recap_docket(pk):
     # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
-        # Index or re-index parties only if the docket has parties.
-        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+        # Index and percolate parties only if within the attorney limit.
+        await sync_to_async(index_docket_parties_in_es.delay)(
+            d.pk, percolate_parties=percolate_parties
+        )
 
     items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
@@ -1391,7 +1395,9 @@ async def process_recap_appellate_docket(pk):
 
     # Skip the percolator request for this save if parties data will be merged
     # afterward.
-    set_skip_percolation_if_parties_data(data["parties"], d)
+    percolate_parties = set_skip_percolation_if_parties_data(
+        data["parties"], d
+    )
     await d.asave()
 
     # Add the HTML to the docket in case we need it someday.
@@ -1407,8 +1413,10 @@ async def process_recap_appellate_docket(pk):
     # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
-        # Index or re-index parties only if the docket has parties.
-        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+        # Index and percolate parties only if within the attorney limit.
+        await sync_to_async(index_docket_parties_in_es.delay)(
+            d.pk, percolate_parties=percolate_parties
+        )
 
     items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
@@ -1510,7 +1518,9 @@ async def process_recap_acms_docket(pk):
 
     # Skip the percolator request for this save if parties data will be merged
     # afterward.
-    set_skip_percolation_if_parties_data(data["parties"], d)
+    percolate_parties = set_skip_percolation_if_parties_data(
+        data["parties"], d
+    )
     await d.asave()
 
     pacer_file = await PacerHtmlFiles.objects.acreate(
@@ -1524,6 +1534,11 @@ async def process_recap_acms_docket(pk):
     # Merge parties before adding docket entries, so they can access parties'
     # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
+    if data["parties"]:
+        # Index and percolate parties only if within the attorney limit.
+        await sync_to_async(index_docket_parties_in_es.delay)(
+            d.pk, percolate_parties=percolate_parties
+        )
 
     # Sort docket entries to ensure consistent ordering
     data["docket_entries"] = sort_acms_docket_entries(data["docket_entries"])
