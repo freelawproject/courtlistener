@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0053_tx_scotus_url_length_and_case_transfer_docket'),
+        ('search', '0054_add_docket_number_source'),
     ]
 
     operations = [
