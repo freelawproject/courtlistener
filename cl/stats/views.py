@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import NoReturn
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -45,9 +46,17 @@ def replication_status(request: HttpRequest) -> HttpResponse:
 
 def elasticsearch_status(request: HttpRequest) -> JsonResponse:
     """Checks the health of the Elasticsearch cluster."""
+    if settings.ELASTICSEARCH_DISABLED:
+        return JsonResponse(
+            {"is_elastic_up": True, "elasticsearch_disabled": True},
+            status=HTTPStatus.OK,
+        )
     is_elastic_up = check_elasticsearch()
     return JsonResponse(
-        {"is_elastic_up": is_elastic_up},
+        {
+            "is_elastic_up": is_elastic_up,
+            "elasticsearch_disabled": False,
+        },
         status=(
             HTTPStatus.OK
             if is_elastic_up
@@ -71,8 +80,8 @@ def redis_writes(request: HttpRequest) -> HttpResponse:
     return HttpResponse("Successful Redis write.", content_type="text/plain")
 
 
-def sentry_fail(request: HttpRequest) -> HttpResponse:
-    division_by_zero = 1 / 0
+def sentry_fail(request: HttpRequest) -> NoReturn:
+    raise ZeroDivisionError("Intentional error for Sentry")
 
 
 def celery_fail(request: HttpRequest) -> HttpResponse:
