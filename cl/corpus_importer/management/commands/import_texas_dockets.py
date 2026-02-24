@@ -6,6 +6,7 @@ from cl.corpus_importer.management.utils import (
     CorpusImporterCommand,
 )
 from cl.corpus_importer.tasks import (
+    fill_case_transfer_missing_dockets,
     texas_corpus_download_task,
     texas_ingest_docket_task,
 )
@@ -47,3 +48,7 @@ class Command(CorpusImporterCommand):
     @staticmethod
     def merge_task() -> app.Task:
         return texas_ingest_docket_task
+
+    def handle(self, *args, **options):
+        super().handle(*args, **options)
+        fill_case_transfer_missing_dockets.delay()

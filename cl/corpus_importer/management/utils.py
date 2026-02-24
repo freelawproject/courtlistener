@@ -144,7 +144,6 @@ class CorpusImporterCommand(VerboseCommand, ABC):
             download task."""
         return map(lambda row: [row[0].strip(), row[1].strip()], csv_reader)
 
-    @final
     def handle(self, *args, **options):
         super().handle(*args, **options)
 

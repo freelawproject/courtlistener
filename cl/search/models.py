@@ -6,7 +6,7 @@ from typing import TypeVar
 import nh3
 import pghistory
 import pytz
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
@@ -4053,6 +4053,88 @@ class CaseTransfer(AbstractDateTimeModel):
     transfer_type = models.SmallIntegerField(
         choices=transfer_type_choices.items(),
     )
+
+    # We currently only generate transfers for state courts, and we do not
+    # scrape trial courts so skip trying to populate fields we'll never be able
+    # to populate.
+    TRACKED_JURISDICTIONS = (Court.STATE_APPELLATE, Court.STATE_SUPREME)
+
+    @classmethod
+    def fill_null_dockets(cls):
+        from cl.recap.mergers import find_docket_object
+
+        logger.info(
+            "Attempting to populate missing fields in CaseTransfer table..."
+        )
+
+        missing_origin_docket = cls.objects.filter(
+            origin_court__jurisdiction__in=cls.TRACKED_JURISDICTIONS,
+            origin_docket__isnull=True,
+        )
+        total_origin = missing_origin_docket.count()
+        for transfer in missing_origin_docket:
+            origin_docket = async_to_sync(find_docket_object)(
+                court_id=transfer.origin_court_id,
+                pacer_case_id=None,
+                docket_number=transfer.origin_docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                docket_source=Docket.SCRAPER,
+                allow_create=False,
+            )
+            if origin_docket:
+                logger.info(
+                    "Found origin docket %s!", transfer.origin_docket_number
+                )
+                transfer.origin_docket = origin_docket
+            else:
+                logger.info(
+                    "Could not find origin docket %s.",
+                    transfer.origin_docket_number,
+                )
+        updated_origin = cls.objects.bulk_update(
+            missing_origin_docket, ["origin_docket"], batch_size=100
+        )
+
+        missing_destination_docket = cls.objects.filter(
+            destination_court__jurisdiction__in=cls.TRACKED_JURISDICTIONS,
+            destination_docket__isnull=True,
+        )
+        total_destination = missing_destination_docket.count()
+        for transfer in missing_destination_docket:
+            destination_docket = async_to_sync(find_docket_object)(
+                court_id=transfer.destination_court_id,
+                pacer_case_id=None,
+                docket_number=transfer.destination_docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                docket_source=Docket.SCRAPER,
+                allow_create=False,
+            )
+            if destination_docket:
+                logger.info(
+                    "Found destination docket %s!",
+                    transfer.destination_docket_number,
+                )
+                transfer.destination_docket = destination_docket
+            else:
+                logger.info(
+                    "Could  not find destination docket %s.",
+                    transfer.destination_docket_number,
+                )
+        updated_destination = cls.objects.bulk_update(
+            missing_destination_docket, ["destination_docket"], batch_size=100
+        )
+
+        logger.info(
+            "Update complete. Populated %s/%s origin dockets and %s/%s destination dockets.",
+            updated_origin,
+            total_origin,
+            updated_destination,
+            total_destination,
+        )
 
     class Meta:
         constraints = [

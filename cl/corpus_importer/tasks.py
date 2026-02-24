@@ -4377,3 +4377,18 @@ def texas_corpus_download_task(
         meta = TexasDocketMeta.model_validate_json(f.read())
 
     return content, meta
+
+
+@app.task(
+    ignore_result=True,
+)
+@time_call(logger)
+def fill_case_transfer_missing_dockets():
+    """
+    Attempt to populate missing Docket foreign key fields in CaseTransfer\
+    objects. Run after a scraping task and on a daily schedule.
+    """
+    logger.info(
+        "Attempting to populate missing CaseTransfer docket foreign keys..."
+    )
+    CaseTransfer.fill_null_dockets()
