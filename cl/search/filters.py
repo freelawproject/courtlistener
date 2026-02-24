@@ -79,7 +79,9 @@ class DocketFilter(NoEmptyFilterSet):
         "cl.people_db.filters.PersonFilter", queryset=Person.objects.all()
     )
     parties = filters.RelatedFilter(
-        "cl.people_db.filters.PartyFilter", queryset=Party.objects.all()
+        "cl.people_db.filters.PartyFilter",
+        queryset=Party.objects.all(),
+        distinct=True,
     )
     tags = filters.RelatedFilter(TagFilter, queryset=Tag.objects.all())
 

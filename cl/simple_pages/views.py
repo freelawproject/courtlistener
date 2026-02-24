@@ -143,6 +143,7 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
         "rt_alerts_sending_rate": int(
             settings.REAL_TIME_ALERTS_SENDING_RATE / 60
         ),
+        "MAX_ATTORNEYS_TO_PERCOLATE": settings.MAX_ATTORNEYS_TO_PERCOLATE,
     }
     context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)
