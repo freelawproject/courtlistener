@@ -140,6 +140,9 @@ async def find_docket_object(
     """Attempt to find the docket based on the parsed docket data. If cannot be
     found, create a new docket. If multiple are found, return the oldest.
 
+    Note: Only sets `source`, `pacer_case_id`, and `court_id` fields on the
+    created docket.
+
     :param court_id: The CourtListener court_id to lookup
     :param pacer_case_id: The PACER case ID for the docket
     :param docket_number: The docket number to lookup.

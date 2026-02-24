@@ -132,6 +132,7 @@ from cl.lib.microservice_utils import (
     doc_page_count_service,
     microservice,
 )
+from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -3510,10 +3511,10 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
     :return: The result of this merge attempt."""
     logger.info(
         "Merging CaseTransfer from docket %s in court %s to docket %s in court %s on %s with type %s.",
-        case_transfer.origin_court.pk,
         case_transfer.origin_docket_number,
-        case_transfer.destination_court.pk,
+        case_transfer.origin_court.pk,
         case_transfer.destination_docket_number,
+        case_transfer.destination_court.pk,
         case_transfer.transfer_date.isoformat(),
         case_transfer.transfer_type,
     )
@@ -3878,6 +3879,11 @@ def merge_texas_case_transfers(
     :param docket: The docket to add the appeal information to.
     :param docket_data: The docket data from Juriscraper.
     :return: The result of the CaseTransfer merge operation"""
+    logger.info(
+        "Determining transfers for docket %s in court %s...",
+        docket.docket_number,
+        docket.court.pk,
+    )
     trial_court_id = texas_originating_court_to_court_id(
         docket_data["originating_court"]
     )
@@ -3896,13 +3902,18 @@ def merge_texas_case_transfers(
         appeals_court = docket_data["appeals_court"]
 
         if docket_data["court_id"] == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+            logger.info("Docket %s is from the CCA", docket.docket_number)
             # Death penalty cases are automatically appealed to the CCA so the
             # appellate court may be missing.
             if (
                 not appeals_court
-                or appeals_court["court_id"] == CourtID.UNKNOWN
+                or appeals_court["court_id"] == CourtID.UNKNOWN.value
             ):
                 # Death penalty appeal
+                logger.info(
+                    "Docket %s in the CCA is a death penalty appeal",
+                    docket.docket_number,
+                )
                 if trial_court_id:
                     transfer.origin_court = Court.objects.get(
                         pk=trial_court_id
@@ -3917,7 +3928,11 @@ def merge_texas_case_transfers(
                     )
                     return MergeResult.failed()
             else:
-                if appeals_court["court_id"] == CourtID.UNKNOWN:
+                logger.info(
+                    "Docket %s in the CCA is not a death penalty appeal",
+                    docket.docket_number,
+                )
+                if appeals_court["court_id"] == CourtID.UNKNOWN.value:
                     logger.error(
                         "Found appellate court with unknown ID (docket %s)",
                         docket.docket_number,
@@ -3927,10 +3942,16 @@ def merge_texas_case_transfers(
                     appeals_court_id = texas_js_court_id_to_court_id(
                         appeals_court["court_id"]
                     )
+                    logger.info(
+                        "Appeals court ID for CCA docket %s is %s",
+                        docket.docket_number,
+                        appeals_court_id,
+                    )
                 transfer.origin_court = Court.objects.get(pk=appeals_court_id)
                 transfer.origin_docket_number = appeals_court["case_number"]
         elif docket_data["court_id"] == CourtID.SUPREME_COURT.value:
-            if appeals_court["court_id"] == CourtID.UNKNOWN:
+            logger.info("Docket %s is from the SC", docket.docket_number)
+            if appeals_court["court_id"] == CourtID.UNKNOWN.value:
                 logger.warning(
                     "Found appellate court with unknown ID (docket %s)",
                     docket.docket_number,
@@ -3939,6 +3960,11 @@ def merge_texas_case_transfers(
             else:
                 appeals_court_id = texas_js_court_id_to_court_id(
                     appeals_court["court_id"]
+                )
+                logger.info(
+                    "Appeals court ID for SC docket %s is %s",
+                    docket.docket_number,
+                    appeals_court_id,
                 )
             transfer.origin_court = Court.objects.get(pk=appeals_court_id)
             transfer.origin_docket_number = appeals_court["case_number"]
@@ -3950,8 +3976,13 @@ def merge_texas_case_transfers(
             return MergeResult.failed()
         transfers = [transfer]
     elif docket_data["court_type"] == CourtType.APPELLATE.value:
+        logger.info("Docket %s is an appellate docket", docket.docket_number)
         transfers = []
         if trial_court_id:
+            logger.info(
+                "Appellate docket %s has a valid trial court",
+                docket.docket_number,
+            )
             transfers.append(
                 CaseTransfer(
                     origin_court=Court.objects.get(pk=trial_court_id),
@@ -3966,6 +3997,9 @@ def merge_texas_case_transfers(
                 )
             )
         if docket_data["transfer_from"]:
+            logger.info(
+                "Appellate docket %s has a transfer in", docket.docket_number
+            )
             transfer_from_date = docket_data["transfer_from"]["date"]
             if not transfer_from_date:
                 logger.warning(
@@ -4104,6 +4138,8 @@ def merge_texas_docket(
                 docket_source=Docket.SCRAPER,
                 allow_create=True,
             )
+        docket.docket_number = docket_number
+        docket.docket_number_core = make_docket_number_core(docket_number)
         docket.date_filed = docket_data["date_filed"]
         docket.cause = docket_data["case_type"]
         originating_court_merge_result = merge_texas_docket_originating_court(
@@ -4122,10 +4158,19 @@ def merge_texas_docket(
                 lower_court_data
             )
         else:
-            lower_court_data = docket_data["appeals_court"]
-            lower_court_id = texas_js_court_id_to_court_id(
-                lower_court_data["court_id"]
-            )
+            if (
+                docket_data["appeals_court"]["court_id"]
+                == CourtID.UNKNOWN.value
+            ):
+                lower_court_data = docket_data["originating_court"]
+                lower_court_id = texas_originating_court_to_court_id(
+                    lower_court_data
+                )
+            else:
+                lower_court_data = docket_data["appeals_court"]
+                lower_court_id = texas_js_court_id_to_court_id(
+                    lower_court_data["court_id"]
+                )
 
         if lower_court_id is not None:
             court = Court.objects.get(pk=lower_court_id)
