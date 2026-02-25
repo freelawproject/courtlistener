@@ -4170,9 +4170,8 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         fields? Items needing OCR still need extraction.
         """
         return (
-                (self.ocr_status is None or self.ocr_status == self.OCR_NEEDED)
-                and self.filepath_local
-            )
+            self.ocr_status is None or self.ocr_status == self.OCR_NEEDED
+        ) and self.filepath_local
 
     @property
     def file_name(self) -> str:
