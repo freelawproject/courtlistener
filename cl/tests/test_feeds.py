@@ -11,7 +11,13 @@ from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.search.models import Court
+from cl.audio.factories import AudioWithParentsFactory
+from cl.search.factories import (
+    CourtFactory,
+    OpinionClusterWithParentsFactory,
+    OpinionWithParentsFactory,
+)
+from cl.search.models import PRECEDENTIAL_STATUS, Court, Docket
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 
 
@@ -21,12 +27,76 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 class FeedsFunctionalTest(BaseSeleniumTest):
     """Tests the Feeds page and functionality"""
 
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "functest_opinions.json",
-        "functest_audio.json",
-    ]
+    def setUp(self) -> None:
+        test_court = CourtFactory.create(
+            id="test",
+            position=0.0,
+            citation_string="Test",
+            short_name="Testing Supreme Court",
+            full_name="Testing Supreme Court",
+            in_use=True,
+            url="https://www.courtlistener.com/",
+            jurisdiction="F",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=False,
+        )
+        ca1_court = CourtFactory.create(
+            id="ca1",
+            position=101.0,
+            citation_string="1st Cir.",
+            short_name="First Circuit",
+            full_name="Court of Appeals for the First Circuit",
+            in_use=True,
+            url="http://www.ca1.uscourts.gov/",
+            jurisdiction="F",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=True,
+        )
+
+        bonvini_cluster_1 = OpinionClusterWithParentsFactory.create(
+            docket__court=test_court,
+            docket__source=Docket.DEFAULT,
+            docket__docket_number="20-0001",
+            case_name="Bonvini v. Alpha",
+            case_name_full="Bonvini v. Alpha",
+            case_name_short="Bonvini v. Alpha",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionWithParentsFactory.create(
+            cluster=bonvini_cluster_1,
+            plain_text="Opinion text mentioning bonvini.",
+            local_path="search/opinion_pdf_text_based.pdf",
+        )
+
+        bonvini_cluster_2 = OpinionClusterWithParentsFactory.create(
+            docket__court=test_court,
+            docket__source=Docket.DEFAULT,
+            docket__docket_number="20-0002",
+            case_name="Bonvini v. Beta",
+            case_name_full="Bonvini v. Beta",
+            case_name_short="Bonvini v. Beta",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionWithParentsFactory.create(
+            cluster=bonvini_cluster_2,
+            plain_text="Another opinion about bonvini.",
+            local_path="search/opinion_pdf_image_based.pdf",
+        )
+        AudioWithParentsFactory.create(
+            docket__court=ca1_court,
+            docket__source=Docket.DEFAULT,
+            docket__docket_number="15-1442",
+            case_name="Ander v. Leo",
+            case_name_full="Ander v Leo (Full Name)",
+            case_name_short="Ander v Leo (Short Name)",
+            source="C",
+            processing_complete=True,
+            local_path_mp3="mp3/2014/06/09/ander_v._leo.mp3",
+            local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
+            duration=15,
+        )
+
+        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_can_get_to_feeds_from_homepage(self) -> None:
