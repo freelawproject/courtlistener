@@ -1,14 +1,11 @@
 import re
 
-from asgiref.sync import async_to_sync
-from django.conf import settings
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import DynamicFieldsMixin
 from cl.favorites.models import DocketTag, Prayer, UserTag
-from cl.favorites.selectors import prayer_eligible
 from cl.search.models import Docket
 
 
@@ -65,11 +62,7 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
                 "A prayer for this recap document already exists."
             )
 
-        # Check if the user is eligible to create a new prayer
-        if not async_to_sync(prayer_eligible)(user)[0]:
-            raise ValidationError(
-                f"You have reached the maximum number of prayers ({settings.ALLOWED_PRAYER_COUNT}) allowed in the last 24 hours."
-            )
+        # API prayers are unlimited - no rate limiting check
         return data
 
 

@@ -11,7 +11,6 @@ from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
 from django.test import override_settings
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
@@ -44,6 +43,7 @@ from cl.favorites.utils import (
     get_user_prayer_history,
     get_user_prayers,
     prayer_unavailable,
+    send_prayer_emails,
 )
 from cl.lib.test_helpers import (
     AudioTestCase,
@@ -1483,6 +1483,36 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         )
         self.assertEqual(total_cost, 3.2)
 
+    @override_settings(ALLOWED_PRAYER_COUNT=2)
+    async def test_web_ui_prayer_rate_limiting(self) -> None:
+        """Verify that web UI prayers are still subject to rate limiting."""
+        current_time = now()
+        prayers = Prayer.objects.all()
+
+        with time_machine.travel(current_time, tick=False):
+            # First prayer should succeed
+            prayer_1 = await create_prayer(self.user, self.rd_2)
+            self.assertIsNotNone(prayer_1)
+            self.assertEqual(await prayers.acount(), 1)
+
+            # Second prayer should succeed
+            prayer_2 = await create_prayer(self.user, self.rd_3)
+            self.assertIsNotNone(prayer_2)
+            self.assertEqual(await prayers.acount(), 2)
+
+            # Third prayer should fail due to rate limiting
+            prayer_3 = await create_prayer(self.user, self.rd_4)
+            self.assertIsNone(prayer_3)
+            self.assertEqual(await prayers.acount(), 2)
+
+        # After more than 24 hours the user is eligible to create more prays.
+        with time_machine.travel(
+            current_time + timedelta(hours=25), tick=False
+        ):
+            prayer_4 = await create_prayer(self.user, self.rd_4)
+            self.assertIsNotNone(prayer_4)
+            self.assertEqual(await prayers.acount(), 3)
+
 
 @patch("cl.favorites.utils.prayer_eligible", return_value=(True, 5))
 @patch("cl.favorites.signals.prayer_unavailable", wraps=prayer_unavailable)
@@ -1783,6 +1813,7 @@ class PrayerAPITests(PrayAndPayTestCase):
         self.assertIsNotNone(prayer_first)
         self.assertEqual(await prayer.acount(), 1)
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertTrue(prayer_first.via_api)
 
     async def test_duplicate_prayer_fails(self) -> None:
         """Ensure a user can't create multiple prayers for the same document
@@ -1889,33 +1920,57 @@ class PrayerAPITests(PrayAndPayTestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
 
-    @override_settings(ALLOWED_PRAYER_COUNT=2)
-    async def test_prayer_creation_eligibility(self):
-        """Test the prayer creation eligibility and limits in the API."""
-        current_time = timezone.now()
+    async def test_api_prayers_unlimited(self):
+        """Test that API prayers are unlimited and not subject to limiting."""
+
         prayers = Prayer.objects.all()
 
-        with time_machine.travel(current_time, tick=False):
-            # First prayer succeed
-            response = await self.make_a_prayer(self.client, self.rd_1.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 1)
+        # First prayer succeed
+        response = await self.make_a_prayer(self.client, self.rd_1.pk)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await prayers.acount(), 1)
 
-            # Second prayer succeed
-            response = await self.make_a_prayer(self.client, self.rd_2.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 2)
+        # Second prayer succeed
+        response = await self.make_a_prayer(self.client, self.rd_2.pk)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await prayers.acount(), 2)
 
-            # Third prayer fails due to limit
-            response = await self.make_a_prayer(self.client, self.rd_3.pk)
-            self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
-            self.assertIn("maximum number of prayers", str(response.data))
-            self.assertEqual(await prayers.acount(), 2)
+        # Third prayer succeed
+        response = await self.make_a_prayer(self.client, self.rd_3.pk)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await prayers.acount(), 3)
 
-        # After more than 24 hours the user is eligible to create more prays.
-        with time_machine.travel(
-            current_time + timedelta(hours=25), tick=False
-        ):
-            response = await self.make_a_prayer(self.client, self.rd_3.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 3)
+    async def test_api_prayers_excluded_from_leaderboard(self) -> None:
+        """Verify that API prayers are excluded from the leaderboard."""
+
+        await self.make_a_prayer(self.client, self.rd_2.pk)
+        top_prayers = await get_top_prayers()
+        self.assertEqual(await top_prayers.acount(), 0)
+
+    async def test_api_prayers_excluded_from_stats(self) -> None:
+        """Verify that API prayers are excluded from summary statistics."""
+
+        await self.make_a_prayer(self.client, self.rd_2.pk)
+
+        # Get lifetime stats for waiting prayers
+        stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+
+        # API prayer should not be counted in stats
+        self.assertEqual(stats.prayer_count, 0)
+        self.assertEqual(stats.distinct_count, 0)
+        self.assertEqual(stats.distinct_users, 0)
+
+    async def test_api_prayers_skip_emails(self) -> None:
+        """Verify that API prayers do not trigger email notifications."""
+
+        await self.make_a_prayer(self.client, self.rd_2.pk)
+
+        # Mark the document as available (simulate granting the prayer)
+        self.rd_2.is_available = True
+        await self.rd_2.asave()
+
+        # Send prayer emails
+        await sync_to_async(send_prayer_emails)(self.rd_2)
+
+        # No emails should be sent for API prayers
+        self.assertEqual(len(mail.outbox), 0)
