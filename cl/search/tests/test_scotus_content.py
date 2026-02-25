@@ -506,35 +506,19 @@ class ScotusDocketMergeTest(TestCase):
             scotus_meta.questions_presented_file.name.endswith("-qp.pdf")
         )
 
-    @mock.patch("cl.corpus_importer.tasks.is_pdf", return_value=True)
-    @mock.patch("cl.corpus_importer.tasks.requests.get")
-    def test_download_qp_scotus_pdf_resolves_relative_url(
-        self,
-        mock_get,
-        mock_is_pdf,
-    ) -> None:
-        """Confirm relative questions_presented_url values (e.g.
+    def test_merge_scotus_docket_resolves_relative_qp_url(self) -> None:
+        """Confirm relative questions_presented URLs (e.g.
         "../qp/14-00556qp.pdf" found in 14-556.html) are resolved to
-        absolute URLs before downloading."""
+        absolute URLs when stored in ScotusDocketMetadata."""
 
-        docket = DocketFactory.create(court=self.court)
-        ScotusDocketMetadata.objects.create(
-            docket=docket,
-            questions_presented_url="../qp/14-00556qp.pdf",
+        report_data = ScotusDocketDataFactory(
+            questions_presented="../qp/14-00556qp.pdf",
         )
-
-        mock_response = mock.Mock()
-        mock_response.iter_content.return_value = [b"fake pdf content"]
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value.__enter__.return_value = mock_response
-
-        download_qp_scotus_pdf.delay(docket.id)
-
-        mock_get.assert_called_once_with(
+        docket, _ = merge_scotus_docket(report_data)
+        scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
+        self.assertEqual(
+            scotus_meta.questions_presented_url,
             "https://www.supremecourt.gov/qp/14-00556qp.pdf",
-            stream=True,
-            timeout=60,
-            headers={"User-Agent": "Free Law Project"},
         )
 
     @mock.patch("cl.corpus_importer.tasks.logger.info")
