@@ -138,6 +138,7 @@ class SearchForm(forms.Form):
     nature_of_suit = forms.CharField(
         required=False,
         label="Nature of Suit",
+        help_text='<a href="https://www.uscourts.gov/sites/default/files/js_044_code_descriptions.pdf" target="_blank" rel="noopener">NOS code reference (PDF)</a>',
         widget=forms.TextInput(
             attrs={
                 "class": "external-input form-control",
@@ -938,6 +939,7 @@ class CorpusSearchForm(forms.Form):
         required=False,
         label="Nature of Suit",
         label_suffix="",
+        help_text='<a href="https://www.uscourts.gov/sites/default/files/js_044_code_descriptions.pdf" target="_blank" rel="noopener">NOS code reference (PDF)</a>',
         widget=forms.TextInput(
             attrs={
                 "class": "focus:ring-0 focus:outline-none w-full",
