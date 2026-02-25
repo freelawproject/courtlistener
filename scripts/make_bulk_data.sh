@@ -66,7 +66,7 @@ docket_fields='(id, date_created, date_modified, source, appeal_from_str,
 	       court_id, idb_data_id, originating_court_information_id, referred_to_id,
 	       federal_dn_case_type, federal_dn_office_code, federal_dn_judge_initials_assigned,
 	       federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id,
-           docket_number_raw
+           docket_number_raw, docket_number_source
 	       )'
 dockets_csv_filename="dockets-$(date -I).csv"
 

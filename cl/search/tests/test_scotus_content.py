@@ -399,7 +399,7 @@ class ScotusDocketMergeTest(TestCase):
         attorney_orgs = AttorneyOrganization.objects.all()
 
         self.assertEqual(
-            attorneys_after.count(), 3, "AttorneysOrgs were duplicated."
+            attorney_orgs.count(), 3, "AttorneysOrgs were duplicated."
         )
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:

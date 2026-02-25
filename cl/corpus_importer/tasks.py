@@ -55,11 +55,19 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
-from juriscraper.pacer.utils import is_pdf
 from juriscraper.scotus import (
     SCOTUSDocketReport,
     SCOTUSDocketReportHTM,
     SCOTUSDocketReportHTML,
+from juriscraper.state.texas import (
+    TexasCaseEvent,
+    TexasCaseParty,
+    TexasSupremeCourtAppellateBrief,
+    TexasSupremeCourtCaseEvent,
+)
+from juriscraper.state.texas.common import (
+    TexasAppellateBrief,
+    TexasCaseDocument,
 )
 from openai import (
     APIConnectionError,
@@ -110,7 +118,10 @@ from cl.lib.courts import find_court_object_by_name
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
 from cl.lib.llm import call_llm
-from cl.lib.microservice_utils import doc_page_count_service, microservice
+from cl.lib.microservice_utils import (
+    doc_page_count_service,
+    microservice,
+)
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -156,7 +167,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
+from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
@@ -173,6 +184,7 @@ from cl.search.models import (
     SCOTUSDocument,
     Tag,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -775,7 +787,7 @@ def get_and_process_free_pdf(
 
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
-    async_to_sync(extract_recap_pdf_base)(
+    async_to_sync(extract_pdf_document_base)(
         rd.pk, ocr_available=False, check_if_needed=False
     )
     return {"result": result, "rd_pk": rd.pk}
@@ -2674,7 +2686,7 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     # Skip OCR for now. It'll happen in a second step.
-    async_to_sync(extract_recap_pdf_base)(rd.pk, ocr_available=False)
+    async_to_sync(extract_pdf_document_base)(rd.pk, ocr_available=False)
 
 
 @app.task(
@@ -3199,6 +3211,24 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         )
 
 
+def is_pdf(response: Response) -> bool:
+    """Check if a `requests.Response` object wraps a PDF file using the
+    "Content-Type" header.
+
+    :param response: The `requests.Response` object to check.
+    :return: Whether the response is a PDF file."""
+    return (
+        # HTTP header names are case-insensitive; real requests.Response
+        # uses CaseInsensitiveDict, but plain dicts (e.g. in tests) don't,
+        # so look up the lowercase key to be safe in both scenarios.
+        response.headers.get("content-type", "")
+        # MIME types are also case-insensitive
+        # (https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types)
+        .lower()
+        .startswith("application/pdf")
+    )
+
+
 @contextmanager
 def download_pdf_in_stream(
     url: str,
@@ -3391,7 +3421,7 @@ def merge_scotus_document(
     if created or file_name_changed:
         chain(
             download_scotus_document_pdf.si(scotus_document.pk),
-            extract_recap_pdf.s(
+            extract_pdf_document.s(
                 check_if_needed=False, model_name="search.SCOTUSDocument"
             ),
         ).apply_async()
@@ -3506,7 +3536,9 @@ def add_scotus_docket_entries(
         - List of SCOTUSDocument PKs that were created
         - List of SCOTUSDocument PKs that were updated
     """
-    sequence_numbers = create_docket_entry_sequence_numbers(docket_entries)
+    sequence_numbers = create_docket_entry_sequence_numbers(
+        docket_entries, "date_filed"
+    )
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
@@ -3775,3 +3807,292 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     :return: None.
     """
     process_scotus_docket.delay(docket_data)
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+    # No retries because download_pdf_in_stream already has retry logic
+)
+def download_texas_document_pdf(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Download a PDF and return its path.
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance to
+    update the attachment for.
+
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed."""
+    try:
+        texas_document = TexasDocument.objects.get(pk=texas_document_pk)
+    except TexasDocument.DoesNotExist:
+        logger.warning(
+            "Texas document PDF download: TexasDocument %s does not exist; skipping.",
+            texas_document_pk,
+        )
+        self.request.chain = None
+        return None
+
+    url = texas_document.url
+    logger.info(
+        "Texas PDF download: Fetching PDF for TexasDocument %s from %s",
+        texas_document_pk,
+        url,
+    )
+
+    with download_pdf_in_stream(url, texas_document.pk, "texas_") as result:
+        if result is None:
+            logger.error(
+                "Failed to download attachment PDF for TexasDocument %s from URL %s.",
+                texas_document.pk,
+                url,
+            )
+            self.request.chain = None
+            return None
+        tmp, sha1_hash = result
+        filename = (
+            f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
+        )
+        downloaded_file = File(tmp)
+        texas_document.filepath_local.save(
+            filename, downloaded_file, save=False
+        )
+        texas_document.file_size = downloaded_file.size
+        texas_document.sha1 = sha1_hash
+        response = async_to_sync(doc_page_count_service)(texas_document)
+        if response.is_success:
+            texas_document.page_count = int(response.text)
+        texas_document.save()
+        return texas_document_pk
+
+
+def merge_texas_document(
+    docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
+) -> tuple[bool, bool, int]:
+    """Merge a single TexasCaseDocument object into CL.
+
+    Checks if the document exists, creating a TexasDocument object if it does
+    not. Then, if the document is new or has changed (media_version_id is
+    different, fetch the attachment PDF, store it, compute metadata, and
+    mark the document as available.
+
+    :param docket_entry: The docket entry this attachment belongs to.
+    :param input_document: The attachment to merge.
+    :return: Tuple with entries
+    - Flag indicating whether a document needed to be created or updated
+    - Flag indicating whether the update operation was successful or not
+    applicable
+    - Primary key of the TexasDocument object which matches the input document
+    """
+    (texas_document, created) = TexasDocument.objects.get_or_create(
+        media_id=input_document["media_id"],
+        docket_entry=docket_entry,
+        defaults={
+            "description": input_document["description"],
+            "media_version_id": input_document["media_version_id"],
+            "url": input_document["document_url"],
+        },
+    )
+
+    if (
+        created
+        or str(texas_document.media_version_id)
+        != input_document["media_version_id"]
+        or not texas_document.filepath_local
+    ):
+        texas_document.description = input_document["description"]
+        texas_document.media_version_id = input_document["media_version_id"]
+        texas_document.url = input_document["document_url"]
+        texas_document.save()
+        chain(
+            download_texas_document_pdf.si(texas_document.pk),
+            extract_pdf_document.s(
+                check_if_needed=False, model_name="search.TexasDocument"
+            ),
+        ).apply_async()
+        return True, True, texas_document.pk
+
+    return False, True, texas_document.pk
+
+
+def merge_texas_documents(
+    docket_entry: TexasDocketEntry,
+    documents: list[TexasCaseDocument],
+) -> list[tuple[bool, bool, int]]:
+    """Merges a list of Texas docket entry attachments into CL.
+
+    :param docket_entry: The docket entry this attachment belongs to.
+    :param documents: List of TexasCaseDocument attached to this docket entry.
+    :return: List of tuples with the following entries:
+    - A flag indicating whether the document needed to be created or updated,
+    - A flag indicating which is set to True when the document was successfully
+    created or updated or when an update was unnecessary,
+    - The primary key of the updated TexasDocument object."""
+    output = [
+        merge_texas_document(docket_entry, document) for document in documents
+    ]
+
+    return output
+
+
+@transaction.atomic
+def merge_texas_docket_entry(
+    docket: Docket,
+    sequence_number: str,
+    appellate_brief: bool,
+    input_docket_entry: TexasCaseEvent
+    | TexasAppellateBrief
+    | TexasSupremeCourtCaseEvent
+    | TexasSupremeCourtAppellateBrief,
+) -> tuple[bool, bool, int]:
+    """Merges a Texas docket entry into CL.
+
+    :param docket: The docket this entry belongs to.
+    :param sequence_number: The sequence number of the docket entry.
+    :param appellate_brief: Whether the docket entry is an appellate brief.
+    :param input_docket_entry: The docket entry being merged.
+    :return: Tuple with the following entries
+    - A flag indicating whether the docket entry or an attached document needed
+    to be created or updated,
+    - A flag which is set to true when the create/update operations are all
+    either successful or unnecessary,
+    - The primary key of the updated TexasDocketEntry object."""
+    logger.info(
+        "Merging TexasDocketEntry with sequence number %s into Docket %s",
+        sequence_number,
+        docket.pk,
+    )
+    Docket.objects.select_for_update().get(pk=docket.pk)
+    docket_entries = TexasDocketEntry.objects.filter(
+        docket=docket,
+        date_filed=input_docket_entry["date"],
+        entry_type=input_docket_entry["type"],
+        appellate_brief=appellate_brief,
+    )
+
+    try:
+        docket_entry = docket_entries.get()
+    except TexasDocketEntry.DoesNotExist:
+        logger.info(
+            "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
+            sequence_number,
+            docket.pk,
+        )
+        docket_entry = TexasDocketEntry(
+            docket=docket,
+            date_filed=input_docket_entry["date"],
+            entry_type=input_docket_entry["type"],
+            appellate_brief=appellate_brief,
+        )
+        created = True
+    except TexasDocketEntry.MultipleObjectsReturned:
+        # More filtering needed
+        matching_sequence_number = docket_entries.filter(
+            sequence_number=sequence_number
+        ).first()
+        logger.info(
+            "Multiple matching TexasDocketEntries found for sequence number %s on Docket %s.",
+            sequence_number,
+            docket.pk,
+        )
+        if matching_sequence_number:
+            logger.info(
+                "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+                sequence_number,
+                docket.pk,
+            )
+            docket_entry = matching_sequence_number
+            created = False
+        else:
+            logger.error(
+                "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
+                sequence_number,
+                docket.pk,
+            )
+            docket_entry = TexasDocketEntry(
+                docket=docket,
+                date_filed=input_docket_entry["date"],
+                entry_type=input_docket_entry["type"],
+                appellate_brief=appellate_brief,
+            )
+            created = True
+    else:
+        logger.info(
+            "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+            sequence_number,
+            docket.pk,
+        )
+        created = False
+
+    docket_entry.sequence_number = sequence_number
+    docket_entry.description = input_docket_entry.get("description", "")
+    docket_entry.disposition = input_docket_entry.get("disposition", "")
+    docket_entry.remarks = input_docket_entry.get("remarks", "")
+    logger.info(
+        "Saving TexasDocketEntry %s on Docket %s",
+        docket_entry.pk,
+        docket.pk,
+    )
+    docket_entry.save()
+
+    logger.info(
+        "Merging attachments for TexasDocketEntry %s on Docket %s",
+        docket_entry.pk,
+        docket.pk,
+    )
+    document_results = merge_texas_documents(
+        docket_entry, input_docket_entry["attachments"]
+    )
+
+    return (
+        created or any(r[0] for r in document_results),
+        all(r[1] for r in document_results),
+        docket_entry.pk,
+    )
+
+
+def normalize_texas_parties(
+    parties: list[TexasCaseParty],
+) -> list[dict[str, Any]]:
+    """Transform Texas court party data to PACER-like format.
+
+    This allows reuse of the existing add_parties_and_attorneys() method for
+    Texas court data.
+
+    :param parties: List of party dicts in Texas format.
+    :returns: List of party dicts in PACER-like format compatible with
+    add_parties_and_attorneys()
+    """
+    return [
+        {
+            "name": party["name"],
+            "type": party["type"],
+            "date_terminated": None,
+            "extra_info": "",
+            "attorneys": [
+                {
+                    "name": attorney,
+                    "contact": attorney,
+                    "roles": ["LEAD_ATTORNEY"] if i == 0 else ["UNKNOWN"],
+                }
+                for i, attorney in enumerate(party["representatives"])
+            ],
+        }
+        for party in parties
+    ]
+
+
+def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
+    """Merge Texas case parties and attorneys into the given docket.
+
+    This function takes a docket and a list of parties associated with a Texas
+    case, normalizes the parties into a PACER-like format, and incorporates
+    them along with their associated attorneys into the docket using
+    add_parties_and_attorneys().
+
+    :param docket: The docket to which parties and attorneys should be added.
+    :param parties: The parties involved in the Texas case.
+    """
+    add_parties_and_attorneys(docket, normalize_texas_parties(parties))

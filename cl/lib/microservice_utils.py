@@ -17,7 +17,7 @@ from cl.audio.models import Audio
 from cl.lib.decorators import retry
 from cl.lib.exceptions import NoSuchKey
 from cl.lib.models import AbstractPDF
-from cl.search.models import Opinion, RECAPDocument, SCOTUSDocument
+from cl.search.models import Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
@@ -159,9 +159,7 @@ async def microservice(
     backoff=2,
     logger=logger,
 )
-async def doc_page_count_service(
-    doc: RECAPDocument | SCOTUSDocument,
-) -> Response:
+async def doc_page_count_service(doc: AbstractPDF) -> Response:
     """Call page-count from doctor with retries
 
     :param doc: the document to count pages
