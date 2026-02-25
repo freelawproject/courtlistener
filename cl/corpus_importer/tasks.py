@@ -59,6 +59,7 @@ from juriscraper.scotus import (
     SCOTUSDocketReport,
     SCOTUSDocketReportHTM,
     SCOTUSDocketReportHTML,
+)
 from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
