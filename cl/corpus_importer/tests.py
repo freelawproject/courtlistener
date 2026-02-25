@@ -111,6 +111,7 @@ from cl.corpus_importer.utils import (
     winnow_case_name,
 )
 from cl.favorites.models import PrayerAvailability
+from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
@@ -2163,7 +2164,11 @@ class TexasMergerTest(TestCase):
         cls.texas_coa1 = CourtFactory.create(id="txctapp1")
         cls.docket_number_coa1 = "01-25-00011-CV"
         cls.docket_coa1 = DocketFactory.create(
-            court=cls.texas_coa1, docket_number=cls.docket_number_coa1
+            court=cls.texas_coa1,
+            docket_number=cls.docket_number_coa1,
+            docket_number_core=make_texas_docket_number_core(
+                cls.docket_number_coa1
+            ),
         )
         cls.docket_coa1_entry = TexasDocketEntryFactory.create(
             docket=cls.docket_coa1,
@@ -3102,7 +3107,12 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_final_court_sets_appeal_from(self):
         """Does merge_texas_docket set appeal_from for final courts?"""
-        docket_sc = DocketFactory.create(court=self.texas_sc)
+        sc_dn = "25-1066"
+        docket_sc = DocketFactory.create(
+            court=self.texas_sc,
+            docket_number=sc_dn,
+            docket_number_core=make_texas_docket_number_core(sc_dn),
+        )
         appeals_court = TexasAppellateCourtInfoDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
         )

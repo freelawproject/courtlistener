@@ -31,6 +31,7 @@ from cl.lib.model_helpers import (
     clean_docket_number,
     make_docket_number_core,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
 )
 from cl.lib.pacer import (
     get_blocked_status,
@@ -161,11 +162,12 @@ async def find_docket_object(
     # Attempt several lookups of decreasing specificity. Note that
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
-    docket_number_core = (
-        make_scotus_docket_number_core(docket_number)
-        if court_id == "scotus"
-        else make_docket_number_core(docket_number)
-    )
+    if court_id == "scotus":
+        docket_number_core = make_scotus_docket_number_core(docket_number)
+    elif court_id.startswith("tex") or court_id.startswith("tx"):
+        docket_number_core = make_texas_docket_number_core(docket_number)
+    else:
+        docket_number_core = make_docket_number_core(docket_number)
     lookups = []
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
