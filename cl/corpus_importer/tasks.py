@@ -132,7 +132,9 @@ from cl.lib.microservice_utils import (
     doc_page_count_service,
     microservice,
 )
-from cl.lib.model_helpers import make_docket_number_core
+from cl.lib.model_helpers import (
+    make_texas_docket_number_core,
+)
 from cl.lib.pacer import (
     get_blocked_status,
     get_first_missing_de_date,
@@ -4139,7 +4141,9 @@ def merge_texas_docket(
                 allow_create=True,
             )
         docket.docket_number = docket_number
-        docket.docket_number_core = make_docket_number_core(docket_number)
+        docket.docket_number_core = make_texas_docket_number_core(
+            docket_number
+        )
         docket.date_filed = docket_data["date_filed"]
         docket.cause = docket_data["case_type"]
         originating_court_merge_result = merge_texas_docket_originating_court(
@@ -4172,11 +4176,19 @@ def merge_texas_docket(
                     lower_court_data["court_id"]
                 )
 
+        court_name = None
         if lower_court_id is not None:
-            court = Court.objects.get(pk=lower_court_id)
-            docket.appeal_from = court
-            court_name = court.full_name
-        else:
+            try:
+                court = Court.objects.get(pk=lower_court_id)
+            except Court.DoesNotExist:
+                logger.error(
+                    "Could not find lower court with ID %s to set appeal_from for Texas docket.",
+                    lower_court_id,
+                )
+            else:
+                docket.appeal_from = court
+                court_name = court.full_name
+        if not court_name:
             logger.warning(
                 "Failed to find court ID %s while populating appeal_from field for Texas docket %s in court %s",
                 lower_court_id,
@@ -4282,20 +4294,22 @@ def texas_ingest_docket_task(
     content, meta = i
     logger.info("Attempting to parse Texas docket %s...", meta.case_number)
     try:
-        if meta.court_code == "cossup":
-            parser = TexasSupremeCourtScraper()
-        elif meta.court_code == "coscca":
-            parser = TexasCourtOfCriminalAppealsScraper()
-        elif meta.court_code.startswith("coa"):
-            parser = TexasCourtOfAppealsScraper(meta.court_code)
-        else:
-            logger.error(
-                "Unrecognized Texas court type %s. Cannot parse docket %s.",
-                meta.court_code,
-                meta.case_number,
-            )
-            task.request.chain = None
-            return MergeResult.failed()
+        match meta.court_code:
+            case "cossup":
+                parser = TexasSupremeCourtScraper()
+            case "coscca":
+                parser = TexasCourtOfCriminalAppealsScraper()
+            case _:
+                if meta.court_code.startswith("coa"):
+                    parser = TexasCourtOfAppealsScraper(meta.court_code)
+                else:
+                    logger.error(
+                        "Unrecognized Texas court type %s. Cannot parse docket %s.",
+                        meta.court_code,
+                        meta.case_number,
+                    )
+                    task.request.chain = None
+                    return MergeResult.failed()
 
         parser._parse_text(content.decode("utf-8"))
         docket_data = parser.data

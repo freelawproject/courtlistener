@@ -1334,20 +1334,21 @@ def texas_originating_court_to_court_id(
     :param court_data: The originating court data from Juriscraper.
     :return: The matching Court ID or None if no court could be found."""
     court_type = court_data["court_type"]
-    if court_type == CourtType.APPELLATE.value:
-        return texas_js_court_id_to_court_id(court_data["court_id"])
-    if court_type == CourtType.DISTRICT.value:
-        district_number = court_data["district"]
-        if district_number:
-            if district_number > 1:
-                district_number = district_number + 1
-            return f"texdistct{district_number}"
-        return "texdistct"
-    if court_type == CourtType.BUSINESS.value:
-        return "texbizct"
-    if court_type == CourtType.MUNICIPAL.value:
-        return "texctyct"
-    if court_type == CourtType.PROBATE.value:
-        return "texprobct"
+    match court_type:
+        case CourtType.APPELLATE.value:
+            return texas_js_court_id_to_court_id(court_data["court_id"])
+        case CourtType.DISTRICT.value:
+            district_number = court_data["district"]
+            if district_number:
+                if district_number > 1:
+                    district_number = district_number + 1
+                return f"texdistct{district_number}"
+            return "texdistct"
+        case CourtType.BUSINESS.value:
+            return "texbizct"
+        case CourtType.MUNICIPAL.value:
+            return "texctyct"
+        case CourtType.PROBATE.value:
+            return "texprobct"
     # County, justice, and unknown court types
     return None
