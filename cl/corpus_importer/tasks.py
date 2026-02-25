@@ -3311,11 +3311,6 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         )
         return None
 
-    # Some pages use relative URLs (e.g. "../qp/14-00556qp.pdf" found in
-    # 14-556.html). Resolve them against the SCOTUS base URL.
-    if not qp_url.startswith("http"):
-        qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
-
     # Avoid re-downloading if we already have a file.
     if scotus_meta.questions_presented_file:
         logger.info(
@@ -3660,6 +3655,11 @@ def merge_scotus_docket(
             defaults["linked_with"] = links
 
         if qp_url := report_data.get("questions_presented"):
+            # Some pages use relative URLs (e.g. "../qp/14-00556qp.pdf"
+            # found in 14-556.html). Resolve them against the SCOTUS base
+            # URL so we always store an absolute URL.
+            if not qp_url.startswith("http"):
+                qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
             defaults["questions_presented_url"] = qp_url
 
         scotus_metadata, _ = ScotusDocketMetadata.objects.update_or_create(
