@@ -4182,36 +4182,3 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         from cl.corpus_importer.utils import extract_file_name_from_url
 
         return extract_file_name_from_url(self.url)
-
-    def save(
-        self,
-        update_fields=None,
-        do_extraction=False,
-        index=False,
-        *args,
-        **kwargs,
-    ):
-        self.clean()
-        super().save(update_fields=update_fields, *args, **kwargs)
-        tasks = []
-        if do_extraction and self.needs_extraction:
-            # Context extraction not done and is requested.
-            from cl.scrapers.tasks import extract_recap_pdf
-
-            tasks.append(extract_recap_pdf.si(self.pk))
-        if len(tasks) > 0:
-            chain(*tasks)()
-
-    async def asave(
-        self,
-        update_fields=None,
-        do_extraction=False,
-        *args,
-        **kwargs,
-    ):
-        return await sync_to_async(self.save)(
-            update_fields=update_fields,
-            do_extraction=do_extraction,
-            *args,
-            **kwargs,
-        )

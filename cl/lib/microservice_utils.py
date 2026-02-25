@@ -17,7 +17,7 @@ from cl.audio.models import Audio
 from cl.lib.decorators import retry
 from cl.lib.exceptions import NoSuchKey
 from cl.lib.models import AbstractPDF
-from cl.search.models import Opinion, RECAPDocument, SCOTUSDocument
+from cl.search.models import Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 

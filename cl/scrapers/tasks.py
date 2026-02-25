@@ -48,6 +48,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OriginatingCourtInformation,
+    RECAPDocument,
 )
 
 logger = logging.getLogger(__name__)

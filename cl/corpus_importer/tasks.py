@@ -3212,8 +3212,11 @@ def is_pdf(response: Response) -> bool:
     :param response: The `requests.Response` object to check.
     :return: Whether the response is a PDF file."""
     return (
-        response.headers.get("Content-Type", "")
-        # MIME types are case-insensitive
+        # HTTP header names are case-insensitive; real requests.Response
+        # uses CaseInsensitiveDict, but plain dicts (e.g. in tests) don't,
+        # so look up the lowercase key to be safe in both scenarios.
+        response.headers.get("content-type", "")
+        # MIME types are also case-insensitive
         # (https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types)
         .lower()
         .startswith("application/pdf")
@@ -3527,7 +3530,9 @@ def add_scotus_docket_entries(
         - List of SCOTUSDocument PKs that were created
         - List of SCOTUSDocument PKs that were updated
     """
-    sequence_numbers = create_docket_entry_sequence_numbers(docket_entries)
+    sequence_numbers = create_docket_entry_sequence_numbers(
+        docket_entries, "date_filed"
+    )
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
