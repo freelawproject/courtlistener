@@ -137,6 +137,7 @@ class SOURCES:
     COLUMBIA_M_MANUAL_INPUT_M_HARVARD = "ZMU"
     COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
+    JUSTIA_WEBSITE = "JUS"
     RECAP = "G"
     NAMES = (
         (COURT_WEBSITE, "court website"),
@@ -1369,6 +1370,10 @@ class RECAPDocument(
         related_name="recap_documents",
         blank=True,
     )
+    document_status = models.TextField(
+        help_text="Reflects the document's current status as shown in the courts' page",
+        blank=True,
+    )
     document_type = models.IntegerField(
         help_text="Whether this is a regular document or an attachment.",
         choices=DOCUMENT_TYPES,
@@ -1390,6 +1395,7 @@ class RECAPDocument(
         fields=[
             "docket_entry_id",
             "document_type",
+            "document_status",
             "document_number",
             "description",
             "pacer_doc_id",
