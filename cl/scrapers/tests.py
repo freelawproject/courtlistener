@@ -76,6 +76,7 @@ from cl.search.factories import (
     OpinionsCitedWithParentsFactory,
     ParentheticalFactory,
 )
+from cl.search.management.commands import consolidate_opinion_clusters
 from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
@@ -2118,3 +2119,137 @@ class SetOrderingKeysTest(SimpleTestCase):
         self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
         self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
         self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
+
+
+class ConsolidateOpinionClustersTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="texapp")
+
+    def test_successful_consolidation(self):
+        """Test if we can consolidate spread clusters"""
+        # Use "common_fields" mappers to prevent random filling by factories
+        common_cluster_fields = {
+            "date_filed": date(2023, 10, 26),
+            "case_name": "State v. Test",
+            "case_name_full": "State of Texas v. Test Defendant",
+            "case_name_short": "State v. Test",
+            "slug": "state-v-test",
+            "source": SOURCES.COURT_WEBSITE,
+            "precedential_status": "Published",
+        }
+
+        common_docket_fields = {
+            "docket_number": "12-34-56789-CR",
+            "case_name": "State v. Test",
+            "case_name_full": "State of Texas v. Test Defendant",
+            "court": self.court,
+            "source": Docket.SCRAPER,
+            "appeal_from_str": "",
+            "appeal_from": None,
+            "assigned_to_str": "",
+            "referred_to_str": "",
+            "jury_demand": "",
+            "jurisdiction_type": "",
+            "nature_of_suit": "",
+            "cause": "",
+            "date_argued": None,
+            "date_reargued": None,
+            "date_reargument_denied": None,
+            "date_cert_granted": None,
+            "date_cert_denied": None,
+            "date_terminated": None,
+            "date_last_filing": None,
+            "date_last_index": None,
+            "case_name_short": "",
+            "slug": "",
+        }
+
+        # Cluster 1: Concurrence
+        docket1 = DocketFactory(pacer_case_id="12345", **common_docket_fields)
+        cluster1 = OpinionClusterFactory(
+            docket=docket1, **common_cluster_fields
+        )
+        op1 = OpinionFactory(
+            cluster=cluster1,
+            type=Opinion.CONCURRENCE,
+            plain_text="<html>I concur with the result.</html>",
+            html_with_citations="",
+        )
+
+        # Cluster 2: Lead
+        docket2 = DocketFactory(pacer_case_id=None, **common_docket_fields)
+        cluster2 = OpinionClusterFactory(
+            docket=docket2, **common_cluster_fields
+        )
+        op2 = OpinionFactory(
+            cluster=cluster2,
+            type=Opinion.LEAD,
+            plain_text="This is the opinion of the court.",
+            html_with_citations="<html>This is the opinion of the court.</html>",
+        )
+
+        # Cluster 3: Dissent
+        docket3 = DocketFactory(pacer_case_id=None, **common_docket_fields)
+        cluster3 = OpinionClusterFactory(
+            docket=docket3, **common_cluster_fields
+        )
+        op3 = OpinionFactory(
+            cluster=cluster3,
+            type=Opinion.DISSENT,
+            plain_text="<html>I respectfully dissent.</html>",
+            html_with_citations="",
+        )
+
+        # Verify initial state
+        self.assertEqual(
+            OpinionCluster.objects.filter(
+                docket__docket_number=common_docket_fields["docket_number"]
+            ).count(),
+            3,
+        )
+
+        cmd = consolidate_opinion_clusters.Command()
+        cmd.handle(court_id="texapp", dry_run=False, limit=100)
+
+        # Check that clusters were consolidated
+        clusters = OpinionCluster.objects.filter(
+            docket__docket_number=common_docket_fields["docket_number"]
+        )
+        self.assertEqual(
+            clusters.count(), 1, "Should have 1 cluster remaining"
+        )
+        remaining_cluster = clusters.first()
+
+        # Check Opinions
+        opinions = remaining_cluster.sub_opinions.all().order_by(
+            "ordering_key"
+        )
+        self.assertEqual(
+            opinions.count(),
+            3,
+            "Should have 3 opinions in the remaining cluster",
+        )
+
+        self.assertEqual(opinions[0].type, Opinion.LEAD)
+        self.assertEqual(opinions[0].ordering_key, 1)
+
+        self.assertEqual(opinions[1].type, Opinion.CONCURRENCE)
+        self.assertEqual(opinions[1].ordering_key, 2)
+
+        self.assertEqual(opinions[2].type, Opinion.DISSENT)
+        self.assertEqual(opinions[2].ordering_key, 3)
+
+        # Check ClusterRedirection
+        # We expect 2 redirections (since 2 clusters were deleted)
+        redirections = ClusterRedirection.objects.filter(
+            cluster=remaining_cluster, reason=ClusterRedirection.CONSOLIDATION
+        )
+        self.assertEqual(redirections.count(), 2)
+
+        # Check Dockets deleted
+        dockets = Docket.objects.filter(
+            docket_number=common_docket_fields["docket_number"],
+            court=self.court,
+        )
+        self.assertEqual(dockets.count(), 1, "Should have 1 docket remaining")
