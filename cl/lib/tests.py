@@ -75,12 +75,16 @@ from cl.users.factories import UserFactory
 
 
 class TestPacerUtils(TestCase):
-    fixtures = ["court_data.json"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.bankruptcy_court = CourtFactory(
+            id="akb", jurisdiction=Court.FEDERAL_BANKRUPTCY
+        )
 
     def test_auto_blocking_small_bankr_docket(self) -> None:
         """Do we properly set small bankruptcy dockets to private?"""
         d = Docket()
-        d.court = Court.objects.get(pk="akb")
+        d.court = self.bankruptcy_court
         blocked, date_blocked = async_to_sync(get_blocked_status)(d)
         self.assertTrue(
             blocked,
@@ -369,10 +373,14 @@ class TestStringUtils(SimpleTestCase):
 class TestModelHelpers(TestCase):
     """Test the model_utils helper functions"""
 
-    fixtures = ["test_court.json"]
+    court: Court
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="test")
 
     def setUp(self) -> None:
-        self.court = Court.objects.get(pk="test")
+        self.court = self.__class__.court
         self.docket = Docket(case_name="Docket", court=self.court)
         self.opinioncluster = OpinionCluster(
             case_name="Hotline Bling",
