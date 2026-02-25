@@ -145,7 +145,8 @@ def check_tabnabbing(lines: list[str]) -> list[tuple[int, str]]:
                     (
                         i,
                         'target="_blank" without rel containing "noopener" or '
-                        '"noreferrer" — tabnabbing risk',
+                        '"noreferrer" — tabnabbing risk '
+                        "(https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/noopener)",
                     )
                 )
     return results
@@ -162,7 +163,8 @@ def check_tabindex(lines: list[str]) -> list[tuple[int, str]]:
                 (
                     i,
                     f'tabindex="{m.group(1)}" — never use tabindex > 0; '
-                    f"use 0 (focusable) or -1 (programmatic only)",
+                    f"use 0 (focusable) or -1 (programmatic only) "
+                    f"(https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/tabindex)",
                 )
             )
     return results
@@ -220,7 +222,7 @@ def check_alpine_shortcuts(
             else:
                 msg = (
                     f'"{shortcut}" — use "x-on:{m.group(1)}" instead '
-                    f"(CSP-safe Alpine prefix)"
+                    f"(https://github.com/freelawproject/courtlistener/wiki/New-Frontend-Architecture#alpine-conventions)"
                 )
             results.append((i, msg))
     return results
@@ -236,7 +238,9 @@ def check_font_awesome(lines: list[str]) -> list[tuple[int, str]]:
             results.append(
                 (
                     i,
-                    "Font Awesome class detected — use SVG icons in new templates",
+                    "Font Awesome class detected — use the {% svg %} template tag instead "
+                    "(see cl/custom_filters/templatetags/svg_tags.py, "
+                    "icons live in cl/assets/static-global/svg/)",
                 )
             )
     return results
