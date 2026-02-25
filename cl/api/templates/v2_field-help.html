@@ -47,11 +47,11 @@
     <p>In the API, you'll see case names in a variety of places due to the fact that they can change over time. For example, there are <code>case_name</code> fields on the <code>Docket</code> object and also on the <code>Opinion Cluster</code> objects. In almost all instances, these values are the same but some cases have different values for the <code>Docket</code> than for an <code>Opinion Cluster</code>, so we keep this data in duplicate.</p>
     <p>Case names can also vary considerably in length, and we've identified three different types of case names:</p>
     <dl>
-      <dt role="term"><code>case_name</code></dt>
+      <dt><code>case_name</code></dt>
       <dd>This is a typical case name that can be used in almost all references. An example might be <em>Roe v. Wade</em>.</dd>
-      <dt role="term"><code>case_name_short</code></dt>
+      <dt><code>case_name_short</code></dt>
       <dd>This is a shortened one or two word case name that can be used in legal writing after the standard case name has been provided by the author. An example of this might be simply <em>Roe</em> used, "As was stated in <em>Roe</em>&hellip;"</dd>
-      <dt role="term"><code>case_name_full</code></dt>
+      <dt><code>case_name_full</code></dt>
       <dd>This is the full list of plaintiffs and defendants in a case, sometimes going on for hundreds of words, and often including titles or other information. For example: <em>Roe Et Al v. Wade, District Attorney of Dallas County</em>.</dd>
     </dl>
     <p>All cases have at least one of these values, many have two values, and some have all three. A <code>case_name_short</code> was generated algorithmically for every case possible, but about 40% of cases were too complicated for our program to process and so they were left blank. Editors have ensured that every Supreme Court case from 1945 to 2018 has a <code>case_name_short</code> value.</p>
@@ -68,12 +68,12 @@
     </c-code>
     <p>There are three sections:</p>
     <dl>
-      <dt role="term">$type</dt>
-        <dd>This is the type of object that has been returned, for example, "docket" indicates that you have gotten a docket as your result.</dd>
-      <dt role="term">$id</dt>
-        <dd>This is a numeric ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not always sequential, but they will never be duplicated within a document type.</dd>
-      <dt role="term">$name-of-the-case</dt>
-        <dd>This is the "<a class="underline" href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without affecting the page that is loaded. Put another way, we load pages based on the <code>$id</code> and <code>$type</code>, not by the name of the case.</dd>
+      <dt>$type</dt>
+      <dd>This is the type of object that has been returned, for example, "docket" indicates that you have gotten a docket as your result.</dd>
+      <dt>$id</dt>
+      <dd>This is a numeric ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not always sequential, but they will never be duplicated within a document type.</dd>
+      <dt>$name-of-the-case</dt>
+      <dd>This is the "<a class="underline" href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without affecting the page that is loaded. Put another way, we load pages based on the <code>$id</code> and <code>$type</code>, not by the name of the case.</dd>
     </dl>
   </c-layout-with-navigation.section>
 
