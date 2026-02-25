@@ -159,9 +159,7 @@ async def microservice(
     backoff=2,
     logger=logger,
 )
-async def doc_page_count_service(
-    doc: RECAPDocument | SCOTUSDocument,
-) -> Response:
+async def doc_page_count_service(doc: AbstractPDF) -> Response:
     """Call page-count from doctor with retries
 
     :param doc: the document to count pages

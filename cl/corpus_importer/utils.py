@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
@@ -1283,7 +1283,7 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
 
 
 def create_docket_entry_sequence_numbers(
-    docket_entries: list[dict[str, Any]],
+    docket_entries: list[dict[Literal["date"], Any]],
 ) -> list[str]:
     """Calculates the sequence numbers for a list of docket entries to allow
     consistent matching and merging.
@@ -1293,7 +1293,7 @@ def create_docket_entry_sequence_numbers(
     :return: A list of sequence numbers corresponding to the list of docket
     entries.
     """
-    dates = [d["date_filed"].isoformat() for d in docket_entries]
+    dates = [d["date"].isoformat() for d in docket_entries]
     date_counts: dict[str, int] = {}
     sequence_numbers = []
     for entry_date in dates:
