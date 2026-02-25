@@ -164,7 +164,14 @@ async def find_docket_object(
     d = None
     if court_id == "scotus":
         docket_number_core = make_scotus_docket_number_core(docket_number)
-    elif court_id.startswith("tex") or court_id.startswith("tx"):
+    elif (
+        court_id == "tex"
+        or court_id == "texcrimapp"
+        or court_id.startswith("txctapp")
+        or court_id.startswith("texdistct")
+        or court_id.startswith("texcrimdistct")
+        or court_id.startswith("texctyct")
+    ):
         docket_number_core = make_texas_docket_number_core(docket_number)
     else:
         docket_number_core = make_docket_number_core(docket_number)
