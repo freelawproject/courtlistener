@@ -577,188 +577,36 @@ $(document).ready(function(){
     </div>
     {% endif %}
 
-    {% if authored_opinions %}
     <div class="row v-offset-below-3">
       <div class="col-xs-12">
-        <h3 id="authored-opinions">
-          <i class="fa-file-text-o fa gray"></i>
-          Case Law Authored by {{ person.name_last }} ({{ authored_opinions.hits.total.value|intcomma }})
-          {% if not person.date_dod and not person.dod_state and not person.dod_city %}
-            <a href="/feed/search/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}">
-              <i class="gray fa fa-rss"
-                 title="Subscribe to a feed of {{ person.name_last }}'s latest cases"></i>
-            </a>
-          {% endif %}
-        </h3>
-        <p class="gray">Includes case law for which {{ person.name_full }} was on the panel, ordered by CiteGeist&trade; relevance.</p>
-        <hr class="top">
-
-        {% for o in authored_opinions %}
-        <div class="row">
-        <div class="col-xs-12">
-          <article class="v-offset-below-2">
-          <h4 class="bottom">
-            <a href="{{ o.absolute_url }}">
-              {{ o.caseName|safe|v_wrapper }}
-              ({% if o.court_id != 'scotus' %}{{ o.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ o.dateFiled|date:"Y" }})
-            </a>
-          </h4>
-          <div class="inline nowrap">
-            <span class="meta-data-header">Date Filed:</span>
-            <time class="meta-data-value"
-                datetime="{{ o.dateFiled|date:'Y-m-d' }}">
-              {% if o.dateFiled %}
-                {{ o.dateFiled|date:"F jS, Y" }}
-              {% else %}
-                Unknown Date
-              {% endif %}
-            </time>
-          </div>
-          <div class="inline nowrap">
-            <span class="meta-data-header">Status:</span>
-            <span class="meta-data-value">{{ o.status }}</span>
-          </div>
-          {% if o.citation %}
-            <div class="inline nowrap">
-              <span class="meta-data-header">Citations: </span>
-              <span class="meta-data-value">{{ o.citation|safeseq|join:", " }}</span>
-            </div>
-          {% endif %}
-          {% if o.docketNumber %}
-            <div class="inline nowrap">
-              <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value select-all">{{ o.docketNumber|safe }}</span>
-            </div>
-          {% endif %}
-          {% if o.citeCount > 0 %}
-            <div class="bottom" class="inline nowrap">
-            <span class="meta-data-value">
-              <a href="/?q=cites%3A({{ o.sibling_ids|join:" OR " }})"
-                 rel="nofollow"
-              >Cited {{ o.citeCount|intcomma }} time{{ o.citeCount|pluralize }}</a>
-            </span>
-            </div>
-          {% endif %}
-          </article>
-        </div>
-        </div>
-        {% endfor %}
+        <h3>More Resources for {{ person.name_last }}</h3>
         <p>
-            <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Published=on&stat_Unpublished=on&stat_Errata=on&stat_Separate=on&stat_In-chambers=on&stat_Relating-to=on&stat_Unknown=on"
-               rel="nofollow"
-               class="btn btn-primary"
-            >Search for All Case Law Authored by {{ person.name_last }} in CourtListener</a>
-        </p>
-      </div>
-    </div>
-    {% endif %}
-
-  {% if recap_cases_assigned %}
-    <div class="row v-offset-below-3">
-      <div class="col-xs-12">
-        <h3 id="assigned-cases">
-          <i class="fa-gavel fa gray"></i>
-          Cases Assigned or Referred to {{ person.name_last }} ({{ recap_cases_assigned.hits.total.value|intcomma }})
-        </h3>
-        <hr class="top">
-
-        {% for result in recap_cases_assigned %}
-        <div class="row">
-          <div class="col-xs-12">
-          <article class="v-offset-below-2">
-          <h4 class="bottom">
-            <a href="{{ result.docket_absolute_url }}">
-              {{ result.caseName|safe|v_wrapper }}
-              ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ result.dateFiled|date:"Y" }})
-            </a>
-          </h4>
-          <div class="inline nowrap">
-            <span class="meta-data-header">Date Filed:</span>
-            <time class="meta-data-value"
-                datetime="{{ result.dateFiled|date:'Y-m-d' }}">
-              {% if result.dateFiled %}
-                {{ result.dateFiled|date:"F jS, Y" }}
-              {% else %}
-                Unknown Date
-              {% endif %}
-            </time>
-          </div>
-          {% if result.docketNumber %}
-            <div class="inline nowrap">
-              <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value select-all">{{ result.docketNumber|safe }}</span>
-            </div>
-            {% endif %}
-          </article>
-        </div>
-        </div>
-        {% endfor %}
-        <p>
-            <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc"
-               rel="nofollow"
-               class="btn btn-primary"
-            >Search for All Cases Assigned/Referred to {{ person.name_last }} in RECAP</a>
-        </p>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if oral_arguments_heard %}
-    <div class="row v-offset-below-3">
-      <div class="col-xs-12">
-        <h3 id="oral-arguments-heard">
-          <i class="fa-volume-up fa gray"></i>
-          Most Recent Oral Arguments Heard by {{ person.name_last }} ({{ oral_arguments_heard.hits.total.value|intcomma }})
-          {% if not person.date_dod and not person.dod_state and not person.dod_city %}
-            <a href="/feed/search/?type=oa&q=panel_ids%3A{{ person.pk }}">
-              <i class="gray fa fa-podcast"
-                 title="Subscribe to a podcast of {{ person.name_last }}'s latest cases"></i>
-            </a>
-          {% endif %}
-        </h3>
-        <p class="gray">Includes oral arguments for which {{ person.name_full }} was on the judicial panel, ordered by date.</p>
-        <hr class="top">
-
-        {% for oa in oral_arguments_heard %}
-        <div class="row">
-        <div class="col-xs-12">
-          <article class="v-offset-below-2">
-          <h4 class="bottom">
-            <a href="{{ oa.absolute_url }}">
-                {{ oa.caseName|safe|v_wrapper }}
-                ({% if oa.court_id != 'scotus' %}{{ oa.court_citation_string|nbsp|safe }}&nbsp;{% endif %}{{ oa.dateArgued|date:"Y" }})
-            </a>
-          </h4>
-          <div class="inline nowrap">
-            <span class="meta-data-header">Date Argued:</span>
-            <time class="meta-data-value"
-                  datetime="{{ oa.dateArgued|date:'Y-m-d' }}">
-              {% if oa.dateArgued %}
-                {{ oa.dateArgued|date:"F jS, Y" }}
-              {% else %}
-                Unknown Date
-              {% endif %}
-            </time>
-          </div>
-          {% if oa.docketNumber %}
-            <div class="inline nowrap">
-              <span class="meta-data-header">Docket Number:</span>
-              <span class="meta-data-value select-all">{{ oa.docketNumber|safe }}</span>
-            </div>
-          {% endif %}
-          </article>
-        </div>
-        </div>
-        {% endfor %}
-
-        <p>
-          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}" class="btn btn-primary"
+          <a href="/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}&stat_Published=on&stat_Unpublished=on&stat_Errata=on&stat_Separate=on&stat_In-chambers=on&stat_Relating-to=on&stat_Unknown=on"
              rel="nofollow"
-          >Search for All Oral Arguments Heard by {{ person.name_last }}</a>
+             class="btn btn-primary"
+          >Search Case Law</a>
+          <a href="/?type=r&q=(assigned_to_id:{{person.pk}} OR referred_to_id:{{person.pk}})&order_by=score%20desc"
+             rel="nofollow"
+             class="btn btn-primary"
+          >Search Federal Dockets</a>
+          <a href="/?type=oa&q=panel_ids%3A{{ person.pk }}"
+             rel="nofollow"
+             class="btn btn-primary"
+          >Search Oral Arguments</a>
         </p>
+        {% if not person.date_dod and not person.dod_state and not person.dod_city %}
+          <p>
+            <a href="/feed/search/?type=o&q=author_id%3A{{ person.pk }}+OR+panel_ids%3A{{ person.pk }}">
+              <i class="gray fa fa-rss"></i> Case Law Feed
+            </a>
+            &middot;
+            <a href="/feed/search/?type=oa&q=panel_ids%3A{{ person.pk }}">
+              <i class="gray fa fa-podcast"></i> Oral Arguments Podcast
+            </a>
+          </p>
+        {% endif %}
       </div>
     </div>
-    {% endif %}
 
     <div class="row">
       <div class="col-xs-12">
