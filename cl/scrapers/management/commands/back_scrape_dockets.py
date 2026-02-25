@@ -90,11 +90,9 @@ class RateLimitedRequestManager:
             # Match more closely a chrome browser
             self.session.headers.update(
                 {
-                    "User-Agent": {
-                        "User-Agent": "Juriscraper",
-                        "Cache-Control": "no-cache, max-age=0, must-revalidate",
-                        "Pragma": "no-cache",
-                    },
+                    "User-Agent": "Juriscraper",
+                    "Cache-Control": "no-cache, max-age=0, must-revalidate",
+                    "Pragma": "no-cache",
                     "Accept": (
                         "text/html,application/xhtml+xml,"
                         "application/xml;q=0.9,image/avif,"
@@ -290,19 +288,6 @@ def save_docket_response(
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
 
-
-def save_search_response_factory(scraper_class_name: str):
-    storage = S3GlacierInstantRetrievalStorage()
-    prefix = f"responses/dockets/{scraper_class_name}/searches/"
-
-    def save_search_reponse(response: requests.Response):
-        now_str = datetime.now().strftime("%Y/%m/%d/%H_%M_%S_%f")
-        path = f"{prefix}{now_str}.html"
-        storage.save(path, ContentFile(response.content))
-
-    return save_search_reponse
-
-
 def parse_date_filed(date_str: str | None) -> date | None:
     """Parse a date_filed string in '%m/%d/%Y' format to a date object."""
     if not date_str:
@@ -363,6 +348,86 @@ def save_batch_meta(
     )
     return path
 
+
+def _process_batch(
+    batch: list[dict],
+    scraper_class_name: str,
+    case_request_manager: RateLimitedRequestManager,
+    ) -> int:
+    """Save batch meta JSONL, then fetch and save each case's HTML + headers.
+
+    Returns the number of cases successfully fetched.
+    """
+    # The following line can be uncommented to save batches of case meta.
+    # save_batch_meta(batch, scraper_class_name)
+
+    fetched = 0
+    for case in batch:
+        case_url = case.get("case_url")
+        if not case_url:
+            continue
+
+        court_id = case.get("court_code") or "unknown_court"
+        try:
+            case_response = case_request_manager.get(case_url)
+            save_docket_response(
+                case_response,
+                scraper_class_name,
+                case,
+                court_id,
+                skip_meta=False,
+            )
+            fetched += 1
+        except requests.RequestException as e:
+            logger.error("Failed to fetch case URL %s: %s", case_url, e)
+    return fetched
+
+def _checkpoint_and_sleep(
+    case_count: int,
+    case: dict,
+    auto_resume: bool,
+    sleep_minutes: int,
+    ) -> None:
+    """Checkpoint to Redis and sleep at every batch boundary."""
+
+    logger.info("Processed %d cases", case_count)
+
+    if auto_resume:
+        if parsed := parse_date_filed(case.get("date_filed")):
+            set_last_checkpoint(parsed)
+            logger.info("Checkpointed at %s", parsed)
+        else:
+            logger.warning(
+                "No parseable date_filed, no checkpoint: %s", case
+            )
+
+    if sleep_minutes > 0:
+        logger.info("Sleeping %d minutes", sleep_minutes)
+        time.sleep(sleep_minutes * 60)
+
+def _parse_date(date_str: str) -> date:
+    """Parse a date string in various formats.
+
+    Args:
+        date_str: Date string (supports YYYY-MM-DD, MM/DD/YYYY, etc.)
+
+    Returns:
+        Parsed date object
+
+    Raises:
+        CommandError: If date cannot be parsed
+    """
+    formats = ["%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"]
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+
+    raise CommandError(
+        f"Unable to parse date: {date_str}. "
+        "Use format YYYY-MM-DD or MM/DD/YYYY"
+    )
 
 class Command(BaseCommand):
     help = "Runs BaseStateScraper backfill operations for docket enumeration."
@@ -475,7 +540,7 @@ class Command(BaseCommand):
             )
 
         auto_resume = False
-        end_date = self._parse_date(options["backscrape_end"])
+        end_date = _parse_date(options["backscrape_end"])
 
         if options.get("auto_resume"):
             auto_resume = True
@@ -515,7 +580,7 @@ class Command(BaseCommand):
             scraper = scraper_class(request_manager=search_request_manager)
 
             # Parse start date
-            start_date = self._parse_date(options["backscrape_start"])
+            start_date = _parse_date(options["backscrape_start"])
 
             # Determine courts to scrape
             courts = (
@@ -544,15 +609,12 @@ class Command(BaseCommand):
                 if len(current_batch) < batch_size:
                     continue
 
-                case_count += self._process_batch(
+                case_count += _process_batch(
                     current_batch,
                     scraper_class_name,
                     case_request_manager,
-                    auto_resume,
-                    sleep_minutes,
-                    case_count,
                 )
-                self._checkpoint_and_sleep(
+                _checkpoint_and_sleep(
                     case_count, case, auto_resume, sleep_minutes
                 )
 
@@ -560,101 +622,12 @@ class Command(BaseCommand):
 
             # Final partial batch
             if current_batch:
-                case_count += self._process_batch(
+                case_count += _process_batch(
                     current_batch,
                     scraper_class_name,
                     case_request_manager,
-                    auto_resume,
-                    sleep_minutes,
-                    case_count,
                 )
 
             logger.info(
                 "Backfill complete. Processed %d cases total.", case_count
             )
-
-    def _process_batch(
-        self,
-        batch: list[dict],
-        scraper_class_name: str,
-        case_request_manager: RateLimitedRequestManager,
-        auto_resume: bool,
-        sleep_minutes: int,
-        case_count_before: int,
-    ) -> int:
-        """Save batch meta JSONL, then fetch and save each case's HTML + headers.
-
-        Returns the number of cases successfully fetched.
-        """
-        # The following line can be uncommented to save batches of case meta.
-        # save_batch_meta(batch, scraper_class_name)
-
-        fetched = 0
-        for case in batch:
-            case_url = case.get("case_url")
-            if not case_url:
-                continue
-
-            court_id = case.get("court_code") or "unknown_court"
-            try:
-                case_response = case_request_manager.get(case_url)
-                save_docket_response(
-                    case_response,
-                    scraper_class_name,
-                    case,
-                    court_id,
-                    skip_meta=False,
-                )
-                fetched += 1
-                running_count = case_count_before + fetched
-            except requests.RequestException as e:
-                logger.error("Failed to fetch case URL %s: %s", case_url, e)
-        return fetched
-
-    def _checkpoint_and_sleep(
-        self,
-        case_count: int,
-        case: dict,
-        auto_resume: bool,
-        sleep_minutes: int,
-    ) -> None:
-        """Checkpoint to Redis and sleep at every batch boundary."""
-
-        logger.info("Processed %d cases", case_count)
-
-        if auto_resume:
-            if parsed := parse_date_filed(case.get("date_filed")):
-                set_last_checkpoint(parsed)
-                logger.info("Checkpointed at %s", parsed)
-            else:
-                logger.warning(
-                    "No parseable date_filed, no checkpoint: %s", case
-                )
-
-        if sleep_minutes > 0:
-            logger.info("Sleeping %d minutes", sleep_minutes)
-            time.sleep(sleep_minutes * 60)
-
-    def _parse_date(self, date_str: str) -> date:
-        """Parse a date string in various formats.
-
-        Args:
-            date_str: Date string (supports YYYY-MM-DD, MM/DD/YYYY, etc.)
-
-        Returns:
-            Parsed date object
-
-        Raises:
-            CommandError: If date cannot be parsed
-        """
-        formats = ["%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"]
-        for fmt in formats:
-            try:
-                return datetime.strptime(date_str, fmt).date()
-            except ValueError:
-                continue
-
-        raise CommandError(
-            f"Unable to parse date: {date_str}. "
-            "Use format YYYY-MM-DD or MM/DD/YYYY"
-        )
