@@ -143,6 +143,7 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
         "rt_alerts_sending_rate": int(
             settings.REAL_TIME_ALERTS_SENDING_RATE / 60
         ),
+        "MAX_ATTORNEYS_TO_PERCOLATE": settings.MAX_ATTORNEYS_TO_PERCOLATE,
     }
     context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)
@@ -195,6 +196,10 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
         "help/broken_email_help.html",
         {"private": True},
     )
+
+
+async def mcp_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "help/mcp_help.html", {"private": False})
 
 
 async def build_court_dicts(courts: QuerySet) -> list[dict[str, str]]:
@@ -345,7 +350,7 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
                 "state": await fetch_data(Court.STATE_JURISDICTIONS),
                 "territory": await fetch_data(Court.TERRITORY_JURISDICTIONS),
                 "international": await fetch_data(
-                    Court.INTERNATIONAL, group_by_state=False
+                    [Court.INTERNATIONAL], group_by_state=False
                 ),
                 "tribal": await fetch_data(
                     Court.TRIBAL_JURISDICTIONS, group_by_state=False

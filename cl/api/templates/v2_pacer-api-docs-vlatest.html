@@ -20,13 +20,14 @@
       {'href': '#parties', 'text': 'Parties'},
       {'href': '#attorneys', 'text': 'Attorneys'},
       {'href': '#orig-court-info', 'text': 'Originating Court Info'},
+      {'href': '#bankruptcy-information-endpoint', 'text': 'Bankruptcy Info'},
       {'href': '#integrated-db', 'text': 'Integrated Database'},
       ]},
     {'href': '#fast-doc-lookup', 'text': 'Fast Document Lookup'},
   ]"
 >
   <c-layout-with-navigation.section id="about">
-    <h1 class="font-sans text-display-xs font-semibold text-greyscale-900">PACER Data APIs</h1>
+    <h1>PACER Data APIs</h1>
     <p class="lead">Use these APIs to access almost half a billion items we have in our collection of PACER data.</p>
     <p>To learn more about what's in the collection and how we gather PACER data each day, see <a class="text-primary-600" href="{% url "coverage_recap" %}">our coverage page on the topic.</a></p>
     <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.</p>
@@ -289,6 +290,12 @@ curl -v \
     <p>Cross-walking from the upper court docket to the lower is possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.</p>
   </c-layout-with-navigation.section>
 
+  <c-layout-with-navigation.section id="bankruptcy-information-endpoint">
+    <h3>Bankruptcy Information <small> — <code class="whitespace-nowrap">{% url 'bankruptcyinformation-list' version=version %}</code></small></h3>
+    <p><code>Bankruptcy Information</code> represents metadata specific to PACER bankruptcy dockets, such as details about the bankruptcy case, including the chapter, trustee information, and key dates.</p>
+    <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, it is only populated for dockets acquired from bankruptcy courts via PACER, so it does not apply to other types of cases.</p>
+  </c-layout-with-navigation.section>
+
   <c-layout-with-navigation.section id="integrated-db">
     <h3>Integrated Database <small> — <code class="whitespace-nowrap">{% url 'fjcintegrateddatabase-list' version=version %}</code></small></h3>
     <p><code>FJC Integrated Database</code> objects represent the information available in the <a class="underline" href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:</p>
@@ -305,11 +312,11 @@ curl -v \
     <h2>Fast Document Lookup <small> — <code>{% url "fast-recapdocument-list" version=version %}</code></small></h2>
     <p>This API is used to check if documents with known IDs are available in our system.</p>
     <p>To use it, provide a court ID and a comma-separated list of <code>pacer_doc_id</code>'s:</p>
-   <c-code>
+    <c-code>
  curl \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   '{% get_full_host %}{% url "fast-recapdocument-list" version=version %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
-   </c-code>
+    </c-code>
     <p>This will return one entry for each document found, up to a maximum of 300 items:</p>
     <c-code>
 {

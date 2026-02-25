@@ -252,6 +252,10 @@ PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED = env(
     "PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED", default=False
 )
 
+# The maximum number of attorneys in parties data allowed for percolating a
+# docket after merging parties.
+MAX_ATTORNEYS_TO_PERCOLATE = env("MAX_ATTORNEYS_TO_PERCOLATE", default=50)
+
 ################################
 # ES bulk indexing batch size #
 ################################
@@ -309,4 +313,7 @@ ELASTICSEARCH_MICRO_CACHE_ENABLED = env(
 )
 ELASTICSEARCH_API_MICRO_CACHE_ENABLED = env(
     "ELASTICSEARCH_API_MICRO_CACHE_ENABLED", default=False
+)
+ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED = env(
+    "ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED", default=False
 )
