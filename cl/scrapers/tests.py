@@ -416,11 +416,46 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
 
 class IngestionTest(TestCase):
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="test")
+        docket = DocketFactory(court=cls.court, appeal_from=cls.court)
+        cluster_1 = OpinionClusterFactory(docket=docket)
+        cluster_2 = OpinionClusterFactory(docket=docket)
+        cluster_3 = OpinionClusterFactory(docket=docket)
+        cls.doc_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_doc.doc",
+            type=Opinion.LEAD,
+            plain_text="",
+        )
+        cls.image_opinion = OpinionFactory(
+            cluster=cluster_2,
+            local_path="test/search/opinion_pdf_image_based.pdf",
+            plain_text="",
+        )
+        cls.pdf_opinion = OpinionFactory(
+            cluster=cluster_3,
+            local_path="test/search/opinion_pdf_text_based.pdf",
+            plain_text="",
+        )
+        cls.html_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_html.html",
+            plain_text="",
+            html="",
+        )
+        cls.wpd_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_wpd.wpd",
+            plain_text="",
+            html="",
+        )
+        cls.txt_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_text.txt",
+            plain_text="",
+        )
 
     def setUp(self) -> None:
         files = Opinion.objects.all()
@@ -434,42 +469,42 @@ class IngestionTest(TestCase):
 
     def test_doc_content_extraction(self) -> None:
         """Can we ingest a doc file?"""
-        doc_opinion = Opinion.objects.get(pk=1)
+        doc_opinion = Opinion.objects.get(pk=self.doc_opinion.pk)
         extract_opinion_content(doc_opinion.pk, ocr_available=False)
         doc_opinion.refresh_from_db()
         self.assertIn("indiana", doc_opinion.plain_text.lower())
 
     def test_image_based_pdf(self) -> None:
         """Can we ingest an image based pdf file?"""
-        image_opinion = Opinion.objects.get(pk=2)
+        image_opinion = Opinion.objects.get(pk=self.image_opinion.pk)
         extract_opinion_content(image_opinion.pk, ocr_available=True)
         image_opinion.refresh_from_db()
         self.assertIn("intelligence", image_opinion.plain_text.lower())
 
     def test_text_based_pdf(self) -> None:
         """Can we ingest a text based pdf file?"""
-        txt_opinion = Opinion.objects.get(pk=3)
-        extract_opinion_content(txt_opinion.pk, ocr_available=False)
-        txt_opinion.refresh_from_db()
-        self.assertIn("tarrant", txt_opinion.plain_text.lower())
+        pdf_opinion = Opinion.objects.get(pk=self.pdf_opinion.pk)
+        extract_opinion_content(pdf_opinion.pk, ocr_available=False)
+        pdf_opinion.refresh_from_db()
+        self.assertIn("tarrant", pdf_opinion.plain_text.lower())
 
     def test_html_content_extraction(self) -> None:
         """Can we ingest an html file?"""
-        html_opinion = Opinion.objects.get(pk=4)
+        html_opinion = Opinion.objects.get(pk=self.html_opinion.pk)
         extract_opinion_content(html_opinion.pk, ocr_available=False)
         html_opinion.refresh_from_db()
         self.assertIn("reagan", html_opinion.html.lower())
 
     def test_wpd_content_extraction(self) -> None:
         """Can we ingest a wpd file?"""
-        wpd_opinion = Opinion.objects.get(pk=5)
+        wpd_opinion = Opinion.objects.get(pk=self.wpd_opinion.pk)
         extract_opinion_content(wpd_opinion.pk, ocr_available=False)
         wpd_opinion.refresh_from_db()
         self.assertIn("greene", wpd_opinion.html.lower())
 
     def test_txt_content_extraction(self) -> None:
         """Can we ingest a txt file?"""
-        txt_opinion = Opinion.objects.get(pk=6)
+        txt_opinion = Opinion.objects.get(pk=self.txt_opinion.pk)
         extract_opinion_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
@@ -517,9 +552,8 @@ class ExtensionIdentificationTest(SimpleTestCase):
 
 
 class DupcheckerTest(TestCase):
-    fixtures = ["test_court.json"]
-
     def setUp(self) -> None:
+        CourtFactory(id="test")
         self.court = Court.objects.get(pk="test")
         self.dup_checkers = [
             DupChecker(self.court, full_crawl=True),
