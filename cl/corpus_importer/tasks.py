@@ -13,6 +13,7 @@ from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
 from typing import IO, Any
+from urllib.parse import urljoin
 
 import botocore.exceptions
 import environ
@@ -3316,6 +3317,11 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
             docket_id,
         )
         return None
+
+    # Some pages use relative URLs (e.g. "../qp/14-00556qp.pdf" found in
+    # 14-556.html). Resolve them against the SCOTUS base URL.
+    if not qp_url.startswith("http"):
+        qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
 
     # Avoid re-downloading if we already have a file.
     if scotus_meta.questions_presented_file:
