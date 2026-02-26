@@ -28,6 +28,7 @@ from cl.lib.model_helpers import (
     linkify_orig_docket_number,
     make_docket_number_core,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
     make_upload_path,
 )
 from cl.lib.pacer import (
@@ -426,6 +427,21 @@ class TestModelHelpers(TestCase):
         # docket_number fields can be null. If so, the core value should be
         # an empty string.
         self.assertEqual(make_docket_number_core(None), "")
+
+    def test_texas_docket_number_core(self) -> None:
+        """Can we correctly normalize Texas docket numbers?"""
+        self.assertEqual(
+            make_texas_docket_number_core("04-97-00972-CV"), "049700972cv"
+        )
+        self.assertEqual(
+            make_texas_docket_number_core("01-18-00277-CR"), "011800277cr"
+        )
+        self.assertEqual(make_texas_docket_number_core("AP-77,129"), "ap77129")
+        self.assertEqual(
+            make_texas_docket_number_core("WR-70,849-04"), "wr7084904"
+        )
+        self.assertEqual(make_texas_docket_number_core("A-4369-A"), "a4369a")
+        self.assertEqual(make_texas_docket_number_core("C-2302"), "c2302")
 
     def test_avoid_generating_docket_number_core(self) -> None:
         """Can we avoid generating docket_number_core when the docket number
