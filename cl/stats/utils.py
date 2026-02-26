@@ -78,45 +78,13 @@ def _validate_labels(name: str, labels: dict[str, str]) -> None:
                 )
 
 
-def _update_prometheus_stat(
-    name: str, inc: int, labels: dict[str, str] | None
-) -> None:
-    """Write prometheus-compatible key to Redis."""
-    r = get_redis_interface("STATS")
-
-    # Build key: prometheus:stat:{name}:{label1}:{label2}:...
+def _get_prometheus_key(name: str, labels: dict[str, str] | None) -> str:
+    """Build the prometheus-compatible Redis key for a metric."""
     if labels:
-        # Use STAT_LABELS order for consistent key structure
         label_order = STAT_LABELS.get(name, [])
         label_values = ":".join(labels[label] for label in label_order)
-        key = f"{STAT_METRICS_PREFIX}{name}:{label_values}"
-    else:
-        key = f"{STAT_METRICS_PREFIX}{name}"
-
-    r.incrby(key, inc)
-
-
-def _update_cached_stat(key, inc, date_logged):
-    r = get_redis_interface("STATS")
-
-    # Compute expiration:
-    # Keys live for 10 full days after the date they represent. For example,
-    # a key for June 1 will expire at June 12 at 00:00:00.
-    midnight_today = datetime.combine(
-        date_logged, datetime.min.time(), tzinfo=now().tzinfo
-    )
-    expire_at_date = midnight_today + timedelta(days=11)
-
-    # Convert to seconds-from-now for Redis EXPIRE
-    ttl_seconds = int((expire_at_date - now()).total_seconds())
-
-    # Increment and apply expiration atomically
-    pipe = r.pipeline()
-    pipe.incrby(key, inc)
-    pipe.expire(key, ttl_seconds)
-    value, _ = pipe.execute()
-
-    return value
+        return f"{STAT_METRICS_PREFIX}{name}:{label_values}"
+    return f"{STAT_METRICS_PREFIX}{name}"
 
 
 def tally_stat(
@@ -139,6 +107,11 @@ def tally_stat(
     if not switch_is_active("increment-stats"):
         return
 
+    # Validate labels: required if metric defines them, validated if provided
+    if name in STAT_LABELS and not labels:
+        raise ValueError(
+            f"Metric '{name}' requires labels {STAT_LABELS[name]}"
+        )
     if labels:
         _validate_labels(name, labels)
 
@@ -146,10 +119,26 @@ def tally_stat(
     if date_logged is None:
         date_logged = current_dt.date()
 
-    key = f"{name}.{date_logged.isoformat()}"
+    cached_key = f"{name}.{date_logged.isoformat()}"
+    prometheus_key = _get_prometheus_key(name, labels)
 
-    result = _update_cached_stat(key, inc, date_logged)
-    _update_prometheus_stat(name, inc, labels)
+    # Compute expiration for cached stat:
+    # Keys live for 10 full days after the date they represent. For example,
+    # a key for June 1 will expire at June 12 at 00:00:00.
+    midnight_today = datetime.combine(
+        date_logged, datetime.min.time(), tzinfo=now().tzinfo
+    )
+    expire_at_date = midnight_today + timedelta(days=11)
+    ttl_seconds = int((expire_at_date - now()).total_seconds())
+
+    # Single pipeline for all Redis operations
+    r = get_redis_interface("STATS")
+    pipe = r.pipeline()
+    pipe.incrby(cached_key, inc)
+    pipe.expire(cached_key, ttl_seconds)
+    pipe.incrby(prometheus_key, inc)
+    result, _, _ = pipe.execute()
+
     return result
 
 
