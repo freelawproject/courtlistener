@@ -31,6 +31,7 @@ from cl.lib.model_helpers import (
     clean_docket_number,
     make_docket_number_core,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
 )
 from cl.lib.pacer import (
     get_blocked_status,
@@ -134,9 +135,14 @@ async def find_docket_object(
     federal_dn_judge_initials_assigned: str | None,
     federal_dn_judge_initials_referred: str | None,
     using: str = "default",
-) -> Docket:
+    docket_source: int = Docket.RECAP,
+    allow_create: bool = True,
+) -> Docket | None:
     """Attempt to find the docket based on the parsed docket data. If cannot be
     found, create a new docket. If multiple are found, return the oldest.
+
+    Note: Only sets `source`, `pacer_case_id`, and `court_id` fields on the
+    created docket.
 
     :param court_id: The CourtListener court_id to lookup
     :param pacer_case_id: The PACER case ID for the docket
@@ -148,16 +154,27 @@ async def find_docket_object(
     :param federal_dn_judge_initials_referred: The judge's initials referred to
     validate the match.
     :param using: The database to use for the lookup queries.
+    :param docket_source: The source to set when creating a new docket.
+    :param allow_create: Whether to create a new docket if no matching one is
+      found
     :return The docket found or created.
     """
     # Attempt several lookups of decreasing specificity. Note that
     # pacer_case_id is required for Docket and Docket History uploads.
     d = None
-    docket_number_core = (
-        make_scotus_docket_number_core(docket_number)
-        if court_id == "scotus"
-        else make_docket_number_core(docket_number)
-    )
+    if court_id == "scotus":
+        docket_number_core = make_scotus_docket_number_core(docket_number)
+    elif (
+        court_id == "tex"
+        or court_id == "texcrimapp"
+        or court_id.startswith("txctapp")
+        or court_id.startswith("texdistct")
+        or court_id.startswith("texcrimdistct")
+        or court_id.startswith("texctyct")
+    ):
+        docket_number_core = make_texas_docket_number_core(docket_number)
+    else:
+        docket_number_core = make_docket_number_core(docket_number)
     lookups = []
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
@@ -251,10 +268,14 @@ async def find_docket_object(
                 break
     if d is None:
         # Couldn't find a docket. Return a new one.
-        return Docket(
-            source=Docket.RECAP,
-            pacer_case_id=pacer_case_id,
-            court_id=court_id,
+        return (
+            Docket(
+                source=docket_source,
+                pacer_case_id=pacer_case_id,
+                court_id=court_id,
+            )
+            if allow_create
+            else None
         )
 
     if using != "default":

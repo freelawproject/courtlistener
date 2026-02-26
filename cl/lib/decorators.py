@@ -295,3 +295,20 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
             field.db_comment = doc
 
     return model
+
+
+def time_call(fn_logger: logging.Logger) -> Callable:
+    def decorator(f: Callable) -> Callable:
+        @wraps(f)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter_ns()
+            result = f(*args, **kwargs)
+            elapsed = time.perf_counter_ns() - start
+            fn_logger.debug(
+                "Ran %s in %d.3 ms", f.__qualname__, elapsed / 1_000_000
+            )
+            return result
+
+        return wrapper
+
+    return decorator

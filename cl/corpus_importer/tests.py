@@ -25,6 +25,7 @@ from juriscraper.lib.string_utils import harmonize, titlecase
 from juriscraper.state.texas import (
     TexasCaseParty,
 )
+from juriscraper.state.texas.common import CourtID, CourtType
 from openai import RateLimitError
 from pydantic import ValidationError
 
@@ -85,9 +86,11 @@ from cl.corpus_importer.tasks import (
     download_texas_document_pdf,
     generate_ia_json,
     get_and_save_free_document_report,
+    merge_texas_case_transfers,
+    merge_texas_docket,
     merge_texas_docket_entry,
+    merge_texas_docket_originating_court,
     merge_texas_document,
-    merge_texas_documents,
     merge_texas_parties,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
@@ -108,6 +111,7 @@ from cl.corpus_importer.utils import (
     winnow_case_name,
 )
 from cl.favorites.models import PrayerAvailability
+from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
@@ -143,6 +147,7 @@ from cl.recap.tests.tests import mock_bucket_open
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.factories import (
+    CaseTransferFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
@@ -157,17 +162,25 @@ from cl.search.factories import (
 from cl.search.models import (
     SEARCH_TYPES,
     SOURCES,
+    CaseTransfer,
     Citation,
     Docket,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
 )
 from cl.search.state.texas.factories import (
+    TexasAppellateCourtInfoDictFactory,
+    TexasAppellateTransferDictFactory,
     TexasCaseDocumentDictFactory,
+    TexasCourtOfAppealsDocketDictFactory,
     TexasDocketEntryDictFactory,
     TexasDocketEntryFactory,
     TexasDocumentFactory,
+    TexasFinalCourtDocketDictFactory,
+    TexasOriginatingCourtDictFactory,
+    TexasOriginatingDistrictCourtDictFactory,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
@@ -2146,12 +2159,16 @@ class TexasMergerTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Create test data for Texas merger tests"""
-        cls.texas_sc = CourtFactory.create(id="texas_sc")
-        cls.texas_cca = CourtFactory.create(id="texas_cca")
-        cls.texas_coa1 = CourtFactory.create(id="texas_coa1")
+        cls.texas_sc = CourtFactory.create(id="tex")
+        cls.texas_cca = CourtFactory.create(id="texcrimapp")
+        cls.texas_coa1 = CourtFactory.create(id="txctapp1")
         cls.docket_number_coa1 = "01-25-00011-CV"
         cls.docket_coa1 = DocketFactory.create(
-            court=cls.texas_coa1, docket_number=cls.docket_number_coa1
+            court=cls.texas_coa1,
+            docket_number=cls.docket_number_coa1,
+            docket_number_core=make_texas_docket_number_core(
+                cls.docket_number_coa1
+            ),
         )
         cls.docket_coa1_entry = TexasDocketEntryFactory.create(
             docket=cls.docket_coa1,
@@ -2173,9 +2190,11 @@ class TexasMergerTest(TestCase):
         result = merge_texas_document(docket_entry, input_document)
 
         # Assertions
-        assert result == (True, True, result[2])
+        assert result.create is True
+        assert result.success is True
+        assert result.pk is not None
         try:
-            created_document = TexasDocument.objects.get(pk=result[2])
+            created_document = TexasDocument.objects.get(pk=result.pk)
         except ObjectDoesNotExist:
             created_document = None
         assert created_document is not None
@@ -2210,8 +2229,10 @@ class TexasMergerTest(TestCase):
         result = merge_texas_document(docket_entry, input_document)
 
         # Assertions
-        assert result == (False, True, current_document.pk)
-        result_document = TexasDocument.objects.get(pk=result[2])
+        assert result.create is False
+        assert result.success is True
+        assert result.pk == current_document.pk
+        result_document = TexasDocument.objects.get(pk=result.pk)
         assert result_document is not None
         assert result_document.docket_entry_id == docket_entry.id
         assert result_document.description == input_document["description"]
@@ -2245,8 +2266,11 @@ class TexasMergerTest(TestCase):
         result = merge_texas_document(docket_entry, input_document)
 
         # Assertions
-        assert result == (True, True, current_document.pk)
-        result_document = TexasDocument.objects.get(pk=result[2])
+        assert result.create is False
+        assert result.update is True
+        assert result.success is True
+        assert result.pk == current_document.pk
+        result_document = TexasDocument.objects.get(pk=result.pk)
         assert result_document is not None
         assert result_document.docket_entry_id == docket_entry.id
         assert result_document.description == input_document["description"]
@@ -2259,11 +2283,16 @@ class TexasMergerTest(TestCase):
 
         self.download_task_mock.assert_called_once_with(current_document.pk)
 
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
     @responses.activate
-    def test_merge_texas_document_plaintext_extraction(self):
+    def test_merge_texas_document_plaintext_extraction(
+        self, pcs_mock, throttle_mock
+    ):
         """
         Ensure plaintext extraction is triggered by `merge_texas_document`.
         """
+        pcs_mock.return_value = httpx.Response(200, text="1")
         # Stop the mocks just for this test
         self.download_task_patch.stop()
         self.extract_pdf_document_patch.stop()
@@ -2286,38 +2315,14 @@ class TexasMergerTest(TestCase):
         )
 
         docket_entry = self.docket_coa1_entry
-        (_, _, pk) = merge_texas_document(docket_entry, input_document)
+        result = merge_texas_document(docket_entry, input_document)
         docket_entry.refresh_from_db()
-        document = TexasDocument.objects.get(pk=pk)
+        document = TexasDocument.objects.get(pk=result.pk)
 
         self.assertEqual(response.call_count, 1)
         self.assertEqual(document.url, input_document["document_url"])
         self.assertTrue(document.filepath_local)
         self.assertIn("UNITED", document.plain_text)
-
-    def test_merge_texas_documents(self):
-        """Can we correctly handle multiple documents?"""
-        docket_entry = self.docket_coa1_entry
-        existing_document = TexasCaseDocumentDictFactory()
-        current_attachment = TexasDocumentFactory.create(
-            docket_entry=docket_entry,
-            description=existing_document["description"],
-            media_id=existing_document["media_id"],
-            media_version_id=existing_document["media_version_id"],
-            url=existing_document["document_url"],
-        )
-        current_attachment.filepath_local = "a"
-        current_attachment.save()
-        input_documents = [
-            TexasCaseDocumentDictFactory(),
-            existing_document,
-        ]
-
-        result = merge_texas_documents(docket_entry, input_documents)
-
-        assert len(result) == 2
-        assert result[0] == (True, True, result[0][2])
-        assert result[1] == (False, True, current_attachment.pk)
 
     def test_merge_texas_docket_entry_new_entry(self):
         """Can we correctly handle a docket entry?"""
@@ -2331,8 +2336,11 @@ class TexasMergerTest(TestCase):
             self.docket_coa1, "2025-01-02.000", True, docket_entry
         )
 
-        assert output == (True, True, output[2])
-        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert output.create is True
+        assert output.update is False
+        assert output.success is True
+        assert output.pk is not None
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == docket_entry["type"]
         assert created_docket_entry.description == docket_entry["description"]
@@ -2347,9 +2355,10 @@ class TexasMergerTest(TestCase):
         """Can we correctly handle a docket entry update noop?"""
         js_docket_entry = TexasDocketEntryDictFactory()
 
-        (_, _, pk) = merge_texas_docket_entry(
+        result = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+        pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
         for document in documents:
             document.filepath_local = "a"
@@ -2362,9 +2371,12 @@ class TexasMergerTest(TestCase):
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
 
-        assert output == (False, True, output[2])
-        assert output[2] == pk
-        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert output.create is False
+        assert output.update is True
+        assert output.success is True
+        assert output.pk is not None
+        assert output.pk == pk
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == js_docket_entry["type"]
         assert (
@@ -2382,9 +2394,10 @@ class TexasMergerTest(TestCase):
         js_docket_entry = TexasDocketEntryDictFactory()
         initial_n_attachments = len(js_docket_entry["attachments"])
 
-        (_, _, pk) = merge_texas_docket_entry(
+        result = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
+        pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
         for document in documents:
             document.filepath_local = "a"
@@ -2397,9 +2410,12 @@ class TexasMergerTest(TestCase):
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
         )
 
-        assert output == (True, True, output[2])
-        assert output[2] == pk
-        created_docket_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert output.create is True
+        assert output.update is True
+        assert output.success is True
+        assert output.pk is not None
+        assert output.pk == pk
+        created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == js_docket_entry["type"]
         assert (
@@ -2444,8 +2460,11 @@ class TexasMergerTest(TestCase):
             self.docket_coa1, "2025-01-02.001", True, js_docket_entry
         )
 
-        assert output == (False, True, existing_entry_2.pk)
-        updated_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert output.create is False
+        assert output.update is True
+        assert output.success is True
+        assert output.pk == existing_entry_2.pk
+        updated_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert updated_entry.description == "Updated description"
         assert updated_entry.sequence_number == "2025-01-02.001"
         # Ensure the first entry was not modified
@@ -2476,8 +2495,11 @@ class TexasMergerTest(TestCase):
             self.docket_coa1, "2025-01-04.001", True, js_docket_entry
         )
 
-        assert output == (False, True, existing_entry.pk)
-        updated_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert output.create is False
+        assert output.update is True
+        assert output.success is True
+        assert output.pk == existing_entry.pk
+        updated_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert updated_entry.description == "Updated description"
         assert updated_entry.sequence_number == "2025-01-04.001"
 
@@ -2513,10 +2535,12 @@ class TexasMergerTest(TestCase):
             self.docket_coa1, "2025-01-03.002", True, js_docket_entry
         )
 
-        assert output[0] is True  # created
-        assert output[1] is True  # success
-        assert output[2] not in (existing_entry_1.pk, existing_entry_2.pk)
-        new_entry = TexasDocketEntry.objects.get(pk=output[2])
+        assert output.create is True
+        assert output.update is False
+        assert output.success is True
+        assert output.pk is not None
+        assert output.pk not in (existing_entry_1.pk, existing_entry_2.pk)
+        new_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert new_entry.description == "New third entry"
         assert new_entry.sequence_number == "2025-01-03.002"
         # Ensure existing entries were not modified
@@ -2709,9 +2733,12 @@ class TexasMergerTest(TestCase):
         result = normalize_texas_parties([])
         assert result == []
 
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
     @responses.activate
-    def test_download_texas_document_pdf_success(self, pcs_mock):
+    def test_download_texas_document_pdf_success(
+        self, pcs_mock, throttle_mock
+    ):
         """Can we successfully download a PDF for a TexasDocument?"""
         self.download_pdf_patch.stop()
         texas_document = TexasDocumentFactory.create()
@@ -2765,6 +2792,346 @@ class TexasMergerTest(TestCase):
         )
         texas_document.refresh_from_db()
         assert not texas_document.filepath_local
+
+    def test_merge_texas_docket_originating_court_creates_new(self):
+        """Can we create new originating court information?"""
+        self.docket_coa1.originating_court_information = None
+        self.docket_coa1.save()
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            docket_number=self.docket_number_coa1,
+            originating_court=TexasOriginatingDistrictCourtDictFactory(
+                district=5,
+            ),
+        )
+
+        result = merge_texas_docket_originating_court(
+            self.docket_coa1, docket_data
+        )
+
+        assert result.create is True
+        assert result.success is True
+
+        self.docket_coa1.refresh_from_db()
+        originating_info = self.docket_coa1.originating_court_information
+        assert originating_info is not None
+        assert (
+            originating_info.docket_number
+            == docket_data["originating_court"]["case"]
+        )
+        assert (
+            originating_info.court_reporter
+            == docket_data["originating_court"]["reporter"]
+        )
+        assert (
+            originating_info.assigned_to_str
+            == docket_data["originating_court"]["judge"]
+        )
+
+    def test_merge_texas_docket_originating_court_updates_existing(self):
+        """Can we update existing originating court information?"""
+        # Create existing originating court information
+        self.docket_coa1.originating_court_information = (
+            OriginatingCourtInformation.objects.create(
+                docket_number="OLD-123",
+                court_reporter="Old Reporter",
+                assigned_to_str="Old Judge",
+            )
+        )
+        self.docket_coa1.save()
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory()
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+        )
+
+        result = merge_texas_docket_originating_court(
+            self.docket_coa1, docket_data
+        )
+
+        assert result.create is False
+        assert result.success is True
+
+        self.docket_coa1.refresh_from_db()
+        updated_info = self.docket_coa1.originating_court_information
+        assert updated_info is not None
+        assert updated_info.docket_number == originating_court["case"]
+        assert updated_info.court_reporter == originating_court["reporter"]
+        assert updated_info.assigned_to_str == originating_court["judge"]
+
+    def test_merge_texas_case_transfers_appellate_court_from_trial(self):
+        """Can we create a CaseTransfer for an appellate court case?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.destination_court == self.texas_coa1
+        assert transfer.destination_docket_number == self.docket_number_coa1
+        assert transfer.origin_court == texas_district
+        assert transfer.origin_docket_number == originating_court["case"]
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+        assert transfer.transfer_date == docket_data["date_filed"]
+
+    def test_merge_texas_case_transfers_appellate_with_workload_transfer(
+        self,
+    ):
+        """Can we create CaseTransfer for appellate case with work sharing?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        texas_coa2 = CourtFactory.create(id="txctapp2")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        transfer_from = TexasAppellateTransferDictFactory(
+            court_id=CourtID.SECOND_COURT_OF_APPEALS.value,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=transfer_from,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 2
+
+        appeal_transfer = transfers.get(transfer_type=CaseTransfer.APPEAL)
+        assert appeal_transfer.destination_court == self.texas_coa1
+        assert (
+            appeal_transfer.destination_docket_number
+            == self.docket_number_coa1
+        )
+        assert appeal_transfer.origin_court == texas_district
+        assert (
+            appeal_transfer.origin_docket_number == originating_court["case"]
+        )
+
+        workload_transfer = transfers.get(transfer_type=CaseTransfer.WORKLOAD)
+        assert workload_transfer.destination_court == self.texas_coa1
+        assert (
+            workload_transfer.destination_docket_number
+            == self.docket_number_coa1
+        )
+        assert workload_transfer.origin_court == texas_coa2
+        assert (
+            workload_transfer.origin_docket_number
+            == transfer_from["origin_docket"]
+        )
+
+    def test_merge_texas_case_transfers_supreme_court(self):
+        """Can we create a CaseTransfer for a Supreme Court case?"""
+        docket_sc = DocketFactory.create(court=self.texas_sc)
+
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            case_number=self.docket_number_coa1,
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            docket_number=docket_sc.docket_number,
+            appeals_court=appeals_court,
+        )
+
+        result = merge_texas_case_transfers(docket_sc, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.destination_court == self.texas_sc
+        assert transfer.destination_docket_number == docket_sc.docket_number
+        assert transfer.origin_court == self.texas_coa1
+        assert transfer.origin_docket_number == self.docket_number_coa1
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+        assert transfer.transfer_date == docket_data["date_filed"]
+
+    def test_merge_texas_case_transfers_cca_from_appellate(self):
+        """Can we create a CaseTransfer for CCA from appellate court?"""
+        docket_cca = DocketFactory.create(court=self.texas_cca)
+
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            case_number=self.docket_number_coa1,
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
+            docket_number=docket_cca.docket_number,
+            appeals_court=appeals_court,
+        )
+
+        result = merge_texas_case_transfers(docket_cca, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.destination_court == self.texas_cca
+        assert transfer.destination_docket_number == docket_cca.docket_number
+        assert transfer.origin_court == self.texas_coa1
+        assert transfer.origin_docket_number == self.docket_number_coa1
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+
+    def test_merge_texas_case_transfers_cca_death_penalty_direct_appeal(
+        self,
+    ):
+        """Can we handle death penalty direct appeals to CCA?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        docket_cca = DocketFactory.create(court=self.texas_cca)
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
+            docket_number=docket_cca.docket_number,
+            originating_court=originating_court,
+            appeals_court=None,
+        )
+
+        result = merge_texas_case_transfers(docket_cca, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.destination_court == self.texas_cca
+        assert transfer.destination_docket_number == docket_cca.docket_number
+        assert transfer.origin_court == texas_district
+        assert transfer.origin_docket_number == originating_court["case"]
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+
+    def test_merge_texas_case_transfers_no_trial_court_info(self):
+        """Do we handle appellate cases without trial court info?"""
+        originating_court = TexasOriginatingCourtDictFactory(
+            court_type=CourtType.UNKNOWN.value,
+            case="",
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 0
+
+    def test_merge_texas_case_transfers_duplicate_handling(self):
+        """Do we properly handle duplicate CaseTransfer objects?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        CaseTransferFactory.create(
+            origin_court=texas_district,
+            origin_docket=None,
+            origin_docket_number=originating_court["case"],
+            destination_court=self.texas_coa1,
+            destination_docket_number=self.docket_number_coa1,
+            destination_docket=self.docket_coa1,
+            transfer_date=docket_data["date_filed"],
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is False
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+
+    def test_merge_texas_docket_appellate_sets_appeal_from(self):
+        """Does merge_texas_docket set appeal_from for appellate courts?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert result.pk == self.docket_coa1.pk
+
+        self.docket_coa1.refresh_from_db()
+        assert self.docket_coa1.date_filed == docket_data["date_filed"]
+        assert self.docket_coa1.cause == docket_data["case_type"]
+        assert self.docket_coa1.appeal_from_id == "texdistct6"
+        assert self.docket_coa1.appeal_from_str == texas_district.full_name
+
+    def test_merge_texas_docket_final_court_sets_appeal_from(self):
+        """Does merge_texas_docket set appeal_from for final courts?"""
+        sc_dn = "25-1066"
+        docket_sc = DocketFactory.create(
+            court=self.texas_sc,
+            docket_number=sc_dn,
+            docket_number_core=make_texas_docket_number_core(sc_dn),
+        )
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            docket_number=docket_sc.docket_number,
+            appeals_court=appeals_court,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert result.pk == docket_sc.pk
+
+        docket_sc.refresh_from_db()
+        assert docket_sc.date_filed == docket_data["date_filed"]
+        assert docket_sc.cause == docket_data["case_type"]
+        assert docket_sc.appeal_from_id == "txctapp1"
+        assert docket_sc.appeal_from_str == self.texas_coa1.full_name
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

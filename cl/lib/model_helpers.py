@@ -111,6 +111,30 @@ def make_docket_number_core(docket_number: str | None) -> str:
     return ""
 
 
+def make_texas_docket_number_core(docket_number: str | None) -> str:
+    """
+    Normalize Texas docket numbers.
+
+    There is overlap between valid Texas docket numbers and valid Federal\
+    docket numbers, but they need to be normalized differently so we need a\
+    separate method.
+
+    :param docket_number: The docket number to normalize.
+
+    :return: The normalized docket number.
+    """
+
+    if docket_number is None:
+        return ""
+    not_alphanum_regex = re.compile(r"[^a-z0-9]")
+
+    # Normalize dashes
+    docket_number = normalize_dashes(docket_number)
+    # Normalize to lowercase
+    docket_number = docket_number.lower()
+    return not_alphanum_regex.sub("", docket_number)
+
+
 def make_scotus_docket_number_core(docket_number: str | None) -> str:
     """Normalize SCOTUS docket numbers like 16A985.
 

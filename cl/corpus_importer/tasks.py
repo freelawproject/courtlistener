@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import hashlib
 import logging
@@ -12,8 +14,9 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any
+from typing import IO, Any, NamedTuple
 
+import botocore.exceptions
 import environ
 import eyecite
 import internetarchive as ia
@@ -57,12 +60,22 @@ from juriscraper.pacer.reports import BaseReport
 from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
+    TexasCourtOfCriminalAppealsDocket,
+    TexasCourtOfCriminalAppealsScraper,
     TexasSupremeCourtAppellateBrief,
     TexasSupremeCourtCaseEvent,
+    TexasSupremeCourtDocket,
+    TexasSupremeCourtScraper,
 )
 from juriscraper.state.texas.common import (
+    CourtID,
+    CourtType,
     TexasAppellateBrief,
     TexasCaseDocument,
+)
+from juriscraper.state.texas.court_of_appeals import (
+    TexasCourtOfAppealsDocket,
+    TexasCourtOfAppealsScraper,
 )
 from openai import (
     APIConnectionError,
@@ -94,25 +107,33 @@ from cl.citations.tasks import (
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
+from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    create_docket_entry_sequence_numbers,
     is_appellate_court,
     is_long_appellate_document_number,
     make_iquery_probing_key,
     mark_ia_upload_needed,
+    texas_js_court_id_to_court_id,
+    texas_originating_court_to_court_id,
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
+from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
-from cl.lib.decorators import retry
+from cl.lib.decorators import retry, time_call
 from cl.lib.llm import call_llm
 from cl.lib.microservice_utils import (
     doc_page_count_service,
     microservice,
+)
+from cl.lib.model_helpers import (
+    make_texas_docket_number_core,
 )
 from cl.lib.pacer import (
     get_blocked_status,
@@ -134,7 +155,11 @@ from cl.lib.recap_utils import (
     get_document_filename,
 )
 from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
+from cl.lib.storage import AWSMediaStorage
 from cl.lib.types import TaskData
+from cl.people_db.lookup_utils import (
+    lookup_judge_by_full_name_and_set_attr,
+)
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
 from cl.recap.mergers import (
@@ -160,12 +185,14 @@ from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
+    CaseTransfer,
     ClaimHistory,
     Court,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
     ScotusDocketMetadata,
     Tag,
@@ -3377,6 +3404,7 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
     ignore_result=True,
     # No retries because download_pdf_in_stream already has retry logic
 )
+@throttle_task("2/s")
 def download_texas_document_pdf(
     self: Task, texas_document_pk: int
 ) -> int | None:
@@ -3431,9 +3459,133 @@ def download_texas_document_pdf(
         return texas_document_pk
 
 
+class MergeResult[T = int](NamedTuple):
+    """Stores data about the result of an attempted merge operation."""
+
+    create: bool
+    """Whether a document needed to be created."""
+    update: bool
+    """Whether a document needed to be updated."""
+    success: bool
+    """Whether the operation was successful."""
+    pk: T | None
+    """The primary key of the created or updated object."""
+
+    @staticmethod
+    def created[S](pk: S) -> MergeResult[S]:
+        """Shorthand for the result of a successful creation operation.
+
+        :param pk: The primary key of the created object.
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=True, update=False, success=True, pk=pk)
+
+    @staticmethod
+    def updated[S](pk: S) -> MergeResult[S]:
+        """Shorthand for the result of a successful update operation.
+
+        :param pk: The primary key of the updated object.
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=False, update=True, success=True, pk=pk)
+
+    @staticmethod
+    def failed[S]() -> MergeResult[S]:
+        """Shorthand for the result of a failed merge operation.
+
+        :return: The constructed MergeResult object."""
+        return MergeResult[S](
+            create=False, update=False, success=False, pk=None
+        )
+
+    @staticmethod
+    def unnecessary[S](pk: S) -> MergeResult[S]:
+        """Shorthand for the result of a unnecessary merge operation.
+
+        :return: The constructed MergeResult object."""
+        return MergeResult(create=False, update=False, success=True, pk=pk)
+
+
+def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
+    """Merges a CaseTransfer object in the database by first checking if it can
+    be used to update an existing object, and if not, creating a new object (if
+    necessary).
+
+    :param case_transfer: The CaseTransfer object to be merged.
+    :return: The result of this merge attempt."""
+    logger.info(
+        "Merging CaseTransfer from docket %s in court %s to docket %s in court %s on %s with type %s.",
+        case_transfer.origin_docket_number,
+        case_transfer.origin_court.pk,
+        case_transfer.destination_docket_number,
+        case_transfer.destination_court.pk,
+        case_transfer.transfer_date.isoformat(),
+        case_transfer.transfer_type,
+    )
+    candidate_case_transfers = CaseTransfer.objects.filter(
+        origin_court=case_transfer.origin_court,
+        origin_docket_number=case_transfer.origin_docket_number,
+        destination_court=case_transfer.destination_court,
+        destination_docket_number=case_transfer.destination_docket_number,
+        transfer_date=case_transfer.transfer_date,
+        transfer_type=case_transfer.transfer_type,
+    )
+    try:
+        # Try to find an existing CaseTransfer to fill in info for.
+        if case_transfer.origin_docket:
+            existing_case_transfer = candidate_case_transfers.get(
+                origin_docket=None
+            )
+        else:
+            existing_case_transfer = candidate_case_transfers.get(
+                destination_docket=None
+            )
+    except CaseTransfer.MultipleObjectsReturned:
+        # This should never happen
+        logger.error(
+            "Found multiple matching CaseTransfer objects.",
+        )
+        return MergeResult.failed()
+    except CaseTransfer.DoesNotExist:
+        logger.info(
+            "Could not find existing transfer to update. Checking if transfer already exists..."
+        )
+        try:
+            existing_case_transfer = candidate_case_transfers.get(
+                origin_docket=case_transfer.origin_docket,
+                destination_docket=case_transfer.destination_docket,
+            )
+        except CaseTransfer.MultipleObjectsReturned:
+            # Should never happen
+            logger.error(
+                "Found multiple matching CaseTransfer objects.",
+            )
+            return MergeResult.failed()
+        except CaseTransfer.DoesNotExist:
+            logger.info(
+                "Did not find existing CaseTransfer object. Creating..."
+            )
+            case_transfer.save()
+            return MergeResult.created(case_transfer.pk)
+        logger.info(
+            "Identical CaseTransfer object already exists. Merge is unnecessary."
+        )
+        return MergeResult.unnecessary(existing_case_transfer.pk)
+    else:
+        logger.info(
+            "Updating existing CaseTransfer %s.", existing_case_transfer.pk
+        )
+        if case_transfer.origin_docket:
+            existing_case_transfer.origin_docket = case_transfer.origin_docket
+        else:
+            existing_case_transfer.destination_docket = (
+                case_transfer.destination_docket
+            )
+        existing_case_transfer.save()
+        return MergeResult.updated(existing_case_transfer.pk)
+
+
 def merge_texas_document(
     docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
-) -> tuple[bool, bool, int]:
+) -> MergeResult:
     """Merge a single TexasCaseDocument object into CL.
 
     Checks if the document exists, creating a TexasDocument object if it does
@@ -3443,28 +3595,35 @@ def merge_texas_document(
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param input_document: The attachment to merge.
-    :return: Tuple with entries
-    - Flag indicating whether a document needed to be created or updated
-    - Flag indicating whether the update operation was successful or not
-    applicable
-    - Primary key of the TexasDocument object which matches the input document
-    """
-    (texas_document, created) = TexasDocument.objects.get_or_create(
-        media_id=input_document["media_id"],
-        docket_entry=docket_entry,
-        defaults={
-            "description": input_document["description"],
-            "media_version_id": input_document["media_version_id"],
-            "url": input_document["document_url"],
-        },
-    )
+    :return: The result of the merge operation."""
+    try:
+        texas_document = TexasDocument.objects.get(
+            media_id=input_document["media_id"],
+            docket_entry=docket_entry,
+        )
+    except TexasDocument.DoesNotExist:
+        existed = False
+        needs_update = True
+        texas_document = TexasDocument(
+            media_id=input_document["media_id"],
+            docket_entry=docket_entry,
+        )
+    except TexasDocument.MultipleObjectsReturned:
+        logger.error(
+            "Found multiple TexasDocument objects on the same docket entry (%s) with the same media_id (%s)",
+            docket_entry.pk,
+            input_document["media_id"],
+        )
+        return MergeResult.failed()
+    else:
+        existed = True
+        needs_update = (
+            str(texas_document.media_version_id)
+            != input_document["media_version_id"]
+            or not texas_document.filepath_local
+        )
 
-    if (
-        created
-        or str(texas_document.media_version_id)
-        != input_document["media_version_id"]
-        or not texas_document.filepath_local
-    ):
+    if needs_update:
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
         texas_document.url = input_document["document_url"]
@@ -3475,29 +3634,14 @@ def merge_texas_document(
                 check_if_needed=False, model_name="search.TexasDocument"
             ),
         ).apply_async()
-        return True, True, texas_document.pk
+        return MergeResult(
+            create=not existed,
+            update=existed,
+            success=True,
+            pk=texas_document.pk,
+        )
 
-    return False, True, texas_document.pk
-
-
-def merge_texas_documents(
-    docket_entry: TexasDocketEntry,
-    documents: list[TexasCaseDocument],
-) -> list[tuple[bool, bool, int]]:
-    """Merges a list of Texas docket entry attachments into CL.
-
-    :param docket_entry: The docket entry this attachment belongs to.
-    :param documents: List of TexasCaseDocument attached to this docket entry.
-    :return: List of tuples with the following entries:
-    - A flag indicating whether the document needed to be created or updated,
-    - A flag indicating which is set to True when the document was successfully
-    created or updated or when an update was unnecessary,
-    - The primary key of the updated TexasDocument object."""
-    output = [
-        merge_texas_document(docket_entry, document) for document in documents
-    ]
-
-    return output
+    return MergeResult.unnecessary(texas_document.pk)
 
 
 @transaction.atomic
@@ -3509,7 +3653,7 @@ def merge_texas_docket_entry(
     | TexasAppellateBrief
     | TexasSupremeCourtCaseEvent
     | TexasSupremeCourtAppellateBrief,
-) -> tuple[bool, bool, int]:
+) -> MergeResult:
     """Merges a Texas docket entry into CL.
 
     :param docket: The docket this entry belongs to.
@@ -3605,14 +3749,16 @@ def merge_texas_docket_entry(
         docket_entry.pk,
         docket.pk,
     )
-    document_results = merge_texas_documents(
-        docket_entry, input_docket_entry["attachments"]
-    )
+    document_results = [
+        merge_texas_document(docket_entry, document)
+        for document in input_docket_entry["attachments"]
+    ]
 
-    return (
-        created or any(r[0] for r in document_results),
-        all(r[1] for r in document_results),
-        docket_entry.pk,
+    return MergeResult(
+        create=created or any(r.create for r in document_results),
+        update=not created or any(r.update for r in document_results),
+        success=all(r.success for r in document_results),
+        pk=docket_entry.pk,
     )
 
 
@@ -3647,7 +3793,9 @@ def normalize_texas_parties(
     ]
 
 
-def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
+def merge_texas_parties(
+    docket: Docket, parties: list[TexasCaseParty]
+) -> MergeResult:
     """Merge Texas case parties and attorneys into the given docket.
 
     This function takes a docket and a list of parties associated with a Texas
@@ -3657,5 +3805,590 @@ def merge_texas_parties(docket: Docket, parties: list[TexasCaseParty]) -> None:
 
     :param docket: The docket to which parties and attorneys should be added.
     :param parties: The parties involved in the Texas case.
+    :return: A MergeResult indicating the operation succeeded. Note that
+        create and update flags are always False and pk is always None since
+        add_parties_and_attorneys does not return this information.
     """
     add_parties_and_attorneys(docket, normalize_texas_parties(parties))
+    return MergeResult(create=False, update=False, success=True, pk=None)
+
+
+def merge_texas_docket_originating_court(
+    docket: Docket,
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> MergeResult:
+    """Merge originating court information into the given Texas docket.
+
+    :param docket: The docket to add the originating court to.
+    :param docket_data: The docket data from Juriscraper.
+    :return: The result of the merge operation."""
+    created = False
+    if not docket.originating_court_information:
+        created = True
+        docket.originating_court_information = OriginatingCourtInformation()
+
+    originating_court_information = docket.originating_court_information
+    originating_court_data = docket_data["originating_court"]
+
+    originating_court_information.docket_number = originating_court_data[
+        "case"
+    ]
+    originating_court_information.court_reporter = originating_court_data[
+        "reporter"
+    ]
+    originating_court_information.assigned_to_str = originating_court_data[
+        "judge"
+    ]
+    originating_court_id = texas_originating_court_to_court_id(
+        originating_court_data
+    )
+    # Only update judge if we're able to associate them with a court.
+    if originating_court_id:
+        async_to_sync(lookup_judge_by_full_name_and_set_attr)(
+            item=originating_court_information,
+            target_field="assigned_to",
+            full_name=originating_court_data["judge"],
+            court_id=originating_court_id,
+            event_date=None,
+            require_living_judge=False,
+        )
+    originating_court_information.save()
+    if created:
+        docket.save()
+
+    return MergeResult(create=created, update=False, success=True, pk=None)
+
+
+def merge_texas_case_transfers(
+    docket: Docket,
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> MergeResult:
+    """This method creates or updates up any `CaseTransfer` objects which point to
+    or originate from a given docket to capture appeal and work sharing
+    information.
+
+    If a `CaseTransfer` exists with the same origin and destination docket
+    numbers and court fields as one we want to create, update the origin or
+    destination docket foreign key field to point to this docket. This allows
+    us to merge `CaseTransfer` objects for which we only have partial
+    information and complete the information at a later time (or never if the
+    origin/destination is a court we don't scrape).
+
+    :param docket: The docket to add the appeal information to.
+    :param docket_data: The docket data from Juriscraper.
+    :return: The result of the CaseTransfer merge operation"""
+    logger.info(
+        "Determining transfers for docket %s in court %s...",
+        docket.docket_number,
+        docket.court.pk,
+    )
+    trial_court_id = texas_originating_court_to_court_id(
+        docket_data["originating_court"]
+    )
+
+    if docket_data["court_type"] == CourtType.SUPREME.value:
+        # Assume that the originating court -> appellate court transfer will
+        # be populated by an appellate docket later on.
+        transfer = CaseTransfer(
+            destination_court=docket.court,
+            destination_docket_number=docket.docket_number,
+            destination_docket=docket,
+            transfer_date=docket_data["date_filed"],
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        appeals_court = docket_data["appeals_court"]
+
+        if docket_data["court_id"] == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+            logger.info("Docket %s is from the CCA", docket.docket_number)
+            # Death penalty cases are automatically appealed to the CCA so the
+            # appellate court may be missing.
+            if (
+                not appeals_court
+                or appeals_court["court_id"] == CourtID.UNKNOWN.value
+            ):
+                # Death penalty appeal
+                logger.info(
+                    "Docket %s in the CCA is a death penalty appeal",
+                    docket.docket_number,
+                )
+                if trial_court_id:
+                    transfer.origin_court = Court.objects.get(
+                        pk=trial_court_id
+                    )
+                    transfer.origin_docket_number = docket_data[
+                        "originating_court"
+                    ]["case"]
+                else:
+                    logger.error(
+                        "Unable to determine trial court ID for Texas docket %s to create CaseTransfer",
+                        docket.docket_number,
+                    )
+                    return MergeResult.failed()
+            else:
+                logger.info(
+                    "Docket %s in the CCA is not a death penalty appeal",
+                    docket.docket_number,
+                )
+                if appeals_court["court_id"] == CourtID.UNKNOWN.value:
+                    logger.error(
+                        "Found appellate court with unknown ID (docket %s)",
+                        docket.docket_number,
+                    )
+                    return MergeResult.failed()
+                else:
+                    appeals_court_id = texas_js_court_id_to_court_id(
+                        appeals_court["court_id"]
+                    )
+                    logger.info(
+                        "Appeals court ID for CCA docket %s is %s",
+                        docket.docket_number,
+                        appeals_court_id,
+                    )
+                transfer.origin_court = Court.objects.get(pk=appeals_court_id)
+                transfer.origin_docket_number = appeals_court["case_number"]
+        elif docket_data["court_id"] == CourtID.SUPREME_COURT.value:
+            logger.info("Docket %s is from the SC", docket.docket_number)
+            if appeals_court["court_id"] == CourtID.UNKNOWN.value:
+                logger.warning(
+                    "Found appellate court with unknown ID (docket %s)",
+                    docket.docket_number,
+                )
+                return MergeResult.failed()
+            else:
+                appeals_court_id = texas_js_court_id_to_court_id(
+                    appeals_court["court_id"]
+                )
+                logger.info(
+                    "Appeals court ID for SC docket %s is %s",
+                    docket.docket_number,
+                    appeals_court_id,
+                )
+            transfer.origin_court = Court.objects.get(pk=appeals_court_id)
+            transfer.origin_docket_number = appeals_court["case_number"]
+        else:
+            logger.error(
+                "Unrecognized Texas final court ID %s while creating CaseTransfer",
+                docket_data["court_id"],
+            )
+            return MergeResult.failed()
+        transfers = [transfer]
+    elif docket_data["court_type"] == CourtType.APPELLATE.value:
+        logger.info("Docket %s is an appellate docket", docket.docket_number)
+        transfers = []
+        if trial_court_id:
+            logger.info(
+                "Appellate docket %s has a valid trial court",
+                docket.docket_number,
+            )
+            transfers.append(
+                CaseTransfer(
+                    origin_court=Court.objects.get(pk=trial_court_id),
+                    origin_docket_number=docket_data["originating_court"][
+                        "case"
+                    ],
+                    destination_court=docket.court,
+                    destination_docket_number=docket.docket_number,
+                    destination_docket=docket,
+                    transfer_date=docket_data["date_filed"],
+                    transfer_type=CaseTransfer.APPEAL,
+                )
+            )
+        if docket_data["transfer_from"]:
+            logger.info(
+                "Appellate docket %s has a transfer in", docket.docket_number
+            )
+            transfer_from_date = docket_data["transfer_from"]["date"]
+            if not transfer_from_date:
+                logger.warning(
+                    "Missing transfer date for workload transfer of docket %s",
+                    docket.docket_number,
+                )
+            transfers.append(
+                CaseTransfer(
+                    origin_court=Court.objects.get(
+                        pk=texas_js_court_id_to_court_id(
+                            docket_data["transfer_from"]["court_id"]
+                        )
+                    ),
+                    origin_docket_number=docket_data["transfer_from"][
+                        "origin_docket"
+                    ],
+                    destination_court=docket.court,
+                    destination_docket_number=docket.docket_number,
+                    destination_docket=docket,
+                    # If the transfer date is absent or empty, assume it matches the filing date
+                    transfer_date=transfer_from_date
+                    if transfer_from_date
+                    else docket_data["date_filed"],
+                    # Texas Government Code 73.001 (accessed 2026-02-23)
+                    transfer_type=CaseTransfer.JURISDICTION
+                    if docket_data["court_id"]
+                    == CourtID.FIFTEENTH_COURT_OF_APPEALS
+                    else CaseTransfer.WORKLOAD,
+                )
+            )
+    else:
+        logger.error(
+            "Unrecognized Texas court type %s while creating CaseTransfer",
+            docket_data["court_type"],
+        )
+        return MergeResult.failed()
+
+    any_created = False
+    for transfer in transfers:
+        case_transfer = CaseTransfer(
+            origin_court=transfer.origin_court,
+            origin_docket_number=transfer.origin_docket_number,
+            origin_docket=transfer.origin_docket,
+            destination_court=transfer.destination_court,
+            destination_docket_number=transfer.destination_docket_number,
+            destination_docket=transfer.destination_docket,
+            transfer_date=transfer.transfer_date,
+            transfer_type=transfer.transfer_type,
+        )
+        merge_result = merge_case_transfer(case_transfer)
+        if merge_result.create:
+            any_created = True
+
+    return MergeResult(success=True, create=any_created, update=False, pk=None)
+
+
+def generate_texas_appellate_brief_flags(
+    case_events: list[TexasCaseEvent],
+    appellate_briefs: list[TexasAppellateBrief],
+) -> list[bool]:
+    """Generates a list of booleans indicating whether the corresponding entry
+    in the list of TexasCaseEvents is in the list of TexasAppellateBriefs.
+
+    The "Appellate Briefs" table in TAMES appears to always be a subset of the
+    case events table. Therefore, we simply use the case events table to
+    generate docket entries and set an "appellate_brief" flag to indicate
+    whether the entry appears in the appellate briefs table. This method
+    generates those flags given the list of case events and the list of
+    appellate briefs.
+
+    :param case_events: A list of TexasCaseEvent objects.
+    :param appellate_briefs: A list of TexasAppellateBrief objects.
+    :return: A list of booleans indicating whether the corresponding entry is
+    an appellate brief."""
+    brief_iter = iter(appellate_briefs)
+    next_brief = next(brief_iter, None)
+    flags = []
+    for case_event in case_events:
+        if next_brief is not None and case_event == next_brief:
+            flags.append(True)
+            next_brief = next(brief_iter, None)
+        else:
+            flags.append(False)
+    return flags
+
+
+def merge_texas_docket(
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> MergeResult:
+    """Merges scraped data from a Texas docket into the `Docket` table.
+
+    :param docket_data: The scraped Texas docket data.
+
+    :return: The result of the merge operation."""
+    court = Court.objects.get(
+        pk=texas_js_court_id_to_court_id(docket_data["court_id"])
+    )
+    docket_number = docket_data["docket_number"]
+    logger.info("Merging Texas docket %s", docket_number)
+    with transaction.atomic():
+        docket = None
+        if docket_data["court_type"] == CourtType.UNKNOWN.value:
+            logger.error(
+                "Texas docket %s has unknown court type", docket_number
+            )
+            return MergeResult.failed()
+        if docket_data["court_type"] == CourtType.APPELLATE.value:
+            logger.info(
+                "Docket is appellate. Checking if disaggregation is necessary..."
+            )
+            docket = async_to_sync(find_docket_object)(
+                court_id="texapp",
+                pacer_case_id=None,
+                docket_number=docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                docket_source=Docket.SCRAPER,
+                allow_create=False,
+            )
+            if docket is not None:
+                logger.info(
+                    "Disaggregating Texas appellate docket %s", docket_number
+                )
+                docket.court = court
+        if docket is None:
+            docket = async_to_sync(find_docket_object)(
+                court_id=court.pk,
+                pacer_case_id=None,
+                docket_number=docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                docket_source=Docket.SCRAPER,
+                allow_create=True,
+            )
+        docket.add_scraper_source()
+        docket.docket_number = docket_number
+        docket.docket_number_core = make_texas_docket_number_core(
+            docket_number
+        )
+        docket.date_filed = docket_data["date_filed"]
+        docket.cause = docket_data["case_type"]
+        originating_court_merge_result = merge_texas_docket_originating_court(
+            docket, docket_data
+        )
+        if not originating_court_merge_result.success:
+            logger.error(
+                "Failed to update originating court information for Texas docket %s in court %s",
+                docket.docket_number,
+                court.pk,
+            )
+
+        if docket_data["court_type"] == CourtType.APPELLATE.value:
+            lower_court_data = docket_data["originating_court"]
+            lower_court_id = texas_originating_court_to_court_id(
+                lower_court_data
+            )
+        else:
+            if (
+                docket_data["appeals_court"]["court_id"]
+                == CourtID.UNKNOWN.value
+            ):
+                lower_court_data = docket_data["originating_court"]
+                lower_court_id = texas_originating_court_to_court_id(
+                    lower_court_data
+                )
+            else:
+                lower_court_data = docket_data["appeals_court"]
+                lower_court_id = texas_js_court_id_to_court_id(
+                    lower_court_data["court_id"]
+                )
+
+        court_name = None
+        if lower_court_id is not None:
+            try:
+                court = Court.objects.get(pk=lower_court_id)
+            except Court.DoesNotExist:
+                logger.error(
+                    "Could not find lower court with ID %s to set appeal_from for Texas docket.",
+                    lower_court_id,
+                )
+            else:
+                docket.appeal_from = court
+                court_name = court.full_name
+        if not court_name:
+            logger.warning(
+                "Failed to find court ID %s while populating appeal_from field for Texas docket %s in court %s",
+                lower_court_id,
+                docket.pk,
+                court.pk,
+            )
+            # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
+            court_name = lower_court_data["name"]
+        logger.info(
+            "Updating lower court info with court %s (ID %s).",
+            court_name,
+            lower_court_id,
+        )
+        docket.appeal_from_str = court_name
+
+        docket.save()
+
+    party_merge_result = merge_texas_parties(docket, docket_data["parties"])
+    if not party_merge_result.success:
+        logger.error(
+            "Failed to merge party data for Texas docket %s in court %s",
+            docket.docket_number,
+            court.pk,
+        )
+
+    entry_merge_results = [
+        merge_texas_docket_entry(
+            docket, sequence_number, appellate_brief, entry
+        )
+        for sequence_number, appellate_brief, entry in zip(
+            create_docket_entry_sequence_numbers(docket_data["case_events"]),
+            generate_texas_appellate_brief_flags(
+                docket_data["case_events"], docket_data["appellate_briefs"]
+            ),
+            docket_data["case_events"],
+        )
+    ]
+
+    merge_case_transfer_result = merge_texas_case_transfers(
+        docket, docket_data
+    )
+    if not merge_case_transfer_result.success:
+        logger.error(
+            "Failed to merge CaseTransfer data for Texas docket %s in court %s",
+            docket.docket_number,
+            court.pk,
+        )
+
+    create = (
+        party_merge_result.create
+        or originating_court_merge_result.create
+        or merge_case_transfer_result.create
+        or any(r.create for r in entry_merge_results)
+    )
+    update = (
+        party_merge_result.update
+        or originating_court_merge_result.update
+        or merge_case_transfer_result.update
+        or any(r.update for r in entry_merge_results)
+    )
+    success = (
+        party_merge_result.success
+        and originating_court_merge_result.success
+        and merge_case_transfer_result.success
+        and all(r.success for r in entry_merge_results)
+    )
+    if not success:
+        logger.error(
+            "One or more steps in Texas case merging failed for docket %s (pk %s). Please review logs.",
+            docket_number,
+            docket.pk,
+        )
+
+    return MergeResult(
+        create=create,
+        update=update,
+        success=success,
+        pk=docket.pk,
+    )
+
+
+@app.task(
+    bind=True,
+    max_retries=5,
+    ignore_result=True,
+)
+@time_call(logger)
+def texas_ingest_docket_task(
+    task: Task,
+    i: tuple[bytes, TexasDocketMeta],
+) -> MergeResult:
+    """
+    Task to parse and merge a Texas docket.
+
+    :param task: The Celery task.
+
+    :param i: Tuple with the following entries:
+    - Bytes string to parse.
+    - Docket metadata.
+
+    :return: The result of the merge operation.
+    """
+    content, meta = i
+    logger.info("Attempting to parse Texas docket %s...", meta.case_number)
+    try:
+        match meta.court_code:
+            case "cossup":
+                parser = TexasSupremeCourtScraper()
+            case "coscca":
+                parser = TexasCourtOfCriminalAppealsScraper()
+            case _:
+                if meta.court_code.startswith("coa"):
+                    parser = TexasCourtOfAppealsScraper(meta.court_code)
+                else:
+                    logger.error(
+                        "Unrecognized Texas court type %s. Cannot parse docket %s.",
+                        meta.court_code,
+                        meta.case_number,
+                    )
+                    task.request.chain = None
+                    return MergeResult.failed()
+
+        parser._parse_text(content.decode("utf-8"))
+        docket_data = parser.data
+    except Exception as e:
+        logger.error(
+            "Encountered error parsing Texas docket at URL %s: %s",
+            meta.case_url,
+            str(e),
+        )
+        task.request.chain = None
+        return MergeResult.failed()
+    return merge_texas_docket(docket_data)
+
+
+@app.task(
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def default_corpus_download_task(
+    bucket: str, s3_key: str
+) -> tuple[bytes, str, str]:
+    """Downloads a scraped file from S3 and returns it for parsing.
+
+    :param bucket: S3 bucket name.
+    :param s3_key: S3 key to download file from.
+    :return: Tuple with entries: Bytes of downloaded file, the bucket
+    parameter, and the s3_key parameter."""
+    logger.info("Downloading file from S3: %s", s3_key)
+    storage = AWSMediaStorage(bucket_name=bucket)
+    with storage.open(s3_key, "rb") as f:
+        content = f.read()
+    return content, bucket, s3_key
+
+
+@app.task(
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+@time_call(logger)
+def texas_corpus_download_task(
+    docket: tuple[str, str],
+    docket_meta: tuple[str, str],
+) -> tuple[bytes, TexasDocketMeta]:
+    """Downloads a scraped file from S3 and returns it for parsing.
+
+    :param docket: Tuple of S3 bucket name and key where docket HTML is stored.
+
+    :param docket_meta: Tuple of S3 bucket name and key where docket metadata\
+        is stored.
+
+    :return: Tuple with entries: Bytes of downloaded file, dictionary with\
+        response headers, and docket metadata."""
+    storage = AWSMediaStorage(bucket_name=docket[0])
+    logger.info(
+        "Downloading docket HTML from S3: (Bucket: %s; Path: %s)",
+        docket[0],
+        docket[1],
+    )
+    with storage.open(docket[1], "rb") as f:
+        content = f.read()
+
+    storage = AWSMediaStorage(bucket_name=docket_meta[0])
+    logger.info(
+        "Downloading docket meta from S3: (Bucket: %s; Path: %s)",
+        docket_meta[0],
+        docket_meta[1],
+    )
+    with storage.open(docket_meta[1], "r") as f:
+        meta = TexasDocketMeta.model_validate_json(f.read())
+
+    return content, meta

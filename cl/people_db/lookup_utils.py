@@ -555,7 +555,8 @@ async def lookup_judge_by_full_name_and_set_attr(
     target_field: str,
     full_name: HumanName | str,
     court_id: str,
-    event_date: date,
+    event_date: date | None,
+    require_living_judge: bool = True,
 ) -> None:
     """Lookup a judge by the attribute of an object
 
@@ -564,11 +565,15 @@ async def lookup_judge_by_full_name_and_set_attr(
     :param full_name: The full name of the judge to look up
     :param court_id: The court where the judge did something
     :param event_date: The date the judge did something
+    :param require_living_judge: Whether to ensure that the judge found was
+    born before the event date and died after it.
     :return None
     """
     if not full_name:
         return None
-    judge = await lookup_judge_by_full_name(full_name, court_id, event_date)
+    judge = await lookup_judge_by_full_name(
+        full_name, court_id, event_date, require_living_judge
+    )
     setattr(item, target_field, judge)
 
 
