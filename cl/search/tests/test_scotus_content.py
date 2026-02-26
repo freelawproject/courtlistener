@@ -419,6 +419,9 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(dockets.count(), 1)
         scotus_metadata = ScotusDocketMetadata.objects.all()
         self.assertEqual(scotus_metadata.count(), 1)
+        # New dockets created by merge_scotus_docket
+        # get SCRAPER source.
+        self.assertEqual(docket.source, Docket.SCRAPER)
 
         # Updated data.
         data = ScotusDocketDataFactory(
@@ -436,6 +439,7 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(scotus_metadata.count(), 1)
 
         self.assertEqual(updated_docket.pk, docket.pk)
+        # Merging into a docket that already has SCRAPER remains as SCRAPER.
         self.assertEqual(updated_docket.source, Docket.SCRAPER)
         self.assertEqual(updated_docket.case_name, "New SCOTUS Case Name")
         self.assertEqual(updated_docket.date_filed, data["date_filed"])
@@ -450,6 +454,46 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(metadata.linked_with, data["links"])
         self.assertEqual(
             metadata.questions_presented_url, data["questions_presented"]
+        )
+
+    def test_merge_scotus_docket_source_compounds_existing(self) -> None:
+        """Merging into an existing docket compounds its source with SCRAPER."""
+        existing = DocketFactory(
+            court=self.court,
+            docket_number="24-200",
+            source=Docket.HARVARD,
+        )
+        data = ScotusDocketDataFactory(
+            docket_number="24-200",
+            docket_entries=[],
+        )
+        docket, _ = merge_scotus_docket(data)
+        docket.refresh_from_db()
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(
+            docket.source,
+            Docket.SCRAPER_AND_HARVARD,
+            "Source should be compounded with SCRAPER.",
+        )
+
+    def test_merge_scotus_docket_source_compounds_recap(self) -> None:
+        """Merging into a RECAP docket compounds with SCRAPER."""
+        existing = DocketFactory(
+            court=self.court,
+            docket_number="24-400",
+            source=Docket.RECAP,
+        )
+        data = ScotusDocketDataFactory(
+            docket_number="24-400",
+            docket_entries=[],
+        )
+        docket, _ = merge_scotus_docket(data)
+        docket.refresh_from_db()
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(
+            docket.source,
+            Docket.RECAP_AND_SCRAPER,
+            "Source should be RECAP + SCRAPER.",
         )
 
     def test_merge_scotus_docket_missing_docket_number(self) -> None:
@@ -513,6 +557,7 @@ class ScotusDocketMergeTest(TestCase):
 
         report_data = ScotusDocketDataFactory(
             questions_presented="../qp/14-00556qp.pdf",
+            docket_entries=[],
         )
         docket, _ = merge_scotus_docket(report_data)
         scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)

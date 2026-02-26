@@ -3585,7 +3585,11 @@ def merge_scotus_docket(
             None,
         )
 
+        # Add SCRAPER source by default if it's a new Docket.
         d.source = Docket.SCRAPER
+        if d.pk:
+            # If the docket already exists, compound the SCRAPER source.
+            d.add_scraper_source()
         d.docket_number = docket_number
         d.docket_number_raw = docket_number
         d.case_name = case_name if case_name else d.case_name
