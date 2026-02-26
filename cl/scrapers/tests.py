@@ -43,6 +43,7 @@ from cl.scrapers.management.commands import (
 from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_judge_names,
     merge_versions_by_download_url,
+    passes_length_ratio_check,
 )
 from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import (
@@ -1729,6 +1730,83 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             version_candidate.main_version_id is None,
             "Loose versioning should not pass when metadata differs ",
         )
+
+
+class LengthRatioCheckTest(SimpleTestCase):
+    """Tests for the passes_length_ratio_check function (Issue #6534)."""
+
+    def test_identical_texts_pass(self):
+        """Identical texts should pass the length ratio check."""
+        text = "This is a test opinion text."
+        passes, ratio = passes_length_ratio_check(text, text)
+        self.assertTrue(passes)
+        self.assertEqual(ratio, 1.0)
+
+    def test_similar_length_texts_pass(self):
+        """Texts with similar lengths should pass."""
+        text1 = "A" * 1000
+        text2 = "B" * 800  # 80% ratio
+        passes, ratio = passes_length_ratio_check(text1, text2)
+        self.assertTrue(passes)
+        self.assertAlmostEqual(ratio, 0.8, places=2)
+
+    def test_vastly_different_lengths_fail(self):
+        """Texts with vastly different lengths should fail"""
+        text1 = "A" * 1000
+        text2 = "B" * 100  # 10% ratio
+        passes, ratio = passes_length_ratio_check(text1, text2)
+        self.assertFalse(passes)
+        self.assertAlmostEqual(ratio, 0.1, places=2)
+
+    def test_borderline_ratio_at_threshold(self):
+        """Test behavior at exactly the 0.5 threshold."""
+        text1 = "A" * 1000
+        text2 = "B" * 500  # exactly 50%
+        passes, ratio = passes_length_ratio_check(text1, text2)
+        self.assertTrue(passes)
+        self.assertAlmostEqual(ratio, 0.5, places=2)
+
+    def test_borderline_ratio_below_threshold(self):
+        """Test behavior just below the 0.5 threshold."""
+        text1 = "A" * 1000
+        text2 = "B" * 499  # just under 50%
+        passes, ratio = passes_length_ratio_check(text1, text2)
+        self.assertFalse(passes)
+        self.assertLess(ratio, 0.5)
+
+    def test_empty_texts_edge_case(self):
+        """Both empty texts should pass"""
+        passes, ratio = passes_length_ratio_check("", "")
+        self.assertTrue(passes)
+        self.assertEqual(ratio, 1.0)
+
+    def test_one_empty_text_fails(self):
+        """One empty text should fail."""
+        passes, ratio = passes_length_ratio_check("some text", "")
+        self.assertFalse(passes)
+        self.assertEqual(ratio, 0.0)
+
+        passes, ratio = passes_length_ratio_check("", "some text")
+        self.assertFalse(passes)
+        self.assertEqual(ratio, 0.0)
+
+    def test_custom_threshold(self):
+        """Can we use a custom threshold?"""
+        text1 = "A" * 1000
+        text2 = "B" * 600  # 60% ratio
+
+        # With default threshold (0.5), should pass
+        passes, _ = passes_length_ratio_check(text1, text2)
+        self.assertTrue(passes)
+
+        # With stricter threshold (0.7), should fail
+        passes, _ = passes_length_ratio_check(text1, text2, min_ratio=0.7)
+        self.assertFalse(passes)
+
+        # With looser threshold (0.3), should pass
+        text3 = "C" * 350  # 35% ratio
+        passes, _ = passes_length_ratio_check(text1, text3, min_ratio=0.3)
+        self.assertTrue(passes)
 
 
 class DeleteDuplicatesTest(TestCase):
