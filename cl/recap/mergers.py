@@ -1596,7 +1596,9 @@ def merge_pacer_docket_into_cl_docket(
 
     # Skip the percolator request for this save if parties data will be merged
     # afterward.
-    set_skip_percolation_if_parties_data(docket_data["parties"], d)
+    percolate_parties = set_skip_percolation_if_parties_data(
+        docket_data["parties"], d
+    )
     d.save()
 
     if appellate:
@@ -1635,8 +1637,10 @@ def merge_pacer_docket_into_cl_docket(
     # data when the RECAPDocuments are percolated.
     add_parties_and_attorneys(d, docket_data["parties"])
     if docket_data["parties"]:
-        # Index or re-index parties only if the docket has parties.
-        index_docket_parties_in_es.delay(d.pk)
+        # Index parties and percolate them only if within the attorney limit.
+        index_docket_parties_in_es.delay(
+            d.pk, percolate_parties=percolate_parties
+        )
 
     items_returned, rds_created, content_updated = async_to_sync(
         add_docket_entries
