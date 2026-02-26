@@ -802,6 +802,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
         ),
         default=False,
     )
+    case_status = models.CharField(
+        help_text="The status of the case (e.g. Active, Disposed)",
+        max_length=100,
+        blank=True,
+    )
+    efile_status = models.CharField(
+        help_text="How complete is the efile account for the case",
+        max_length=100,
+        blank=True,
+    )
+    case_source_url = models.URLField(
+        help_text="URL for the source page of the case details",
+        max_length=500,
+        blank=True,
+        null=True,
+    )
     es_pa_field_tracker = FieldTracker(fields=["docket_number", "court_id"])
     es_oa_field_tracker = FieldTracker(
         fields=[
@@ -1339,6 +1355,79 @@ class AbstractPacerDocument(models.Model):
 
     class Meta:
         abstract = True
+
+
+@pghistory.track()
+class StateDocument(AbstractPDF, AbstractDateTimeModel, CSVExportMixin):
+    "Model for e-filed documents and metadata"
+
+    docket = models.ForeignKey(
+        Docket,
+        help_text=(
+            "Foreign key to the Docket this document belongs to. "
+            "Multiple documents can belong to a docket."
+        ),
+        related_name="state_documents",
+        on_delete=models.CASCADE,
+    )
+    tags = models.ManyToManyField(
+        "search.Tag",
+        help_text="The tags associated with the document.",
+        related_name="state_documents",
+        blank=True,
+    )
+    document_number = models.IntegerField(
+        help_text="Document number assigned by the state"
+    )
+    document_name = models.CharField(
+        help_text="Assigned name of the document", max_length=100, blank=True
+    )
+    description = models.CharField(
+        help_text="Description of the document provided in the sub-header",
+        max_length=100,
+        blank=True,
+    )
+    filed_by = models.ForeignKey(
+        "people_db.Person",
+        related_name="filed_by",
+        help_text="The person who filed the document in the system",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+    )
+    filed_by_str = models.CharField(
+        help_text="Person who filed the document as a string",
+        max_length=100,
+        blank=True,
+    )
+    filed_status = models.CharField(
+        help_text="Status of the document filed (e.g., Processed)",
+        max_length=100,
+        blank=True,
+    )
+    # Confirmation Notices are PDFs that could also be collected and
+    # represented as an object. For simplicity they are currently stored
+    # by their URL.
+    confirmation_notice_url = models.URLField(
+        help_text="URL to the confirmation notice of the document", blank=True
+    )
+    document_source_url = models.URLField(
+        help_text="URL for the online PDF of the document", blank=True
+    )
+    # Assumes fields inherited from AbstractDateTimeModel denote when
+    # the object was created in the database
+    date_filed = models.DateTimeField(
+        help_text="The date the document was filed", blank=True, null=True
+    )
+    date_received = models.DateTimeField(
+        help_text="The date the file was received", blank=True, null=True
+    )
+
+    class Meta:
+        unique_together = (
+            "docket",
+            "document_number",
+        )
 
 
 @pghistory.track()
@@ -2236,7 +2325,12 @@ class Court(models.Model):
         "raw)",
         blank=True,
     )
-
+    state = USPostalCodeField(
+        help_text="The two-letter USPS postal abbreviation for the state "
+        "the court is in",
+        choices=USPS_CHOICES + OBSOLETE_STATES,
+        blank=True,
+    )
     objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
 
