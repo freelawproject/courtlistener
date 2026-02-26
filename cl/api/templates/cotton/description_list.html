@@ -1,0 +1,12 @@
+{# description_list.html #}
+
+<c-vars content safe="true"></c-vars>
+
+<div class="overflow-auto">
+  <dl>
+    {% for record in content %}
+      <dt class="font-semibold">{{ record.term }}</dt>
+      <dd class="pl-4">{{ record.description|safe }}</dd>
+    {% endfor %}
+  </dl>
+</div>
