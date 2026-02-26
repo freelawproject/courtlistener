@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
@@ -102,3 +104,47 @@ class PACERMobilePageData(AbstractDateTimeModel):
 
     def __str__(self) -> str:
         return f"<{self.pk}: Docket {self.docket_id} crawled at {self.date_last_mobile_crawl} with {self.count_last_mobile_crawl} results>"
+
+
+class Scraper(models.IntegerChoices):
+    TEXAS = 1, "Texas"
+
+
+class AccountSubscription(models.Model):
+    scraper = models.IntegerField(
+        help_text="The scraper/site the account is for.",
+        choices=Scraper.choices,
+    )
+    email = models.EmailField(
+        help_text="The email address for the account.",
+    )
+    user_name = models.CharField(
+        help_text="The username of the account.",
+        max_length=30,
+    )
+    first_subscription = models.DateField(
+        help_text="The date of the first subscription.",
+        default=date.today,
+    )
+    last_subscription = models.DateField(
+        help_text="The date of the last subscription.",
+        default=date.today,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scraper", "user_name"],
+                name="unique_scraper_user_name",
+            )
+        ]
+
+    def include_subscriptions(self, dates: set[date]) -> None:
+        """Update first/last subscription to encompass the given dates."""
+        all_dates = dates | {self.first_subscription, self.last_subscription}
+        self.first_subscription = min(all_dates)
+        self.last_subscription = max(all_dates)
+        self.save(update_fields=["first_subscription", "last_subscription"])
+
+    def __str__(self) -> str:
+        return f"{self.get_scraper_display()}: {self.user_name} ({self.email}): {self.first_subscription or 'Unknown'} - {self.last_subscription or 'current'}"
