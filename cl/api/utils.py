@@ -43,19 +43,32 @@ from cl.api.models import (
     ThrottleType,
     Webhook,
     WebhookEvent,
+    WebhookEventType,
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.lib.decorators import tiered_cache
 from cl.lib.redis_utils import get_redis_interface
+from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
-from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
+from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
 from cl.users.tasks import (
     create_or_update_zoho_account,
     notify_failing_webhook,
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+# Map WebhookEventType integer values to StatWebhookEventType string values
+# for Prometheus metric labeling.
+WEBHOOK_EVENT_TYPE_TO_STAT: dict[int, StatWebhookEventType] = {
+    WebhookEventType.DOCKET_ALERT: StatWebhookEventType.DOCKET_ALERT,
+    WebhookEventType.SEARCH_ALERT: StatWebhookEventType.SEARCH_ALERT,
+    WebhookEventType.RECAP_FETCH: StatWebhookEventType.RECAP_FETCH,
+    WebhookEventType.OLD_DOCKET_ALERTS_REPORT: StatWebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+    WebhookEventType.PRAY_AND_PAY: StatWebhookEventType.PRAY_AND_PAY,
+}
+
 BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
     "exact",
@@ -1465,6 +1478,14 @@ def update_webhook_event_after_request(
             # Only log successful webhook events and not debug.
             results = log_webhook_event(webhook_event.webhook.user.pk)
             handle_webhook_events(results, webhook_event.webhook.user)
+            event_type_label = WEBHOOK_EVENT_TYPE_TO_STAT.get(
+                webhook_event.webhook.event_type
+            )
+            if event_type_label:
+                tally_stat(
+                    StatMetric.WEBHOOKS_SENT,
+                    labels={"event_type": event_type_label},
+                )
     webhook_event.save()
 
 

@@ -6,6 +6,7 @@ class StatMetric(StrEnum):
 
     SEARCH_RESULTS = "search.results"
     ALERTS_SENT = "alerts.sent"
+    WEBHOOKS_SENT = "webhooks.sent"
 
 
 # Label names per metric (order matters for key parsing)
@@ -13,6 +14,7 @@ class StatMetric(StrEnum):
 STAT_LABELS: dict[str, list[str]] = {
     "search.results": ["query_type", "method"],
     "alerts.sent": ["alert_type"],
+    "webhooks.sent": ["event_type"],
 }
 
 
@@ -32,11 +34,20 @@ class StatAlertType(StrEnum):
     SCHEDULED = "scheduled"
 
 
+class StatWebhookEventType(StrEnum):
+    DOCKET_ALERT = "docket_alert"
+    SEARCH_ALERT = "search_alert"
+    RECAP_FETCH = "recap_fetch"
+    OLD_DOCKET_ALERTS_REPORT = "old_docket_alerts_report"
+    PRAY_AND_PAY = "pray_and_pay"
+
+
 # For validation: allowed values per label
 STAT_LABEL_VALUES: dict[str, type[StrEnum]] = {
     "query_type": StatQueryType,
     "method": StatMethod,
     "alert_type": StatAlertType,
+    "event_type": StatWebhookEventType,
 }
 
 STAT_METRICS_PREFIX = "prometheus:stat:"
