@@ -4485,6 +4485,7 @@ class RECAPAlertsPercolatorTest(
                 court=self.court,
                 case_name="Attorney Limit Case",
                 docket_number="1:21-bk-9999",
+                docket_number_raw="1:21-bk-9999",
                 source=Docket.RECAP,
                 pacer_case_id="999888",
             )
@@ -4712,6 +4713,7 @@ class RECAPAlertsPercolatorTest(
                 court=self.court,
                 case_name="Attorney Limit Docket Case",
                 docket_number="1:21-bk-8888",
+                docket_number_raw="1:21-bk-8888",
                 source=Docket.RECAP,
                 date_filed=datetime.date(2025, 8, 16),
                 pacer_case_id="324242",
