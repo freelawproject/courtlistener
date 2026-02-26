@@ -16,21 +16,6 @@ from cl.stats.constants import STAT_LABELS, STAT_METRICS_PREFIX
 logger = logging.getLogger(__name__)
 
 # Search metrics
-search_queries_total = Counter(
-    "cl_search_queries_total",
-    "Total number of search queries",
-    ["query_type", "method"],
-)
-"""
-Usage:
-    search_queries_total.labels(query_type='keyword', method='web').inc()
-    search_queries_total.labels(query_type='semantic', method='api').inc()
-
-Labels:
-    query_type: 'keyword' | 'semantic'
-    method: 'web' | 'api'
-"""
-
 search_duration_seconds = Histogram(
     "cl_search_duration_seconds",
     "Duration of search query execution in seconds",

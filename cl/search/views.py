@@ -33,7 +33,6 @@ from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
 from cl.stats.constants import StatMethod, StatMetric, StatQueryType
-from cl.stats.metrics import search_queries_total
 from cl.stats.utils import tally_stat
 
 
@@ -256,9 +255,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     "method": StatMethod.WEB,
                 },
             )
-            search_queries_total.labels(
-                query_type="keyword", method="web"
-            ).inc()
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(

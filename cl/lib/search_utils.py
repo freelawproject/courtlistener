@@ -66,7 +66,8 @@ from cl.search.models import (
     OpinionCluster,
     SearchQuery,
 )
-from cl.stats.metrics import search_queries_total
+from cl.stats.constants import StatMethod, StatMetric, StatQueryType
+from cl.stats.utils import tally_stat
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -307,13 +308,25 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
-    if not flag_is_active(request, "store-search-api-queries"):
-        # Do not store search queries
-        return
-
     if is_bot(request):
         return
+
     is_semantic = has_semantic_params(request.GET)
+    query_type = (
+        StatQueryType.SEMANTIC if is_semantic else StatQueryType.KEYWORD
+    )
+    tally_stat(
+        StatMetric.SEARCH_RESULTS,
+        labels={
+            "query_type": query_type,
+            "method": StatMethod.API,
+        },
+    )
+
+    if not flag_is_active(request, "store-search-api-queries"):
+        # Do not store search queries in the DB
+        return
+
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -326,8 +339,6 @@ def store_search_api_query(
         if is_semantic
         else SearchQuery.KEYWORD,
     )
-    query_type = "semantic" if is_semantic else "keyword"
-    search_queries_total.labels(query_type=query_type, method="api").inc()
 
 
 class CachedESSearchResults(TypedDict):
