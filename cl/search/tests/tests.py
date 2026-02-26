@@ -302,15 +302,19 @@ class DocketValidationTest(TestCase):
         """Is blank pacer_case_id denied in not appellate dockets?"""
         with self.assertRaises(ValidationError):
             Docket.objects.create(
-                source=Docket.RECAP, court=self.court, docket_number="12-1233"
+                source=Docket.RECAP,
+                court=self.court,
+                docket_number_raw="12-1233",
+                docket_number="12-1233",
             )
 
         appellate = Docket.objects.create(
             source=Docket.RECAP,
             court=self.court_appellate,
             docket_number="12-1234",
+            docket_number_raw="12-1234",
         )
-        self.assertEqual(appellate.docket_number, "12-1234")
+        self.assertEqual(appellate.docket_number_raw, "12-1234")
 
     def test_creating_a_recap_docket_with_docket_number_blank(self) -> None:
         """Is blank docket_number denied?"""
@@ -330,6 +334,7 @@ class DocketValidationTest(TestCase):
         Docket.objects.create(
             source=Docket.RECAP,
             docket_number="asdf",
+            docket_number_raw="asdf",
             pacer_case_id="asdf",
             court_id=self.court.pk,
         )
@@ -338,6 +343,7 @@ class DocketValidationTest(TestCase):
                 Docket.objects.create(
                     source=Docket.RECAP_AND_SCRAPER,
                     docket_number="asdf",
+                    docket_number_raw="asdf",
                     pacer_case_id="asdf",
                     court_id=self.court.pk,
                 )
@@ -2178,11 +2184,13 @@ class CaptionTest(TestCase):
 
     async def test_simple_caption(self) -> None:
         c, _ = await Court.objects.aget_or_create(
-            pk="ca1", defaults={"position": 1}
+            pk="ca1", defaults={"position": 1}, citation_string="1st Cir."
         )
-        d = await Docket.objects.acreate(source=0, court=c)
+        docket = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
+            case_name="foo",
+            docket=docket,
+            date_filed=datetime.date(1984, 1, 1),
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2191,9 +2199,10 @@ class CaptionTest(TestCase):
             reporter="F.2d",
             page="44",
         )
+        caption = await cluster.acaption()
         self.assertEqual(
             "foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)",
-            await cluster.acaption(),
+            caption,
         )
 
     async def test_scotus_caption(self) -> None:
@@ -3714,10 +3723,17 @@ class PopulateDocketNumberRawCommandTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.dn = "1111"
-        cls.docket = DocketFactory(docket_number=cls.dn, docket_number_raw="")
+        # cannot create a Docket with empty string as docket_number_raw,
+        # will emulate the change in the test
+        cls.docket = DocketFactory(
+            docket_number=cls.dn, docket_number_raw="xxxx"
+        )
 
     def test_populate_docket_number_raw(self):
         """Does the command properly copies docket_number_raw into docket number?"""
+        Docket.objects.filter(id=self.docket.id).update(docket_number_raw="")
+        self.docket.events.all().delete()
+
         populate_docket_number_raw.Command().handle(
             start_id=self.docket.id,
             end_id=self.docket.id + 10,
@@ -3858,3 +3874,141 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             {str(self.docket_4.id)},
             "Redis cache set should contain docket_4 only",
         )
+
+
+class DocketSignalTest(TestCase):
+    def setUp(self):
+        self.clean_docket_func_path = (
+            "cl.search.signals.clean_docket_number_raw_and_update_redis_cache"
+        )
+        self.court = CourtFactory(id="test")
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_on_creation(self):
+        """Verify cleaning runs when a new non-RECAP docket is created."""
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            Docket.objects.create(
+                court=self.court,
+                docket_number_raw="2023-cv-00001",
+                source=Docket.SCRAPER,  # source != Docket.RECAP
+            )
+            self.assertTrue(mocked_cleaner.called)
+            self.assertEqual(mocked_cleaner.call_count, 1)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_on_field_change(self):
+        """Verify cleaning runs when docket_number_raw is updated."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="2023-cv-00001",
+            source=Docket.SCRAPER,
+        )
+        new_docket_number = "2023-cv-13-00001"
+        self.assertNotEqual(docket.docket_number_raw, new_docket_number)
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = new_docket_number
+            docket.save()
+
+            self.assertTrue(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_does_not_trigger_when_value_is_the_same(self):
+        """Verify cleaning does not run if the field did not change"""
+        dn = "2023-cv-00001"
+        docket = Docket.objects.create(
+            court=self.court, docket_number_raw=dn, source=Docket.SCRAPER
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = dn
+            docket.save()
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_does_not_trigger_on_other_field_change(self):
+        """Verify cleaning does not run if a different field is updated."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="123-ABC",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.case_name = "Changed another field"
+            docket.save()
+
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_respects_recap_source(self):
+        """Verify cleaning does not run if the source is RECAP."""
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            Docket.objects.create(
+                court=self.court,
+                docket_number_raw="123-ABC",
+                source=Docket.RECAP,
+                pacer_case_id="111",
+            )
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_with_explicit_update_fields(self):
+        """Verify cleaning runs when save(update_fields) includes
+        docket_number_raw."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="2023-cv-00001",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = "2023-cv-99999"
+            docket.save(update_fields=["docket_number_raw"])
+
+            self.assertTrue(mocked_cleaner.called)
+            self.assertEqual(mocked_cleaner.call_count, 1)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_skipped_with_explicit_unrelated_update_fields(self):
+        """Verify cleaning does not run when save(update_fields) excludes
+        docket_number_raw, even if the field was changed in memory."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="123-ABC",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = "999-XYZ"
+            docket.case_name = "New name"
+            docket.save(update_fields=["case_name"])
+
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_no_recursion_from_cleaner(self):
+        """Verify the cleaner's internal save does not cause infinite
+        recursion. The cleaner calls save(update_fields=["docket_number", ...])
+        which re-triggers the signal, but the guard returns early."""
+        from cl.search.docket_number_cleaner import (
+            clean_docket_number_raw_and_update_redis_cache,
+        )
+
+        court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+
+        with mock.patch(
+            self.clean_docket_func_path,
+            wraps=clean_docket_number_raw_and_update_redis_cache,
+        ) as wrapped_cleaner:
+            docket = Docket.objects.create(
+                court=court_scotus,
+                docket_number_raw="12-1234-ag",
+                source=Docket.SCRAPER,
+            )
+
+            # The cleaner should have been called exactly once (on create),
+            # not recursively when it saved the cleaned docket_number.
+            self.assertEqual(wrapped_cleaner.call_count, 1)
+            docket.refresh_from_db()
+            self.assertEqual(docket.docket_number, "12-1234-AG")

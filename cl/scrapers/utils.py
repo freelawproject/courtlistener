@@ -271,8 +271,8 @@ def get_existing_docket(
     # with juriscraper string formatting
     # https://github.com/freelawproject/juriscraper/pull/1166
     lookup = Q(court_id=court_id) & (
-        Q(docket_number=docket_number.replace(";", ""))
-        | Q(docket_number=docket_number)
+        Q(docket_number_raw=docket_number.replace(";", ""))
+        | Q(docket_number_raw=docket_number)
     )
 
     # Special case where docket numbers are the same and repeated

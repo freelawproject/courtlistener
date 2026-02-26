@@ -397,13 +397,13 @@ def merge_docket_numbers(
     cl_docket = cluster.docket
     file_cleaned_docket = clean_docket_number(docket_number)
 
-    if cl_docket.docket_number:
+    if cl_docket.docket_number_raw:
         # Check if docket number exists
         # e.g. CL docket id #3952066 doesn't have
-        cl_clean_docket = clean_docket_number(cl_docket.docket_number)
+        cl_clean_docket = clean_docket_number(cl_docket.docket_number_raw)
         if (
             cl_clean_docket in file_cleaned_docket
-            and cl_docket.docket_number != file_cleaned_docket
+            and cl_docket.docket_number_raw != file_cleaned_docket
         ):
             return file_cleaned_docket
         else:
@@ -957,9 +957,9 @@ def content_too_different(
         return True
 
     # If a docket number exists: check against it.
-    if case.docket.docket_number is not None:
+    if case.docket.docket_number_raw is not None:
         clean_docket = clean_docket_number(docket)
-        if clean_docket not in case.docket.docket_number:
+        if clean_docket not in case.docket.docket_number_raw:
             return True
     return False
 

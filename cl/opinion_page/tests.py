@@ -1814,6 +1814,7 @@ class UploadPublication(TestCase):
             court_id="tennworkcompcl",
             pacer_case_id=None,
             docket_number="1234123",
+            docket_number_raw="1234123",
             case_name="One v. Two",
         )
         oc = OpinionCluster.objects.create(

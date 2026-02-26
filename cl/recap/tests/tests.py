@@ -2734,7 +2734,7 @@ class RecapDocketFetchApiTest(TestCase):
 
         # Check that the docket fields match the expected fake data.
         self.assertEqual(appellate_docket.court_id, "ca1")
-        self.assertEqual(appellate_docket.docket_number, "10-1081")
+        self.assertEqual(appellate_docket.docket_number_raw, "10-1081")
         self.assertEqual(appellate_docket.case_name, "United States v. Brown")
 
         # Verify that a RECAPDocument was created and linked to the docket.
@@ -2764,7 +2764,7 @@ class RecapDocketFetchApiTest(TestCase):
     ):
         # Ensure the docket does not exist before the fetch.
         self.assertFalse(
-            Docket.objects.filter(docket_number="25-4097").exists()
+            Docket.objects.filter(docket_number_raw="25-4097").exists()
         )
 
         fq = PacerFetchQueue.objects.create(
@@ -2796,12 +2796,14 @@ class RecapDocketFetchApiTest(TestCase):
         mock_appellate_docket_report.assert_not_called()
 
         # Verify that the docket was created.
-        acms_docket = Docket.objects.filter(docket_number="25-4097").first()
+        acms_docket = Docket.objects.filter(
+            docket_number_raw="25-4097"
+        ).first()
         self.assertIsNotNone(acms_docket)
 
         # Check that the docket fields match the expected fake data.
         self.assertEqual(acms_docket.court_id, "ca9")
-        self.assertEqual(acms_docket.docket_number, "25-4097")
+        self.assertEqual(acms_docket.docket_number_raw, "25-4097")
         self.assertEqual(
             acms_docket.case_name, "Wortman, et al. v. All Nippon Airways"
         )
