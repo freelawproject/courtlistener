@@ -11,7 +11,7 @@ from sentry_sdk import capture_exception
 
 from cl.lib.celery_utils import get_queue_length
 from cl.lib.redis_utils import get_redis_interface
-from cl.stats.constants import STAT_LABELS, STAT_METRICS_PREFIX
+from cl.stats.constants import STAT_LABELS, get_stat_metrics_prefix
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +87,13 @@ class StatMetricsCollector:
         # Group metrics by name
         metrics_data: dict[str, list[tuple[list[str], int]]] = {}
 
-        for key in r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
+        prefix = get_stat_metrics_prefix()
+        for key in r.scan_iter(f"{prefix}*"):
             # Handle bytes if redis returns them
             if isinstance(key, bytes):
                 key = key.decode()
             # Parse: prometheus:stat:{name}:{label1}:{label2}...
-            parts = key.removeprefix(STAT_METRICS_PREFIX).split(":")
+            parts = key.removeprefix(prefix).split(":")
             metric_name = parts[0]
             label_values = parts[1:] if len(parts) > 1 else []
 

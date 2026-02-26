@@ -18,7 +18,7 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.stats.constants import (
     STAT_LABEL_VALUES,
     STAT_LABELS,
-    STAT_METRICS_PREFIX,
+    get_stat_metrics_prefix,
 )
 
 MILESTONES = OrderedDict(
@@ -81,11 +81,12 @@ def _validate_labels(name: str, labels: dict[str, str]) -> None:
 
 def _get_prometheus_key(name: str, labels: dict[str, str] | None) -> str:
     """Build the prometheus-compatible Redis key for a metric."""
+    prefix = get_stat_metrics_prefix()
     if labels:
         label_order = STAT_LABELS.get(name, [])
         label_values = ":".join(labels[label] for label in label_order)
-        return f"{STAT_METRICS_PREFIX}{name}:{label_values}"
-    return f"{STAT_METRICS_PREFIX}{name}"
+        return f"{prefix}{name}:{label_values}"
+    return f"{prefix}{name}"
 
 
 def tally_stat(

@@ -50,4 +50,8 @@ STAT_LABEL_VALUES: dict[str, type[StrEnum]] = {
     "event_type": StatWebhookEventType,
 }
 
-STAT_METRICS_PREFIX = "prometheus:stat:"
+
+def get_stat_metrics_prefix() -> str:
+    from django.conf import settings
+
+    return settings.STAT_METRICS_PREFIX

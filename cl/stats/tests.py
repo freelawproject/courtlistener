@@ -15,12 +15,12 @@ from waffle.testutils import override_flag, override_switch
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
 from cl.stats.constants import (
-    STAT_METRICS_PREFIX,
     StatAlertType,
     StatMethod,
     StatMetric,
     StatQueryType,
     StatWebhookEventType,
+    get_stat_metrics_prefix,
 )
 from cl.stats.metrics import (
     CeleryQueueCollector,
@@ -131,16 +131,20 @@ class ElasticsearchStatusTests(TestCase):
 
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="StatTests")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="StatTests",
+    STAT_METRICS_PREFIX="prometheus:stat:StatTests:",
+)
 class StatTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
+        self.prefix = get_stat_metrics_prefix()
         # Clean up date-based test keys
         keys = self.r.keys("test*")
         if keys:
             self.r.delete(*keys)
         # Clean up prometheus test keys
-        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}test*"):
+        for key in self.r.scan_iter(f"{self.prefix}test*"):
             self.r.delete(key)
 
     def test_tally_a_stat(self) -> None:
@@ -273,7 +277,10 @@ def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:
 
 @override_flag("semantic-search", active=True)
 @override_switch("increment-stats", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="PrometheusIntegrationTestBase")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="PrometheusIntegrationTestBase",
+    STAT_METRICS_PREFIX="prometheus:stat:PrometheusIntegrationTestBase:",
+)
 class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
     """Base class for Prometheus integration tests"""
 
@@ -294,7 +301,10 @@ class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
 
 
 @override_flag("store-search-api-queries", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="test_prometheus_integration")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="test_prometheus_integration",
+    STAT_METRICS_PREFIX="prometheus:stat:PrometheusIntegrationAPITests:",
+)
 class PrometheusIntegrationAPITests(PrometheusIntegrationTestBase):
     """Integration tests for Prometheus metrics with API searches"""
 
@@ -491,7 +501,7 @@ class GetPrometheusKeyTests(TestCase):
     def test_key_without_labels(self) -> None:
         """Test key format without labels"""
         key = _get_prometheus_key("test.metric", None)
-        self.assertEqual(key, f"{STAT_METRICS_PREFIX}test.metric")
+        self.assertEqual(key, f"{get_stat_metrics_prefix()}test.metric")
 
     def test_key_with_labels(self) -> None:
         """Test key format with labels in STAT_LABELS order"""
@@ -500,19 +510,23 @@ class GetPrometheusKeyTests(TestCase):
             {"query_type": "keyword", "method": "web"},
         )
         self.assertEqual(
-            key, f"{STAT_METRICS_PREFIX}search.results:keyword:web"
+            key, f"{get_stat_metrics_prefix()}search.results:keyword:web"
         )
 
 
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="TallyStatPrometheusTests")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="TallyStatPrometheusTests",
+    STAT_METRICS_PREFIX="prometheus:stat:TallyStatPrometheusTests:",
+)
 class TallyStatPrometheusTests(TestCase):
     """Test that tally_stat writes prometheus keys via pipeline"""
 
     def setUp(self):
         self.r = get_redis_interface("STATS")
-        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
+        self.prefix = get_stat_metrics_prefix()
+        for key in self.r.scan_iter(f"{self.prefix}*"):
             self.r.delete(key)
 
     def test_tally_stat_writes_prometheus_key(self) -> None:
@@ -523,7 +537,7 @@ class TallyStatPrometheusTests(TestCase):
             labels={"alert_type": "docket"},
         )
 
-        key = f"{STAT_METRICS_PREFIX}alerts.sent:docket"
+        key = f"{self.prefix}alerts.sent:docket"
         value = int(self.r.get(key) or 0)
         self.assertEqual(value, 3)
 
@@ -540,7 +554,7 @@ class TallyStatPrometheusTests(TestCase):
             labels={"alert_type": "docket"},
         )
 
-        key = f"{STAT_METRICS_PREFIX}alerts.sent:docket"
+        key = f"{self.prefix}alerts.sent:docket"
         value = int(self.r.get(key) or 0)
         self.assertEqual(value, 5)
 
@@ -556,28 +570,32 @@ class TallyStatPrometheusTests(TestCase):
             labels={"event_type": StatWebhookEventType.DOCKET_ALERT},
         )
 
-        key = f"{STAT_METRICS_PREFIX}webhooks.sent:docket_alert"
+        key = f"{self.prefix}webhooks.sent:docket_alert"
         value = int(self.r.get(key) or 0)
         self.assertEqual(value, 3)
 
 
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
+@override_settings(
+    STAT_METRICS_PREFIX="prometheus:stat:StatMetricsCollectorTests:"
+)
 class StatMetricsCollectorTests(TestCase):
     """Unit tests for StatMetricsCollector"""
 
     def setUp(self):
         self.r = get_redis_interface("STATS")
+        self.prefix = get_stat_metrics_prefix()
         # Clean up any prometheus:stat: keys
-        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
+        for key in self.r.scan_iter(f"{self.prefix}*"):
             self.r.delete(key)
 
     def test_collects_metrics_from_redis(self) -> None:
         """Test that collector reads and formats metrics from Redis"""
         # Set up some test data in Redis
-        key1 = f"{STAT_METRICS_PREFIX}search.results:keyword:web"
-        key2 = f"{STAT_METRICS_PREFIX}search.results:semantic:api"
-        key3 = f"{STAT_METRICS_PREFIX}alerts.sent:docket"
+        key1 = f"{self.prefix}search.results:keyword:web"
+        key2 = f"{self.prefix}search.results:semantic:api"
+        key3 = f"{self.prefix}alerts.sent:docket"
         self.r.set(key1, 10)
         self.r.set(key2, 5)
         self.r.set(key3, 20)
@@ -586,7 +604,7 @@ class StatMetricsCollectorTests(TestCase):
         self.assertEqual(int(self.r.get(key1)), 10)
 
         # Verify scan_iter finds the keys
-        found_keys = list(self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"))
+        found_keys = list(self.r.scan_iter(f"{self.prefix}*"))
         self.assertGreaterEqual(
             len(found_keys), 3, f"Expected 3+ keys, found: {found_keys}"
         )
@@ -637,14 +655,17 @@ class StatMetricsCollectorTests(TestCase):
 
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
+@override_settings(
+    STAT_METRICS_PREFIX="prometheus:stat:TallyStatWithLabelsTests:"
+)
 class TallyStatWithLabelsTests(TestCase):
     """Integration tests for tally_stat with labels"""
 
     def setUp(self):
         self.r = get_redis_interface("STATS")
-        # Clean up test keys and search.results keys
+        self.prefix = get_stat_metrics_prefix()
+        # Clean up date-based keys for metrics this class uses
         for pattern in [
-            "test*",
             "search.results*",
             "alerts.sent*",
             "webhooks.sent*",
@@ -653,7 +674,7 @@ class TallyStatWithLabelsTests(TestCase):
             if keys:
                 self.r.delete(*keys)
         # Clean up prometheus keys
-        for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
+        for key in self.r.scan_iter(f"{self.prefix}*"):
             self.r.delete(key)
 
     def test_tally_stat_with_labels_writes_both_keys(self) -> None:
@@ -672,7 +693,7 @@ class TallyStatWithLabelsTests(TestCase):
         self.assertEqual(date_value, 1)
 
         # Check prometheus key exists
-        prom_key = f"{STAT_METRICS_PREFIX}search.results:keyword:web"
+        prom_key = f"{self.prefix}search.results:keyword:web"
         prom_value = int(self.r.get(prom_key) or 0)
         self.assertEqual(prom_value, 1)
 
