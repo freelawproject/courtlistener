@@ -906,6 +906,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
 
+    def add_scraper_source(self) -> None:
+        if self.source in self.NON_SCRAPER_SOURCES():
+            self.source = self.source + self.SCRAPER
+
     def add_recap_source(self):
         if self.source == self.DEFAULT:
             self.source = self.RECAP_AND_SCRAPER

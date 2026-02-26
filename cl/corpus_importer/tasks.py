@@ -4140,6 +4140,7 @@ def merge_texas_docket(
                 docket_source=Docket.SCRAPER,
                 allow_create=True,
             )
+        docket.add_scraper_source()
         docket.docket_number = docket_number
         docket.docket_number_core = make_texas_docket_number_core(
             docket_number
