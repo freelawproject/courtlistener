@@ -3951,3 +3951,64 @@ class DocketSignalTest(TestCase):
                 pacer_case_id="111",
             )
             self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_with_explicit_update_fields(self):
+        """Verify cleaning runs when save(update_fields) includes
+        docket_number_raw."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="2023-cv-00001",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = "2023-cv-99999"
+            docket.save(update_fields=["docket_number_raw"])
+
+            self.assertTrue(mocked_cleaner.called)
+            self.assertEqual(mocked_cleaner.call_count, 1)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_skipped_with_explicit_unrelated_update_fields(self):
+        """Verify cleaning does not run when save(update_fields) excludes
+        docket_number_raw, even if the field was changed in memory."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="123-ABC",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = "999-XYZ"
+            docket.case_name = "New name"
+            docket.save(update_fields=["case_name"])
+
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_no_recursion_from_cleaner(self):
+        """Verify the cleaner's internal save does not cause infinite
+        recursion. The cleaner calls save(update_fields=["docket_number", ...])
+        which re-triggers the signal, but the guard returns early."""
+        from cl.search.docket_number_cleaner import (
+            clean_docket_number_raw_and_update_redis_cache,
+        )
+
+        court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+
+        with mock.patch(
+            self.clean_docket_func_path,
+            wraps=clean_docket_number_raw_and_update_redis_cache,
+        ) as wrapped_cleaner:
+            docket = Docket.objects.create(
+                court=court_scotus,
+                docket_number_raw="12-1234-ag",
+                source=Docket.SCRAPER,
+            )
+
+            # The cleaner should have been called exactly once (on create),
+            # not recursively when it saved the cleaned docket_number.
+            self.assertEqual(wrapped_cleaner.call_count, 1)
+            docket.refresh_from_db()
+            self.assertEqual(docket.docket_number, "12-1234-AG")
