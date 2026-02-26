@@ -58,7 +58,7 @@
     "webpack": "^5.94.0",
     "webpack-bundle-analyzer": "^4.4.1",
     "webpack-cli": "^4.10.0",
-    "webpack-dev-server": "^4.10.0"
+    "webpack-dev-server": "^5.2.1"
   },
   "dependencies": {
     "@types/react-bootstrap": "^0.32.23",
