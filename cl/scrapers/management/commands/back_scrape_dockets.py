@@ -288,6 +288,7 @@ def save_docket_response(
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
 
+
 def parse_date_filed(date_str: str | None) -> date | None:
     """Parse a date_filed string in '%m/%d/%Y' format to a date object."""
     if not date_str:
@@ -353,7 +354,7 @@ def _process_batch(
     batch: list[dict],
     scraper_class_name: str,
     case_request_manager: RateLimitedRequestManager,
-    ) -> int:
+) -> int:
     """Save batch meta JSONL, then fetch and save each case's HTML + headers.
 
     Returns the number of cases successfully fetched.
@@ -382,12 +383,13 @@ def _process_batch(
             logger.error("Failed to fetch case URL %s: %s", case_url, e)
     return fetched
 
+
 def _checkpoint_and_sleep(
     case_count: int,
     case: dict,
     auto_resume: bool,
     sleep_minutes: int,
-    ) -> None:
+) -> None:
     """Checkpoint to Redis and sleep at every batch boundary."""
 
     logger.info("Processed %d cases", case_count)
@@ -397,13 +399,12 @@ def _checkpoint_and_sleep(
             set_last_checkpoint(parsed)
             logger.info("Checkpointed at %s", parsed)
         else:
-            logger.warning(
-                "No parseable date_filed, no checkpoint: %s", case
-            )
+            logger.warning("No parseable date_filed, no checkpoint: %s", case)
 
     if sleep_minutes > 0:
         logger.info("Sleeping %d minutes", sleep_minutes)
         time.sleep(sleep_minutes * 60)
+
 
 def _parse_date(date_str: str) -> date:
     """Parse a date string in various formats.
@@ -428,6 +429,7 @@ def _parse_date(date_str: str) -> date:
         f"Unable to parse date: {date_str}. "
         "Use format YYYY-MM-DD or MM/DD/YYYY"
     )
+
 
 class Command(BaseCommand):
     help = "Runs BaseStateScraper backfill operations for docket enumeration."
