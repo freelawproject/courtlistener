@@ -551,7 +551,7 @@ class SearchForm(forms.Form):
     #     Failure to do that will result in the query being processed correctly
     #     (search results are all good), but the form on the UI won't be
     #     cleaned up for the user, making things rather confusing.
-    #  3. We do some cleanup work in elasticsearch_utils.make_es_stats_variable().
+    #  3. We do some cleanup work in search_utils.fetch_facets().
     #     The work that's done there is used to check or un-check the boxes in
     #     the sidebar, so if you tweak how they work you'll need to tweak this
     #     function.
@@ -685,9 +685,6 @@ class SearchForm(forms.Form):
                     cleaned_data[key] = False
             # ...except precedential
             cleaned_data[default_status] = True
-
-        cleaned_data["_court_count"] = len(court_bools)
-        cleaned_data["_stat_count"] = len(stat_bools)
 
         # 4. Strip any whitespace, otherwise it crashes.
         for k, v in cleaned_data.items():
