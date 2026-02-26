@@ -295,8 +295,15 @@ disclosures_debt_fields='(
 	   )'
 disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
 
+# search_proceeding
+search_proceeding_fields='(
+	       id, date_created, date_modified, proceeding_date_time, memo,
+	       proceeding_room, event, court_id, docket_id, judge_id
+	   )'
+search_proceeding_csv_filename="search-proceeding-$(date -I).csv"
+
 # If you add or remove a table, you need to update this number
-NUM_TABLES=32
+NUM_TABLES=33
 
 # Every new table added to bulk script should be added as an associative array
 # This ordering is important. Tables with foreign key constraints must be loaded in order.
@@ -335,6 +342,8 @@ declare -a t_29=("disclosures_spouseincome" "$spouseincome_fields" "$spouseincom
 declare -a t_30=("disclosures_reimbursement" "$disclosures_reimbursement_fields" "$disclosures_reimbursement_csv_filename")
 declare -a t_31=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
 declare -a t_32=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
+
+declare -a t_33=("search_proceeding" "$search_proceeding_fields" "$search_proceeding_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists

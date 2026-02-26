@@ -1290,6 +1290,47 @@ class DocketEntryTags(DocketEntry.tags.through):
         proxy = True
 
 
+@pghistory.track()
+class Proceeding(AbstractDateTimeModel):
+    """A model class to track proceedings and link them with Dockets"""
+
+    docket = models.ForeignKey(
+        Docket,
+        related_name="proceedings",
+        on_delete=models.CASCADE,
+    )
+    proceeding_date_time = models.DateTimeField(
+        help_text="Date and time of the proceeding in local timezone",
+    )
+    memo = models.TextField(
+        help_text="Memo about the proceeding",
+        blank=True,
+    )
+    court = models.ForeignKey(
+        "Court",
+        help_text="The court this proceeding takes place in",
+        on_delete=models.RESTRICT,
+    )
+    proceeding_room = models.TextField(
+        help_text="The court room of the proceeding",
+        blank=True,
+    )
+    judge = models.ForeignKey(
+        "people_db.Person",
+        help_text="The judge presiding over this proceeding",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+    )
+    event = models.TextField(
+        help_text='Event that occurred. E.g. "Jury Trial"',
+        blank=True,
+    )
+
+    def __str__(self) -> str:
+        return f"{self.event} for {self.docket.docket_number}"
+
+
 class AbstractPacerDocument(models.Model):
     date_upload = models.DateTimeField(
         help_text=(
