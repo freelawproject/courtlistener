@@ -19,6 +19,7 @@ from cl.stats.constants import (
     StatMethod,
     StatMetric,
     StatQueryType,
+    StatWebhookEventType,
 )
 from cl.stats.metrics import (
     CeleryQueueCollector,
@@ -29,11 +30,10 @@ from cl.stats.metrics import (
     register_celery_queue_collector,
     register_stat_metrics_collector,
     search_duration_seconds,
-    search_queries_total,
 )
 from cl.stats.models import Event
 from cl.stats.utils import (
-    _update_prometheus_stat,
+    _get_prometheus_key,
     _validate_labels,
     get_milestone_range,
     tally_stat,
@@ -156,53 +156,9 @@ class StatTests(TestCase):
 
 class PrometheusMetricsTests(TestCase):
     def setUp(self):
-        search_queries_total._metrics.clear()
         search_duration_seconds._metrics.clear()
         accounts_created_total._value.set(0)
         accounts_deleted_total._value.set(0)
-
-    def test_search_queries_metric(self) -> None:
-        """Test recording search query metrics with different labels"""
-        test_cases = [
-            {
-                "name": "keyword_web",
-                "query_type": "keyword",
-                "method": "web",
-                "increments": [1],
-            },
-            {
-                "name": "semantic_api",
-                "query_type": "semantic",
-                "method": "api",
-                "increments": [1],
-            },
-            {
-                "name": "accumulation",
-                "query_type": "keyword",
-                "method": "api",
-                "increments": [1, 2, 3],
-            },
-        ]
-
-        for test_case in test_cases:
-            with self.subTest(case=test_case["name"]):
-                initial = search_queries_total.labels(
-                    query_type=test_case["query_type"],
-                    method=test_case["method"],
-                )._value.get()
-
-                for inc in test_case["increments"]:
-                    search_queries_total.labels(
-                        query_type=test_case["query_type"],
-                        method=test_case["method"],
-                    ).inc(inc)
-
-                final = search_queries_total.labels(
-                    query_type=test_case["query_type"],
-                    method=test_case["method"],
-                )._value.get()
-                expected_total = sum(test_case["increments"])
-                self.assertEqual(final, initial + expected_total)
 
     def test_account_metrics(self) -> None:
         """Test recording account creation and deletion metrics"""
@@ -297,7 +253,6 @@ class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
     """Base class for Prometheus integration tests"""
 
     def setUp(self):
-        search_queries_total._metrics.clear()
         self.async_client = AsyncAPIClient()
 
     async def _get_metric_count(self, query_type: str, method: str) -> float:
@@ -308,7 +263,7 @@ class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
         self.assertEqual(response.status_code, 200)
         metrics = parse_prometheus_metrics(response.content.decode("utf-8"))
         return metrics.get(
-            f'cl_search_queries_total{{method="{method}",query_type="{query_type}"}}',
+            f'cl_search_results_total{{method="{method}",query_type="{query_type}"}}',
             0.0,
         )
 
@@ -463,6 +418,15 @@ class ValidateLabelsTests(TestCase):
             StatMetric.ALERTS_SENT,
             {"alert_type": StatAlertType.RECAP},
         )
+        # Valid webhooks.sent labels
+        _validate_labels(
+            StatMetric.WEBHOOKS_SENT,
+            {"event_type": StatWebhookEventType.DOCKET_ALERT},
+        )
+        _validate_labels(
+            StatMetric.WEBHOOKS_SENT,
+            {"event_type": StatWebhookEventType.SEARCH_ALERT},
+        )
 
     def test_missing_labels_raise(self) -> None:
         """Test that missing labels raise ValueError"""
@@ -496,54 +460,80 @@ class ValidateLabelsTests(TestCase):
         self.assertIn("invalid", str(ctx.exception))
 
 
+class GetPrometheusKeyTests(TestCase):
+    """Unit tests for _get_prometheus_key helper function"""
+
+    def test_key_without_labels(self) -> None:
+        """Test key format without labels"""
+        key = _get_prometheus_key("test.metric", None)
+        self.assertEqual(key, f"{STAT_METRICS_PREFIX}test.metric")
+
+    def test_key_with_labels(self) -> None:
+        """Test key format with labels in STAT_LABELS order"""
+        key = _get_prometheus_key(
+            StatMetric.SEARCH_RESULTS,
+            {"query_type": "keyword", "method": "web"},
+        )
+        self.assertEqual(
+            key, f"{STAT_METRICS_PREFIX}search.results:keyword:web"
+        )
+
+
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
-class UpdatePrometheusStatTests(TestCase):
-    """Unit tests for _update_prometheus_stat helper function"""
+@override_settings(WAFFLE_CACHE_PREFIX="TallyStatPrometheusTests")
+class TallyStatPrometheusTests(TestCase):
+    """Test that tally_stat writes prometheus keys via pipeline"""
 
     def setUp(self):
         self.r = get_redis_interface("STATS")
-        # Clean up any prometheus:stat: keys
         for key in self.r.scan_iter(f"{STAT_METRICS_PREFIX}*"):
             self.r.delete(key)
 
-    def test_writes_key_without_labels(self) -> None:
-        """Test that keys are written correctly without labels"""
-        _update_prometheus_stat("test.metric", 5, None)
-
-        key = f"{STAT_METRICS_PREFIX}test.metric"
-        value = int(self.r.get(key) or 0)
-        self.assertEqual(value, 5)
-
-    def test_writes_key_with_labels(self) -> None:
-        """Test that keys are written correctly with labels"""
-        _update_prometheus_stat(
-            StatMetric.SEARCH_RESULTS,
-            3,
-            {"query_type": "keyword", "method": "web"},
+    def test_tally_stat_writes_prometheus_key(self) -> None:
+        """Test that tally_stat writes both cached and prometheus keys"""
+        tally_stat(
+            StatMetric.ALERTS_SENT,
+            inc=3,
+            labels={"alert_type": "docket"},
         )
 
-        # Key should include label values in the order defined in STAT_LABELS
-        key = f"{STAT_METRICS_PREFIX}search.results:keyword:web"
+        key = f"{STAT_METRICS_PREFIX}alerts.sent:docket"
         value = int(self.r.get(key) or 0)
         self.assertEqual(value, 3)
 
-    def test_increments_existing_key(self) -> None:
-        """Test that the stat increments correctly"""
-        _update_prometheus_stat(
+    def test_tally_stat_increments_prometheus_key(self) -> None:
+        """Test that repeated calls increment the prometheus key"""
+        tally_stat(
             StatMetric.ALERTS_SENT,
-            2,
-            {"alert_type": "docket"},
+            inc=2,
+            labels={"alert_type": "docket"},
         )
-        _update_prometheus_stat(
+        tally_stat(
             StatMetric.ALERTS_SENT,
-            3,
-            {"alert_type": "docket"},
+            inc=3,
+            labels={"alert_type": "docket"},
         )
 
         key = f"{STAT_METRICS_PREFIX}alerts.sent:docket"
         value = int(self.r.get(key) or 0)
         self.assertEqual(value, 5)
+
+    def test_tally_stat_writes_webhook_prometheus_key(self) -> None:
+        """Test that tally_stat writes prometheus key for webhooks.sent"""
+        tally_stat(
+            StatMetric.WEBHOOKS_SENT,
+            labels={"event_type": StatWebhookEventType.DOCKET_ALERT},
+        )
+        tally_stat(
+            StatMetric.WEBHOOKS_SENT,
+            inc=2,
+            labels={"event_type": StatWebhookEventType.DOCKET_ALERT},
+        )
+
+        key = f"{STAT_METRICS_PREFIX}webhooks.sent:docket_alert"
+        value = int(self.r.get(key) or 0)
+        self.assertEqual(value, 3)
 
 
 @pytest.mark.django_db
@@ -628,7 +618,12 @@ class TallyStatWithLabelsTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
         # Clean up test keys and search.results keys
-        for pattern in ["test*", "search.results*", "alerts.sent*"]:
+        for pattern in [
+            "test*",
+            "search.results*",
+            "alerts.sent*",
+            "webhooks.sent*",
+        ]:
             keys = self.r.keys(pattern)
             if keys:
                 self.r.delete(*keys)
