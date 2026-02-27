@@ -24,8 +24,8 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
-    clean_texas_docket_number,
     clean_scotus_docket_number,
+    clean_texas_docket_number,
     is_docket_number,
     is_texas_court,
     linkify_orig_docket_number,
