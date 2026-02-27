@@ -70,13 +70,12 @@ def _validate_labels(name: str, labels: dict[str, str]) -> None:
     # Check each value is valid
     for label_name, value in labels.items():
         allowed_enum = STAT_LABEL_VALUES.get(label_name)
-        if allowed_enum:
-            allowed_values = [e.value for e in allowed_enum]
-            if value not in allowed_values:
-                raise ValueError(
-                    f"Invalid value '{value}' for label '{label_name}'. "
-                    f"Allowed: {allowed_values}"
-                )
+        allowed_values = [e.value for e in allowed_enum]
+        if value not in allowed_values:
+            raise ValueError(
+                f"Invalid value '{value}' for label '{label_name}'. "
+                f"Allowed: {allowed_values}"
+            )
 
 
 def _get_prometheus_key(name: str, labels: dict[str, str] | None) -> str:
