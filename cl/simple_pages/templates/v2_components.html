@@ -21,6 +21,7 @@
         {'href': '#nav-layout', 'text': 'Layout with navigation'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
         {'href': '#data-table', 'text': 'Data table'},
+        {'href': '#content-table', 'text': 'Content table'},
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
       ]},
@@ -735,6 +736,161 @@ Sample code here.
 &gt;&lt;/c-data-table&gt;
       </c-code>
     </c-expansion-panel>
+  </section>
+
+  {# TABLE FOR CONTENT NOT DATA #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="content-table">
+    <h2 class="mt-6 mb-3">Content table</h2>
+    <p>Renders a content table</p>
+
+    <h4 class="my-3">Demo</h4>
+    <c-options-table
+      safe
+      caption="Usage example of data table component"
+      :columns="[
+       {'label': 'First header', 'field': 'first'},
+        {'label': 'Second header', 'field': 'second'},
+        {'label': 'Third header', 'field': 'third'},
+      ]"
+      :rows="[
+        {
+          'first': 'Row 1<br>This one has a line break (safe only)',
+          'second': 'Row 1, second',
+          'third': 'Row 1, third',
+        },
+        {
+          'first': 'Row 2, first',
+          'second': 'Row 2, second',
+          'third': 'Row 2, third',
+         },
+        {
+          'first': 'Row 3, first',
+          'second': 'Row 3, second',
+          'third': 'Row 3, third',
+        },
+      ]"
+      :longrow="[
+        {
+          'first': 'Row 4, first',
+          'second': 'Row 4, second, spanning two columns',
+          'colspan': '2'
+        },
+      ]"
+      :footer="[
+        {
+          'first': 'First foot',
+          'second': 'Second foot',
+          'third': 'Third foot',
+          'fifth': 'Fifth foot',
+        },
+      ]"
+    ></c-options-table>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>columns</code></c-slot>
+        <c-slot name="description">
+          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the col value for each row).
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item only>
+        <c-slot name="label"><code>rows</code></c-slot>
+        <c-slot name="description">
+          List of rows in the <code>&lt;tbody&gt;</code>.
+          <br>Each element in the list is a dictionary where the keys correspond to the column fields.
+          <br>If a given field isn't present, the cell will be empty.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item only>
+        <c-slot name="label"><code>longrow</code></c-slot>
+        <c-slot name="description">
+          List of rows with unusual widths, which can accept a <code>colspan</code> prop.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item only>
+        <c-slot name="label"><code>caption</code></c-slot>
+        <c-slot name="description">
+          Table caption for accessibility.<br>Not displayed visually, but it's important to provide context for screen readers.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>align</code></c-slot>
+        <c-slot name="description">
+          Default is to align table contents to the left. Use <code>center</code> to align everything in the middle. Use <code>data-center</code> to keep the first column left, but center the rest of the table.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>footer</code></c-slot>
+        <c-slot name="description">
+          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>safe</code></c-slot>
+        <c-slot name="description">
+          Marks the contents as safe, so it can render HTML inside the table.
+          <br>Defaults to false.
+          <br><strong>Warning:</strong> May allow XSS vulnerabilities if enabled on user-provided HTML, so use only with trusted content.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.list title="Slots" only>
+        <p>No slots</p>
+      </c-library.list>
+
+      <c-expansion-panel title="Code">
+        <c-code>
+&lt;c-options-table
+      safe
+      caption="Usage example of data table component"
+      :columns="[
+       {'label': 'First header', 'field': 'first'},
+        {'label': 'Second header', 'field': 'second'},
+        {'label': 'Third header', 'field': 'third'},
+      ]"
+      :rows="[
+        {
+          'first': 'Row 1<br>This one has a line break (safe only)',
+          'second': 'Row 1, second',
+          'third': 'Row 1, third',
+        },
+        {
+          'first': 'Row 2, first',
+          'second': 'Row 2, second',
+          'third': 'Row 2, third',
+         },
+        {
+          'first': 'Row 3, first',
+          'second': 'Row 3, second',
+          'third': 'Row 3, third',
+        },
+      ]"
+      :longrow="[
+        {
+          'first': 'Row 4, first',
+          'second': 'Row 4, second, spanning two columns',
+          'colspan': '2'
+        },
+      ]"
+      :footer="[
+        {
+          'first': 'First foot',
+          'second': 'Second foot',
+          'third': 'Third foot',
+          'fifth': 'Fifth foot',
+        },
+      ]"
+    >&lt;/c-options-table>
+        </c-code>
+      </c-expansion-panel>
+
+    </c-library.list>
   </section>
 
   {# DIALOG #}
