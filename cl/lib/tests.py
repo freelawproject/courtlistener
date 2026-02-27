@@ -528,9 +528,12 @@ class TestModelHelpers(TestCase):
                     make_scotus_docket_number_core(input_value), expected
                 )
 
-    def test_making_scotus_docket_number_core_raises(self) -> None:
-        """Test that multiple docket numbers of the same type raise
-        ValueError.
+    @mock.patch("cl.lib.model_helpers.logger")
+    def test_making_scotus_docket_number_core_logs_multiple(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """Test that multiple docket numbers of the same type log an
+        error and return empty string.
         """
         error_cases = [
             "No. 01A576 01A578",
@@ -538,8 +541,10 @@ class TestModelHelpers(TestCase):
         ]
         for input_value in error_cases:
             with self.subTest(input=input_value):
-                with self.assertRaises(ValueError):
-                    make_scotus_docket_number_core(input_value)
+                mock_logger.reset_mock()
+                result = make_scotus_docket_number_core(input_value)
+                self.assertEqual(result, "")
+                mock_logger.error.assert_called_once()
 
     def test_clean_scotus_docket_number(self) -> None:
         """Test clean_scotus_docket_number prioritizes NN-NNNN format."""
@@ -565,8 +570,12 @@ class TestModelHelpers(TestCase):
             with self.subTest(raw=raw):
                 self.assertEqual(clean_scotus_docket_number(raw), expected)
 
-    def test_clean_scotus_docket_number_raises(self) -> None:
-        """Test that multiple same-type docket numbers raise ValueError."""
+    @mock.patch("cl.lib.model_helpers.logger")
+    def test_clean_scotus_docket_number_logs_multiple(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """Test that multiple same-type docket numbers log an error and
+        return empty string."""
         error_cases = [
             "No. 01A576 01A578",
             "No. 01-8148 01-8149",
@@ -574,8 +583,10 @@ class TestModelHelpers(TestCase):
         ]
         for raw in error_cases:
             with self.subTest(raw=raw):
-                with self.assertRaises(ValueError):
-                    clean_scotus_docket_number(raw)
+                mock_logger.reset_mock()
+                result = clean_scotus_docket_number(raw)
+                self.assertEqual(result, "")
+                mock_logger.error.assert_called_once()
 
 
 class S3PrivateUUIDStorageTest(TestCase):

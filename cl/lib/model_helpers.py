@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from collections.abc import Callable
@@ -14,6 +15,8 @@ from cl.lib.string_utils import normalize_dashes, trunc
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
+
+logger = logging.getLogger(__name__)
 
 
 def is_docket_number(value: str) -> bool:
@@ -77,7 +80,6 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
 
     :param docket_number: The docket number to clean.
     :return: The cleaned docket number or an empty string.
-    :raises ValueError: If multiple docket numbers of the same type are found.
     """
     if not docket_number:
         return ""
@@ -91,16 +93,16 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
     if len(scotus_m) == 1:
         return scotus_m[0]
     if len(scotus_m) > 1:
-        raise ValueError(
-            f"Multiple NN-NNNN docket numbers found in: {docket_number}"
+        logger.error(
+            "Multiple NN-NNNN docket numbers found in: %s", docket_number
         )
+        return ""
 
     if len(scotus_a_m) == 1:
         return scotus_a_m[0]
     if len(scotus_a_m) > 1:
-        raise ValueError(
-            f"Multiple NNA docket numbers found in: {docket_number}"
-        )
+        logger.error("Multiple NNA docket numbers found in: %s", docket_number)
+        return ""
 
     return ""
 
@@ -158,7 +160,6 @@ def make_scotus_docket_number_core(docket_number: str | None) -> str:
     :return: empty string if no change possible, or the condensed version if it
     worked. Note that all values returned are strings. We cannot return an int
     because that'd strip leading zeroes, which we need.
-    :raises ValueError: If multiple docket numbers of the same type are found.
     """
     if not docket_number:
         return ""
