@@ -137,16 +137,17 @@
   <c-layout-with-navigation.section id="recap-breaking-changes">
     <h3>RECAP (type=r)</h3>
     <ul>
-      <li>The following fields will be removed from the v3 search API when <code>type=r</code>:</li>
-      <ul>
-        <li>attorney</li>
-        <li>attorney_id</li>
-        <li>firm</li>
-        <li>firm_id</li>
-        <li>party</li>
-        <li>party_id</li>
-        <li>docket_absolute_url</li>
-      </ul>
+      <li>The following fields will be removed from the v3 search API when <code>type=r</code>:
+        <ul>
+          <li>attorney</li>
+          <li>attorney_id</li>
+          <li>firm</li>
+          <li>firm_id</li>
+          <li>party</li>
+          <li>party_id</li>
+          <li>docket_absolute_url</li>
+        </ul>
+      </li>
     </ul>
     <ul>
       <li>Fielded text queries that include party fields won't work, for instance:
@@ -161,14 +162,15 @@
   <c-layout-with-navigation.section id="opinions-breaking-changes">
     <h3>Opinions (type=o)</h3>
     <ul>
-        <li>The following fields will be removed from the v3 search API when <code>type=o</code>:</li>
-        <ul>
-          <li>caseNameShort</li>
-          <li>pagerank</li>
-          <li>status_exact</li>
-          <li>non_participating_judge_ids</li>
-          <li>source</li>
-        </ul>
+        <li>The following fields will be removed from the v3 search API when <code>type=o</code>:
+          <ul>
+            <li>caseNameShort</li>
+            <li>pagerank</li>
+            <li>status_exact</li>
+            <li>non_participating_judge_ids</li>
+            <li>source</li>
+          </ul>
+        </li>
         <li>The <code>date_created</code> field will be added.</li>
         <li>The <code>snippet</code> will change. In the Solr version, it includes content from all fields, while in ElasticSearch it will display only the Opinion text content.</li>
         <li>The <code>type=o</code> will use a cardinality aggregation to compute the result count, which will have an error of ±6% if results are over 2000 hits.</li>
@@ -317,55 +319,59 @@
   <c-layout-with-navigation.section id="backwards-removed-fields">
     <h3>Removed Fields</h3>
     <ul>
-      <li>The following fields have been removed from the case law search results (<code>type=o</code>):</li>
-      <ul>
-        <li>caseNameShort</li>
-        <li>pagerank</li>
-        <li>status_exact</li>
-        <li>non_participating_judge_ids</li>
-      </ul>
+      <li>The following fields have been removed from the case law search results (<code>type=o</code>):
+        <ul>
+          <li>caseNameShort</li>
+          <li>pagerank</li>
+          <li>status_exact</li>
+          <li>non_participating_judge_ids</li>
+        </ul>
+      </li>
     </ul>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="backwards-changed-fields">
     <h3>Changed Field Values</h3>
     <ul>
-      <li>For legibility, in the case law search results (<code>type=o</code>), some <code>type</code> field values have changed:</li>
-      <ul>
-        <li>010combined → combined-opinion</li>
-        <li>015unamimous → unanimous-opinion</li>
-        <li>020lead → lead-opinion</li>
-        <li>025plurality → plurality-opinion</li>
-        <li>030concurrence → concurrence-opinion</li>
-        <li>035concurrenceinpart → in-part-opinion</li>
-        <li>040dissent → dissent</li>
-        <li>050addendum → addendum</li>
-        <li>060remittitur → remittitur</li>
-        <li>070rehearing → rehearing</li>
-        <li>080onthemerits → on-the-merits</li>
-        <li>090onmotiontostrike → on-motion-to-strike</li>
-      </ul>
+      <li>For legibility, in the case law search results (<code>type=o</code>), some <code>type</code> field values have changed:
+        <ul>
+          <li>010combined → combined-opinion</li>
+          <li>015unamimous → unanimous-opinion</li>
+          <li>020lead → lead-opinion</li>
+          <li>025plurality → plurality-opinion</li>
+          <li>030concurrence → concurrence-opinion</li>
+          <li>035concurrenceinpart → in-part-opinion</li>
+          <li>040dissent → dissent</li>
+          <li>050addendum → addendum</li>
+          <li>060remittitur → remittitur</li>
+          <li>070rehearing → rehearing</li>
+          <li>080onthemerits → on-the-merits</li>
+          <li>090onmotiontostrike → on-motion-to-strike</li>
+        </ul>
+      </li>
     </ul>
     <ul>
-      <li>Some of the values of the <code>status</code> field in the case law search results have changed:</li>
-      <ul>
-        <li>precedential → published</li>
-        <li>non-precedential → unpublished</li>
-        <li>errata → errata</li>
-        <li>separate opinion → separate</li>
-        <li>in-chambers → in-chambers</li>
-        <li>relating-to orders → relating-to</li>
-        <li>unknown status → unknown</li>
-      </ul>
-      <li>The <code>snippet</code> field in the case law search results previously included more than one opinion text field. It now only contains the best text field, based on the following priority and determined by availability:</li>
-      <ul>
-        <li>html_columbia</li>
-        <li>html_lawbox</li>
-        <li>xml_harvard</li>
-        <li>html_anon_2020</li>
-        <li>html</li>
-        <li>plain_text</li>
-      </ul>
+      <li>Some of the values of the <code>status</code> field in the case law search results have changed:
+        <ul>
+          <li>precedential → published</li>
+          <li>non-precedential → unpublished</li>
+          <li>errata → errata</li>
+          <li>separate opinion → separate</li>
+          <li>in-chambers → in-chambers</li>
+          <li>relating-to orders → relating-to</li>
+          <li>unknown status → unknown</li>
+        </ul>
+      </li>
+      <li>The <code>snippet</code> field in the case law search results previously included more than one opinion text field. It now only contains the best text field, based on the following priority and determined by availability:
+        <ul>
+          <li>html_columbia</li>
+          <li>html_lawbox</li>
+          <li>xml_harvard</li>
+          <li>html_anon_2020</li>
+          <li>html</li>
+          <li>plain_text</li>
+        </ul>
+      </li>
     </ul>
   </c-layout-with-navigation.section>
 
@@ -377,47 +383,53 @@
     </ul>
     <p>The following is a full list of date fields that are now date objects (rather than datetime objects, which they were in v3):</p>
     <ul>
-      <li>types <code>r</code> and <code>d</code>:</li>
-      <ul>
-        <li>dateArgued</li>
-        <li>dateFiled</li>
-        <li>dateTerminated</li>
-      </ul>
-      <li>types <code>r</code> and <code>rd</code>:</li>
-      <ul>
-        <li><code>entry_date_filed</code> (in type <code>r</code> is available in documents nested within the <code>recap_documents key</code>)</li>
-      </ul>
-      <li>type <code>o</code>:</li>
-      <ul>
-        <li>dateArgued</li>
-        <li>dateFiled</li>
-        <li>dateReargued</li>
-        <li>dateReargumentDenied</li>
-      </ul>
-      <li>type <code>oa</code>:</li>
-      <ul>
-        <li>dateArgued</li>
-        <li>dateReargued</li>
-        <li>dateReargumentDenied</li>
-      </ul>
-      <li>type <code>p</code>:</li>
-      <ul>
-        <li>dob</li>
-        <li>dod</li>
-        <li>The following fields are available within the nested <code>positions</code> key:</li>
+      <li>types <code>r</code> and <code>d</code>:
         <ul>
-          <li>date_confirmation</li>
-          <li>date_elected</li>
-          <li>date_hearing</li>
-          <li>date_judicial_committee_action</li>
-          <li>date_nominated</li>
-          <li>date_recess_appointment</li>
-          <li>date_referred_to_judicial_committee</li>
-          <li>date_retirement</li>
-          <li>date_start</li>
-          <li>date_termination</li>
+          <li>dateArgued</li>
+          <li>dateFiled</li>
+          <li>dateTerminated</li>
         </ul>
-      </ul>
+      </li>
+      <li>types <code>r</code> and <code>rd</code>:
+        <ul>
+          <li><code>entry_date_filed</code> (in type <code>r</code> is available in documents nested within the <code>recap_documents key</code>)</li>
+        </ul>
+      </li>
+      <li>type <code>o</code>:
+        <ul>
+          <li>dateArgued</li>
+          <li>dateFiled</li>
+          <li>dateReargued</li>
+          <li>dateReargumentDenied</li>
+        </ul>
+      </li>
+      <li>type <code>oa</code>:
+        <ul>
+          <li>dateArgued</li>
+          <li>dateReargued</li>
+          <li>dateReargumentDenied</li>
+        </ul>
+      </li>
+      <li>type <code>p</code>:
+        <ul>
+          <li>dob</li>
+          <li>dod</li>
+          <li>The following fields are available within the nested <code>positions</code> key:
+            <ul>
+              <li>date_confirmation</li>
+              <li>date_elected</li>
+              <li>date_hearing</li>
+              <li>date_judicial_committee_action</li>
+              <li>date_nominated</li>
+              <li>date_recess_appointment</li>
+              <li>date_referred_to_judicial_committee</li>
+              <li>date_retirement</li>
+              <li>date_start</li>
+              <li>date_termination</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
     </ul>
   </c-layout-with-navigation.section>
 
@@ -440,16 +452,17 @@
   <c-layout-with-navigation.section id="backwards-get-params">
     <h3>Changes to GET Parameters</h3>
     <ul>
-      <li>When searching the case law status fields, the GET parameters have been changed as follows:</li>
-      <ul>
-        <li>stat_Precedential → stat_Published</li>
-        <li>stat_Non-Precedential → stat_Unpublished</li>
-        <li>stat_Errata → stat_Errata</li>
-        <li>stat_Separate Opinion → stat_Separate</li>
-        <li>stat_In-chambers → stat_In-chambers</li>
-        <li>stat_Relating-to orders → stat_Relating-to</li>
-        <li>stat_Unknown Status → stat_Unknown</li>
-      </ul>
+      <li>When searching the case law status fields, the GET parameters have been changed as follows:
+        <ul>
+          <li>stat_Precedential → stat_Published</li>
+          <li>stat_Non-Precedential → stat_Unpublished</li>
+          <li>stat_Errata → stat_Errata</li>
+          <li>stat_Separate Opinion → stat_Separate</li>
+          <li>stat_In-chambers → stat_In-chambers</li>
+          <li>stat_Relating-to orders → stat_Relating-to</li>
+          <li>stat_Unknown Status → stat_Unknown</li>
+        </ul>
+      </li>
     </ul>
   </c-layout-with-navigation.section>
 
@@ -457,12 +470,12 @@
     <h3>Bad Request Error Code: 400</h3>
     <ul>
       <li>The error can contain one of the following custom messages in the <code>detail</code> key, explaining the reason for the error:
+        <ul>
+          <li>The query contains unbalanced parentheses.</li>
+          <li>The query contains unbalanced quotes.</li>
+          <li>The query contains an unrecognized proximity token.</li>
+        </ul>
       </li>
-      <ul>
-        <li>The query contains unbalanced parentheses.</li>
-        <li>The query contains unbalanced quotes.</li>
-        <li>The query contains an unrecognized proximity token.</li>
-      </ul>
     </ul>
   </c-layout-with-navigation.section>
 
