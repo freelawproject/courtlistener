@@ -1,5 +1,6 @@
 import os
 
+from asgiref.sync import async_to_sync
 from celery import chain
 from django.conf import settings
 
@@ -22,7 +23,7 @@ def get_dockets(options):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
 
     jackson_id = 1609
     ds = Docket.objects.filter(court_id="dcd", assigned_to_id=jackson_id)

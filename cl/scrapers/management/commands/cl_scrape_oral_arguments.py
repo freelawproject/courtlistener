@@ -116,7 +116,7 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
-        content = site.download_content(
+        content = async_to_sync(site.download_content)(
             item["download_urls"], media_root=settings.MEDIA_ROOT
         )
         # request.content is sometimes a str, sometimes unicode, so

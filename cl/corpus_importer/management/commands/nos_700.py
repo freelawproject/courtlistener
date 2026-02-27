@@ -1,5 +1,6 @@
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 
@@ -231,7 +232,7 @@ def get_dockets(options, items, tags, sample_size=0):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     for i, row in enumerate(items):
         if i < options["offset"]:
             continue
@@ -244,7 +245,7 @@ def get_dockets(options, items, tags, sample_size=0):
             session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
+            async_to_sync(session.login)()
 
         # All tests pass. Get the docket.
         logger.info("Doing row %s: %s", i, row)
@@ -281,7 +282,7 @@ def get_attachment_pages(options, tag):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
     get_district_attachment_pages(
         options=options, rd_pks=rd_pks, tag_names=[tag], session=session
     )
