@@ -24,6 +24,7 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
+    clean_scotus_docket_number,
     is_docket_number,
     linkify_orig_docket_number,
     make_docket_number_core,
@@ -474,9 +475,6 @@ class TestModelHelpers(TestCase):
             "12-cv-01032-JKG-MJL": "12-cv-01032",
             "Nos. 212-213, Dockets 27264, 27265": "",
             "Nos. 12-213, Dockets 27264, 27265": "12-213",
-            # SCOTUS A Dockets.
-            "Docket: 16A989": "16a989",
-            "Case  17A80": "17a80",
         }
 
         for raw, expected in test_cases.items():
@@ -517,6 +515,11 @@ class TestModelHelpers(TestCase):
             ("06-10672", "06010672"),
             # Non-matching SCOTUS docket numbers
             ("23-cv-001", ""),
+            # Mixed formats: NN-NNNN is prioritized over NNA
+            ("No. 01A576 (01-8099)", "01008099"),
+            ("No. 01-8148 (01A587)", "01008148"),
+            # Single NN-NNNN with multiple NNA is still valid
+            ("No. 01-8148 01A578 01A578", "01008148"),
         ]
 
         for input_value, expected in test_cases:
@@ -524,6 +527,55 @@ class TestModelHelpers(TestCase):
                 self.assertEqual(
                     make_scotus_docket_number_core(input_value), expected
                 )
+
+    def test_making_scotus_docket_number_core_raises(self) -> None:
+        """Test that multiple docket numbers of the same type raise
+        ValueError.
+        """
+        error_cases = [
+            "No. 01A576 01A578",
+            "No. 01-8148 01-8149",
+        ]
+        for input_value in error_cases:
+            with self.subTest(input=input_value):
+                with self.assertRaises(ValueError):
+                    make_scotus_docket_number_core(input_value)
+
+    def test_clean_scotus_docket_number(self) -> None:
+        """Test clean_scotus_docket_number prioritizes NN-NNNN format."""
+        test_cases = {
+            # Empty/None inputs
+            None: "",
+            "": "",
+            # Single NN-NNNN format
+            "No. 01-8148": "01-8148",
+            "12-33112": "12-33112",
+            # Single NNA format
+            "16A985": "16a985",
+            "Docket: 01A576": "01a576",
+            # Mixed: NN-NNNN takes priority
+            "No. 01A576 (01-8099)": "01-8099",
+            "No. 01-8148 (01A587)": "01-8148",
+            # Single NN-NNNN with multiple NNA is valid
+            "No. 01-8148 01A578 01A579": "01-8148",
+            # No matches
+            "23-cv-001": "",
+        }
+        for raw, expected in test_cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_scotus_docket_number(raw), expected)
+
+    def test_clean_scotus_docket_number_raises(self) -> None:
+        """Test that multiple same-type docket numbers raise ValueError."""
+        error_cases = [
+            "No. 01A576 01A578",
+            "No. 01-8148 01-8149",
+            "01-8148, 01-8149 01A578",
+        ]
+        for raw in error_cases:
+            with self.subTest(raw=raw):
+                with self.assertRaises(ValueError):
+                    clean_scotus_docket_number(raw)
 
 
 class S3PrivateUUIDStorageTest(TestCase):
