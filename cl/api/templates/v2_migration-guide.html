@@ -284,25 +284,27 @@
       <li><code>type=rd</code> returns a flat list of PACER documents, and is similar to <code>type=r</code> in v3 of the API.
         Results for this type can be queried by any docket fields except the <code>party</code> and <code>attorney</code> fields.</li>
       <li>The field differences between <code>r</code> in v3 and <code>rd</code> in v4 are that all the docket-level fields were removed:</li>
-      <ul>
-        <li>assignedTo</li>
-        <li>assigned_to_id</li>
-        <li>caseName</li>
-        <li>cause</li>
-        <li>court</li>
-        <li>court_citation_string</li>
-        <li>court_exact</li>
-        <li>court_id</li>
-        <li>dateArgued</li>
-        <li>dateFiled</li>
-        <li>dateTerminated</li>
-        <li>docketNumber</li>
-        <li>jurisdictionType</li>
-        <li>juryDemand</li>
-        <li>referredTo</li>
-        <li>referred_to_id</li>
-        <li>suitNature</li>
-      </ul>
+      <li>
+        <ul>
+          <li>assignedTo</li>
+          <li>assigned_to_id</li>
+          <li>caseName</li>
+          <li>cause</li>
+          <li>court</li>
+          <li>court_citation_string</li>
+          <li>court_exact</li>
+          <li>court_id</li>
+          <li>dateArgued</li>
+          <li>dateFiled</li>
+          <li>dateTerminated</li>
+          <li>docketNumber</li>
+          <li>jurisdictionType</li>
+          <li>juryDemand</li>
+          <li>referredTo</li>
+          <li>referred_to_id</li>
+          <li>suitNature</li>
+        </ul>
+      </li>
       <li><code>docket_id</code> is still available in the <code>rd</code> type so users can identify the docket and pull additional docket data from the docket API.</li>
       <li>One field that changed is <code>entry_date_filed</code>. In <code>r</code> v3, it was a <code>datetime</code> field with PST midnight as the default time. Now, it's simply a date field.</li>
       <li>The <code>timestamp</code> field has been moved to the new <code>meta</code> field, which also contains <code>date_created</code>.</li>
