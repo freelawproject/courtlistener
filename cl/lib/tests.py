@@ -24,7 +24,9 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
+    clean_texas_docket_number,
     is_docket_number,
+    is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_scotus_docket_number_core,
@@ -428,6 +430,39 @@ class TestModelHelpers(TestCase):
         # an empty string.
         self.assertEqual(make_docket_number_core(None), "")
 
+    def test_is_texas_court(self) -> None:
+        """Can we identify Texas courts?"""
+        test_cases = [
+            ("tex", True),
+            ("texcrimapp", True),
+            ("txctapp01", True),
+            ("texdistct127", True),
+            ("texcrimdistct127", True),
+            ("texctyct001", True),
+            ("scotus", False),
+            ("ca5", False),
+            ("txwd", False),  # Federal district in Texas
+        ]
+        for court_id, expected in test_cases:
+            with self.subTest(court_id=court_id):
+                self.assertEqual(is_texas_court(court_id), expected)
+
+    def test_clean_texas_docket_number(self) -> None:
+        """Can we extract Texas docket numbers from dirty input?"""
+        test_cases = [
+            ("Case Number: 04-97-00972-CV", "04-97-00972-CV"),
+            ("04-97-00972-CV", "04-97-00972-CV"),
+            ("AP-77,129", "AP-77,129"),
+            ("WR-70,849-04", "WR-70,849-04"),
+            ("A-4369-A", "A-4369-A"),
+            (None, ""),
+            ("", ""),
+            ("garbage text", ""),
+        ]
+        for input_dn, expected in test_cases:
+            with self.subTest(input_dn=input_dn):
+                self.assertEqual(clean_texas_docket_number(input_dn), expected)
+
     def test_texas_docket_number_core(self) -> None:
         """Can we correctly normalize Texas docket numbers?"""
         self.assertEqual(
@@ -442,6 +477,16 @@ class TestModelHelpers(TestCase):
         )
         self.assertEqual(make_texas_docket_number_core("A-4369-A"), "a4369a")
         self.assertEqual(make_texas_docket_number_core("C-2302"), "c2302")
+
+        # Dirty input should be cleaned first, then normalized
+        self.assertEqual(
+            make_texas_docket_number_core("Case Number: 04-97-00972-CV"),
+            "049700972cv",
+        )
+
+        # Invalid input returns empty string
+        self.assertEqual(make_texas_docket_number_core("garbage text"), "")
+        self.assertEqual(make_texas_docket_number_core(None), "")
 
     def test_avoid_generating_docket_number_core(self) -> None:
         """Can we avoid generating docket_number_core when the docket number

@@ -42,6 +42,7 @@ from cl.lib import fields
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
     CSVExportMixin,
+    is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
@@ -876,14 +877,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 self.docket_number_core = make_scotus_docket_number_core(
                     self.docket_number
                 )
-            elif (
-                self.court_id == "tex"
-                or self.court_id == "texcrimapp"
-                or self.court_id.startswith("txctapp")
-                or self.court_id.startswith("texdistct")
-                or self.court_id.startswith("texcrimdistct")
-                or self.court_id.startswith("texctyct")
-            ):
+            elif is_texas_court(self.court_id):
                 self.docket_number_core = make_texas_docket_number_core(
                     self.docket_number
                 )

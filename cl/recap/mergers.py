@@ -29,6 +29,7 @@ from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import (
     clean_docket_number,
+    is_texas_court,
     make_docket_number_core,
     make_scotus_docket_number_core,
     make_texas_docket_number_core,
@@ -156,15 +157,9 @@ async def find_docket_object(
     if court_id == "scotus":
         docket_number_core = make_scotus_docket_number_core(docket_number)
         skip_check = False
-    elif (
-        court_id == "tex"
-        or court_id == "texcrimapp"
-        or court_id.startswith("txctapp")
-        or court_id.startswith("texdistct")
-        or court_id.startswith("texcrimdistct")
-        or court_id.startswith("texctyct")
-    ):
+    elif is_texas_court(court_id):
         docket_number_core = make_texas_docket_number_core(docket_number)
+        # Texas docket numbers are unique and do not need the extra check SCOTUS and Federal docket numbers require.
         skip_check = True
     else:
         docket_number_core = make_docket_number_core(docket_number)
