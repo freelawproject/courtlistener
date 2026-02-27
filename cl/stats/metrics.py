@@ -84,24 +84,30 @@ class StatMetricsCollector:
     def collect(self):
         r = get_redis_interface("STATS")
 
-        # Group metrics by name
-        metrics_data: dict[str, list[tuple[list[str], int]]] = {}
-
+        # Collect all keys first, then fetch values in a single pipeline
         prefix = get_stat_metrics_prefix()
+        keys = []
+        parsed: list[tuple[str, list[str]]] = []
         for key in r.scan_iter(f"{prefix}*"):
-            # Handle bytes if redis returns them
             if isinstance(key, bytes):
                 key = key.decode()
-            # Parse: prometheus:stat:{name}:{label1}:{label2}...
             parts = key.removeprefix(prefix).split(":")
-            metric_name = parts[0]
-            label_values = parts[1:] if len(parts) > 1 else []
+            keys.append(key)
+            parsed.append((parts[0], parts[1:] if len(parts) > 1 else []))
 
-            value = int(r.get(key) or 0)
+        if not keys:
+            return
 
+        values = r.mget(keys)
+
+        # Group metrics by name
+        metrics_data: dict[str, list[tuple[list[str], int]]] = {}
+        for (metric_name, label_values), raw_value in zip(parsed, values):
             if metric_name not in metrics_data:
                 metrics_data[metric_name] = []
-            metrics_data[metric_name].append((label_values, value))
+            metrics_data[metric_name].append(
+                (label_values, int(raw_value or 0))
+            )
 
         # Yield a CounterMetricFamily for each metric
         for metric_name, data in metrics_data.items():
