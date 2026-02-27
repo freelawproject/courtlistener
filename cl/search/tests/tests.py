@@ -60,6 +60,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
+    CaseTransferFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
@@ -83,6 +84,7 @@ from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    CaseTransfer,
     Citation,
     ClusterRedirection,
     Court,
@@ -3858,3 +3860,84 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             {str(self.docket_4.id)},
             "Redis cache set should contain docket_4 only",
         )
+
+
+class CaseTransferFillNullDocketsTest(TestCase):
+    """Tests for CaseTransfer.fill_null_dockets."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.appellate_court = CourtFactory.create(
+            jurisdiction=Court.STATE_APPELLATE,
+        )
+        cls.supreme_court = CourtFactory.create(
+            jurisdiction=Court.STATE_SUPREME,
+        )
+
+    def test_fills_missing_origin_docket(self):
+        """Does fill_null_dockets populate a missing origin_docket FK?"""
+        origin_docket = DocketFactory.create(court=self.appellate_court)
+        destination_docket = DocketFactory.create(court=self.supreme_court)
+        transfer = CaseTransferFactory.create(
+            origin_court=origin_docket.court,
+            origin_docket=None,
+            origin_docket_number=origin_docket.docket_number,
+            destination_court=destination_docket.court,
+            destination_docket=destination_docket,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.origin_docket_id == origin_docket.pk
+
+    def test_fills_missing_destination_docket(self):
+        """Does fill_null_dockets populate a missing destination_docket FK?"""
+        origin_docket = DocketFactory.create(court=self.appellate_court)
+        destination_docket = DocketFactory.create(court=self.supreme_court)
+        transfer = CaseTransferFactory.create(
+            origin_court=origin_docket.court,
+            origin_docket=origin_docket,
+            destination_court=destination_docket.court,
+            destination_docket=None,
+            destination_docket_number=destination_docket.docket_number,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.destination_docket == destination_docket
+
+    def test_leaves_already_populated_dockets_unchanged(self):
+        """Does fill_null_dockets leave already-populated FKs alone?"""
+        origin = DocketFactory.create()
+        destination = DocketFactory.create()
+        transfer = CaseTransferFactory.create(
+            origin_court=origin.court,
+            origin_docket=origin,
+            destination_court=destination.court,
+            destination_docket=destination,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.origin_docket == origin
+        assert transfer.destination_docket == destination
+
+    def test_no_match_leaves_null(self):
+        """Does fill_null_dockets leave FK null when no docket is found?"""
+        destination_docket = DocketFactory.create()
+        transfer = CaseTransferFactory.create(
+            origin_court=CourtFactory.create(),
+            origin_docket=None,
+            origin_docket_number=destination_docket.docket_number
+            + "dontmatch",
+            destination_court=destination_docket.court,
+            destination_docket=destination_docket,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.origin_docket is None

@@ -9,6 +9,7 @@ from cl.corpus_importer.tasks import (
     texas_corpus_download_task,
     texas_ingest_docket_task,
 )
+from cl.search.models import CaseTransfer
 
 
 class Command(CorpusImporterCommand):
@@ -47,3 +48,7 @@ class Command(CorpusImporterCommand):
     @staticmethod
     def merge_task() -> app.Task:
         return texas_ingest_docket_task
+
+    def handle(self, *args, **options):
+        super().handle(*args, **options)
+        CaseTransfer.fill_null_dockets()
