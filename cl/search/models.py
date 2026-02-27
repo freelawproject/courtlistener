@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import nh3
 import pghistory
@@ -4060,72 +4060,67 @@ class CaseTransfer(AbstractDateTimeModel):
     TRACKED_JURISDICTIONS = (Court.STATE_APPELLATE, Court.STATE_SUPREME)
 
     @classmethod
-    def fill_null_dockets(cls):
+    def _fill_null_docket_side(
+        cls, side: Literal["origin"] | Literal["destination"]
+    ) -> tuple[int, int]:
+        """Fill null docket FKs for one side (origin or destination).
+
+        :param side: Either "origin" or "destination".
+        :return: Tuple of (updated_count, total_count).
+        """
         from cl.recap.mergers import find_docket_object
 
+        qs = cls.objects.filter(
+            **{
+                f"{side}_court__jurisdiction__in": cls.TRACKED_JURISDICTIONS,
+                f"{side}_docket__isnull": True,
+            }
+        )
+        total = qs.count()
+        updated_transfers: list[CaseTransfer] = []
+        total_updated = 0
+
+        for transfer in qs.iterator():
+            docket = async_to_sync(find_docket_object)(
+                court_id=getattr(transfer, f"{side}_court_id"),
+                pacer_case_id=None,
+                docket_number=getattr(transfer, f"{side}_docket_number"),
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                allow_create=False,
+            )
+            if docket:
+                logger.info(
+                    "Found %s docket %s!",
+                    side,
+                    getattr(transfer, f"{side}_docket_number"),
+                )
+                setattr(transfer, f"{side}_docket", docket)
+                updated_transfers.append(transfer)
+
+            if len(updated_transfers) >= 100:
+                total_updated += cls.objects.bulk_update(
+                    updated_transfers, [f"{side}_docket"]
+                )
+                updated_transfers = []
+
+        if updated_transfers:
+            total_updated += cls.objects.bulk_update(
+                updated_transfers, [f"{side}_docket"]
+            )
+
+        return total_updated, total
+
+    @classmethod
+    def fill_null_dockets(cls) -> None:
         logger.info(
             "Attempting to populate missing fields in CaseTransfer table..."
         )
 
-        missing_origin_docket = cls.objects.filter(
-            origin_court__jurisdiction__in=cls.TRACKED_JURISDICTIONS,
-            origin_docket__isnull=True,
-        )
-        total_origin = missing_origin_docket.count()
-        for transfer in missing_origin_docket:
-            origin_docket = async_to_sync(find_docket_object)(
-                court_id=transfer.origin_court_id,
-                pacer_case_id=None,
-                docket_number=transfer.origin_docket_number,
-                federal_defendant_number=None,
-                federal_dn_judge_initials_assigned=None,
-                federal_dn_judge_initials_referred=None,
-                docket_source=Docket.SCRAPER,
-                allow_create=False,
-            )
-            if origin_docket:
-                logger.info(
-                    "Found origin docket %s!", transfer.origin_docket_number
-                )
-                transfer.origin_docket = origin_docket
-            else:
-                logger.info(
-                    "Could not find origin docket %s.",
-                    transfer.origin_docket_number,
-                )
-        updated_origin = cls.objects.bulk_update(
-            missing_origin_docket, ["origin_docket"], batch_size=100
-        )
-
-        missing_destination_docket = cls.objects.filter(
-            destination_court__jurisdiction__in=cls.TRACKED_JURISDICTIONS,
-            destination_docket__isnull=True,
-        )
-        total_destination = missing_destination_docket.count()
-        for transfer in missing_destination_docket:
-            destination_docket = async_to_sync(find_docket_object)(
-                court_id=transfer.destination_court_id,
-                pacer_case_id=None,
-                docket_number=transfer.destination_docket_number,
-                federal_defendant_number=None,
-                federal_dn_judge_initials_assigned=None,
-                federal_dn_judge_initials_referred=None,
-                docket_source=Docket.SCRAPER,
-                allow_create=False,
-            )
-            if destination_docket:
-                logger.info(
-                    "Found destination docket %s!",
-                    transfer.destination_docket_number,
-                )
-                transfer.destination_docket = destination_docket
-            else:
-                logger.info(
-                    "Could  not find destination docket %s.",
-                    transfer.destination_docket_number,
-                )
-        updated_destination = cls.objects.bulk_update(
-            missing_destination_docket, ["destination_docket"], batch_size=100
+        updated_origin, total_origin = cls._fill_null_docket_side("origin")
+        updated_destination, total_destination = cls._fill_null_docket_side(
+            "destination"
         )
 
         logger.info(
