@@ -228,6 +228,7 @@ def make_pdf_path(instance, filename, thumbs=False):
         ClaimHistory,
         RECAPDocument,
         ScotusDocketMetadata,
+        SCOTUSDocument,
         TexasDocument,
     )
 
@@ -249,6 +250,10 @@ def make_pdf_path(instance, filename, thumbs=False):
         slug = slugify(Path(filename).stem)
         file_name = f"gov.scotus.{slug}.pdf"
         return str(Path("scotus") / "qp" / file_name)
+    elif isinstance(instance, SCOTUSDocument):
+        slug = slugify(Path(filename).stem)
+        file_name = f"gov.scotus.{slug}.pdf"
+        return str(Path("scotus") / "documents" / file_name)
     elif isinstance(instance, TexasDocument):
         slug = slugify(Path(filename).stem)
         court_id = instance.docket_entry.docket.court_id

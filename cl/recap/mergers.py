@@ -24,7 +24,6 @@ from cl.corpus_importer.utils import (
     is_long_appellate_document_number,
     mark_ia_upload_needed,
 )
-from cl.lib.courts import find_court_object_by_name
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import (
@@ -69,7 +68,6 @@ from cl.search.models import (
     DocketEntry,
     OriginatingCourtInformation,
     RECAPDocument,
-    ScotusDocketMetadata,
     Tag,
 )
 from cl.search.tasks import index_docket_parties_in_es
@@ -1275,6 +1273,76 @@ def disassociate_extraneous_entities(
     ).delete()
 
 
+def normalize_scotus_parties(
+    parties: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Transform SCOTUS court party data to PACER-like format.
+
+    This allows reuse of the existing add_parties_and_attorneys() method
+    for SCOTUS court data.
+
+    :param parties: List of party dicts in SCOTUS format.
+    :returns: List of party dicts in PACER-like format compatible with
+    add_parties_and_attorneys()
+    """
+    normalized = []
+
+    for party in parties:
+        normalized_party = {
+            "name": party.get("name", ""),
+            "type": party.get("type", "Unknown"),
+            "date_terminated": None,
+            "extra_info": "",
+            "attorneys": [],
+        }
+
+        for atty in party.get("attorneys", []):
+            # Build contact string from structured fields
+            contact_parts = []
+
+            if atty.get("title"):
+                contact_parts.append(atty["title"])
+
+            if atty.get("address"):
+                contact_parts.append(atty["address"])
+
+            # Build city, state zip line
+            city_state_zip_parts = []
+            if atty.get("city"):
+                city_state_zip_parts.append(atty["city"])
+            if atty.get("state"):
+                city_state_zip_parts.append(atty["state"])
+
+            if city_state_zip_parts:
+                line = ", ".join(city_state_zip_parts)
+                if atty.get("zip"):
+                    line += f" {atty['zip']}"
+                contact_parts.append(line)
+
+            if atty.get("phone"):
+                contact_parts.append(atty["phone"])
+
+            if atty.get("email"):
+                contact_parts.append(f"Email: {atty['email']}")
+
+            # Build roles list
+            roles = []
+            if atty.get("is_counsel_of_record"):
+                roles.append("LEAD ATTORNEY")
+
+            normalized_party["attorneys"].append(
+                {
+                    "name": atty.get("name", ""),
+                    "contact": "\n".join(contact_parts),
+                    "roles": roles,
+                }
+            )
+
+        normalized.append(normalized_party)
+
+    return normalized
+
+
 @transaction.atomic
 # Retry on transaction deadlocks; see #814.
 @retry(OperationalError, tries=2, delay=1, backoff=1, logger=logger)
@@ -2008,6 +2076,10 @@ async def merge_attachment_page_data(
                 )
             except ValueError:
                 pass
+
+        if is_scotus:
+            rd.document_url = attachment["document_url"]
+
         await rd.asave()
 
     if not is_acms_attachment and not is_scotus:
@@ -2166,141 +2238,3 @@ def process_case_query_report(
         ContentFile(report_text.encode()),
     )
     return None
-
-
-def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
-    """Add sequential attachment numbers and pacer_doc_id to SCOTUS attachments.
-
-    :param docket_entries: A list of docket entry dictionaries.
-    :return: None. The input list is changed in place.
-    """
-
-    for entry in docket_entries:
-        main_doc_short_desc = ""
-        attachments = entry.get("attachments") or []
-        entry["pacer_doc_id"] = ""
-
-        for idx, attachment in enumerate(attachments, start=1):
-            if idx == 1:
-                main_doc_short_desc = attachment["description"]
-            attachment["attachment_number"] = idx
-            attachment["pacer_doc_id"] = ""
-
-        if not attachments:
-            entry["attachments"] = None
-
-        entry["short_description"] = main_doc_short_desc
-
-
-def merge_scotus_docket(report_data: dict[str, Any]) -> Docket | None:
-    """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
-
-    This will create or update the Docket row for the SCOTUS and
-    then create or update the related ScotusDocketMetadata instance.
-
-    :param report_data: A dictionary containing parsed SCOTUS docket data.
-    :return: The created or updated Docket instance.
-    """
-    with transaction.atomic():
-        court = Court.objects.get(pk="scotus")
-        docket_number = report_data["docket_number"]
-        if not docket_number:
-            raise ValueError(
-                "Docket number can't be missing in SCOTUS dockets."
-            )
-
-        case_name = report_data.get("case_name") or ""
-        date_filed = report_data.get("date_filed")
-        lower_court_name = report_data.get("lower_court")
-
-        d = async_to_sync(find_docket_object)(
-            court.pk,
-            None,
-            docket_number,
-            None,
-            None,
-            None,
-        )
-
-        d.source = Docket.SCRAPER
-        d.docket_number = docket_number
-        d.docket_number_raw = docket_number
-        d.case_name = case_name if case_name else d.case_name
-        d.date_filed = date_filed if date_filed else d.date_filed
-        d.appeal_from_str = (
-            lower_court_name if lower_court_name else d.appeal_from_str
-        )
-        if lower_court_name:
-            lower_court = find_court_object_by_name(
-                lower_court_name, bankruptcy=False
-            )
-            d.appeal_from = (
-                lower_court if lower_court is not None else d.appeal_from
-            )
-
-        lower_court_case_numbers = report_data.get("lower_court_case_numbers")
-        lower_court_case_numbers_raw = report_data.get(
-            "lower_court_case_numbers_raw"
-        )
-        lower_court_decision_date = report_data.get(
-            "lower_court_decision_date"
-        )
-        lower_court_rehearing_denied_date = report_data.get(
-            "lower_court_rehearing_denied_date"
-        )
-        if (
-            lower_court_case_numbers
-            or lower_court_decision_date
-            or lower_court_rehearing_denied_date
-        ):
-            oci = d.originating_court_information
-            # Create originating_court_information if missing
-            oci = OriginatingCourtInformation() if not oci else oci
-
-            oci.docket_number = (
-                ", ".join(lower_court_case_numbers)
-                if lower_court_case_numbers
-                else oci.docket_number
-            )
-            oci.docket_number_raw = (
-                lower_court_case_numbers_raw
-                if lower_court_case_numbers_raw
-                else oci.docket_number_raw
-            )
-            oci.date_judgment = (
-                lower_court_decision_date
-                if lower_court_decision_date
-                else oci.date_judgment
-            )
-            oci.date_rehearing_denied = (
-                lower_court_rehearing_denied_date
-                if lower_court_rehearing_denied_date
-                else oci.date_rehearing_denied
-            )
-            oci.save()
-            d.originating_court_information = oci
-        d.save()
-
-        # Merge ScotusDocketMetadata
-        defaults = {
-            "capital_case": bool(report_data.get("capital_case")),
-            "date_discretionary_court_decision": report_data.get(
-                "discretionary_court_decision"
-            ),
-        }
-        if links := report_data.get("links"):
-            defaults["linked_with"] = links
-
-        if qp_url := report_data.get("questions_presented"):
-            defaults["questions_presented_url"] = qp_url
-
-        ScotusDocketMetadata.objects.update_or_create(
-            docket=d,
-            defaults=defaults,
-        )
-
-    # Docket entries merger:
-    enrich_scotus_attachments(report_data["docket_entries"])
-    async_to_sync(add_docket_entries)(d, report_data["docket_entries"])
-
-    return d

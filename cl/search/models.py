@@ -969,6 +969,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
         return build_authority_opinions_query(opinions)
 
+    def add_scraper_source(self) -> None:
+        if self.source in self.NON_SCRAPER_SOURCES():
+            self.source = self.source + self.SCRAPER
+
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
@@ -4160,3 +4164,22 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
+
+    def __str__(self) -> str:
+        return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
+    @property
+    def needs_extraction(self):
+        """Does the item need extraction and does it have all the right
+        fields? Items needing OCR still need extraction.
+        """
+        return (
+            self.ocr_status is None or self.ocr_status == self.OCR_NEEDED
+        ) and self.filepath_local
+
+    @property
+    def file_name(self) -> str:
+        """Extract the filename from the url."""
+        from cl.corpus_importer.utils import extract_file_name_from_url
+
+        return extract_file_name_from_url(self.url)
