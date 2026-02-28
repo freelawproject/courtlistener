@@ -2,7 +2,9 @@ import logging
 import os
 import re
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
+from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -265,6 +267,30 @@ def make_path(root: str, filename: str) -> str:
     return os.path.join(
         root, f"{d.year}", f"{d.month:02d}", f"{d.day:02d}", filename
     )
+
+
+def _make_llm_file_path(root: str, instance, filename: str) -> str:
+    """Make a file path for LLM related uploads
+
+    Falls back to uuid4 when instance.pk is None (unsaved instance)
+
+    :param root: The root directory for the file path.
+    :param instance: The model instance.
+    :param filename: The original filename.
+    :returns: The generated file path.
+    """
+    ext = Path(filename).suffix
+    name = instance.pk or uuid4().hex
+    return make_path(root, f"{name}{ext}")
+
+
+make_llm_task_input_file_path = partial(_make_llm_file_path, "llm-tasks")
+make_llm_request_response_file_path = partial(
+    _make_llm_file_path, "llm-requests"
+)
+make_llm_task_response_file_path = partial(
+    _make_llm_file_path, "llm-tasks/responses"
+)
 
 
 def make_lasc_path(instance, filename):
