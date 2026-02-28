@@ -43,6 +43,12 @@ GOOGLE_AUTH = {
 }
 
 
+################
+# Stats / Metrics
+################
+STAT_METRICS_PREFIX = "prometheus:stat:"
+
+
 ##############
 # Super Misc #
 ##############

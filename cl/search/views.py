@@ -30,6 +30,7 @@ from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
+from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
 
 
@@ -246,8 +247,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
         # Just a regular search
         if not is_bot(request):
             tally_stat(
-                "search.results",
-                prometheus_handler_key="search.queries.keyword.web",
+                StatMetric.SEARCH_RESULTS,
+                labels={
+                    "query_type": StatQueryType.KEYWORD,
+                    "method": StatMethod.WEB,
+                },
             )
 
         # Create bare-bones alert form.
