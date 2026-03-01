@@ -31,7 +31,8 @@ from cl.lib.string_utils import trunc
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
-from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -522,7 +523,7 @@ def add_new_case(
             case_name_full=case_name_full,
             precedential_status="Published",
             docket_id=docket.id,
-            source=SOURCES.HARVARD_CASELAW,
+            source=ClusterSources.HARVARD_CASELAW,
             date_filed=date_filed,
             date_filed_is_approximate=is_approximate,
             attorneys=short_data["attorneys"],

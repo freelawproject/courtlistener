@@ -9,8 +9,8 @@ from cl.api.utils import (
 )
 from cl.audio.models import Audio
 from cl.people_db.models import Party, Person
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
-    SOURCES,
     Citation,
     Court,
     Docket,
@@ -153,7 +153,7 @@ class OpinionClusterFilter(NoEmptyFilterSet):
     sub_opinions = filters.RelatedFilter(
         OpinionFilter, queryset=Opinion.objects.all()
     )
-    source = filters.MultipleChoiceFilter(choices=SOURCES.NAMES)
+    source = filters.MultipleChoiceFilter(choices=ClusterSources.NAMES)
     citations = filters.RelatedFilter(
         CitationFilter, queryset=Citation.objects.all()
     )

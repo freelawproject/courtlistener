@@ -21,9 +21,9 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.lib.factories import RelatedFactoryVariableList
 from cl.people_db.factories import PersonFactory
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     BankruptcyInformation,
     Citation,
     Court,
@@ -188,7 +188,7 @@ class OpinionClusterFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     date_filed = Faker("date")
     slug = Faker("slug")
-    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
+    source = FuzzyChoice(ClusterSources.NAMES, getter=lambda c: c[0])
     precedential_status = FuzzyChoice(
         PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
     )

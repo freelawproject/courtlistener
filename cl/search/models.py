@@ -52,8 +52,9 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.storage import IncrementingAWSMediaStorage
+from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
+from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
 from cl.search.state.texas.models import *
 from cl.users.models import User
@@ -91,187 +92,6 @@ class PRECEDENTIAL_STATUS:
     def get_status_value_reverse(cls, name):
         reverse_names = {key: value for key, value in cls.NAMES}
         return reverse_names.get(name)
-
-
-class SOURCES:
-    COURT_WEBSITE = "C"
-    PUBLIC_RESOURCE = "R"
-    COURT_M_RESOURCE = "CR"
-    LAWBOX = "L"
-    LAWBOX_M_COURT = "LC"
-    LAWBOX_M_RESOURCE = "LR"
-    LAWBOX_M_COURT_RESOURCE = "LCR"
-    MANUAL_INPUT = "M"
-    INTERNET_ARCHIVE = "A"
-    BRAD_HEATH_ARCHIVE = "H"
-    COLUMBIA_ARCHIVE = "Z"
-    HARVARD_CASELAW = "U"
-    COURT_M_HARVARD = "CU"
-    DIRECT_COURT_INPUT = "D"
-    ANON_2020 = "Q"
-    ANON_2020_M_HARVARD = "QU"
-    COURT_M_RESOURCE_M_HARVARD = "CRU"
-    DIRECT_COURT_INPUT_M_HARVARD = "DU"
-    LAWBOX_M_HARVARD = "LU"
-    LAWBOX_M_COURT_M_HARVARD = "LCU"
-    LAWBOX_M_RESOURCE_M_HARVARD = "LRU"
-    LAWBOX_M_COURT_RESOURCE_M_HARVARD = "LCRU"
-    MANUAL_INPUT_M_HARVARD = "MU"
-    PUBLIC_RESOURCE_M_HARVARD = "RU"
-    COLUMBIA_M_INTERNET_ARCHIVE = "ZA"
-    COLUMBIA_M_DIRECT_COURT_INPUT = "ZD"
-    COLUMBIA_M_COURT = "ZC"
-    COLUMBIA_M_BRAD_HEATH_ARCHIVE = "ZH"
-    COLUMBIA_M_LAWBOX_COURT = "ZLC"
-    COLUMBIA_M_LAWBOX_RESOURCE = "ZLR"
-    COLUMBIA_M_LAWBOX_COURT_RESOURCE = "ZLCR"
-    COLUMBIA_M_RESOURCE = "ZR"
-    COLUMBIA_M_COURT_RESOURCE = "ZCR"
-    COLUMBIA_M_LAWBOX = "ZL"
-    COLUMBIA_M_MANUAL = "ZM"
-    COLUMBIA_M_ANON_2020 = "ZQ"
-    COLUMBIA_ARCHIVE_M_HARVARD = "ZU"
-    COLUMBIA_M_LAWBOX_M_HARVARD = "ZLU"
-    COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD = "ZDU"
-    COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD = "ZLRU"
-    COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD = "ZLCRU"
-    COLUMBIA_M_COURT_M_HARVARD = "ZCU"
-    COLUMBIA_M_MANUAL_INPUT_M_HARVARD = "ZMU"
-    COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
-    COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
-    RECAP = "G"
-    NAMES = (
-        (COURT_WEBSITE, "court website"),
-        (PUBLIC_RESOURCE, "public.resource.org"),
-        (COURT_M_RESOURCE, "court website merged with resource.org"),
-        (LAWBOX, "lawbox"),
-        (LAWBOX_M_COURT, "lawbox merged with court"),
-        (LAWBOX_M_RESOURCE, "lawbox merged with resource.org"),
-        (LAWBOX_M_COURT_RESOURCE, "lawbox merged with court and resource.org"),
-        (MANUAL_INPUT, "manual input"),
-        (INTERNET_ARCHIVE, "internet archive"),
-        (BRAD_HEATH_ARCHIVE, "brad heath archive"),
-        (COLUMBIA_ARCHIVE, "columbia archive"),
-        (COLUMBIA_M_INTERNET_ARCHIVE, "columbia merged with internet archive"),
-        (
-            COLUMBIA_M_DIRECT_COURT_INPUT,
-            "columbia merged with direct court input",
-        ),
-        (COLUMBIA_M_COURT, "columbia merged with court"),
-        (
-            COLUMBIA_M_BRAD_HEATH_ARCHIVE,
-            "columbia merged with brad heath archive",
-        ),
-        (COLUMBIA_M_LAWBOX_COURT, "columbia merged with lawbox and court"),
-        (
-            COLUMBIA_M_LAWBOX_RESOURCE,
-            "columbia merged with lawbox and resource.org",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_COURT_RESOURCE,
-            "columbia merged with lawbox, court, and resource.org",
-        ),
-        (COLUMBIA_M_RESOURCE, "columbia merged with resource.org"),
-        (
-            COLUMBIA_M_COURT_RESOURCE,
-            "columbia merged with court and resource.org",
-        ),
-        (COLUMBIA_M_LAWBOX, "columbia merged with lawbox"),
-        (COLUMBIA_M_MANUAL, "columbia merged with manual input"),
-        (COLUMBIA_M_ANON_2020, "columbia merged with 2020 anonymous database"),
-        (
-            HARVARD_CASELAW,
-            "Harvard, Library Innovation Lab Case Law Access Project",
-        ),
-        (COURT_M_HARVARD, "court website merged with Harvard"),
-        (DIRECT_COURT_INPUT, "direct court input"),
-        (ANON_2020, "2020 anonymous database"),
-        (ANON_2020_M_HARVARD, "2020 anonymous database merged with Harvard"),
-        (COURT_M_HARVARD, "court website merged with Harvard"),
-        (
-            COURT_M_RESOURCE_M_HARVARD,
-            "court website merged with public.resource.org and Harvard",
-        ),
-        (
-            DIRECT_COURT_INPUT_M_HARVARD,
-            "direct court input merged with Harvard",
-        ),
-        (LAWBOX_M_HARVARD, "lawbox merged with Harvard"),
-        (
-            LAWBOX_M_COURT_M_HARVARD,
-            "Lawbox merged with court website and Harvard",
-        ),
-        (
-            LAWBOX_M_RESOURCE_M_HARVARD,
-            "Lawbox merged with public.resource.org and with Harvard",
-        ),
-        (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
-        (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),
-        (COLUMBIA_ARCHIVE_M_HARVARD, "columbia archive merged with Harvard"),
-        (
-            COLUMBIA_M_LAWBOX_M_HARVARD,
-            "columbia archive merged with Lawbox and Harvard",
-        ),
-        (
-            COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD,
-            "columbia archive merged with direct court input and Harvard",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD,
-            "columbia archive merged with lawbox, public.resource.org and Harvard",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD,
-            "columbia archive merged with lawbox, court website, public.resource.org and Harvard",
-        ),
-        (
-            COLUMBIA_M_COURT_M_HARVARD,
-            "columbia archive merged with court website and Harvard",
-        ),
-        (
-            COLUMBIA_M_MANUAL_INPUT_M_HARVARD,
-            "columbia archive merged with manual input and Harvard",
-        ),
-        (
-            COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD,
-            "columbia archive merged with public.resource.org and Harvard",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
-            "columbia archive merged with lawbox, court website and Harvard",
-        ),
-        (
-            RECAP,
-            "recap",
-        ),
-    )
-
-    # use a frozenset since the order of characters is arbitrary
-    parts_to_source_mapper = {frozenset(name[0]): name[0] for name in NAMES}
-
-    @classmethod
-    def merge_sources(cls, source1: str, source2: str) -> str:
-        """Merge source values
-
-        Use this to merge sources when merging clusters
-
-        :param source1: a source
-        :param source2: other source
-        :return: a source which merges the input sources
-        """
-        if source1 in source2:
-            return source2
-        if source2 in source1:
-            return source1
-
-        unique_parts = frozenset(source1 + source2)
-        if cls.parts_to_source_mapper.get(unique_parts):
-            return cls.parts_to_source_mapper.get(unique_parts)
-
-        # Unexpected case
-        if len(source1) > len(source2):
-            return source1
-        return source2
 
 
 class DocketNumberSources:
@@ -2476,10 +2296,10 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: {}".format(
-            ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES)
+            ", ".join(f"{t[0]} ({t[1]})" for t in ClusterSources.NAMES)
         ),
         max_length=10,
-        choices=SOURCES.NAMES,
+        choices=ClusterSources.NAMES,
         blank=True,
     )
     procedural_history = models.TextField(
@@ -2628,6 +2448,18 @@ class OpinionCluster(AbstractDateTimeModel):
         help_text="The case PDF from the Caselaw Access Project for this cluster",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
+    filepath_xml_scan = models.FileField(
+        help_text="The XML obtained from LLM containing all available metadata and opinion(s).",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
+    filepath_pdf_scan = models.FileField(
+        help_text="The case PDF from the Scanning Project",
+        upload_to=make_upload_path,
+        storage=S3PrivateUUIDStorage(),
         blank=True,
     )
     arguments = models.TextField(
@@ -3354,6 +3186,9 @@ class Opinion(AbstractDateTimeModel):
     xml_harvard = models.TextField(
         help_text="XML of Harvard CaseLaw Access Project opinion", blank=True
     )
+    xml_scan = models.TextField(
+        help_text="XML of Scanning Project", blank=True
+    )
     html_with_citations = models.TextField(
         help_text=(
             "HTML of the document with citation links and other "
@@ -3474,6 +3309,112 @@ class OpinionJoinedBy(Opinion.joined_by.through):
 
     class Meta:
         proxy = True
+
+
+class OpinionContent(AbstractDateTimeModel):
+    """Stores normalized opinion text content.
+
+    Each Opinion can have multiple OpinionContent records, one per content type.
+    This normalized structure replaces the previous wide table design that had
+    separate fields for each content source (plain_text, html, html_lawbox, etc.).
+
+    Future work: Add fields from Opinion model (sha1, download_url,
+    local_path, etc.) so existing content can be copied from Opinion
+    to OpinionContent, enabling full versioning support.
+    """
+
+    SCRAPERS = 1
+    HARVARD_CAP = 2
+    ANON_2020 = 3
+    COLUMBIA_ARCHIVE = 4
+    LAWBOX = 5
+    RECAP = 6
+    FLP_SCANNING = 7
+    SOURCES = (
+        (SCRAPERS, "Got from juriscraper"),
+        (HARVARD_CAP, "Got from the Harvard Case Law Access Project"),
+        (ANON_2020, "Got from 2020 anonymous database"),
+        (COLUMBIA_ARCHIVE, "Got from Columbia archive"),
+        (LAWBOX, "Got from Lawbox"),
+        (RECAP, "Free opinions on RECAP"),
+        (FLP_SCANNING, "Got from FLP Scanning Project"),
+    )
+
+    DEFAULT = 0
+    OCR = 1
+    LLM = 2
+    EXTRACTION_METHOD = (
+        (DEFAULT, "Extracted by opening the document and getting the text"),
+        (OCR, "Extracted via OCR"),
+        (
+            LLM,
+            "Extracted via LLM",
+        ),
+    )
+    opinion = models.ForeignKey(
+        Opinion,
+        help_text="The opinion this content belongs to",
+        related_name="contents",
+        on_delete=models.CASCADE,
+    )
+    content = models.TextField(
+        help_text="The text content of the opinion",
+        blank=True,
+    )
+    source = models.SmallIntegerField(
+        help_text="Source of the opinions content",
+        choices=SOURCES,
+    )
+    extraction_type = models.SmallIntegerField(
+        help_text="Method used to extract the opinion content",
+        choices=EXTRACTION_METHOD,
+    )
+    is_main_version = models.BooleanField(
+        help_text="True if this is the most up to date or official version of the Opinion's content"
+    )
+    sha1 = models.CharField(
+        help_text=(
+            "unique ID for the document, as generated via SHA1 of the "
+            "binary file or text data"
+        ),
+        max_length=40,
+        blank=True,
+    )
+    page_count = models.IntegerField(
+        help_text="The number of pages in the document, if known",
+        blank=True,
+        null=True,
+    )
+    download_url = models.URLField(
+        help_text=(
+            "The URL where the item was originally scraped. Note that "
+            "these URLs may often be dead due to the court or the bulk "
+            "provider changing their website. We keep the original link "
+            "here given that it often contains valuable metadata."
+        ),
+        max_length=500,
+        db_index=True,
+        null=True,
+        blank=True,
+    )
+    local_path = models.FileField(
+        help_text=(
+            "The location in AWS S3 where the original opinion file is "
+            f"stored. {s3_warning_note}"
+        ),
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+        db_index=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["sha1"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.pk} - {self.opinion.cluster.case_name}"
 
 
 class OpinionsCited(models.Model):

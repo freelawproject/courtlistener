@@ -8,9 +8,9 @@ from cl.scrapers.tasks import (
     extract_opinion_content,
     update_document_from_text,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     Opinion,
     OpinionCluster,
 )
@@ -187,7 +187,7 @@ class Command(ScraperCommand):
             "docket__court_id": court_id,
             "date_filed__gte": options["date_filed_gte"],
             "date_filed__lte": options["date_filed_lte"],
-            "source__contains": SOURCES.COURT_WEBSITE,
+            "source__contains": ClusterSources.COURT_WEBSITE,
         }
 
         if options["cluster_status"]:

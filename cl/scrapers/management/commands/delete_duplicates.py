@@ -17,7 +17,8 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_metadata,
     update_referencing_objects,
 )
-from cl.search.models import SOURCES, ClusterRedirection, Opinion
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import ClusterRedirection, Opinion
 
 
 def delete_duplicate_opinion(
@@ -221,7 +222,7 @@ def delete_cleaned_up_content_duplicates(
     """
     query = Q(
         cluster__docket__court_id=court_id,
-        cluster__source=SOURCES.COURT_WEBSITE,
+        cluster__source=ClusterSources.COURT_WEBSITE,
     )
     qs = group_opinions_by_url(query)
     seen_urls = set()
@@ -283,7 +284,7 @@ def delete_by_text_comparison(stats: defaultdict, court_id: str) -> None:
 
     query = Q(
         cluster__docket__court_id=court_id,
-        cluster__source=SOURCES.COURT_WEBSITE,
+        cluster__source=ClusterSources.COURT_WEBSITE,
     )
     qs = group_opinions_by_url(query)
     seen_urls = set()
@@ -350,8 +351,9 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--cluster-sources",
-            choices=list(SOURCES.parts_to_source_mapper.values()) + ["ALL"],
-            default=[SOURCES.COURT_WEBSITE],
+            choices=list(ClusterSources.parts_to_source_mapper.values())
+            + ["ALL"],
+            default=[ClusterSources.COURT_WEBSITE],
             nargs="*",
             help="""`OpinionCluster.source` values to include when finding
             duplicate groups. Pass `ALL` if you want to include all sources.""",
