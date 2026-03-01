@@ -295,8 +295,14 @@ disclosures_debt_fields='(
 	   )'
 disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
 
+# citations_unmatchedcitations
+unmatchedcitations_fields='(id, volume, reporter, page, type, citing_opinion_id, status,
+			citation_string, court_id, year
+	   )'
+unmatchedcitations_csv_filename="unmatched-citations-$(date -I).csv"
+
 # If you add or remove a table, you need to update this number
-NUM_TABLES=32
+NUM_TABLES=33
 
 # Every new table added to bulk script should be added as an associative array
 # This ordering is important. Tables with foreign key constraints must be loaded in order.
@@ -336,6 +342,8 @@ declare -a t_30=("disclosures_reimbursement" "$disclosures_reimbursement_fields"
 declare -a t_31=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
 declare -a t_32=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
 
+declare -a t_33=("citations_unmatchedcitations" "$unmatchedcitations_fields" "$unmatchedcitations_csv_filename")
+
 # Create a new array with the data of each associative array
 declare -a listOfLists
 for (( i=1; i<=$NUM_TABLES; i++ )); do
@@ -371,6 +379,7 @@ pg_dump \
     --table 'audio_*' \
 	--table 'recap_*' \
 	--table 'disclosures_*' \
+	--table 'citations_unmatchedcitations' \
     --no-privileges \
     --no-publications \
     --no-subscriptions courtlistener | \
