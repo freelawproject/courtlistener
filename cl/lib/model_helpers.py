@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from collections.abc import Callable
@@ -6,6 +7,9 @@ from pathlib import Path
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
 from django.utils.timezone import now
+from juriscraper.state.texas.common import (
+    DOCKET_NUMBER_REGEXES as TEXAS_DN_REGEXES,
+)
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
@@ -14,6 +18,8 @@ from cl.lib.string_utils import normalize_dashes, trunc
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
 scotus_d_a_num_regex = r"(\d{2})a(\d{1,5})"
+
+logger = logging.getLogger(__name__)
 
 
 def is_docket_number(value: str) -> bool:
@@ -59,10 +65,47 @@ def clean_docket_number(docket_number: str | None) -> str:
     if len(bankr_m) == 1:
         return bankr_m[0]
 
-    # Match SCOTUS docket numbers.
+    return ""
+
+
+def clean_scotus_docket_number(docket_number: str | None) -> str:
+    """Clean a SCOTUS docket number, prioritizing the NN-NNNN format over the
+    NNA format.
+
+    SCOTUS docket numbers can appear in formats like:
+        No. 01-8148         -> 01-8148
+        No. 01A576          -> 01a576
+        No. 01A576 (01-8099) -> 01-8099  (prioritize NN-NNNN)
+        No. 01-8148 (01A587) -> 01-8148  (prioritize NN-NNNN)
+
+    If multiple numbers of the same type are found (e.g., "01A576 01A578"),
+    a ValueError is raised.
+
+    :param docket_number: The docket number to clean.
+    :return: The cleaned docket number or an empty string.
+    """
+    if not docket_number:
+        return ""
+
+    docket_number = normalize_dashes(docket_number)
+    docket_number = docket_number.lower()
+
+    scotus_m = re.findall(r"(?<![^ ,(])\d\d-\d+", docket_number)
     scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
+
+    if len(scotus_m) == 1:
+        return scotus_m[0]
+    if len(scotus_m) > 1:
+        logger.error(
+            "Multiple NN-NNNN docket numbers found in: %s", docket_number
+        )
+        return ""
+
     if len(scotus_a_m) == 1:
         return scotus_a_m[0]
+    if len(scotus_a_m) > 1:
+        logger.error("Multiple NNA docket numbers found in: %s", docket_number)
+        return ""
 
     return ""
 
@@ -111,8 +154,86 @@ def make_docket_number_core(docket_number: str | None) -> str:
     return ""
 
 
+def is_texas_court(court_id: str) -> bool:
+    """Check if the given court_id belongs to a Texas state court.
+
+    :param court_id: The CourtListener court_id to check.
+    :return: True if the court is a Texas state court.
+    """
+    return (
+        court_id == "tex"
+        or court_id == "texcrimapp"
+        or court_id.startswith("txctapp")
+        or court_id.startswith("texdistct")
+        or court_id.startswith("texcrimdistct")
+        or court_id.startswith("texctyct")
+    )
+
+
+def clean_texas_docket_number(docket_number: str | None) -> str:
+    """Clean a Texas docket number by extracting the valid docket number
+    from potentially dirty input using Juriscraper's regex patterns.
+
+    Converts inputs like:
+
+        Case Number: 04-97-00972-CV -> 04-97-00972-CV
+        04-97-00972-CV -> 04-97-00972-CV
+
+    :param docket_number: The docket number to clean.
+    :return: The cleaned docket number or empty string if no valid match.
+    """
+    if not docket_number:
+        return ""
+
+    docket_number = normalize_dashes(docket_number)
+
+    # Try fullmatch on the entire string first (clean input)
+    for regex in TEXAS_DN_REGEXES:
+        if regex.fullmatch(docket_number):
+            return docket_number
+
+    # Try fullmatch on each whitespace-separated token (dirty input
+    # like "Case Number: 04-97-00972-CV"). We use fullmatch rather
+    # than search because these regexes were designed for fullmatch
+    # and can produce false positives with partial matching.
+    for token in docket_number.split():
+        for regex in TEXAS_DN_REGEXES:
+            if regex.fullmatch(token):
+                return token
+
+    return ""
+
+
+def make_texas_docket_number_core(docket_number: str | None) -> str:
+    """Normalize Texas docket numbers.
+
+    First cleans the docket number using Juriscraper's DOCKET_NUMBER_REGEXES
+    to extract the actual docket number, then normalizes by stripping all
+    non-alphanumeric characters and lowercasing.
+
+    There is overlap between valid Texas docket numbers and valid Federal
+    docket numbers, but they need to be normalized differently so we need a
+    separate method.
+
+    :param docket_number: The docket number to normalize.
+    :return: The normalized docket number, or empty string if no valid
+    docket number is found.
+    """
+    if docket_number is None:
+        return ""
+
+    cleaned = clean_texas_docket_number(docket_number)
+    if not cleaned:
+        return ""
+
+    not_alphanum_regex = re.compile(r"[^a-z0-9]")
+    return not_alphanum_regex.sub("", cleaned.lower())
+
+
 def make_scotus_docket_number_core(docket_number: str | None) -> str:
-    """Normalize SCOTUS docket numbers like 16A985.
+    """Normalize SCOTUS docket numbers like 16A985 or 01-8148.
+
+    Prioritizes the NN-NNNN format over the NNA format when both are present.
 
     :param docket_number: The docket number to condense.
     :return: empty string if no change possible, or the condensed version if it
@@ -122,14 +243,14 @@ def make_scotus_docket_number_core(docket_number: str | None) -> str:
     if not docket_number:
         return ""
 
-    cleaned_docket_number = clean_docket_number(docket_number)
+    cleaned_docket_number = clean_scotus_docket_number(docket_number)
 
     if bankr_n_core := make_appellate_bankr_number_core(cleaned_docket_number):
         return bankr_n_core
 
-    scouts_a_m = re.search(scotus_d_a_num_regex, cleaned_docket_number)
-    if scouts_a_m:
-        year, serial = scouts_a_m.groups()
+    scotus_a_m = re.search(scotus_d_a_num_regex, cleaned_docket_number)
+    if scotus_a_m:
+        year, serial = scotus_a_m.groups()
         return f"{year}A{int(serial):05d}"
 
     return ""
