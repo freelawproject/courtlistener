@@ -29,6 +29,7 @@ from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.model_helpers import (
     clean_docket_number,
+    is_texas_court,
     make_docket_number_core,
     make_scotus_docket_number_core,
     make_texas_docket_number_core,
@@ -147,10 +148,6 @@ async def find_docket_object(
     :param court_id: The CourtListener court_id to lookup
     :param pacer_case_id: The PACER case ID for the docket
     :param docket_number: The docket number to lookup.
-    :param federal_defendant_number: The federal defendant number to validate
-    the match.
-    :param federal_dn_judge_initials_assigned: The judge's initials assigned to
-    validate the match.
     :param federal_dn_judge_initials_referred: The judge's initials referred to
     validate the match.
     :param using: The database to use for the lookup queries.
@@ -164,17 +161,14 @@ async def find_docket_object(
     d = None
     if court_id == "scotus":
         docket_number_core = make_scotus_docket_number_core(docket_number)
-    elif (
-        court_id == "tex"
-        or court_id == "texcrimapp"
-        or court_id.startswith("txctapp")
-        or court_id.startswith("texdistct")
-        or court_id.startswith("texcrimdistct")
-        or court_id.startswith("texctyct")
-    ):
+        skip_check = False
+    elif is_texas_court(court_id):
         docket_number_core = make_texas_docket_number_core(docket_number)
+        # Texas docket numbers are unique and do not need the extra check SCOTUS and Federal docket numbers require.
+        skip_check = True
     else:
         docket_number_core = make_docket_number_core(docket_number)
+        skip_check = False
     lookups = []
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
@@ -226,8 +220,10 @@ async def find_docket_object(
             continue  # Try a looser lookup.
         if count == 1:
             d = await ds.afirst()
-            if kwargs.get("pacer_case_id") is None and kwargs.get(
-                "docket_number_core"
+            if (
+                not skip_check
+                and kwargs.get("pacer_case_id") is None
+                and kwargs.get("docket_number_core")
             ):
                 d = confirm_docket_number_core_lookup_match(
                     d,
@@ -258,8 +254,10 @@ async def find_docket_object(
             else:
                 # Choose the oldest one and live with it.
                 d = await ds.aearliest("date_created")
-                if kwargs.get("pacer_case_id") is None and kwargs.get(
-                    "docket_number_core"
+                if (
+                    not skip_check
+                    and kwargs.get("pacer_case_id") is None
+                    and kwargs.get("docket_number_core")
                 ):
                     d = confirm_docket_number_core_lookup_match(
                         d, docket_number
