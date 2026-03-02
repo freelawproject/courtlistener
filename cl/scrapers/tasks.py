@@ -932,7 +932,7 @@ def _login_tames(
     tree = etree.fromstring(resp.text, etree.HTMLParser())
     payload: dict[str, str] = {}
     hidden_elements = tree.xpath("//input[@type='hidden']")
-    if isinstance(hidden_elements,etree._Element):
+    if isinstance(hidden_elements, etree._Element):
         for input_tag in hidden_elements:
             if name := input_tag.get("name"):
                 payload[name] = input_tag.get("value", "")
@@ -970,7 +970,7 @@ def subscribe_to_tames_cases(
     :param cases: List of dicts, each with "court", "case", and "date_filed" keys.
     :raises SubscriptionFailure: If login fails.
     """
-    if not settings.TAMES_USER: # ignore: type[misc]
+    if not settings.TAMES_USER:  # ignore: type[misc]
         raise ConfigurationException("TAMES_USER must be set.")
     tames_user = json.loads(settings.TAMES_USER)
     subscription_tracker, _created = AccountSubscription.objects.get_or_create(
@@ -1029,7 +1029,9 @@ def subscribe_to_tames_cases(
                 case_number,
                 message,
             )
-            date_filed = datetime.strptime(case["date_filed"], "%m/%d/%Y").date()
+            date_filed = datetime.strptime(
+                case["date_filed"], "%m/%d/%Y"
+            ).date()
             successful_dates.add(date_filed)
         except Exception as e:
             logger.error(
