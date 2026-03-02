@@ -1,8 +1,10 @@
+import json
 import logging
 import random
 import re
 import traceback
 from collections import defaultdict
+from datetime import date, datetime
 from io import BytesIO
 
 import celery
@@ -48,6 +50,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     get_query_from_url,
     merge_versions_by_text_similarity,
 )
+from cl.scrapers.models import AccountSubscription, Scraper
 from cl.scrapers.utils import citation_is_duplicated, make_citation
 from cl.search.models import (
     SOURCES,
@@ -426,7 +429,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     # from the court's server. Since this task is called on a scrape, we assume
     # that is the most recent
     if versions.exists():
-        stats = defaultdict(lambda: 0)
+        stats: defaultdict[str, int] = defaultdict(lambda: 0)
         merge_versions_by_text_similarity(
             recently_scraped_opinion, versions, stats
         )
@@ -636,12 +639,12 @@ def process_audio_file(self, pk) -> None:
     audio_response.raise_for_status()
     cf = ContentFile(audio_response.content)
     file_name = f"{trunc(best_case_name(audio_obj).lower(), 72)}_cl.mp3"
-    audio_obj.file_with_date = audio_obj.docket.date_argued
+    audio_obj.file_with_date = audio_obj.docket.date_argued  # type: ignore[attr-defined]
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
     audio_obj.duration = float(
         async_to_sync(microservice)(
             service="audio-duration",
-            file=audio_response.content,
+            file=audio_response.content,  # type: ignore[arg-type]
             file_type="mp3",
         ).text
     )
@@ -909,7 +912,9 @@ CASEMAIL_MESSAGE_XPATH = (
 )
 
 
-def _login_tames(session: requests.Session) -> None:
+def _login_tames(
+    session: requests.Session, tames_user: dict[str, str]
+) -> None:
     """Log in to the TAMES CaseMail system.
 
     Fetches the login page, extracts ASP.NET hidden fields, and POSTs
@@ -919,24 +924,23 @@ def _login_tames(session: requests.Session) -> None:
     :raises ConfigurationException: If credentials are not set.
     :raises requests.RequestException: If the login request fails.
     """
-    if not settings.TAMES_USERNAME or not settings.TAMES_PASSWORD:
-        raise ConfigurationException(
-            "TAMES_USERNAME and TAMES_PASSWORD must be set."
-        )
-
+    tames_username = tames_user["username"]
+    tames_password = tames_user["password"]
     resp = session.get(CASEMAIL_LOGIN_URL, timeout=30)
     resp.raise_for_status()
 
     tree = etree.fromstring(resp.text, etree.HTMLParser())
     payload: dict[str, str] = {}
-    for input_tag in tree.xpath("//input[@type='hidden']"):
-        if name := input_tag.get("name"):
-            payload[name] = input_tag.get("value", "")
+    hidden_elements = tree.xpath("//input[@type='hidden']")
+    if isinstance(hidden_elements,etree._Element):
+        for input_tag in hidden_elements:
+            if name := input_tag.get("name"):
+                payload[name] = input_tag.get("value", "")
 
     payload.update(
         {
-            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtUserName": settings.TAMES_USERNAME,
-            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtPassword": settings.TAMES_PASSWORD,
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtUserName": tames_username,
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtPassword": tames_password,
             "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$cmdLogon": "Logon",
         }
     )
@@ -963,9 +967,17 @@ def subscribe_to_tames_cases(
     S3 cache for the next invocation.
 
     :param self: The Celery task.
-    :param cases: List of dicts, each with "court" and "case" keys.
+    :param cases: List of dicts, each with "court", "case", and "date_filed" keys.
     :raises SubscriptionFailure: If login fails.
     """
+    if not settings.TAMES_USER: # ignore: type[misc]
+        raise ConfigurationException("TAMES_USER must be set.")
+    tames_user = json.loads(settings.TAMES_USER)
+    subscription_tracker, _created = AccountSubscription.objects.get_or_create(
+        scraper=Scraper.TEXAS,
+        user_name=tames_user["username"],
+        defaults={"email": tames_user["email"]},
+    )
     cache = get_s3_cache("db_cache")
     cache_key = make_s3_cache_key(TAMES_FAILURES_CACHE_KEY, None)
 
@@ -981,7 +993,7 @@ def subscribe_to_tames_cases(
     session.headers.update({"User-Agent": "Free Law Project"})
 
     try:
-        _login_tames(session)
+        _login_tames(session, tames_user)
     except requests.RequestException as exc:
         if self.request.retries == self.max_retries:
             cache.set(cache_key, cases, None)
@@ -989,6 +1001,7 @@ def subscribe_to_tames_cases(
 
     html_parser = etree.HTMLParser()
     failed: list[dict[str, str]] = []
+    successful_dates: set[date] = set()
     for case in cases:
         court = case["court"]
         case_number = case["case"]
@@ -1005,13 +1018,19 @@ def subscribe_to_tames_cases(
             resp.raise_for_status()
             tree = etree.fromstring(resp.text, html_parser)
             messages = tree.xpath(CASEMAIL_MESSAGE_XPATH)
-            message = messages[0].text if messages else "No message found"
+            message = "No message found"
+            if isinstance(messages, list) and messages:
+                first_msg = messages[0]
+                if isinstance(first_msg, etree._Element):
+                    message = first_msg.text or message
             logger.info(
                 "TAMES subscription for %s/%s: %s",
                 court,
                 case_number,
                 message,
             )
+            date_filed = datetime.strptime(case["date_filed"], "%m/%d/%Y").date()
+            successful_dates.add(date_filed)
         except Exception as e:
             logger.error(
                 "Failed to subscribe to TAMES case %s/%s",
@@ -1021,6 +1040,7 @@ def subscribe_to_tames_cases(
             )
             failed.append(case)
 
+    subscription_tracker.include_subscriptions(successful_dates)
     if not failed:
         cache.delete(cache_key)
         return
