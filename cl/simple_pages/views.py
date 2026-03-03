@@ -24,6 +24,7 @@ from django.template import loader
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
+from waffle import flag_is_active
 
 from cl.audio.models import Audio
 from cl.disclosures.models import (
@@ -50,6 +51,10 @@ from cl.search.models import (
 from cl.search.selectors import get_available_documents_estimate_count
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
+from cl.simple_pages.tasks import (
+    create_zoho_crm_lead_from_contact,
+    create_zoho_desk_ticket,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -434,19 +439,76 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
-            default_from = settings.DEFAULT_FROM_EMAIL
-            subject = form.email_subject()
-            body = form.render_email_body(
-                user_agent=request.headers.get("user-agent", "Unknown")
+            use_zoho = await sync_to_async(flag_is_active)(
+                request, "zoho-desk-tickets"
             )
+            if use_zoho:
+                if cd["issue_type"] == ContactForm.PARTNERSHIPS:
+                    create_zoho_crm_lead_from_contact.delay(
+                        name=cd["name"],
+                        email=cd["email"],
+                        message=cd.get("message", ""),
+                        partner_current_work=cd.get(
+                            "partner_current_work", ""
+                        ),
+                        partner_prior_outreach=cd.get(
+                            "partner_prior_outreach", ""
+                        ),
+                        partner_team_size=form.label_for("partner_team_size")
+                        or "",
+                        partner_founded_year=cd.get(
+                            "partner_founded_year", None
+                        ),
+                        partner_funding_total=form.label_for(
+                            "partner_funding_total"
+                        )
+                        or "",
+                        partner_funding_stage=form.label_for(
+                            "partner_funding_stage"
+                        )
+                        or "",
+                        partner_ideal_outcome=cd.get(
+                            "partner_ideal_outcome", ""
+                        ),
+                        partner_background=[
+                            label
+                            for label in (
+                                form.label_for("partner_background") or ""
+                            ).split(", ")
+                            if label
+                        ],
+                        partner_background_other=cd.get(
+                            "partner_background_other", ""
+                        ),
+                    )
+                else:
+                    create_zoho_desk_ticket.delay(
+                        subject=cd["phone_number"],
+                        name=cd["name"],
+                        email=cd["email"],
+                        description=form.render_email_body(
+                            user_agent=request.headers.get(
+                                "user-agent", "Unknown"
+                            ),
+                            target="zoho_desk",
+                        ),
+                        request_type=form.get_zoho_request_type(),
+                        assignee_id=form.get_zoho_assignee_id(),
+                    )
+            else:
+                default_from = settings.DEFAULT_FROM_EMAIL
+                subject = form.email_subject()
+                body = form.render_email_body(
+                    user_agent=request.headers.get("user-agent", "Unknown")
+                )
 
-            message = EmailMessage(
-                subject=subject,
-                body=body,
-                to=["support@freelawproject.atlassian.net"],
-                reply_to=[cd.get("email", default_from) or default_from],
-            )
-            await sync_to_async(message.send)()
+                message = EmailMessage(
+                    subject=subject,
+                    body=body,
+                    to=["support@freelawproject.atlassian.net"],
+                    reply_to=[cd.get("email", default_from) or default_from],
+                )
+                await sync_to_async(message.send)()
             return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
