@@ -185,8 +185,8 @@ class ZohoModule:
     @staticmethod
     def _build_body_wrapper(
         records: list[Record],
-        triggers: list[str] | None = None,
         process: list[str] | None = None,
+        triggers: list[str] | None = None,
     ) -> BodyWrapper:
         """
         Wrap one or more Record instances in a BodyWrapper with optional process and trigger.
