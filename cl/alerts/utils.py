@@ -47,6 +47,7 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    DocketDocumentPlain,
     ESOpinionDocumentPlain,
     ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
@@ -708,7 +709,15 @@ def prepare_percolator_content(
             es_document_index = AudioDocument._index._name
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
-            es_document_index = DocketDocument._index._name
+            model = apps.get_model(app_label)
+            docket = model.objects.get(pk=document_id)
+            document_content_plain = DocketDocumentPlain().prepare(docket)
+            del document_content_plain["docket_child"]
+            documents_to_percolate = (
+                document_content_plain,
+                None,
+                None,
+            )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
             model = apps.get_model(app_label)
@@ -771,17 +780,52 @@ def set_skip_percolation_if_bankruptcy_data(
         d.skip_percolator_request = True
 
 
+def _exceeds_attorney_limit(
+    parties_data: list[dict[str, Any]], limit: int
+) -> bool:
+    """Check if total attorneys in parties data exceeds the given limit.
+
+    Stops counting early once the limit is exceeded for efficiency, since
+    parties data can be very large.
+
+    :param parties_data: A list of dicts containing the parties data.
+    :param limit: The maximum number of attorneys allowed.
+    :return: True if the total number of attorneys exceeds the limit.
+    """
+    count = 0
+    for party in parties_data:
+        count += len(party.get("attorneys", []))
+        if count > limit:
+            return True
+    return False
+
+
 def set_skip_percolation_if_parties_data(
     parties_data: list[dict[str, Any]], d: Docket
-) -> None:
+) -> bool:
     """Set skip percolation flag if parties data is present.
+
+    If parties data is available and the attorney count does not exceed the
+    limit, percolation is skipped during docket save(), since percolation
+    will be scheduled after merging and indexing parties.
 
     :param parties_data: A list of dicts containing the parties data.
     :param d: The docket to be saved.
-    :return: None
+    :return: True if the docket should be percolated after merging parties,
+    False otherwise.
     """
-    if parties_data:
-        d.skip_percolator_request = True
+    if not parties_data:
+        return False
+
+    if _exceeds_attorney_limit(
+        parties_data, settings.MAX_ATTORNEYS_TO_PERCOLATE
+    ):
+        # Party limit exceeded. Do not skip percolation. The docket will be
+        # percolated without considering parties via the ES signal processor.
+        return False
+
+    d.skip_percolator_request = True
+    return True
 
 
 def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
