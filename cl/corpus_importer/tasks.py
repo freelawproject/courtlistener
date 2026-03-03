@@ -3831,10 +3831,10 @@ def merge_texas_docket_originating_court(
 
     originating_court_information = docket.originating_court_information
     originating_court_data = docket_data["originating_court"]
+    oc_docket_number = originating_court_data["case"]
 
-    originating_court_information.docket_number = originating_court_data[
-        "case"
-    ]
+    originating_court_information.docket_number = oc_docket_number
+    originating_court_information.docket_number_raw = oc_docket_number
     originating_court_information.court_reporter = originating_court_data[
         "reporter"
     ]
@@ -4098,7 +4098,7 @@ def merge_texas_docket(
     :param docket_data: The scraped Texas docket data.
 
     :return: The result of the merge operation."""
-    court = Court.objects.get(
+    lower_court = Court.objects.get(
         pk=texas_js_court_id_to_court_id(docket_data["court_id"])
     )
     docket_number = docket_data["docket_number"]
@@ -4128,10 +4128,10 @@ def merge_texas_docket(
                 logger.info(
                     "Disaggregating Texas appellate docket %s", docket_number
                 )
-                docket.court = court
+                docket.court = lower_court
         if docket is None:
             docket = async_to_sync(find_docket_object)(
-                court_id=court.pk,
+                court_id=lower_court.pk,
                 pacer_case_id=None,
                 docket_number=docket_number,
                 federal_defendant_number=None,
@@ -4154,56 +4154,46 @@ def merge_texas_docket(
             logger.error(
                 "Failed to update originating court information for Texas docket %s in court %s",
                 docket.docket_number,
-                court.pk,
+                lower_court.pk,
             )
 
-        if docket_data["court_type"] == CourtType.APPELLATE.value:
+        if (
+            docket_data["court_type"] == CourtType.APPELLATE.value
+            or docket_data["appeals_court"]["court_id"]
+            == CourtID.UNKNOWN.value
+        ):
             lower_court_data = docket_data["originating_court"]
             lower_court_id = texas_originating_court_to_court_id(
                 lower_court_data
             )
         else:
-            if (
-                docket_data["appeals_court"]["court_id"]
-                == CourtID.UNKNOWN.value
-            ):
-                lower_court_data = docket_data["originating_court"]
-                lower_court_id = texas_originating_court_to_court_id(
-                    lower_court_data
-                )
-            else:
-                lower_court_data = docket_data["appeals_court"]
-                lower_court_id = texas_js_court_id_to_court_id(
-                    lower_court_data["court_id"]
-                )
+            lower_court_data = docket_data["appeals_court"]
+            lower_court_id = texas_js_court_id_to_court_id(
+                lower_court_data["court_id"]
+            )
 
-        court_name = None
+        lower_court_name = None
         if lower_court_id is not None:
             try:
-                court = Court.objects.get(pk=lower_court_id)
+                lower_court = Court.objects.get(pk=lower_court_id)
             except Court.DoesNotExist:
                 logger.error(
                     "Could not find lower court with ID %s to set appeal_from for Texas docket.",
                     lower_court_id,
                 )
             else:
-                docket.appeal_from = court
-                court_name = court.full_name
-        if not court_name:
+                docket.appeal_from = lower_court
+                lower_court_name = lower_court.full_name
+        if not lower_court_name:
             logger.warning(
                 "Failed to find court ID %s while populating appeal_from field for Texas docket %s in court %s",
                 lower_court_id,
                 docket.pk,
-                court.pk,
+                lower_court.pk,
             )
             # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
-            court_name = lower_court_data["name"]
-        logger.info(
-            "Updating lower court info with court %s (ID %s).",
-            court_name,
-            lower_court_id,
-        )
-        docket.appeal_from_str = court_name
+            lower_court_name = lower_court_data.get("name", "")
+        docket.appeal_from_str = lower_court_name
 
         docket.save()
 
@@ -4212,7 +4202,7 @@ def merge_texas_docket(
         logger.error(
             "Failed to merge party data for Texas docket %s in court %s",
             docket.docket_number,
-            court.pk,
+            lower_court.pk,
         )
 
     entry_merge_results = [
@@ -4235,7 +4225,7 @@ def merge_texas_docket(
         logger.error(
             "Failed to merge CaseTransfer data for Texas docket %s in court %s",
             docket.docket_number,
-            court.pk,
+            lower_court.pk,
         )
 
     create = (
@@ -4300,17 +4290,16 @@ def texas_ingest_docket_task(
                 parser = TexasSupremeCourtScraper()
             case "coscca":
                 parser = TexasCourtOfCriminalAppealsScraper()
+            case court_code if court_code.startswith("coa"):
+                parser = TexasCourtOfAppealsScraper(meta.court_code)
             case _:
-                if meta.court_code.startswith("coa"):
-                    parser = TexasCourtOfAppealsScraper(meta.court_code)
-                else:
-                    logger.error(
-                        "Unrecognized Texas court type %s. Cannot parse docket %s.",
-                        meta.court_code,
-                        meta.case_number,
-                    )
-                    task.request.chain = None
-                    return MergeResult.failed()
+                logger.error(
+                    "Unrecognized Texas court type %s. Cannot parse docket %s.",
+                    meta.court_code,
+                    meta.case_number,
+                )
+                task.request.chain = None
+                return MergeResult.failed()
 
         parser._parse_text(content.decode("utf-8"))
         docket_data = parser.data
