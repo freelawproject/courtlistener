@@ -25,14 +25,7 @@ cl/                     # Main Django project
 
 ## Frontend
 
-**If touching templates or CSS, read `FRONTEND.md` first.**
-
-CourtListener has two frontend stacks (legacy Bootstrap/jQuery and new Tailwind/Alpine/Cotton). Key rules for new templates:
-
-- MUST extend `new_base.html`, not `base.html`
-- MUST NOT use jQuery, Bootstrap, Font Awesome, React, or `{% include %}`
-- Use Cotton components (`<c-...>`), not `{% include %}`
-- Tailwind classes MUST be complete strings — never dynamically constructed
+CourtListener has two frontend stacks (legacy Bootstrap/jQuery and new Tailwind/Alpine/Cotton). Before writing any frontend code, MUST determine which stack you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not mix stacks.
 
 ## Coding Rules
 

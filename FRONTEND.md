@@ -10,6 +10,8 @@
 
 CourtListener is migrating from Bootstrap 3 / jQuery to Tailwind / Alpine.js / Cotton. Both stacks coexist.
 
+**Before writing any frontend code, determine which stack you're working in.** Check whether the template extends `base.html` (legacy) or `new_base.html` (new), or whether a `v2_` counterpart exists. If unclear, ask. The two stacks use different technologies and conventions — mixing them causes subtle, hard-to-debug breakage.
+
 | | Legacy | New (redesign) |
 |---|---|---|
 | Base template | `base.html` | `new_base.html` |
