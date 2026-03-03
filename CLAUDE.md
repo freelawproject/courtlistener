@@ -14,15 +14,25 @@ Rules and guidance on our wiki is written with flexibility for humans, but MUST 
 
 ```
 cl/                     # Main Django project
-├── assets/            # Static files, templates, React components
-│   ├── templates/     # Django templates (base.html, etc.)
-│   ├── react/         # React/TypeScript components
+├── assets/            # Static files, templates, components
+│   ├── templates/     # Django templates
 │   └── static-global/ # Global CSS/JS
 ├── lib/               # Shared utilities
 ├── tests/             # Test utilities and base classes
 └── [app]/             # Individual Django apps (search, alerts, etc.)
 ```
 
+
+## Frontend
+
+**If touching templates or CSS, read `FRONTEND.md` first.**
+
+CourtListener has two frontend stacks (legacy Bootstrap/jQuery and new Tailwind/Alpine/Cotton). Key rules for new templates:
+
+- MUST extend `new_base.html`, not `base.html`
+- MUST NOT use jQuery, Bootstrap, Font Awesome, React, or `{% include %}`
+- Use Cotton components (`<c-...>`), not `{% include %}`
+- Tailwind classes MUST be complete strings — never dynamically constructed
 
 ## Coding Rules
 
