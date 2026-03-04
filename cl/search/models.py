@@ -42,11 +42,13 @@ from cl.lib import fields
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
     CSVExportMixin,
+    is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
     make_recap_path,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
@@ -270,6 +272,18 @@ class SOURCES:
         if len(source1) > len(source2):
             return source1
         return source2
+
+
+class DocketNumberSources:
+    ORIGINAL = 0
+    AUTOMATED = 1
+    MANUAL = 2
+
+    CHOICES = (
+        (ORIGINAL, "Original from source"),
+        (AUTOMATED, "Automatically cleaned using heuristics and LLM"),
+        (MANUAL, "Manually cleaned by a human"),
+    )
 
 
 @pghistory.track()
@@ -629,6 +643,15 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         default="",
     )
+    docket_number_source = models.PositiveSmallIntegerField(
+        help_text=(
+            "The source of the docket number, "
+            "whether they came from the original source, "
+            "were automatically cleaned, or were manually cleaned."
+        ),
+        choices=DocketNumberSources.CHOICES,
+        default=DocketNumberSources.ORIGINAL,
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
@@ -850,11 +873,18 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if self.docket_number and not self.docket_number_core:
-            self.docket_number_core = (
-                make_scotus_docket_number_core(self.docket_number)
-                if self.court_id == "scotus"
-                else make_docket_number_core(self.docket_number)
-            )
+            if self.court_id == "scotus":
+                self.docket_number_core = make_scotus_docket_number_core(
+                    self.docket_number
+                )
+            elif is_texas_court(self.court_id):
+                self.docket_number_core = make_texas_docket_number_core(
+                    self.docket_number
+                )
+            else:
+                self.docket_number_core = make_docket_number_core(
+                    self.docket_number
+                )
 
         if self.source in self.RECAP_SOURCES():
             for field in ["pacer_case_id", "docket_number"]:

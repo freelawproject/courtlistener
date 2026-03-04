@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
+from django.http import QueryDict
 from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -71,6 +72,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.forms import SearchForm
 from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.management.commands import populate_docket_number_raw
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
@@ -3858,3 +3860,75 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             {str(self.docket_4.id)},
             "Redis cache set should contain docket_4 only",
         )
+
+
+class SearchFormCourtCleanTest(TestCase):
+    """Tests that SearchForm.clean() correctly normalizes court selection inputs."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
+        cls.court_ca2 = CourtFactory(id="ca2", jurisdiction="F")
+
+    def test_picker_syntax_is_normalized_into_court_field(self) -> None:
+        """Picker syntax populates canonical 'court' filter."""
+
+        # Single court selected via picker
+        form = SearchForm(
+            QueryDict("q=test&type=o&court_scotus=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        self.assertEqual(cd["court"], "scotus")
+
+        # Multiple courts selected via picker
+        form = SearchForm(
+            QueryDict("q=test&type=o&court_scotus=on&court_ca1=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        self.assertTrue(cd["court_scotus"])
+        self.assertTrue(cd["court_ca1"])
+        court_ids = set(cd["court"].split())
+        self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_picker_court_logic_is_preserved(self) -> None:
+        """Canonical `court` param populates individual `court_<id>` for frontend picker."""
+        form = SearchForm(
+            QueryDict("q=test&type=o&court=scotus+ca1"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        self.assertTrue(cd["court_scotus"])
+        self.assertTrue(cd["court_ca1"])
+        court_ids = set(cd["court"].split())
+        self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_picker_and_canonical_inputs_are_merged(self) -> None:
+        """When both picker and canonical params are present, they are merged."""
+        form = SearchForm(
+            QueryDict("q=test&type=o&court=scotus+ca1&court_ca1=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        court_ids = set(cd["court"].split())
+        self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_no_court_selection_results_in_empty_court_filter(self) -> None:
+        """With no court selection, all picker booleans default to True"""
+        form = SearchForm(
+            QueryDict("q=test&type=o"),
+            courts=[self.court_scotus, self.court_ca1],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        # All courts default to True
+        self.assertTrue(cd["court_scotus"])
+        self.assertTrue(cd["court_ca1"])
+        # But court field stays empty — no ES filter
+        self.assertEqual(cd["court"], "")
