@@ -43,6 +43,7 @@ from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
+from storages.backends.s3 import S3Storage
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.alerts.utils import (
@@ -82,7 +83,7 @@ from cl.lib.pacer_session import (
     get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import get_document_filename
-from cl.lib.storage import RecapEmailSESStorage
+from cl.lib.storage import RecapEmailSESStorage, TexasEmailSESStorage
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -125,6 +126,20 @@ from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
+
+
+def retrieve_email_from_queue(epq: EmailProcessingQueue, bucket: S3Storage):
+    message_id = epq.message_id
+    # Try to read the file using utf-8.
+    # If it fails, fallback on iso-8859-1
+    try:
+        with bucket.open(message_id, "rb") as f:
+            return f.read().decode("utf-8")
+    except UnicodeDecodeError:
+        with bucket.open(message_id, "rb") as f:
+            return f.read().decode("iso-8859-1")
+    except FileNotFoundError as exc:
+        raise exc
 
 
 async def process_recap_upload(pq: ProcessingQueue) -> None:
@@ -3099,16 +3114,8 @@ def open_and_validate_email_notification(
     or None otherwise, the raw notification body to store in next steps.
     """
 
-    message_id = epq.message_id
-    bucket = RecapEmailSESStorage()
-    # Try to read the file using utf-8.
-    # If it fails fallback on iso-8859-1
     try:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("utf-8")
-    except UnicodeDecodeError:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("iso-8859-1")
+        body = retrieve_email_from_queue(epq, RecapEmailSESStorage())
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             msg = "File not found."
@@ -3658,4 +3665,52 @@ def process_texas_email(self: Task, epq: EmailProcessingQueue) -> None:
     :param epq: The EmailProcessingQueue object representing the email to\
         process
     """
-    raise NotImplementedError
+    async_to_sync(mark_pq_status)(
+        epq,
+        "Processing TAMES CaseMail email",
+        PROCESSING_STATUS.IN_PROGRESS,
+        "status_message",
+    )
+
+    try:
+        body = retrieve_email_from_queue(epq, TexasEmailSESStorage())
+    except FileNotFoundError as exc:
+        if self.request.retries == self.max_retries:
+            async_to_sync(mark_pq_status)(
+                epq,
+                "File not found.",
+                PROCESSING_STATUS.FAILED,
+                "status_message",
+            )
+            self.request.chain = None
+            return None
+        else:
+            raise self.retry(exc=exc)
+
+    # TODO Implement once Texas email parser is ready
+    # texas_email_parser = TexasEmail()
+    # texas_email._parse_text
+    # data = texas_email.data
+
+    try:
+        # d = merge_texas_docket(data)
+        pass
+    except Exception as e:
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"SCOTUS docket update error: {e}",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+    else:
+        async_to_sync(associate_related_instances)(
+            epq,
+            # d_id=d.pk,
+            de_id=None,
+            rd_id=None,
+        )
+        msg = f"Texas docket {data['docket_number']} updated successfully."
+        status = PROCESSING_STATUS.SUCCESSFUL
+        async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
+
+    return None
