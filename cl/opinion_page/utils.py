@@ -4,6 +4,7 @@ import traceback
 from dataclasses import dataclass, field
 from io import StringIO
 
+import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
@@ -282,6 +283,15 @@ async def es_get_related_clusters_with_cache(
     if is_bot(request) or not sub_opinion_pks:
         return related_cluster_result
 
+    if not await sync_to_async(waffle.flag_is_active)(
+        request, "citing_and_related_enabled"
+    ):
+        # Don't perform any queries if citing_and_related_enabled is disabled.
+        # Return True for timeout to display buttons for users to click.
+        return RelatedClusterResults(
+            url_search_params=url_search_params, timeout=True
+        )
+
     cached_related_clusters, timeout_related = (
         await cache.aget(mlt_cache_key) or (None, False)
         if settings.RELATED_USE_CACHE
@@ -363,6 +373,18 @@ async def es_get_cited_clusters_with_cache(
     cluster_results = RelatedCitingResults()
     if is_bot(request) or not sub_opinion_pks:
         return cluster_results
+
+    if not await sync_to_async(waffle.flag_is_active)(
+        request, "citing_and_related_enabled"
+    ):
+        # Don't perform any queries if citing_and_related_enabled is disabled.
+        # Return True for timeout to display buttons for users to click.
+        url_search_params = {
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
+        }
+        return RelatedCitingResults(
+            url_search_params=url_search_params, timeout=True
+        )
 
     cached_citing_results, cached_citing_clusters_count, timeout_cited = (
         await cache.aget(cache_citing_key) or (None, False, False)

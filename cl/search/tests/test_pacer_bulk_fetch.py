@@ -228,7 +228,7 @@ class BulkFetchPacerDocsTest(TestCase):
                 self.assertNotIn(doc.pk, called_args)
 
     @patch(
-        "cl.search.management.commands.pacer_bulk_fetch.extract_recap_pdf.si"
+        "cl.search.management.commands.pacer_bulk_fetch.extract_pdf_document.si"
     )
     def test_fetch_queue_processing(
         self,

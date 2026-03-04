@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import operator
+import pickle
 import re
 import time
 import traceback
@@ -18,7 +19,6 @@ from django.core.paginator import Page
 from django.db.models import Case, QuerySet, TextField, When
 from django.db.models import Q as QObject
 from django.db.models.functions import Substr
-from django.forms.boundfield import BoundField
 from django.http.request import QueryDict
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
@@ -33,8 +33,10 @@ from elasticsearch_dsl.utils import AttrDict, AttrList
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.courts import lookup_child_courts_cache
+from cl.lib.crypto import sha256
 from cl.lib.date_time import midnight_pt
 from cl.lib.microservice_utils import microservice
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -1620,46 +1622,6 @@ def build_child_docs_query(
     return Q(query_dict)
 
 
-def get_only_status_facets(
-    search_query: Search, search_form: SearchForm
-) -> list[BoundField]:
-    """Create a useful facet variable to use in a template
-
-    This method creates an Elasticsearch query with the status aggregations
-    and sets the size to 0 to ensure that no documents are returned.
-    :param search_query: The Elasticsearch search query object.
-    :param search_form: The form displayed in the user interface
-    """
-    search_query = search_query.extra(size=0)
-    # filter out opinions and get just the clusters
-    search_query = search_query.query(
-        Q("bool", must=Q("match", cluster_child="opinion_cluster"))
-    )
-    search_query.aggs.bucket("status", A("terms", field="status.raw"))
-    response = search_query.execute()
-    return make_es_stats_variable(search_form, response)
-
-
-def get_facet_dict_for_search_query(
-    search_query: Search, cd: CleanData, search_form: SearchForm
-):
-    """Create facets variables to use in a template omitting the stat_ filter
-    so the facets counts consider cluster for all status.
-
-    :param search_query: The Elasticsearch search query object.
-    :param cd: The user input CleanedData
-    :param search_form: The form displayed in the user interface
-    """
-
-    cd["just_facets_query"] = True
-    es_queries = build_es_base_query(search_query, cd)
-    search_query = es_queries.search_query
-    search_query.aggs.bucket("status", A("terms", field="status.raw"))
-    search_query = search_query.extra(size=0)
-    response = search_query.execute()
-    return make_es_stats_variable(search_form, response)
-
-
 def build_es_main_query(
     search_query: Search, cd: CleanData
 ) -> tuple[Search, Search | None, int | None]:
@@ -2671,6 +2633,22 @@ def build_search_feed_query(
     return s
 
 
+def process_feed_query_results(
+    response: Response, cd: CleanData, jurisdiction: bool
+) -> None:
+    """Process feed query results by applying highlighting and limiting hits.
+
+    :param response: The Elasticsearch DSL response.
+    :param cd: The query CleanedData.
+    :param jurisdiction: Whether this is a jurisdiction query.
+    :return: None. The function modifies the response in place.
+    """
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        if not jurisdiction:
+            limit_inner_hits(cd, response, cd["type"])
+    set_results_highlights(response, cd["type"])
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
@@ -2678,7 +2656,7 @@ def do_es_feed_query(
     jurisdiction: bool = False,
     exclude_docs_for_empty_field: str = "",
 ) -> Response | list:
-    """Execute an Elasticsearch query for podcasts.
+    """Execute an Elasticsearch query for feeds with optional micro-caching.
 
     :param search_query: Elasticsearch DSL Search object
     :param cd: The query CleanedData
@@ -2690,17 +2668,51 @@ def do_es_feed_query(
     :return: The Elasticsearch DSL response.
     """
 
+    # Check micro-cache if enabled
+    if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
+        # Create cache parameters from cleaned data
+        cache_params = cd.copy()
+        cache_params["rows"] = rows
+        cache_params["jurisdiction"] = jurisdiction
+        if exclude_docs_for_empty_field:
+            cache_params["exclude_field"] = exclude_docs_for_empty_field
+
+        # Generate cache key
+        sorted_params = dict(sorted(cache_params.items()))
+        params_hash = sha256(pickle.dumps(sorted_params))
+
+        cache = get_s3_cache("default")
+        cache_key = make_s3_cache_key(
+            f"search_feed_cache:{params_hash}",
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+        # Try to retrieve from cache
+        cached_results = cache.get(cache_key)
+        if cached_results:
+            response = pickle.loads(cached_results)
+            # Process cached results
+            process_feed_query_results(response, cd, jurisdiction)
+            return response
+
+    # Execute ES query if not cached
     s = build_search_feed_query(
         search_query, cd, jurisdiction, exclude_docs_for_empty_field
     )
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
-    if cd["type"] == SEARCH_TYPES.OPINION:
-        # Merge the text field for Opinions.
-        if not jurisdiction:
-            limit_inner_hits(cd, response, cd["type"])
 
-    set_results_highlights(response, cd["type"])
+    # Cache the raw response before processing if caching is enabled
+    if settings.ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED:
+        serialized_data = pickle.dumps(response)
+        cache.set(
+            cache_key,
+            serialized_data,
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+
+    # Process results
+    process_feed_query_results(response, cd, jurisdiction)
+
     return response
 
 
@@ -3273,44 +3285,6 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
         result["joined_by_ids"] = opinion["joined_by_ids"]
         result["court_exact"] = opinion["joined_by_ids"]
         result["status_exact"] = result["status"]
-
-
-def make_es_stats_variable(
-    search_form: SearchForm,
-    results: Page | Response,
-) -> list[BoundField]:
-    """Create a useful facet variable for use in a template
-
-    :param search_form: The form displayed in the user interface
-    :param results: The Page or Response containing the results to add the
-    status aggregations.
-    """
-
-    facet_fields = []
-    try:
-        if isinstance(results, Page):
-            aggregations = results.paginator.aggregations.to_dict()  # type: ignore
-            buckets = aggregations["status"]["buckets"]
-        else:
-            buckets = results.aggregations.status.buckets
-        facet_values = {group["key"]: group["doc_count"] for group in buckets}
-    except (KeyError, AttributeError):
-        facet_values = {}
-
-    for field in search_form:
-        if not field.html_name.startswith("stat_"):
-            continue
-
-        try:
-            count = facet_values[field.html_name.replace("stat_", "")]
-        except KeyError:
-            # Happens when a field is iterated on that doesn't exist in the
-            # facets variable
-            count = 0
-
-        field.count = count
-        facet_fields.append(field)
-    return facet_fields
 
 
 def do_es_api_query(

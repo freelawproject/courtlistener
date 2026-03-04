@@ -12,7 +12,7 @@
 <p>To look up a particular docket, use its ID:</p>
 <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-detail" version=version pk="4214664" %}"</pre>
+"{% get_full_host %}{% url "docket-detail" version=version pk="4214664" %}"</pre>
 <p>The response you get will not list the docket entries, parties, or attorneys for the docket (doing so doesn't scale), but will have many other metadata fields:
 </p>
 <pre class="pre-scrollable tall">{
