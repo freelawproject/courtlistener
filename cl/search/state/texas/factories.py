@@ -2,6 +2,7 @@
 
 import random
 
+import factory
 from factory import DictFactory, Faker, List, SubFactory
 from factory.declarations import LazyAttribute
 from factory.django import DjangoModelFactory
@@ -23,10 +24,25 @@ class TexasCaseDocumentDictFactory(DictFactory):
 class TexasDocketEntryDictFactory(DictFactory):
     date = Faker("date_object")
     type = Faker("pystr", min_chars=3, max_chars=3)
-    disposition = Faker("text")
-    description = Faker("text")
-    remarks = Faker("text")
     attachments = List([SubFactory(TexasCaseDocumentDictFactory)])
+
+
+class TexasAppellateBriefDictFactory(TexasDocketEntryDictFactory):
+    description = Faker("text")
+
+
+class TexasSupremeCourtAppellateBriefDictFactory(
+    TexasAppellateBriefDictFactory
+):
+    remarks = Faker("text")
+
+
+class TexasCaseEventDictFactory(TexasDocketEntryDictFactory):
+    disposition = Faker("text")
+
+
+class TexasSupremeCourtCaseEventDictFactory(TexasCaseEventDictFactory):
+    remarks = Faker("text")
 
 
 class TexasCasePartyDictFactory(DictFactory):
@@ -100,12 +116,19 @@ class TexasCommonDataDictFactory(DictFactory):
     case_type = Faker("pystr")
     parties = List([SubFactory(TexasCasePartyDictFactory)])
     originating_court = SubFactory(TexasOriginatingCourtDictFactory)
-    case_events = List([SubFactory(TexasDocketEntryDictFactory)])
+    case_events = List([SubFactory(TexasCaseEventDictFactory)])
     appellate_briefs = LazyAttribute(
         lambda d: list(
-            filter(
-                lambda e: True if random.random() < 0.1 else False,
-                d.case_events,
+            map(
+                lambda ce: TexasAppellateBriefDictFactory(
+                    date=ce["date"],
+                    type=ce["type"],
+                    attachments=ce["attachments"],
+                ),
+                filter(
+                    lambda e: True if random.random() < 0.1 else False,
+                    d.case_events,
+                ),
             )
         )
     )
@@ -209,3 +232,28 @@ class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
             CourtID.COURT_OF_CRIMINAL_APPEALS.value,
         ),
     )
+
+    @factory.post_generation
+    @staticmethod
+    def set_sc(obj, create, extracted, **kwargs):
+        if not create:
+            return
+        if obj["court_id"] == CourtID.SUPREME_COURT.value:
+            obj["case_events"] = map(
+                lambda ce: TexasSupremeCourtCaseEventDictFactory(
+                    date=ce["date"],
+                    type=ce["type"],
+                    attachments=ce["attachments"],
+                    disposition=ce["disposition"],
+                ),
+                obj["case_events"],
+            )
+            obj["appellate_briefs"] = map(
+                lambda ab: TexasSupremeCourtAppellateBriefDictFactory(
+                    date=ab["date"],
+                    type=ab["type"],
+                    attachments=ab["attachments"],
+                    description=ab["description"],
+                ),
+                obj["appellate_briefs"],
+            )
