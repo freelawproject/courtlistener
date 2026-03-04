@@ -4103,7 +4103,7 @@ def merge_texas_docket(
     :param docket_data: The scraped Texas docket data.
 
     :return: The result of the merge operation."""
-    lower_court = Court.objects.get(
+    court = Court.objects.get(
         pk=texas_js_court_id_to_court_id(docket_data["court_id"])
     )
     docket_number = docket_data["docket_number"]
@@ -4133,10 +4133,10 @@ def merge_texas_docket(
                 logger.info(
                     "Disaggregating Texas appellate docket %s", docket_number
                 )
-                docket.court = lower_court
+                docket.court = court
         if docket is None:
             docket = async_to_sync(find_docket_object)(
-                court_id=lower_court.pk,
+                court_id=court.pk,
                 pacer_case_id=None,
                 docket_number=docket_number,
                 federal_defendant_number=None,
@@ -4159,7 +4159,7 @@ def merge_texas_docket(
             logger.error(
                 "Failed to update originating court information for Texas docket %s in court %s",
                 docket.docket_number,
-                lower_court.pk,
+                court.pk,
             )
 
         if (
