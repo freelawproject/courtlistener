@@ -4080,7 +4080,12 @@ def generate_texas_appellate_brief_flags(
     next_brief = next(brief_iter, None)
     flags = []
     for case_event in case_events:
-        if next_brief is not None and case_event == next_brief:
+        if (
+            next_brief is not None
+            and case_event["date"] == next_brief["date"]
+            and case_event["type"] == next_brief["type"]
+            and case_event["attachments"] == next_brief["attachments"]
+        ):
             flags.append(True)
             next_brief = next(brief_iter, None)
         else:
@@ -4185,12 +4190,6 @@ def merge_texas_docket(
                 docket.appeal_from = lower_court
                 lower_court_name = lower_court.full_name
         if not lower_court_name:
-            logger.warning(
-                "Failed to find court ID %s while populating appeal_from field for Texas docket %s in court %s",
-                lower_court_id,
-                docket.pk,
-                lower_court.pk,
-            )
             # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
             lower_court_name = lower_court_data.get("name", "")
         docket.appeal_from_str = lower_court_name
@@ -4202,7 +4201,7 @@ def merge_texas_docket(
         logger.error(
             "Failed to merge party data for Texas docket %s in court %s",
             docket.docket_number,
-            lower_court.pk,
+            court.pk,
         )
 
     entry_merge_results = [
@@ -4225,7 +4224,7 @@ def merge_texas_docket(
         logger.error(
             "Failed to merge CaseTransfer data for Texas docket %s in court %s",
             docket.docket_number,
-            lower_court.pk,
+            court.pk,
         )
 
     create = (
