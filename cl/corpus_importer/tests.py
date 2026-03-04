@@ -85,6 +85,7 @@ from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
     download_texas_document_pdf,
     generate_ia_json,
+    generate_texas_appellate_brief_flags,
     get_and_save_free_document_report,
     merge_texas_case_transfers,
     merge_texas_docket,
@@ -171,6 +172,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.state.texas.factories import (
+    TexasAppellateBriefDictFactory,
     TexasAppellateCourtInfoDictFactory,
     TexasAppellateTransferDictFactory,
     TexasCaseDocumentDictFactory,
@@ -186,6 +188,7 @@ from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
+from cl.tests.providers import fake
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -2179,6 +2182,36 @@ class TexasMergerTest(TestCase):
         self.download_task_patch.stop()
         self.extract_pdf_document_patch.stop()
         self.download_pdf_patch.stop()
+
+    def test_generate_appellate_brief_flags(self):
+        n_events = fake.random_int(min=0, max=30)
+        case_events = [TexasCaseEventDictFactory() for _ in range(n_events)]
+
+        appellate_brief_indices = sorted(
+            fake.random_elements(range(len(case_events)), unique=True)
+        )
+
+        appellate_briefs = [
+            TexasAppellateBriefDictFactory(
+                date=case_events[i]["date"],
+                type=case_events[i]["type"],
+                attachments=case_events[i]["attachments"],
+            )
+            for i in appellate_brief_indices
+        ]
+
+        appellate_brief_flags = generate_texas_appellate_brief_flags(
+            case_events, appellate_briefs
+        )
+
+        actual_flags = [
+            True if i in appellate_brief_indices else False
+            for i in range(len(case_events))
+        ]
+
+        assert appellate_brief_flags == actual_flags, (
+            f"Incorrect appellate brief flags ({appellate_brief_flags}!={actual_flags}).\nCase events: {case_events}\nAppellate briefs: {appellate_briefs}"
+        )
 
     def test_merge_texas_document_new_document(self):
         """Can we correctly add a new attachment to an existing docket entry?"""
