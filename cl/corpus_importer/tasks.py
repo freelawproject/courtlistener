@@ -3830,27 +3830,34 @@ def merge_texas_docket_originating_court(
         docket.originating_court_information = OriginatingCourtInformation()
 
     originating_court_information = docket.originating_court_information
-    originating_court_data = docket_data["originating_court"]
-    oc_docket_number = originating_court_data["case"]
 
-    originating_court_information.docket_number = oc_docket_number
-    originating_court_information.docket_number_raw = oc_docket_number
-    originating_court_information.court_reporter = originating_court_data[
-        "reporter"
-    ]
-    originating_court_information.assigned_to_str = originating_court_data[
-        "judge"
-    ]
-    originating_court_id = texas_originating_court_to_court_id(
-        originating_court_data
-    )
+    if (
+        docket_data["court_type"] == CourtType.APPELLATE.value
+        or docket_data["appeals_court"]["court_id"] == CourtID.UNKNOWN.value
+    ):
+        ocd = docket_data["originating_court"]
+        oc_dn = ocd["case"]
+        oc_reporter = ocd["reporter"]
+        oc_judge = ocd["judge"]
+        oc_id = texas_originating_court_to_court_id(ocd)
+    else:
+        ocd = docket_data["appeals_court"]
+        oc_dn = ocd["case_number"]
+        oc_reporter = ""
+        oc_judge = ocd["justice"]
+        oc_id = texas_js_court_id_to_court_id(ocd["court_id"])
+
+    originating_court_information.docket_number = oc_dn
+    originating_court_information.docket_number_raw = oc_dn
+    originating_court_information.court_reporter = oc_reporter
+    originating_court_information.assigned_to_str = oc_judge
     # Only update judge if we're able to associate them with a court.
-    if originating_court_id:
+    if oc_id:
         async_to_sync(lookup_judge_by_full_name_and_set_attr)(
             item=originating_court_information,
             target_field="assigned_to",
-            full_name=originating_court_data["judge"],
-            court_id=originating_court_id,
+            full_name=oc_judge,
+            court_id=oc_id,
             event_date=None,
             require_living_judge=False,
         )
