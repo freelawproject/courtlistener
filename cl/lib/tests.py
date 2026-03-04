@@ -24,10 +24,14 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
+    clean_scotus_docket_number,
+    clean_texas_docket_number,
     is_docket_number,
+    is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
     make_upload_path,
 )
 from cl.lib.pacer import (
@@ -427,6 +431,64 @@ class TestModelHelpers(TestCase):
         # an empty string.
         self.assertEqual(make_docket_number_core(None), "")
 
+    def test_is_texas_court(self) -> None:
+        """Can we identify Texas courts?"""
+        test_cases = [
+            ("tex", True),
+            ("texcrimapp", True),
+            ("txctapp01", True),
+            ("texdistct127", True),
+            ("texcrimdistct127", True),
+            ("texctyct001", True),
+            ("scotus", False),
+            ("ca5", False),
+            ("txwd", False),  # Federal district in Texas
+        ]
+        for court_id, expected in test_cases:
+            with self.subTest(court_id=court_id):
+                self.assertEqual(is_texas_court(court_id), expected)
+
+    def test_clean_texas_docket_number(self) -> None:
+        """Can we extract Texas docket numbers from dirty input?"""
+        test_cases = [
+            ("Case Number: 04-97-00972-CV", "04-97-00972-CV"),
+            ("04-97-00972-CV", "04-97-00972-CV"),
+            ("AP-77,129", "AP-77,129"),
+            ("WR-70,849-04", "WR-70,849-04"),
+            ("A-4369-A", "A-4369-A"),
+            (None, ""),
+            ("", ""),
+            ("garbage text", ""),
+        ]
+        for input_dn, expected in test_cases:
+            with self.subTest(input_dn=input_dn):
+                self.assertEqual(clean_texas_docket_number(input_dn), expected)
+
+    def test_texas_docket_number_core(self) -> None:
+        """Can we correctly normalize Texas docket numbers?"""
+        self.assertEqual(
+            make_texas_docket_number_core("04-97-00972-CV"), "049700972cv"
+        )
+        self.assertEqual(
+            make_texas_docket_number_core("01-18-00277-CR"), "011800277cr"
+        )
+        self.assertEqual(make_texas_docket_number_core("AP-77,129"), "ap77129")
+        self.assertEqual(
+            make_texas_docket_number_core("WR-70,849-04"), "wr7084904"
+        )
+        self.assertEqual(make_texas_docket_number_core("A-4369-A"), "a4369a")
+        self.assertEqual(make_texas_docket_number_core("C-2302"), "c2302")
+
+        # Dirty input should be cleaned first, then normalized
+        self.assertEqual(
+            make_texas_docket_number_core("Case Number: 04-97-00972-CV"),
+            "049700972cv",
+        )
+
+        # Invalid input returns empty string
+        self.assertEqual(make_texas_docket_number_core("garbage text"), "")
+        self.assertEqual(make_texas_docket_number_core(None), "")
+
     def test_avoid_generating_docket_number_core(self) -> None:
         """Can we avoid generating docket_number_core when the docket number
         format doesn't match a valid format or if a string contains more than
@@ -474,9 +536,6 @@ class TestModelHelpers(TestCase):
             "12-cv-01032-JKG-MJL": "12-cv-01032",
             "Nos. 212-213, Dockets 27264, 27265": "",
             "Nos. 12-213, Dockets 27264, 27265": "12-213",
-            # SCOTUS A Dockets.
-            "Docket: 16A989": "16a989",
-            "Case  17A80": "17a80",
         }
 
         for raw, expected in test_cases.items():
@@ -517,6 +576,11 @@ class TestModelHelpers(TestCase):
             ("06-10672", "06010672"),
             # Non-matching SCOTUS docket numbers
             ("23-cv-001", ""),
+            # Mixed formats: NN-NNNN is prioritized over NNA
+            ("No. 01A576 (01-8099)", "01008099"),
+            ("No. 01-8148 (01A587)", "01008148"),
+            # Single NN-NNNN with multiple NNA is still valid
+            ("No. 01-8148 01A578 01A578", "01008148"),
         ]
 
         for input_value, expected in test_cases:
@@ -524,6 +588,66 @@ class TestModelHelpers(TestCase):
                 self.assertEqual(
                     make_scotus_docket_number_core(input_value), expected
                 )
+
+    @mock.patch("cl.lib.model_helpers.logger")
+    def test_making_scotus_docket_number_core_logs_multiple(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """Test that multiple docket numbers of the same type log an
+        error and return empty string.
+        """
+        error_cases = [
+            "No. 01A576 01A578",
+            "No. 01-8148 01-8149",
+        ]
+        for input_value in error_cases:
+            with self.subTest(input=input_value):
+                mock_logger.reset_mock()
+                result = make_scotus_docket_number_core(input_value)
+                self.assertEqual(result, "")
+                mock_logger.error.assert_called_once()
+
+    def test_clean_scotus_docket_number(self) -> None:
+        """Test clean_scotus_docket_number prioritizes NN-NNNN format."""
+        test_cases = {
+            # Empty/None inputs
+            None: "",
+            "": "",
+            # Single NN-NNNN format
+            "No. 01-8148": "01-8148",
+            "12-33112": "12-33112",
+            # Single NNA format
+            "16A985": "16a985",
+            "Docket: 01A576": "01a576",
+            # Mixed: NN-NNNN takes priority
+            "No. 01A576 (01-8099)": "01-8099",
+            "No. 01-8148 (01A587)": "01-8148",
+            # Single NN-NNNN with multiple NNA is valid
+            "No. 01-8148 01A578 01A579": "01-8148",
+            # No matches
+            "23-cv-001": "",
+        }
+        for raw, expected in test_cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_scotus_docket_number(raw), expected)
+
+    @mock.patch("cl.lib.model_helpers.logger")
+    def test_clean_scotus_docket_number_logs_multiple(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """Test that multiple same-type docket numbers log an error and
+        return empty string."""
+        error_cases = [
+            "No. 01A576 01A578",
+            "No. 01-8148 01-8149",
+            "01-8148, 01-8149 01A578",
+        ]
+        for raw in error_cases:
+            with self.subTest(raw=raw):
+                mock_logger.reset_mock()
+                result = clean_scotus_docket_number(raw)
+                self.assertEqual(result, "")
+                mock_logger.error.assert_called_once()
 
 
 class S3PrivateUUIDStorageTest(TestCase):
