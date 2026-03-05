@@ -38,6 +38,16 @@ class LLMTaskStatusChoices(models.IntegerChoices):
     FINISHED = 4, "LLM response processed"
 
 
+class LLMRequestStatusChoices(models.IntegerChoices):
+    """LLM Request status choices"""
+
+    UNPROCESSED = 0, "Unprocessed"
+    IN_PROGRESS = 1, "In Progress"
+    SUCCEEDED = 2, "LLM response received"
+    FAILED = 3, "Failed"
+    FINISHED = 4, "LLM response processed"
+
+
 class PromptTypes(models.IntegerChoices):
     """Prompt type choices"""
 
@@ -115,8 +125,8 @@ class LLMRequest(AbstractDateTimeModel):
     )
     status = models.SmallIntegerField(
         help_text="The current status of the request",
-        choices=LLMTaskStatusChoices,
-        default=LLMTaskStatusChoices.UNPROCESSED,
+        choices=LLMRequestStatusChoices,
+        default=LLMRequestStatusChoices.UNPROCESSED,
     )
     prompts = models.ManyToManyField(
         Prompt,
@@ -205,7 +215,7 @@ class LLMTask(AbstractDateTimeModel):
         help_text="A unique identifier from the LLM provider for this task, used to map results back from a batch job.",
     )
 
-    task = models.SmallIntegerField(
+    task_type = models.SmallIntegerField(
         help_text="The specific type of operation this task represents.",
         choices=LLMTaskChoices,
     )

@@ -856,6 +856,7 @@ class DocketAlertTest(TestCase):
             court_id="scotus",
             pacer_case_id="asdf",
             docket_number="12-cv-02354",
+            docket_number_raw="12-cv-02354",
             case_name="Vargas v. Wilkins",
         )
 
@@ -2006,6 +2007,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
             "type=oa&docket_number=19-1010&order_by=score+desc&stat_Published=": False,
             "q=hello": False,
             "filter=value": False,
+            "&highlight=on&semantic=true": True,
         }
 
         for query_string, expected in test_cases.items():

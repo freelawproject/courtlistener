@@ -10,6 +10,7 @@ from cl.ai.llm_providers.google import (
 from cl.ai.models import (
     LLMProvider,
     LLMRequest,
+    LLMRequestStatusChoices,
     LLMTask,
     LLMTaskChoices,
     LLMTaskStatusChoices,
@@ -40,7 +41,7 @@ class AiModelsTest(TestCase):
             is_batch=True,
             provider=LLMProvider.GEMINI,
             api_model_name="gemini-2.5-pro",
-            status=LLMTaskStatusChoices.UNPROCESSED,
+            status=LLMRequestStatusChoices.UNPROCESSED,
         )
         llm_request.prompts.add(prompt)
         self.assertEqual(LLMRequest.objects.count(), 1)
@@ -48,7 +49,7 @@ class AiModelsTest(TestCase):
 
         llm_task = LLMTask.objects.create(
             request=llm_request,
-            task=LLMTaskChoices.CASENAME,
+            task_type=LLMTaskChoices.CASENAME,
             content_object=self.docket,
             llm_key="test-key-1",
         )
