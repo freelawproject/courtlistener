@@ -82,6 +82,7 @@ from cl.corpus_importer.signals import (
     update_latest_case_id_and_schedule_iquery_sweep,
 )
 from cl.corpus_importer.tasks import (
+    MergeResult,
     classify_case_name_by_llm,
     download_texas_document_pdf,
     generate_ia_json,
@@ -2219,10 +2220,8 @@ class TexasMergerTest(TestCase):
 
         input_document = TexasCaseDocumentDictFactory()
 
-        # Run the function
         result = merge_texas_document(docket_entry, input_document)
 
-        # Assertions
         assert result.create is True
         assert result.success is True
         assert result.pk is not None
@@ -2258,10 +2257,8 @@ class TexasMergerTest(TestCase):
         current_document.filepath_local = "a"
         current_document.save()
 
-        # Run the function
         result = merge_texas_document(docket_entry, input_document)
 
-        # Assertions
         assert result.create is False
         assert result.success is True
         assert result.pk == current_document.pk
@@ -2286,7 +2283,6 @@ class TexasMergerTest(TestCase):
             media_id=input_document["media_id"],
         )
 
-        # Create an attachment
         current_document = TexasDocumentFactory.create(
             docket_entry=docket_entry,
             description=old_document["description"],
@@ -2295,10 +2291,8 @@ class TexasMergerTest(TestCase):
             url=old_document["document_url"],
         )
 
-        # Run the function
         result = merge_texas_document(docket_entry, input_document)
 
-        # Assertions
         assert result.create is False
         assert result.update is True
         assert result.success is True
@@ -3165,6 +3159,56 @@ class TexasMergerTest(TestCase):
         assert docket_sc.cause == docket_data["case_type"]
         assert docket_sc.appeal_from_id == "txctapp1"
         assert docket_sc.appeal_from_str == self.texas_coa1.full_name
+
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_case_transfers",
+        return_value=MergeResult.created(1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_docket_entry",
+        return_value=MergeResult.created(1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_parties",
+        return_value=MergeResult.created(1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_docket_originating_court",
+        return_value=MergeResult.created(1),
+    )
+    def test_merge_texas_docket_populates_all_fields(
+        self, mock_oci, mock_parties, mock_entry, mock_transfers
+    ):
+        """Does merge_texas_docket populate all Docket fields from input data?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert result.pk is not None
+
+        docket = Docket.objects.get(pk=result.pk)
+        assert docket.source & Docket.SCRAPER
+        assert docket.court_id == "txctapp1"
+        assert docket.docket_number == docket_data["docket_number"]
+        assert docket.docket_number_core == make_texas_docket_number_core(
+            docket_data["docket_number"]
+        )
+        assert docket.docket_number_raw == docket_data["docket_number"]
+        assert docket.case_name == docket_data["case_name"]
+        assert docket.case_name_full == docket_data["case_name_full"]
+        assert docket.date_filed == docket_data["date_filed"]
+        assert docket.cause == docket_data["case_type"]
+        assert docket.appeal_from_id == "texdistct6"
+        assert docket.appeal_from_str == texas_district.full_name
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

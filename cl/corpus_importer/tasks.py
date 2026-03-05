@@ -3786,7 +3786,9 @@ def normalize_texas_parties(
                     "contact": attorney,
                     "roles": ["LEAD_ATTORNEY"] if i == 0 else ["UNKNOWN"],
                 }
-                for i, attorney in enumerate(party["representatives"])
+                for i, attorney in enumerate(
+                    [rep for rep in party["representatives"] if len(rep) > 0]
+                )
             ],
         }
         for party in parties
@@ -4159,6 +4161,9 @@ def merge_texas_docket(
         )
         docket.date_filed = docket_data["date_filed"]
         docket.cause = docket_data["case_type"]
+        docket.case_name = docket_data["case_name"]
+        docket.case_name_full = docket_data["case_name_full"]
+        docket.docket_number_raw = docket_number
         originating_court_merge_result = merge_texas_docket_originating_court(
             docket, docket_data
         )
