@@ -178,12 +178,15 @@ from cl.search.state.texas.factories import (
     TexasAppellateTransferDictFactory,
     TexasCaseDocumentDictFactory,
     TexasCaseEventDictFactory,
+    TexasCasePartyDictFactory,
     TexasCourtOfAppealsDocketDictFactory,
     TexasDocketEntryFactory,
     TexasDocumentFactory,
     TexasFinalCourtDocketDictFactory,
     TexasOriginatingCourtDictFactory,
     TexasOriginatingDistrictCourtDictFactory,
+    TexasSupremeCourtAppellateBriefDictFactory,
+    TexasSupremeCourtCaseEventDictFactory,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
@@ -2184,6 +2187,36 @@ class TexasMergerTest(TestCase):
         self.extract_pdf_document_patch.stop()
         self.download_pdf_patch.stop()
 
+    def get_random_docket_entry_dict(self, **kwargs):
+        return fake.random_element(
+            (
+                TexasSupremeCourtAppellateBriefDictFactory(**kwargs),
+                TexasSupremeCourtCaseEventDictFactory(**kwargs),
+                TexasAppellateBriefDictFactory(**kwargs),
+                TexasCaseEventDictFactory(**kwargs),
+            )
+        )
+
+    def test_normalize_texas_parties_empty_atty_name(self):
+        party_0 = TexasCasePartyDictFactory(representatives=[""])
+        # Filter out empty representatives
+        parties = [party_0]
+
+        normalized = normalize_texas_parties(parties)
+
+        self.assertEqual(
+            normalized,
+            [
+                {
+                    "name": party_0["name"],
+                    "type": party_0["type"],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "attorneys": [],
+                }
+            ],
+        )
+
     def test_generate_appellate_brief_flags(self):
         n_events = fake.random_int(min=0, max=30)
         case_events = [TexasCaseEventDictFactory() for _ in range(n_events)]
@@ -2353,7 +2386,7 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_entry_new_entry(self):
         """Can we correctly handle a docket entry?"""
-        docket_entry = TexasCaseEventDictFactory(
+        docket_entry = self.get_random_docket_entry_dict(
             attachments=[TexasCaseDocumentDictFactory()],
             date=date.fromisoformat("2025-01-02"),
             type="Brief",
@@ -2370,7 +2403,13 @@ class TexasMergerTest(TestCase):
         created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == docket_entry["type"]
-        assert created_docket_entry.disposition == docket_entry["disposition"]
+        assert created_docket_entry.disposition == docket_entry.get(
+            "disposition", ""
+        )
+        assert created_docket_entry.description == docket_entry.get(
+            "description", ""
+        )
+        assert created_docket_entry.remarks == docket_entry.get("remarks", "")
         assert created_docket_entry.date_filed == docket_entry["date"]
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
@@ -2380,7 +2419,7 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
-        js_docket_entry = TexasCaseEventDictFactory()
+        js_docket_entry = self.get_random_docket_entry_dict()
 
         result = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.000", True, js_docket_entry
@@ -2418,7 +2457,7 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
-        js_docket_entry = TexasCaseEventDictFactory()
+        js_docket_entry = self.get_random_docket_entry_dict()
         initial_n_attachments = len(js_docket_entry["attachments"])
 
         result = merge_texas_docket_entry(
@@ -2445,8 +2484,14 @@ class TexasMergerTest(TestCase):
         created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == js_docket_entry["type"]
-        assert (
-            created_docket_entry.disposition == js_docket_entry["disposition"]
+        assert created_docket_entry.remarks == js_docket_entry.get(
+            "remarks", ""
+        )
+        assert created_docket_entry.description == js_docket_entry.get(
+            "description", ""
+        )
+        assert created_docket_entry.disposition == js_docket_entry.get(
+            "disposition", ""
         )
         assert created_docket_entry.date_filed == js_docket_entry["date"]
         n_attachments = TexasDocument.objects.filter(
