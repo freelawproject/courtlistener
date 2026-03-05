@@ -80,8 +80,8 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
         No. 01A576 (01-8099) -> 01-8099  (prioritize NN-NNNN)
         No. 01-8148 (01A587) -> 01-8148  (prioritize NN-NNNN)
 
-    If multiple numbers of the same type are found (e.g., "01A576 01A578"),
-    a ValueError is raised.
+    When multiple numbers of the same type are found, the lexicographically
+    smallest one is selected to ensure deterministic behavior.
 
     :param docket_number: The docket number to clean.
     :return: The cleaned docket number or an empty string.
@@ -98,16 +98,18 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
     if len(scotus_m) == 1:
         return scotus_m[0]
     if len(scotus_m) > 1:
-        logger.error(
+        logger.warning(
             "Multiple NN-NNNN docket numbers found in: %s", docket_number
         )
-        return ""
+        return sorted(scotus_m)[0]
 
     if len(scotus_a_m) == 1:
         return scotus_a_m[0]
     if len(scotus_a_m) > 1:
-        logger.error("Multiple NNA docket numbers found in: %s", docket_number)
-        return ""
+        logger.warning(
+            "Multiple NNA docket numbers found in: %s", docket_number
+        )
+        return sorted(scotus_a_m)[0]
 
     return ""
 
