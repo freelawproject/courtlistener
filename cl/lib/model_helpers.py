@@ -93,7 +93,6 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
     docket_number = docket_number.lower()
 
     scotus_m = re.findall(r"(?<![^ ,(])\d\d-\d+", docket_number)
-    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
 
     if len(scotus_m) == 1:
         return scotus_m[0]
@@ -101,7 +100,9 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
         logger.warning(
             "Multiple NN-NNNN docket numbers found in: %s", docket_number
         )
-        return sorted(scotus_m)[0]
+        return min(scotus_m)
+
+    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
 
     if len(scotus_a_m) == 1:
         return scotus_a_m[0]
@@ -109,7 +110,7 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
         logger.warning(
             "Multiple NNA docket numbers found in: %s", docket_number
         )
-        return sorted(scotus_a_m)[0]
+        return min(scotus_a_m)
 
     return ""
 
