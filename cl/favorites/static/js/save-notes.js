@@ -64,6 +64,9 @@ $(function () {
 
   $('#save-note-delete').on("click", function (event) {
     event.preventDefault();
+    if (!window.confirm('Are you sure you want to delete this note?')) {
+      return false;
+    }
     // Send a post that deletes the note from the DB, and if successful
     // remove the notes from the sidebar; toggle the star icon.
     var note_id = $('#modal-save-note').data('id'),
