@@ -4,20 +4,36 @@ from unittest import mock
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
-from cl.corpus_importer.tasks import download_qp_scotus_pdf
-from cl.recap.mergers import merge_scotus_docket
+from cl.corpus_importer.tasks import (
+    download_qp_scotus_pdf,
+    ingest_scotus_docket,
+    merge_scotus_docket,
+    merge_scotus_document,
+)
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    AttorneyOrganizationAssociation,
+    Party,
+    PartyType,
+    Role,
+)
+from cl.recap.tests.tests import mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
-    SCOTUSAttachmentFactory,
+    SCOTUSAttachmentDataFactory,
+    SCOTUSAttorneyDataFactory,
     ScotusDocketDataFactory,
+    SCOTUSDocketEntryDataFactory,
     SCOTUSDocketEntryFactory,
+    SCOTUSPartyDataFactory,
 )
 from cl.search.models import (
     Docket,
-    DocketEntry,
-    RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
 )
 
 
@@ -31,47 +47,97 @@ class ScotusDocketMergeTest(TestCase):
             jurisdiction="A",
         )
 
-    def test_merge_scotus_docket_creates_docket_and_metadata(self) -> None:
+    @mock.patch("cl.corpus_importer.tasks.logger.info")
+    @mock.patch(
+        "cl.corpus_importer.tasks.requests.get",
+    )
+    def test_merge_scotus_docket_creates_docket_and_metadata(
+        self, mock_get, mock_logger_info
+    ) -> None:
         """Confirm SCOTUS data is merged into Docket and metadata."""
 
-        de_1 = SCOTUSDocketEntryFactory(
+        att_1 = SCOTUSAttachmentDataFactory(
+            description="Main 1", document_number=23453
+        )
+        att_2 = SCOTUSAttachmentDataFactory(
+            description="Attachment 2", document_number=23453
+        )
+        de_1 = SCOTUSDocketEntryDataFactory(
             description="lorem ipsum 1",
             date_filed=datetime.date(2015, 8, 19),
             document_number=23453,
-            attachments=[
-                SCOTUSAttachmentFactory(
-                    description="Main 1", document_number=23453
-                ),
-                SCOTUSAttachmentFactory(
-                    description="Attachment 2", document_number=23453
-                ),
-            ],
+            attachments=[att_1, att_2],
         )
-        de_2 = SCOTUSDocketEntryFactory(
+        de_2 = SCOTUSDocketEntryDataFactory(
             description="lorem ipsum 2",
             date_filed=datetime.date(2015, 8, 21),
             document_number=23455,
             attachments=[
-                SCOTUSAttachmentFactory(
+                SCOTUSAttachmentDataFactory(
                     description="Main 1.1 ", document_number=23455
                 ),
-                SCOTUSAttachmentFactory(
+                SCOTUSAttachmentDataFactory(
                     description="Attachment 2.1 ", document_number=23455
                 ),
             ],
         )
-        de_3 = SCOTUSDocketEntryFactory(
+        de_3 = SCOTUSDocketEntryDataFactory(
             description="Low after process.",
             date_filed=datetime.date(2015, 8, 22),
             document_number=None,
             attachments=[],
         )
-        de_4 = SCOTUSDocketEntryFactory(
+        de_4 = SCOTUSDocketEntryDataFactory(
             description="Key street surface",
             date_filed=datetime.date(2015, 8, 22),
             document_number=None,
             attachments=[],
         )
+        atty_1 = SCOTUSAttorneyDataFactory(
+            name="Paul D. Clement",
+            address="706 Duke Street",
+            city="Alexandria",
+            state="VA",
+            zip="22314",
+            phone="(202) 742-8900",
+            email="PAUL.CLEMENT@CLEMENTMURPHY.COM",
+            is_counsel_of_record=True,
+            title="Clement & Murphy, LLC",
+        )
+        atty_2 = SCOTUSAttorneyDataFactory(
+            name="Noel John Francisco",
+            address="51 Louisiana Avenue, NW",
+            city="Washington",
+            state="DC",
+            zip="20001",
+            phone="(202) 879-3939",
+            email="NJFRANCISCO@JONESDAY.COM",
+            is_counsel_of_record=True,
+            title="Law Firm Test LLC",
+        )
+        atty_3 = SCOTUSAttorneyDataFactory(
+            name="Eric Nelson",
+            address="54 Florence Street",
+            city="Staten Island",
+            state="NY",
+            zip="10308",
+            phone="(718) 356-0566",
+            email=None,
+            is_counsel_of_record=False,
+            title=None,
+        )
+
+        party_1 = SCOTUSPartyDataFactory(
+            name="Encino Motorcars, LLC",
+            type="Petitioner",
+            attorneys=[atty_1],
+        )
+        party_2 = SCOTUSPartyDataFactory(
+            name="United States",
+            type="Respondent",
+            attorneys=[atty_2, atty_3],
+        )
+
         data = ScotusDocketDataFactory(
             docket_number="23-1434",
             capital_case=False,
@@ -79,9 +145,22 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers=["22-16375", "22-16622"],
             lower_court_case_numbers_raw="Docket Num. 22-16375, Docket Num. 22-16622",
             docket_entries=[de_1, de_2, de_3, de_4],
+            parties=[party_1, party_2],
         )
-        docket = merge_scotus_docket(data)
+
+        mock_response = mock.Mock()
+        mock_response.headers = {"content-type": "application/pdf"}
+        with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+            pdf_content = f.read()
+        mock_response.iter_content.return_value = [pdf_content]
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value.__enter__.return_value = mock_response
+
+        ingest_scotus_docket(data)
+        docket = Docket.objects.all().first()
         docket.refresh_from_db()
+
+        self.assertEqual(mock_logger_info.call_count, 6)
 
         # Docket fields
         self.assertEqual(docket.court_id, self.court.pk)
@@ -95,43 +174,36 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(docket.appeal_from_id, self.lower_court.pk)
 
         # Docket entries
-        des = DocketEntry.objects.filter(docket=docket)
+        des = SCOTUSDocketEntry.objects.filter(docket=docket)
         self.assertEqual(des.count(), 4, "Wrong number of Docket entries.")
 
         des_tests = [de_1, de_2, de_3, de_4]
         for de in des_tests:
-            de_db = DocketEntry.objects.filter(
+            de_db = SCOTUSDocketEntry.objects.filter(
                 docket=docket, description=de["description"]
             ).first()
             self.assertEqual(de["document_number"], de_db.entry_number)
 
-        rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
-        self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
+        rds = SCOTUSDocument.objects.filter(docket_entry__docket=docket)
+        self.assertEqual(rds.count(), 4, "Wrong number of Documents.")
         rds_pks = set(rds.values_list("pk", flat=True))
 
-        rd_att_1 = RECAPDocument.objects.filter(
+        rd_att_1 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Main 1"
         ).first()
-        self.assertEqual(rd_att_1.document_type, RECAPDocument.ATTACHMENT)
-        rd_att_2 = RECAPDocument.objects.filter(
+
+        self.assertEqual(rd_att_1.url, att_1["document_url"])
+        self.assertTrue(rd_att_1.filepath_local)
+        self.assertEqual(rd_att_1.page_count, 1)
+        self.assertIsNotNone(rd_att_1.sha1)
+        self.assertIn("UNITED", rd_att_1.plain_text)
+
+        rd_att_2 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Attachment 2"
         ).first()
-        self.assertEqual(rd_att_2.document_type, RECAPDocument.ATTACHMENT)
-
-        main_rds = RECAPDocument.objects.filter(
-            docket_entry__docket=docket,
-            document_type=RECAPDocument.PACER_DOCUMENT,
-        )
-        self.assertEqual(
-            main_rds.count(), 2, "Wrong number of Main documents."
-        )
-
-        atts_rds = RECAPDocument.objects.filter(
-            docket_entry__docket=docket, document_type=RECAPDocument.ATTACHMENT
-        )
-        self.assertEqual(
-            atts_rds.count(), 4, "Wrong number of Attachment documents."
-        )
+        self.assertEqual(rd_att_2.url, att_2["document_url"])
+        self.assertTrue(rd_att_2.filepath_local)
+        self.assertIn("UNITED", rd_att_2.plain_text)
 
         # ScotusDocketMetadata fields
         metadata = docket.scotus_metadata
@@ -161,29 +233,174 @@ class ScotusDocketMergeTest(TestCase):
             data["lower_court_rehearing_denied_date"],
         )
 
+        # Assert parties were created
+        parties = Party.objects.filter(party_types__docket=docket)
+        self.assertEqual(parties.count(), 2, "Wrong number of parties.")
+
+        # Assert party 1 - Petitioner
+        party_1_db = Party.objects.filter(
+            name="Encino Motorcars, LLC", party_types__docket=docket
+        ).first()
+        self.assertIsNotNone(party_1_db)
+
+        party_type_1 = PartyType.objects.filter(
+            docket=docket, party=party_1_db
+        ).first()
+        self.assertEqual(party_type_1.name, "Petitioner")
+
+        # Assert party 2 - Respondent
+        party_2_db = Party.objects.filter(
+            name="United States", party_types__docket=docket
+        ).first()
+        self.assertIsNotNone(party_2_db)
+
+        party_type_2 = PartyType.objects.filter(
+            docket=docket, party=party_2_db
+        ).first()
+        self.assertEqual(party_type_2.name, "Respondent")
+
+        # Assert attorneys were created
+        attorneys = Attorney.objects.filter(roles__docket=docket).distinct()
+        self.assertEqual(attorneys.count(), 3, "Wrong number of attorneys.")
+
+        # Assert attorney 1 - Paul D. Clement
+        atty_1_db = Attorney.objects.filter(
+            name="Paul D. Clement", roles__docket=docket
+        ).first()
+        self.assertIsNotNone(atty_1_db)
+        self.assertEqual(atty_1_db.phone, "(202) 742-8900")
+        self.assertEqual(atty_1_db.email, "PAUL.CLEMENT@CLEMENTMURPHY.COM")
+        self.assertIn("706 Duke Street", atty_1_db.contact_raw)
+        self.assertIn("Alexandria", atty_1_db.contact_raw)
+
+        # Assert attorney 1 has LEAD role (is_counsel_of_record=True)
+        atty_1_role = Role.objects.filter(
+            attorney=atty_1_db, docket=docket, party=party_1_db
+        ).first()
+        self.assertEqual(atty_1_role.role, Role.ATTORNEY_LEAD)
+
+        # Assert attorney 2 - Noel John Francisco
+        atty_2_db = Attorney.objects.filter(
+            name="Noel John Francisco", roles__docket=docket
+        ).first()
+        self.assertIsNotNone(atty_2_db)
+        self.assertEqual(atty_2_db.email, "NJFRANCISCO@JONESDAY.COM")
+
+        atty_2_role = Role.objects.filter(
+            attorney=atty_2_db, docket=docket, party=party_2_db
+        ).first()
+        self.assertEqual(atty_2_role.role, Role.ATTORNEY_LEAD)
+
+        # Assert attorney 3 - Eric Nelson (not counsel of record)
+        atty_3_db = Attorney.objects.filter(
+            name="Eric Nelson", roles__docket=docket
+        ).first()
+        self.assertIsNotNone(atty_3_db)
+        self.assertEqual(atty_3_db.email, "")  # email was None
+
+        atty_3_role = Role.objects.filter(
+            attorney=atty_3_db, docket=docket, party=party_2_db
+        ).first()
+        # Not counsel of record, so should not be ATTORNEY_LEAD
+        self.assertEqual(atty_3_role.role, Role.UNKNOWN)
+
+        # Assert AttorneyOrganization instances were created
+        attorney_orgs = AttorneyOrganization.objects.all()
+
+        # 3 orgs expected: "Clement & Murphy, LLC", "Law Firm Test LLC" and
+        # Eric Nelson.
+        self.assertEqual(
+            attorney_orgs.count(), 3, "Wrong number of attorney organizations."
+        )
+
+        # Assert organization 1 - Clement & Murphy, LLC
+        org_1 = AttorneyOrganization.objects.filter(
+            name="Clement & Murphy, LLC"
+        ).first()
+        self.assertIsNotNone(org_1)
+        self.assertEqual(org_1.address1, "706 Duke St.")
+        self.assertEqual(org_1.city, "Alexandria")
+        self.assertEqual(org_1.state, "VA")
+        self.assertEqual(org_1.zip_code, "22314")
+
+        # Assert organization 2 - Law Firm Test LLC
+        org_2 = AttorneyOrganization.objects.filter(
+            name="Law Firm Test LLC"
+        ).first()
+        self.assertIsNotNone(org_2)
+        self.assertEqual(org_2.address1, "51 Louisiana Ave., NW")
+        self.assertEqual(org_2.city, "Washington")
+        self.assertEqual(org_2.state, "DC")
+        self.assertEqual(org_2.zip_code, "20001")
+
+        org_3 = AttorneyOrganization.objects.filter(name="Eric Nelson").first()
+        self.assertIsNotNone(org_3)
+        self.assertEqual(org_3.address1, "54 Florence St.")
+        self.assertEqual(org_3.city, "Staten Island")
+        self.assertEqual(org_3.state, "NY")
+        self.assertEqual(org_3.zip_code, "10308")
+
+        # Assert AttorneyOrganizationAssociation links attorneys to orgs
+        assoc_1 = AttorneyOrganizationAssociation.objects.filter(
+            attorney=atty_1_db, attorney_organization=org_1, docket=docket
+        ).first()
+        self.assertIsNotNone(
+            assoc_1,
+        )
+        assoc_2 = AttorneyOrganizationAssociation.objects.filter(
+            attorney=atty_2_db, attorney_organization=org_2, docket=docket
+        ).first()
+        self.assertIsNotNone(
+            assoc_2,
+        )
+        assoc_3 = AttorneyOrganizationAssociation.objects.filter(
+            attorney=atty_3_db, docket=docket
+        ).first()
+        self.assertIsNotNone(
+            assoc_3,
+        )
+
         # Merge again. Confirm objects are not duplicated.
-        docket = merge_scotus_docket(data)
+        ingest_scotus_docket(data)
         docket.refresh_from_db()
 
+        # No additional calls to the download methods’ loggers.
+        self.assertEqual(mock_logger_info.call_count, 6)
+
         # Docket entries
-        des = DocketEntry.objects.filter(docket=docket)
+        des = SCOTUSDocketEntry.objects.filter(docket=docket)
         self.assertEqual(des.count(), 4, "Wrong number of Docket entries.")
 
-        rds = RECAPDocument.objects.filter(docket_entry__docket=docket)
-        self.assertEqual(rds.count(), 6, "Wrong number of Documents entries.")
+        rds = SCOTUSDocument.objects.filter(docket_entry__docket=docket)
+        self.assertEqual(rds.count(), 4, "Wrong number of Documents")
         rds_pks_new = set(rds.values_list("pk", flat=True))
         self.assertEqual(rds_pks, rds_pks_new)
 
-        rd_att_1_1 = RECAPDocument.objects.filter(
+        rd_att_1_1 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Main 1"
         ).first()
-        self.assertEqual(rd_att_1_1.document_type, RECAPDocument.ATTACHMENT)
-        rd_att_2_1 = RECAPDocument.objects.filter(
+        rd_att_2_1 = SCOTUSDocument.objects.filter(
             docket_entry__docket=docket, description="Attachment 2"
         ).first()
-        self.assertEqual(rd_att_2_1.document_type, RECAPDocument.ATTACHMENT)
         self.assertEqual(rd_att_1.pk, rd_att_1_1.pk)
         self.assertEqual(rd_att_2.pk, rd_att_2_1.pk)
+
+        # No more parties created.
+        parties_after = Party.objects.filter(party_types__docket=docket)
+        self.assertEqual(parties_after.count(), 2, "Parties were duplicated.")
+
+        attorneys_after = Attorney.objects.filter(
+            roles__docket=docket
+        ).distinct()
+        self.assertEqual(
+            attorneys_after.count(), 3, "Attorneys were duplicated."
+        )
+
+        attorney_orgs = AttorneyOrganization.objects.all()
+
+        self.assertEqual(
+            attorney_orgs.count(), 3, "AttorneysOrgs were duplicated."
+        )
 
     def test_merge_scotus_docket_updates_existing_docket(self) -> None:
         """Confirm merging again updates an existing SCOTUS docket."""
@@ -193,14 +410,18 @@ class ScotusDocketMergeTest(TestCase):
             case_name="Old Name",
             capital_case=False,
             lower_court=self.lower_court.full_name,
+            docket_entries=[],
         )
-        docket = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 1)
         scotus_metadata = ScotusDocketMetadata.objects.all()
         self.assertEqual(scotus_metadata.count(), 1)
+        # New dockets created by merge_scotus_docket
+        # get SCRAPER source.
+        self.assertEqual(docket.source, Docket.SCRAPER)
 
         # Updated data.
         data = ScotusDocketDataFactory(
@@ -210,13 +431,15 @@ class ScotusDocketMergeTest(TestCase):
             linked_with="23-6433",
             lower_court=self.lower_court.full_name,
             lower_court_case_numbers=["23-6433"],
+            docket_entries=[],
         )
-        updated_docket = merge_scotus_docket(data)
+        updated_docket, _ = merge_scotus_docket(data)
         updated_docket.refresh_from_db()
         self.assertEqual(dockets.count(), 1)
         self.assertEqual(scotus_metadata.count(), 1)
 
         self.assertEqual(updated_docket.pk, docket.pk)
+        # Merging into a docket that already has SCRAPER remains as SCRAPER.
         self.assertEqual(updated_docket.source, Docket.SCRAPER)
         self.assertEqual(updated_docket.case_name, "New SCOTUS Case Name")
         self.assertEqual(updated_docket.date_filed, data["date_filed"])
@@ -233,11 +456,53 @@ class ScotusDocketMergeTest(TestCase):
             metadata.questions_presented_url, data["questions_presented"]
         )
 
+    def test_merge_scotus_docket_source_compounds_existing(self) -> None:
+        """Merging into an existing docket compounds its source with SCRAPER."""
+        existing = DocketFactory(
+            court=self.court,
+            docket_number="24-200",
+            source=Docket.HARVARD,
+        )
+        data = ScotusDocketDataFactory(
+            docket_number="24-200",
+            docket_entries=[],
+        )
+        docket, _ = merge_scotus_docket(data)
+        docket.refresh_from_db()
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(
+            docket.source,
+            Docket.SCRAPER_AND_HARVARD,
+            "Source should be compounded with SCRAPER.",
+        )
+
+    def test_merge_scotus_docket_source_compounds_recap(self) -> None:
+        """Merging into a RECAP docket compounds with SCRAPER."""
+        existing = DocketFactory(
+            court=self.court,
+            docket_number="24-400",
+            source=Docket.RECAP,
+        )
+        data = ScotusDocketDataFactory(
+            docket_number="24-400",
+            docket_entries=[],
+        )
+        docket, _ = merge_scotus_docket(data)
+        docket.refresh_from_db()
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(
+            docket.source,
+            Docket.RECAP_AND_SCRAPER,
+            "Source should be RECAP + SCRAPER.",
+        )
+
     def test_merge_scotus_docket_missing_docket_number(self) -> None:
         """Confirm ValueError is raised when docket_number is missing."""
 
         data = ScotusDocketDataFactory(
-            case_name="New SCOTUS Case Name", docket_number=None
+            case_name="New SCOTUS Case Name",
+            docket_number=None,
+            docket_entries=[],
         )
 
         with self.assertRaisesMessage(
@@ -285,6 +550,22 @@ class ScotusDocketMergeTest(TestCase):
             scotus_meta.questions_presented_file.name.endswith("-qp.pdf")
         )
 
+    def test_merge_scotus_docket_resolves_relative_qp_url(self) -> None:
+        """Confirm relative questions_presented URLs (e.g.
+        "../qp/14-00556qp.pdf" found in 14-556.html) are resolved to
+        absolute URLs when stored in ScotusDocketMetadata."""
+
+        report_data = ScotusDocketDataFactory(
+            questions_presented="../qp/14-00556qp.pdf",
+            docket_entries=[],
+        )
+        docket, _ = merge_scotus_docket(report_data)
+        scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
+        self.assertEqual(
+            scotus_meta.questions_presented_url,
+            "https://www.supremecourt.gov/qp/14-00556qp.pdf",
+        )
+
     @mock.patch("cl.corpus_importer.tasks.logger.info")
     @mock.patch("cl.corpus_importer.tasks.requests.get")
     def test_download_qp_scotus_pdf_skips_if_file_already_present(
@@ -323,9 +604,10 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23-1435",
             lower_court="Imaginary Court of The Dragons",
             lower_court_case_numbers=["10-1000"],
+            docket_entries=[],
         )
 
-        docket = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -350,9 +632,10 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23-1436",
             lower_court="District of Massachusetts",
             lower_court_case_numbers=["10-2000"],
+            docket_entries=[],
         )
 
-        docket = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -378,9 +661,10 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="23-1437",
             lower_court="Non-existent Court",
             lower_court_case_numbers=["10-3000"],
+            docket_entries=[],
         )
 
-        docket = merge_scotus_docket(data)
+        docket, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -391,3 +675,112 @@ class ScotusDocketMergeTest(TestCase):
             "cadc123",
             "Non-existent Court",
         )
+
+    @mock.patch("cl.corpus_importer.tasks.chain")
+    def test_merge_scotus_document_triggers_download_correctly(
+        self, mock_chain
+    ) -> None:
+        """Confirm PDF download is triggered only when document is new or
+        filename changes."""
+
+        docket = DocketFactory(
+            court=self.court,
+            docket_number="23-1435",
+            source=Docket.SCRAPER,
+        )
+        docket_entry = SCOTUSDocketEntryFactory(
+            docket=docket,
+            entry_number=1,
+            description="Test entry",
+            date_filed=datetime.date(2015, 8, 19),
+        )
+
+        # Case 1: New document, should trigger download
+        doc_data_1 = {
+            "document_number": 1,
+            "attachment_number": 0,
+            "document_url": "https://example.com/path/to/document1.pdf",
+            "description": "Main document",
+        }
+
+        created, doc_pk = merge_scotus_document(docket_entry, doc_data_1)
+
+        self.assertTrue(created, "Document should be created")
+        self.assertEqual(
+            mock_chain.call_count,
+            1,
+            "Download should be triggered for new document",
+        )
+        mock_chain.reset_mock()
+
+        # Verify the document was created correctly
+        scotus_doc = SCOTUSDocument.objects.get(pk=doc_pk)
+        self.assertEqual(scotus_doc.url, doc_data_1["document_url"])
+        self.assertEqual(scotus_doc.file_name, "document1.pdf")
+        self.assertEqual(
+            SCOTUSDocument.objects.count(), 1, "Should have 1 document"
+        )
+
+        # Case 2: Update same document with same filename, should NOT trigger download
+        doc_data_2 = doc_data_1
+        doc_data_2["description"] = "Updated description"
+
+        created, doc_pk_2 = merge_scotus_document(docket_entry, doc_data_2)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_2, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            0,
+            "Download should NOT be triggered when filename unchanged",
+        )
+
+        # Verify description was updated but URL remains the same
+        scotus_doc.refresh_from_db()
+        self.assertEqual(scotus_doc.description, "Updated description")
+        self.assertEqual(scotus_doc.url, doc_data_2["document_url"])
+        self.assertEqual(
+            SCOTUSDocument.objects.count(), 1, "Should still have 1 document"
+        )
+
+        # Case 3: Update document with different filename, should trigger download
+        doc_data_3 = doc_data_2
+        doc_data_3["document_url"] = (
+            "https://example.com/different/path/document2.pdf"
+        )
+
+        created, doc_pk_3 = merge_scotus_document(docket_entry, doc_data_3)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_3, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            1,
+            "Download should be triggered when filename changes",
+        )
+
+        # Verify the URL was updated
+        scotus_doc.refresh_from_db()
+        self.assertEqual(scotus_doc.url, doc_data_3["document_url"])
+        self.assertEqual(scotus_doc.file_name, "document2.pdf")
+
+        # Case 4: Update with different URL but same filename - should NOT trigger download
+        mock_chain.reset_mock()
+        doc_data_4 = doc_data_3
+        doc_data_4["document_url"] = (
+            "https://example.com/other-files/document2.pdf"
+        )
+        created, doc_pk_4 = merge_scotus_document(docket_entry, doc_data_4)
+
+        self.assertFalse(created, "Document should not be created")
+        self.assertEqual(doc_pk, doc_pk_4, "Should return same document pk")
+        self.assertEqual(
+            mock_chain.call_count,
+            0,
+            "Download should NOT be triggered when filename is the same",
+        )
+
+        # Verify the URL was updated even though download wasn't triggered
+        scotus_doc.refresh_from_db()
+        self.assertEqual(scotus_doc.url, doc_data_4["document_url"])
+        self.assertEqual(scotus_doc.file_name, "document2.pdf")

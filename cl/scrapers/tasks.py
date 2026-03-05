@@ -522,7 +522,6 @@ async def extract_pdf_document_base(
 
     :return: A list of processed document pks.
     """
-
     if not is_iter(pks):
         pks = [pks]
 

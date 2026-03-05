@@ -36,6 +36,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
 )
 from cl.tests.providers import LegalProvider
 
@@ -371,6 +372,17 @@ class BankruptcyInformationFactory(DjangoModelFactory):
     trustee_str = Faker("name_female")
 
 
+class SCOTUSDocketEntryFactory(DjangoModelFactory):
+    class Meta:
+        model = SCOTUSDocketEntry
+
+    docket = SubFactory(DocketFactory)
+    entry_number = Faker("random_int", min=1, max=1000)
+    description = Faker("text", max_nb_chars=750)
+    date_filed = Faker("date")
+    sequence_number = Faker("numerify", text="########")
+
+
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
     """Make a OpinionsCitedByRECAPDocument with parents"""
 
@@ -399,18 +411,43 @@ class EmbeddingsDataFactory(DictFactory):
     embeddings = List([SubFactory(EmbeddingDataFactory)])
 
 
-class SCOTUSAttachmentFactory(DictFactory):
+class SCOTUSAttachmentDataFactory(DictFactory):
     document_url = Faker("url")
     description = Faker("text", max_nb_chars=20)
     document_number = Faker("pyint", min_value=1, max_value=1000)
 
 
-class SCOTUSDocketEntryFactory(DictFactory):
-    attachments = List([SubFactory(SCOTUSAttachmentFactory)])
+class SCOTUSDocketEntryDataFactory(DictFactory):
+    attachments = List([SubFactory(SCOTUSAttachmentDataFactory)])
     date_filed = Faker("date_object")
     description = Faker("text", max_nb_chars=20)
     description_html = Faker("text", max_nb_chars=20)
     document_number = Faker("pyint", min_value=1, max_value=1000)
+
+
+class SCOTUSAttorneyDataFactory(DictFactory):
+    """Factory for SCOTUS attorney dicts."""
+
+    address = Faker("street_address")
+    city = Faker("city")
+    email = Faker("email")
+    is_counsel_of_record = Faker("boolean")
+    name = Faker("name")
+    phone = Faker("phone_number")
+    state = Faker("state_abbr")
+    title = Faker("company")
+    zip = Faker("postcode")
+
+
+class SCOTUSPartyDataFactory(DictFactory):
+    """Factory for SCOTUS party dicts."""
+
+    attorneys = List([SubFactory(SCOTUSAttorneyDataFactory)])
+    name = Faker("company")
+    type = Faker(
+        "random_element",
+        elements=["Petitioner", "Respondent", "Amicus Curiae"],
+    )
 
 
 class ScotusDocketDataFactory(DictFactory):
@@ -426,5 +463,5 @@ class ScotusDocketDataFactory(DictFactory):
     lower_court_decision_date = Faker("date_object")
     lower_court_rehearing_denied_date = Faker("date_object")
     questions_presented = Faker("url")
-    docket_entries = List([SubFactory(SCOTUSDocketEntryFactory)])
-    parties = []
+    docket_entries = List([SubFactory(SCOTUSDocketEntryDataFactory)])
+    parties = List([SubFactory(SCOTUSPartyDataFactory)])
