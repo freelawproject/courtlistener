@@ -3826,6 +3826,15 @@ def merge_texas_docket_originating_court(
     :param docket: The docket to add the originating court to.
     :param docket_data: The docket data from Juriscraper.
     :return: The result of the merge operation."""
+    if (
+        docket_data["originating_court"]["court_type"]
+        == CourtType.UNKNOWN.value
+    ):
+        logger.warning(
+            "Skipping merge of OCI for Texas docket %s due to unknown originating court type.",
+            docket_data["docket_number"],
+        )
+        return MergeResult(create=False, update=False, success=False, pk=None)
     created = False
     if not docket.originating_court_information:
         created = True
