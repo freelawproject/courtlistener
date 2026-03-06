@@ -118,7 +118,7 @@ def process_succeeded_request(
                         ),
                     )
                 except (TypeError, ValueError) as e:
-                    logger.warning(
+                    logger.error(
                         f"Could not serialize JSON for task {task.llm_key}: {e}"
                     )
                     task.response_file.save(
@@ -227,7 +227,7 @@ class Command(VerboseCommand):
             provider=LLMProvider.GEMINI,
         )
         logger.info(
-            f"Found {len(pending_requests)} pending batch requests to check."
+            f"Found {pending_requests.count()} pending batch requests to check."
         )
 
         if not pending_requests:

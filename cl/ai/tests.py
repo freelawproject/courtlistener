@@ -2,6 +2,9 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
+from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from cl.ai.llm_providers.google import (
     GoogleGenAIBatchWrapper,
@@ -717,8 +720,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test successful batch submission end-to-end."""
-        from django.core.management import call_command
-
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=3)
 
@@ -765,7 +766,7 @@ class SendGeminiBatchesTest(TestCase):
         self.assertEqual(LLMTask.objects.count(), 3)
         for task in LLMTask.objects.all():
             self.assertEqual(task.request, llm_request)
-            self.assertEqual(task.task, LLMTaskChoices.SCAN_EXTRACTION)
+            self.assertEqual(task.task_type, LLMTaskChoices.SCAN_EXTRACTION)
             self.assertTrue(task.llm_key.startswith("scan-batch-"))
 
         # Verify API calls
@@ -800,8 +801,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test --store-input-files flag stores files in CourtListener storage."""
-        from django.core.management import call_command
-
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=2)
 
@@ -852,8 +851,6 @@ class SendGeminiBatchesTest(TestCase):
     )
     def test_send_gemini_batches_invalid_model(self):
         """Test validation fails for unsupported Gemini model."""
-        from django.core.management import call_command
-        from django.core.management.base import CommandError
 
         with self.assertRaises(CommandError) as context:
             call_command(
@@ -882,8 +879,6 @@ class SendGeminiBatchesTest(TestCase):
     )
     def test_send_gemini_batches_invalid_prompts(self):
         """Test validation fails for invalid prompts (wrong type or non-existent)."""
-        from django.core.management import call_command
-        from django.core.management.base import CommandError
 
         # Test case 1: Prompt exists but has wrong type
         with self.subTest(case="wrong_prompt_type"):
@@ -945,8 +940,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test handling when S3 path has no files."""
-        from django.core.management import call_command
-        from django.core.management.base import CommandError
 
         # Setup S3 mock to return empty list
         mock_s3_client = MagicMock()
@@ -991,8 +984,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test error handling when Gemini API fails."""
-        from django.core.management import call_command
-        from django.core.management.base import CommandError
 
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=2)
@@ -1040,9 +1031,6 @@ class SendGeminiBatchesTest(TestCase):
     )
     def test_send_gemini_batches_s3_access_denied(self, mock_boto3_client):
         """Test error handling for S3 permission errors."""
-        from botocore.exceptions import ClientError
-        from django.core.management import call_command
-        from django.core.management.base import CommandError
 
         # Setup S3 mock to raise AccessDenied error
         mock_s3_client = MagicMock()
@@ -1090,8 +1078,6 @@ class SendGeminiBatchesTest(TestCase):
         mock_remove,
     ):
         """Test --bucket parameter works."""
-        from django.core.management import call_command
-        from django.core.management.base import CommandError
 
         # Setup S3 mocks
         self._mock_s3_with_files(mock_boto3_client, num_files=1)
@@ -1143,7 +1129,7 @@ class CheckGeminiBatchStatusTest(TestCase):
             # Use the same format as in mock results: scan-batch-{pk}-{index}
             task = LLMTask.objects.create(
                 request=llm_request,
-                task=LLMTaskChoices.SCAN_EXTRACTION,
+                task_type=LLMTaskChoices.SCAN_EXTRACTION,
                 llm_key=f"scan-batch-{llm_request.pk}-{i}",
                 status=LLMTaskStatusChoices.IN_PROGRESS,  # Set to IN_PROGRESS to match request status
             )
@@ -1160,8 +1146,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_job_succeeded(self, mock_wrapper_class):
         """Test successful result processing when job succeeds."""
-        from django.core.management import call_command
-
         # Create test data
         llm_request, tasks = self._create_request_with_tasks(
             "batches/test123", num_tasks=3
@@ -1242,8 +1226,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_job_with_mixed_results(self, mock_wrapper_class):
         """Test handling of both successful and failed tasks."""
-        from django.core.management import call_command
-
         # Create test data
         llm_request, tasks = self._create_request_with_tasks(
             "batches/test456", num_tasks=3
@@ -1321,8 +1303,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_job_non_success_states(self, mock_wrapper_class):
         """Test handling when batch jobs end in non-success states (FAILED, CANCELLED, EXPIRED)."""
-        from django.core.management import call_command
-
         # Test all three non-success states using subTest
         test_cases = [
             ("JOB_STATE_FAILED", "batches/test789"),
@@ -1374,8 +1354,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_job_still_running(self, mock_wrapper_class):
         """Test command skips jobs that are still running."""
-        from django.core.management import call_command
-
         # Create two requests
         running_request, _ = self._create_request_with_tasks(
             "batches/running", num_tasks=2
@@ -1426,8 +1404,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_download_error(self, mock_wrapper_class):
         """Test error handling when download fails."""
-        from django.core.management import call_command
-
         # Create test data
         llm_request, tasks = self._create_request_with_tasks(
             "batches/downloaderror", num_tasks=2
@@ -1461,8 +1437,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_process_results_error(self, mock_wrapper_class):
         """Test handling when result processing fails."""
-        from django.core.management import call_command
-
         # Create test data
         llm_request, tasks = self._create_request_with_tasks(
             "batches/processerror", num_tasks=1
@@ -1498,8 +1472,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_multiple_batches(self, mock_wrapper_class):
         """Test command processes multiple pending batches."""
-        from django.core.management import call_command
-
         # Create 3 requests with different states
         request1, _ = self._create_request_with_tasks(
             "batches/multi1", num_tasks=1
@@ -1554,8 +1526,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_task_not_found(self, mock_wrapper_class):
         """Test handling when task key doesn't match any LLMTask."""
-        from django.core.management import call_command
-
         # Create test data
         llm_request, tasks = self._create_request_with_tasks(
             "batches/notfound", num_tasks=2
@@ -1614,8 +1584,6 @@ class CheckGeminiBatchStatusTest(TestCase):
     )
     def test_check_status_response_file_save_error(self, mock_wrapper_class):
         """Test fallback when JSON serialization fails."""
-        from django.core.management import call_command
-
         # Create test data
         llm_request, tasks = self._create_request_with_tasks(
             "batches/jsonerror", num_tasks=1

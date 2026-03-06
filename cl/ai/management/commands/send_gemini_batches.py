@@ -341,7 +341,7 @@ def fetch_files_and_create_tasks(
             llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
             task = LLMTask.objects.create(
                 request=llm_request,
-                task=LLMTaskChoices.SCAN_EXTRACTION,
+                task_type=LLMTaskChoices.SCAN_EXTRACTION,
                 llm_key=llm_key,
             )
 
@@ -365,6 +365,7 @@ def fetch_files_and_create_tasks(
             )
 
     except CommandError:
+        cleanup_temp_files(temp_files)
         llm_request.delete()
         raise
 
