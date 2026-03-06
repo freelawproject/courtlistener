@@ -261,6 +261,9 @@ FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
 )
 
 
+_SPACES_RE = re.compile(r"\s+")
+
+
 def document_model(model: type[models.Model]) -> type[models.Model]:
     """
     Decorator for Django models to use docstrings to populate unset
@@ -278,7 +281,10 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
     ]
     field_docs = dict(
         [
-            (field_name, docstring.replace("\n", " "))
+            (
+                field_name,
+                _SPACES_RE.sub(" ", docstring).strip(),
+            )
             for field_name, docstring in ivar_docs
             if field_name in model_fields
         ]

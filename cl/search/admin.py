@@ -32,6 +32,7 @@ from cl.search.models import (
     RECAPDocument,
     ScotusDocketMetadata,
     SearchQuery,
+    TrialCourtData,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.search.utils import seal_documents
@@ -597,6 +598,27 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+@admin.register(TrialCourtData)
+class TrialCourtDataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("docket", "court")
+    list_display = (
+        "pk",
+        "docket_number",
+        "court_name",
+        "judge",
+        "date_filed",
+    )
+    search_fields = (
+        "docket_number",
+        "docket_number_raw",
+    )
+    list_filter = ("date_filed",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
 
 
 class TexasDocumentInline(admin.StackedInline):
