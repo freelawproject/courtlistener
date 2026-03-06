@@ -9,13 +9,36 @@ from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from prometheus_client import CollectorRegistry
 from waffle.testutils import override_flag, override_switch
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
-from cl.stats.metrics import record_prometheus_metric, search_queries_total
+from cl.stats.constants import (
+    StatAlertType,
+    StatMethod,
+    StatMetric,
+    StatQueryType,
+    StatWebhookEventType,
+    get_stat_metrics_prefix,
+)
+from cl.stats.metrics import (
+    CeleryQueueCollector,
+    StatMetricsCollector,
+    accounts_created_total,
+    accounts_deleted_total,
+    record_search_duration,
+    register_celery_queue_collector,
+    register_stat_metrics_collector,
+    search_duration_seconds,
+)
 from cl.stats.models import Event
-from cl.stats.utils import get_milestone_range, tally_stat
+from cl.stats.utils import (
+    _get_prometheus_key,
+    _validate_labels,
+    get_milestone_range,
+    tally_stat,
+)
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import AsyncAPIClient
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
@@ -108,13 +131,21 @@ class ElasticsearchStatusTests(TestCase):
 
 @pytest.mark.django_db
 @override_switch("increment-stats", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="StatTests")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="StatTests",
+    STAT_METRICS_PREFIX="prometheus:stat:StatTests:",
+)
 class StatTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
-        key = self.r.keys("test*")
-        if key:
-            self.r.delete(*key)
+        self.prefix = get_stat_metrics_prefix()
+        # Clean up date-based test keys
+        keys = self.r.keys("test*")
+        if keys:
+            self.r.delete(*keys)
+        # Clean up prometheus test keys
+        for key in self.r.scan_iter(f"{self.prefix}test*"):
+            self.r.delete(key)
 
     def test_tally_a_stat(self) -> None:
         count = tally_stat("test")
@@ -154,50 +185,77 @@ class StatTests(TestCase):
 
 class PrometheusMetricsTests(TestCase):
     def setUp(self):
-        search_queries_total._metrics.clear()
+        search_duration_seconds._metrics.clear()
+        accounts_created_total._value.set(0)
+        accounts_deleted_total._value.set(0)
 
-    def test_record_prometheus_metric(self) -> None:
-        """Test recording metrics with different handler keys and labels"""
+    def test_account_metrics(self) -> None:
+        """Test recording account creation and deletion metrics"""
+        # Test accounts created
+        initial_created = accounts_created_total._value.get()
+        accounts_created_total.inc()
+        accounts_created_total.inc(2)
+        final_created = accounts_created_total._value.get()
+        self.assertEqual(final_created, initial_created + 3)
+
+        # Test accounts deleted
+        initial_deleted = accounts_deleted_total._value.get()
+        accounts_deleted_total.inc()
+        final_deleted = accounts_deleted_total._value.get()
+        self.assertEqual(final_deleted, initial_deleted + 1)
+
+    def test_search_duration_histogram(self) -> None:
+        """Test recording search duration histogram metrics"""
         test_cases = [
             {
                 "name": "keyword_web",
-                "handler_key": "search.queries.keyword.web",
                 "query_type": "keyword",
                 "method": "web",
-                "increments": [1],
+                "durations": [0.1, 0.2, 0.15],
             },
             {
                 "name": "semantic_api",
-                "handler_key": "search.queries.semantic.api",
                 "query_type": "semantic",
                 "method": "api",
-                "increments": [1],
+                "durations": [0.5, 0.3],
             },
             {
-                "name": "accumulation",
-                "handler_key": "search.queries.keyword.api",
+                "name": "keyword_api",
                 "query_type": "keyword",
                 "method": "api",
-                "increments": [1, 2, 3],
+                "durations": [0.05],
             },
         ]
 
         for test_case in test_cases:
             with self.subTest(case=test_case["name"]):
-                initial = search_queries_total.labels(
+                # Get initial sum
+                initial_sum = search_duration_seconds.labels(
                     query_type=test_case["query_type"],
                     method=test_case["method"],
-                )._value.get()
+                )._sum.get()
 
-                for inc in test_case["increments"]:
-                    record_prometheus_metric(test_case["handler_key"], inc)
+                # Record durations
+                for duration in test_case["durations"]:
+                    record_search_duration(
+                        duration,
+                        query_type=test_case["query_type"],
+                        method=test_case["method"],
+                    )
 
-                final = search_queries_total.labels(
+                # Check that sum increased by total of durations
+                final_sum = search_duration_seconds.labels(
                     query_type=test_case["query_type"],
                     method=test_case["method"],
-                )._value.get()
-                expected_total = sum(test_case["increments"])
-                self.assertEqual(final, initial + expected_total)
+                )._sum.get()
+                expected_sum = initial_sum + sum(test_case["durations"])
+                self.assertAlmostEqual(final_sum, expected_sum, places=5)
+
+    def test_celery_queue_collector_registration_idempotent(self) -> None:
+        """Ensure collector registration is idempotent without collecting."""
+        registry = CollectorRegistry()
+        self.assertTrue(register_celery_queue_collector(registry))
+        self.assertFalse(register_celery_queue_collector(registry))
 
 
 def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:
@@ -219,12 +277,14 @@ def parse_prometheus_metrics(metrics_text: str) -> dict[str, float]:
 
 @override_flag("semantic-search", active=True)
 @override_switch("increment-stats", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="PrometheusIntegrationTestBase")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="PrometheusIntegrationTestBase",
+    STAT_METRICS_PREFIX="prometheus:stat:PrometheusIntegrationTestBase:",
+)
 class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
     """Base class for Prometheus integration tests"""
 
     def setUp(self):
-        search_queries_total._metrics.clear()
         self.async_client = AsyncAPIClient()
 
     async def _get_metric_count(self, query_type: str, method: str) -> float:
@@ -235,13 +295,16 @@ class PrometheusIntegrationTestBase(ESIndexTestCase, TestCase):
         self.assertEqual(response.status_code, 200)
         metrics = parse_prometheus_metrics(response.content.decode("utf-8"))
         return metrics.get(
-            f'cl_search_queries_total{{method="{method}",query_type="{query_type}"}}',
+            f'cl_search_results_total{{method="{method}",query_type="{query_type}"}}',
             0.0,
         )
 
 
 @override_flag("store-search-api-queries", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="test_prometheus_integration")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="test_prometheus_integration",
+    STAT_METRICS_PREFIX="prometheus:stat:PrometheusIntegrationAPITests:",
+)
 class PrometheusIntegrationAPITests(PrometheusIntegrationTestBase):
     """Integration tests for Prometheus metrics with API searches"""
 
@@ -296,3 +359,348 @@ class PrometheusIntegrationWebTests(PrometheusIntegrationTestBase):
 
         final_count = await self._get_metric_count("keyword", "web")
         self.assertEqual(final_count, initial_count + 3)
+
+
+class CeleryQueueCollectorTests(TestCase):
+    """Unit tests for CeleryQueueCollector"""
+
+    @patch("cl.stats.metrics.get_queue_length")
+    @patch("cl.stats.metrics.settings")
+    def test_collector_returns_queue_lengths(
+        self, mock_settings, mock_get_queue_length
+    ) -> None:
+        """Test that collector returns correct gauge metrics for each queue"""
+        mock_settings.CELERY_QUEUES = ["celery", "batch0", "recap_fetch"]
+        mock_get_queue_length.side_effect = [10, 5, 0]
+
+        collector = CeleryQueueCollector()
+        metrics = list(collector.collect())
+
+        self.assertEqual(len(metrics), 1)
+        gauge = metrics[0]
+        self.assertEqual(gauge.name, "cl_celery_queue_length")
+        self.assertEqual(len(gauge.samples), 3)
+
+        # Check each sample has correct queue label and value
+        samples_by_queue = {s.labels["queue"]: s.value for s in gauge.samples}
+        self.assertEqual(samples_by_queue["celery"], 10)
+        self.assertEqual(samples_by_queue["batch0"], 5)
+        self.assertEqual(samples_by_queue["recap_fetch"], 0)
+
+    @patch("cl.stats.metrics.get_queue_length")
+    @patch("cl.stats.metrics.settings")
+    def test_collector_handles_errors_gracefully(
+        self, mock_settings, mock_get_queue_length
+    ) -> None:
+        """Test that collector continues collecting when one queue fails"""
+        mock_settings.CELERY_QUEUES = ["celery", "bad_queue", "batch0"]
+
+        def side_effect(queue):
+            if queue == "bad_queue":
+                raise ConnectionError("Redis unavailable")
+            return 10 if queue == "celery" else 5
+
+        mock_get_queue_length.side_effect = side_effect
+
+        collector = CeleryQueueCollector()
+        metrics = list(collector.collect())
+
+        gauge = metrics[0]
+        # Should only have 2 samples (bad_queue was skipped)
+        self.assertEqual(len(gauge.samples), 2)
+
+        samples_by_queue = {s.labels["queue"]: s.value for s in gauge.samples}
+        self.assertIn("celery", samples_by_queue)
+        self.assertIn("batch0", samples_by_queue)
+        self.assertNotIn("bad_queue", samples_by_queue)
+
+
+class CeleryQueueCollectorIntegrationTests(TestCase):
+    """Integration test for CeleryQueueCollector via prometheus endpoint"""
+
+    async def test_celery_queue_metrics_in_prometheus_output(self) -> None:
+        """Verify celery queue metrics appear in prometheus endpoint"""
+        client = AsyncAPIClient()
+        response = await client.get("/monitoring/prometheus/metrics")
+        self.assertEqual(response.status_code, 200)
+
+        content = response.content.decode("utf-8")
+        self.assertIn("cl_celery_queue_length", content)
+        # Check for at least one queue label
+        self.assertIn('queue="celery"', content)
+
+
+class ValidateLabelsTests(TestCase):
+    """Unit tests for _validate_labels helper function"""
+
+    def test_valid_labels_pass(self) -> None:
+        """Test that valid labels don't raise an error"""
+        # Valid search.results labels
+        _validate_labels(
+            StatMetric.SEARCH_RESULTS,
+            {"query_type": StatQueryType.KEYWORD, "method": StatMethod.WEB},
+        )
+        _validate_labels(
+            StatMetric.SEARCH_RESULTS,
+            {"query_type": StatQueryType.SEMANTIC, "method": StatMethod.API},
+        )
+        # Valid alerts.sent labels
+        _validate_labels(
+            StatMetric.ALERTS_SENT,
+            {"alert_type": StatAlertType.DOCKET},
+        )
+        _validate_labels(
+            StatMetric.ALERTS_SENT,
+            {"alert_type": StatAlertType.RECAP},
+        )
+        # Valid webhooks.sent labels
+        _validate_labels(
+            StatMetric.WEBHOOKS_SENT,
+            {"event_type": StatWebhookEventType.DOCKET_ALERT},
+        )
+        _validate_labels(
+            StatMetric.WEBHOOKS_SENT,
+            {"event_type": StatWebhookEventType.SEARCH_ALERT},
+        )
+
+    def test_missing_labels_raise(self) -> None:
+        """Test that missing labels raise ValueError"""
+        with self.assertRaises(ValueError) as ctx:
+            _validate_labels(
+                StatMetric.SEARCH_RESULTS, {"query_type": "keyword"}
+            )
+        self.assertIn("must be", str(ctx.exception))
+
+    def test_extra_labels_raise(self) -> None:
+        """Test that extra labels raise ValueError"""
+        with self.assertRaises(ValueError) as ctx:
+            _validate_labels(
+                StatMetric.SEARCH_RESULTS,
+                {
+                    "query_type": "keyword",
+                    "method": "web",
+                    "extra": "value",
+                },
+            )
+        self.assertIn("must be", str(ctx.exception))
+
+    def test_invalid_values_raise(self) -> None:
+        """Test that invalid label values raise ValueError"""
+        with self.assertRaises(ValueError) as ctx:
+            _validate_labels(
+                StatMetric.SEARCH_RESULTS,
+                {"query_type": "invalid", "method": "web"},
+            )
+        self.assertIn("Invalid value", str(ctx.exception))
+        self.assertIn("invalid", str(ctx.exception))
+
+
+class GetPrometheusKeyTests(TestCase):
+    """Unit tests for _get_prometheus_key helper function"""
+
+    def test_key_without_labels(self) -> None:
+        """Test key format without labels"""
+        key = _get_prometheus_key("test.metric", None)
+        self.assertEqual(key, f"{get_stat_metrics_prefix()}test.metric")
+
+    def test_key_with_labels(self) -> None:
+        """Test key format with labels in STAT_LABELS order"""
+        key = _get_prometheus_key(
+            StatMetric.SEARCH_RESULTS,
+            {"query_type": "keyword", "method": "web"},
+        )
+        self.assertEqual(
+            key, f"{get_stat_metrics_prefix()}search.results:keyword:web"
+        )
+
+
+@pytest.mark.django_db
+@override_switch("increment-stats", active=True)
+@override_settings(
+    WAFFLE_CACHE_PREFIX="TallyStatPrometheusTests",
+    STAT_METRICS_PREFIX="prometheus:stat:TallyStatPrometheusTests:",
+)
+class TallyStatPrometheusTests(TestCase):
+    """Test that tally_stat writes prometheus keys via pipeline"""
+
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        self.prefix = get_stat_metrics_prefix()
+        for key in self.r.scan_iter(f"{self.prefix}*"):
+            self.r.delete(key)
+
+    def test_tally_stat_writes_prometheus_key(self) -> None:
+        """Test that tally_stat writes both cached and prometheus keys"""
+        tally_stat(
+            StatMetric.ALERTS_SENT,
+            inc=3,
+            labels={"alert_type": "docket"},
+        )
+
+        key = f"{self.prefix}alerts.sent:docket"
+        value = int(self.r.get(key) or 0)
+        self.assertEqual(value, 3)
+
+    def test_tally_stat_increments_prometheus_key(self) -> None:
+        """Test that repeated calls increment the prometheus key"""
+        tally_stat(
+            StatMetric.ALERTS_SENT,
+            inc=2,
+            labels={"alert_type": "docket"},
+        )
+        tally_stat(
+            StatMetric.ALERTS_SENT,
+            inc=3,
+            labels={"alert_type": "docket"},
+        )
+
+        key = f"{self.prefix}alerts.sent:docket"
+        value = int(self.r.get(key) or 0)
+        self.assertEqual(value, 5)
+
+    def test_tally_stat_writes_webhook_prometheus_key(self) -> None:
+        """Test that tally_stat writes prometheus key for webhooks.sent"""
+        tally_stat(
+            StatMetric.WEBHOOKS_SENT,
+            labels={"event_type": StatWebhookEventType.DOCKET_ALERT},
+        )
+        tally_stat(
+            StatMetric.WEBHOOKS_SENT,
+            inc=2,
+            labels={"event_type": StatWebhookEventType.DOCKET_ALERT},
+        )
+
+        key = f"{self.prefix}webhooks.sent:docket_alert"
+        value = int(self.r.get(key) or 0)
+        self.assertEqual(value, 3)
+
+
+@pytest.mark.django_db
+@override_switch("increment-stats", active=True)
+@override_settings(
+    STAT_METRICS_PREFIX="prometheus:stat:StatMetricsCollectorTests:"
+)
+class StatMetricsCollectorTests(TestCase):
+    """Unit tests for StatMetricsCollector"""
+
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        self.prefix = get_stat_metrics_prefix()
+        # Clean up any prometheus:stat: keys
+        for key in self.r.scan_iter(f"{self.prefix}*"):
+            self.r.delete(key)
+
+    def test_collects_metrics_from_redis(self) -> None:
+        """Test that collector reads and formats metrics from Redis"""
+        # Set up some test data in Redis
+        key1 = f"{self.prefix}search.results:keyword:web"
+        key2 = f"{self.prefix}search.results:semantic:api"
+        key3 = f"{self.prefix}alerts.sent:docket"
+        self.r.set(key1, 10)
+        self.r.set(key2, 5)
+        self.r.set(key3, 20)
+
+        # Verify keys were written
+        self.assertEqual(int(self.r.get(key1)), 10)
+
+        # Verify scan_iter finds the keys
+        found_keys = list(self.r.scan_iter(f"{self.prefix}*"))
+        self.assertGreaterEqual(
+            len(found_keys), 3, f"Expected 3+ keys, found: {found_keys}"
+        )
+
+        collector = StatMetricsCollector()
+        metrics = list(collector.collect())
+
+        # Find the search.results metric
+        search_metric = next(
+            (m for m in metrics if m.name == "cl_search_results"), None
+        )
+        self.assertIsNotNone(search_metric)
+
+        # Should have at least 2 samples for search.results
+        self.assertGreaterEqual(len(search_metric.samples), 2)
+
+        # Check that our test values are present
+        sample_values = {
+            tuple(s.labels.values()): s.value for s in search_metric.samples
+        }
+        self.assertEqual(sample_values.get(("keyword", "web")), 10)
+        self.assertEqual(sample_values.get(("semantic", "api")), 5)
+
+        # Find the alerts.sent metric
+        alerts_metric = next(
+            (m for m in metrics if m.name == "cl_alerts_sent"), None
+        )
+        self.assertIsNotNone(alerts_metric)
+
+        # Check that our test value is present
+        alert_values = {
+            tuple(s.labels.values()): s.value for s in alerts_metric.samples
+        }
+        self.assertEqual(alert_values.get(("docket",)), 20)
+
+    def test_handles_empty_redis(self) -> None:
+        """Test that collector handles empty Redis gracefully"""
+        collector = StatMetricsCollector()
+        metrics = list(collector.collect())
+        self.assertEqual(len(metrics), 0)
+
+    def test_registration_idempotent(self) -> None:
+        """Ensure StatMetricsCollector registration is idempotent"""
+        registry = CollectorRegistry()
+        self.assertTrue(register_stat_metrics_collector(registry))
+        self.assertFalse(register_stat_metrics_collector(registry))
+
+
+@pytest.mark.django_db
+@override_switch("increment-stats", active=True)
+@override_settings(
+    STAT_METRICS_PREFIX="prometheus:stat:TallyStatWithLabelsTests:"
+)
+class TallyStatWithLabelsTests(TestCase):
+    """Integration tests for tally_stat with labels"""
+
+    def setUp(self):
+        self.r = get_redis_interface("STATS")
+        self.prefix = get_stat_metrics_prefix()
+        # Clean up date-based keys for metrics this class uses
+        for pattern in [
+            "search.results*",
+            "alerts.sent*",
+            "webhooks.sent*",
+        ]:
+            keys = self.r.keys(pattern)
+            if keys:
+                self.r.delete(*keys)
+        # Clean up prometheus keys
+        for key in self.r.scan_iter(f"{self.prefix}*"):
+            self.r.delete(key)
+
+    def test_tally_stat_with_labels_writes_both_keys(self) -> None:
+        """Test that tally_stat writes both the date-based key and prometheus key"""
+        tally_stat(
+            StatMetric.SEARCH_RESULTS,
+            labels={
+                "query_type": StatQueryType.KEYWORD,
+                "method": StatMethod.WEB,
+            },
+        )
+
+        # Check date-based key exists (legacy format)
+        date_key = f"{StatMetric.SEARCH_RESULTS}.{now().date().isoformat()}"
+        date_value = int(self.r.get(date_key) or 0)
+        self.assertEqual(date_value, 1)
+
+        # Check prometheus key exists
+        prom_key = f"{self.prefix}search.results:keyword:web"
+        prom_value = int(self.r.get(prom_key) or 0)
+        self.assertEqual(prom_value, 1)
+
+    def test_tally_stat_validates_labels(self) -> None:
+        """Test that tally_stat validates labels before writing"""
+        with self.assertRaises(ValueError):
+            tally_stat(
+                StatMetric.SEARCH_RESULTS,
+                labels={"query_type": "invalid", "method": "web"},
+            )

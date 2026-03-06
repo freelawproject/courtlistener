@@ -47,6 +47,7 @@ from cl.lib.ratelimiter import (
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
+from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
     AccountDeleteForm,
     CustomPasswordChangeForm,
@@ -372,6 +373,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             )
             delete_user_assets(request.user)
             user = convert_to_stub_account(request.user)
+            accounts_deleted_total.inc()
             update_session_auth_hash(request, user)
             logout(request)
             return HttpResponseRedirect(reverse("delete_profile_done"))
