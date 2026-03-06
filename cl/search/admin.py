@@ -10,7 +10,10 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from cl.alerts.models import DocketAlert
-from cl.lib.admin import build_admin_url
+from cl.lib.admin import (
+    AdminLinkConfig,
+    generate_admin_links,
+)
 from cl.lib.string_utils import trunc
 from cl.search.models import (
     BankruptcyInformation,
@@ -466,7 +469,7 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
 
 @admin.register(Docket)
 class DocketAdmin(CursorPaginatorAdmin):
-    change_form_template = "admin/docket_change_form.html"
+    change_form_template = "admin/change_form_with_custom_links.html"
     prepopulated_fields = {"slug": ["case_name"]}
     list_display = (
         "__str__",
@@ -498,18 +501,19 @@ class DocketAdmin(CursorPaginatorAdmin):
     def change_view(self, request, object_id, form_url="", extra_context=None):
         """Add links to pre-filtered related admin pages."""
         extra_context = extra_context or {}
-        query_params = {"docket": object_id}
-
-        extra_context["docket_entries_url"] = build_admin_url(
-            DocketEntry,
-            query_params,
-        )
-
-        extra_context["docket_alerts_url"] = build_admin_url(
-            DocketAlert,
-            query_params,
-        )
-
+        custom_links: list[AdminLinkConfig] = [
+            {
+                "label": "View Docket Entries",
+                "model_class": DocketEntry,
+                "query_params": {"docket": object_id},
+            },
+            {
+                "label": "View Docket Alerts",
+                "model_class": DocketAlert,
+                "query_params": {"docket": object_id},
+            },
+        ]
+        extra_context["custom_links"] = generate_admin_links(custom_links)
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
         )
