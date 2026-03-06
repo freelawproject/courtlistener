@@ -15,6 +15,7 @@ from tempfile import NamedTemporaryFile
 from typing import IO, Any
 from urllib.parse import urljoin
 
+import botocore.exceptions
 import environ
 import eyecite
 import internetarchive as ia
@@ -55,6 +56,11 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
+from juriscraper.scotus import (
+    SCOTUSDocketReport,
+    SCOTUSDocketReportHTM,
+    SCOTUSDocketReportHTML,
+)
 from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
@@ -138,6 +144,7 @@ from cl.lib.recap_utils import (
     get_document_filename,
 )
 from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
+from cl.lib.storage import AWSMediaStorage
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -3511,11 +3518,11 @@ def merge_scotus_docket_entry(
         de.date_filed = date_filed
         de.save()
 
-    # Merge attachments
-    attachments = input_docket_entry["attachments"]
-    for document in attachments:
-        merge_scotus_document(de, document)
-    return de_created, de.pk
+        # Merge attachments
+        attachments = input_docket_entry["attachments"]
+        for document in attachments:
+            merge_scotus_document(de, document)
+        return de_created, de.pk
 
 
 def add_scotus_docket_entries(
@@ -3760,6 +3767,48 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         )
         doc.save()
         return doc_pk
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def download_and_parse_scotus_docket(
+    self: Task, bucket: str, s3_key: str
+) -> dict[str, Any] | None:
+    """Download a SCOTUS docket file from S3 and parse it.
+
+    :param self: The Celery task instance.
+    :param bucket: The S3 bucket name.
+    :param s3_key: The S3 key for the docket file.
+    :return: Parsed docket data dict.
+    """
+
+    logger.info("Downloading and parsing SCOTUS file: %s.", s3_key)
+    storage = AWSMediaStorage(bucket_name=bucket)
+    with storage.open(s3_key, "rb") as f:
+        content = f.read().decode("utf-8")
+
+    ext = s3_key.rsplit(".", 1)[-1].lower()
+    parser_map: dict[str, type] = {
+        "json": SCOTUSDocketReport,
+        "html": SCOTUSDocketReportHTML,
+        "htm": SCOTUSDocketReportHTM,
+    }
+    if not (parser_cls := parser_map.get(ext)):
+        logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+        self.request.chain = None
+        return None
+
+    parser = parser_cls()
+    parser._parse_text(content)
+    return parser.data
 
 
 def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
