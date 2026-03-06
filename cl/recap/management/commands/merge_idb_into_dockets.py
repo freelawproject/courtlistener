@@ -1,5 +1,6 @@
 import os
 
+from asgiref.sync import async_to_sync
 from celery.canvas import chain
 from django.conf import settings
 from juriscraper.lib.string_utils import CaseNameTweaker
@@ -119,7 +120,7 @@ class Command(VerboseCommand, CommandUtils):
         session = ProxyPacerSession(
             username=PACER_USERNAME, password=PACER_PASSWORD
         )
-        session.login()
+        async_to_sync(session.login)()
         for i, d in enumerate(ds.iterator()):
             if i < options["offset"]:
                 continue
@@ -132,7 +133,7 @@ class Command(VerboseCommand, CommandUtils):
                 session = ProxyPacerSession(
                     username=PACER_USERNAME, password=PACER_PASSWORD
                 )
-                session.login()
+                async_to_sync(session.login)()
 
             throttle.maybe_wait()
             logger.info("Getting pacer_case_id for item %s", d)

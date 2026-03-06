@@ -1,6 +1,7 @@
 import datetime
 import time
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template import loader
@@ -48,12 +49,12 @@ class Command(VerboseCommand):
         s = ProxyPacerSession(
             username=settings.PACER_USERNAME, password=settings.PACER_PASSWORD
         )
-        s.login()
+        async_to_sync(s.login)()
         report = CaseQueryAdvancedBankruptcy("canb", s)
         t1 = now()
         while True:
             query = "Pacific"
-            report.query(
+            async_to_sync(report.query)(
                 name_last=query,
                 filed_from=datetime.date(2019, 1, 28),
                 filed_to=datetime.date(2019, 1, 30),
@@ -66,7 +67,7 @@ class Command(VerboseCommand):
                 exit(0)
 
             query = "PG&E"
-            report.query(
+            async_to_sync(report.query)(
                 name_last=query,
                 filed_from=datetime.date(2019, 1, 28),
                 filed_to=datetime.date(2019, 1, 30),
@@ -83,5 +84,5 @@ class Command(VerboseCommand):
             min_login_frequency = 60 * 30  # thirty minutes
             if (t2 - t1).seconds > min_login_frequency:
                 print("Logging in again.")
-                s.login()
+                async_to_sync(s.login)()
                 t1 = now()
