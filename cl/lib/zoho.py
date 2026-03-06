@@ -1,5 +1,6 @@
 from typing import Any, Literal, Protocol
 
+import requests
 from django.conf import settings
 from django.core.cache import cache
 from zohocrmsdk.src.com.zoho.api.authenticator import OAuthToken
@@ -184,8 +185,8 @@ class ZohoModule:
     @staticmethod
     def _build_body_wrapper(
         records: list[Record],
-        triggers: list[str] | None = None,
         process: list[str] | None = None,
+        triggers: list[str] | None = None,
     ) -> BodyWrapper:
         """
         Wrap one or more Record instances in a BodyWrapper with optional process and trigger.
@@ -196,6 +197,78 @@ class ZohoModule:
         if process:
             wrapper.set_process(process)
         return wrapper
+
+
+class ZohoDeskClient(ZohoModule):
+    """Thin wrapper around the Zoho Desk REST API v1.
+
+    Authentication is handled by the Zoho CRM SDK, the same OAuth app
+    and refresh token are shared across CRM and Desk, so we just call
+    ``Initializer.get_initializer().token.get_token()`` to obtain a
+    valid access token (the SDK refreshes it automatically when needed).
+    """
+
+    BASE_URL = "https://desk.zoho.com/api/v1"
+    module_name = "Desk"
+
+    def _get_access_token(self) -> str:
+        """Return a valid access token from the Zoho CRM SDK.
+
+        ``OAuthToken.get_token()`` checks expiry, refreshes via the
+        Zoho accounts API if needed, persists the new token to the
+        ``FileStore``, and returns the access token string.
+        """
+        return Initializer.get_initializer().token.get_token()
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Zoho-oauthtoken {self._get_access_token()}",
+            "orgId": settings.ZOHO_DESK_ORG_ID,
+            "Content-Type": "application/json",
+        }
+
+    def create_ticket(
+        self,
+        *,
+        subject: str,
+        email: str,
+        contact_name: str,
+        description: str,
+        request_type: str,
+        assignee_id: str = "",
+    ) -> dict:
+        """Create a new Zoho Desk ticket.
+
+        :param subject: Ticket subject line.
+        :param email: Submitter's email (used to link/create a Desk contact).
+        :param contact_name: Submitter's full name.
+        :param description: Full ticket body (plain text).
+        :param request_type: Request type label (e.g. "General Support").
+        :param assignee_id: Zoho Desk agent ID. Empty = unassigned.
+        :return: Parsed JSON response from the Desk API.
+        """
+        payload: dict = {
+            "subject": subject,
+            "email": email,
+            "departmentId": settings.ZOHO_DESK_DEPARTMENT_ID,
+            "description": description,
+            "cf": {
+                "cf_request_type": request_type,
+            },
+            "contact": {"lastName": contact_name, "email": email},
+        }
+
+        if assignee_id:
+            payload["assigneeId"] = assignee_id
+
+        response = requests.post(
+            f"{self.BASE_URL}/tickets",
+            json=payload,
+            headers=self._headers(),
+            timeout=60,
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 class SearchRecordMixin:
