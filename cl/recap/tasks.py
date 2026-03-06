@@ -487,12 +487,12 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
             rd.filepath_local.delete(save=False)
             return None
 
-    if not pq.debug:
-        tasks = (
-            [extract_pdf_document.si(rd.pk)] if not existing_document else []
-        )
-        tasks.append(check_pdf_redactions.si(rd.pk))
-        await sync_to_async(chain(*tasks).apply_async)()
+    if not existing_document and not pq.debug:
+        await sync_to_async(
+            chain(
+                extract_pdf_document.si(rd.pk),
+                check_pdf_redactions.si(rd.pk)
+            ).apply_async)()
 
     if not pq.debug:
         de = await DocketEntry.objects.aget(recap_documents=rd)
