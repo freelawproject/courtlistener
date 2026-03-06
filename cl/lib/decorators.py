@@ -261,6 +261,9 @@ FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
 )
 
 
+_SPACES_RE = re.compile(r"\s+")
+
+
 def document_model(model: type[models.Model]) -> type[models.Model]:
     """
     Decorator for Django models to use docstrings to populate unset
@@ -278,7 +281,10 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
     ]
     field_docs = dict(
         [
-            (field_name, docstring.replace("\n", " "))
+            (
+                field_name,
+                _SPACES_RE.sub(" ", docstring).strip(),
+            )
             for field_name, docstring in ivar_docs
             if field_name in model_fields
         ]
@@ -295,3 +301,20 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
             field.db_comment = doc
 
     return model
+
+
+def time_call(fn_logger: logging.Logger) -> Callable:
+    def decorator(f: Callable) -> Callable:
+        @wraps(f)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter_ns()
+            result = f(*args, **kwargs)
+            elapsed = time.perf_counter_ns() - start
+            fn_logger.debug(
+                "Ran %s in %d.3 ms", f.__qualname__, elapsed / 1_000_000
+            )
+            return result
+
+        return wrapper
+
+    return decorator

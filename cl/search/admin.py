@@ -14,6 +14,7 @@ from cl.lib.admin import build_admin_url
 from cl.lib.string_utils import trunc
 from cl.search.models import (
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Claim,
     ClaimHistory,
@@ -31,6 +32,7 @@ from cl.search.models import (
     RECAPDocument,
     ScotusDocketMetadata,
     SearchQuery,
+    TrialCourtData,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.search.utils import seal_documents
@@ -358,6 +360,37 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
     raw_id_fields = ("docket",)
 
 
+@admin.register(CaseTransfer)
+class CaseTransferAdmin(CursorPaginatorAdmin):
+    raw_id_fields = (
+        "origin_court",
+        "origin_docket",
+        "destination_court",
+        "destination_docket",
+    )
+    list_display = (
+        "pk",
+        "origin_court",
+        "origin_docket_number",
+        "destination_court",
+        "destination_docket_number",
+        "transfer_date",
+        "transfer_type",
+    )
+    list_filter = (
+        "transfer_type",
+        "transfer_date",
+    )
+    search_fields = (
+        "origin_docket_number",
+        "destination_docket_number",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(CursorPaginatorAdmin):
     search_fields = (
@@ -565,6 +598,27 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+@admin.register(TrialCourtData)
+class TrialCourtDataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("docket", "court")
+    list_display = (
+        "pk",
+        "docket_number",
+        "court_name",
+        "judge",
+        "date_filed",
+    )
+    search_fields = (
+        "docket_number",
+        "docket_number_raw",
+    )
+    list_filter = ("date_filed",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
 
 
 class TexasDocumentInline(admin.StackedInline):

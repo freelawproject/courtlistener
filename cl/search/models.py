@@ -1,12 +1,12 @@
 import logging
 import re
 from datetime import datetime
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import nh3
 import pghistory
 import pytz
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
@@ -915,6 +915,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
+
+    def add_scraper_source(self) -> None:
+        if self.source in self.NON_SCRAPER_SOURCES():
+            self.source = self.source + self.SCRAPER
 
     def add_recap_source(self):
         if self.source == self.DEFAULT:
@@ -4085,6 +4089,83 @@ class CaseTransfer(AbstractDateTimeModel):
         choices=transfer_type_choices.items(),
     )
 
+    # We currently only generate transfers for state courts, and we do not
+    # scrape trial courts so skip trying to populate fields we'll never be able
+    # to populate.
+    TRACKED_JURISDICTIONS = (Court.STATE_APPELLATE, Court.STATE_SUPREME)
+
+    @classmethod
+    def _fill_null_docket_side(
+        cls, side: Literal["origin"] | Literal["destination"]
+    ) -> tuple[int, int]:
+        """Fill null docket FKs for one side (origin or destination).
+
+        :param side: Either "origin" or "destination".
+        :return: Tuple of (updated_count, total_count).
+        """
+        from cl.recap.mergers import find_docket_object
+
+        qs = cls.objects.filter(
+            **{
+                f"{side}_court__jurisdiction__in": cls.TRACKED_JURISDICTIONS,
+                f"{side}_docket__isnull": True,
+            }
+        )
+        total = qs.count()
+        updated_transfers: list[CaseTransfer] = []
+        total_updated = 0
+
+        for transfer in qs.iterator():
+            docket = async_to_sync(find_docket_object)(
+                court_id=getattr(transfer, f"{side}_court_id"),
+                pacer_case_id=None,
+                docket_number=getattr(transfer, f"{side}_docket_number"),
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                allow_create=False,
+            )
+            if docket:
+                logger.info(
+                    "Found %s docket %s!",
+                    side,
+                    getattr(transfer, f"{side}_docket_number"),
+                )
+                setattr(transfer, f"{side}_docket", docket)
+                updated_transfers.append(transfer)
+
+            if len(updated_transfers) >= 100:
+                total_updated += cls.objects.bulk_update(
+                    updated_transfers, [f"{side}_docket"]
+                )
+                updated_transfers = []
+
+        if updated_transfers:
+            total_updated += cls.objects.bulk_update(
+                updated_transfers, [f"{side}_docket"]
+            )
+
+        return total_updated, total
+
+    @classmethod
+    def fill_null_dockets(cls) -> None:
+        logger.info(
+            "Attempting to populate missing fields in CaseTransfer table..."
+        )
+
+        updated_origin, total_origin = cls._fill_null_docket_side("origin")
+        updated_destination, total_destination = cls._fill_null_docket_side(
+            "destination"
+        )
+
+        logger.info(
+            "Update complete. Populated %s/%s origin dockets and %s/%s destination dockets.",
+            updated_origin,
+            total_origin,
+            updated_destination,
+            total_destination,
+        )
+
     class Meta:
         constraints = [
             CheckConstraint(
@@ -4170,3 +4251,61 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
+
+
+@pghistory.track()
+@document_model
+class TrialCourtData(AbstractDateTimeModel):
+    """
+    Trial court information for cases which have moved at least twice since
+    originating in a trial court. This is useful because
+    `originating_court_information` only captures info from the court directly
+    below in the appellate chain, and `CaseTransfer` similarly only goes one
+    step at a time. This model lets us store data from the very first time a
+    case appeared.
+
+    :ivar docket: The docket for the trial court case. Will be blank if the
+        case does not exist in the database. Currently, this is always the case
+        since we do not scrape any trial courts, so this field is just here for
+        future-proofing.
+    :ivar docket_number: The docket number of the case with (potentially)
+        some cleanup applied. May be blank if not available for a given state.
+    :ivar docket_number_raw: The raw docket number value as found on the
+        source, with no cleaning or transformations applied. May be blank.
+    :ivar judge: The judge who presided over the case. May be blank if this
+        information is not available.
+    :ivar reporter: The court reporter listed for this case. May be blank if
+        this information is not available.
+    :ivar date_filed: The date this case was originally filed. May be blank if
+        this information is not available.
+    :ivar court_name: The name of the court this case was filed in as it
+        appears in the source. May be blank if this information is not
+        available.
+    :ivar court: A foreign key to the Court object corresponding to the court
+        this case was heard in. May be blank if the court is not in the
+        database or is unavailable in the source.
+    :ivar punishment: The punishment assigned in criminal cases if available.
+    :ivar county: The county the trial court is located in if available.
+    """
+
+    docket = models.ForeignKey(
+        Docket, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    docket_number = models.CharField(blank=True, default="")
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            " with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
+    judge = models.TextField(blank=True)
+    reporter = models.TextField(blank=True)
+    date_filed = models.DateField(blank=True, null=True)
+    court_name = models.TextField(blank=True)
+    court = models.ForeignKey(
+        Court, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    punishment = models.TextField(blank=True)
+    county = models.TextField(blank=True)
