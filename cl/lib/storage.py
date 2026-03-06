@@ -96,6 +96,17 @@ class RecapEmailSESStorage(S3Storage):
     bucket_name = "recap.email"
 
 
+class S3PrivateLLMStorage(S3Storage):
+    """Private S3 storage for LLM-related files (inputs, responses, batch
+    results). Uses private ACL to keep internal processing files
+    inaccessible to the public
+    """
+
+    default_acl = "private"
+    bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
+    file_overwrite = False
+
+
 class S3PrivateUUIDStorage(S3Storage):
     """Implements a UUID file system storage.
 

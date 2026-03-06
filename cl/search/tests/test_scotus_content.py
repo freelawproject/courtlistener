@@ -1,11 +1,12 @@
 import datetime
 from unittest import mock
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
 from cl.corpus_importer.tasks import download_qp_scotus_pdf
-from cl.recap.mergers import merge_scotus_docket
+from cl.recap.mergers import find_docket_object, merge_scotus_docket
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -391,3 +392,43 @@ class ScotusDocketMergeTest(TestCase):
             "cadc123",
             "Non-existent Court",
         )
+
+    def test_find_docket_object_matches_same_docket_regardless_of_order(
+        self,
+    ) -> None:
+        """Confirm that find_docket_object consistently matches the same
+        docket when multiple NN-NNNN numbers appear in different orders.
+
+        The lexicographic sorting in clean_scotus_docket_number ensures
+        the same docket_number_core is always produced.
+        """
+        # Create a docket whose core matches the smallest NN-NNNN number
+        # "01-8148" -> core "01008148"
+        docket = DocketFactory(
+            court=self.court,
+            docket_number="01-8148",
+            docket_number_core="01008148",
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+
+        # Multiple NN-NNNN numbers in different orders should always
+        # resolve to the same docket_number_core ("01008148") and
+        # match the existing docket.
+        docket_number_variants = [
+            "No. 01-8200 01-8148",
+            "No. 01-8148 01-8200",
+            "01-8200, 01-8148, 01-9999",
+            "01-9999, 01-8200, 01-8148",
+        ]
+        for docket_number in docket_number_variants:
+            with self.subTest(docket_number=docket_number):
+                found = async_to_sync(find_docket_object)(
+                    court_id=self.court.pk,
+                    pacer_case_id=None,
+                    docket_number=docket_number,
+                    federal_defendant_number=None,
+                    federal_dn_judge_initials_assigned=None,
+                    federal_dn_judge_initials_referred=None,
+                )
+                self.assertEqual(found.pk, docket.pk)
