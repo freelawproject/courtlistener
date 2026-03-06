@@ -40,13 +40,13 @@
     </ul>
     <p>Other types of data are linked to this API and have their own documentation, including:</p>
     <ul>
-      <li><a class="text-primary-600" href="{% url "financial_disclosures_api_help" %}">Financial Disclosures</a></li>
-      <li><a class="text-primary-600" href="{% url "pacer_api_help" %}">PACER Filings</a></li>
-      <li><a class="text-primary-600" href="{% url "case_law_api_help" %}">Case Law</a></li>
-      <li><a class="text-primary-600" href="{% url "oral_argument_api_help" %}">Oral Argument Audio</a></li>
+      <li><a class="links" href="{% url "financial_disclosures_api_help" %}">Financial Disclosures</a></li>
+      <li><a class="links" href="{% url "pacer_api_help" %}">PACER Filings</a></li>
+      <li><a class="links" href="{% url "case_law_api_help" %}">Case Law</a></li>
+      <li><a class="links" href="{% url "oral_argument_api_help" %}">Oral Argument Audio</a></li>
     </ul>
     <p>In life, people can serve various roles in the justice system. Therefore, this is not strictly a database of judges, but rather a database of <em>people</em> and the positions they hold.</p>
-    <p>For example, <a class="text-primary-600" href="{% url "view_person" pk="26" slug="william-howard-taft" %}">William Taft</a> served as president, where he appointed justices, but he was also a Supreme Court justice himself. Therefore, he has a single "person" record in the API, he has one position record for his role as president, and another position record for his role as a justice.</p>
+    <p>For example, <a class="links" href="{% url "view_person" pk="26" slug="william-howard-taft" %}">William Taft</a> served as president, where he appointed justices, but he was also a Supreme Court justice himself. Therefore, he has a single "person" record in the API, he has one position record for his role as president, and another position record for his role as a justice.</p>
     <p>There are a number of "granularity" fields for dates. These are used to indicate how granular a corresponding date is. For example, if we know the year somebody died but not the month or day, we would put <code>2010-01-01</code> as the date of death, and set the date of death granularity field to <code>%Y</code>.</p>
     <p>This approach means that you can still — mostly — filter and sort by these date fields, but with an awareness that the data may be incomplete.</p>
   </c-layout-with-navigation.section>

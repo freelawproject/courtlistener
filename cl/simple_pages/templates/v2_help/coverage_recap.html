@@ -25,7 +25,7 @@
 >
   <c-layout-with-navigation.section id="overview">
     <h1 class="text-display-xs">RECAP Archive Coverage — What PACER Data Does CourtListener Have?</h1>
-    <p class="lead">The <a class="text-primary-600" href="{% url "advanced_r" %}">RECAP Archive</a> is the biggest open collection of PACER data on the Internet.</p>
+    <p class="lead">The <a class="links" href="{% url "advanced_r" %}">RECAP Archive</a> is the biggest open collection of PACER data on the Internet.</p>
     <p>It contains hundreds of millions of docket entries, nearly every federal case, and millions of documents. On a given day, it is likely to gain numerous new dockets, thousands of new documents, and around 100,000 new docket entries.</p>
     <p>Our goal with the RECAP Archive is to collect any PACER data that we can so that we can share it as widely as possible.</p>
   </c-layout-with-navigation.section>
@@ -52,7 +52,7 @@
 
   <c-layout-with-navigation.section id="special-scrapers">
     <h4>Special Case Scrapers</h4>
-    <p>CourtListener automatically identifies certain cases as "special." These cases get additional monitoring via scrapers that regularly gather data from PACER. Examples of special cases are those that have active <a class="text-primary-600" href="{% url "alert_help" %}#recap-alerts">Docket Alerts</a>, are saved in <a class="text-primary-600" href="{% url "tag_notes_help" %}#notes">Notes</a>, or are otherwise popular or important.
+    <p>CourtListener automatically identifies certain cases as "special." These cases get additional monitoring via scrapers that regularly gather data from PACER. Examples of special cases are those that have active <a class="links" href="{% url "alert_help" %}#recap-alerts">Docket Alerts</a>, are saved in <a class="links" href="{% url "tag_notes_help" %}#notes">Notes</a>, or are otherwise popular or important.
     </p>
     <div class="flex flex-col md:flex-row gap-2">
       <a class="btn-outline max-md:btn-xl" href="{% url "alert_help" %}">Learn About Docket Alerts</a>
@@ -94,7 +94,7 @@
   <c-layout-with-navigation.section id="rss">
     <h4>PACER RSS Feeds</h4>
     <p>Most federal district courts provide RSS feeds listing their latest docket entries. We crawl these feeds on an ongoing basis to get the latest docket entries.</p>
-    <p>For details on which courts have enabled RSS feeds, <a class="text-primary-600" href="{% url "alert_help" %}#coverage-gaps">see the documentation on alerts</a>.</p>
+    <p>For details on which courts have enabled RSS feeds, <a class="links" href="{% url "alert_help" %}#coverage-gaps">see the documentation on alerts</a>.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="free-pacer-scraper">
@@ -106,7 +106,7 @@
 
   <c-layout-with-navigation.section id="bots">
     <h4>Social Media Bots</h4>
-    <p>We host a fleet of social media bots that download important documents from PACER so they can be shared with the public. The bots use <a class="text-primary-600" href="{% url "api_index" %}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.</p>
+    <p>We host a fleet of social media bots that download important documents from PACER so they can be shared with the public. The bots use <a class="links" href="{% url "api_index" %}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.</p>
     <a class="btn-outline max-md:btn-xl" href="https://bots.law" target="_blank">Meet the Bots</a>
   </c-layout-with-navigation.section>
 

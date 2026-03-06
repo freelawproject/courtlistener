@@ -29,7 +29,7 @@
   <c-layout-with-navigation.section id="about">
     <h1>PACER Data APIs</h1>
     <p class="lead">Use these APIs to access almost half a billion items we have in our collection of PACER data.</p>
-    <p>To learn more about what's in the collection and how we gather PACER data each day, see <a class="text-primary-600" href="{% url "coverage_recap" %}">our coverage page on the topic.</a></p>
+    <p>To learn more about what's in the collection and how we gather PACER data each day, see <a class="links" href="{% url "coverage_recap" %}">our coverage page on the topic.</a></p>
     <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.</p>
     <p>In any legal proceeding, there are roughly three things: Documents, people, and organizations. Documents are grouped together into docket entries, which are grouped together into dockets. People and organizations are examples of parties. Parties have attorneys who act on their behalf in particular ways, which we call the attorney's role in the case.</p>
     <p>Each of these relationships is interlinked and has metadata that describes it. Use these APIs to explore this data.</p>
@@ -153,7 +153,7 @@ curl -v \
     ></c-data-table>
 
        {% if not perms.search.has_recap_api_access %}
-      <p>This endpoint is only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access this API.</p>
+      <p>This endpoint is only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access this API.</p>
     {% endif %}
   </c-layout-with-navigation.section>
 
@@ -233,7 +233,7 @@ curl -v \
       </li>
     </ol>
     {% if not perms.people_db.has_recap_api_access %}
-      <p>These endpoints are only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access these endpoints.</p>
+      <p>These endpoints are only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access these endpoints.</p>
     {% endif %}
   </c-layout-with-navigation.section>
 
@@ -278,7 +278,7 @@ curl -v \
 ...</c-code>
     <p>Similar to the party API above, when you filter attorneys to a particular docket, the nested <code>parties_represented</code> field is not filtered and can show other parties the attorney represented in other dockets.</p>
     {% if not perms.people_db.has_recap_api_access %}
-      <p>These endpoints are only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access these endpoints.
+      <p>These endpoints are only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access these endpoints.
       </p>
     {% endif %}
   </c-layout-with-navigation.section>
@@ -340,7 +340,7 @@ curl -v \
     <p class="alert-warning"><strong>Careful:</strong> When placing queries, the fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero, and you will need to do so in your queries.</p>
     <p>To query whether a case is in our system, use the <code>Docket</code> endpoint described above.</p>
     {% if not perms.search.has_recap_api_access %}
-      <p>This endpoint is only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access this API.</p>
+      <p>This endpoint is only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access this API.</p>
     {% endif %}
   </c-layout-with-navigation.section>
 </c-layout-with-navigation>
