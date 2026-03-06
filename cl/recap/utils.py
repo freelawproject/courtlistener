@@ -1,6 +1,5 @@
 from typing import Any
 
-from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
@@ -207,7 +206,7 @@ def find_subdocket_atts_rds_from_data(
     ]
 
 
-async def send_bad_redaction_email(
+def send_bad_redaction_email(
     rd: RECAPDocument,
     redactions: dict,
 ) -> None:
@@ -218,14 +217,11 @@ async def send_bad_redaction_email(
     """
     template = loader.get_template("emails/bad_redaction_alert.txt")
 
-    de = await DocketEntry.objects.select_related("docket__court").aget(
+    de = DocketEntry.objects.select_related("docket__court").get(
         pk=rd.docket_entry_id
     )
     docket = de.docket
     court = docket.court
-
-    # Use the model's get_absolute_url which handles all document types
-    document_url = await sync_to_async(rd.get_absolute_url)()
 
     context = {
         "rd_id": rd.pk,
@@ -233,10 +229,10 @@ async def send_bad_redaction_email(
         "court": court.full_name,
         "document_number": rd.document_number,
         "redactions": redactions,
-        "document_url": f"https://www.courtlistener.com{document_url}",
+        "document_url": f"https://www.courtlistener.com{rd.get_absolute_url()}",
     }
 
-    await sync_to_async(send_mail)(
+    send_mail(
         subject=f"Bad Redactions Detected: {docket.case_name[:50]}",
         message=template.render(context),
         from_email=settings.DEFAULT_FROM_EMAIL,

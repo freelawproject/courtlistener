@@ -473,24 +473,6 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
                 )
             rd.file_size = rd.filepath_local.size
 
-            # Check for bad redactions using X-Ray
-            try:
-                redaction_response = await check_redactions_service(rd)
-                if redaction_response.is_success:
-                    redaction_data = redaction_response.json()
-                    # Response: {"error": false, "results": {"1": [{"text": "...", "bbox": ...}]}}
-                    if not redaction_data.get("error") and redaction_data.get(
-                        "results"
-                    ):
-                        await send_bad_redaction_email(
-                            rd, redaction_data["results"]
-                        )
-            except Exception as e:
-                # Log but don't fail ingestion if redaction check fails
-                logger.warning(
-                    "Redaction check failed for RD %s: %s", rd.pk, e
-                )
-
         rd.ocr_status = None
         rd.is_available = True
         rd.sha1 = new_sha1
@@ -505,12 +487,12 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
             rd.filepath_local.delete(save=False)
             return None
 
-    if not existing_document and not pq.debug:
-        await sync_to_async(
-            chain(
-                extract_pdf_document.si(rd.pk),
-            ).apply_async
-        )()
+    if not pq.debug:
+        tasks = (
+            [extract_pdf_document.si(rd.pk)] if not existing_document else []
+        )
+        tasks.append(check_pdf_redactions.si(rd.pk))
+        await sync_to_async(chain(*tasks).apply_async)()
 
     if not pq.debug:
         de = await DocketEntry.objects.aget(recap_documents=rd)
@@ -3659,3 +3641,31 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
         process_recap_email.si(epq.pk, user.pk),
         extract_pdf_document.s(),
     ).apply_async()
+
+
+@app.task(
+    autoretry_for=(Exception,),
+    max_retries=2,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def check_pdf_redactions(rd_pk: int) -> None:
+    """Check a RECAPDocument PDF for bad redactions using X-Ray.
+
+    Runs as a background Celery task so it doesn't block PDF ingestion.
+
+    :param rd_pk: The PK of the RECAPDocument to check
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    try:
+        redaction_response = async_to_sync(check_redactions_service)(rd)
+    except Exception:
+        logger.error("Redaction check failed for RD %s", rd_pk, exc_info=True)
+        raise
+
+    if not redaction_response.is_success:
+        return
+
+    redaction_data = redaction_response.json()
+    if not redaction_data.get("error") and redaction_data.get("results"):
+        send_bad_redaction_email(rd, redaction_data["results"])
