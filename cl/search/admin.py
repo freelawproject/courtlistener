@@ -12,6 +12,7 @@ from django.utils.html import format_html
 from cl.alerts.models import DocketAlert
 from cl.lib.admin import (
     AdminLinkConfig,
+    SealableDocumentAdmin,
     generate_admin_links,
 )
 from cl.lib.string_utils import trunc
@@ -36,7 +37,6 @@ from cl.search.models import (
     SearchQuery,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
-from cl.search.utils import seal_documents
 from cl.visualizations.models import SCOTUSMap
 
 
@@ -362,7 +362,8 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
 
 
 @admin.register(RECAPDocument)
-class RECAPDocumentAdmin(CursorPaginatorAdmin):
+class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+    change_form_template = "admin/change_form_with_custom_links.html"
     search_fields = (
         "pk",
     )  # Required for search box; actual search handled by get_search_results
@@ -374,6 +375,16 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
         "date_modified",
     )
     actions = ("seal_documents",)
+
+    # SealableDocumentAdmin config
+    seal_url_name = "recapdocument_seal_confirmation"
+    seal_link_label = "Seal Document"
+    seal_heading_template = "Seal RECAP Document #{pk}?"
+    seal_model = RECAPDocument
+    seal_change_url_name = "admin:search_recapdocument_change"
+
+    def get_seal_documents(self, obj):
+        return [obj]
 
     def get_search_results(
         self, request: HttpRequest, queryset: QuerySet, search_term: str
@@ -397,20 +408,7 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
-        ia_failures = seal_documents(queryset)
-        if ia_failures:
-            self.message_user(
-                request,
-                f"Failed to remove {len(ia_failures)} item(s) from Internet "
-                "Archive. Please do so by hand. Sorry. The URL(s): "
-                f"{ia_failures}.",
-            )
-        else:
-            self.message_user(
-                request,
-                f"Successfully sealed and removed {queryset.count()} "
-                "document(s).",
-            )
+        self._seal_and_report(request, queryset=queryset)
 
 
 class RECAPDocumentInline(admin.StackedInline):
@@ -425,7 +423,8 @@ class RECAPDocumentInline(admin.StackedInline):
 
 
 @admin.register(DocketEntry)
-class DocketEntryAdmin(CursorPaginatorAdmin):
+class DocketEntryAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+    change_form_template = "admin/change_form_with_custom_links.html"
     inlines = (RECAPDocumentInline,)
     search_help_text = (
         "Search DocketEntries by Docket ID or RECAP sequence number."
@@ -449,6 +448,28 @@ class DocketEntryAdmin(CursorPaginatorAdmin):
         "date_modified",
     )
     list_filter = ("date_filed", "date_created", "date_modified")
+    actions = ("seal_docket_entry_documents",)
+
+    # SealableDocumentAdmin config
+    seal_url_name = "docketentry_seal_confirmation"
+    seal_link_label = "Seal Documents"
+    seal_heading_template = "Seal documents in Docket Entry #{pk}?"
+    seal_model = DocketEntry
+    seal_change_url_name = "admin:search_docketentry_change"
+
+    def get_seal_documents(self, obj):
+        return list(
+            obj.recap_documents.all().order_by(
+                "document_number", "attachment_number"
+            )
+        )
+
+    @admin.action(description="Seal documents for selected docket entries")
+    def seal_docket_entry_documents(
+        self, request: HttpRequest, queryset: QuerySet
+    ) -> None:
+        docs = RECAPDocument.objects.filter(docket_entry__in=queryset)
+        self._seal_and_report(request, queryset=docs)
 
     @admin.display(description="Docket entry")
     def get_pk(self, obj):
