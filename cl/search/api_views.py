@@ -307,12 +307,12 @@ class OpinionClusterViewSet(
             # First, try to get the object normally
             return super().retrieve(request, *args, **kwargs)
         except Http404 as exc:
+            pk = kwargs.get("pk")
             try:
-                pk = kwargs.get("pk")
                 redirection = ClusterRedirection.objects.get(
-                    deleted_cluster_id=pk
+                    deleted_cluster_id=int(pk)
                 )
-            except ClusterRedirection.DoesNotExist:
+            except (ValueError, TypeError, ClusterRedirection.DoesNotExist):
                 raise exc
 
             if redirection.reason == ClusterRedirection.SEALED:

@@ -2,7 +2,9 @@ import logging
 import os
 import re
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
+from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -78,8 +80,8 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
         No. 01A576 (01-8099) -> 01-8099  (prioritize NN-NNNN)
         No. 01-8148 (01A587) -> 01-8148  (prioritize NN-NNNN)
 
-    If multiple numbers of the same type are found (e.g., "01A576 01A578"),
-    a ValueError is raised.
+    When multiple numbers of the same type are found, the lexicographically
+    smallest one is selected to ensure deterministic behavior.
 
     :param docket_number: The docket number to clean.
     :return: The cleaned docket number or an empty string.
@@ -91,21 +93,24 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
     docket_number = docket_number.lower()
 
     scotus_m = re.findall(r"(?<![^ ,(])\d\d-\d+", docket_number)
-    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
 
     if len(scotus_m) == 1:
         return scotus_m[0]
     if len(scotus_m) > 1:
-        logger.error(
+        logger.warning(
             "Multiple NN-NNNN docket numbers found in: %s", docket_number
         )
-        return ""
+        return min(scotus_m)
+
+    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
 
     if len(scotus_a_m) == 1:
         return scotus_a_m[0]
     if len(scotus_a_m) > 1:
-        logger.error("Multiple NNA docket numbers found in: %s", docket_number)
-        return ""
+        logger.warning(
+            "Multiple NNA docket numbers found in: %s", docket_number
+        )
+        return min(scotus_a_m)
 
     return ""
 
@@ -265,6 +270,30 @@ def make_path(root: str, filename: str) -> str:
     return os.path.join(
         root, f"{d.year}", f"{d.month:02d}", f"{d.day:02d}", filename
     )
+
+
+def _make_llm_file_path(root: str, instance, filename: str) -> str:
+    """Make a file path for LLM related uploads
+
+    Falls back to uuid4 when instance.pk is None (unsaved instance)
+
+    :param root: The root directory for the file path.
+    :param instance: The model instance.
+    :param filename: The original filename.
+    :returns: The generated file path.
+    """
+    ext = Path(filename).suffix
+    name = instance.pk or uuid4().hex
+    return make_path(root, f"{name}{ext}")
+
+
+make_llm_task_input_file_path = partial(_make_llm_file_path, "llm-tasks")
+make_llm_request_response_file_path = partial(
+    _make_llm_file_path, "llm-requests"
+)
+make_llm_task_response_file_path = partial(
+    _make_llm_file_path, "llm-tasks/responses"
+)
 
 
 def make_lasc_path(instance, filename):
