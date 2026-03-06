@@ -38,18 +38,44 @@ class Command(VerboseCommand):
 
         rds: QuerySet = RECAPDocument.objects.filter(
             docket_entry__docket_id=docket_id,
-        )
+        ).select_related("docket_entry__docket")
         if entry_number is not None:
             rds = rds.filter(docket_entry__entry_number=entry_number)
         if rd_ids:
             rds = rds.filter(pk__in=rd_ids)
 
-        count = rds.count()
-        if not count:
+        rd_list = list(rds)
+        if not rd_list:
             logger.info("No RECAPDocuments found matching the given filters.")
             return
 
-        logger.info("Sealing %d RECAPDocument(s)...", count)
+        docket = rd_list[0].docket_entry.docket
+        self.stdout.write(f"\nDocket: {docket} (ID: {docket.pk})")
+        self.stdout.write(f"Court:  {docket.court_id}")
+        self.stdout.write(f"\nDocuments to seal ({len(rd_list)}):")
+        self.stdout.write(
+            f"{'ID':>10}  {'Entry':>6}  {'Type':>12}  {'Description'}"
+        )
+        self.stdout.write(
+            f"{'--':>10}  {'-----':>6}  {'----':>12}  {'-----------'}"
+        )
+        for rd in rd_list:
+            de = rd.docket_entry
+            desc = rd.description or de.description or ""
+            if len(desc) > 60:
+                desc = desc[:57] + "..."
+            self.stdout.write(
+                f"{rd.pk:>10}  {de.entry_number or '':>6}  "
+                f"{rd.get_document_type_display():>12}  {desc}"
+            )
+
+        self.stdout.write("")
+        confirm = input("Proceed with sealing? [y/N] ")
+        if confirm.lower() != "y":
+            self.stdout.write("Aborted.")
+            return
+
+        logger.info("Sealing %d RECAPDocument(s)...", len(rd_list))
         ia_failures = seal_documents(rds)
         if ia_failures:
             logger.warning(
@@ -59,4 +85,4 @@ class Command(VerboseCommand):
             for url in ia_failures:
                 logger.warning("  - %s", url)
         else:
-            logger.info("Successfully sealed %d document(s).", count)
+            logger.info("Successfully sealed %d document(s).", len(rd_list))
