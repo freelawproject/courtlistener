@@ -4268,9 +4268,9 @@ class TrialCourtData(AbstractDateTimeModel):
         since we do not scrape any trial courts, so this field is just here for
         future-proofing.
     :ivar docket_number: The docket number of the case with (potentially)
-        some cleanup applied.
-    :ivar docket_number_raw: The docket number of the case as it appears in the
-        source
+        some cleanup applied. May be blank if not available for a given state.
+    :ivar docket_number_raw: The raw docket number value as found on the
+        source, with no cleaning or transformations applied. May be blank.
     :ivar judge: The judge who presided over the case. May be blank if this
         information is not available.
     :ivar reporter: The court reporter listed for this case. May be blank if
@@ -4283,13 +4283,22 @@ class TrialCourtData(AbstractDateTimeModel):
     :ivar court: A foreign key to the Court object corresponding to the court
         this case was heard in. May be blank if the court is not in the
         database or is unavailable in the source.
+    :ivar punishment: The punishment assigned in criminal cases if available.
+    :ivar county: The county the trial court is located in if available.
     """
 
     docket = models.ForeignKey(
         Docket, on_delete=models.SET_NULL, blank=True, null=True
     )
-    docket_number = models.TextField()
-    docket_number_raw = models.TextField()
+    docket_number = models.CharField(blank=True, default="")
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            " with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
     judge = models.TextField(blank=True)
     reporter = models.TextField(blank=True)
     date_filed = models.DateField(blank=True, null=True)
@@ -4297,5 +4306,5 @@ class TrialCourtData(AbstractDateTimeModel):
     court = models.ForeignKey(
         Court, on_delete=models.SET_NULL, blank=True, null=True
     )
-
-    pass
+    punishment = models.TextField(blank=True)
+    county = models.TextField(blank=True)
