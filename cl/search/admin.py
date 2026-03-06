@@ -24,6 +24,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
@@ -58,6 +59,18 @@ class OpinionAdmin(CursorPaginatorAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("cluster")
+
+
+@admin.register(OpinionContent)
+class OpinionContentAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("opinion",)
+    search_fields = ("content",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("source",)
+    list_display = ("__str__", "source", "extraction_type")
 
 
 @admin.register(Citation)
