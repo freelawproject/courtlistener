@@ -112,11 +112,15 @@ from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
     ABARatingFactory,
+    AttorneyFactory,
     EducationFactory,
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
+    RoleFactory,
     SchoolFactory,
 )
 from cl.people_db.lookup_utils import (
@@ -617,10 +621,25 @@ class GetQuarterTest(SimpleTestCase):
 class IAUploaderTest(TestCase):
     """Tests related to uploading docket content to the Internet Archive"""
 
-    fixtures = [
-        "test_objects_query_counts.json",
-        "attorney_party_dup_roles.json",
-    ]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket_1 = DocketFactory()
+        cls.docket_2 = DocketFactory()
+        cls.docket_3 = DocketFactory()
+
+        party_1 = PartyFactory.build()
+        party_1.save()
+        party_2 = PartyFactory.build()
+        party_2.save()
+        PartyTypeFactory(docket=cls.docket_1, party=party_1)
+        PartyTypeFactory(docket=cls.docket_2, party=party_2)
+
+        attorney = AttorneyFactory(docket=cls.docket_1)
+        RoleFactory(docket=cls.docket_1, party=party_1, attorney=attorney)
+        RoleFactory(docket=cls.docket_2, party=party_1, attorney=attorney)
+
+        docket_entry = DocketEntryFactory(docket=cls.docket_1)
+        RECAPDocumentFactory(docket_entry=docket_entry)
 
     def test_correct_json_generated(self) -> None:
         """Do we generate the correct JSON for a handful of tricky dockets?
@@ -628,7 +647,7 @@ class IAUploaderTest(TestCase):
         The most important thing here is that we don't screw up how we handle
         m2m relationships, which have a tendency of being tricky.
         """
-        d, j_str = generate_ia_json(1)
+        d, j_str = generate_ia_json(self.docket_1.pk)
         j = json.loads(j_str)
         parties = j["parties"]
         first_party = parties[0]
@@ -660,13 +679,13 @@ class IAUploaderTest(TestCase):
         Let's avoid that.
         """
         with self.assertNumQueries(11):
-            generate_ia_json(1)
+            generate_ia_json(self.docket_1.pk)
 
         with self.assertNumQueries(9):
-            generate_ia_json(2)
+            generate_ia_json(self.docket_2.pk)
 
         with self.assertNumQueries(5):
-            generate_ia_json(3)
+            generate_ia_json(self.docket_3.pk)
 
 
 class HarvardTests(TestCase):
