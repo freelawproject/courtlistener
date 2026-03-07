@@ -92,7 +92,11 @@ def merge_or_add_opinions(
     # Merge docket information
     docket.add_anon_2020_source()
     docket.date_argued = date_argued or docket.date_argued
+
+    # need to populate the docket number for tests to pass until we activate
+    # the docket_number_raw cleaning flag
     docket.docket_number = docket_number or docket.docket_number
+    docket.docket_number_raw = docket_number or docket.docket_number_raw
     docket.case_name_short = (
         case_names["case_name_short"] or docket.case_name_short
     )
@@ -185,6 +189,7 @@ def add_new_records(
     docket = Docket.objects.create(
         **case_names,
         docket_number=docket_number,
+        docket_number_raw=docket_number,
         court_id=court_id,
         source=Docket.ANON_2020,
         ia_needs_upload=False,

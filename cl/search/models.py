@@ -15,6 +15,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import (
     Case,
     CharField,
+    CheckConstraint,
     F,
     Prefetch,
     Q,
@@ -41,11 +42,13 @@ from cl.lib import fields
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
     CSVExportMixin,
+    is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
     make_recap_path,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
@@ -269,6 +272,18 @@ class SOURCES:
         if len(source1) > len(source2):
             return source1
         return source2
+
+
+class DocketNumberSources:
+    ORIGINAL = 0
+    AUTOMATED = 1
+    MANUAL = 2
+
+    CHOICES = (
+        (ORIGINAL, "Original from source"),
+        (AUTOMATED, "Automatically cleaned using heuristics and LLM"),
+        (MANUAL, "Manually cleaned by a human"),
+    )
 
 
 @pghistory.track()
@@ -628,6 +643,15 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         default="",
     )
+    docket_number_source = models.PositiveSmallIntegerField(
+        help_text=(
+            "The source of the docket number, "
+            "whether they came from the original source, "
+            "were automatically cleaned, or were manually cleaned."
+        ),
+        choices=DocketNumberSources.CHOICES,
+        default=DocketNumberSources.ORIGINAL,
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
@@ -821,6 +845,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "date_reargument_denied",
         ]
     )
+    docket_number_raw_tracker = FieldTracker(fields=["docket_number_raw"])
 
     class Meta:
         constraints = [
@@ -848,15 +873,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if self.docket_number and not self.docket_number_core:
-            self.docket_number_core = (
-                make_scotus_docket_number_core(self.docket_number)
-                if self.court_id == "scotus"
-                else make_docket_number_core(self.docket_number)
-            )
+        if self.docket_number_raw and not self.docket_number_core:
+            if self.court_id == "scotus":
+                self.docket_number_core = make_scotus_docket_number_core(
+                    self.docket_number_raw
+                )
+            elif is_texas_court(self.court_id):
+                self.docket_number_core = make_texas_docket_number_core(
+                    self.docket_number_raw
+                )
+            else:
+                self.docket_number_core = make_docket_number_core(
+                    self.docket_number_raw
+                )
 
         if self.source in self.RECAP_SOURCES():
-            for field in ["pacer_case_id", "docket_number"]:
+            for field in ["pacer_case_id", "docket_number_raw"]:
                 if (
                     field == "pacer_case_id"
                     and getattr(self, "court", None)
@@ -988,7 +1020,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
             "servlet=CaseSummary.jsp&"
-            f"caseNum={self.docket_number}&"
+            f"caseNum={self.docket_number_raw}&"
             "incOrigDkt=Y&"
             "incDktEntries=Y"
         )
@@ -996,7 +1028,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def pacer_acms_url(self):
         return (
             f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
-            f"{self.docket_number}"
+            f"{self.docket_number_raw}"
         )
 
     @property
@@ -3980,10 +4012,30 @@ class CaseTransfer(AbstractDateTimeModel):
     Represents any transfer of a docket between two courts whether that be
     an appeal, workload balancing, or docket merging.
 
+    The `x_court` and `x_docket_number` fields must always be set and at least
+    one of `origin_docket` or `destination_docket` must be set to ensure
+    that transfers are associated with dockets in the DB. The reason for
+    (effectively) duplicating the docket number via `x_docket` and
+    `x_docket_number` is to allow populating transfers even if only one end is
+    in the DB. This allows us to track transfers from untracked courts to
+    tracked courts (e.g. appeals from trial courts) and to populate transfers
+    during the initial docket merging step independently of the order dockets
+    are merged in.
+
+    The intended way to populate this table in a merger is to:
+
+    1. Lookup if a transfer with matching origin and destination courts and\
+       docket numbers exists;
+    2. If it does, update the missing foreign key on that entry;
+    3. Otherwise, create a new entry with only origin or destination docket\
+       field set depending on which you have.
+
     :ivar origin_court: The court this transfer originates from.
-    :ivar origin_docket: The docket this transfer originates from.
+    :ivar origin_docket_number: The ID of the docket this transfer originates from.
+    :ivar origin_docket: The docket object this transfer originates from.
     :ivar destination_court: The court the docket is being transferred to.
-    :ivar destination_docket: The case docket in the destination court.
+    :ivar destination_docket_number: The ID of the case docket in the destination court.
+    :ivar destination_docket: The docket object in the destination court.
     :ivar transfer_date: The date this transfer occurred.
     :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
     """
@@ -4007,25 +4059,40 @@ class CaseTransfer(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_court",
     )
+    origin_docket_number = models.TextField()
     origin_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_docket",
+        blank=True,
+        null=True,
     )
     destination_court = models.ForeignKey(
         "search.Court",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_court",
     )
+    destination_docket_number = models.TextField()
     destination_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_docket",
+        blank=True,
+        null=True,
     )
     transfer_date = models.DateField()
     transfer_type = models.SmallIntegerField(
         choices=transfer_type_choices.items(),
     )
+
+    class Meta:
+        constraints = [
+            CheckConstraint(
+                condition=Q(origin_docket__isnull=False)
+                | Q(destination_docket__isnull=False),
+                name="docket_at_least_one_fk_set",
+            )
+        ]
 
 
 @pghistory.track()
@@ -4090,7 +4157,7 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         blank=True,
         null=True,
     )
-    url = models.URLField()
+    url = models.URLField(max_length=1000)
 
     class Meta:
         indexes = [
