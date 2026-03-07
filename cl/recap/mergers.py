@@ -102,7 +102,7 @@ def confirm_docket_number_core_lookup_match(
     validate the match.
     :return: The docket object if both dockets matched or otherwise None.
     """
-    existing_docket_number = clean_docket_number(docket.docket_number)
+    existing_docket_number = clean_docket_number(docket.docket_number_raw)
     incoming_docket_number = clean_docket_number(docket_number)
     if existing_docket_number != incoming_docket_number:
         return None
@@ -156,14 +156,20 @@ async def find_docket_object(
     d = None
     if court_id == "scotus":
         docket_number_core = make_scotus_docket_number_core(docket_number)
-        skip_check = False
+        # SCOTUS docket numbers can contain multiple NN-NNNN numbers
+        # (e.g. "No. 01-8200 01-8148"). The docket_number_core is computed
+        # deterministically via lexicographic sorting, so the federal
+        # clean_docket_number confirmation would fail on multi-number
+        # inputs and must be skipped.
+        skip_dn_core_confirmation = True
     elif is_texas_court(court_id):
         docket_number_core = make_texas_docket_number_core(docket_number)
-        # Texas docket numbers are unique and do not need the extra check SCOTUS and Federal docket numbers require.
-        skip_check = True
+        # Texas docket numbers are unique and do not need the extra
+        # confirmation that federal docket numbers require.
+        skip_dn_core_confirmation = True
     else:
         docket_number_core = make_docket_number_core(docket_number)
-        skip_check = False
+        skip_dn_core_confirmation = False
     lookups = []
     if pacer_case_id:
         # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
@@ -205,7 +211,7 @@ async def find_docket_object(
         # match b/c of punctuation or whatever, but we can try. Avoid lookups
         # by blank docket_number values.
         lookups.append(
-            {"pacer_case_id": None, "docket_number": docket_number},
+            {"pacer_case_id": None, "docket_number_raw": docket_number},
         )
 
     for kwargs in lookups:
@@ -216,7 +222,7 @@ async def find_docket_object(
         if count == 1:
             d = await ds.afirst()
             if (
-                not skip_check
+                not skip_dn_core_confirmation
                 and kwargs.get("pacer_case_id") is None
                 and kwargs.get("docket_number_core")
             ):
@@ -250,7 +256,7 @@ async def find_docket_object(
                 # Choose the oldest one and live with it.
                 d = await ds.aearliest("date_created")
                 if (
-                    not skip_check
+                    not skip_dn_core_confirmation
                     and kwargs.get("pacer_case_id") is None
                     and kwargs.get("docket_number_core")
                 ):
@@ -403,7 +409,13 @@ async def update_docket_metadata(
     """
     d = update_case_names(d, docket_data["case_name"])
     await mark_ia_upload_needed(d, save_docket=False)
-    d.docket_number = docket_data["docket_number"] or d.docket_number
+
+    # need to populate the docket number for tests to pass until we
+    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # the clean docket_number_raw value once cleaning is activated
+    if not d.docket_number:
+        d.docket_number = docket_data["docket_number"]
+
     d.docket_number_raw = docket_data["docket_number"] or d.docket_number_raw
     d.pacer_case_id = d.pacer_case_id or docket_data.get("pacer_case_id")
     d.date_filed = docket_data.get("date_filed") or d.date_filed

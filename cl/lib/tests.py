@@ -581,6 +581,10 @@ class TestModelHelpers(TestCase):
             ("No. 01-8148 (01A587)", "01008148"),
             # Single NN-NNNN with multiple NNA is still valid
             ("No. 01-8148 01A578 01A578", "01008148"),
+            # Multiple NN-NNNN: picks lexicographically smallest
+            ("No. 01-8149 01-8148", "01008148"),
+            # Multiple NNA: picks lexicographically smallest
+            ("No. 01A578 01A576", "01A00576"),
         ]
 
         for input_value, expected in test_cases:
@@ -593,19 +597,19 @@ class TestModelHelpers(TestCase):
     def test_making_scotus_docket_number_core_logs_multiple(
         self, mock_logger: mock.MagicMock
     ) -> None:
-        """Test that multiple docket numbers of the same type log an
-        error and return empty string.
+        """Test that multiple docket numbers of the same type log a
+        warning and return the lexicographically smallest match.
         """
-        error_cases = [
-            "No. 01A576 01A578",
-            "No. 01-8148 01-8149",
+        warning_cases = [
+            ("No. 01A578 01A576", "01A00576"),
+            ("No. 01-8149 01-8148", "01008148"),
         ]
-        for input_value in error_cases:
+        for input_value, expected in warning_cases:
             with self.subTest(input=input_value):
                 mock_logger.reset_mock()
                 result = make_scotus_docket_number_core(input_value)
-                self.assertEqual(result, "")
-                mock_logger.error.assert_called_once()
+                self.assertEqual(result, expected)
+                mock_logger.warning.assert_called_once()
 
     def test_clean_scotus_docket_number(self) -> None:
         """Test clean_scotus_docket_number prioritizes NN-NNNN format."""
@@ -624,6 +628,15 @@ class TestModelHelpers(TestCase):
             "No. 01-8148 (01A587)": "01-8148",
             # Single NN-NNNN with multiple NNA is valid
             "No. 01-8148 01A578 01A579": "01-8148",
+            # Multiple NN-NNNN: picks lexicographically smallest
+            "No. 01-8149 01-8148": "01-8148",
+            "01-8200, 01-8100": "01-8100",
+            # Lexicographic sort picks "01-10" over "01-9" (not numerically
+            # smaller, but deterministic regardless of input order)
+            "01-9, 01-10": "01-10",
+            "01-10, 01-9": "01-10",
+            # Multiple NNA: picks lexicographically smallest
+            "No. 01A578 01A576": "01a576",
             # No matches
             "23-cv-001": "",
         }
@@ -635,19 +648,19 @@ class TestModelHelpers(TestCase):
     def test_clean_scotus_docket_number_logs_multiple(
         self, mock_logger: mock.MagicMock
     ) -> None:
-        """Test that multiple same-type docket numbers log an error and
-        return empty string."""
-        error_cases = [
-            "No. 01A576 01A578",
-            "No. 01-8148 01-8149",
-            "01-8148, 01-8149 01A578",
+        """Test that multiple same-type docket numbers log a warning and
+        return the lexicographically smallest match."""
+        warning_cases = [
+            ("No. 01A578 01A576", "01a576"),
+            ("No. 01-8149 01-8148", "01-8148"),
+            ("01-8148, 01-8149 01A578", "01-8148"),
         ]
-        for raw in error_cases:
+        for raw, expected in warning_cases:
             with self.subTest(raw=raw):
                 mock_logger.reset_mock()
                 result = clean_scotus_docket_number(raw)
-                self.assertEqual(result, "")
-                mock_logger.error.assert_called_once()
+                self.assertEqual(result, expected)
+                mock_logger.warning.assert_called_once()
 
 
 class S3PrivateUUIDStorageTest(TestCase):
