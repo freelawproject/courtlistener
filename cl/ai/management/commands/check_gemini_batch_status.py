@@ -47,14 +47,17 @@ EXAMPLE OUTPUT:
 
 import json
 import logging
+from datetime import timedelta
 from typing import Any
 
 import environ
+import httpx
 import sentry_sdk
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.timezone import now
+from google.genai.errors import ServerError
 from google.genai.types import JobState
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
@@ -67,6 +70,10 @@ from cl.ai.models import (
 from cl.lib.command_utils import VerboseCommand
 
 logger = logging.getLogger(__name__)
+
+# Uploaded files in Gemini expire after 48h. If a request has been
+# in progress longer than this, retrying is pointless.
+MAX_REQUEST_AGE = timedelta(hours=48)
 
 COMPLETED_STATES = {
     JobState.JOB_STATE_SUCCEEDED,
@@ -204,6 +211,34 @@ def handle_request(
         logger.warning(
             f"ValueError downloading results for request {request.pk}: {e}"
         )
+    except (
+        ServerError,
+        httpx.TimeoutException,
+        httpx.NetworkError,
+    ) as e:
+        too_old = (
+            request.date_started
+            and now() - request.date_started > MAX_REQUEST_AGE
+        )
+        if too_old:
+            logger.error(
+                "Request %s has been in progress since %s "
+                "(over %s). Marking as failed.",
+                request.pk,
+                request.date_started,
+                MAX_REQUEST_AGE,
+            )
+            sentry_sdk.capture_exception(e)
+            request.status = LLMRequestStatusChoices.FAILED
+            request.date_completed = now()
+            request.save()
+        else:
+            logger.warning(
+                "Transient error checking request %s, will retry: %s",
+                request.pk,
+                e,
+            )
+            sentry_sdk.capture_exception(e)
     except Exception as e:
         logger.exception(
             f"Unexpected error in check_gemini_batch_status for request {request.pk}"
