@@ -55,18 +55,25 @@ from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.timezone import now
+from google.genai.types import JobState
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
-from cl.ai.models import LLMProvider, LLMRequest, LLMTaskStatusChoices
+from cl.ai.models import (
+    LLMProvider,
+    LLMRequest,
+    LLMRequestStatusChoices,
+    LLMTaskStatusChoices,
+)
 from cl.lib.command_utils import VerboseCommand
 
 logger = logging.getLogger(__name__)
 
 COMPLETED_STATES = {
-    "JOB_STATE_SUCCEEDED",
-    "JOB_STATE_FAILED",
-    "JOB_STATE_CANCELLED",
-    "JOB_STATE_EXPIRED",
+    JobState.JOB_STATE_SUCCEEDED,
+    JobState.JOB_STATE_FAILED,
+    JobState.JOB_STATE_CANCELLED,
+    JobState.JOB_STATE_EXPIRED,
+    JobState.JOB_STATE_PARTIALLY_SUCCEEDED,
 }
 
 
@@ -127,7 +134,7 @@ def process_succeeded_request(
                     )
             task.save()
 
-        request.status = LLMTaskStatusChoices.FINISHED
+        request.status = LLMRequestStatusChoices.FINISHED
         request.completed_tasks = request.tasks.filter(
             status=LLMTaskStatusChoices.SUCCEEDED
         ).count()
@@ -148,8 +155,9 @@ def process_failed_request(request: LLMRequest, job_state_name: str) -> None:
         ``JOB_STATE_FAILED``) included in task error messages.
     """
     with transaction.atomic():
-        request.status = LLMTaskStatusChoices.FAILED
+        request.status = LLMRequestStatusChoices.FAILED
         request.date_completed = now()
+        request.failed_tasks = request.tasks.all().count()
         for task in request.tasks.all():
             task.status = LLMTaskStatusChoices.FAILED
             task.error_message = (
@@ -202,7 +210,7 @@ def handle_request(
         )
         sentry_sdk.capture_exception(e)
 
-        request.status = LLMTaskStatusChoices.FAILED
+        request.status = LLMRequestStatusChoices.FAILED
         request.date_completed = now()
         request.save()
 
@@ -223,7 +231,7 @@ class Command(VerboseCommand):
 
         pending_requests = LLMRequest.objects.filter(
             is_batch=True,
-            status=LLMTaskStatusChoices.IN_PROGRESS,
+            status=LLMRequestStatusChoices.IN_PROGRESS,
             provider=LLMProvider.GEMINI,
         )
         logger.info(
