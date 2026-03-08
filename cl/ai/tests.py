@@ -1003,8 +1003,8 @@ class SendGeminiBatchesTest(TestCase):
         mock_wrapper.prepare_batch_requests.return_value = []
         mock_wrapper.execute_batch.side_effect = Exception("API Error")
 
-        # Execute command - should fail gracefully
-        with self.assertRaises(CommandError) as context:
+        # Execute command - exception propagates after transaction rollback
+        with self.assertRaises(Exception):
             call_command(
                 "send_gemini_batches",
                 path="llm-inputs/test-batch/",
@@ -1012,12 +1012,8 @@ class SendGeminiBatchesTest(TestCase):
                 user_prompt=self.user_prompt.pk,
             )
 
-        self.assertIn("Failed to create batch job", str(context.exception))
-
-        # Verify request was created but marked as FAILED
-        self.assertEqual(LLMRequest.objects.count(), 1)
-        llm_request = LLMRequest.objects.first()
-        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FAILED)
+        # Verify the transaction rolled back and no request was persisted
+        self.assertEqual(LLMRequest.objects.count(), 0)
 
     @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
     @patch.dict(

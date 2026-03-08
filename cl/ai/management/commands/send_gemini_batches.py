@@ -134,6 +134,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
+from django.db import transaction
 from django.utils.timezone import now
 
 from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
@@ -239,7 +240,7 @@ def get_s3_file_list(
                 file_content = response["Body"].read()
 
                 file_count += 1
-                yield (filename, file_content, key)
+                yield filename, file_content, key
 
         if file_count == 0:
             raise CommandError(
@@ -308,7 +309,8 @@ def fetch_files_and_create_tasks(
     s3_path: str,
     bucket: str,
     store_files: bool,
-) -> tuple[list[dict], list[str]]:
+    temp_files: list[str],
+) -> list[dict]:
     """Iterate S3 files, create ``LLMTask`` objects, and stage temp files.
 
     For each PDF found via :func:`get_s3_file_list`, an ``LLMTask`` is
@@ -316,64 +318,58 @@ def fetch_files_and_create_tasks(
     or referenced by S3 key.  A temporary local copy is also written for
     later upload to the Google GenAI Files API.
 
-    On failure the *llm_request* is deleted so no partial state is left
-    behind.
+    This function should be called inside a ``transaction.atomic()`` block
+    so that all DB writes roll back cleanly on failure.
 
     :param llm_request: The parent request all tasks belong to.
     :param s3_path: S3 prefix containing files to process.
     :param bucket: S3 bucket name.
     :param store_files: When ``True``, duplicate files into CL storage;
         otherwise only store the S3 key reference.
-    :returns: A tuple of (tasks_data, temp_files) where *tasks_data* is a
-        list of dicts with ``llm_key`` and ``input_file_path`` keys, and
-        *temp_files* is a list of temporary file paths to clean up later.
+    :param temp_files: Mutable list populated in-place with temporary file
+        paths. This ensures the caller can clean them up even if this
+        function fails partway through.
+    :returns: A list of dicts with ``llm_key`` and ``input_file_path`` keys.
     """
     logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
     tasks_data: list[dict] = []
-    temp_files: list[str] = []
 
-    try:
-        for filename, file_content, s3_key in get_s3_file_list(
-            s3_path=s3_path,
-            bucket_name=bucket,
-            file_extension=".pdf",
-        ):
-            llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
-            task = LLMTask.objects.create(
-                request=llm_request,
-                task_type=LLMTaskChoices.SCAN_EXTRACTION,
-                llm_key=llm_key,
-            )
+    for filename, file_content, s3_key in get_s3_file_list(
+        s3_path=s3_path,
+        bucket_name=bucket,
+        file_extension=".pdf",
+    ):
+        llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
+        task = LLMTask.objects.create(
+            request=llm_request,
+            task_type=LLMTaskChoices.SCAN_EXTRACTION,
+            llm_key=llm_key,
+        )
 
-            if store_files:
-                task.input_file.save(filename, ContentFile(file_content))
-                logger.info(f"  - Stored file: {filename}")
-            else:
-                task.input_file.name = s3_key
-                task.save()
-                logger.info(f"  - Referenced S3 file: {s3_key}")
+        if store_files:
+            task.input_file.save(filename, ContentFile(file_content))
+            logger.info(f"  - Stored file: {filename}")
+        else:
+            task.input_file.name = s3_key
+            task.save()
+            logger.info(f"  - Referenced S3 file: {s3_key}")
 
-            temp_file = tempfile.NamedTemporaryFile(
-                delete=False, suffix=os.path.splitext(filename)[1]
-            )
-            temp_file.write(file_content)
-            temp_file.close()
-            temp_files.append(temp_file.name)
+        temp_file = tempfile.NamedTemporaryFile(
+            delete=False, suffix=os.path.splitext(filename)[1]
+        )
+        temp_file.write(file_content)
+        temp_file.close()
+        temp_files.append(temp_file.name)
 
-            tasks_data.append(
-                {"llm_key": llm_key, "input_file_path": temp_file.name}
-            )
-
-    except CommandError:
-        cleanup_temp_files(temp_files)
-        llm_request.delete()
-        raise
+        tasks_data.append(
+            {"llm_key": llm_key, "input_file_path": temp_file.name}
+        )
 
     llm_request.total_tasks = len(tasks_data)
     llm_request.save()
     logger.info(f"Created {llm_request.total_tasks} LLMTask objects.")
 
-    return tasks_data, temp_files
+    return tasks_data
 
 
 def submit_batch(
@@ -390,9 +386,8 @@ def submit_batch(
     requests from *tasks_data*, and submits the batch.  On success the
     ``batch_id`` is persisted on the *llm_request*.
 
-    If a ``ValueError`` (configuration error) or unexpected ``Exception``
-    occurs, the *llm_request* is marked as ``FAILED`` and the error is
-    reported.
+    This function should be called inside a ``transaction.atomic()`` block
+    so that all DB writes roll back cleanly on failure.
 
     :param llm_request: The parent request to associate the batch with.
     :param batch_api_key: Google GenAI batch API key.
@@ -404,45 +399,28 @@ def submit_batch(
     :param cache_name: Stable display name for the system-prompt cache.
     :returns: The batch ID assigned by the provider.
     """
-    try:
-        logger.info("Initializing Google GenAI wrapper...")
-        wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
+    logger.info("Initializing Google GenAI wrapper...")
+    wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
 
-        logger.info("Preparing batch requests...")
-        prepared_requests = wrapper.prepare_batch_requests(
-            tasks_data, user_prompt.text
-        )
+    logger.info("Preparing batch requests...")
+    prepared_requests = wrapper.prepare_batch_requests(
+        tasks_data, user_prompt.text
+    )
 
-        logger.info("Executing batch job...")
-        batch_id = wrapper.execute_batch(
-            model_name=llm_request.api_model_name,
-            requests=prepared_requests,
-            system_prompt=system_prompt.text,
-            cache_display_name=cache_name,
-            batch_display_name=llm_request.name or f"Request-{llm_request.pk}",
-        )
+    logger.info("Executing batch job...")
+    batch_id = wrapper.execute_batch(
+        model_name=llm_request.api_model_name,
+        requests=prepared_requests,
+        system_prompt=system_prompt.text,
+        cache_display_name=cache_name,
+        batch_display_name=llm_request.name or f"Request-{llm_request.pk}",
+    )
 
-        llm_request.batch_id = batch_id
-        llm_request.save()
+    llm_request.batch_id = batch_id
+    llm_request.save()
 
-        logger.info(f"Batch job sent to provider. Batch ID: {batch_id}")
-        return batch_id
-
-    except ValueError as e:
-        llm_request.status = LLMTaskStatusChoices.FAILED
-        llm_request.save()
-        logger.warning(
-            f"Configuration error for request {llm_request.pk}: {e}"
-        )
-        raise CommandError(f"Configuration error: {e}")
-    except Exception as e:
-        llm_request.status = LLMTaskStatusChoices.FAILED
-        llm_request.save()
-        logger.exception(
-            f"Unexpected error creating batch for request {llm_request.pk}"
-        )
-        sentry_sdk.capture_exception(e)
-        raise CommandError(f"Failed to create batch job: {e}")
+    logger.info(f"Batch job sent to provider. Batch ID: {batch_id}")
+    return batch_id
 
 
 def cleanup_temp_files(temp_files: list[str]) -> None:
@@ -530,29 +508,38 @@ class Command(VerboseCommand):
 
         batch_api_key, system_prompt, user_prompt = validate_inputs(options)
 
-        llm_request = LLMRequest.objects.create(
-            name=request_name,
-            is_batch=True,
-            provider=LLMProvider.GEMINI,
-            api_model_name=model,
-            status=LLMTaskStatusChoices.IN_PROGRESS,
-            date_started=now(),
-        )
-        llm_request.prompts.set([system_prompt, user_prompt])
-        logger.info(f"Created LLMRequest with ID: {llm_request.pk}")
-
-        tasks_data, temp_files = fetch_files_and_create_tasks(
-            llm_request, s3_path, bucket, store_files
-        )
-
+        temp_files: list[str] = []
         try:
-            submit_batch(
-                llm_request,
-                batch_api_key,
-                tasks_data,
-                system_prompt,
-                user_prompt,
-                cache_name,
-            )
+            with transaction.atomic():
+                llm_request = LLMRequest.objects.create(
+                    name=request_name,
+                    is_batch=True,
+                    provider=LLMProvider.GEMINI,
+                    api_model_name=model,
+                    status=LLMTaskStatusChoices.IN_PROGRESS,
+                    date_started=now(),
+                )
+                llm_request.prompts.set([system_prompt, user_prompt])
+                logger.info(f"Created LLMRequest with ID: {llm_request.pk}")
+
+                tasks_data = fetch_files_and_create_tasks(
+                    llm_request, s3_path, bucket, store_files, temp_files
+                )
+
+                submit_batch(
+                    llm_request,
+                    batch_api_key,
+                    tasks_data,
+                    system_prompt,
+                    user_prompt,
+                    cache_name,
+                )
+        except Exception as e:
+            # Catch any error (CommandError, API failures, S3 errors,
+            # etc.) so we always log and report to Sentry before the
+            # transaction rolls back.
+            logger.exception("Failed to create and submit batch request")
+            sentry_sdk.capture_exception(e)
+            raise
         finally:
             cleanup_temp_files(temp_files)
