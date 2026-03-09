@@ -92,7 +92,7 @@ class DocketFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
-    docket_number_raw = Faker("federal_district_docket_number")
+    docket_number_raw = SelfAttribute("docket_number")
     slug = Faker("slug")
     date_argued = Faker("date_object")
     view_count = 0

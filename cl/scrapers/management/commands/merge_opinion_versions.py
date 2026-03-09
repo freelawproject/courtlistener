@@ -780,13 +780,13 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     # Special case for NY courts: allow versioning without matching docket numbers
     # when at least one docket number is empty.
     if docket.court_id.startswith("ny") and (
-        not docket.docket_number or not version_docket.docket_number
+        not docket.docket_number_raw or not version_docket.docket_number_raw
     ):
         return True
 
-    if docket.docket_number != version_docket.docket_number:
+    if docket.docket_number_raw != version_docket.docket_number_raw:
         logger.error(
-            log_template, "docket_number", docket.id, version_docket.id
+            log_template, "docket_number_raw", docket.id, version_docket.id
         )
         return False
 
