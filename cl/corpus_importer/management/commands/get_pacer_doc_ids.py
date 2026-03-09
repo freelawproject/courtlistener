@@ -1,5 +1,6 @@
 import os
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 
 from cl.corpus_importer.tasks import get_pacer_doc_id_with_show_case_doc_url
@@ -12,7 +13,7 @@ PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
-def get_pacer_doc_ids(options):
+async def get_pacer_doc_ids(options):
     """Get pacer_doc_ids for any item that needs them."""
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
@@ -37,7 +38,7 @@ def get_pacer_doc_ids(options):
             session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
+            async_to_sync(session.login)()
             logger.info(
                 f"Sent {completed} tasks to celery so far. Latest pk: {row_pk}"
             )
@@ -72,4 +73,4 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        get_pacer_doc_ids(options)
+        async_to_sync(get_pacer_doc_ids)(options)
