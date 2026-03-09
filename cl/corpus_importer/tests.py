@@ -165,7 +165,6 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
-    SOURCES,
     CaseTransfer,
     Citation,
     Docket,

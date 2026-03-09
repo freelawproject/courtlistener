@@ -186,7 +186,6 @@ from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     CaseTransfer,
     ClaimHistory,
     Court,
