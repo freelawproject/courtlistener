@@ -845,6 +845,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "date_reargument_denied",
         ]
     )
+    docket_number_raw_tracker = FieldTracker(fields=["docket_number_raw"])
 
     class Meta:
         constraints = [
@@ -872,22 +873,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if self.docket_number and not self.docket_number_core:
+        if self.docket_number_raw and not self.docket_number_core:
             if self.court_id == "scotus":
                 self.docket_number_core = make_scotus_docket_number_core(
-                    self.docket_number
+                    self.docket_number_raw
                 )
             elif is_texas_court(self.court_id):
                 self.docket_number_core = make_texas_docket_number_core(
-                    self.docket_number
+                    self.docket_number_raw
                 )
             else:
                 self.docket_number_core = make_docket_number_core(
-                    self.docket_number
+                    self.docket_number_raw
                 )
 
         if self.source in self.RECAP_SOURCES():
-            for field in ["pacer_case_id", "docket_number"]:
+            for field in ["pacer_case_id", "docket_number_raw"]:
                 if (
                     field == "pacer_case_id"
                     and getattr(self, "court", None)
@@ -1023,7 +1024,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
             "servlet=CaseSummary.jsp&"
-            f"caseNum={self.docket_number}&"
+            f"caseNum={self.docket_number_raw}&"
             "incOrigDkt=Y&"
             "incDktEntries=Y"
         )
@@ -1031,7 +1032,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def pacer_acms_url(self):
         return (
             f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
-            f"{self.docket_number}"
+            f"{self.docket_number_raw}"
         )
 
     @property
@@ -4250,3 +4251,66 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
+
+
+@pghistory.track()
+@document_model
+class TrialCourtData(AbstractDateTimeModel):
+    """
+    Trial court information for cases which have moved at least twice since
+    originating in a trial court. This is useful because
+    `originating_court_information` only captures info from the court directly
+    below in the appellate chain, and `CaseTransfer` similarly only goes one
+    step at a time. This model lets us store data from the very first time a
+    case appeared.
+
+    :ivar docket: The docket for the trial court case. Will be blank if the
+        case does not exist in the database. Currently, this is always the case
+        since we do not scrape any trial courts, so this field is just here for
+        future-proofing.
+    :ivar docket_number: The docket number of the case with (potentially)
+        some cleanup applied. May be blank if not available for a given state.
+    :ivar docket_number_raw: The raw docket number value as found on the
+        source, with no cleaning or transformations applied. May be blank.
+    :ivar judge_str: The name of the judge who presided over the case. May be
+        blank if this information is not available.
+    :ivar judge: The entry in people_db.Person for the judge who presided over
+        this case if available.
+    :ivar reporter: The court reporter listed for this case. May be blank if
+        this information is not available.
+    :ivar date_filed: The date this case was originally filed. May be blank if
+        this information is not available.
+    :ivar court_name: The name of the court this case was filed in as it
+        appears in the source. May be blank if this information is not
+        available.
+    :ivar court: A foreign key to the Court object corresponding to the court
+        this case was heard in. May be blank if the court is not in the
+        database or is unavailable in the source.
+    :ivar punishment: The punishment assigned in criminal cases if available.
+    :ivar county: The county the trial court is located in if available.
+    """
+
+    docket = models.ForeignKey(
+        Docket, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    docket_number = models.CharField(blank=True, default="")
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            " with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
+    judge_str = models.TextField(blank=True)
+    judge = models.ForeignKey(
+        "people_db.Person", blank=True, null=True, on_delete=models.SET_NULL
+    )
+    reporter = models.TextField(blank=True)
+    date_filed = models.DateField(blank=True, null=True)
+    court_name = models.TextField(blank=True)
+    court = models.ForeignKey(
+        Court, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    punishment = models.TextField(blank=True)
+    county = models.TextField(blank=True)

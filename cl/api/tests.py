@@ -4189,6 +4189,19 @@ class ClusterRedirectionTest(TestCase):
         self.assertEqual(response.json()["detail"], message)
         self.assertEqual(response.status_code, HTTPStatus.GONE)
 
+    async def test_non_integer_cluster_id_returns_404(self):
+        """Test that a non-integer cluster ID returns 404 instead of
+        raising a ValueError."""
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        for bad_pk in ("undefined", "abc"):
+            with self.subTest(pk=bad_pk):
+                url = reverse(
+                    "opinioncluster-detail",
+                    kwargs={"version": "v4", "pk": bad_pk},
+                )
+                response = await api_client.get(url)
+                self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
 
 class TestOpinionViewsetXMLRendering(TestCase):
     @classmethod
