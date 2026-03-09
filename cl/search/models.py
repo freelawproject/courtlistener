@@ -4170,3 +4170,61 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
+
+
+@pghistory.track()
+@document_model
+class TrialCourtData(AbstractDateTimeModel):
+    """
+    Trial court information for cases which have moved at least twice since
+    originating in a trial court. This is useful because
+    `originating_court_information` only captures info from the court directly
+    below in the appellate chain, and `CaseTransfer` similarly only goes one
+    step at a time. This model lets us store data from the very first time a
+    case appeared.
+
+    :ivar docket: The docket for the trial court case. Will be blank if the
+        case does not exist in the database. Currently, this is always the case
+        since we do not scrape any trial courts, so this field is just here for
+        future-proofing.
+    :ivar docket_number: The docket number of the case with (potentially)
+        some cleanup applied. May be blank if not available for a given state.
+    :ivar docket_number_raw: The raw docket number value as found on the
+        source, with no cleaning or transformations applied. May be blank.
+    :ivar judge: The judge who presided over the case. May be blank if this
+        information is not available.
+    :ivar reporter: The court reporter listed for this case. May be blank if
+        this information is not available.
+    :ivar date_filed: The date this case was originally filed. May be blank if
+        this information is not available.
+    :ivar court_name: The name of the court this case was filed in as it
+        appears in the source. May be blank if this information is not
+        available.
+    :ivar court: A foreign key to the Court object corresponding to the court
+        this case was heard in. May be blank if the court is not in the
+        database or is unavailable in the source.
+    :ivar punishment: The punishment assigned in criminal cases if available.
+    :ivar county: The county the trial court is located in if available.
+    """
+
+    docket = models.ForeignKey(
+        Docket, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    docket_number = models.CharField(blank=True, default="")
+    docket_number_raw = models.CharField(
+        help_text=(
+            "The raw docket number value as found on the source,"
+            " with no cleaning or transformations applied"
+        ),
+        blank=True,
+        default="",
+    )
+    judge = models.TextField(blank=True)
+    reporter = models.TextField(blank=True)
+    date_filed = models.DateField(blank=True, null=True)
+    court_name = models.TextField(blank=True)
+    court = models.ForeignKey(
+        Court, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    punishment = models.TextField(blank=True)
+    county = models.TextField(blank=True)
