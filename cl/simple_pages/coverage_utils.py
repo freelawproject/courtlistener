@@ -4,8 +4,9 @@ from typing import Any
 from django.db.models import Max, Min
 
 from cl.lib.elasticsearch_utils import get_opinions_coverage_chart_data
+from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import OpinionClusterDocument
-from cl.search.models import SOURCES, Court, Docket, OpinionCluster
+from cl.search.models import Court, Docket, OpinionCluster
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +164,7 @@ def build_chart_data(court_ids: list[str]) -> list[dict[str, Any]]:
             # Query db for scraper data
             scraper_dates = OpinionCluster.objects.filter(
                 docket__court=court_id,
-                source__contains=SOURCES.COURT_WEBSITE,
+                source__contains=ClusterSources.COURT_WEBSITE,
             ).aggregate(
                 earliest=Min("date_filed"),
                 latest=Max("date_filed"),
