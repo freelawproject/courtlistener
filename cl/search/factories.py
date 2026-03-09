@@ -37,6 +37,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    TrialCourtData,
 )
 from cl.tests.providers import LegalProvider
 
@@ -457,3 +458,20 @@ class CaseTransferFactory(DjangoModelFactory):
 
     class Meta:
         model = CaseTransfer
+
+
+class TrialCourtDataFactory(DjangoModelFactory):
+    docket = SubFactory(DocketFactory)
+    docket_number_trial = Faker("federal_district_docket_number")
+    docket_number_raw_trial = SelfAttribute("docket_number_trial")
+    judge_str = Faker("name")
+    judge = SubFactory(PersonFactory)
+    reporter = Faker("name")
+    date_filed = Faker("date_object")
+    court_name = Faker("court_name")
+    court = SubFactory(CourtFactory)
+    punishment = Faker("pystr")
+    county = Faker("pystr")
+
+    class Meta:
+        model = TrialCourtData

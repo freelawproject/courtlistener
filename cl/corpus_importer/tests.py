@@ -94,6 +94,7 @@ from cl.corpus_importer.tasks import (
     merge_texas_docket_originating_court,
     merge_texas_document,
     merge_texas_parties,
+    merge_texas_trial_court_data,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
 )
@@ -171,6 +172,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
     RECAPDocument,
+    TrialCourtData,
 )
 from cl.search.state.texas.factories import (
     TexasAppellateBriefDictFactory,
@@ -3254,6 +3256,45 @@ class TexasMergerTest(TestCase):
         assert docket.cause == docket_data["case_type"]
         assert docket.appeal_from_id == "texdistct6"
         assert docket.appeal_from_str == texas_district.full_name
+
+    def test_merge_trial_court_data(self):
+        """Can we create and then update TrialCourtData?"""
+        # Test written with the help of Claude Code
+        texas_district = CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            originating_court=originating_court,
+        )
+
+        docket_sc = DocketFactory.create(court=self.texas_sc)
+        result = merge_texas_trial_court_data(docket_sc, docket_data)
+
+        assert result.create is True
+        assert result.success is True
+        assert result.pk is not None
+
+        tcd = TrialCourtData.objects.get(pk=result.pk)
+        assert tcd.docket_id == docket_sc.pk
+        assert tcd.docket_number_raw_trial == originating_court["case"]
+        assert tcd.docket_number_trial == originating_court["case"]
+        assert tcd.judge_str == originating_court["judge"]
+        assert tcd.reporter == originating_court["reporter"]
+        assert tcd.punishment == originating_court["punishment"]
+        assert tcd.county == originating_court["county"]
+        assert tcd.court == texas_district
+        assert tcd.court_name == texas_district.full_name
+
+        # Merging the same data again should update, not create
+        result2 = merge_texas_trial_court_data(docket_sc, docket_data)
+
+        assert result2.create is False
+        assert result2.update is True
+        assert result2.success is True
+        assert result2.pk == tcd.pk
+        assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
 
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")

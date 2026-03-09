@@ -158,6 +158,7 @@ from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
 from cl.lib.storage import AWSMediaStorage
 from cl.lib.types import TaskData
 from cl.people_db.lookup_utils import (
+    lookup_judge_by_full_name,
     lookup_judge_by_full_name_and_set_attr,
 )
 from cl.people_db.models import Attorney, Role
@@ -196,6 +197,7 @@ from cl.search.models import (
     RECAPDocument,
     ScotusDocketMetadata,
     Tag,
+    TrialCourtData,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 
@@ -3499,11 +3501,99 @@ class MergeResult[T = int](NamedTuple):
         )
 
     @staticmethod
-    def unnecessary[S](pk: S) -> MergeResult[S]:
-        """Shorthand for the result of a unnecessary merge operation.
+    def unnecessary[S](pk: S | None) -> MergeResult[S]:
+        """Shorthand for the result of an unnecessary merge operation.
 
         :return: The constructed MergeResult object."""
-        return MergeResult(create=False, update=False, success=True, pk=pk)
+        return MergeResult[S](create=False, update=False, success=True, pk=pk)
+
+
+def merge_texas_trial_court_data(
+    docket: Docket,
+    docket_data: TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
+) -> MergeResult:
+    """
+    Create or update a TrialCourtData object to capture trial court information
+    for Texas SC and CCA cases.
+
+    :param docket: The docket in the SC or CCA.
+    :param docket_data: The scraped docket data.
+
+    :return: The result of the attempted merge operation.
+    """
+    originating_court = docket_data["originating_court"]
+    if originating_court["court_type"] == CourtType.APPELLATE.value:
+        logger.info(
+            "Originating court for Texas docket %s is appellate. TrialCourtData unnecessary.",
+            docket.docket_number,
+        )
+        return MergeResult.unnecessary(None)
+    dn_trial = originating_court["case"]
+    judge_name = originating_court["judge"]
+    reporter = originating_court["reporter"]
+    punishment = originating_court["punishment"]
+    county = originating_court["county"]
+    court_id = texas_originating_court_to_court_id(originating_court)
+    if court_id:
+        court = Court.objects.get(pk=court_id)
+        court_name = court.full_name
+
+        if judge_name:
+            judge = async_to_sync(lookup_judge_by_full_name)(
+                name=judge_name,
+                court_id=court_id,
+                event_date=None,
+                require_living_judge=False,
+            )
+        else:
+            judge = None
+    else:
+        court = None
+        court_name = originating_court["name"]
+        judge = None
+
+    try:
+        trial_court_data = TrialCourtData.objects.get(
+            docket=docket,
+        )
+    except TrialCourtData.DoesNotExist:
+        logger.info(
+            "No existing TrialCourtData object found for Texas docket %s. Creating...",
+            docket.docket_number,
+        )
+        created = True
+        trial_court_data = TrialCourtData(
+            docket=docket,
+        )
+    else:
+        created = False
+
+    new_values = {
+        "docket_number_trial": dn_trial,
+        "docket_number_raw_trial": dn_trial,
+        "judge_str": judge_name,
+        "judge": judge,
+        "reporter": reporter,
+        "court_name": court_name,
+        "court": court,
+        "punishment": punishment,
+        "county": county,
+    }
+
+    updated = False
+    if not created:
+        updated = any(
+            getattr(trial_court_data, k) != v for k, v in new_values.items()
+        )
+        if not updated:
+            return MergeResult.unnecessary(trial_court_data.pk)
+
+    for k, v in new_values.items():
+        setattr(trial_court_data, k, v)
+    trial_court_data.save()
+    return MergeResult(
+        create=created, update=updated, success=True, pk=trial_court_data.pk
+    )
 
 
 def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
@@ -4155,7 +4245,7 @@ def merge_texas_docket(
                 )
                 docket.court = court
         if docket is None:
-            docket = async_to_sync(find_docket_object)(
+            docket: Docket = async_to_sync(find_docket_object)(
                 court_id=court.pk,
                 pacer_case_id=None,
                 docket_number=docket_number,
@@ -4219,6 +4309,11 @@ def merge_texas_docket(
 
         docket.save()
 
+    if docket_data["court_type"] == CourtType.SUPREME.value:
+        trial_court_result = merge_texas_trial_court_data(docket, docket_data)
+    else:
+        trial_court_result = MergeResult.unnecessary(None)
+
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
     if not party_merge_result.success:
         logger.error(
@@ -4252,18 +4347,21 @@ def merge_texas_docket(
 
     create = (
         party_merge_result.create
+        or trial_court_result.create
         or originating_court_merge_result.create
         or merge_case_transfer_result.create
         or any(r.create for r in entry_merge_results)
     )
     update = (
         party_merge_result.update
+        or trial_court_result.update
         or originating_court_merge_result.update
         or merge_case_transfer_result.update
         or any(r.update for r in entry_merge_results)
     )
     success = (
         party_merge_result.success
+        and trial_court_result.success
         and originating_court_merge_result.success
         and merge_case_transfer_result.success
         and all(r.success for r in entry_merge_results)
