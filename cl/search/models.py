@@ -4191,8 +4191,10 @@ class TrialCourtData(AbstractDateTimeModel):
         some cleanup applied. May be blank if not available for a given state.
     :ivar docket_number_raw: The raw docket number value as found on the
         source, with no cleaning or transformations applied. May be blank.
-    :ivar judge: The judge who presided over the case. May be blank if this
-        information is not available.
+    :ivar judge_str: The name of the judge who presided over the case. May be
+        blank if this information is not available.
+    :ivar judge: The entry in people_db.Person for the judge who presided over
+        this case if available.
     :ivar reporter: The court reporter listed for this case. May be blank if
         this information is not available.
     :ivar date_filed: The date this case was originally filed. May be blank if
@@ -4219,7 +4221,10 @@ class TrialCourtData(AbstractDateTimeModel):
         blank=True,
         default="",
     )
-    judge = models.TextField(blank=True)
+    judge_str = models.TextField(blank=True)
+    judge = models.ForeignKey(
+        "people_db.Person", blank=True, null=True, on_delete=models.SET_NULL
+    )
     reporter = models.TextField(blank=True)
     date_filed = models.DateField(blank=True, null=True)
     court_name = models.TextField(blank=True)
