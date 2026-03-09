@@ -1114,7 +1114,7 @@ class CheckGeminiBatchStatusTest(TestCase):
             is_batch=True,
             provider=LLMProvider.GEMINI,
             api_model_name="gemini-2.5-pro",
-            status=LLMTaskStatusChoices.IN_PROGRESS,
+            status=LLMRequestStatusChoices.IN_PROGRESS,
             batch_id=batch_id,
             total_tasks=num_tasks,
         )
@@ -1331,7 +1331,7 @@ class CheckGeminiBatchStatusTest(TestCase):
                 # Check LLMRequest
                 llm_request.refresh_from_db()
                 self.assertEqual(
-                    llm_request.status, LLMTaskStatusChoices.FAILED
+                    llm_request.status, LLMRequestStatusChoices.FAILED
                 )
                 self.assertIsNotNone(llm_request.date_completed)
 
@@ -1381,13 +1381,13 @@ class CheckGeminiBatchStatusTest(TestCase):
         # Assertions
         running_request.refresh_from_db()
         self.assertEqual(
-            running_request.status, LLMTaskStatusChoices.IN_PROGRESS
+            running_request.status, LLMRequestStatusChoices.IN_PROGRESS
         )
         self.assertIsNone(running_request.date_completed)
 
         succeeded_request.refresh_from_db()
         self.assertEqual(
-            succeeded_request.status, LLMTaskStatusChoices.FINISHED
+            succeeded_request.status, LLMRequestStatusChoices.FINISHED
         )
         self.assertIsNotNone(succeeded_request.date_completed)
 

@@ -141,9 +141,9 @@ from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
 from cl.ai.models import (
     LLMProvider,
     LLMRequest,
+    LLMRequestStatusChoices,
     LLMTask,
     LLMTaskChoices,
-    LLMTaskStatusChoices,
     Prompt,
     PromptTypes,
 )
@@ -516,7 +516,7 @@ class Command(VerboseCommand):
                     is_batch=True,
                     provider=LLMProvider.GEMINI,
                     api_model_name=model,
-                    status=LLMTaskStatusChoices.IN_PROGRESS,
+                    status=LLMRequestStatusChoices.IN_PROGRESS,
                     date_started=now(),
                 )
                 llm_request.prompts.set([system_prompt, user_prompt])
