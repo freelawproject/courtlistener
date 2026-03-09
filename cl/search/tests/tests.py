@@ -93,6 +93,7 @@ from cl.search.models import (
     DocketEvent,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     RECAPDocument,
     SearchQuery,
     sort_cites,
@@ -284,6 +285,68 @@ class ModelTest(TestCase):
         # Order default value is null
         op_5 = OpinionFactory(cluster=cluster, type="Lead Opinion")
         self.assertEqual(op_5.ordering_key, None)
+
+    def test_opinion_content_model(self):
+        """Verify the correct creation of OpinionContent object"""
+        self.docket = Docket.objects.create(
+            case_name="People v. Curry",
+            court_id="cal",
+            source=Docket.SCANNING_PROJECT,
+        )
+        self.oc = OpinionCluster.objects.create(
+            case_name="People v. Curry",
+            docket=self.docket,
+            date_filed=datetime.date(2023, 11, 25),
+        )
+
+        op_content = """
+            <opinion type="majority">
+              <p id="p1214-1" pgmap="1214">
+                The above-captioned matter is transferred to the Court of Appeal, Third Appellate District, with directions to vacate its decision and reconsider the cause in light of our decision in People v. Braden (2023) <citation case_name="People v. Braden" volume="14" reporter="Cal.5th" page="791" court="Cal." year="2023">14 Cal.5th 791</citation>, <citation volume="308" reporter="Cal.Rptr.3d" page="846">308 Cal.Rptr.3d 846</citation>, <citation volume="529" reporter="P.3d" page="1116">529 P.3d 1116</citation>, and to provide any other relief to which defendant is entitled. (Cal. Rules of Court, rule 8.528(d).) As explained in Standing Order Exercising Authority Under California Rules of Court, Rule 8.1115(e)(3), Upon Grant of Review or Transfer of a Matter with an Underlying Published Court of Appeal Opinion, Administrative Order 2021-04-21, and California Rules of Court, rule 8.1115(e)(3), corresponding comment, par. 3, the opinion is hereby rendered either “depublished” or “not citable.”
+              </p>
+              <p id="p1214-2" pgmap="1214">Votes: Guerrero, C.J., Corrigan, Liu, Kruger, Groban, Jenkins and Evans, JJ.</p>
+            </opinion>
+        """
+
+        self.op = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
+
+        self.op_c = OpinionContent.objects.create(
+            opinion=self.op,
+            content=op_content,
+            source=OpinionContent.FLP_SCANNING,
+            extraction_type=OpinionContent.LLM,
+            is_main_version=True,
+        )
+
+        self.assertEqual(self.op_c.opinion, self.op)
+        self.assertEqual(self.op_c.content, op_content)
+        self.assertEqual(self.op_c.source, OpinionContent.FLP_SCANNING)
+        self.assertEqual(self.op_c.extraction_type, OpinionContent.LLM)
+
+    def test_opinion_content_str(self):
+        """Test the __str__ method of the OpinionContent model."""
+        self.docket = Docket.objects.create(
+            case_name="People v. Curry",
+            court_id="cal",
+            source=Docket.SCANNING_PROJECT,
+        )
+        self.oc = OpinionCluster.objects.create(
+            case_name="People v. Curry",
+            docket=self.docket,
+            date_filed=datetime.date(2023, 11, 25),
+        )
+        self.op = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
+        self.op_c = OpinionContent.objects.create(
+            opinion=self.op,
+            content="test content",
+            source=OpinionContent.FLP_SCANNING,
+            extraction_type=OpinionContent.LLM,
+            is_main_version=True,
+        )
+        self.assertEqual(
+            str(self.op_c),
+            f"{self.op_c.pk} - {self.oc.case_name}",
+        )
 
 
 class DocketValidationTest(TestCase):
