@@ -1,6 +1,7 @@
 import datetime
 from unittest import mock
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
@@ -18,6 +19,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.mergers import find_docket_object
 from cl.recap.tests.tests import mock_bucket_open
 from cl.search.factories import (
     CourtFactory,
@@ -419,6 +421,9 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(dockets.count(), 1)
         scotus_metadata = ScotusDocketMetadata.objects.all()
         self.assertEqual(scotus_metadata.count(), 1)
+        # New dockets created by merge_scotus_docket
+        # get SCRAPER source.
+        self.assertEqual(docket.source, Docket.SCRAPER)
 
         # Updated data.
         data = ScotusDocketDataFactory(
@@ -436,6 +441,7 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(scotus_metadata.count(), 1)
 
         self.assertEqual(updated_docket.pk, docket.pk)
+        # Merging into a docket that already has SCRAPER remains as SCRAPER.
         self.assertEqual(updated_docket.source, Docket.SCRAPER)
         self.assertEqual(updated_docket.case_name, "New SCOTUS Case Name")
         self.assertEqual(updated_docket.date_filed, data["date_filed"])
@@ -450,6 +456,46 @@ class ScotusDocketMergeTest(TestCase):
         self.assertEqual(metadata.linked_with, data["links"])
         self.assertEqual(
             metadata.questions_presented_url, data["questions_presented"]
+        )
+
+    def test_merge_scotus_docket_source_compounds_existing(self) -> None:
+        """Merging into an existing docket compounds its source with SCRAPER."""
+        existing = DocketFactory(
+            court=self.court,
+            docket_number="24-200",
+            source=Docket.HARVARD,
+        )
+        data = ScotusDocketDataFactory(
+            docket_number="24-200",
+            docket_entries=[],
+        )
+        docket, _ = merge_scotus_docket(data)
+        docket.refresh_from_db()
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(
+            docket.source,
+            Docket.SCRAPER_AND_HARVARD,
+            "Source should be compounded with SCRAPER.",
+        )
+
+    def test_merge_scotus_docket_source_compounds_recap(self) -> None:
+        """Merging into a RECAP docket compounds with SCRAPER."""
+        existing = DocketFactory(
+            court=self.court,
+            docket_number="24-400",
+            source=Docket.RECAP,
+        )
+        data = ScotusDocketDataFactory(
+            docket_number="24-400",
+            docket_entries=[],
+        )
+        docket, _ = merge_scotus_docket(data)
+        docket.refresh_from_db()
+        self.assertEqual(docket.pk, existing.pk)
+        self.assertEqual(
+            docket.source,
+            Docket.RECAP_AND_SCRAPER,
+            "Source should be RECAP + SCRAPER.",
         )
 
     def test_merge_scotus_docket_missing_docket_number(self) -> None:
@@ -513,6 +559,7 @@ class ScotusDocketMergeTest(TestCase):
 
         report_data = ScotusDocketDataFactory(
             questions_presented="../qp/14-00556qp.pdf",
+            docket_entries=[],
         )
         docket, _ = merge_scotus_docket(report_data)
         scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
@@ -739,3 +786,43 @@ class ScotusDocketMergeTest(TestCase):
         scotus_doc.refresh_from_db()
         self.assertEqual(scotus_doc.url, doc_data_4["document_url"])
         self.assertEqual(scotus_doc.file_name, "document2.pdf")
+
+    def test_find_docket_object_matches_same_docket_regardless_of_order(
+        self,
+    ) -> None:
+        """Confirm that find_docket_object consistently matches the same
+        docket when multiple NN-NNNN numbers appear in different orders.
+
+        The lexicographic sorting in clean_scotus_docket_number ensures
+        the same docket_number_core is always produced.
+        """
+        # Create a docket whose core matches the smallest NN-NNNN number
+        # "01-8148" -> core "01008148"
+        docket = DocketFactory(
+            court=self.court,
+            docket_number="01-8148",
+            docket_number_core="01008148",
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+
+        # Multiple NN-NNNN numbers in different orders should always
+        # resolve to the same docket_number_core ("01008148") and
+        # match the existing docket.
+        docket_number_variants = [
+            "No. 01-8200 01-8148",
+            "No. 01-8148 01-8200",
+            "01-8200, 01-8148, 01-9999",
+            "01-9999, 01-8200, 01-8148",
+        ]
+        for docket_number in docket_number_variants:
+            with self.subTest(docket_number=docket_number):
+                found = async_to_sync(find_docket_object)(
+                    court_id=self.court.pk,
+                    pacer_case_id=None,
+                    docket_number=docket_number,
+                    federal_defendant_number=None,
+                    federal_dn_judge_initials_assigned=None,
+                    federal_dn_judge_initials_referred=None,
+                )
+                self.assertEqual(found.pk, docket.pk)

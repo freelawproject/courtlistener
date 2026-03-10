@@ -119,6 +119,7 @@ from cl.search.api_views import (
     RECAPDocumentViewSet,
     TagViewSet,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -133,7 +134,6 @@ from cl.search.filters import CourtFilter, DocketFilter, OpinionFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
-    SOURCES,
     ClusterRedirection,
     Court,
     Docket,
@@ -1914,10 +1914,10 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
         # Multiple choice filter
 
-        sources = [SOURCES.COURT_WEBSITE]
+        sources = [ClusterSources.COURT_WEBSITE]
         self.q = {"source": sources}
         await self.assertCountInResults(2)
-        sources.append(SOURCES.COURT_M_RESOURCE)
+        sources.append(ClusterSources.COURT_M_RESOURCE)
         await self.assertCountInResults(3)
 
     async def test_opinion_cited_filters(self) -> None:
@@ -4188,6 +4188,19 @@ class ClusterRedirectionTest(TestCase):
         response = await api_client.get(url)
         self.assertEqual(response.json()["detail"], message)
         self.assertEqual(response.status_code, HTTPStatus.GONE)
+
+    async def test_non_integer_cluster_id_returns_404(self):
+        """Test that a non-integer cluster ID returns 404 instead of
+        raising a ValueError."""
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        for bad_pk in ("undefined", "abc"):
+            with self.subTest(pk=bad_pk):
+                url = reverse(
+                    "opinioncluster-detail",
+                    kwargs={"version": "v4", "pk": bad_pk},
+                )
+                response = await api_client.get(url)
+                self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
 
 class TestOpinionViewsetXMLRendering(TestCase):
