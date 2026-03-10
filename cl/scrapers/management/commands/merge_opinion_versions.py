@@ -20,9 +20,9 @@ from cl.people_db.models import (
 from cl.recap.models import PacerFetchQueue, ProcessingQueue
 from cl.scrapers.exceptions import MergingError
 from cl.scrapers.models import PACERMobilePageData
+from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
-    SOURCES,
     BankruptcyInformation,
     Citation,
     Claim,
@@ -278,7 +278,7 @@ cluster_fields_to_merge = [
     "scdb_decision_direction",
     "scdb_votes_majority",
     "scdb_votes_minority",
-    ("source", SOURCES.merge_sources),
+    ("source", ClusterSources.merge_sources),
     "procedural_history",
     "attorneys",
     "nature_of_suit",
@@ -368,7 +368,7 @@ def get_same_url_opinions(
     )
     return (
         Opinion.objects.filter(download_url_query)
-        .filter(cluster__source=SOURCES.COURT_WEBSITE)
+        .filter(cluster__source=ClusterSources.COURT_WEBSITE)
         .select_related("cluster", "cluster__docket")
         .order_by("-date_created")
     )
@@ -725,7 +725,7 @@ def merge_versions_by_download_url(
     else:
         query = Q()
 
-    query = query & Q(cluster__source=SOURCES.COURT_WEBSITE)
+    query = query & Q(cluster__source=ClusterSources.COURT_WEBSITE)
     qs = group_opinions_by_url(query)
 
     # The groups queryset will look like
@@ -780,13 +780,13 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     # Special case for NY courts: allow versioning without matching docket numbers
     # when at least one docket number is empty.
     if docket.court_id.startswith("ny") and (
-        not docket.docket_number or not version_docket.docket_number
+        not docket.docket_number_raw or not version_docket.docket_number_raw
     ):
         return True
 
-    if docket.docket_number != version_docket.docket_number:
+    if docket.docket_number_raw != version_docket.docket_number_raw:
         logger.error(
-            log_template, "docket_number", docket.id, version_docket.id
+            log_template, "docket_number_raw", docket.id, version_docket.id
         )
         return False
 

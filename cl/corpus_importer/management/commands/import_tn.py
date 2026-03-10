@@ -16,7 +16,8 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
     save_everything,
 )
 from cl.scrapers.tasks import extract_opinion_content
-from cl.search.models import SOURCES, Court, Docket, Opinion
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Court, Docket, Opinion
 
 
 def make_item(case):
@@ -49,7 +50,7 @@ def make_item(case):
 
     return {
         "source": Docket.DIRECT_INPUT,
-        "cluster_source": SOURCES.DIRECT_COURT_INPUT,
+        "cluster_source": ClusterSources.DIRECT_COURT_INPUT,
         "case_names": case["title"],
         "case_dates": pub_date,
         "precedential_statuses": "Published",
