@@ -5,6 +5,7 @@ import pytest
 from botocore.exceptions import ClientError
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from google.genai.types import JobState
 
 from cl.ai.llm_providers.google import (
     GoogleGenAIBatchWrapper,
@@ -333,7 +334,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         # Setup mock job
         mock_job = MagicMock()
         mock_job.name = "batches/h3j6k9m2n5p8q1r4s7t0u3v6w9x2y5z8a1b4c7d0"
-        mock_job.state.name = "JOB_STATE_RUNNING"
+        mock_job.state = JobState.JOB_STATE_RUNNING
 
         # Setup client mock
         mock_client_instance = MagicMock()
@@ -653,7 +654,7 @@ class ResponseValidatorTest(SimpleTestCase):
 
 
 class SendGeminiBatchesTest(TestCase):
-    """Tests for the send_gemini_batches management command."""
+    """Tests for the send_gemini_file_batches management command."""
 
     def setUp(self):
         """Set up test data for each test."""
@@ -695,14 +696,14 @@ class SendGeminiBatchesTest(TestCase):
 
         return mock_s3_client
 
-    @patch("cl.ai.management.commands.send_gemini_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.tempfile.NamedTemporaryFile"
+        "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.GoogleGenAIBatchWrapper"
+        "cl.ai.management.commands.send_gemini_file_batches.GoogleGenAIBatchWrapper"
     )
-    @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.boto3.client")
     @patch.dict(
         os.environ,
         {
@@ -712,7 +713,7 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_success(
+    def test_send_gemini_file_batches_success(
         self,
         mock_boto3_client,
         mock_wrapper_class,
@@ -743,7 +744,7 @@ class SendGeminiBatchesTest(TestCase):
 
         # Execute command
         call_command(
-            "send_gemini_batches",
+            "send_gemini_file_batches",
             path="llm-inputs/test-batch/",
             system_prompt=self.system_prompt.pk,
             user_prompt=self.user_prompt.pk,
@@ -755,7 +756,9 @@ class SendGeminiBatchesTest(TestCase):
         # Assertions
         self.assertEqual(LLMRequest.objects.count(), 1)
         llm_request = LLMRequest.objects.first()
-        self.assertEqual(llm_request.status, LLMTaskStatusChoices.IN_PROGRESS)
+        self.assertEqual(
+            llm_request.status, LLMRequestStatusChoices.IN_PROGRESS
+        )
         self.assertEqual(llm_request.total_tasks, 3)
         self.assertEqual(llm_request.batch_id, "batches/test123abc")
         self.assertEqual(llm_request.provider, LLMProvider.GEMINI)
@@ -776,14 +779,14 @@ class SendGeminiBatchesTest(TestCase):
         # Verify temp file cleanup
         self.assertEqual(mock_remove.call_count, 3)
 
-    @patch("cl.ai.management.commands.send_gemini_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.tempfile.NamedTemporaryFile"
+        "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.GoogleGenAIBatchWrapper"
+        "cl.ai.management.commands.send_gemini_file_batches.GoogleGenAIBatchWrapper"
     )
-    @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.boto3.client")
     @patch.dict(
         os.environ,
         {
@@ -793,7 +796,7 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_with_store_input_files(
+    def test_send_gemini_file_batches_with_store_input_files(
         self,
         mock_boto3_client,
         mock_wrapper_class,
@@ -824,7 +827,7 @@ class SendGeminiBatchesTest(TestCase):
 
         # Execute command with store_input_files flag
         call_command(
-            "send_gemini_batches",
+            "send_gemini_file_batches",
             path="llm-inputs/test-batch/",
             system_prompt=self.system_prompt.pk,
             user_prompt=self.user_prompt.pk,
@@ -849,12 +852,12 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_invalid_model(self):
+    def test_send_gemini_file_batches_invalid_model(self):
         """Test validation fails for unsupported Gemini model."""
 
         with self.assertRaises(CommandError) as context:
             call_command(
-                "send_gemini_batches",
+                "send_gemini_file_batches",
                 path="llm-inputs/test/",
                 system_prompt=self.system_prompt.pk,
                 user_prompt=self.user_prompt.pk,
@@ -877,7 +880,7 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_invalid_prompts(self):
+    def test_send_gemini_file_batches_invalid_prompts(self):
         """Test validation fails for invalid prompts (wrong type or non-existent)."""
 
         # Test case 1: Prompt exists but has wrong type
@@ -891,7 +894,7 @@ class SendGeminiBatchesTest(TestCase):
 
             with self.assertRaises(CommandError) as context:
                 call_command(
-                    "send_gemini_batches",
+                    "send_gemini_file_batches",
                     path="llm-inputs/test/",
                     system_prompt=wrong_type_prompt.pk,
                     user_prompt=self.user_prompt.pk,
@@ -905,7 +908,7 @@ class SendGeminiBatchesTest(TestCase):
         with self.subTest(case="nonexistent_prompt"):
             with self.assertRaises(CommandError) as context:
                 call_command(
-                    "send_gemini_batches",
+                    "send_gemini_file_batches",
                     path="llm-inputs/test/",
                     system_prompt=99999,  # Non-existent
                     user_prompt=self.user_prompt.pk,
@@ -915,14 +918,14 @@ class SendGeminiBatchesTest(TestCase):
                 "Invalid system or user prompt", str(context.exception)
             )
 
-    @patch("cl.ai.management.commands.send_gemini_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.tempfile.NamedTemporaryFile"
+        "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.GoogleGenAIBatchWrapper"
+        "cl.ai.management.commands.send_gemini_file_batches.GoogleGenAIBatchWrapper"
     )
-    @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.boto3.client")
     @patch.dict(
         os.environ,
         {
@@ -932,7 +935,7 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_empty_s3_path(
+    def test_send_gemini_file_batches_empty_s3_path(
         self,
         mock_boto3_client,
         mock_wrapper_class,
@@ -951,7 +954,7 @@ class SendGeminiBatchesTest(TestCase):
         # Should raise CommandError about no files found
         with self.assertRaises(CommandError) as context:
             call_command(
-                "send_gemini_batches",
+                "send_gemini_file_batches",
                 path="llm-inputs/empty/",
                 system_prompt=self.system_prompt.pk,
                 user_prompt=self.user_prompt.pk,
@@ -959,14 +962,14 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("No .pdf files found", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.tempfile.NamedTemporaryFile"
+        "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.GoogleGenAIBatchWrapper"
+        "cl.ai.management.commands.send_gemini_file_batches.GoogleGenAIBatchWrapper"
     )
-    @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.boto3.client")
     @patch.dict(
         os.environ,
         {
@@ -976,7 +979,7 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_gemini_api_error(
+    def test_send_gemini_file_batches_gemini_api_error(
         self,
         mock_boto3_client,
         mock_wrapper_class,
@@ -1006,7 +1009,7 @@ class SendGeminiBatchesTest(TestCase):
         # Execute command - exception propagates after transaction rollback
         with self.assertRaises(Exception):
             call_command(
-                "send_gemini_batches",
+                "send_gemini_file_batches",
                 path="llm-inputs/test-batch/",
                 system_prompt=self.system_prompt.pk,
                 user_prompt=self.user_prompt.pk,
@@ -1015,7 +1018,7 @@ class SendGeminiBatchesTest(TestCase):
         # Verify the transaction rolled back and no request was persisted
         self.assertEqual(LLMRequest.objects.count(), 0)
 
-    @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.boto3.client")
     @patch.dict(
         os.environ,
         {
@@ -1025,7 +1028,9 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_s3_access_denied(self, mock_boto3_client):
+    def test_send_gemini_file_batches_s3_access_denied(
+        self, mock_boto3_client
+    ):
         """Test error handling for S3 permission errors."""
 
         # Setup S3 mock to raise AccessDenied error
@@ -1041,7 +1046,7 @@ class SendGeminiBatchesTest(TestCase):
 
         with self.assertRaises(CommandError) as context:
             call_command(
-                "send_gemini_batches",
+                "send_gemini_file_batches",
                 path="llm-inputs/test/",
                 system_prompt=self.system_prompt.pk,
                 user_prompt=self.user_prompt.pk,
@@ -1049,14 +1054,14 @@ class SendGeminiBatchesTest(TestCase):
 
         self.assertIn("Access denied", str(context.exception))
 
-    @patch("cl.ai.management.commands.send_gemini_batches.os.remove")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.tempfile.NamedTemporaryFile"
+        "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
     )
     @patch(
-        "cl.ai.management.commands.send_gemini_batches.GoogleGenAIBatchWrapper"
+        "cl.ai.management.commands.send_gemini_file_batches.GoogleGenAIBatchWrapper"
     )
-    @patch("cl.ai.management.commands.send_gemini_batches.boto3.client")
+    @patch("cl.ai.management.commands.send_gemini_file_batches.boto3.client")
     @patch.dict(
         os.environ,
         {
@@ -1066,7 +1071,7 @@ class SendGeminiBatchesTest(TestCase):
             "AWS_STORAGE_BUCKET_NAME": "test-bucket",
         },
     )
-    def test_send_gemini_batches_custom_bucket(
+    def test_send_gemini_file_batches_custom_bucket(
         self,
         mock_boto3_client,
         mock_wrapper_class,
@@ -1081,7 +1086,7 @@ class SendGeminiBatchesTest(TestCase):
         # Try with a custom bucket that's not in the allowed list
         with self.assertRaises(CommandError) as context:
             call_command(
-                "send_gemini_batches",
+                "send_gemini_file_batches",
                 path="llm-inputs/test/",
                 system_prompt=self.system_prompt.pk,
                 user_prompt=self.user_prompt.pk,
@@ -1089,6 +1094,92 @@ class SendGeminiBatchesTest(TestCase):
             )
 
         self.assertIn("not in allowed list", str(context.exception))
+
+    @patch("cl.ai.management.commands.send_gemini_file_batches.os.remove")
+    @patch(
+        "cl.ai.management.commands.send_gemini_file_batches.tempfile.NamedTemporaryFile"
+    )
+    @patch(
+        "cl.ai.management.commands.send_gemini_file_batches.GoogleGenAIBatchWrapper"
+    )
+    @patch("cl.ai.management.commands.send_gemini_file_batches.boto3.client")
+    @patch.dict(
+        os.environ,
+        {
+            "GEMINI_BATCH_API_KEY": "test-api-key-123",
+            "AWS_ACCESS_KEY_ID": "test-access-key",
+            "AWS_SECRET_ACCESS_KEY": "test-secret-key",
+            "AWS_STORAGE_BUCKET_NAME": "test-bucket",
+        },
+    )
+    def test_send_gemini_file_batches_splits_by_batch_size(
+        self,
+        mock_boto3_client,
+        mock_wrapper_class,
+        mock_tempfile,
+        mock_remove,
+    ):
+        """Test that files are split into multiple LLMRequests when
+        exceeding batch_size."""
+        # Setup S3 mocks with 5 files
+        self._mock_s3_with_files(mock_boto3_client, num_files=5)
+
+        # Setup temp file mocks
+        mock_temp_files = []
+        for i in range(5):
+            mock_temp = MagicMock()
+            mock_temp.name = f"/tmp/mock_file_{i}.pdf"
+            mock_temp_files.append(mock_temp)
+
+        mock_tempfile.return_value = MagicMock()
+        call_count = iter(range(5))
+
+        def make_temp(*args, **kwargs):
+            idx = next(call_count)
+            return mock_temp_files[idx]
+
+        mock_tempfile.side_effect = make_temp
+
+        # Setup Google wrapper mocks
+        mock_wrapper = MagicMock()
+        mock_wrapper_class.return_value = mock_wrapper
+        mock_wrapper.prepare_batch_requests.return_value = []
+        batch_ids = iter(
+            ["batches/batch1", "batches/batch2", "batches/batch3"]
+        )
+        mock_wrapper.execute_batch.side_effect = lambda **kwargs: next(
+            batch_ids
+        )
+
+        # Execute with batch_size=2 (should create 3 requests: 2+2+1)
+        call_command(
+            "send_gemini_file_batches",
+            path="llm-inputs/test-batch/",
+            system_prompt=self.system_prompt.pk,
+            user_prompt=self.user_prompt.pk,
+            batch_size=2,
+        )
+
+        # Should create 3 LLMRequests
+        self.assertEqual(LLMRequest.objects.count(), 3)
+        self.assertEqual(LLMTask.objects.count(), 5)
+
+        requests = LLMRequest.objects.order_by("pk")
+        # First batch: 2 tasks
+        self.assertEqual(requests[0].total_tasks, 2)
+        self.assertEqual(requests[0].batch_id, "batches/batch1")
+        self.assertEqual(requests[0].name, "Batch for llm-inputs/test-batch/")
+        # Second batch: 2 tasks, name gets "(part 2)"
+        self.assertEqual(requests[1].total_tasks, 2)
+        self.assertEqual(requests[1].batch_id, "batches/batch2")
+        self.assertIn("part 2", requests[1].name)
+        # Third batch: 1 task, name gets "(part 3)"
+        self.assertEqual(requests[2].total_tasks, 1)
+        self.assertEqual(requests[2].batch_id, "batches/batch3")
+        self.assertIn("part 3", requests[2].name)
+
+        # Wrapper should have been called 3 times
+        self.assertEqual(mock_wrapper.execute_batch.call_count, 3)
 
 
 class CheckGeminiBatchStatusTest(TestCase):
@@ -1153,7 +1244,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Mock job status
         mock_job = MagicMock()
-        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_job.state = JobState.JOB_STATE_SUCCEEDED
         mock_wrapper.get_job.return_value = mock_job
 
         # Mock JSONL content - use actual request pk
@@ -1200,7 +1291,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Check LLMRequest status
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FINISHED)
+        self.assertEqual(llm_request.status, LLMRequestStatusChoices.FINISHED)
         self.assertEqual(llm_request.completed_tasks, 3)
         self.assertEqual(llm_request.failed_tasks, 0)
         self.assertIsNotNone(llm_request.date_completed)
@@ -1233,7 +1324,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Mock job status
         mock_job = MagicMock()
-        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_job.state = JobState.JOB_STATE_SUCCEEDED
         mock_wrapper.get_job.return_value = mock_job
 
         # Mock JSONL content with mixed results - use actual request pk
@@ -1273,7 +1364,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Assertions
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FINISHED)
+        self.assertEqual(llm_request.status, LLMRequestStatusChoices.FINISHED)
         self.assertEqual(llm_request.completed_tasks, 2)
         self.assertEqual(llm_request.failed_tasks, 1)
 
@@ -1301,13 +1392,13 @@ class CheckGeminiBatchStatusTest(TestCase):
         """Test handling when batch jobs end in non-success states (FAILED, CANCELLED, EXPIRED)."""
         # Test all three non-success states using subTest
         test_cases = [
-            ("JOB_STATE_FAILED", "batches/test789"),
-            ("JOB_STATE_CANCELLED", "batches/cancelled"),
-            ("JOB_STATE_EXPIRED", "batches/expired"),
+            (JobState.JOB_STATE_FAILED, "batches/test789"),
+            (JobState.JOB_STATE_CANCELLED, "batches/cancelled"),
+            (JobState.JOB_STATE_EXPIRED, "batches/expired"),
         ]
 
-        for state_name, batch_id in test_cases:
-            with self.subTest(state=state_name):
+        for job_state, batch_id in test_cases:
+            with self.subTest(state=job_state.name):
                 # Create test data
                 llm_request, tasks = self._create_request_with_tasks(
                     batch_id, num_tasks=2
@@ -1319,7 +1410,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
                 # Mock job status
                 mock_job = MagicMock()
-                mock_job.state.name = state_name
+                mock_job.state = job_state
                 mock_wrapper.get_job.return_value = mock_job
 
                 # Execute command
@@ -1339,7 +1430,7 @@ class CheckGeminiBatchStatusTest(TestCase):
                 for task in tasks:
                     task.refresh_from_db()
                     self.assertEqual(task.status, LLMTaskStatusChoices.FAILED)
-                    self.assertIn(state_name, task.error_message)
+                    self.assertIn(job_state.name, task.error_message)
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"
@@ -1366,9 +1457,9 @@ class CheckGeminiBatchStatusTest(TestCase):
         def get_job_side_effect(batch_id):
             mock_job = MagicMock()
             if batch_id == "batches/running":
-                mock_job.state.name = "JOB_STATE_RUNNING"
+                mock_job.state = JobState.JOB_STATE_RUNNING
             else:
-                mock_job.state.name = "JOB_STATE_SUCCEEDED"
+                mock_job.state = JobState.JOB_STATE_SUCCEEDED
             return mock_job
 
         mock_wrapper.get_job.side_effect = get_job_side_effect
@@ -1411,7 +1502,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Mock job succeeded but download fails
         mock_job = MagicMock()
-        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_job.state = JobState.JOB_STATE_SUCCEEDED
         mock_wrapper.get_job.return_value = mock_job
         mock_wrapper.download_results.side_effect = ValueError(
             "Download failed"
@@ -1422,7 +1513,9 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Should catch the error and leave request IN_PROGRESS
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, LLMTaskStatusChoices.IN_PROGRESS)
+        self.assertEqual(
+            llm_request.status, LLMRequestStatusChoices.IN_PROGRESS
+        )
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"
@@ -1444,7 +1537,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Mock job succeeded but processing fails
         mock_job = MagicMock()
-        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_job.state = JobState.JOB_STATE_SUCCEEDED
         mock_wrapper.get_job.return_value = mock_job
         mock_wrapper.download_results.return_value = "{}"
         mock_wrapper.process_results.side_effect = Exception(
@@ -1456,7 +1549,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Should mark request as FAILED
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FAILED)
+        self.assertEqual(llm_request.status, LLMRequestStatusChoices.FAILED)
         self.assertIsNotNone(llm_request.date_completed)
 
     @patch(
@@ -1487,11 +1580,11 @@ class CheckGeminiBatchStatusTest(TestCase):
         def get_job_side_effect(batch_id):
             mock_job = MagicMock()
             if batch_id == "batches/multi1":
-                mock_job.state.name = "JOB_STATE_SUCCEEDED"
+                mock_job.state = JobState.JOB_STATE_SUCCEEDED
             elif batch_id == "batches/multi2":
-                mock_job.state.name = "JOB_STATE_FAILED"
+                mock_job.state = JobState.JOB_STATE_FAILED
             else:
-                mock_job.state.name = "JOB_STATE_RUNNING"
+                mock_job.state = JobState.JOB_STATE_RUNNING
             return mock_job
 
         mock_wrapper.get_job.side_effect = get_job_side_effect
@@ -1505,13 +1598,13 @@ class CheckGeminiBatchStatusTest(TestCase):
         self.assertEqual(mock_wrapper.get_job.call_count, 3)
 
         request1.refresh_from_db()
-        self.assertEqual(request1.status, LLMTaskStatusChoices.FINISHED)
+        self.assertEqual(request1.status, LLMRequestStatusChoices.FINISHED)
 
         request2.refresh_from_db()
-        self.assertEqual(request2.status, LLMTaskStatusChoices.FAILED)
+        self.assertEqual(request2.status, LLMRequestStatusChoices.FAILED)
 
         request3.refresh_from_db()
-        self.assertEqual(request3.status, LLMTaskStatusChoices.IN_PROGRESS)
+        self.assertEqual(request3.status, LLMRequestStatusChoices.IN_PROGRESS)
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"
@@ -1533,7 +1626,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Mock job succeeded
         mock_job = MagicMock()
-        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_job.state = JobState.JOB_STATE_SUCCEEDED
         mock_wrapper.get_job.return_value = mock_job
         mock_wrapper.download_results.return_value = "{}"
 
@@ -1561,15 +1654,16 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Request should still be marked as finished
         llm_request.refresh_from_db()
-        self.assertEqual(llm_request.status, LLMTaskStatusChoices.FINISHED)
+        self.assertEqual(llm_request.status, LLMRequestStatusChoices.FINISHED)
 
         # First task should be updated
         tasks[0].refresh_from_db()
         self.assertEqual(tasks[0].status, LLMTaskStatusChoices.SUCCEEDED)
 
-        # Second task should remain in progress (no matching key)
+        # Second task should be marked as FAILED (missing from batch results)
         tasks[1].refresh_from_db()
-        self.assertEqual(tasks[1].status, LLMTaskStatusChoices.IN_PROGRESS)
+        self.assertEqual(tasks[1].status, LLMTaskStatusChoices.FAILED)
+        self.assertIn("missing from batch results", tasks[1].error_message)
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"
@@ -1591,7 +1685,7 @@ class CheckGeminiBatchStatusTest(TestCase):
 
         # Mock job succeeded
         mock_job = MagicMock()
-        mock_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_job.state = JobState.JOB_STATE_SUCCEEDED
         mock_wrapper.get_job.return_value = mock_job
         mock_wrapper.download_results.return_value = "{}"
 
