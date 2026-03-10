@@ -35,7 +35,8 @@ from cl.people_db.models import (
     Position,
     Source,
 )
-from cl.search.models import SEARCH_TYPES, SOURCES, Opinion
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import SEARCH_TYPES, Opinion
 
 s3_client = boto3.client("s3")
 
@@ -516,7 +517,9 @@ def get_monthly_record_ids_by_type(
                 Opinion.objects.filter(pk__in=ids)
                 .filter(
                     Q(extracted_by_ocr=False)
-                    | Q(cluster__source__icontains=SOURCES.HARVARD_CASELAW)
+                    | Q(
+                        cluster__source__icontains=ClusterSources.HARVARD_CASELAW
+                    )
                 )
                 .values_list("pk")
                 .distinct()

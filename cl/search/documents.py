@@ -38,6 +38,7 @@ from cl.people_db.models import (
     Position,
     Role,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.constants import (
     PEOPLE_ES_HL_FIELDS,
     PEOPLE_ES_HL_KEYWORD_FIELDS,
@@ -59,7 +60,6 @@ from cl.search.es_indices import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     BankruptcyInformation,
     Citation,
     Docket,
@@ -422,7 +422,9 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
         transformations["local_path"] = lambda x: (
             f"https://storage.courtlistener.com/{x}" if x else ""
         )
-        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        transformations["source"] = lambda x: dict(ClusterSources.NAMES).get(
+            x, x
+        )
         return transformations
 
     def prepare_absolute_url(self, instance):
@@ -2310,7 +2312,9 @@ class OpinionClusterDocument(
         )
 
         # Add a transformation to compute Human-readable values
-        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        transformations["source"] = lambda x: dict(ClusterSources.NAMES).get(
+            x, x
+        )
         transformations["status"] = lambda x: dict(
             PRECEDENTIAL_STATUS.NAMES
         ).get(x, x)
