@@ -8,6 +8,7 @@
 {% block content %}
 <article class="flex flex-col gap-11 items-start max-md:pt-4 max-w-full md:max-w-[calc(100%)] [&_section]:flex [&_section]:flex-col [&_section]:gap-4">
   <section id="overview" class="max-w-[--padded-full-width] w-full">
+    <c-eyebrow>Courtlistener</c-eyebrow>
     <h1>CourtListener APIs, Webhooks, and Bulk Legal&nbsp;Data</h1>
     <p class="lead">We currently have six major services available on CourtListener:</p>
     <ol>
@@ -18,10 +19,9 @@
       <li><p><em>Coming soon:</em> If you use AI assistants like Claude or ChatGPT, our <a href="{% url "mcp_help" %}" class="text-primary-600">MCP server</a> will allow them to access CourtListener data directly.</p></li>
       <li><p>Finally, we also offer <a href="https://free.law/data-consulting/" class="underline">custom data services</a> and custom bulk file creation, with hourly and project-based rates.</p></li>
     </ol>
-    <c-options-table
-      safe
-      align="data-center"
+    <c-flex-table
       caption="Features of CourtListener's data services"
+      align="data-center"
       :columns="[
         {'label': 'Learn More About...', 'field': 'first'},
         {'label': 'Update Speed', 'field': 'second'},
@@ -30,56 +30,57 @@
         {'label': 'Learning Curve', 'field': 'fifth'},
         {'label': 'Setup', 'field': 'sixth'},
       ]"
-      :rows="[
-        {
-          'first': '<a href={% url "replication_docs" %} class=btn-primary>Replication</a>',
-          'second': 'Instant',
-          'third': 'Complete',
-          'fourth': 'Unlimited SQL Queries',
-          'fifth': 'Short',
-          'sixth': 'Complex',
-        },
-        {
-          'first': '<a href={% url "bulk_data_index" %} class=btn-primary>Bulk Data</a>',
-          'second': 'Slow',
-          'third': 'Great',
-          'fourth': 'None',
-          'fifth': 'Short',
-          'sixth': 'None',
-        },
-        {
-          'first': '<a href={% url "rest_docs" %} class=btn-primary>REST APIs</a>',
-          'second': 'Fast',
-          'third': 'Good',
-          'fourth': 'Filters & Joins',
-          'fifth': 'Longer',
-          'sixth': 'None',
-        },
-        {
-          'first': '<a href={% url "webhooks_docs" %} class=btn-primary>Webhooks</a>',
-          'second': 'Instant',
-          'third': 'Good',
-          'fourth': 'Subscribe to Events',
-          'fifth': 'Medium',
-          'sixth': 'Complex',
-        },
-        {
-          'first': '<a href={% url "mcp_help" %} class=btn-primary>MCP Server</a><em class=subtext>Coming soon</em></td>',
-          'second': 'Fast',
-          'third': 'Good',
-          'fourth': 'Natural Language',
-          'fifth': 'Short',
-          'sixth': 'Easy',
-        },
-      ]"
-      :longrow="[
-        {
-          'first': '<a href=https://free.law/data-consulting/ class=btn-dark>Data Services</a>',
-          'second': 'Engage with Free Law Project, the non-profit behind CourtListener and RECAP, for the most flexibility.',
-          'colspan': '5',
-        },
-      ]"
-    ></c-options-table>
+    >
+      <tr class="border-b-greyscale-200 border-b">
+          <c-flex-cell align="data-center">
+            <a href="{% url "replication_docs" %}" class="btn-primary justify-center items-center gap-4 flex w-full py-2 px-1">Replication</a>
+          </c-flex-cell>
+          <c-flex-cell align="data-center">Instant</c-flex-cell>
+          <c-flex-cell align="data-center">Complete</c-flex-cell>
+          <c-flex-cell align="data-center">Unlimited SQL Queries</c-flex-cell>
+          <c-flex-cell align="data-center">Short</c-flex-cell>
+          <c-flex-cell align="data-center">Complex</c-flex-cell>
+      </tr>
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell align="data-center"><a href="{% url "bulk_data_index" %}" class="btn-primary justify-center items-center gap-4 flex w-full py-2 px-1">Bulk Data</a></c-flex-cell>
+        <c-flex-cell align="data-center">Slow</c-flex-cell>
+        <c-flex-cell align="data-center">Great</c-flex-cell>
+        <c-flex-cell align="data-center">None</c-flex-cell>
+        <c-flex-cell align="data-center">Short</c-flex-cell>
+        <c-flex-cell align="data-center">None</c-flex-cell>
+      </tr>
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell align="data-center"><a href="{% url "rest_docs" %}" class="btn-primary justify-center items-center gap-4 flex w-full py-2 px-1">REST APIs</a></c-flex-cell>
+        <c-flex-cell align="data-center">Fast</c-flex-cell>
+        <c-flex-cell align="data-center">Good</c-flex-cell>
+        <c-flex-cell align="data-center">Filters &amp; Joins</c-flex-cell>
+        <c-flex-cell align="data-center">Longer</c-flex-cell>
+        <c-flex-cell align="data-center">None</c-flex-cell>
+      </tr>
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell align="data-center"><a href="{% url "webhooks_docs" %}" class="btn-primary justify-center items-center gap-4 flex w-full py-2 px-1">Webhooks</a></c-flex-cell>
+        <c-flex-cell align="data-center">Instant</c-flex-cell>
+        <c-flex-cell align="data-center">Good</c-flex-cell>
+        <c-flex-cell align="data-center">Subscribe to Events</c-flex-cell>
+        <c-flex-cell align="data-center">Medium</c-flex-cell>
+        <c-flex-cell align="data-center">Complex</c-flex-cell>
+      </tr>
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell align="data-center">
+          <a href="{% url "mcp_help" %}" class="btn-primary justify-center items-center gap-4 flex w-full py-2 px-1">MCP Server</a>
+          <p class="text-xs text-center text-greyscale-700"><em>Coming soon</em></p>
+        </c-flex-cell>
+        <c-flex-cell align="data-center">Fast</c-flex-cell>
+        <c-flex-cell align="data-center">Good</c-flex-cell>
+        <c-flex-cell align="data-center">Natural Language</c-flex-cell>
+        <c-flex-cell align="data-center">Short</c-flex-cell>
+        <c-flex-cell align="data-center">Easy</c-flex-cell>
+      </tr>
+      <tr>
+        <c-flex-cell align="data-center"><a href="https://free.law/data-consulting/" class="btn-dark justify-center items-center gap-4 flex w-full">Data Services</a></c-flex-cell>
+        <td class="align-top text-sm font-normal p-2 text-start" colspan="5">Engage with Free Law Project, the non-profit behind CourtListener and RECAP, for the most flexibility.</td>
+      </tr>
+    </c-flex-table>
   </section>
 
   <section id="pricing" class="max-w-[--padded-full-width] w-full">

@@ -1,0 +1,13 @@
+<c-vars align></c-vars>
+
+<td class="align-top text-sm font-normal p-2
+  {% if align == "data-center" %}
+    text-center first:text-start
+  {% elif align == "center" %}
+    text-center
+  {% else %}
+    text-start
+  {% endif %}
+">
+  {{ slot }}
+</td>
