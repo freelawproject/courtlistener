@@ -4245,7 +4245,7 @@ def merge_texas_docket(
                 )
                 docket.court = court
         if docket is None:
-            docket: Docket = async_to_sync(find_docket_object)(
+            docket = async_to_sync(find_docket_object)(
                 court_id=court.pk,
                 pacer_case_id=None,
                 docket_number=docket_number,

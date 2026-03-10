@@ -2171,6 +2171,7 @@ class TexasMergerTest(TestCase):
         cls.texas_sc = CourtFactory.create(id="tex")
         cls.texas_cca = CourtFactory.create(id="texcrimapp")
         cls.texas_coa1 = CourtFactory.create(id="txctapp1")
+        cls.texas_dc100 = CourtFactory.create(id="texdistct101")
         cls.docket_number_coa1 = "01-25-00011-CV"
         cls.docket_coa1 = DocketFactory.create(
             court=cls.texas_coa1,
@@ -2223,9 +2224,12 @@ class TexasMergerTest(TestCase):
         n_events = fake.random_int(min=0, max=30)
         case_events = [TexasCaseEventDictFactory() for _ in range(n_events)]
 
-        appellate_brief_indices = sorted(
-            fake.random_elements(range(len(case_events)), unique=True)
-        )
+        if len(case_events) == 0:
+            appellate_brief_indices = []
+        else:
+            appellate_brief_indices = sorted(
+                fake.random_elements(range(len(case_events)), unique=True)
+            )
 
         appellate_briefs = [
             TexasAppellateBriefDictFactory(
@@ -2447,8 +2451,14 @@ class TexasMergerTest(TestCase):
         created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == js_docket_entry["type"]
-        assert (
-            created_docket_entry.disposition == js_docket_entry["disposition"]
+        assert created_docket_entry.disposition == js_docket_entry.get(
+            "disposition", ""
+        )
+        assert created_docket_entry.description == js_docket_entry.get(
+            "description", ""
+        )
+        assert created_docket_entry.remarks == js_docket_entry.get(
+            "remarks", ""
         )
         assert created_docket_entry.date_filed == js_docket_entry["date"]
         n_attachments = TexasDocument.objects.filter(
@@ -3194,6 +3204,9 @@ class TexasMergerTest(TestCase):
             court_id=CourtID.SUPREME_COURT.value,
             docket_number=docket_sc.docket_number,
             appeals_court=appeals_court,
+            originating_court=TexasOriginatingDistrictCourtDictFactory(
+                district=100
+            ),
         )
 
         result = merge_texas_docket(docket_data)
@@ -3287,13 +3300,37 @@ class TexasMergerTest(TestCase):
         assert tcd.court == texas_district
         assert tcd.court_name == texas_district.full_name
 
-        # Merging the same data again should update, not create
+        # Merging the same data again should be unnecessary
         result2 = merge_texas_trial_court_data(docket_sc, docket_data)
-
+        tcd.refresh_from_db()
         assert result2.create is False
-        assert result2.update is True
+        assert result2.update is False
         assert result2.success is True
+        assert tcd.docket_number_raw_trial == originating_court["case"]
+        assert tcd.docket_number_trial == originating_court["case"]
+        assert tcd.judge_str == originating_court["judge"]
+        assert tcd.reporter == originating_court["reporter"]
+        assert tcd.punishment == originating_court["punishment"]
+        assert tcd.county == originating_court["county"]
         assert result2.pk == tcd.pk
+        assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
+
+        # Merging changed data should update
+        new_dn = originating_court["case"] + "Different"
+        originating_court["case"] = new_dn
+
+        result3 = merge_texas_trial_court_data(docket_sc, docket_data)
+        tcd.refresh_from_db()
+        assert result3.create is False
+        assert result3.update is True
+        assert result3.success is True
+        assert tcd.docket_number_raw_trial == originating_court["case"]
+        assert tcd.docket_number_trial == new_dn
+        assert tcd.judge_str == originating_court["judge"]
+        assert tcd.reporter == originating_court["reporter"]
+        assert tcd.punishment == originating_court["punishment"]
+        assert tcd.county == originating_court["county"]
+        assert result3.pk == tcd.pk
         assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
 
 
