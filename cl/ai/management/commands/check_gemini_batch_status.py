@@ -75,12 +75,18 @@ logger = logging.getLogger(__name__)
 # in progress longer than this, retrying is pointless.
 MAX_REQUEST_AGE = timedelta(hours=48)
 
-COMPLETED_STATES = {
+# Job states where results can be downloaded and processed.
+SUCCEEDED_STATES = {
     JobState.JOB_STATE_SUCCEEDED,
+    JobState.JOB_STATE_PARTIALLY_SUCCEEDED,
+}
+
+# All terminal job states (no further status changes expected).
+COMPLETED_STATES = {
+    *SUCCEEDED_STATES,
     JobState.JOB_STATE_FAILED,
     JobState.JOB_STATE_CANCELLED,
     JobState.JOB_STATE_EXPIRED,
-    JobState.JOB_STATE_PARTIALLY_SUCCEEDED,
 }
 
 
@@ -141,6 +147,17 @@ def process_succeeded_request(
                     )
             task.save()
 
+        # Mark any tasks still IN_PROGRESS as FAILED. This can happen
+        # when a job returns JOB_STATE_PARTIALLY_SUCCEEDED and the
+        # results file omits some tasks entirely.
+        orphaned_tasks = request.tasks.filter(
+            status=LLMTaskStatusChoices.IN_PROGRESS
+        )
+        orphaned_tasks.update(
+            status=LLMTaskStatusChoices.FAILED,
+            error_message="Task missing from batch results",
+        )
+
         request.status = LLMRequestStatusChoices.FINISHED
         request.completed_tasks = request.tasks.filter(
             status=LLMTaskStatusChoices.SUCCEEDED
@@ -190,13 +207,13 @@ def handle_request(
     try:
         job = wrapper.get_job(request.batch_id)
 
-        if job.state.name not in COMPLETED_STATES:
+        if job.state not in COMPLETED_STATES:
             logger.info(
                 f"  - Job state is '{job.state.name}'. Skipping for now."
             )
             return
 
-        if job.state.name == "JOB_STATE_SUCCEEDED":
+        if job.state in SUCCEEDED_STATES:
             logger.info(
                 "  - Job succeeded. Downloading and processing results..."
             )
@@ -269,11 +286,10 @@ class Command(VerboseCommand):
             status=LLMRequestStatusChoices.IN_PROGRESS,
             provider=LLMProvider.GEMINI,
         )
-        logger.info(
-            f"Found {pending_requests.count()} pending batch requests to check."
-        )
+        pending_count = pending_requests.count()
+        logger.info(f"Found {pending_count} pending batch requests to check.")
 
-        if not pending_requests:
+        if pending_count == 0:
             return
 
         wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
