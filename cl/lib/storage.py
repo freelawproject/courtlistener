@@ -96,6 +96,10 @@ class RecapEmailSESStorage(S3Storage):
     bucket_name = "recap.email"
 
 
+class TexasEmailSESStorage(S3Storage):
+    bucket_name = "texas.email"
+
+
 class S3PrivateLLMStorage(S3Storage):
     """Private S3 storage for LLM-related files (inputs, responses, batch
     results). Uses private ACL to keep internal processing files
