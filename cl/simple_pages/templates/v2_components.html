@@ -752,6 +752,13 @@ Sample code here.
         {'label': 'Speed', 'field': 'second'},
         {'label': 'Fidelity', 'field': 'third'},
       ]"
+      :footer="[
+        {
+          'first': 'Total',
+          'second': '3 services',
+          'third': '',
+        },
+      ]"
     >
       <tr class="border-b-greyscale-200 border-b">
         <c-flex-cell align="data-center">First service</c-flex-cell>
@@ -792,6 +799,13 @@ Sample code here.
       </c-library.item>
 
       <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-table</code>: <code>footer</code></c-slot>
+        <c-slot name="description">
+          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Each element is a dictionary where the keys correspond to the column fields. Content is rendered in bold.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
         <c-slot name="label"><code>c-flex-cell</code>: <code>align</code></c-slot>
         <c-slot name="description">
           Alignment for the cell content. Accepts the same values as the table's <code>align</code> prop: <code>center</code>, <code>data-center</code>, or left-aligned by default.
@@ -821,6 +835,13 @@ Sample code here.
     {'label': 'Service', 'field': 'first'},
     {'label': 'Speed', 'field': 'second'},
     {'label': 'Fidelity', 'field': 'third'},
+  ]"
+  :footer="[
+    {
+      'first': 'Total',
+      'second': '3 services',
+      'third': '',
+    },
   ]"
 &gt;
   &lt;tr class="border-b-greyscale-200 border-b"&gt;

@@ -26,32 +26,28 @@
     <tbody>
         {{ slot }}
     </tbody>
-{#    {% if footer %}#}
-{#      <tfoot>#}
-{#      {% for item in footer %}#}
-{#        <tr>#}
-{#          {% for column in columns %}#}
-{#            <td class="align-top text-sm p-2#}
-{#              {% if align == "data-center" %}#}
-{#                text-center first:text-start#}
-{#              {% elif align == "center" %}#}
-{#                text-center#}
-{#              {% else %}#}
-{#                text-start#}
-{#              {% endif %}#}
-{#            ">#}
-{#              <strong>#}
-{#                {% if safe %}#}
-{#                  {{ item|get:column.field|safe }}#}
-{#                {% else %}#}
-{#                  {{ item|get:column.field }}#}
-{#                {% endif %}#}
-{#              </strong>#}
-{#            </td>#}
-{#          {% endfor %}#}
-{#        </tr>#}
-{#      {% endfor %}#}
-{#      </tfoot>#}
-{#    {% endif %}#}
+    {% if footer %}
+      <tfoot>
+      {% for item in footer %}
+        <tr>
+          {% for column in columns %}
+            <td class="align-top text-sm p-2
+              {% if align == "data-center" %}
+                text-center first:text-start
+              {% elif align == "center" %}
+                text-center
+              {% else %}
+                text-start
+              {% endif %}
+            ">
+              <strong>
+                {{ item|get:column.field }}
+              </strong>
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tfoot>
+    {% endif %}
   </table>
 </div>
