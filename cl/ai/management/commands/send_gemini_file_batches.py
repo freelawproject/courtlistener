@@ -36,21 +36,24 @@ OPTIONAL ARGUMENTS:
     --store-input-files Store files in CourtListener storage (creates duplicates)
                         Default: Only S3 references are stored (no duplication)
 
+    --batch-size        Maximum files per batch request (default: 5000)
+                        Files exceeding this are split into multiple LLMRequests
+
 BASIC USAGE:
-    python manage.py send_gemini_batches \\
+    python manage.py send_gemini_file_batches \\
         --path "llm-inputs/batch-2026-01/" \\
         --system-prompt 1 \\
         --user-prompt 2
 
 DOCKER USAGE:
-    docker exec cl-django python manage.py send_gemini_batches \\
+    docker exec cl-django python manage.py send_gemini_file_batches \\
         --path "llm-inputs/january-scans/" \\
         --system-prompt 1 \\
         --user-prompt 2 \\
         --request-name "January 2026 Scan Batch"
 
 EXAMPLE WITH CACHING:
-    docker exec cl-django python manage.py send_gemini_batches \\
+    docker exec cl-django python manage.py send_gemini_file_batches \\
         --path "llm-inputs/batch-2026-01/" \\
         --system-prompt 1 \\
         --user-prompt 2 \\
@@ -58,7 +61,7 @@ EXAMPLE WITH CACHING:
         --model "gemini-2.0-flash-001"
 
 EXAMPLE WITH CUSTOM BUCKET:
-    docker exec cl-django python manage.py send_gemini_batches \\
+    docker exec cl-django python manage.py send_gemini_file_batches \\
         --path "external-scans/batch-jan/" \\
         --bucket "dev-com-courtlistener-storage" \\
         --system-prompt 1 \\
@@ -125,7 +128,8 @@ import logging
 import os
 import tempfile
 import uuid
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
+from itertools import islice
 
 import boto3
 import environ
@@ -159,6 +163,8 @@ SUPPORTED_GEMINI_MODELS = {
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
 }
+
+DEFAULT_BATCH_SIZE = 1000
 
 
 def get_s3_file_list(
@@ -304,26 +310,36 @@ def validate_inputs(
     return batch_api_key, system_prompt, user_prompt
 
 
-def fetch_files_and_create_tasks(
+def chunk_iterator(iterator: Iterator, size: int) -> Generator[list]:
+    """Yield successive lists of up to *size* items from *iterator*.
+
+    :param iterator: The source iterator to consume in chunks.
+    :param size: Maximum number of items per chunk.
+    :returns: A generator of lists, each containing up to *size* items.
+    """
+    iterator = iter(iterator)
+    while chunk := list(islice(iterator, size)):
+        yield chunk
+
+
+def create_tasks_from_files(
     llm_request: LLMRequest,
-    s3_path: str,
-    bucket: str,
+    files: list[tuple[str, bytes, str]],
     store_files: bool,
     temp_files: list[str],
 ) -> list[dict]:
-    """Iterate S3 files, create ``LLMTask`` objects, and stage temp files.
+    """Create ``LLMTask`` objects from file data and stage temp files.
 
-    For each PDF found via :func:`get_s3_file_list`, an ``LLMTask`` is
-    created and the file content is either stored in CourtListener storage
-    or referenced by S3 key.  A temporary local copy is also written for
-    later upload to the Google GenAI Files API.
+    For each file tuple, an ``LLMTask`` is created and the file content is
+    either stored in CourtListener storage or referenced by S3 key.  A
+    temporary local copy is also written for later upload to the Google
+    GenAI Files API.
 
     This function should be called inside a ``transaction.atomic()`` block
     so that all DB writes roll back cleanly on failure.
 
     :param llm_request: The parent request all tasks belong to.
-    :param s3_path: S3 prefix containing files to process.
-    :param bucket: S3 bucket name.
+    :param files: List of (filename, file_content_bytes, s3_key) tuples.
     :param store_files: When ``True``, duplicate files into CL storage;
         otherwise only store the S3 key reference.
     :param temp_files: Mutable list populated in-place with temporary file
@@ -331,14 +347,9 @@ def fetch_files_and_create_tasks(
         function fails partway through.
     :returns: A list of dicts with ``llm_key`` and ``input_file_path`` keys.
     """
-    logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
     tasks_data: list[dict] = []
 
-    for filename, file_content, s3_key in get_s3_file_list(
-        s3_path=s3_path,
-        bucket_name=bucket,
-        file_extension=".pdf",
-    ):
+    for filename, file_content, s3_key in files:
         llm_key = f"scan-batch-{llm_request.pk}-{uuid.uuid4().hex[:12]}"
         task = LLMTask.objects.create(
             request=llm_request,
@@ -494,6 +505,13 @@ class Command(VerboseCommand):
             action="store_true",
             help="Store input files in CourtListener storage (creates duplicates). By default, only S3 references are stored.",
         )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=DEFAULT_BATCH_SIZE,
+            help=f"Maximum number of files per batch request (default: {DEFAULT_BATCH_SIZE}). "
+            "Files exceeding this limit are split into multiple LLMRequests.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -505,41 +523,70 @@ class Command(VerboseCommand):
         cache_name = options["cache_name"]
         bucket = options.get("bucket") or settings.AWS_STORAGE_BUCKET_NAME
         store_files = options["store_input_files"]
+        batch_size = options["batch_size"]
 
         batch_api_key, system_prompt, user_prompt = validate_inputs(options)
 
-        temp_files: list[str] = []
+        logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
+        s3_files = get_s3_file_list(
+            s3_path=s3_path,
+            bucket_name=bucket,
+            file_extension=".pdf",
+        )
+
+        all_temp_files: list[str] = []
+        batch_number = 0
         try:
             with transaction.atomic():
-                llm_request = LLMRequest.objects.create(
-                    name=request_name,
-                    is_batch=True,
-                    provider=LLMProvider.GEMINI,
-                    api_model_name=model,
-                    status=LLMRequestStatusChoices.IN_PROGRESS,
-                    date_started=now(),
-                )
-                llm_request.prompts.set([system_prompt, user_prompt])
-                logger.info(f"Created LLMRequest with ID: {llm_request.pk}")
+                for chunk in chunk_iterator(s3_files, batch_size):
+                    batch_number += 1
+                    batch_name = (
+                        f"{request_name} (part {batch_number})"
+                        if batch_number > 1
+                        else request_name
+                    )
 
-                tasks_data = fetch_files_and_create_tasks(
-                    llm_request, s3_path, bucket, store_files, temp_files
-                )
+                    llm_request = LLMRequest.objects.create(
+                        name=batch_name,
+                        is_batch=True,
+                        provider=LLMProvider.GEMINI,
+                        api_model_name=model,
+                        status=LLMRequestStatusChoices.IN_PROGRESS,
+                        date_started=now(),
+                    )
+                    llm_request.prompts.set([system_prompt, user_prompt])
+                    logger.info(
+                        f"Created LLMRequest {llm_request.pk} "
+                        f"(batch {batch_number}, {len(chunk)} files)"
+                    )
 
-                submit_batch(
-                    llm_request,
-                    batch_api_key,
-                    tasks_data,
-                    system_prompt,
-                    user_prompt,
-                    cache_name,
-                )
+                    tasks_data = create_tasks_from_files(
+                        llm_request, chunk, store_files, all_temp_files
+                    )
+
+                    submit_batch(
+                        llm_request,
+                        batch_api_key,
+                        tasks_data,
+                        system_prompt,
+                        user_prompt,
+                        cache_name,
+                    )
         except Exception as e:
             # Catch any error (CommandError, API failures, S3 errors,
-            # etc.) so we always log and report to Sentry before the
-            # transaction rolls back.
-            logger.exception("Failed to create and submit batch request")
+            # etc.) so we always log and report to Sentry. The outer
+            # transaction.atomic() ensures all DB changes (LLMRequests,
+            # LLMTasks) are rolled back, leaving no partial state.
+            logger.exception(
+                "Failed to create and submit batch requests. "
+                "All DB changes rolled back. "
+                f"Failed at batch {batch_number}, "
+                f"s3_path={s3_path}, model={model}, "
+                f"batch_size={batch_size}"
+            )
             sentry_sdk.capture_exception(e)
             raise
         finally:
-            cleanup_temp_files(temp_files)
+            cleanup_temp_files(all_temp_files)
+
+        logger.info(f"Finished submitting {batch_number} batch request(s).")
