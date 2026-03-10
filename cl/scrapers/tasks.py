@@ -931,10 +931,9 @@ def _login_tames(
     tree = etree.fromstring(resp.text, etree.HTMLParser())
     payload: dict[str, str] = {}
     hidden_elements = tree.xpath("//input[@type='hidden']")
-    if isinstance(hidden_elements,etree._Element):
-        for input_tag in hidden_elements:
-            if name := input_tag.get("name"):
-                payload[name] = input_tag.get("value", "")
+    for input_tag in hidden_elements:
+        if name := input_tag.get("name"):
+            payload[name] = input_tag.get("value", "")
 
     payload.update(
         {
@@ -946,12 +945,16 @@ def _login_tames(
 
     resp = session.post(CASEMAIL_LOGIN_URL, data=payload, timeout=30)
     resp.raise_for_status()
-
+    if "ctl00_ctl00_BaseContentPlaceHolder1_ContentPlaceHolder1_gvCaseWatch" not in resp.text:
+        raise SubscriptionFailure("Login failed.")
 
 TAMES_FAILURES_CACHE_KEY = "scraper:tames:subscription_failures"
 
 
-@app.task(bind=True, max_retries=3, retry_backoff=10)
+@app.task(bind=True,
+          max_retries=3,
+          retry_backoff=10,
+          autoretry_for=(SubscriptionFailure,))
 def subscribe_to_tames_cases(
     self: celery.Task,
     cases: list[dict[str, str]],
@@ -969,7 +972,7 @@ def subscribe_to_tames_cases(
     :param cases: List of dicts, each with "court", "case", and "date_filed" keys.
     :raises SubscriptionFailure: If login fails.
     """
-    if not settings.TAMES_USER: # ignore: type[misc]
+    if not settings.TAMES_USER:  # type: ignore[misc]
         raise ConfigurationException("TAMES_USER must be set.")
     tames_user = json.loads(settings.TAMES_USER)
     subscription_tracker, _created = AccountSubscription.objects.get_or_create(
@@ -993,10 +996,14 @@ def subscribe_to_tames_cases(
 
     try:
         _login_tames(session, tames_user)
-    except requests.RequestException as exc:
+    except (requests.RequestException,SubscriptionFailure) as exc:
         if self.request.retries == self.max_retries:
             cache.set(cache_key, cases, None)
-        raise SubscriptionFailure(f"TAMES login failed: {exc}")
+        raise self.retry(
+            args=(failed,),
+            exc=SubscriptionFailure(f"{len(failed)}/{len(cases)} cases failed"),
+            countdown=(10 * 2**self.request.retries)
+        )
 
     html_parser = etree.HTMLParser()
     failed: list[dict[str, str]] = []
@@ -1028,18 +1035,20 @@ def subscribe_to_tames_cases(
                 case_number,
                 message,
             )
-            date_filed = datetime.strptime(case["date_filed"], "%m/%d/%Y").date()
+            date_filed = datetime.strptime(
+                case["date_filed"], "%m/%d/%Y"
+            ).date()
             successful_dates.add(date_filed)
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to subscribe to TAMES case %s/%s",
                 court,
                 case_number,
-                e,
             )
             failed.append(case)
 
-    subscription_tracker.include_subscriptions(successful_dates)
+    if successful_dates:
+        subscription_tracker.include_subscriptions(successful_dates)
     if not failed:
         cache.delete(cache_key)
         return
@@ -1056,4 +1065,5 @@ def subscribe_to_tames_cases(
     raise self.retry(
         args=(failed,),
         exc=SubscriptionFailure(f"{len(failed)}/{len(cases)} cases failed"),
+        countdown=(10 * 2**self.request.retries)
     )
