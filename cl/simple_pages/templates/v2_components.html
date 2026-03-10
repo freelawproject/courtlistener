@@ -21,7 +21,7 @@
         {'href': '#nav-layout', 'text': 'Layout with navigation'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
         {'href': '#data-table', 'text': 'Data table'},
-        {'href': '#content-table', 'text': 'Content table'},
+        {'href': '#flex-table', 'text': 'Flex table'},
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
       ]},
@@ -738,159 +738,108 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
-  {# TABLE FOR CONTENT NOT DATA #}
-  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="content-table">
-    <h2 class="mt-6 mb-3">Content table</h2>
-    <p>Renders a content table</p>
+  {# FLEX TABLE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="flex-table">
+    <h2 class="mt-6 mb-3">Flex table</h2>
+    <p>A slot-based table component for content that needs full control over row markup, such as links, buttons, or colspan. Use with <code>c-flex-cell</code> for consistent cell styling.</p>
 
     <h4 class="my-3">Demo</h4>
-    <c-options-table
-      safe
-      caption="Usage example of data table component"
+    <c-flex-table
+      caption="Usage example of flex table component"
+      align="data-center"
       :columns="[
-       {'label': 'First header', 'field': 'first'},
-        {'label': 'Second header', 'field': 'second'},
-        {'label': 'Third header', 'field': 'third'},
+        {'label': 'Service', 'field': 'first'},
+        {'label': 'Speed', 'field': 'second'},
+        {'label': 'Fidelity', 'field': 'third'},
       ]"
-      :rows="[
-        {
-          'first': 'Row 1<br>This one has a line break (safe only)',
-          'second': 'Row 1, second',
-          'third': 'Row 1, third',
-        },
-        {
-          'first': 'Row 2, first',
-          'second': 'Row 2, second',
-          'third': 'Row 2, third',
-         },
-        {
-          'first': 'Row 3, first',
-          'second': 'Row 3, second',
-          'third': 'Row 3, third',
-        },
-      ]"
-      :longrow="[
-        {
-          'first': 'Row 4, first',
-          'second': 'Row 4, second, spanning two columns',
-          'colspan': '2'
-        },
-      ]"
-      :footer="[
-        {
-          'first': 'First foot',
-          'second': 'Second foot',
-          'third': 'Third foot',
-          'fifth': 'Fifth foot',
-        },
-      ]"
-    ></c-options-table>
+    >
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell align="data-center">First service</c-flex-cell>
+        <c-flex-cell align="data-center">Fast</c-flex-cell>
+        <c-flex-cell align="data-center">Great</c-flex-cell>
+      </tr>
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell align="data-center">Second service</c-flex-cell>
+        <c-flex-cell align="data-center">Slow</c-flex-cell>
+        <c-flex-cell align="data-center">Good</c-flex-cell>
+      </tr>
+      <tr>
+        <c-flex-cell align="data-center">Third service</c-flex-cell>
+        <td class="align-top text-sm font-normal p-2 text-start" colspan="2">This cell spans two columns using a raw td with colspan.</td>
+      </tr>
+    </c-flex-table>
 
     <c-library.list title="Props" only>
       <c-library.item only>
-        <c-slot name="label"><code>columns</code></c-slot>
+        <c-slot name="label"><code>c-flex-table</code>: <code>columns</code></c-slot>
         <c-slot name="description">
-          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the col value for each row).
+          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the column).
         </c-slot>
       </c-library.item>
 
       <c-library.item only>
-        <c-slot name="label"><code>rows</code></c-slot>
-        <c-slot name="description">
-          List of rows in the <code>&lt;tbody&gt;</code>.
-          <br>Each element in the list is a dictionary where the keys correspond to the column fields.
-          <br>If a given field isn't present, the cell will be empty.
-        </c-slot>
-      </c-library.item>
-
-      <c-library.item only>
-        <c-slot name="label"><code>longrow</code></c-slot>
-        <c-slot name="description">
-          List of rows with unusual widths, which can accept a <code>colspan</code> prop.
-        </c-slot>
-      </c-library.item>
-
-      <c-library.item only>
-        <c-slot name="label"><code>caption</code></c-slot>
+        <c-slot name="label"><code>c-flex-table</code>: <code>caption</code></c-slot>
         <c-slot name="description">
           Table caption for accessibility.<br>Not displayed visually, but it's important to provide context for screen readers.
         </c-slot>
       </c-library.item>
 
       <c-library.item optional only>
-        <c-slot name="label"><code>align</code></c-slot>
+        <c-slot name="label"><code>c-flex-table</code>: <code>align</code></c-slot>
         <c-slot name="description">
-          Default is to align table contents to the left. Use <code>center</code> to align everything in the middle. Use <code>data-center</code> to keep the first column left, but center the rest of the table.
+          Alignment for table headers. Use <code>center</code> to center all headers. Use <code>data-center</code> to keep the first column left-aligned and center the rest. Defaults to left-aligned.
         </c-slot>
       </c-library.item>
 
       <c-library.item optional only>
-        <c-slot name="label"><code>footer</code></c-slot>
+        <c-slot name="label"><code>c-flex-cell</code>: <code>align</code></c-slot>
         <c-slot name="description">
-          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Same structure as <code>rows</code>.
+          Alignment for the cell content. Accepts the same values as the table's <code>align</code> prop: <code>center</code>, <code>data-center</code>, or left-aligned by default.
         </c-slot>
       </c-library.item>
-
-      <c-library.item optional only>
-        <c-slot name="label"><code>safe</code></c-slot>
-        <c-slot name="description">
-          Marks the contents as safe, so it can render HTML inside the table.
-          <br>Defaults to false.
-          <br><strong>Warning:</strong> May allow XSS vulnerabilities if enabled on user-provided HTML, so use only with trusted content.
-        </c-slot>
-      </c-library.item>
-
-      <c-library.list title="Slots" only>
-        <p>No slots</p>
-      </c-library.list>
-
-      <c-expansion-panel title="Code">
-        <c-code>
-&lt;c-options-table
-      safe
-      caption="Usage example of data table component"
-      :columns="[
-       {'label': 'First header', 'field': 'first'},
-        {'label': 'Second header', 'field': 'second'},
-        {'label': 'Third header', 'field': 'third'},
-      ]"
-      :rows="[
-        {
-          'first': 'Row 1<br>This one has a line break (safe only)',
-          'second': 'Row 1, second',
-          'third': 'Row 1, third',
-        },
-        {
-          'first': 'Row 2, first',
-          'second': 'Row 2, second',
-          'third': 'Row 2, third',
-         },
-        {
-          'first': 'Row 3, first',
-          'second': 'Row 3, second',
-          'third': 'Row 3, third',
-        },
-      ]"
-      :longrow="[
-        {
-          'first': 'Row 4, first',
-          'second': 'Row 4, second, spanning two columns',
-          'colspan': '2'
-        },
-      ]"
-      :footer="[
-        {
-          'first': 'First foot',
-          'second': 'Second foot',
-          'third': 'Third foot',
-          'fifth': 'Fifth foot',
-        },
-      ]"
-    >&lt;/c-options-table>
-        </c-code>
-      </c-expansion-panel>
-
     </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-flex-table</code> default</c-slot>
+        <c-slot name="description">
+          Raw <code>&lt;tr&gt;</code> elements for the table body. Use <code>c-flex-cell</code> for consistent cell styling, or raw <code>&lt;td&gt;</code> elements when you need attributes like <code>colspan</code>.
+        </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-flex-cell</code> default</c-slot>
+        <c-slot name="description">Cell content.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-flex-table
+  caption="Usage example of flex table component"
+  align="data-center"
+  :columns="[
+    {'label': 'Service', 'field': 'first'},
+    {'label': 'Speed', 'field': 'second'},
+    {'label': 'Fidelity', 'field': 'third'},
+  ]"
+&gt;
+  &lt;tr class="border-b-greyscale-200 border-b"&gt;
+    &lt;c-flex-cell align="data-center"&gt;First service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell align="data-center"&gt;Fast&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell align="data-center"&gt;Great&lt;/c-flex-cell&gt;
+  &lt;/tr&gt;
+  &lt;tr class="border-b-greyscale-200 border-b"&gt;
+    &lt;c-flex-cell align="data-center"&gt;Second service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell align="data-center"&gt;Slow&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell align="data-center"&gt;Good&lt;/c-flex-cell&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;c-flex-cell align="data-center"&gt;Third service&lt;/c-flex-cell&gt;
+    &lt;td class="align-top text-sm font-normal p-2 text-start" colspan="2"&gt;This cell spans two columns using a raw td with colspan.&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/c-flex-table&gt;
+      </c-code>
+    </c-expansion-panel>
   </section>
 
   {# DIALOG #}
