@@ -153,15 +153,11 @@ class Command(VerboseCommand):
 
         if options["only_extraction"]:
             chunk_size = options["chunk_size"]
-            logger.info(
-                "Extracting SCOTUSDocument PDFs (extraction only)."
-            )
+            logger.info("Extracting SCOTUSDocument PDFs (extraction only).")
             extract_scotus_pdfs(extraction_queue, chunk_size, delay)
         else:
             download_queue = options["download_queue"]
-            logger.info(
-                "Downloading and extracting SCOTUSDocument PDFs."
-            )
+            logger.info("Downloading and extracting SCOTUSDocument PDFs.")
             download_and_extract_scotus_pdfs(
                 download_queue, extraction_queue, delay
             )
