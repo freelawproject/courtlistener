@@ -2,6 +2,7 @@ import time
 from itertools import batched
 
 from celery import chain
+from django.db.models import Q
 
 from cl.corpus_importer.tasks import download_scotus_document_pdf
 from cl.lib.celery_utils import CeleryThrottle
@@ -17,7 +18,7 @@ def download_and_extract_scotus_pdfs(
 ) -> None:
     """Download and extract PDFs for SCOTUSDocuments missing a local file.
 
-    Queries SCOTUSDocument instances that have a URL but no filepath_local,
+    Queries SCOTUSDocument instances that have no filepath_local,
     then schedules a download -> extraction chain for each.
 
     :param download_queue: The celery queue for download tasks.
@@ -26,14 +27,13 @@ def download_and_extract_scotus_pdfs(
     :return: None
     """
     docs = (
-        SCOTUSDocument.objects.exclude(url="")
-        .filter(filepath_local="")
+        SCOTUSDocument.objects.filter(filepath_local="")
         .values_list("pk", flat=True)
         .order_by()
     )
     count = docs.count()
     logger.info("Found %s SCOTUSDocuments needing download.", count)
-    throttle = CeleryThrottle(queue_name=download_queue)
+    throttle = CeleryThrottle(queue_name=extraction_queue)
     processed_count = 0
     for pk in docs.iterator():
         throttle.maybe_wait()
@@ -54,10 +54,9 @@ def download_and_extract_scotus_pdfs(
             )
         time.sleep(delay)
     logger.info(
-        "Scheduled %s/%s (%s)",
+        "Scheduled %s/%s",
         processed_count,
         count,
-        f"{processed_count / count:.0%}",
     )
 
 
@@ -66,10 +65,10 @@ def extract_scotus_pdfs(
     chunk_size: int,
     delay: float,
 ) -> None:
-    """Extract text from SCOTUSDocuments that have a file but no plain_text.
+    """Extract text from SCOTUSDocuments that have a file but incomplete OCR.
 
     Queries SCOTUSDocument instances that already have a filepath_local but
-    have not been extracted yet (empty plain_text).
+    whose OCR status is not complete or unnecessary.
 
     :param extraction_queue: The celery queue for extraction tasks.
     :param chunk_size: The number of items to extract per celery task batch.
@@ -78,7 +77,10 @@ def extract_scotus_pdfs(
     """
     docs = (
         SCOTUSDocument.objects.exclude(filepath_local="")
-        .filter(plain_text="")
+        .exclude(
+            Q(ocr_status=SCOTUSDocument.OCR_COMPLETE)
+            | Q(ocr_status=SCOTUSDocument.OCR_UNNECESSARY)
+        )
         .values_list("pk", flat=True)
         .order_by()
     )
