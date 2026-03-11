@@ -316,7 +316,23 @@ class ContactForm(forms.Form):
         user_agent: str = "Unknown",
         target: Literal["jira", "zoho_desk"] = "jira",
     ) -> str:
-        """Plain-text email body built from cleaned_data. Includes all relevant fields for the issue type."""
+        """Build the email body from cleaned_data.
+
+        The output includes a common header (subject, name, email, and issue
+        type), followed by issue-type-specific fields (such as partnership
+        details or technical support context) and the user's free-text message.
+
+        The output format depends on the target parameter:
+
+        - When target is "jira", the output is plain text with newline separators
+        and format email addresses as with angle brackets.
+        - When target is "zoho_desk", the output uses HTML line breaks.
+
+        :param user_agent: The submitter's browser User-Agent string.
+        :param target: Output format target, either "jira" or "zoho_desk", which
+            determines line separators and email formatting.
+        :return: The formatted body string.
+        """
         cd = self.cleaned_data
         issue_type_label = self.get_issue_type_display()
 
