@@ -95,7 +95,13 @@ def build_zoho_payload_from_user(
     return payload
 
 
-class ZohoModule:
+class ZohoBase:
+    """Base class for all Zoho API clients.
+
+    Handles OAuth initialization via the Zoho CRM SDK. Subclasses must
+    set ``module_name`` to a non-empty string.
+    """
+
     module_name: str = ""
 
     def __init__(self):
@@ -124,6 +130,14 @@ class ZohoModule:
             store=settings.ZOHO_STORE,
             resource_path=settings.ZOHO_RESOURCE_PATH,
         )
+
+
+class ZohoModule(ZohoBase):
+    """Base class for Zoho CRM module clients.
+
+    Adds CRM SDK helpers (response handling, record building) on top
+    of the OAuth initialization provided by ``ZohoBase``.
+    """
 
     @staticmethod
     def handle_api_response(response):
@@ -199,7 +213,7 @@ class ZohoModule:
         return wrapper
 
 
-class ZohoDeskClient(ZohoModule):
+class ZohoDeskClient(ZohoBase):
     """Thin wrapper around the Zoho Desk REST API v1.
 
     Authentication is handled by the Zoho CRM SDK, the same OAuth app
