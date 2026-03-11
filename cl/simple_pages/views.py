@@ -40,8 +40,8 @@ from cl.disclosures.models import (
 from cl.favorites.models import Prayer
 from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.people_db.models import Person
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
-    SOURCES,
     Court,
     Docket,
     OpinionCluster,
@@ -143,6 +143,7 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
         "rt_alerts_sending_rate": int(
             settings.REAL_TIME_ALERTS_SENDING_RATE / 60
         ),
+        "MAX_ATTORNEYS_TO_PERCOLATE": settings.MAX_ATTORNEYS_TO_PERCOLATE,
     }
     context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)
@@ -271,11 +272,11 @@ async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
         count_lawbox = 0
         count_scraper = 0
         async for d in counts:
-            if SOURCES.PUBLIC_RESOURCE in d["source"]:
+            if ClusterSources.PUBLIC_RESOURCE in d["source"]:
                 count_pro += d["source__count"]
-            if SOURCES.COURT_WEBSITE in d["source"]:
+            if ClusterSources.COURT_WEBSITE in d["source"]:
                 count_scraper += d["source__count"]
-            if SOURCES.LAWBOX in d["source"]:
+            if ClusterSources.LAWBOX in d["source"]:
                 count_lawbox += d["source__count"]
 
         opinion_courts = Court.objects.filter(
