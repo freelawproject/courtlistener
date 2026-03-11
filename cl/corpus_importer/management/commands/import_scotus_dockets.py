@@ -110,7 +110,9 @@ class Command(VerboseCommand):
                     download_and_parse_scotus_docket.si(bucket, s3_key).set(
                         queue=retrieval_queue
                     ),
-                    process_scotus_docket.s().set(queue=ingesting_queue),
+                    process_scotus_docket.s(download_file=False).set(
+                        queue=ingesting_queue
+                    ),
                 ).apply_async()
                 time.sleep(delay)
 
