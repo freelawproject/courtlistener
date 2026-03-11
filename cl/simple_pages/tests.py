@@ -408,7 +408,7 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         mock_task.delay.assert_called_once()
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["email"], "partner@example.com")
-        self.assertEqual(call_kwargs["request_type"], "Partnerships")
+        self.assertEqual(call_kwargs["request_type"], "Partnership Inquiry")
 
     @patch("cl.simple_pages.views.create_zoho_desk_ticket")
     async def test_removal_with_sealing_keyword_is_recategorized(
