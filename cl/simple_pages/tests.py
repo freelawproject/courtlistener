@@ -383,8 +383,8 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "General Support")
 
-    @patch("cl.simple_pages.views.create_zoho_crm_lead_from_contact")
-    async def test_partnership_creates_crm_lead(
+    @patch("cl.simple_pages.views.create_zoho_desk_ticket")
+    async def test_partnership_creates_desk_ticket(
         self, mock_task: MagicMock, mock_captcha: MagicMock
     ) -> None:
         msg = {
@@ -408,12 +408,7 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         mock_task.delay.assert_called_once()
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["email"], "partner@example.com")
-        self.assertEqual(
-            call_kwargs["partner_background"], ["Founder / Co-founder"]
-        )
-        self.assertEqual(call_kwargs["partner_team_size"], "2\u20135")
-        self.assertEqual(call_kwargs["partner_funding_total"], "None")
-        self.assertEqual(call_kwargs["partner_funding_stage"], "Pre-seed")
+        self.assertEqual(call_kwargs["request_type"], "Partnerships")
 
     @patch("cl.simple_pages.views.create_zoho_desk_ticket")
     async def test_removal_with_sealing_keyword_is_recategorized(
