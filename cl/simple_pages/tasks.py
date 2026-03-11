@@ -1,7 +1,7 @@
 from typing import Any
 
 from celery import Task
-from requests.exceptions import Timeout
+from requests.exceptions import ConnectionError, Timeout
 from zohocrmsdk.src.com.zoho.crm.api.record import Field
 from zohocrmsdk.src.com.zoho.crm.api.util import Choice
 
@@ -12,7 +12,7 @@ from cl.lib.zoho import LeadsModule, ZohoDeskClient
 
 @app.task(
     bind=True,
-    autoretry_for=(Timeout,),
+    autoretry_for=(Timeout, ConnectionError),
     max_retries=3,
     interval_start=5,
     ignore_result=True,
