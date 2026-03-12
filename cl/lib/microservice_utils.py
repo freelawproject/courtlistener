@@ -149,7 +149,6 @@ async def microservice(
             params=params,
             timeout=services[service]["timeout"],
         )
-
         return await client.send(req)
 
 
@@ -160,16 +159,16 @@ async def microservice(
     backoff=2,
     logger=logger,
 )
-async def doc_page_count_service(rd: AbstractPDF) -> Response:
+async def doc_page_count_service(doc: AbstractPDF) -> Response:
     """Call page-count from doctor with retries
 
-    :param rd: the document to count pages
+    :param doc: the document to count pages
     :return: Response object
     """
     try:
         response = await microservice(
             service="page-count",
-            item=rd,
+            item=doc,
         )
         return response
     except ClientError as error:
