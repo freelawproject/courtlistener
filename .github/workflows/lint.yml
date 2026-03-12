@@ -84,4 +84,5 @@ jobs:
           cl/scrapers/management/commands/back_scrape_dockets.py \
           cl/corpus_importer/management/commands/import_texas_dockets.py \
           cl/corpus_importer/management/utils.py \
-          cl/lib/decorators.py
+          cl/lib/decorators.py \
+          cl/corpus_importer/management/commands/import_scotus_dockets.py
