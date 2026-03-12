@@ -10,6 +10,7 @@ from cl.corpus_importer.tasks import (
     ingest_scotus_docket,
     merge_scotus_docket,
     merge_scotus_document,
+    process_scotus_docket,
 )
 from cl.people_db.models import (
     Attorney,
@@ -786,6 +787,45 @@ class ScotusDocketMergeTest(TestCase):
         scotus_doc.refresh_from_db()
         self.assertEqual(scotus_doc.url, doc_data_4["document_url"])
         self.assertEqual(scotus_doc.file_name, "document2.pdf")
+
+    @mock.patch("cl.corpus_importer.tasks.chain")
+    def test_merge_scotus_document_skips_download_when_flag_is_false(
+        self, mock_chain
+    ) -> None:
+        """Confirm no download chain is triggered when download_file=False,
+        even for newly created documents or filename changes."""
+
+        att_1 = SCOTUSAttachmentDataFactory(
+            description="Main 1", document_number=23453
+        )
+        de_1 = SCOTUSDocketEntryDataFactory(
+            description="lorem ipsum 1",
+            date_filed=datetime.date(2015, 8, 19),
+            document_number=23453,
+            attachments=[att_1],
+        )
+        data = ScotusDocketDataFactory(
+            docket_number="23-1438",
+            lower_court="United States Court of Appeals for the Second Circuit",
+            docket_entries=[de_1],
+            parties=[],
+            questions_presented="",
+        )
+
+        process_scotus_docket(data, download_file=False)
+
+        mock_chain.assert_not_called()
+
+        # Confirm docket entry and document were still created
+        docket = Docket.objects.get(docket_number="23-1438")
+        des = SCOTUSDocketEntry.objects.filter(docket=docket)
+        self.assertEqual(des.count(), 1)
+
+        rds = SCOTUSDocument.objects.filter(docket_entry__docket=docket)
+        self.assertEqual(rds.count(), 1)
+
+        # Verify document have no local file since download was skipped
+        self.assertFalse(rds.first().filepath_local)
 
     def test_find_docket_object_matches_same_docket_regardless_of_order(
         self,
