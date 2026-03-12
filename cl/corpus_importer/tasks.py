@@ -4142,7 +4142,9 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
 
 
 def merge_texas_document(
-    docket_entry: TexasDocketEntry, input_document: TexasCaseDocument
+    docket_entry: TexasDocketEntry,
+    input_document: TexasCaseDocument,
+    download_attachments: bool = False,
 ) -> MergeResult:
     """Merge a single TexasCaseDocument object into CL.
 
@@ -4153,7 +4155,10 @@ def merge_texas_document(
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param input_document: The attachment to merge.
-    :return: The result of the merge operation."""
+    :param download_attachments: Whether to download docket entry attachments.
+
+    :return: The result of the merge operation.
+    """
     try:
         texas_document = TexasDocument.objects.get(
             media_id=input_document["media_id"],
@@ -4185,13 +4190,18 @@ def merge_texas_document(
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
         texas_document.url = input_document["document_url"]
+        texas_document.filepath_local = ""
+        # Using this as a quick and dirty proxy for stale attachments, because
+        # I don't want to do a migration.
+        texas_document.ocr_status = None
         texas_document.save()
-        chain(
-            download_texas_document_pdf.si(texas_document.pk),
-            extract_pdf_document.s(
-                check_if_needed=False, model_name="search.TexasDocument"
-            ),
-        ).apply_async()
+        if download_attachments:
+            chain(
+                download_texas_document_pdf.si(texas_document.pk),
+                extract_pdf_document.s(
+                    check_if_needed=False, model_name="search.TexasDocument"
+                ),
+            ).apply_async()
         return MergeResult(
             create=not existed,
             update=existed,
@@ -4211,6 +4221,7 @@ def merge_texas_docket_entry(
     | TexasAppellateBrief
     | TexasSupremeCourtCaseEvent
     | TexasSupremeCourtAppellateBrief,
+    download_attachments: bool = False,
 ) -> MergeResult:
     """Merges a Texas docket entry into CL.
 
@@ -4218,12 +4229,15 @@ def merge_texas_docket_entry(
     :param sequence_number: The sequence number of the docket entry.
     :param appellate_brief: Whether the docket entry is an appellate brief.
     :param input_docket_entry: The docket entry being merged.
+    :param download_attachments: Whether to download docket entry attachments.
+
     :return: Tuple with the following entries
     - A flag indicating whether the docket entry or an attached document needed
     to be created or updated,
     - A flag which is set to true when the create/update operations are all
     either successful or unnecessary,
-    - The primary key of the updated TexasDocketEntry object."""
+    - The primary key of the updated TexasDocketEntry object.
+    """
     logger.info(
         "Merging TexasDocketEntry with sequence number %s into Docket %s",
         sequence_number,
@@ -4308,7 +4322,9 @@ def merge_texas_docket_entry(
         docket.pk,
     )
     document_results = [
-        merge_texas_document(docket_entry, document)
+        merge_texas_document(
+            docket_entry, document, download_attachments=download_attachments
+        )
         for document in input_docket_entry["attachments"]
     ]
 
@@ -4673,10 +4689,12 @@ def merge_texas_docket(
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
+    download_attachments: bool = False,
 ) -> MergeResult:
     """Merges scraped data from a Texas docket into the `Docket` table.
 
     :param docket_data: The scraped Texas docket data.
+    :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation."""
     court = Court.objects.get(
@@ -4790,7 +4808,11 @@ def merge_texas_docket(
 
     entry_merge_results = [
         merge_texas_docket_entry(
-            docket, sequence_number, appellate_brief, entry
+            docket,
+            sequence_number,
+            appellate_brief,
+            entry,
+            download_attachments=download_attachments,
         )
         for sequence_number, appellate_brief, entry in zip(
             create_docket_entry_sequence_numbers(docket_data["case_events"]),
@@ -4856,6 +4878,7 @@ def merge_texas_docket(
 def texas_ingest_docket_task(
     task: Task,
     i: tuple[bytes, TexasDocketMeta],
+    download_attachments: bool = False,
 ) -> MergeResult:
     """
     Task to parse and merge a Texas docket.
@@ -4865,6 +4888,7 @@ def texas_ingest_docket_task(
     :param i: Tuple with the following entries:
     - Bytes string to parse.
     - Docket metadata.
+    :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation.
     """
@@ -4897,7 +4921,9 @@ def texas_ingest_docket_task(
         )
         task.request.chain = None
         return MergeResult.failed()
-    return merge_texas_docket(docket_data)
+    return merge_texas_docket(
+        docket_data, download_attachments=download_attachments
+    )
 
 
 @app.task(

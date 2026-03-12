@@ -48,9 +48,12 @@ class CorpusImporterCommand(VerboseCommand, ABC):
 
     Required methods are:
 
-    - `merge_task`: Should return a Celery task which takes the output of
+    - `merge_task`: Should return a Celery task which takes the output of\
         `download_task`, parses it, and merges it into the database. Input\
-         should be whatever the output of `download_task` is.
+        should be whatever the output of `download_task` is. Must accept a\
+        `download_attachments` boolean keyword argument indicating whether\
+        docket entry attachments should be downloaded as part of the merging\
+        process.
 
     Required properties are:
 
@@ -116,6 +119,12 @@ class CorpusImporterCommand(VerboseCommand, ABC):
             default=False,
             help="Randomly select rows from the inventory file to import.",
         )
+        parser.add_argument(
+            "--download-attachments",
+            type=bool,
+            default=False,
+            help="Whether to download docket entry attachments as part of this command.",
+        )
 
     @staticmethod
     def download_task() -> app.Task:
@@ -152,6 +161,7 @@ class CorpusImporterCommand(VerboseCommand, ABC):
         delay = options["delay"]
         inventory_rows = options["inventory_rows"]
         inventory_path = settings.MEDIA_ROOT / options["inventory_file"]
+        download_attachments = options["download_attachments"]
 
         start_row = options["start_row"]
         if options["auto_resume"]:
@@ -184,7 +194,9 @@ class CorpusImporterCommand(VerboseCommand, ABC):
                     self.download_task()
                     .si(*download_args)
                     .set(queue=retrieval_queue),
-                    self.merge_task().s().set(queue=ingesting_queue),
+                    self.merge_task()
+                    .s(download_attachments=download_attachments)
+                    .set(queue=ingesting_queue),
                 ).apply_async()
                 time.sleep(delay)
 
