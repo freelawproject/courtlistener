@@ -10,6 +10,12 @@ from google.genai import types
 
 logger = logging.getLogger(__name__)
 
+# Job states where results can be downloaded and processed.
+DOWNLOADABLE_JOB_STATES = {
+    types.JobState.JOB_STATE_SUCCEEDED,
+    types.JobState.JOB_STATE_PARTIALLY_SUCCEEDED,
+}
+
 
 class ProcessedResult(TypedDict):
     """Structure for processed batch result."""
@@ -259,10 +265,10 @@ class GoogleGenAIBatchWrapper:
         :return: The raw JSONL content of the result file as a string.
         :raises ValueError: If the job has not succeeded.
         """
-        if job.state != types.JobState.JOB_STATE_SUCCEEDED:
+        if job.state not in DOWNLOADABLE_JOB_STATES:
             raise ValueError(
                 f"Cannot download results for job in state {job.state.name}. "
-                f"Expected JOB_STATE_SUCCEEDED."
+                f"Expected one of: {', '.join(s.name for s in DOWNLOADABLE_JOB_STATES)}."
             )
 
         return self.client.files.download(file=job.dest.file_name).decode(

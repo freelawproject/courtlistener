@@ -355,28 +355,34 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         )
 
     @patch("cl.ai.llm_providers.google.genai.Client")
-    @patch("cl.ai.llm_providers.google.types.JobState")
-    def test_download_results_success(self, mock_job_state, mock_client_class):
-        """Test downloading results from a succeeded job."""
-        # Setup mock job
-        mock_job = MagicMock()
-        mock_job.state = mock_job_state.JOB_STATE_SUCCEEDED
-        mock_job.dest.file_name = "files/results-123.jsonl"
+    def test_download_results_success(self, mock_client_class):
+        """Test downloading results from succeeded and partially succeeded jobs."""
+        from google.genai.types import JobState
 
-        # Setup client mock
-        mock_client_instance = MagicMock()
-        mock_client_instance.files.download.return_value = (
-            b'{"key": "task-1", "response": {}}'
-        )
-        mock_client_class.return_value = mock_client_instance
+        test_cases = [
+            JobState.JOB_STATE_SUCCEEDED,
+            JobState.JOB_STATE_PARTIALLY_SUCCEEDED,
+        ]
 
-        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
-        result = wrapper.download_results(mock_job)
+        for job_state in test_cases:
+            with self.subTest(state=job_state.name):
+                mock_job = MagicMock()
+                mock_job.state = job_state
+                mock_job.dest.file_name = "files/results-123.jsonl"
 
-        self.assertEqual(result, '{"key": "task-1", "response": {}}')
-        mock_client_instance.files.download.assert_called_once_with(
-            file="files/results-123.jsonl"
-        )
+                mock_client_instance = MagicMock()
+                mock_client_instance.files.download.return_value = (
+                    b'{"key": "task-1", "response": {}}'
+                )
+                mock_client_class.return_value = mock_client_instance
+
+                wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
+                result = wrapper.download_results(mock_job)
+
+                self.assertEqual(result, '{"key": "task-1", "response": {}}')
+                mock_client_instance.files.download.assert_called_with(
+                    file="files/results-123.jsonl"
+                )
 
     @patch("cl.ai.llm_providers.google.genai.Client")
     def test_download_results_not_succeeded_raises_error(
@@ -1006,8 +1012,8 @@ class SendGeminiBatchesTest(TestCase):
         mock_wrapper.prepare_batch_requests.return_value = []
         mock_wrapper.execute_batch.side_effect = Exception("API Error")
 
-        # Execute command - exception propagates after transaction rollback
-        with self.assertRaises(Exception):
+        # Execute command - per-chunk rollback, then CommandError raised
+        with self.assertRaises(CommandError):
             call_command(
                 "send_gemini_file_batches",
                 path="llm-inputs/test-batch/",
@@ -1547,10 +1553,14 @@ class CheckGeminiBatchStatusTest(TestCase):
         # Execute command
         call_command("check_gemini_batch_status")
 
-        # Should mark request as FAILED
+        # Should mark request and tasks as FAILED
         llm_request.refresh_from_db()
         self.assertEqual(llm_request.status, LLMRequestStatusChoices.FAILED)
         self.assertIsNotNone(llm_request.date_completed)
+        for task in tasks:
+            task.refresh_from_db()
+            self.assertEqual(task.status, LLMTaskStatusChoices.FAILED)
+            self.assertIn("UNEXPECTED_ERROR", task.error_message)
 
     @patch(
         "cl.ai.management.commands.check_gemini_batch_status.GoogleGenAIBatchWrapper"

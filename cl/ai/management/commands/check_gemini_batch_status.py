@@ -179,15 +179,13 @@ def process_failed_request(request: LLMRequest, job_state_name: str) -> None:
         ``JOB_STATE_FAILED``) included in task error messages.
     """
     with transaction.atomic():
+        request.tasks.all().update(
+            status=LLMTaskStatusChoices.FAILED,
+            error_message=f"Batch job failed with state: {job_state_name}",
+        )
         request.status = LLMRequestStatusChoices.FAILED
         request.date_completed = now()
         request.failed_tasks = request.tasks.all().count()
-        for task in request.tasks.all():
-            task.status = LLMTaskStatusChoices.FAILED
-            task.error_message = (
-                f"Batch job failed with state: {job_state_name}"
-            )
-            task.save()
         request.save()
 
 
@@ -246,9 +244,7 @@ def handle_request(
                 MAX_REQUEST_AGE,
             )
             sentry_sdk.capture_exception(e)
-            request.status = LLMRequestStatusChoices.FAILED
-            request.date_completed = now()
-            request.save()
+            process_failed_request(request, "TRANSIENT_ERROR_EXPIRED")
         else:
             logger.warning(
                 "Transient error checking request %s, will retry: %s",
@@ -261,10 +257,7 @@ def handle_request(
             f"Unexpected error in check_gemini_batch_status for request {request.pk}"
         )
         sentry_sdk.capture_exception(e)
-
-        request.status = LLMRequestStatusChoices.FAILED
-        request.date_completed = now()
-        request.save()
+        process_failed_request(request, "UNEXPECTED_ERROR")
 
 
 class Command(VerboseCommand):

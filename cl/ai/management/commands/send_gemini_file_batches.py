@@ -536,57 +536,77 @@ class Command(VerboseCommand):
 
         all_temp_files: list[str] = []
         batch_number = 0
+        failed_batches = 0
         try:
-            with transaction.atomic():
-                for chunk in chunk_iterator(s3_files, batch_size):
-                    batch_number += 1
-                    batch_name = (
-                        f"{request_name} (part {batch_number})"
-                        if batch_number > 1
-                        else request_name
-                    )
+            for chunk in chunk_iterator(s3_files, batch_size):
+                batch_number += 1
+                batch_name = (
+                    f"{request_name} (part {batch_number})"
+                    if batch_number > 1
+                    else request_name
+                )
 
-                    llm_request = LLMRequest.objects.create(
-                        name=batch_name,
-                        is_batch=True,
-                        provider=LLMProvider.GEMINI,
-                        api_model_name=model,
-                        status=LLMRequestStatusChoices.IN_PROGRESS,
-                        date_started=now(),
-                    )
-                    llm_request.prompts.set([system_prompt, user_prompt])
-                    logger.info(
-                        f"Created LLMRequest {llm_request.pk} "
-                        f"(batch {batch_number}, {len(chunk)} files)"
-                    )
+                try:
+                    with transaction.atomic():
+                        llm_request = LLMRequest.objects.create(
+                            name=batch_name,
+                            is_batch=True,
+                            provider=LLMProvider.GEMINI,
+                            api_model_name=model,
+                            status=LLMRequestStatusChoices.IN_PROGRESS,
+                            date_started=now(),
+                        )
+                        llm_request.prompts.set([system_prompt, user_prompt])
+                        logger.info(
+                            f"Created LLMRequest {llm_request.pk} "
+                            f"(batch {batch_number}, {len(chunk)} files)"
+                        )
 
-                    tasks_data = create_tasks_from_files(
-                        llm_request, chunk, store_files, all_temp_files
-                    )
+                        tasks_data = create_tasks_from_files(
+                            llm_request,
+                            chunk,
+                            store_files,
+                            all_temp_files,
+                        )
 
-                    submit_batch(
-                        llm_request,
-                        batch_api_key,
-                        tasks_data,
-                        system_prompt,
-                        user_prompt,
-                        cache_name,
+                        submit_batch(
+                            llm_request,
+                            batch_api_key,
+                            tasks_data,
+                            system_prompt,
+                            user_prompt,
+                            cache_name,
+                        )
+                except Exception as e:
+                    failed_batches += 1
+                    logger.exception(
+                        "Failed to submit batch %d. "
+                        "DB changes for this batch rolled back. "
+                        "s3_path=%s, model=%s",
+                        batch_number,
+                        s3_path,
+                        model,
                     )
+                    sentry_sdk.capture_exception(e)
         except Exception as e:
-            # Catch any error (CommandError, API failures, S3 errors,
-            # etc.) so we always log and report to Sentry. The outer
-            # transaction.atomic() ensures all DB changes (LLMRequests,
-            # LLMTasks) are rolled back, leaving no partial state.
             logger.exception(
-                "Failed to create and submit batch requests. "
-                "All DB changes rolled back. "
-                f"Failed at batch {batch_number}, "
-                f"s3_path={s3_path}, model={model}, "
-                f"batch_size={batch_size}"
+                "S3 iteration failed after batch %d. s3_path=%s, model=%s",
+                batch_number,
+                s3_path,
+                model,
             )
             sentry_sdk.capture_exception(e)
             raise
         finally:
             cleanup_temp_files(all_temp_files)
 
-        logger.info(f"Finished submitting {batch_number} batch request(s).")
+        succeeded = batch_number - failed_batches
+        logger.info(
+            f"Finished: {succeeded}/{batch_number} batch(es) submitted "
+            f"successfully, {failed_batches} failed."
+        )
+        if failed_batches:
+            raise CommandError(
+                f"{failed_batches}/{batch_number} batch(es) failed. "
+                "Check logs for details."
+            )
