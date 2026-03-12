@@ -3379,6 +3379,7 @@ def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
 def merge_scotus_document(
     docket_entry: SCOTUSDocketEntry,
     doc_data: dict[str, Any],
+    download_file: bool = True,
 ) -> tuple[bool, int]:
     """Merge a single SCOTUSDocument attachment into CL.
 
@@ -3388,6 +3389,9 @@ def merge_scotus_document(
 
     :param docket_entry: The docket entry this attachment belongs to.
     :param doc_data: The attachment data to merge.
+    :param download_file: Whether to trigger the PDF download and extraction
+    chain. Set to False when bulk importing to avoid overwhelming Celery
+    workers.
     :return: Tuple with entries:
         - A flag indicating whether the document was created.
         - The pk of the SCOTUSDocument object.
@@ -3422,7 +3426,7 @@ def merge_scotus_document(
             update_fields=["description", "url", "date_modified"]
         )
 
-    if created or file_name_changed:
+    if download_file and (created or file_name_changed):
         chain(
             download_scotus_document_pdf.si(scotus_document.pk),
             extract_pdf_document.s(
@@ -3437,12 +3441,14 @@ def merge_scotus_docket_entry(
     docket: Docket,
     sequence_number: str,
     input_docket_entry: dict[str, Any],
+    download_file: bool = True,
 ) -> tuple[bool, int | None]:
     """Merges a SCOTUS docket entry into CL.
 
     :param docket: The docket this entry belongs to.
     :param sequence_number: The sequence number of the docket entry.
     :param input_docket_entry: The docket entry being merged.
+    :param download_file: Whether to trigger PDF download and extraction.
     :return: Tuple with the following entries:
         - A flag which is set to true when the SCOTUSDocketEntry was created.
         - The pk of the updated SCOTUSDocketEntry object.
@@ -3523,18 +3529,20 @@ def merge_scotus_docket_entry(
         # Merge attachments
         attachments = input_docket_entry["attachments"]
         for document in attachments:
-            merge_scotus_document(de, document)
+            merge_scotus_document(de, document, download_file=download_file)
         return de_created, de.pk
 
 
 def add_scotus_docket_entries(
     docket: Docket,
     docket_entries: list[dict[str, Any]],
+    download_file: bool = True,
 ) -> None:
     """Add or update SCOTUS docket entries for a docket.
 
     :param docket: The Docket to add entries to.
     :param docket_entries: List of docket entry dicts from the scraper.
+    :param download_file: Whether to trigger PDF download and extraction.
     :return: A three-tuple containing:
         - List of SCOTUSDocketEntry PKs that were created or updated
         - List of SCOTUSDocument PKs that were created
@@ -3550,6 +3558,7 @@ def add_scotus_docket_entries(
             docket,
             sequence_number,
             docket_entry,
+            download_file=download_file,
         )
         if de_pk is None:
             logger.warning(
@@ -3563,6 +3572,7 @@ def add_scotus_docket_entries(
 
 def merge_scotus_docket(
     report_data: dict[str, Any],
+    download_file: bool = True,
 ) -> tuple[Docket, bool]:
     """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
 
@@ -3570,6 +3580,7 @@ def merge_scotus_docket(
     then create or update the related ScotusDocketMetadata instance.
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
+    :param download_file: Whether to trigger PDF download and extraction.
     :return: A two-tuple: the created or updated Docket instance, whether the
     QP file should be downloaded.
     """
@@ -3692,13 +3703,19 @@ def merge_scotus_docket(
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    add_scotus_docket_entries(d, report_data["docket_entries"])
+    add_scotus_docket_entries(
+        d, report_data["docket_entries"], download_file=download_file
+    )
 
     return d, download_qp
 
 
 @app.task(bind=True)
-def process_scotus_docket(self, report_data: dict[str, Any]) -> None:
+def process_scotus_docket(
+    self,
+    report_data: dict[str, Any],
+    download_file: bool = True,
+) -> None:
     """Process and merge a SCOTUS docket report.
 
     This task merges the provided SCOTUS docket report data into the database,
@@ -3707,9 +3724,12 @@ def process_scotus_docket(self, report_data: dict[str, Any]) -> None:
 
     :param self: The Celery task instance.
     :param report_data: Parsed SCOTUS docket report data.
+    :param download_file: Whether to trigger PDF download and extraction.
     :return: None
     """
-    docket, download_qp = merge_scotus_docket(report_data)
+    docket, download_qp = merge_scotus_docket(
+        report_data, download_file=download_file
+    )
     if download_qp:
         download_qp_scotus_pdf.delay(docket.pk)
 
