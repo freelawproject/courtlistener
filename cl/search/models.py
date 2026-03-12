@@ -4196,7 +4196,7 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
             "attachment_number",
         )
         ordering = ("document_number", "attachment_number")
-        
+
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
@@ -4215,6 +4215,7 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         from cl.corpus_importer.utils import extract_file_name_from_url
 
         return extract_file_name_from_url(self.url)
+
 
 @pghistory.track()
 @document_model
@@ -4274,4 +4275,3 @@ class TrialCourtData(AbstractDateTimeModel):
     )
     punishment = models.TextField(blank=True)
     county = models.TextField(blank=True)
-

@@ -37,8 +37,8 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
-    TrialCourtData,
     SCOTUSDocketEntry,
+    TrialCourtData,
 )
 from cl.tests.providers import LegalProvider
 
@@ -512,5 +512,6 @@ class TrialCourtDataFactory(DjangoModelFactory):
 
     class Meta:
         model = TrialCourtData
+
     docket_entries = List([SubFactory(SCOTUSDocketEntryDataFactory)])
     parties = List([SubFactory(SCOTUSPartyDataFactory)])
