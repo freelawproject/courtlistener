@@ -2259,7 +2259,9 @@ class TexasMergerTest(TestCase):
 
         input_document = TexasCaseDocumentDictFactory()
 
-        result = merge_texas_document(docket_entry, input_document)
+        result = merge_texas_document(
+            docket_entry, input_document, download_attachments=True
+        )
 
         assert result.create is True
         assert result.success is True
@@ -2330,7 +2332,9 @@ class TexasMergerTest(TestCase):
             url=old_document["document_url"],
         )
 
-        result = merge_texas_document(docket_entry, input_document)
+        result = merge_texas_document(
+            docket_entry, input_document, download_attachments=True
+        )
 
         assert result.create is False
         assert result.update is True
@@ -2348,6 +2352,20 @@ class TexasMergerTest(TestCase):
         assert str(result_document.url) == input_document["document_url"]
 
         self.download_task_mock.assert_called_once_with(current_document.pk)
+
+    def test_merge_texas_document_skips_download_when_disabled(self):
+        """Are attachment downloads skipped when download_attachments=False?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocumentDictFactory()
+
+        result = merge_texas_document(
+            docket_entry, input_document, download_attachments=False
+        )
+
+        assert result.create is True
+        assert result.success is True
+        assert result.pk is not None
+        self.download_task_mock.assert_not_called()
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
@@ -2381,7 +2399,9 @@ class TexasMergerTest(TestCase):
         )
 
         docket_entry = self.docket_coa1_entry
-        result = merge_texas_document(docket_entry, input_document)
+        result = merge_texas_document(
+            docket_entry, input_document, download_attachments=True
+        )
         docket_entry.refresh_from_db()
         document = TexasDocument.objects.get(pk=result.pk)
 
@@ -2399,7 +2419,11 @@ class TexasMergerTest(TestCase):
         )
 
         output = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-02.000", True, docket_entry
+            self.docket_coa1,
+            "2025-01-02.000",
+            True,
+            docket_entry,
+            download_attachments=True,
         )
 
         assert output.create is True
@@ -2428,7 +2452,11 @@ class TexasMergerTest(TestCase):
         js_docket_entry = self.get_random_docket_entry_dict()
 
         result = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+            self.docket_coa1,
+            "2025-01-02.000",
+            True,
+            js_docket_entry,
+            download_attachments=True,
         )
         pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
@@ -2440,7 +2468,11 @@ class TexasMergerTest(TestCase):
 
         # noop
         output = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+            self.docket_coa1,
+            "2025-01-02.000",
+            True,
+            js_docket_entry,
+            download_attachments=True,
         )
 
         assert output.create is False
@@ -2473,7 +2505,11 @@ class TexasMergerTest(TestCase):
         initial_n_attachments = len(js_docket_entry["attachments"])
 
         result = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+            self.docket_coa1,
+            "2025-01-02.000",
+            True,
+            js_docket_entry,
+            download_attachments=True,
         )
         pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
@@ -2485,7 +2521,11 @@ class TexasMergerTest(TestCase):
 
         js_docket_entry["attachments"].append(TexasCaseDocumentDictFactory())
         output = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+            self.docket_coa1,
+            "2025-01-02.000",
+            True,
+            js_docket_entry,
+            download_attachments=True,
         )
 
         assert output.create is True
