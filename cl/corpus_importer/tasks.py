@@ -4515,7 +4515,7 @@ def merge_texas_case_transfers(
     ac_id = appeals_court.get("court_id", "")
     ac_dn = appeals_court.get("case_number", "")
     trial_court_id = texas_originating_court_to_court_id(originating_court)
-    appeal_transfer_origin_court_id = ""
+    appeal_transfer_origin_court_id: str | None = ""
     appeal_transfer_origin_dn = ""
 
     transfers = []
