@@ -4197,13 +4197,18 @@ def merge_texas_document(
         texas_document.save()
         if download_attachments:
             transaction.on_commit(
-                lambda pk=texas_document.pk: chain(
-                    download_texas_document_pdf.si(pk),
-                    extract_pdf_document.s(
-                        check_if_needed=False,
-                        model_name="search.TexasDocument",
-                    ),
-                ).apply_async()
+                # Lambda captures the pk without needing to keep the whole
+                # object around. It needs to be wrapped in another lambda to
+                # prevent mypy from complaining.
+                (
+                    lambda pk: lambda: chain(
+                        download_texas_document_pdf.si(pk),
+                        extract_pdf_document.s(
+                            check_if_needed=False,
+                            model_name="search.TexasDocument",
+                        ),
+                    ).apply_async()
+                )(texas_document.pk)
             )
         return MergeResult(
             create=not existed,
