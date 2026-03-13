@@ -3644,7 +3644,10 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
 
 
 @app.task(
-    autoretry_for=(Exception,),
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,),
     max_retries=2,
     retry_backoff=10,
     ignore_result=True,
