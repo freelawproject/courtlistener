@@ -209,6 +209,6 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         else:
             self.message_user(
                 request,
-                f"Successfully sealed {sealed_count} document(s).",
+                f"Successfully sealed and removed {sealed_count} document(s).",
                 messages.SUCCESS,
             )
