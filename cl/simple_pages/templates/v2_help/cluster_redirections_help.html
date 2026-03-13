@@ -1,0 +1,67 @@
+{% extends "new_base.html" %}
+
+{% block title %}Opinion Cluster Redirections – CourtListener.com{% endblock %}
+{% block og_title %}Opinion Cluster Redirections – CourtListener.com{% endblock %}
+
+{% block description %}Learn how CourtListener handles opinion cluster redirections when clusters are merged, deduplicated, or sealed.{% endblock %}
+{% block og_description %}Learn how CourtListener handles opinion cluster redirections when clusters are merged, deduplicated, or sealed.{% endblock %}
+
+{% block content %}
+<c-layout-with-navigation
+  data-first-active="about"
+  :nav_items="[
+    {'href': '#about', 'text': 'Overview'},
+    {'href': '#why', 'text': 'Why Clusters Get Redirected'},
+    {'href': '#behavior', 'text': 'How Redirections Work'},
+    {'href': '#consumers', 'text': 'For Data Consumers', 'children': [
+      {'href': '#api-users', 'text': 'API Users'},
+      {'href': '#replication-users', 'text': 'Replication Users'},
+    ]},
+  ]"
+>
+  <section id="about">
+    <h1>Opinion Cluster Redirections</h1>
+    <p class="text-lg text-greyscale-600">CourtListener preserves persistent URLs for all opinion clusters. When a cluster becomes obsolete, its original <code>cluster_id</code> is never simply discarded. Instead, a <code>ClusterRedirection</code> record maps the old cluster to the current, active one.</p>
+  </section>
+
+  <c-layout-with-navigation.section id="why">
+    <h2>Why Clusters Get Redirected</h2>
+    <p>Clusters may be removed or consolidated for several reasons:</p>
+    <ul class="list-disc ml-5 pl-6 space-y-2">
+      <li><strong>Duplicates:</strong> Two or more clusters representing the same opinion are merged into one.</li>
+      <li><strong>Versioning:</strong> A newer version of an opinion was incorrectly ingested as a separate cluster. When corrected, the opinions are consolidated into a single cluster and the extra clusters are deleted.</li>
+      <li><strong>Consolidation:</strong> Opinions from the same case (lead opinion, dissent, concurrence) were spread across different clusters because a court published them as separate files. When corrected, we keep a single cluster and delete the others.</li>
+      <li><strong>Sealed:</strong> A cluster is removed or sealed by court order.</li>
+    </ul>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="behavior">
+    <h2>How Redirections Work</h2>
+    <p>When you request a cluster that has been redirected, the behavior depends on the reason:</p>
+    <ul class="list-disc ml-5 pl-6 space-y-2">
+      <li>For <strong>version</strong>, <strong>duplicate</strong>, or <strong>consolidation</strong> redirections, you will receive an <strong>HTTP 301</strong> response pointing to the surviving cluster.</li>
+      <li>For <strong>sealed</strong> clusters, you will receive an <strong>HTTP 410 Gone</strong> status with no redirection target.</li>
+    </ul>
+    <p>In some cases (e.g., error pages or court listing pages incorrectly ingested as opinions), clusters are simply deleted with no redirection record, and the old <code>cluster_id</code> will no longer exist.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="consumers">
+    <h2>For Data Consumers</h2>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="api-users">
+    <h3>API Users</h3>
+    <p>The <a class="text-primary-600" href="{% url "case_law_api_help" %}">Clusters API endpoint</a> supports cluster redirections. When requesting a redirected cluster, you will receive the appropriate HTTP status code (301 or 410) as described above.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="replication-users">
+    <h3>Replication Users</h3>
+    <p>If you use our <a class="text-primary-600" href="{% url "replication_docs" %}">database replication service</a>, the <code>search_clusterredirection</code> table is included in your replica. You can query it directly to find redirections and understand how clusters have been merged or removed.</p>
+    <p>Be aware that an old <code>cluster_id</code> may internally redirect to a different, newer cluster. Your application should handle this gracefully when joining data across tables.</p>
+  </c-layout-with-navigation.section>
+
+  <c-support-plea-banner />
+
+</c-layout-with-navigation>
+
+{% endblock %}

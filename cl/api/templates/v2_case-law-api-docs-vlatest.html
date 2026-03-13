@@ -17,6 +17,7 @@
       {'href': '#docket-endpoint', 'text': 'Dockets'},
       {'href': '#cluster-endpoint', 'text': 'Clusters'},
       {'href': '#opinion-endpoint', 'text': 'Opinions'},
+      {'href': '#cluster-redirections', 'text': 'Cluster Redirections'},
       {'href': '#court-endpoint', 'text': 'Courts'},
     ]},
     {'href': '#examples', 'text': 'API Examples', 'children': [
@@ -115,6 +116,12 @@ curl -v \
       <p>Whichever field you choose, please use <a class="text-primary-600" href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> to omit unnecessary fields. This will make your system faster and ease the load on ours.</p>
     </li>
   </ul>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="cluster-redirections">
+    <h4>Opinion Cluster Redirections</h4>
+    <p>When clusters are merged, deduplicated, or sealed, CourtListener preserves persistent URLs by creating redirection records. The Clusters API handles these automatically, returning <strong>HTTP 301</strong> or <strong>HTTP 410</strong> responses as appropriate.</p>
+    <p>For full details on why clusters get redirected and how different data consumers should handle them, see the <a class="text-primary-600" href="{% url "cluster_redirections_help" %}">Opinion Cluster Redirections</a> help page.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="court-endpoint">
