@@ -316,6 +316,31 @@ def check_sync_notice(lines: list[str]) -> list[tuple[int, str]]:
     return []
 
 
+def _has_ancestor_link_styling(lines: list[str], line_idx: int) -> bool:
+    """Check whether an ancestor element styles links via ``[&_a]:``.
+
+    Scans backward from *line_idx* (0-based) looking for an opening tag
+    whose class contains a Tailwind ``[&_a]:`` descendant selector, which
+    styles child ``<a>`` elements without requiring a class on the ``<a>``
+    itself.
+    """
+    ancestor_re = re.compile(r"\[&_a\]:")
+    depth = 0
+    for j in range(line_idx - 1, -1, -1):
+        ln = lines[j]
+        # Closing tags mean we entered a sibling subtree — increase depth
+        depth += len(re.findall(r"</\w", ln))
+        # Opening tags (excluding <a> itself) decrease depth
+        opens = re.findall(r"<(?!/)(?!a[\s>])\w", ln)
+        if opens:
+            depth -= len(opens)
+            if depth <= 0:
+                tag = _get_full_tag(lines, j)
+                if ancestor_re.search(tag):
+                    return True
+    return False
+
+
 def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
     """Flag <a> tags without class attribute (heuristic)."""
     results = []
@@ -327,6 +352,8 @@ def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
         for m in a_tag_re.finditer(line):
             full_tag = _get_full_tag(lines, i - 1, col=m.start())
             if not class_re.search(full_tag):
+                if _has_ancestor_link_styling(lines, i - 1):
+                    continue
                 results.append(
                     (
                         i,
