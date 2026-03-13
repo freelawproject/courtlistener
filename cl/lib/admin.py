@@ -1,7 +1,7 @@
 from typing import Any, TypedDict
 from urllib.parse import urlencode
 
-from django.contrib import messages
+from django.contrib import admin, messages
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db.models import Model, QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -87,7 +87,7 @@ def generate_admin_links(
     return generated_links
 
 
-class SealableDocumentAdmin:
+class SealableDocumentAdmin(admin.ModelAdmin):
     """Mixin for admin classes that support sealing RECAP documents
     via a confirmation page and bulk actions.
 
@@ -111,7 +111,7 @@ class SealableDocumentAdmin:
     seal_url_name: str = ""
     seal_link_label: str = ""
     seal_heading_template: str = ""
-    seal_model: type[Model] | None = None
+    seal_model: type[Model]
     seal_change_url_name: str = ""
 
     def get_seal_documents(self, obj: Model) -> list | QuerySet:
