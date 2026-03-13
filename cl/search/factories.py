@@ -465,8 +465,8 @@ class ScotusDocketDataFactory(DictFactory):
     lower_court_decision_date = Faker("date_object")
     lower_court_rehearing_denied_date = Faker("date_object")
     questions_presented = Faker("url")
-    docket_entries = List([SubFactory(SCOTUSDocketEntryFactory)])
-    parties = []
+    docket_entries = List([SubFactory(SCOTUSDocketEntryDataFactory)])
+    parties = List([SubFactory(SCOTUSPartyDataFactory)])
 
 
 class CaseTransferFactory(DjangoModelFactory):
@@ -512,6 +512,3 @@ class TrialCourtDataFactory(DjangoModelFactory):
 
     class Meta:
         model = TrialCourtData
-
-    docket_entries = List([SubFactory(SCOTUSDocketEntryDataFactory)])
-    parties = List([SubFactory(SCOTUSPartyDataFactory)])
