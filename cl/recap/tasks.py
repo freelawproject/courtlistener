@@ -11,6 +11,7 @@ from multiprocessing import process
 from typing import Any
 from zipfile import ZipFile
 
+import httpx
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
 from botocore import exceptions as botocore_exception
