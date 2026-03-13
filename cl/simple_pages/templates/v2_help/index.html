@@ -20,8 +20,7 @@
       </div>
       <div class="pl-4">
         <ol
-          class="list-decimal text-primary-600 marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
-          {#     testing checks     #}
+          class="list-decimal [&_a]:text-primary-600 marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
           <li><a href="{% url "alert_help" %}">Help with search and docket alerts</a></li>
           <li><a href="{% url "recap_email_help" %}">Help with @recap.email</a></li>
           <li><a href="{% url "advanced_search" %}">Help with advanced search parameters</a></li>
@@ -44,7 +43,7 @@
         <p class="text-sm font-normal text-greyscale-600">We've built some of the biggest open datasets in the world. Learn more about them:</p>
       </div>
       <div class="pl-4">
-        <ol class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal text-primary-600 space-y-2">
+        <ol class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal [&_a]:text-primary-600 space-y-2">
           <li><a href="{% url "coverage" %}">Coverage Homepage</a></li>
           <li><a href="{% url "coverage_recap" %}">PACER Data Coverage</a></li>
           <li><a href="{% url "coverage_opinions" %}">Case Law Coverage</a></li>
@@ -63,7 +62,7 @@
       <div class="pl-4">
         <ol
             class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal
-             text-primary-600 space-y-4">
+             [&_a]:text-primary-600 space-y-4">
           <li>
             <p class="mb-2 text-greyscale-800">API Documentation</p>
             <ul class="list-disc pl-3 space-y-2">
