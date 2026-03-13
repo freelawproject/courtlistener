@@ -232,7 +232,7 @@ class BulkFetchPacerDocsTest(TestCase):
     )
     def test_fetch_queue_processing(
         self,
-        mock_extract_recap_pdf,
+        mock_extract_pdf_document,
         mock_fetch_pacer_doc_by_rd,
         mock_pacer_cookies,
         mock_sleep,
@@ -266,9 +266,9 @@ class BulkFetchPacerDocsTest(TestCase):
 
         # For each FQ, we expect an OCR extract call and a "mark successful" call
         self.assertEqual(
-            mock_extract_recap_pdf.call_count,
+            mock_extract_pdf_document.call_count,
             len(successful_fqs),
-            "extract_recap_pdf",
+            "extract_pdf_document",
         )
 
 
