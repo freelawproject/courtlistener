@@ -2260,9 +2260,7 @@ class TexasMergerTest(TestCase):
         input_document = TexasCaseDocumentDictFactory()
 
         with self.captureOnCommitCallbacks(execute=True):
-            result = merge_texas_document(
-                docket_entry, input_document, download_attachments=True
-            )
+            result = merge_texas_document(docket_entry, input_document)
 
         assert result.create is True
         assert result.success is True
@@ -2334,9 +2332,7 @@ class TexasMergerTest(TestCase):
         )
 
         with self.captureOnCommitCallbacks(execute=True):
-            result = merge_texas_document(
-                docket_entry, input_document, download_attachments=True
-            )
+            result = merge_texas_document(docket_entry, input_document)
 
         assert result.create is False
         assert result.update is True
@@ -2402,9 +2398,7 @@ class TexasMergerTest(TestCase):
 
         docket_entry = self.docket_coa1_entry
         with self.captureOnCommitCallbacks(execute=True):
-            result = merge_texas_document(
-                docket_entry, input_document, download_attachments=True
-            )
+            result = merge_texas_document(docket_entry, input_document)
         docket_entry.refresh_from_db()
         document = TexasDocument.objects.get(pk=result.pk)
 
@@ -2423,11 +2417,7 @@ class TexasMergerTest(TestCase):
 
         with self.captureOnCommitCallbacks(execute=True):
             output = merge_texas_docket_entry(
-                self.docket_coa1,
-                "2025-01-02.000",
-                True,
-                docket_entry,
-                download_attachments=True,
+                self.docket_coa1, "2025-01-02.000", True, docket_entry
             )
 
         assert output.create is True
@@ -2457,11 +2447,7 @@ class TexasMergerTest(TestCase):
 
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_docket_entry(
-                self.docket_coa1,
-                "2025-01-02.000",
-                True,
-                js_docket_entry,
-                download_attachments=True,
+                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
             )
         pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
@@ -2474,11 +2460,7 @@ class TexasMergerTest(TestCase):
         # noop
         with self.captureOnCommitCallbacks(execute=True):
             output = merge_texas_docket_entry(
-                self.docket_coa1,
-                "2025-01-02.000",
-                True,
-                js_docket_entry,
-                download_attachments=True,
+                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
             )
 
         assert output.create is False
@@ -2512,11 +2494,7 @@ class TexasMergerTest(TestCase):
 
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_docket_entry(
-                self.docket_coa1,
-                "2025-01-02.000",
-                True,
-                js_docket_entry,
-                download_attachments=True,
+                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
             )
         pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
@@ -2529,11 +2507,7 @@ class TexasMergerTest(TestCase):
         js_docket_entry["attachments"].append(TexasCaseDocumentDictFactory())
         with self.captureOnCommitCallbacks(execute=True):
             output = merge_texas_docket_entry(
-                self.docket_coa1,
-                "2025-01-02.000",
-                True,
-                js_docket_entry,
-                download_attachments=True,
+                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
             )
 
         assert output.create is True

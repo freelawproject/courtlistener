@@ -4000,10 +4000,16 @@ def merge_texas_trial_court_data(
     punishment = originating_court["punishment"]
     county = originating_court["county"]
     court_id = texas_originating_court_to_court_id(originating_court)
+    court = None
+    court_name = originating_court["name"]
+    judge = None
     if court_id:
-        court = Court.objects.get(pk=court_id)
+        try:
+            court = Court.objects.get(pk=court_id)
+        except Court.DoesNotExist:
+            logger.error("Court with ID %s not found.", court_id)
+            court = None
         court_name = court.full_name
-
         if judge_name:
             judge = async_to_sync(lookup_judge_by_full_name)(
                 name=judge_name,
@@ -4011,12 +4017,6 @@ def merge_texas_trial_court_data(
                 event_date=None,
                 require_living_judge=False,
             )
-        else:
-            judge = None
-    else:
-        court = None
-        court_name = originating_court["name"]
-        judge = None
 
     try:
         trial_court_data = TrialCourtData.objects.get(
@@ -4144,7 +4144,7 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
 def merge_texas_document(
     docket_entry: TexasDocketEntry,
     input_document: TexasCaseDocument,
-    download_attachments: bool = False,
+    download_attachments: bool = True,
 ) -> MergeResult:
     """Merge a single TexasCaseDocument object into CL.
 
@@ -4190,9 +4190,9 @@ def merge_texas_document(
         texas_document.description = input_document["description"]
         texas_document.media_version_id = input_document["media_version_id"]
         texas_document.url = input_document["document_url"]
+        if texas_document.filepath_local:
+            texas_document.filepath_local.delete(save=False)
         texas_document.filepath_local = ""
-        # Using this as a quick and dirty proxy for stale attachments, because
-        # I don't want to do a migration.
         texas_document.ocr_status = None
         texas_document.save()
         if download_attachments:
@@ -4229,7 +4229,7 @@ def merge_texas_docket_entry(
     | TexasAppellateBrief
     | TexasSupremeCourtCaseEvent
     | TexasSupremeCourtAppellateBrief,
-    download_attachments: bool = False,
+    download_attachments: bool = True,
 ) -> MergeResult:
     """Merges a Texas docket entry into CL.
 
@@ -4502,6 +4502,7 @@ def merge_texas_case_transfers(
         )
 
         appeals_court = docket_data["appeals_court"]
+        transfer_origin_court: Court | None = None
 
         if docket_data["court_id"] == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
             logger.info("Docket %s is from the CCA", docket.docket_number)
@@ -4517,9 +4518,15 @@ def merge_texas_case_transfers(
                     docket.docket_number,
                 )
                 if trial_court_id:
-                    transfer.origin_court = Court.objects.get(
-                        pk=trial_court_id
-                    )
+                    try:
+                        transfer_origin_court = Court.objects.get(
+                            pk=trial_court_id
+                        )
+                    except Court.DoesNotExist:
+                        logger.error(
+                            "Court with ID %s not found while populating CaseTransfer.origin_court.",
+                            trial_court_id,
+                        )
                     transfer.origin_docket_number = docket_data[
                         "originating_court"
                     ]["case"]
@@ -4549,7 +4556,15 @@ def merge_texas_case_transfers(
                         docket.docket_number,
                         appeals_court_id,
                     )
-                transfer.origin_court = Court.objects.get(pk=appeals_court_id)
+                try:
+                    transfer_origin_court = Court.objects.get(
+                        pk=appeals_court_id
+                    )
+                except Court.DoesNotExist:
+                    logger.error(
+                        "Court with ID %s not found while populating CaseTransfer.origin_court.",
+                        appeals_court_id,
+                    )
                 transfer.origin_docket_number = appeals_court["case_number"]
         elif docket_data["court_id"] == CourtID.SUPREME_COURT.value:
             logger.info("Docket %s is from the SC", docket.docket_number)
@@ -4568,7 +4583,13 @@ def merge_texas_case_transfers(
                     docket.docket_number,
                     appeals_court_id,
                 )
-            transfer.origin_court = Court.objects.get(pk=appeals_court_id)
+            try:
+                transfer_origin_court = Court.objects.get(pk=appeals_court_id)
+            except Court.DoesNotExist:
+                logger.error(
+                    "Court with ID %s not found while populating CaseTransfer.origin_court.",
+                    appeals_court_id,
+                )
             transfer.origin_docket_number = appeals_court["case_number"]
         else:
             logger.error(
@@ -4576,7 +4597,11 @@ def merge_texas_case_transfers(
                 docket_data["court_id"],
             )
             return MergeResult.failed()
-        transfers = [transfer]
+        if transfer_origin_court:
+            transfer.origin_court = transfer_origin_court
+            transfers = [transfer]
+        else:
+            transfers = []
     elif docket_data["court_type"] == CourtType.APPELLATE.value:
         logger.info("Docket %s is an appellate docket", docket.docket_number)
         transfers = []
@@ -4585,19 +4610,27 @@ def merge_texas_case_transfers(
                 "Appellate docket %s has a valid trial court",
                 docket.docket_number,
             )
-            transfers.append(
-                CaseTransfer(
-                    origin_court=Court.objects.get(pk=trial_court_id),
-                    origin_docket_number=docket_data["originating_court"][
-                        "case"
-                    ],
-                    destination_court=docket.court,
-                    destination_docket_number=docket.docket_number,
-                    destination_docket=docket,
-                    transfer_date=docket_data["date_filed"],
-                    transfer_type=CaseTransfer.APPEAL,
+            try:
+                appeal_origin_court = Court.objects.get(pk=trial_court_id)
+            except Court.DoesNotExist:
+                logger.error(
+                    "Court with ID %s not found while populating CaseTransfer.origin_court.",
+                    trial_court_id,
                 )
-            )
+            else:
+                transfers.append(
+                    CaseTransfer(
+                        origin_court=Court.objects.get(pk=appeal_origin_court),
+                        origin_docket_number=docket_data["originating_court"][
+                            "case"
+                        ],
+                        destination_court=docket.court,
+                        destination_docket_number=docket.docket_number,
+                        destination_docket=docket,
+                        transfer_date=docket_data["date_filed"],
+                        transfer_type=CaseTransfer.APPEAL,
+                    )
+                )
         if docket_data["transfer_from"]:
             logger.info(
                 "Appellate docket %s has a transfer in", docket.docket_number
@@ -4608,30 +4641,39 @@ def merge_texas_case_transfers(
                     "Missing transfer date for workload transfer of docket %s",
                     docket.docket_number,
                 )
-            transfers.append(
-                CaseTransfer(
-                    origin_court=Court.objects.get(
-                        pk=texas_js_court_id_to_court_id(
-                            docket_data["transfer_from"]["court_id"]
-                        )
-                    ),
-                    origin_docket_number=docket_data["transfer_from"][
-                        "origin_docket"
-                    ],
-                    destination_court=docket.court,
-                    destination_docket_number=docket.docket_number,
-                    destination_docket=docket,
-                    # If the transfer date is absent or empty, assume it matches the filing date
-                    transfer_date=transfer_from_date
-                    if transfer_from_date
-                    else docket_data["date_filed"],
-                    # Texas Government Code 73.001 (accessed 2026-02-23)
-                    transfer_type=CaseTransfer.JURISDICTION
-                    if docket_data["court_id"]
-                    == CourtID.FIFTEENTH_COURT_OF_APPEALS
-                    else CaseTransfer.WORKLOAD,
-                )
+            workload_origin_court_id = texas_js_court_id_to_court_id(
+                docket_data["transfer_from"]["court_id"]
             )
+            try:
+                workload_origin_court = Court.objects.get(
+                    pk=workload_origin_court_id
+                )
+            except Court.DoesNotExist:
+                logger.error(
+                    "Court with ID %s not found while populating CaseTransfer.origin_court.",
+                    workload_origin_court_id,
+                )
+            else:
+                transfers.append(
+                    CaseTransfer(
+                        origin_court=workload_origin_court,
+                        origin_docket_number=docket_data["transfer_from"][
+                            "origin_docket"
+                        ],
+                        destination_court=docket.court,
+                        destination_docket_number=docket.docket_number,
+                        destination_docket=docket,
+                        # If the transfer date is absent or empty, assume it matches the filing date
+                        transfer_date=transfer_from_date
+                        if transfer_from_date
+                        else docket_data["date_filed"],
+                        # Texas Government Code 73.001 (accessed 2026-02-23)
+                        transfer_type=CaseTransfer.JURISDICTION
+                        if docket_data["court_id"]
+                        == CourtID.FIFTEENTH_COURT_OF_APPEALS
+                        else CaseTransfer.WORKLOAD,
+                    )
+                )
     else:
         logger.error(
             "Unrecognized Texas court type %s while creating CaseTransfer",
@@ -4697,7 +4739,7 @@ def merge_texas_docket(
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
-    download_attachments: bool = False,
+    download_attachments: bool = True,
 ) -> MergeResult:
     """Merges scraped data from a Texas docket into the `Docket` table.
 
@@ -4886,7 +4928,7 @@ def merge_texas_docket(
 def texas_ingest_docket_task(
     task: Task,
     i: tuple[bytes, TexasDocketMeta],
-    download_attachments: bool = False,
+    download_attachments: bool = True,
 ) -> MergeResult:
     """
     Task to parse and merge a Texas docket.
