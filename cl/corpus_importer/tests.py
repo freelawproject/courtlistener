@@ -3058,6 +3058,7 @@ class TexasMergerTest(TestCase):
             court_id=CourtID.SUPREME_COURT.value,
             docket_number=docket_sc.docket_number,
             appeals_court=appeals_court,
+            is_direct_appeal=False,
         )
 
         result = merge_texas_case_transfers(docket_sc, docket_data)
@@ -3087,6 +3088,7 @@ class TexasMergerTest(TestCase):
             court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
             docket_number=docket_cca.docket_number,
             appeals_court=appeals_court,
+            is_direct_appeal=False,
         )
 
         result = merge_texas_case_transfers(docket_cca, docket_data)
@@ -3117,7 +3119,7 @@ class TexasMergerTest(TestCase):
             court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
             docket_number=docket_cca.docket_number,
             originating_court=originating_court,
-            appeals_court=None,
+            is_direct_appeal=True,
         )
 
         result = merge_texas_case_transfers(docket_cca, docket_data)
@@ -3229,6 +3231,7 @@ class TexasMergerTest(TestCase):
             originating_court=TexasOriginatingDistrictCourtDictFactory(
                 district=100
             ),
+            is_direct_appeal=False,
         )
 
         result = merge_texas_docket(docket_data)

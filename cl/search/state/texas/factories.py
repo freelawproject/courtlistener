@@ -232,10 +232,11 @@ class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
             CourtID.COURT_OF_CRIMINAL_APPEALS.value,
         ),
     )
+    is_direct_appeal = Faker("pybool")
 
     @factory.post_generation
     @staticmethod
-    def set_sc(obj, create, extracted, **kwargs):
+    def post_gen(obj, create, extracted, **kwargs):
         if not create:
             return
         if obj["court_id"] == CourtID.SUPREME_COURT.value:
@@ -257,3 +258,14 @@ class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
                 ),
                 obj["appellate_briefs"],
             )
+        if obj["is_direct_appeal"]:
+            obj["appeals_court"] = TexasAppellateCourtInfoDictFactory(
+                court_id=CourtID.UNKNOWN.value,
+                case_number="",
+                case_url="",
+                disposition="",
+                district="",
+                justice="",
+                opinion_cite="",
+            )
+        del obj["is_direct_appeal"]
