@@ -4009,7 +4009,8 @@ def merge_texas_trial_court_data(
         except Court.DoesNotExist:
             logger.error("Court with ID %s not found.", court_id)
             court = None
-        court_name = court.full_name
+        else:
+            court_name = court.full_name
         if judge_name:
             judge = async_to_sync(lookup_judge_by_full_name)(
                 name=judge_name,
