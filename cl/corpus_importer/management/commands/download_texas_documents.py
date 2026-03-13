@@ -29,7 +29,7 @@ def download_and_extract_texas_documents(
     docs = (
         TexasDocument.objects.filter(Q(filepath_local=""))
         .exclude(
-            ocr_status__notin=(
+            ocr_status__in=(
                 TexasDocument.OCR_UNNECESSARY,
                 TexasDocument.OCR_COMPLETE,
             )

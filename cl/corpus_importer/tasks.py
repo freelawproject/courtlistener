@@ -4196,12 +4196,15 @@ def merge_texas_document(
         texas_document.ocr_status = None
         texas_document.save()
         if download_attachments:
-            chain(
-                download_texas_document_pdf.si(texas_document.pk),
-                extract_pdf_document.s(
-                    check_if_needed=False, model_name="search.TexasDocument"
-                ),
-            ).apply_async()
+            transaction.on_commit(
+                lambda pk=texas_document.pk: chain(
+                    download_texas_document_pdf.si(pk),
+                    extract_pdf_document.s(
+                        check_if_needed=False,
+                        model_name="search.TexasDocument",
+                    ),
+                ).apply_async()
+            )
         return MergeResult(
             create=not existed,
             update=existed,
