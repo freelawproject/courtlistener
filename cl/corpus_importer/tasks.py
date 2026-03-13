@@ -4377,6 +4377,30 @@ def normalize_texas_parties(
     ]
 
 
+def texas_docket_has_appellate_info(
+    docket_data: TexasCourtOfAppealsDocket
+    | TexasCourtOfCriminalAppealsDocket
+    | TexasSupremeCourtDocket,
+) -> bool:
+    """
+    Helper method returning whether a scraped Texas docket has appellate case
+    info.
+
+    Checks that the docket court is not an appellate court (cases in appellate
+    courts cannot be appealed to appellate courts) and that the "appeals_court"
+    entry of docket data is filled in.
+
+    :param docket_data: The scraped docket data.
+
+    :return: Whether the docket has appellate case information.
+    """
+
+    return (
+        docket_data["court_type"] != CourtType.APPELLATE.value
+        and docket_data["appeals_court"]["court_id"] != CourtID.UNKNOWN.value
+    )
+
+
 def merge_texas_parties(
     docket: Docket, parties: list[TexasCaseParty]
 ) -> MergeResult:
@@ -4424,10 +4448,7 @@ def merge_texas_docket_originating_court(
 
     originating_court_information = docket.originating_court_information
 
-    if (
-        docket_data["court_type"] == CourtType.APPELLATE.value
-        or docket_data["appeals_court"]["court_id"] == CourtID.UNKNOWN.value
-    ):
+    if not texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["originating_court"]
         oc_dn = ocd["case"]
         oc_reporter = ocd["reporter"]
@@ -4760,11 +4781,7 @@ def merge_texas_docket(
                 court.pk,
             )
 
-        if (
-            docket_data["court_type"] == CourtType.APPELLATE.value
-            or docket_data["appeals_court"]["court_id"]
-            == CourtID.UNKNOWN.value
-        ):
+        if not texas_docket_has_appellate_info(docket_data):
             lower_court_data = docket_data["originating_court"]
             lower_court_id = texas_originating_court_to_court_id(
                 lower_court_data
