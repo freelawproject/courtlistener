@@ -4172,13 +4172,6 @@ def merge_texas_document(
             media_id=input_document["media_id"],
             docket_entry=docket_entry,
         )
-    except TexasDocument.MultipleObjectsReturned:
-        logger.error(
-            "Found multiple TexasDocument objects on the same docket entry (%s) with the same media_id (%s)",
-            docket_entry.pk,
-            input_document["media_id"],
-        )
-        return MergeResult.failed()
     else:
         existed = True
         needs_update = (
@@ -4260,21 +4253,9 @@ def merge_texas_docket_entry(
         appellate_brief=appellate_brief,
     )
 
+    docket_entry = None
     try:
         docket_entry = docket_entries.get()
-    except TexasDocketEntry.DoesNotExist:
-        logger.info(
-            "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
-            sequence_number,
-            docket.pk,
-        )
-        docket_entry = TexasDocketEntry(
-            docket=docket,
-            date_filed=input_docket_entry["date"],
-            entry_type=input_docket_entry["type"],
-            appellate_brief=appellate_brief,
-        )
-        created = True
     except TexasDocketEntry.MultipleObjectsReturned:
         # More filtering needed
         matching_sequence_number = docket_entries.filter(
@@ -4292,37 +4273,32 @@ def merge_texas_docket_entry(
                 docket.pk,
             )
             docket_entry = matching_sequence_number
-            created = False
-        else:
-            logger.error(
-                "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
-                sequence_number,
-                docket.pk,
-            )
-            docket_entry = TexasDocketEntry(
-                docket=docket,
-                date_filed=input_docket_entry["date"],
-                entry_type=input_docket_entry["type"],
-                appellate_brief=appellate_brief,
-            )
-            created = True
     else:
         logger.info(
             "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
             sequence_number,
             docket.pk,
         )
-        created = False
+
+    created = False
+    if not docket_entry:
+        logger.error(
+            "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
+            sequence_number,
+            docket.pk,
+        )
+        docket_entry = TexasDocketEntry(
+            docket=docket,
+            date_filed=input_docket_entry["date"],
+            entry_type=input_docket_entry["type"],
+            appellate_brief=appellate_brief,
+        )
+        created = True
 
     docket_entry.sequence_number = sequence_number
     docket_entry.description = input_docket_entry.get("description", "")
     docket_entry.disposition = input_docket_entry.get("disposition", "")
     docket_entry.remarks = input_docket_entry.get("remarks", "")
-    logger.info(
-        "Saving TexasDocketEntry %s on Docket %s",
-        docket_entry.pk,
-        docket.pk,
-    )
     docket_entry.save()
 
     logger.info(
@@ -4433,50 +4409,51 @@ def merge_texas_docket_originating_court(
     :param docket: The docket to add the originating court to.
     :param docket_data: The docket data from Juriscraper.
     :return: The result of the merge operation."""
-    if (
+
+    if texas_docket_has_appellate_info(docket_data):
+        ocd = docket_data["appeals_court"]
+        oc_dn = ocd["case_number"]
+        oc_reporter = ""
+        oc_judge = ocd["justice"]
+        oc_id = texas_js_court_id_to_court_id(ocd["court_id"])
+    elif (
         docket_data["originating_court"]["court_type"]
-        == CourtType.UNKNOWN.value
+        != CourtType.UNKNOWN.value
     ):
-        logger.warning(
-            "Skipping merge of OCI for Texas docket %s due to unknown originating court type.",
-            docket_data["docket_number"],
-        )
-        return MergeResult(create=False, update=False, success=False, pk=None)
-    created = False
-    if not docket.originating_court_information:
-        created = True
-        docket.originating_court_information = OriginatingCourtInformation()
-
-    originating_court_information = docket.originating_court_information
-
-    if not texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["originating_court"]
         oc_dn = ocd["case"]
         oc_reporter = ocd["reporter"]
         oc_judge = ocd["judge"]
         oc_id = texas_originating_court_to_court_id(ocd)
     else:
-        ocd = docket_data["appeals_court"]
-        oc_dn = ocd["case_number"]
-        oc_reporter = ""
-        oc_judge = ocd["justice"]
-        oc_id = texas_js_court_id_to_court_id(ocd["court_id"])
+        logger.warning(
+            "Skipping merge of OCI for Texas docket %s due to unknown originating court type.",
+            docket.docket_number,
+        )
+        return MergeResult.failed()
 
-    originating_court_information.docket_number = oc_dn
-    originating_court_information.docket_number_raw = oc_dn
-    originating_court_information.court_reporter = oc_reporter
-    originating_court_information.assigned_to_str = oc_judge
+    created = False
+    if not docket.originating_court_information:
+        created = True
+        docket.originating_court_information = OriginatingCourtInformation()
+
+    oci = docket.originating_court_information
+
+    oci.docket_number = oc_dn
+    oci.docket_number_raw = oc_dn
+    oci.court_reporter = oc_reporter
+    oci.assigned_to_str = oc_judge
     # Only update judge if we're able to associate them with a court.
     if oc_id:
         async_to_sync(lookup_judge_by_full_name_and_set_attr)(
-            item=originating_court_information,
+            item=oci,
             target_field="assigned_to",
             full_name=oc_judge,
             court_id=oc_id,
             event_date=None,
             require_living_judge=False,
         )
-    originating_court_information.save()
+    oci.save()
     if created:
         docket.save()
 
@@ -4725,13 +4702,13 @@ def merge_texas_docket(
     )
     docket_number = docket_data["docket_number"]
     logger.info("Merging Texas docket %s", docket_number)
+
+    if docket_data["court_type"] == CourtType.UNKNOWN.value:
+        logger.error("Texas docket %s has unknown court type", docket_number)
+        return MergeResult.failed()
+
     with transaction.atomic():
         docket = None
-        if docket_data["court_type"] == CourtType.UNKNOWN.value:
-            logger.error(
-                "Texas docket %s has unknown court type", docket_number
-            )
-            return MergeResult.failed()
         if docket_data["court_type"] == CourtType.APPELLATE.value:
             logger.info(
                 "Docket is appellate. Checking if disaggregation is necessary..."
@@ -4775,26 +4752,21 @@ def merge_texas_docket(
         originating_court_merge_result = merge_texas_docket_originating_court(
             docket, docket_data
         )
-        if not originating_court_merge_result.success:
-            logger.error(
-                "Failed to update originating court information for Texas docket %s in court %s",
-                docket.docket_number,
-                court.pk,
-            )
 
-        if not texas_docket_has_appellate_info(docket_data):
-            lower_court_data = docket_data["originating_court"]
-            lower_court_id = texas_originating_court_to_court_id(
-                lower_court_data
-            )
-        else:
+        if texas_docket_has_appellate_info(docket_data):
             lower_court_data = docket_data["appeals_court"]
             lower_court_id = texas_js_court_id_to_court_id(
                 lower_court_data["court_id"]
             )
+        else:
+            lower_court_data = docket_data["originating_court"]
+            lower_court_id = texas_originating_court_to_court_id(
+                lower_court_data
+            )
 
-        lower_court_name = None
-        if lower_court_id is not None:
+        # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
+        lower_court_name = lower_court_data.get("name", "")
+        if lower_court_id:
             try:
                 lower_court = Court.objects.get(pk=lower_court_id)
             except Court.DoesNotExist:
@@ -4805,9 +4777,6 @@ def merge_texas_docket(
             else:
                 docket.appeal_from = lower_court
                 lower_court_name = lower_court.full_name
-        if not lower_court_name:
-            # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
-            lower_court_name = lower_court_data.get("name", "")
         docket.appeal_from_str = lower_court_name
 
         docket.save()
@@ -4818,12 +4787,6 @@ def merge_texas_docket(
         trial_court_result = MergeResult.unnecessary(None)
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
-    if not party_merge_result.success:
-        logger.error(
-            "Failed to merge party data for Texas docket %s in court %s",
-            docket.docket_number,
-            court.pk,
-        )
 
     entry_merge_results = [
         merge_texas_docket_entry(
@@ -4845,12 +4808,6 @@ def merge_texas_docket(
     merge_case_transfer_result = merge_texas_case_transfers(
         docket, docket_data
     )
-    if not merge_case_transfer_result.success:
-        logger.error(
-            "Failed to merge CaseTransfer data for Texas docket %s in court %s",
-            docket.docket_number,
-            court.pk,
-        )
 
     create = (
         party_merge_result.create
@@ -4875,9 +4832,10 @@ def merge_texas_docket(
     )
     if not success:
         logger.error(
-            "One or more steps in Texas case merging failed for docket %s (pk %s). Please review logs.",
+            "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Please review logs.",
             docket_number,
             docket.pk,
+            court.pk,
         )
 
     return MergeResult(
