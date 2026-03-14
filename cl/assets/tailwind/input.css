@@ -87,12 +87,10 @@
   .alert {
     @apply px-4 py-3 text-sm rounded-[10px] border;
   }
-
   .alert-warning {
     @apply alert text-greyscale-950 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
   }
-
-   .alert-danger {
+  .alert-danger {
     @apply alert bg-red-100 text-red-700 border-red-500;
   }
   .btn {
@@ -124,6 +122,10 @@
   }
   .input-text {
     @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
+  }
+  /* Screenshots used in Help pages */
+  .screenshot {
+    @apply rounded-2xl block max-w-full;
   }
 
   /* ----------- THIRD PARTY OVERRIDES ----------- */

@@ -2,6 +2,19 @@
 {% load static %}
 {% load extras %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_migration-guide.html                                ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}V4 API Migration Guide &ndash; CourtListener.com{% endblock %}
 {% block description %}
 {% endblock %}
@@ -41,16 +54,16 @@
   </p>
 
   <h2 id="support">Support</h2>
-  <p>Questions about this migration can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our GitHub Discussions forum</a> or to our <a href="{% url "contact" %}">contact form</a>.
+  <p>Questions about this migration can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank" rel="noopener noreferrer">to our GitHub Discussions forum</a> or to our <a href="{% url "contact" %}">contact form</a>.
   </p>
   <p>We prefer that questions be posted in the forum so they can help others. If you are a private organization posting to that forum, we will avoid sharing details about your organization.
   </p>
   <p>
     <a href="https://github.com/freelawproject/courtlistener/discussions"
-        target="_blank"
+        target="_blank" rel="noopener noreferrer"
         class="btn btn-default">Ask in GitHub Discussions</a>
     <a href="{% url "contact" %}"
-       target="_blank"
+       target="_blank" rel="noopener noreferrer"
        class="btn btn-default">Send us a Private Message</a>
   </p>
 
@@ -112,7 +125,7 @@
     <li>Timezone handling is more consistent.</li>
     <li>We've added a number of new searchable fields.</li>
   </ul>
-  <p>For more details, please<a href="https://free.law/2024/01/18/new-recap-archive-search-is-live/" target="_blank"> see our blog</a>.</p>
+  <p>For more details, please<a href="https://free.law/2024/01/18/new-recap-archive-search-is-live/" target="_blank" rel="noopener noreferrer"> see our blog</a>.</p>
   <h2 id="breaking-changes">Breaking Changes to v3 of the Search API</h2>
   <p>We cannot continue running Solr forever, but we can do our best to support v3 of the API. To do this, on <strong>November 25, 2024</strong>,
     v3 of the Search API will be upgraded to use ElasticSearch. We expect this to support most uses, but it will cause some breaking changes, as outlined in this section.

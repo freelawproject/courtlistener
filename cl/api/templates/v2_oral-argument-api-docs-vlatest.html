@@ -7,10 +7,6 @@
 {% block description %}We have the biggest collection of oral argument audio in the world. Use these APIs to gather and analyze oral argument audio files from federal courts.{% endblock %}
 {% block og_description %}We have the biggest collection of oral argument audio in the world. Use these APIs to gather and analyze oral argument audio files from federal courts.{% endblock %}
 
-{% block footer-scripts %}
-  {% include "includes/anchors.html" %}
-{% endblock %}
-
 {% block content %}
 <c-layout-with-navigation
   data-first-active="about"
@@ -48,7 +44,7 @@ curl -v \
 
   <c-layout-with-navigation.section id="docket-endpoint">
     <h3>Dockets <small> — <code>{% url "docket-list" version=version %}</code></small></h3>
-    {% include "includes/docket-endpoint.html" %}
+    <c-docket-endpoint></c-docket-endpoint>
   </c-layout-with-navigation.section>
 
   <c-support-plea-banner />

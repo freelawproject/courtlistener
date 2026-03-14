@@ -36,7 +36,9 @@ from cl.people_db.models import (
     AttorneyOrganization,
     Person,
     Position,
+    Role,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.constants import (
     PEOPLE_ES_HL_FIELDS,
     PEOPLE_ES_HL_KEYWORD_FIELDS,
@@ -58,7 +60,6 @@ from cl.search.es_indices import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     BankruptcyInformation,
     Citation,
     Docket,
@@ -421,7 +422,9 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
         transformations["local_path"] = lambda x: (
             f"https://storage.courtlistener.com/{x}" if x else ""
         )
-        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        transformations["source"] = lambda x: dict(ClusterSources.NAMES).get(
+            x, x
+        )
         return transformations
 
     def prepare_absolute_url(self, instance):
@@ -1627,6 +1630,27 @@ class DocketDocument(
         return data
 
 
+class DocketDocumentPlain(DocketDocument):
+    """This class is used for Docket document percolation. Here, we can
+    control whether to include parties based on
+    the MAX_ATTORNEYS_TO_PERCOLATE setting."""
+
+    def prepare_parties(self, instance: Docket) -> dict[str, set]:
+        out = {
+            "party_id": set(),
+            "party": set(),
+            "attorney_id": set(),
+            "attorney": set(),
+            "firm_id": set(),
+            "firm": set(),
+        }
+        atty_count = Role.objects.filter(docket=instance).distinct().count()
+        if atty_count > settings.MAX_ATTORNEYS_TO_PERCOLATE:
+            return out
+
+        return super().prepare_parties(instance)
+
+
 # Opinions
 class OpinionBaseDocument(Document):
     absolute_url = fields.KeywordField(index=False)
@@ -2288,7 +2312,9 @@ class OpinionClusterDocument(
         )
 
         # Add a transformation to compute Human-readable values
-        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        transformations["source"] = lambda x: dict(ClusterSources.NAMES).get(
+            x, x
+        )
         transformations["status"] = lambda x: dict(
             PRECEDENTIAL_STATUS.NAMES
         ).get(x, x)
@@ -2382,17 +2408,20 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
             "firm": set(),
         }
 
+        docket = instance.docket_entry.docket
+        atty_count = Role.objects.filter(docket=docket).count()
+        if atty_count > settings.MAX_ATTORNEYS_TO_PERCOLATE:
+            return out
+
         # Extract only required parties values.
-        party_values = instance.docket_entry.docket.parties.values_list(
-            "pk", "name"
-        )
+        party_values = docket.parties.values_list("pk", "name")
         for pk, name in party_values.iterator():
             out["party_id"].add(pk)
             out["party"].add(name)
 
         # Extract only required attorney values.
         atty_values = (
-            Attorney.objects.filter(roles__docket=instance.docket_entry.docket)
+            Attorney.objects.filter(roles__docket=docket)
             .distinct()
             .values_list("pk", "name")
         )
@@ -2403,7 +2432,7 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         # Extract only required firm values.
         firms_values = (
             AttorneyOrganization.objects.filter(
-                attorney_organization_associations__docket=instance.docket_entry.docket
+                attorney_organization_associations__docket=docket
             )
             .distinct()
             .values_list("pk", "name")
@@ -2411,7 +2440,6 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         for pk, name in firms_values.iterator():
             out["firm_id"].add(pk)
             out["firm"].add(name)
-
         return out
 
     def prepare_docket_absolute_url(self, instance):

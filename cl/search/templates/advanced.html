@@ -174,10 +174,7 @@
                                         {% if facet_field.value %}checked="checked"{% endif %}>
                                 <label
                                         for="id_{{ facet_field.html_name }}"
-                                        class="pointer {% if facet_field.count == 0 %}gray{% endif %}">
-                                    <div>{{ facet_field.label }}&nbsp;{% if facet_field.count != None %}<span
-                                            class="gray small">({{ facet_field.count|intcomma }}){% endif %}</span>
-                                    </div>
+                                        class="pointer">{{ facet_field.label }}
                                 </label>
                             </div>
                         {% endfor %}
@@ -600,7 +597,7 @@
                 </p>
                 <p>
                   <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger">Donate Now</a>
-                  <a href="https://donate.free.law/forms/membership" class="btn btn-danger">Join Free.law</a>
+                  <a href="https://free.law/membership/" class="btn btn-danger">Join Free.law</a>
                 </p>
             </div>
             <div class="col-md-4">
@@ -658,7 +655,7 @@
                 </p>
                 <p>
                     <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger">Donate Now</a>
-                    <a href="https://donate.free.law/forms/membership" class="btn btn-danger">Join Free.law</a>
+                    <a href="https://free.law/membership/" class="btn btn-danger">Join Free.law</a>
                 </p>
             </div>
             <div class="col-md-4">
@@ -733,7 +730,7 @@
                 </p>
                 <p>
                     <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger">Donate Now</a>
-                    <a href="https://donate.free.law/forms/membership" class="btn btn-danger">Join Free.law</a>
+                    <a href="https://free.law/membership/" class="btn btn-danger">Join Free.law</a>
                 </p>
             </div>
             <div class="col-sm-4">

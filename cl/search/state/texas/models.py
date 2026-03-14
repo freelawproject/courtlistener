@@ -3,7 +3,8 @@
 import pghistory
 from django.db import models
 
-from cl.lib.model_helpers import CSVExportMixin, document_model
+from cl.lib.decorators import document_model
+from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
@@ -54,6 +55,7 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         # See: https://stackoverflow.com/a/20283983/22035917
         app_label = "search"
         ordering = ["-sequence_number"]
+        # verbose_name_plural = "Texas Docket Entries"
 
 
 @pghistory.track()
@@ -68,7 +70,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     provided. Used to perform document merging.
     :ivar media_version_id: The MediaVersionID parameter from the download
     URL that TAMES provided. Used to perform document merging.
-    :ivar document_url: The download URL that TAMES provided for this document.
+    :ivar url: The download URL that TAMES provided for this document.
     """
 
     docket_entry = models.ForeignKey(
@@ -77,7 +79,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
-    document_url = models.URLField()
+    url = models.URLField(max_length=250)
 
     class Meta:
         app_label = "search"

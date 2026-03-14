@@ -17,7 +17,6 @@ from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.lib.bot_detector import is_bot
-from cl.lib.elasticsearch_utils import get_only_status_facets
 from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
 from cl.lib.search_utils import (
     do_es_search,
@@ -27,7 +26,6 @@ from cl.lib.search_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.lib.types import AuthenticatedHttpRequest
-from cl.search.documents import OpinionClusterDocument
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
@@ -294,21 +292,18 @@ def advanced(request: HttpRequest, search_type: str) -> HttpResponse:
     if search_type == SEARCH_TYPES.OPINION:
         search_form = SearchForm({"type": search_type}, courts=courts)
         render_dict["search_form"] = search_form
-        # Needed b/c of facet values.
-        search_query = OpinionClusterDocument.search()
-        facet_results = get_only_status_facets(
-            search_query, render_dict["search_form"]
-        )
         search_form.is_valid()
         cd = search_form.cleaned_data
         search_form = _clean_form({"type": search_type}, cd, courts)
-        # Merge form with courts.
+        facet_fields = [
+            f for f in search_form if f.html_name.startswith("stat_")
+        ]
         courts, court_count_human, court_count = merge_form_with_courts(
             courts, search_form
         )
         render_dict.update(
             {
-                "facet_fields": facet_results,
+                "facet_fields": facet_fields,
                 "courts": courts,
                 "court_count_human": court_count_human,
                 "court_count": court_count,
