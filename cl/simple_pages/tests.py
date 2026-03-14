@@ -136,11 +136,11 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         self, mock: MagicMock
     ) -> None:
         """Is the documentation checkbox required for support-type issues?"""
-        for issue_type in ["support", "api", "recap"]:
+        for issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
             with self.subTest(issue_type=issue_type):
                 msg = self.test_msg.copy()
                 msg["issue_type"] = issue_type
-                if issue_type in ("api", "recap"):
+                if issue_type in ContactForm.TECH_ISSUE_TYPES:
                     msg["tech_description"] = "Something is broken"
                 del msg["checked_documentation"]
 
