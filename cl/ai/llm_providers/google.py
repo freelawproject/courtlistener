@@ -3,6 +3,7 @@ import logging
 import mimetypes
 import os
 import tempfile
+from datetime import date
 from typing import Any, TypedDict
 
 from google import genai
@@ -14,6 +15,17 @@ logger = logging.getLogger(__name__)
 DOWNLOADABLE_JOB_STATES = {
     types.JobState.JOB_STATE_SUCCEEDED,
     types.JobState.JOB_STATE_PARTIALLY_SUCCEEDED,
+}
+
+# Supported Gemini models for batch operations.
+# Maps model name to its shutdown date (None if no date announced).
+# See https://ai.google.dev/gemini-api/docs/deprecations
+SUPPORTED_GEMINI_MODELS: dict[str, date | None] = {
+    "gemini-3.1-pro-preview": None,
+    "gemini-3-flash-preview": None,
+    "gemini-2.5-pro": date(2026, 6, 17),
+    "gemini-2.5-flash": date(2026, 6, 17),
+    "gemini-2.5-flash-lite": date(2026, 7, 22),
 }
 
 
@@ -93,33 +105,80 @@ class GoogleGenAIBatchWrapper:
     A stateless wrapper for Google GenAI batch operations, decoupled from Django.
     """
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, model_name: str | None = None):
         """
         Initializes the Google GenAI client.
 
         :param api_key: The Google API key (required, no fallback).
-        :raises ValueError: If the API key is not provided.
+        :param model_name: Optional model name. When provided, it is
+            validated and stored for later use by ``execute_batch`` and
+            ``get_or_create_cache``.
+        :raises ValueError: If the API key is not provided or the model
+            is invalid.
         """
         if not api_key:
             raise ValueError("API key is required for GoogleGenAIBatchWrapper")
         self.client = genai.Client(api_key=api_key)
+        self.model_name: str | None = None
+        if model_name is not None:
+            self.validate_model(model_name)
+            self.model_name = model_name
+
+    @staticmethod
+    def validate_model(model: str) -> None:
+        """Validate that a Gemini model is supported and not past its shutdown date.
+
+        Logs a warning when the model has no announced shutdown date,
+        prompting the caller to verify manually.
+
+        :param model: The Gemini model name to validate.
+        :raises ValueError: If the model is not supported or past its
+            shutdown date.
+        """
+        if model not in SUPPORTED_GEMINI_MODELS:
+            raise ValueError(
+                f"Invalid Gemini model '{model}'. "
+                f"Supported models: {', '.join(sorted(SUPPORTED_GEMINI_MODELS))}"
+            )
+
+        shutdown_date = SUPPORTED_GEMINI_MODELS[model]
+        if shutdown_date is None:
+            logger.warning(
+                "Model '%s' does not have a shutdown date. "
+                "Verify at https://ai.google.dev/gemini-api/docs/deprecations",
+                model,
+            )
+            return
+
+        if date.today() >= shutdown_date:
+            raise ValueError(
+                f"Model '{model}' was shut down on {shutdown_date}. "
+                f"See https://ai.google.dev/gemini-api/docs/deprecations"
+            )
 
     def get_or_create_cache(
         self,
         system_prompt: str,
-        model_name: str,
         cache_display_name: str,
         cache_ttl: str = "3600s",
     ) -> str:
         """
         Retrieves an existing cache by display name, or creates a new one.
 
+        Requires ``model_name`` to have been set at construction time.
+
         :param system_prompt: The system prompt text to cache.
-        :param model_name: The model for which the cache is created.
         :param cache_display_name: The human-readable name for the cache.
         :param cache_ttl: TTL for cache
         :return: The full resource name of the valid cache.
+        :raises ValueError: If ``model_name`` was not provided at init.
         """
+        if not self.model_name:
+            raise ValueError(
+                "model_name is required for cache operations. "
+                "Pass it when constructing GoogleGenAIBatchWrapper."
+            )
+
         for cache in self.client.caches.list():
             if cache.display_name == cache_display_name:
                 logger.info(f"Found existing cache: {cache_display_name}")
@@ -127,7 +186,7 @@ class GoogleGenAIBatchWrapper:
 
         logger.info(f"Creating new cache: {cache_display_name}")
         cached_content = self.client.caches.create(
-            model=model_name,
+            model=self.model_name,
             config=types.CreateCachedContentConfig(
                 display_name=cache_display_name,
                 system_instruction=types.Content(
@@ -195,7 +254,6 @@ class GoogleGenAIBatchWrapper:
 
     def execute_batch(
         self,
-        model_name: str,
         requests: list[dict],
         system_prompt: str | None = None,
         cache_display_name: str | None = "cl-default-cache",
@@ -205,16 +263,24 @@ class GoogleGenAIBatchWrapper:
         Creates and executes a batch job with Google GenAI. If a system prompt
         is provided, it will be cached and applied to all requests in the batch.
 
-        :param model_name: The name of the model to use.
+        Requires ``model_name`` to have been set at construction time.
+
         :param requests: A list of prepared request dictionaries.
         :param system_prompt: The system prompt text to use for this batch.
         :param cache_display_name: An optional, stable name for the system prompt cache.
         :param batch_display_name: An optional display name for the job in the Google Cloud console.
         :return: The unique name (ID) of the created batch job.
+        :raises ValueError: If ``model_name`` was not provided at init.
         """
+        if not self.model_name:
+            raise ValueError(
+                "model_name is required for batch execution. "
+                "Pass it when constructing GoogleGenAIBatchWrapper."
+            )
+
         if system_prompt:
             cache_name = self.get_or_create_cache(
-                system_prompt, model_name, cache_display_name
+                system_prompt, cache_display_name
             )
             for req in requests:
                 req["request"]["cached_content"] = cache_name
@@ -242,7 +308,7 @@ class GoogleGenAIBatchWrapper:
         config = types.CreateBatchJobConfig(display_name=batch_display_name)
 
         job = self.client.batches.create(
-            model=model_name,
+            model=self.model_name,
             src=jsonl_file.name,
             config=config,
         )

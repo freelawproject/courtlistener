@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -63,6 +64,43 @@ class AiModelsTest(TestCase):
         self.assertEqual(llm_task.status, LLMTaskStatusChoices.UNPROCESSED)
 
 
+class ValidateGeminiModelTest(SimpleTestCase):
+    """Tests for the GoogleGenAIBatchWrapper.validate_model function."""
+
+    @patch("cl.ai.llm_providers.google.logger")
+    def test_valid_model_with_no_shutdown_date_logs_warning(self, mock_logger):
+        """Test that a model without a shutdown date logs a warning."""
+        GoogleGenAIBatchWrapper.validate_model("gemini-3-flash-preview")
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        self.assertIn("does not have a shutdown date", warning_msg)
+        self.assertIn("deprecations", warning_msg)
+
+    @patch("cl.ai.llm_providers.google.date")
+    def test_valid_model_before_shutdown_date(self, mock_date):
+        """Test that a model before its shutdown date passes validation."""
+        mock_date.today.return_value = date(2026, 1, 1)
+        mock_date.side_effect = lambda *args, **kw: date(*args, **kw)
+        GoogleGenAIBatchWrapper.validate_model("gemini-2.5-pro")
+
+    @patch("cl.ai.llm_providers.google.date")
+    def test_model_past_shutdown_date_raises_error(self, mock_date):
+        """Test that a model past its shutdown date raises ValueError."""
+        mock_date.today.return_value = date(2026, 6, 17)
+        mock_date.side_effect = lambda *args, **kw: date(*args, **kw)
+        with self.assertRaises(ValueError) as context:
+            GoogleGenAIBatchWrapper.validate_model("gemini-2.5-pro")
+        self.assertIn("shut down", str(context.exception))
+        self.assertIn("2026-06-17", str(context.exception))
+
+    def test_unsupported_model_raises_error(self):
+        """Test that an unsupported model raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            GoogleGenAIBatchWrapper.validate_model("invalid-model")
+        self.assertIn("Invalid Gemini model", str(context.exception))
+        self.assertIn("Supported models", str(context.exception))
+
+
 class GoogleGenAIBatchWrapperTest(SimpleTestCase):
     """Tests for the GoogleGenAIBatchWrapper class."""
 
@@ -98,10 +136,11 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_instance.caches.list.return_value = [mock_cache]
         mock_client_class.return_value = mock_client_instance
 
-        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
+        wrapper = GoogleGenAIBatchWrapper(
+            api_key="test-key", model_name="gemini-3.1-pro-preview"
+        )
         cache_name = wrapper.get_or_create_cache(
             system_prompt="Test prompt",
-            model_name="gemini-3-pro-preview",
             cache_display_name="test-cache",
         )
 
@@ -127,10 +166,11 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
 
         mock_client_class.return_value = mock_client_instance
 
-        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
+        wrapper = GoogleGenAIBatchWrapper(
+            api_key="test-key", model_name="gemini-3.1-pro-preview"
+        )
         cache_name = wrapper.get_or_create_cache(
             system_prompt="New system prompt",
-            model_name="gemini-3-pro-preview",
             cache_display_name="new-cache",
         )
 
@@ -251,7 +291,9 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_instance.batches.create.return_value = mock_job
         mock_client_class.return_value = mock_client_instance
 
-        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
+        wrapper = GoogleGenAIBatchWrapper(
+            api_key="test-key", model_name="gemini-3.1-pro-preview"
+        )
         requests = [
             {
                 "key": "req-1",
@@ -264,7 +306,6 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         ]
 
         batch_id = wrapper.execute_batch(
-            model_name="gemini-3-pro-preview",
             requests=requests,
             system_prompt=None,
         )
@@ -300,7 +341,9 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         mock_client_instance.batches.create.return_value = mock_job
         mock_client_class.return_value = mock_client_instance
 
-        wrapper = GoogleGenAIBatchWrapper(api_key="test-key")
+        wrapper = GoogleGenAIBatchWrapper(
+            api_key="test-key", model_name="gemini-3.1-pro-preview"
+        )
         requests = [
             {
                 "key": "req-2",
@@ -313,7 +356,6 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         ]
 
         batch_id = wrapper.execute_batch(
-            model_name="gemini-3-pro-preview",
             requests=requests,
             system_prompt="You are a helpful assistant.",
             cache_display_name="test-cache",

@@ -141,7 +141,10 @@ from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.timezone import now
 
-from cl.ai.llm_providers.google import GoogleGenAIBatchWrapper
+from cl.ai.llm_providers.google import (
+    SUPPORTED_GEMINI_MODELS,
+    GoogleGenAIBatchWrapper,
+)
 from cl.ai.models import (
     LLMProvider,
     LLMRequest,
@@ -154,15 +157,6 @@ from cl.ai.models import (
 from cl.lib.command_utils import VerboseCommand
 
 logger = logging.getLogger(__name__)
-
-# Supported Gemini models for batch operations
-SUPPORTED_GEMINI_MODELS = {
-    "gemini-3-flash-preview",
-    "gemini-3-pro-preview",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-}
 
 DEFAULT_BATCH_SIZE = 1000
 
@@ -273,21 +267,14 @@ def validate_inputs(
 ) -> tuple[str, Prompt, Prompt]:
     """Validate command options and return resolved inputs.
 
-    Checks that the Gemini model is supported, that the
-    ``GEMINI_BATCH_API_KEY`` environment variable is set, and that the
-    supplied prompt IDs correspond to existing ``Prompt`` objects with the
-    correct types.
+    Checks that the ``GEMINI_BATCH_API_KEY`` environment variable is set
+    and that the supplied prompt IDs correspond to existing ``Prompt``
+    objects with the correct types. Model validation is handled by
+    :meth:`GoogleGenAIBatchWrapper.validate_model` in ``execute_batch``.
 
     :param options: Parsed command-line options dictionary.
     :returns: A tuple of (batch_api_key, system_prompt, user_prompt).
     """
-    model = options["model"]
-    if model not in SUPPORTED_GEMINI_MODELS:
-        raise CommandError(
-            f"Invalid Gemini model '{model}'. "
-            f"Supported models: {', '.join(sorted(SUPPORTED_GEMINI_MODELS))}"
-        )
-
     env = environ.FileAwareEnv()
     batch_api_key = env("GEMINI_BATCH_API_KEY", default=None)
     if not batch_api_key:
@@ -385,7 +372,7 @@ def create_tasks_from_files(
 
 def submit_batch(
     llm_request: LLMRequest,
-    batch_api_key: str,
+    wrapper: GoogleGenAIBatchWrapper,
     tasks_data: list[dict],
     system_prompt: Prompt,
     user_prompt: Prompt,
@@ -393,15 +380,15 @@ def submit_batch(
 ) -> str:
     """Prepare and execute the Gemini batch job.
 
-    Initialises a :class:`GoogleGenAIBatchWrapper`, prepares the individual
-    requests from *tasks_data*, and submits the batch.  On success the
-    ``batch_id`` is persisted on the *llm_request*.
+    Uses the provided *wrapper* to prepare the individual requests from
+    *tasks_data* and submit the batch. On success the ``batch_id`` is
+    persisted on the *llm_request*.
 
     This function should be called inside a ``transaction.atomic()`` block
     so that all DB writes roll back cleanly on failure.
 
     :param llm_request: The parent request to associate the batch with.
-    :param batch_api_key: Google GenAI batch API key.
+    :param wrapper: Pre-initialised Google GenAI batch wrapper.
     :param tasks_data: List of dicts with ``llm_key`` and
         ``input_file_path`` keys produced by
         :func:`fetch_files_and_create_tasks`.
@@ -410,8 +397,6 @@ def submit_batch(
     :param cache_name: Stable display name for the system-prompt cache.
     :returns: The batch ID assigned by the provider.
     """
-    logger.info("Initializing Google GenAI wrapper...")
-    wrapper = GoogleGenAIBatchWrapper(api_key=batch_api_key)
 
     logger.info("Preparing batch requests...")
     prepared_requests = wrapper.prepare_batch_requests(
@@ -420,7 +405,6 @@ def submit_batch(
 
     logger.info("Executing batch job...")
     batch_id = wrapper.execute_batch(
-        model_name=llm_request.api_model_name,
         requests=prepared_requests,
         system_prompt=system_prompt.text,
         cache_display_name=cache_name,
@@ -527,6 +511,13 @@ class Command(VerboseCommand):
 
         batch_api_key, system_prompt, user_prompt = validate_inputs(options)
 
+        try:
+            wrapper = GoogleGenAIBatchWrapper(
+                api_key=batch_api_key, model_name=model
+            )
+        except ValueError as e:
+            raise CommandError(str(e))
+
         logger.info(f"Fetching PDF files from S3: s3://{bucket}/{s3_path}")
         s3_files = get_s3_file_list(
             s3_path=s3_path,
@@ -571,7 +562,7 @@ class Command(VerboseCommand):
 
                         submit_batch(
                             llm_request,
-                            batch_api_key,
+                            wrapper,
                             tasks_data,
                             system_prompt,
                             user_prompt,
