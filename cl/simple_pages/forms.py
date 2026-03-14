@@ -4,7 +4,7 @@ from typing import Any, Literal
 from django import forms
 from django.conf import settings
 from django.urls import reverse
-from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
 SEALING_KEYWORDS_REGEX = re.compile(
@@ -232,13 +232,13 @@ class ContactForm(forms.Form):
         # reverse() can't be called at class definition time because
         # Django's URL configuration isn't loaded yet during import.
         help_url = reverse("help_home")
-        self.fields["checked_documentation"].label = mark_safe(
-            "I have reviewed the "
-            '<a href="https://wiki.free.law">wiki</a>, '
-            f'<a href="{help_url}">documentation</a>, '
-            "and "
-            '<a href="https://github.com/freelawproject/courtlistener/discussions">discussion forum</a> '
-            "for an answer to my question."
+        self.fields["checked_documentation"].label = format_html(
+            'I have reviewed the <a href="https://wiki.free.law">wiki</a>,'
+            ' <a href="{}">documentation</a>, and'
+            ' <a href="https://github.com/freelawproject/courtlistener/'
+            'discussions">discussion forum</a>'
+            " for an answer to my question.",
+            help_url,
         )
 
     def clean(self) -> dict[str, Any] | None:
