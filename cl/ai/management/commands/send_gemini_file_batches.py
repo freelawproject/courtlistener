@@ -151,6 +151,7 @@ from cl.ai.models import (
     LLMRequestStatusChoices,
     LLMTask,
     LLMTaskChoices,
+    LLMTaskStatusChoices,
     Prompt,
     PromptTypes,
 )
@@ -438,6 +439,63 @@ def cleanup_temp_files(temp_files: list[str]) -> None:
                 )
 
 
+def get_successfully_processed_s3_keys(
+    s3_path: str,
+    model: str,
+    system_prompt_id: int,
+    user_prompt_id: int,
+) -> set[str]:
+    """Return S3 keys already processed successfully with the given config.
+
+    A file is considered already processed if an LLMTask exists where:
+    - input_file is under the given S3 prefix
+    - parent LLMRequest used the same model
+    - parent LLMRequest used both the same system and user prompts
+    - task status is SUCCEEDED or FINISHED
+
+    :param s3_path: S3 prefix to match against input_file names.
+    :param model: The API model name to match.
+    :param system_prompt_id: PK of the system Prompt.
+    :param user_prompt_id: PK of the user Prompt.
+    :returns: Set of S3 keys that have already been processed.
+    """
+    return set(
+        LLMTask.objects.filter(
+            status__in=[
+                LLMTaskStatusChoices.SUCCEEDED,
+                LLMTaskStatusChoices.FINISHED,
+            ],
+            input_file__startswith=s3_path,
+            request__api_model_name=model,
+            request__prompts=system_prompt_id,
+        )
+        .filter(request__prompts=user_prompt_id)
+        .values_list("input_file", flat=True)
+    )
+
+
+def filter_already_processed(
+    s3_files: Iterator[tuple[str, bytes, str]],
+    already_processed: set[str],
+) -> Generator[tuple[str, bytes, str]]:
+    """Skip S3 files whose keys are in the already-processed set.
+
+    Yields only files not yet successfully processed. Logs each skip.
+
+    :param s3_files: Iterator of (filename, file_content, s3_key) tuples.
+    :param already_processed: Set of S3 keys to skip.
+    :returns: Generator yielding unprocessed file tuples.
+    """
+    skipped = 0
+    for filename, file_content, s3_key in s3_files:
+        if s3_key in already_processed:
+            skipped += 1
+            continue
+        yield filename, file_content, s3_key
+    if skipped:
+        logger.info(f"Skipped {skipped} already-processed file(s).")
+
+
 class Command(VerboseCommand):
     help = "Create and submit Google Gemini batch requests for files stored in S3."
 
@@ -496,6 +554,11 @@ class Command(VerboseCommand):
             help=f"Maximum number of files per batch request (default: {DEFAULT_BATCH_SIZE}). "
             "Files exceeding this limit are split into multiple LLMRequests.",
         )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Skip deduplication and reprocess all files, even if they were previously processed successfully.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -524,6 +587,19 @@ class Command(VerboseCommand):
             bucket_name=bucket,
             file_extension=".pdf",
         )
+
+        force = options["force"]
+        s3_prefix = s3_path.lstrip("/")
+        if not force:
+            already_processed = get_successfully_processed_s3_keys(
+                s3_prefix, model, system_prompt.pk, user_prompt.pk
+            )
+            if already_processed:
+                logger.info(
+                    f"Found {len(already_processed)} previously processed "
+                    "file(s). Use --force to reprocess."
+                )
+            s3_files = filter_already_processed(s3_files, already_processed)
 
         all_temp_files: list[str] = []
         batch_number = 0

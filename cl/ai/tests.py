@@ -12,6 +12,10 @@ from cl.ai.llm_providers.google import (
     GoogleGenAIBatchWrapper,
     _ResponseValidator,
 )
+from cl.ai.management.commands.send_gemini_file_batches import (
+    filter_already_processed,
+    get_successfully_processed_s3_keys,
+)
 from cl.ai.models import (
     LLMProvider,
     LLMRequest,
@@ -1765,3 +1769,191 @@ class CheckGeminiBatchStatusTest(TestCase):
         self.assertEqual(tasks[0].status, LLMTaskStatusChoices.SUCCEEDED)
         # Response file should be saved (as .txt instead of .json)
         self.assertTrue(tasks[0].response_file)
+
+
+@pytest.mark.django_db
+class DeduplicationTest(TestCase):
+    """Tests for send_gemini_file_batches deduplication logic."""
+
+    S3_PREFIX = "llm-inputs/batch-2026-01/"
+    MODEL = "gemini-2.5-pro"
+
+    def setUp(self):
+        self.system_prompt = Prompt.objects.create(
+            name="System Prompt",
+            prompt_type=PromptTypes.SYSTEM,
+            text="You are a helpful assistant.",
+        )
+        self.user_prompt = Prompt.objects.create(
+            name="User Prompt",
+            prompt_type=PromptTypes.USER,
+            text="Extract the data.",
+        )
+
+    def _create_task(
+        self,
+        s3_key: str,
+        status: int,
+        model: str | None = None,
+        system_prompt: Prompt | None = None,
+        user_prompt: Prompt | None = None,
+    ) -> LLMTask:
+        """Create an LLMRequest + LLMTask with the given config.
+
+        :param s3_key: The S3 key to store in input_file.name.
+        :param status: The LLMTaskStatusChoices value.
+        :param model: Override model name (defaults to self.MODEL).
+        :param system_prompt: Override system prompt.
+        :param user_prompt: Override user prompt.
+        :returns: The created LLMTask.
+        """
+        llm_request = LLMRequest.objects.create(
+            name="Test Request",
+            is_batch=True,
+            provider=LLMProvider.GEMINI,
+            api_model_name=model or self.MODEL,
+            status=LLMRequestStatusChoices.FINISHED,
+        )
+        llm_request.prompts.set(
+            [
+                system_prompt or self.system_prompt,
+                user_prompt or self.user_prompt,
+            ]
+        )
+        task = LLMTask.objects.create(
+            request=llm_request,
+            task_type=LLMTaskChoices.SCAN_EXTRACTION,
+            llm_key=f"scan-batch-{llm_request.pk}",
+            status=status,
+        )
+        task.input_file.name = s3_key
+        task.save()
+        return task
+
+    def test_skips_already_succeeded_files(self):
+        """SUCCEEDED tasks should appear in the processed set."""
+        s3_key = f"{self.S3_PREFIX}doc1.pdf"
+        self._create_task(s3_key, LLMTaskStatusChoices.SUCCEEDED)
+
+        result = get_successfully_processed_s3_keys(
+            self.S3_PREFIX,
+            self.MODEL,
+            self.system_prompt.pk,
+            self.user_prompt.pk,
+        )
+        self.assertIn(s3_key, result)
+
+    def test_skips_already_finished_files(self):
+        """FINISHED tasks should appear in the processed set."""
+        s3_key = f"{self.S3_PREFIX}doc2.pdf"
+        self._create_task(s3_key, LLMTaskStatusChoices.FINISHED)
+
+        result = get_successfully_processed_s3_keys(
+            self.S3_PREFIX,
+            self.MODEL,
+            self.system_prompt.pk,
+            self.user_prompt.pk,
+        )
+        self.assertIn(s3_key, result)
+
+    def test_does_not_skip_failed_files(self):
+        """FAILED tasks should not be in the processed set."""
+        s3_key = f"{self.S3_PREFIX}doc3.pdf"
+        self._create_task(s3_key, LLMTaskStatusChoices.FAILED)
+
+        result = get_successfully_processed_s3_keys(
+            self.S3_PREFIX,
+            self.MODEL,
+            self.system_prompt.pk,
+            self.user_prompt.pk,
+        )
+        self.assertNotIn(s3_key, result)
+
+    def test_does_not_skip_different_model(self):
+        """Tasks processed with a different model should not match."""
+        s3_key = f"{self.S3_PREFIX}doc4.pdf"
+        self._create_task(
+            s3_key, LLMTaskStatusChoices.SUCCEEDED, model="gemini-2.5-flash"
+        )
+
+        result = get_successfully_processed_s3_keys(
+            self.S3_PREFIX,
+            self.MODEL,
+            self.system_prompt.pk,
+            self.user_prompt.pk,
+        )
+        self.assertNotIn(s3_key, result)
+
+    def test_does_not_skip_different_prompts(self):
+        """Tasks processed with different prompts should not match."""
+        s3_key = f"{self.S3_PREFIX}doc5.pdf"
+        other_user_prompt = Prompt.objects.create(
+            name="Other User Prompt",
+            prompt_type=PromptTypes.USER,
+            text="Do something else.",
+        )
+        self._create_task(
+            s3_key,
+            LLMTaskStatusChoices.SUCCEEDED,
+            user_prompt=other_user_prompt,
+        )
+
+        result = get_successfully_processed_s3_keys(
+            self.S3_PREFIX,
+            self.MODEL,
+            self.system_prompt.pk,
+            self.user_prompt.pk,
+        )
+        self.assertNotIn(s3_key, result)
+
+    def test_filter_already_processed_skips_known_keys(self):
+        """filter_already_processed should yield only unprocessed files."""
+        files = [
+            ("a.pdf", b"content-a", "prefix/a.pdf"),
+            ("b.pdf", b"content-b", "prefix/b.pdf"),
+            ("c.pdf", b"content-c", "prefix/c.pdf"),
+        ]
+        already_processed = {"prefix/a.pdf", "prefix/c.pdf"}
+
+        result = list(filter_already_processed(iter(files), already_processed))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0][2], "prefix/b.pdf")
+
+    @patch(
+        "cl.ai.management.commands.send_gemini_file_batches.get_s3_file_list"
+    )
+    @patch(
+        "cl.ai.management.commands.send_gemini_file_batches.GoogleGenAIBatchWrapper"
+    )
+    @patch.dict(
+        os.environ,
+        {"GEMINI_BATCH_API_KEY": "test-api-key-123"},
+    )
+    def test_force_flag_bypasses_dedup(self, mock_wrapper_class, mock_s3_list):
+        """With --force, previously processed files should be reprocessed."""
+        s3_key = f"{self.S3_PREFIX}doc6.pdf"
+        self._create_task(s3_key, LLMTaskStatusChoices.SUCCEEDED)
+
+        mock_s3_list.return_value = iter(
+            [("doc6.pdf", b"pdf-content", s3_key)]
+        )
+
+        mock_wrapper = MagicMock()
+        mock_wrapper_class.return_value = mock_wrapper
+        mock_wrapper.execute_batch.return_value = "batches/test-force"
+
+        call_command(
+            "send_gemini_file_batches",
+            path=self.S3_PREFIX,
+            system_prompt=self.system_prompt.pk,
+            user_prompt=self.user_prompt.pk,
+            model=self.MODEL,
+            force=True,
+        )
+
+        # A new LLMTask should have been created (the file was reprocessed)
+        new_tasks = LLMTask.objects.filter(
+            input_file=s3_key,
+            status=LLMTaskStatusChoices.UNPROCESSED,
+        )
+        self.assertEqual(new_tasks.count(), 1)
