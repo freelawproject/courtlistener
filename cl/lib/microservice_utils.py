@@ -149,7 +149,6 @@ async def microservice(
             params=params,
             timeout=services[service]["timeout"],
         )
-
         return await client.send(req)
 
 
@@ -160,18 +159,41 @@ async def microservice(
     backoff=2,
     logger=logger,
 )
-async def doc_page_count_service(rd: AbstractPDF) -> Response:
+async def doc_page_count_service(doc: AbstractPDF) -> Response:
     """Call page-count from doctor with retries
 
-    :param rd: the document to count pages
+    :param doc: the document to count pages
     :return: Response object
     """
     try:
         response = await microservice(
             service="page-count",
-            item=rd,
+            item=doc,
         )
         return response
+    except ClientError as error:
+        if error.response["Error"]["Code"] == "NoSuchKey":
+            raise NoSuchKey("Key not found: The specified key does not exist.")
+        raise error
+
+
+@retry(
+    ExceptionToCheck=(NetworkError, TimeoutException, NoSuchKey),
+    tries=3,
+    delay=2,
+    backoff=2,
+    logger=logger,
+)
+async def check_redactions_service(rd: RECAPDocument) -> Response:
+    """Call redaction check from doctor with retries
+
+    Uses X-Ray to detect bad redactions (text visible under redaction boxes).
+
+    :param rd: The RECAPDocument to check for bad redactions
+    :return: Response object with redaction data
+    """
+    try:
+        return await microservice(service="check-redactions", item=rd)
     except ClientError as error:
         if error.response["Error"]["Code"] == "NoSuchKey":
             raise NoSuchKey("Key not found: The specified key does not exist.")

@@ -109,6 +109,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.recap.tasks import (
+    check_pdf_redactions,
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
     download_acms_pdf_by_rd,
@@ -126,7 +127,10 @@ from cl.recap.tasks import (
     process_recap_upload,
     process_recap_zip,
 )
-from cl.recap.utils import get_court_id_from_fetch_queue
+from cl.recap.utils import (
+    get_court_id_from_fetch_queue,
+    send_bad_redaction_email,
+)
 from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
@@ -8698,3 +8702,106 @@ class RemoveDuplicatedMinuteEntries(TestCase):
                 entry_db.recap_documents.all()[0].description,
                 entry["short_description"],
             )
+
+
+class BadRedactionCheckTest(TestCase):
+    """Tests for the X-Ray bad redaction checking feature."""
+
+    SAMPLE_REDACTIONS = {
+        "1": [{"text": "Hidden SSN", "bbox": (10, 20, 100, 30)}],
+        "3": [{"text": "Secret text", "bbox": (50, 60, 150, 70)}],
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="txnd", jurisdiction="FB")
+
+    def setUp(self):
+        self.docket = DocketFactory(
+            court=self.court,
+            case_name="Test Case v. Bad Redactions",
+            pacer_case_id="12345",
+        )
+        self.de = DocketEntryFactory(docket=self.docket, entry_number=1)
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
+            document_number="1",
+            pacer_doc_id="test-doc-id",
+            is_available=True,
+        )
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+
+    def _mock_redaction_response(self, results=None, error=False):
+        """Create a mock redaction check response."""
+        mock_response = MagicMock()
+        mock_response.is_success = True
+        mock_response.json.return_value = {
+            "error": error,
+            "results": results or {},
+        }
+        return mock_response
+
+    @mock.patch("cl.recap.tasks.send_bad_redaction_email")
+    @mock.patch("cl.recap.tasks.check_redactions_service")
+    def test_redaction_check_sends_email_only_when_results_found(
+        self, mock_check, mock_send_email
+    ):
+        """Email is sent only when bad redactions are found."""
+        test_cases = [
+            ("with_results", self.SAMPLE_REDACTIONS, True),
+            ("empty_results", {}, False),
+            ("error_response", {"1": [{"text": "x"}]}, False),
+        ]
+        for label, results, expect_email in test_cases:
+            with self.subTest(label=label):
+                mock_send_email.reset_mock()
+                error = label == "error_response"
+                mock_check.return_value = self._mock_redaction_response(
+                    results=results, error=error
+                )
+
+                check_pdf_redactions(self.rd.pk)
+
+                if expect_email:
+                    mock_send_email.assert_called_once()
+                else:
+                    mock_send_email.assert_not_called()
+
+    @mock.patch("cl.recap.tasks.check_redactions_service")
+    def test_redaction_check_failure_raises(self, mock_check):
+        """Redaction check failures are raised (for Celery retry)."""
+        mock_check.side_effect = Exception("Doctor service down")
+        with self.assertRaises(Exception):
+            check_pdf_redactions(self.rd.pk)
+
+    def test_send_bad_redaction_email_content(self):
+        """Email contains correct subject, recipients, and redaction text."""
+        send_bad_redaction_email(self.rd, self.SAMPLE_REDACTIONS)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("Bad Redactions Detected", email.subject)
+        self.assertEqual(email.to, [settings.BAD_REDACTION_EMAIL])
+        for page_num, items in self.SAMPLE_REDACTIONS.items():
+            self.assertIn(f"Page {page_num}", email.body)
+            for item in items:
+                self.assertIn(item["text"], email.body)
+
+    def test_send_bad_redaction_email_for_attachment(self):
+        """Email URL contains the attachment number for attachment docs."""
+        rd_attachment = RECAPDocument.objects.create(
+            docket_entry=self.de,
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="1",
+            attachment_number=2,
+            pacer_doc_id="test-att-id",
+        )
+
+        send_bad_redaction_email(
+            rd_attachment, {"1": [{"text": "Secret", "bbox": (0, 0, 10, 10)}]}
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("/1/2/", mail.outbox[0].body)
