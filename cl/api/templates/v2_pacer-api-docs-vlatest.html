@@ -15,7 +15,7 @@
     {'href': '#the-apis', 'text': 'The APIs', 'children': [
       {'href': '#dockets', 'text': 'Dockets'},
       {'href': '#courts', 'text': 'Courts'},
-      {'href': '#docker-entries', 'text': 'Docker Entries'},
+      {'href': '#docket-entries', 'text': 'Docket Entries'},
       {'href': '#documents', 'text': 'Documents'},
       {'href': '#parties', 'text': 'Parties'},
       {'href': '#attorneys', 'text': 'Attorneys'},
@@ -127,7 +127,7 @@ curl -v \
     <p>You can generally cache this API. It does not change often.</p>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="docker-entries">
+  <c-layout-with-navigation.section id="docket-entries">
     <h3>Docket Entries <small> — <code>{% url "docketentry-list" version=version %}</code></small></h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
