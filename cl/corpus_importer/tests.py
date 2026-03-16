@@ -112,11 +112,15 @@ from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
     ABARatingFactory,
+    AttorneyFactory,
     EducationFactory,
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
+    RoleFactory,
     SchoolFactory,
 )
 from cl.people_db.lookup_utils import (
@@ -142,6 +146,7 @@ from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.recap.tests.tests import mock_bucket_open
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
+from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -156,7 +161,6 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
-    SOURCES,
     Citation,
     Docket,
     Opinion,
@@ -617,10 +621,25 @@ class GetQuarterTest(SimpleTestCase):
 class IAUploaderTest(TestCase):
     """Tests related to uploading docket content to the Internet Archive"""
 
-    fixtures = [
-        "test_objects_query_counts.json",
-        "attorney_party_dup_roles.json",
-    ]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket_1 = DocketFactory()
+        cls.docket_2 = DocketFactory()
+        cls.docket_3 = DocketFactory()
+
+        party_1 = PartyFactory.build()
+        party_1.save()
+        party_2 = PartyFactory.build()
+        party_2.save()
+        PartyTypeFactory(docket=cls.docket_1, party=party_1)
+        PartyTypeFactory(docket=cls.docket_2, party=party_2)
+
+        attorney = AttorneyFactory(docket=cls.docket_1)
+        RoleFactory(docket=cls.docket_1, party=party_1, attorney=attorney)
+        RoleFactory(docket=cls.docket_2, party=party_1, attorney=attorney)
+
+        docket_entry = DocketEntryFactory(docket=cls.docket_1)
+        RECAPDocumentFactory(docket_entry=docket_entry)
 
     def test_correct_json_generated(self) -> None:
         """Do we generate the correct JSON for a handful of tricky dockets?
@@ -628,7 +647,7 @@ class IAUploaderTest(TestCase):
         The most important thing here is that we don't screw up how we handle
         m2m relationships, which have a tendency of being tricky.
         """
-        d, j_str = generate_ia_json(1)
+        d, j_str = generate_ia_json(self.docket_1.pk)
         j = json.loads(j_str)
         parties = j["parties"]
         first_party = parties[0]
@@ -660,13 +679,13 @@ class IAUploaderTest(TestCase):
         Let's avoid that.
         """
         with self.assertNumQueries(11):
-            generate_ia_json(1)
+            generate_ia_json(self.docket_1.pk)
 
         with self.assertNumQueries(9):
-            generate_ia_json(2)
+            generate_ia_json(self.docket_2.pk)
 
         with self.assertNumQueries(5):
-            generate_ia_json(3)
+            generate_ia_json(self.docket_3.pk)
 
 
 class HarvardTests(TestCase):
@@ -1305,7 +1324,7 @@ class HarvardMergerTests(TestCase):
             (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
 
         cluster = OpinionClusterWithMultipleOpinionsFactory(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {
@@ -1405,31 +1424,31 @@ class HarvardMergerTests(TestCase):
         """Test query for Non Harvard Sources"""
 
         OpinionClusterFactory(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             id=1,
             filepath_json_harvard="/the/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.HARVARD_CASELAW,
+            source=ClusterSources.HARVARD_CASELAW,
             docket=DocketFactory(source=Docket.HARVARD),
             id=2,
             filepath_json_harvard="/a/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
+            source=ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
             docket=DocketFactory(source=Docket.HARVARD_AND_COLUMBIA),
             id=3,
             filepath_json_harvard="/some/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
             docket=DocketFactory(source=Docket.SCRAPER),
             id=4,
             filepath_json_harvard="/my/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
             docket=DocketFactory(source=Docket.SCRAPER),
             id=5,
             filepath_json_harvard=None,
@@ -1483,7 +1502,7 @@ class HarvardMergerTests(TestCase):
         the Harvard merger?"""
 
         cluster = OpinionClusterWithMultipleOpinionsFactory(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {"author_str": "", "plain_text": "My opinion"},
@@ -1541,7 +1560,7 @@ class HarvardMergerTests(TestCase):
         assigned"""
 
         cluster = OpinionClusterWithMultipleOpinionsFactory(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {"author_str": "Broyles", "plain_text": "My opinion"},
@@ -1773,15 +1792,15 @@ class HarvardMergerTests(TestCase):
         """Can we update cluster source?"""
 
         cluster_1 = OpinionClusterWithParentsFactory(
-            source=SOURCES.COURT_WEBSITE
+            source=ClusterSources.COURT_WEBSITE
         )
         update_cluster_source(cluster_1)
         cluster_1.refresh_from_db()
-        self.assertEqual(cluster_1.source, SOURCES.COURT_M_HARVARD)
+        self.assertEqual(cluster_1.source, ClusterSources.COURT_M_HARVARD)
 
         with self.assertRaises(ClusterSourceException):
             cluster_2 = OpinionClusterWithParentsFactory(
-                source=SOURCES.INTERNET_ARCHIVE
+                source=ClusterSources.INTERNET_ARCHIVE
             )
             update_cluster_source(cluster_2)
             cluster_2.refresh_from_db()
@@ -2066,7 +2085,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             "Granted Feb. 13, 2002.",
             posture="",
             judges="Alma, Duncan, Lopez, Rickhoff, Sarah, Tom",
-            source=SOURCES.LAWBOX_M_HARVARD,
+            source=ClusterSources.LAWBOX_M_HARVARD,
             docket=DocketFactory(source=Docket.HARVARD),
             sub_opinions__data=[
                 {
@@ -4503,19 +4522,21 @@ class AWSManifestTest(TestCase):
         ):
             opinion_1 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                    source=ClusterSources.HARVARD_CASELAW,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=False,
             )
             opinion_2 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                    source=ClusterSources.HARVARD_CASELAW,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=False,
             )
             opinion_3 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.COURT_WEBSITE, docket=DocketFactory()
+                    source=ClusterSources.COURT_WEBSITE, docket=DocketFactory()
                 ),
                 extracted_by_ocr=True,
             )
@@ -4530,13 +4551,15 @@ class AWSManifestTest(TestCase):
             opinion_3.save()
             opinion_4 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.COLUMBIA_ARCHIVE, docket=DocketFactory()
+                    source=ClusterSources.COLUMBIA_ARCHIVE,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=True,
             )
             opinion_5 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                    source=ClusterSources.HARVARD_CASELAW,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=False,
             )
