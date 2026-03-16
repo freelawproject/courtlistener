@@ -1100,8 +1100,8 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         self.q = {"short_name__iexact": "Cc1"}
         count = await self.qs.filter(short_name__iexact="Cc1").acount()
         await self.assertCountInResults(count)
-        self.q = {"short_name__icontains": "cc"}
-        count = await self.qs.filter(short_name__icontains="cc").acount()
+        self.q = {"short_name__istartswith": "cc"}
+        count = await self.qs.filter(short_name__istartswith="cc").acount()
         await self.assertCountInResults(count)
 
     async def test_full_name_filter(self):
@@ -1109,17 +1109,16 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         self.q = {"full_name__istartswith": "Child"}
         count = await self.qs.filter(full_name__istartswith="Child").acount()
         await self.assertCountInResults(count)
-        self.q = {"full_name__iendswith": "Court"}
-        count = await self.qs.filter(full_name__iendswith="Court").acount()
-        await self.assertCountInResults(count)
 
     async def test_citation_string_filter(self):
         """Can we filter courts by citation_string with text lookups?"""
         self.q = {"citation_string": "OC"}
         count = await self.qs.filter(citation_string="OC").acount()
         await self.assertCountInResults(count)
-        self.q = {"citation_string__icontains": "2"}
-        count = await self.qs.filter(citation_string__icontains="2").acount()
+        self.q = {"citation_string__istartswith": "CC"}
+        count = await self.qs.filter(
+            citation_string__istartswith="CC"
+        ).acount()
         await self.assertCountInResults(count)
 
     async def test_jurisdiction_filter(self):
@@ -1225,9 +1224,9 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)
 
         # Moving on to careers. Bad value, then good.
-        self.q["positions__job_title__icontains"] = "XXX"
+        self.q["positions__job_title__istartswith"] = "XXX"
         await self.assertCountInResults(0)
-        self.q["positions__job_title__icontains"] = "lawyer"
+        self.q["positions__job_title__istartswith"] = "Corporate"
         await self.assertCountInResults(1)
 
         # Moving on to titles...bad value, then good.
@@ -1323,9 +1322,9 @@ class DRFJudgeApiFilterTests(
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
         # Traverse person, position
-        self.q["person__positions__job_title__icontains"] = "xxx"
+        self.q["person__positions__job_title__istartswith"] = "xxx"
         await self.assertCountInResults(0)
-        self.q["person__positions__job_title__icontains"] = "lawyer"
+        self.q["person__positions__job_title__istartswith"] = "Corporate"
         await self.assertCountInResults(2)
 
         # Just traverse to the judge table
@@ -1496,9 +1495,9 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
         await self.assertCountInResults(1)
         self.q = {"parties_represented__id": 9999}
         await self.assertCountInResults(0)
-        self.q = {"parties_represented__name__contains": "Honker"}
+        self.q = {"parties_represented__name__startswith": "Honker"}
         await self.assertCountInResults(1)
-        self.q = {"parties_represented__name__contains": "Honker-Nope"}
+        self.q = {"parties_represented__name__startswith": "Honker-Nope"}
         await self.assertCountInResults(0)
 
         # Adds extra role to the existing attorney
@@ -1613,15 +1612,15 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
 
         self.q = {"name": "Honker"}
         await self.assertCountInResults(1)
-        self.q = {"name__icontains": "Honk"}
+        self.q = {"name__istartswith": "Honk"}
         await self.assertCountInResults(1)
 
         self.q = {"name": "Cardinal Bonds"}
         await self.assertCountInResults(0)
 
-        self.q = {"attorney__name__icontains": "Juneau"}
+        self.q = {"attorney__name__istartswith": "Juneau"}
         await self.assertCountInResults(1)
-        self.q = {"attorney__name__icontains": "Juno"}
+        self.q = {"attorney__name__istartswith": "Juno"}
         await self.assertCountInResults(0)
 
         # Add another attorney to the party record but linked to another docket
@@ -1762,12 +1761,16 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
         # Create two parties with matching names on the same docket
         attorney_1 = await Attorney.objects.aget(pk=self.attorney.pk)
         party1 = await sync_to_async(PartyFactory)(
-            name="First Corp LLC", attorneys=[attorney_1], docket=self.docket
+            name="Corp Alpha Plaintiff LLC",
+            attorneys=[attorney_1],
+            docket=self.docket,
         )
 
         attorney_2 = await Attorney.objects.aget(pk=self.attorney_2.pk)
         party2 = await sync_to_async(PartyFactory)(
-            name="Second Corp Inc", attorneys=[attorney_2], docket=self.docket
+            name="Corp Beta Defendant Inc",
+            attorneys=[attorney_2],
+            docket=self.docket,
         )
         await sync_to_async(PartyTypeFactory.create)(
             docket=self.docket, party=party1, name="Plaintiff"
@@ -1778,7 +1781,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
 
         self.q = {
             "id": self.docket.id,
-            "parties__name__icontains": "Corp",
+            "parties__name__istartswith": "Corp",
         }
         # Should return exactly 1 result, not 2 duplicates
         await self.assertCountInResults(1)
