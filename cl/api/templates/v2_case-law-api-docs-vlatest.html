@@ -119,7 +119,7 @@ curl -v \
 
   <c-layout-with-navigation.section id="court-endpoint">
     <h3>Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>
-    {% include "includes/court-endpoint.html" %}
+    <c-court-endpoint></c-court-endpoint>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="examples">
