@@ -679,6 +679,14 @@ class TallyStatWithLabelsTests(TestCase):
 
     def test_tally_stat_with_labels_writes_both_keys(self) -> None:
         """Test that tally_stat writes both the date-based key and prometheus key"""
+        # Capture values before to check deltas — the legacy date key is
+        # shared across parallel tests (no prefix), so other tests may
+        # also increment it.
+        date_key = f"{StatMetric.SEARCH_RESULTS}.{now().date().isoformat()}"
+        prom_key = f"{self.prefix}search.results:keyword:web"
+        date_before = int(self.r.get(date_key) or 0)
+        prom_before = int(self.r.get(prom_key) or 0)
+
         tally_stat(
             StatMetric.SEARCH_RESULTS,
             labels={
@@ -687,15 +695,13 @@ class TallyStatWithLabelsTests(TestCase):
             },
         )
 
-        # Check date-based key exists (legacy format)
-        date_key = f"{StatMetric.SEARCH_RESULTS}.{now().date().isoformat()}"
+        # Check date-based key incremented (legacy format)
         date_value = int(self.r.get(date_key) or 0)
-        self.assertEqual(date_value, 1)
+        self.assertEqual(date_value - date_before, 1)
 
-        # Check prometheus key exists
-        prom_key = f"{self.prefix}search.results:keyword:web"
+        # Check prometheus key incremented
         prom_value = int(self.r.get(prom_key) or 0)
-        self.assertEqual(prom_value, 1)
+        self.assertEqual(prom_value - prom_before, 1)
 
     def test_tally_stat_validates_labels(self) -> None:
         """Test that tally_stat validates labels before writing"""
