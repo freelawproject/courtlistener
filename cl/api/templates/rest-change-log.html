@@ -31,6 +31,22 @@
   <h1 id="about">REST API Change Log</h1>
   <ul>
     <li>
+      <p><strong>v4.5</strong> — Removes expensive text filter lookups to improve database performance. The following filter
+        types have been removed from text fields across all endpoints:</p>
+      <ul>
+        <li><code>contains</code> and <code>icontains</code> — Searched for text anywhere within a field (e.g.,
+          <code>name__icontains=smith</code>).</li>
+        <li><code>endswith</code> and <code>iendswith</code> — Searched for text at the end of a field (e.g.,
+          <code>name__endswith=LLC</code>).</li>
+      </ul>
+      <p>These filters caused full table scans on large tables, significantly impacting performance. The following filters remain available:</p>
+      <ul>
+        <li><code>exact</code> / <code>iexact</code> — Exact match (case-sensitive / case-insensitive)</li>
+        <li><code>startswith</code> / <code>istartswith</code> — Matches the beginning of a field</li>
+      </ul>
+      <p>If you need to search within the text of fields, please use the <a href="{% url "search_api_help" %}">Search API</a> instead, which is powered by Elasticsearch and optimized for full-text search.(<a href="https://github.com/freelawproject/courtlistener/issues/6864">Issue #6864</a>)</p>
+    </li>
+    <li>
       <p><strong>v4.4</strong> — Adds bankruptcy information support. This release introduces:</p>
       <ul>
         <li>A new <code>bankruptcy_information</code> field in the <a href="{% url "pacer_api_help" %}#docket-endpoint">/dockets</a> endpoint that links to detailed bankruptcy metadata when available.</li>
