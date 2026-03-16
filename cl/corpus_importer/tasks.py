@@ -4256,6 +4256,8 @@ def merge_texas_docket_entry(
     docket_entry = None
     try:
         docket_entry = docket_entries.get()
+    except TexasDocketEntry.DoesNotExist:
+        pass
     except TexasDocketEntry.MultipleObjectsReturned:
         # More filtering needed
         matching_sequence_number = docket_entries.filter(
