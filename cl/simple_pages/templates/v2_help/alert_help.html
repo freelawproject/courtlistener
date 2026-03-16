@@ -34,15 +34,15 @@
   <c-layout-with-navigation.section id="about">
     <h1>Help with Search and Docket Alerts</h1>
     <p class="text-xl font-sans font-normal text-greyscale-700">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
-    <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a class="underline" href="{% url "webhooks_docs" %}">webhook events</a> to your server.</p>
+    <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a class="links" href="{% url "webhooks_docs" %}">webhook events</a> to your server.</p>
   </c-layout-with-navigation.section>
 
   {# Docket Alerts for PACER #}
   <c-layout-with-navigation.section id="recap-alerts">
     <h2>Docket Alerts for PACER</h2>
-    <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a class="underline" href="{% url "webhooks_docs" %}">webhook events</a> whenever new data is found.
+    <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a class="links" href="{% url "webhooks_docs" %}">webhook events</a> whenever new data is found.
     </p>
-    <p>Our alerts are only as good as our sources. To learn more about the data sources that trigger alerts see our <a class="underline" href="{% url "coverage_recap" %}">coverage page</a>.
+    <p>Our alerts are only as good as our sources. To learn more about the data sources that trigger alerts see our <a class="links" href="{% url "coverage_recap" %}">coverage page</a>.
     </p>
     <p>For active cases, alerts can come within seconds of a new filing. For less active cases, it can take more time or alerts may not arrive at all, if we do not have a source of new information for that case.
     </p>
@@ -57,9 +57,9 @@
     </p>
     <p>Members can create as many alerts as they need, though we may set up some reasonable limits in the future, based on usage.
     </p>
-    <p>Corporate rates are available for large organizations needing to provide alerts to many users. This feature is intended for individual users. If you think you may need to use alerts for a commercial endeavor, please <a class="underline" href="{% url "contact" %}">get in touch</a>.
+    <p>Corporate rates are available for large organizations needing to provide alerts to many users. This feature is intended for individual users. If you think you may need to use alerts for a commercial endeavor, please <a class="links" href="{% url "contact" %}">get in touch</a>.
     </p>
-    <p>We can sometimes provide need-based exceptions to these rates. If you might need an exception, <a class="underline" href="{% url "contact" %}">please let us know</a>.
+    <p>We can sometimes provide need-based exceptions to these rates. If you might need an exception, <a class="links" href="{% url "contact" %}">please let us know</a>.
     </p>
     <div class="flex flex-col md:flex-row gap-2">
       <a href="https://free.law/recap/"
@@ -115,7 +115,7 @@
   {# Coverage gaps #}
   <section x-intersect.margin.-30%.0.-65%.0="show" id="coverage-gaps">
     <h3>Coverage Gaps</h3>
-    <p>A major source we use for our alerts is RSS feeds provided by the courts. Even after supplementing these with <a class="underline" href="{% url "coverage_recap" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything new in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
+    <p>A major source we use for our alerts is RSS feeds provided by the courts. Even after supplementing these with <a class="links" href="{% url "coverage_recap" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything new in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
     </p>
 
     <h4 class="text-xl">Full RSS Feeds</h4>
@@ -185,7 +185,7 @@
   {# Creating Search Alerts #}
   <section x-intersect.margin.-20%.0.-70%.0="show" id="creating-search-alerts">
     <h3>Creating Alerts</h3>
-    <p>To create a Search Alert, begin with a search in CourtListener's Case Law, RECAP or Oral Argument database. You can set static calendar dates, or rolling <a class="underline" href="{% url "relative_dates" %}">relative dates</a> for your alerts. In the results page, click the bell icon in the search bar or click the Get Alerts button in the sidebar on the left.
+    <p>To create a Search Alert, begin with a search in CourtListener's Case Law, RECAP or Oral Argument database. You can set static calendar dates, or rolling <a class="links" href="{% url "relative_dates" %}">relative dates</a> for your alerts. In the results page, click the bell icon in the search bar or click the Get Alerts button in the sidebar on the left.
     </p>
     <figure class="bg-greyscale-50 p-2 rounded-2xl">
       <img
@@ -270,7 +270,7 @@
   {# Editing or Deleting a Search Alert #}
   <c-layout-with-navigation.section id="editing-search-alerts">
     <h3>Editing or Deleting a Search Alert</h3>
-    <p>Existing alerts can be edited or deleted from <a class="underline" href="{% url "profile_alerts" %}">your user profile</a>. By clicking the Edit button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
+    <p>Existing alerts can be edited or deleted from <a class="links" href="{% url "profile_alerts" %}">your user profile</a>. By clicking the Edit button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
     </p>
     <p>From your profile page, you can also delete an alert.</p>
   </c-layout-with-navigation.section>
@@ -285,9 +285,9 @@
   {# Supported Courts #}
   <c-layout-with-navigation.section id="courts">
     <h3>Supported Courts</h3>
-    <p>Search alerts are available for many jurisdictions across the country, and we are frequently expanding our system to support even more locations. To see which courts are currently supported, check <a class="underline" href="{% url "coverage" %}">our coverage pages</a>, where we list the jurisdictions that we regularly scrape for oral arguments or case law.
+    <p>Search alerts are available for many jurisdictions across the country, and we are frequently expanding our system to support even more locations. To see which courts are currently supported, check <a class="links" href="{% url "coverage" %}">our coverage pages</a>, where we list the jurisdictions that we regularly scrape for oral arguments or case law.
     </p>
-    <p>If there is a jurisdiction that is not currently listed, please <a class="underline" href="{% url "contact" %}">express your interest</a>, and we will do our best to add it to our list.
+    <p>If there is a jurisdiction that is not currently listed, please <a class="links" href="{% url "contact" %}">express your interest</a>, and we will do our best to add it to our list.
     </p>
   </c-layout-with-navigation.section>
 
@@ -300,7 +300,7 @@
 
     </p>
     <blockquote>Whenever the Supreme Court cites <cite>Roe v. Wade</cite> and mentions the First Amendment, send me an email.</blockquote>
-    <p>To create a citation alert, start at webpage for the case that interests you. In this example, we will use <a class="underline" href="/opinion/108713/roe-v-wade/"><cite>Roe v. Wade</cite></a>.
+    <p>To create a citation alert, start at webpage for the case that interests you. In this example, we will use <a class="links" href="/opinion/108713/roe-v-wade/"><cite>Roe v. Wade</cite></a>.
     </p>
     <p>On that page, in the sidebar on the left, any cases that cite it are listed, and there is a button to "Get Citation Alerts":
     </p>
@@ -313,7 +313,7 @@
         height="253">
     </figure>
 
-    <p>Clicking that button will perform a search in CourtListener that <a class="underline" href="/?q=cites%3A(108713)&show_alert_modal=yes" rel="nofollow">shows the case law that cites <cite>Roe v. Wade</cite></a>, and a dialog will appear where you can save the alert.</p>
+    <p>Clicking that button will perform a search in CourtListener that <a class="links" href="/?q=cites%3A(108713)&show_alert_modal=yes" rel="nofollow">shows the case law that cites <cite>Roe v. Wade</cite></a>, and a dialog will appear where you can save the alert.</p>
     <p>If you prefer to modify the alert, you can close the dialog that appeared, tweak the query and filters you wish to apply, and then save it as you would any regular alert.
     </p>
     <p>For more on citation alerts, <a class="links-external" href="https://free.law/2016/01/30/citation-searching/">see our blog post announcing this feature</a>.
@@ -329,7 +329,7 @@
         <strong>Email:</strong> Stay informed in your inbox with straightforward notifications. This is the simplest, easiest way to get alerts, and it doesn't require any additional setup.
       </li>
       <li>
-        <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="underline" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
+        <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="links" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
       </li>
     </ul>
   </c-layout-with-navigation.section>

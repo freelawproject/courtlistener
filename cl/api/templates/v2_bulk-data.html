@@ -31,7 +31,7 @@
   <c-layout-with-navigation.section id="about">
     <h1>Bulk Legal Data</h1>
     <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general, the files that are available correspond to the major types of data we have in our database, such as case law, case law embeddings, oral arguments, dockets, and judges.</p>
-    <p><a class="underline" href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.</p>
+    <p><a class="links" href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.</p>
     <p>If you have questions about the data, <a class="links-external" href="https://github.com/freelawproject/courtlistener/discussions">please use our forum</a> and we'll get back to you as soon as possible.</p>
   </c-layout-with-navigation.section>
 
@@ -49,7 +49,7 @@
     <c-code>COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\', HEADER);</c-code>
     <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:</p>
     <c-code>psql [various connection parameters] < schema.sql</c-code>
-    <p>Field definitions can be found in one of two ways. First, you can <a class="links-external" href="https://github.com/freelawproject/courtlistener">browse the CourtListener code base</a>, where all the fields and tables are defined in <code>models.py</code> files. Second, if you send an <code>HTTP OPTIONS</code> request to our <a class="underline" href="{% url "rest_docs" %}">REST API</a>, it will give you field definitions (though the API does not always correspond to the CSV files on a 1-to-1 basis).</p>
+    <p>Field definitions can be found in one of two ways. First, you can <a class="links-external" href="https://github.com/freelawproject/courtlistener">browse the CourtListener code base</a>, where all the fields and tables are defined in <code>models.py</code> files. Second, if you send an <code>HTTP OPTIONS</code> request to our <a class="links" href="{% url "rest_docs" %}">REST API, it will give you field definitions (though the API does not always correspond to the CSV files on a 1-to-1 basis).</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="schemas">
@@ -85,12 +85,12 @@
 
   <c-layout-with-navigation.section id="disclosures">
     <h3>Financial Disclosure Data</h3>
-    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a class="underline" href="{% url "financial_disclosures_api_help" %}">REST API documentation</a> or the <a class="underline" href="{% url "coverage_fds" %}">disclosures coverage page</a>.</p>
+    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a class="links" href="{% url "financial_disclosures_api_help" %}">REST API documentation</a> or the <a class="links" href="{% url "coverage_fds" %}">disclosures coverage page</a>.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="people-db">
     <h3>Judge Data</h3>
-    <p>Our judge database is described in detail in our <a class="underline" href="{% url "rest_docs" %}">REST API documentation</a>. To learn more about that data, we suggest you read that documentation. Before you can import this data, you will need to import the court data.</p>
+    <p>Our judge database is described in detail in our <a class="links" href="{% url "rest_docs" %}">REST API documentation</a>. To learn more about that data, we suggest you read that documentation. Before you can import this data, you will need to import the court data.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="audio-db">
@@ -100,7 +100,7 @@
 
   <c-layout-with-navigation.section id="embeddings">
     <h2>Case Law Embeddings</h2>
-    <p>To encourage innovation, the case law embeddings for <a href="{% url "citegeist_help" %}" class="underline">our semantic search engine</a> are available for download.
+    <p>To encourage innovation, the case law embeddings for <a href="{% url "citegeist_help" %}" class="links">our semantic search engine</a> are available for download.
     </p>
     <p>These embeddings are about 2TB in size and can be downloaded from our AWS S3 bucket with a command like:
     </p>
