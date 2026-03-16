@@ -341,6 +341,48 @@ def _has_ancestor_link_styling(lines: list[str], line_idx: int) -> bool:
     return False
 
 
+def _link_wraps_visual_content(
+    lines: list[str], line_idx: int, col: int
+) -> bool:
+    """Check whether an ``<a>`` tag only wraps visual elements.
+
+    Links that wrap images or SVGs don't need text-styling classes.
+    Recognised visual patterns: ``<img>``, ``<svg>``, ``{% svg %}``.
+    """
+    # Find end of the <a ...> opening tag
+    content = ""
+    found_close = False
+    for j in range(line_idx, len(lines)):
+        segment = lines[j] if j != line_idx else lines[j][col:]
+        gt = segment.find(">")
+        if gt != -1:
+            content = segment[gt + 1 :]
+            found_close = True
+            start_line = j
+            break
+    if not found_close:
+        return False
+
+    # Collect content until </a>
+    for j in range(start_line, len(lines)):
+        if j != start_line:
+            content += " " + lines[j]
+        end = content.find("</a>")
+        if end != -1:
+            content = content[:end]
+            break
+    else:
+        return False
+
+    # Strip visual elements and whitespace — if nothing remains, it's
+    # a visual-only link.
+    inner = content.strip()
+    inner = re.sub(r"<img\b[^>]*/?>", "", inner)
+    inner = re.sub(r"<svg\b.*?</svg>", "", inner, flags=re.DOTALL)
+    inner = re.sub(r"\{%\s*svg\b[^%]*%\}", "", inner)
+    return inner.strip() == ""
+
+
 def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
     """Flag <a> tags without class attribute (heuristic)."""
     results = []
@@ -353,6 +395,8 @@ def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
             full_tag = _get_full_tag(lines, i - 1, col=m.start())
             if not class_re.search(full_tag):
                 if _has_ancestor_link_styling(lines, i - 1):
+                    continue
+                if _link_wraps_visual_content(lines, i - 1, m.start()):
                     continue
                 results.append(
                     (
