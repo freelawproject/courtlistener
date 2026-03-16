@@ -47,7 +47,7 @@
       <p>There are two other objects in the case law database:</p>
     <ul>
       <li><p><strong>Citation</strong> objects link together which opinion objects cite each other. For more information, see the <a class="links" href="{% url "citation_api_help" %}">Citation help page</a>.</p></li>
-      <li><p><strong>Parenthetical</strong> objects are extracted from the opinion text when a decision explains a citation it relies on as authority. These are not yet available in an API (see <a class="underline" href="https://github.com/freelawproject/courtlistener/issues/4082">parentheticals issue on GitHub</a>), but are available as bulk data.</p></li>
+      <li><p><strong>Parenthetical</strong> objects are extracted from the opinion text when a decision explains a citation it relies on as authority. These are not yet available in an API (see <a class="links-external" href="https://github.com/freelawproject/courtlistener/issues/4082">parentheticals issue on GitHub</a>), but are available as bulk data.</p></li>
     </ul>
   </c-layout-with-navigation.section>
 
@@ -97,7 +97,7 @@ curl -v \
   <p>A few notes:</p>
   <ul>
     <li><p>The <code>type</code> field indicates whether the item is a concurrence, lead opinion, dissent, etc. The values provided for this field are proceeded by numbers so that if they are sorted, they will also be sorted from highest priority to lowest. The most common type of opinion is a "Combined Opinion" this is what we label any opinion that either cannot be identified as a specific type, or that contains more than one type.</p></li>
-    <li><p>The <code>download_url</code> field contains the original location where we scraped the decision. Many courts do not maintain <a class="underline" href="https://www.w3.org/Provider/Style/URI.html">Cool URIs</a>, so this field is often unreliable.</p></li>
+    <li><p>The <code>download_url</code> field contains the original location where we scraped the decision. Many courts do not maintain <a class="links-external" href="https://www.w3.org/Provider/Style/URI.html">Cool URIs</a>, so this field is often unreliable.</p></li>
     <li><p>The <code>local_path</code> field contains the path to the binary file for the decision, if we have one. To use it, see the <a class="links" href="{% url "field_api_help" %}#downloads">advanced help on file download fields</a>.</p></li>
     <li><p>The <code>opinions_cited</code> field has a list of other opinions cited by the one you are reviewing.</p></li>
     <li><p>The <code>ordering_key</code> field indicates the order of opinions within a cluster. This field is only populated for opinions ingested from Harvard or Columbia sources.</p></li>

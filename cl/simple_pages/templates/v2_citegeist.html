@@ -33,7 +33,7 @@
     <ul>
       <li><strong>Stemming</strong> — When a query is made, the first step is to find the root of each word so that the query can match all relevant documents. This step broadens each query so that words like <em>runner</em>, <em>running</em>, and <em>run</em> are all treated as equal.</li>
       <li><strong>Synonyms</strong> — Citegeist has a list of nearly 1,000 synonyms so that queries containing words like <em>IRS</em> will match documents containing <em>Internal Revenue Service</em>. This list was created by analyzing the top acronyms used in legal documents.</li>
-      <li><strong>BM25</strong> — This <a href="https://en.wikipedia.org/wiki/Okapi_BM25" class="underline">algorithm</a> forms the heart of keyword ranking. In brief, it uses the frequency of words and the length of documents to identify the most important results for a query.</li>
+      <li><strong>BM25</strong> — This <a href="https://en.wikipedia.org/wiki/Okapi_BM25" class="links-external">algorithm</a> forms the heart of keyword ranking. In brief, it uses the frequency of words and the length of documents to identify the most important results for a query.</li>
       <li><strong>Field Boosting</strong> — Matches on some fields are more meaningful than others. For example, a match on the name of a case is more important than a match in the body of a case. We boost accordingly.</li>
       <li><strong>Phrase Boosting</strong> — When a user makes a query with multiple words, we boost if those words are found near each other in a result, indicating that a phrase in your query matched a phrase in a result.</li>
       <li><strong>Relevance Decay</strong> — As content gets older, it gets less relevant. A relevance decay curve is applied to our search results so that older content is demoted.</li>
@@ -141,7 +141,7 @@
       </li>
     </ul>
 
-    <p>Semantic search uses a language model and the <a href="https://www.elastic.co/blog/understanding-ann" class="underline">approximate nearest neighbor algorithm</a> to identify semantic meaning between documents and queries. The quality of the model that we use determines how well the system works. To provide the best results possible, we <a href="https://free.law/2025/03/11/semantic-search" class="underline">created a domain-adapted fine-tuned model</a>, which we released to the public for free.
+    <p>Semantic search uses a language model and the <a href="https://www.elastic.co/blog/understanding-ann" class="links-external">approximate nearest neighbor algorithm</a> to identify semantic meaning between documents and queries. The quality of the model that we use determines how well the system works. To provide the best results possible, we <a href="https://free.law/2025/03/11/semantic-search" class="links-external">created a domain-adapted fine-tuned model</a>, which we released to the public for free.
     </p>
     <p>Citegeist uses this model in conjunction with BM25, date decay, and jurisdiction boosting to rank results (see above).</p>
   </c-layout-with-navigation.section>

@@ -150,7 +150,7 @@
 }
         </c-code>
       <p>The <code>embedding</code> key in your request body is a list of floating-point numbers representing a vector of your query. It should have a length of 768 dimensions and is required for <code>POST</code> requests.</p>
-      <p>To calculate embeddings, we recommend our <a class="underline" href="https://github.com/freelawproject/inception">Inception microservice</a>. For it to work properly, you will need to use <a class="underline" href="https://free.law/2025/03/11/semantic-search">our fine-tuned model</a>.</p>
+      <p>To calculate embeddings, we recommend our <a class="links-external" href="https://github.com/freelawproject/inception">Inception microservice</a>. For it to work properly, you will need to use <a class="links-external" href="https://free.law/2025/03/11/semantic-search">our fine-tuned model</a>.</p>
     </li>
   </ul>
   <p>Semantic search is only available for the case law search engine.</p>
@@ -218,7 +218,7 @@ curl -X OPTIONS \
   "{% get_full_host %}{% url "docket-list" version=version %}" \
   | jq '.actions.POST.docket_number'
     </c-code>
-    <p>After filtering through <a class="underline" href="https://github.com/jqlang/jq"><code>jq</code></a>, that returns:</p>
+    <p>After filtering through <a class="links-external" href="https://github.com/jqlang/jq"><code>jq</code></a>, that returns:</p>
     <c-code>
 {
   "type": "string",

@@ -147,7 +147,7 @@ curl -v \
         {'label': 'Notes', 'field': 'notes'}
       ]"
       :rows="[
-        {'field': '<code>plain_text</code>', 'notes': '<p>This field contains the extracted text of the document.</p><p>We use <a class=underline href=https://free.law/open-source-tools#doctor>Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p><p>To see whether OCR was used, check the <code>ocr_status</code> field.</p><p>If you don’t need this content, omit it via <a class=text-primary-600 href={% url "rest_docs" version=version %}#field-selection>Field Selection</a> to significantly reduce response times and payload size.</p>'},
+        {'field': '<code>plain_text</code>', 'notes': '<p>This field contains the extracted text of the document.</p><p>We use <a class=links-external href=https://free.law/open-source-tools#doctor>Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p><p>To see whether OCR was used, check the <code>ocr_status</code> field.</p><p>If you don’t need this content, omit it via <a class=text-primary-600 href={% url "rest_docs" version=version %}#field-selection>Field Selection</a> to significantly reduce response times and payload size.</p>'},
         {'field': '<code>filepath_local</code>', 'notes': '<p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a class=text-primary-600 href={% url "field_api_help" %}#downloads>help article on this topic</a>.</p><p>The name of this field dates back to when all our files were locally stored on a single server.</p>'}
       ]"
     ></c-data-table>
@@ -298,11 +298,11 @@ curl -v \
 
   <c-layout-with-navigation.section id="integrated-db">
     <h3>Integrated Database <small> — <code class="whitespace-nowrap">{% url 'fjcintegrateddatabase-list' version=version %}</code></small></h3>
-    <p><code>FJC Integrated Database</code> objects represent the information available in the <a class="underline" href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:</p>
+    <p><code>FJC Integrated Database</code> objects represent the information available in the <a class="links-external" href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:</p>
     <ul>
-      <li><a class="underline" href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
-      <li><a class="underline" href="https://free.law/idb-facts/">Our datasheet on the IDB</a></li>
-      <li>The various codebooks for <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Civil%20Codebook%201988%20Forward_0.pdf">civil</a>, <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Criminal%20Code%20Book%201996%20Forward.pdf">criminal</a>, <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Appeals%20Codebook%202008%20Forward.pdf">appellate</a>, and <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Bankruptcy%20Codebook%202008%20Forward%20(Rev%20January%202018).pdf">bankruptcy</a> datasets.</li>
+      <li><a class="links-external" href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
+      <li><a class="links-external" href="https://free.law/idb-facts/">Our datasheet on the IDB</a></li>
+      <li>The various codebooks for <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Civil%20Codebook%201988%20Forward_0.pdf">civil</a>, <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Criminal%20Code%20Book%201996%20Forward.pdf">criminal</a>, <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Appeals%20Codebook%202008%20Forward.pdf">appellate</a>, and <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Bankruptcy%20Codebook%202008%20Forward%20(Rev%20January%202018).pdf">bankruptcy</a> datasets.</li>
     </ul>
     <p>As always, you can find our interpretations of these fields by performing an <code>OPTIONS</code> request on this endpoint.</p>
     <p><strong>Note:</strong> Pending further support, this endpoint should be considered <em>experimental</em> quality. It is not guaranteed to have all of the available data sets, may not have the latest quarterly data, and indeed may have bugs. If you encounter any bugs, please let us know. If you would like better guarantees about the quality of this endpoint, we are enthusiastic about finding partners to better support it.</p>

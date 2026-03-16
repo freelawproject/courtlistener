@@ -15,12 +15,12 @@
   <c-layout-with-navigation.section id="overview">
     <h1>CourtListener Database Replication</h1>
     <p class="lead">The CourtListener Database Replication service is for researchers and organizations that need high-speed, granular access to the CourtListener database on an ongoing basis.</p>
-    <p>This service works by using PostgreSQL to create and maintain a table-based <a class="underline" href="https://www.postgresql.org/docs/current/logical-replication.html">logical replica</a> of our database allocated specifically for you. Once the replica has completed its first sync, you can query your replica of the CourtListener database using standard SQL commands. This provides an incredibly powerful way to access one of the largest open collections of American legal data.</p>
+    <p>This service works by using PostgreSQL to create and maintain a table-based <a class="links-external" href="https://www.postgresql.org/docs/current/logical-replication.html">logical replica</a> of our database allocated specifically for you. Once the replica has completed its first sync, you can query your replica of the CourtListener database using standard SQL commands. This provides an incredibly powerful way to access one of the largest open collections of American legal data.</p>
     <p>The following types of data are currently available as part of this service:</p>
     <ul>
       <li><p><a class="links" href="{% url "advanced_o" %}">Case Law</a></p></li>
       <li><p><a class="links" href="{% url "advanced_r" %}">RECAP Archive of PACER data</a></p></li>
-      <li><p>The <a class="underline" href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> civil data</p></li>
+      <li><p>The <a class="links-external" href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> civil data</p></li>
       <li><p><a class="links" href="{% url "advanced_oa" %}">Oral Arguments</a></p></li>
       <li><p><a class="links" href="{% url "financial_disclosures_home" %}">Financial Disclosures</a></p></li>
       <li><p><a class="links" href="{% url "advanced_p" %}">Judge and Appointer data</a></p></li>
@@ -32,7 +32,7 @@
 
   <c-layout-with-navigation.section id="how">
     <h2>How Logical Replication Works</h2>
-    <p><a class="underline" href="https://www.postgresql.org/docs/current/logical-replication.html">Logical replication</a> is a system supported by recent versions of PostgreSQL. Unlike older methods of database replication, which worked by shipping the database binary files across the network (so&#8209;called physical replication), logical replication works by streaming SQL commands from a "publisher" server to a "subscriber" server.</p>
+    <p><a class="links-external" href="https://www.postgresql.org/docs/current/logical-replication.html">Logical replication</a> is a system supported by recent versions of PostgreSQL. Unlike older methods of database replication, which worked by shipping the database binary files across the network (so&#8209;called physical replication), logical replication works by streaming SQL commands from a "publisher" server to a "subscriber" server.</p>
     <p>This form of replication provides a number of benefits over physical replication including the ability to have slightly different versions of the database installed, and the ability to only replicate certain tables from the publisher to the subscriber.</p>
   </c-layout-with-navigation.section>
 

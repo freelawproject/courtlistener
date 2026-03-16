@@ -51,7 +51,7 @@
 
   <c-layout-with-navigation.section id="pacer-fetch">
     <h2>PACER Fetch <small> — <code>{% url "pacerfetchqueue-list" version=version %}</code></small></h2>
-    <p>Use this API to buy PACER content and add it to CourtListener so that it is available via our website, APIs, <a class="links" href="{% url "webhooks_docs" %}">webhooks</a>, and <a class="links" href="{% url "replication_docs" %}">replicated database</a>. This is <a class="underline" href="https://free.law/2019/11/05/pacer-fetch-api">a free API</a>, but it uses your PACER credentials to purchase and download PACER content. You'll still have to pay your PACER bill when it comes.</p>
+    <p>Use this API to buy PACER content and add it to CourtListener so that it is available via our website, APIs, <a class="links" href="{% url "webhooks_docs" %}">webhooks</a>, and <a class="links" href="{% url "replication_docs" %}">replicated database</a>. This is <a class="links-external" href="https://free.law/2019/11/05/pacer-fetch-api">a free API</a>, but it uses your PACER credentials to purchase and download PACER content. You'll still have to pay your PACER bill when it comes.</p>
     <p>Because downloading content from PACER takes time, this API is asynchronous. After you send an HTTP <code>POST</code>, it immediately responds with an ID for the request and places the request in a queue to be downloaded by our scrapers. Most requests are completed within seconds.</p>
     <p>As the request is processed, it will have a status code:</p>
     <c-data-table
@@ -102,7 +102,7 @@
     <p>Once we have your password, we work to rid ourselves of it as quickly as possible. We do not store it in our database or logs at any time. Instead, we use it to immediately log into the PACER system. That gives us cookies for your account, which we store in our in-memory database with a one hour expiration period. As soon as we have the cookies, we throw away your username and password.</p>
     <p>The result of this system is that we have your password until we have logged you in, and no longer. After that point, we only have a cache of your cookies for one hour.</p>
     <p class="alert-warning"><strong>Listen Up!</strong> This API gets content on your behalf using <em>your</em> access rights. This means that if you use this API to request a sealed item from PACER, we will go get it and add it to our system, just like you asked. <strong>Do not do this</strong>. If you do this accidentally, <a class="links" href="{% url "contact" %}">please get in touch</a> as soon as possible, so we can revert the error.</p>
-    <p>If you have questions about our approach, please see <a class="underline" href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.</p>
+    <p>If you have questions about our approach, please see <a class="links-external" href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="known-issues">
@@ -289,7 +289,7 @@ curl -X DELETE \
   <c-layout-with-navigation.section id="recap-upload">
     <h2>RECAP Upload API <small>— <code>{% url "processingqueue-list" version=version %}</code></small></h2>
     <p>This API is used by the RECAP extension and a handful of special partners to upload PACER content to the RECAP Archive. This API is not available to the public. If you have a collection of PACER data you wish to donate to the RECAP Archive so it is permanently available to the public, please <a class="links" href="{% url "contact" %}">get in touch</a>.</p>
-    <p>We describe the process for completing these uploads below, and you can see examples of them in <a class="underline" href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.</p>
+    <p>We describe the process for completing these uploads below, and you can see examples of them in <a class="links-external" href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.</p>
     <p>When you make an upload, you create a <code>Processing Queue</code> object in the CourtListener system. This object will be returned in the HTTP response to your upload, so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:</p>
     <c-data-table
       safe
