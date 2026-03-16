@@ -3,9 +3,6 @@ import environ
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
-# Payment secrets
-EIN_SECRET = env("EIN_SECRET", default="")
-
 # Payments & Prices
 MIN_DONATION = {
     "rt_alerts": 10,
