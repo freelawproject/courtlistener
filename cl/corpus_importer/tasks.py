@@ -13,7 +13,9 @@ from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
 from typing import IO, Any
+from urllib.parse import urljoin
 
+import botocore.exceptions
 import environ
 import eyecite
 import internetarchive as ia
@@ -54,6 +56,11 @@ from juriscraper.pacer import (
     ShowCaseDocApi,
 )
 from juriscraper.pacer.reports import BaseReport
+from juriscraper.scotus import (
+    SCOTUSDocketReport,
+    SCOTUSDocketReportHTM,
+    SCOTUSDocketReportHTML,
+)
 from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
@@ -100,6 +107,8 @@ from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    create_docket_entry_sequence_numbers,
+    extract_file_name_from_url,
     is_appellate_court,
     is_long_appellate_document_number,
     make_iquery_probing_key,
@@ -107,6 +116,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
+from cl.lib.courts import find_court_object_by_name
 from cl.lib.crypto import sha1
 from cl.lib.decorators import retry
 from cl.lib.llm import call_llm
@@ -134,6 +144,7 @@ from cl.lib.recap_utils import (
     get_document_filename,
 )
 from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
+from cl.lib.storage import AWSMediaStorage
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -145,6 +156,8 @@ from cl.recap.mergers import (
     find_docket_object,
     make_recap_sequence_number,
     merge_pacer_docket_into_cl_docket,
+    normalize_long_description,
+    normalize_scotus_parties,
     process_case_query_report,
     save_iquery_to_docket,
     update_docket_metadata,
@@ -166,8 +179,11 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     Tag,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
@@ -3206,8 +3222,11 @@ def is_pdf(response: Response) -> bool:
     :param response: The `requests.Response` object to check.
     :return: Whether the response is a PDF file."""
     return (
-        response.headers.get("Content-Type", "")
-        # MIME types are case-insensitive
+        # HTTP header names are case-insensitive; real requests.Response
+        # uses CaseInsensitiveDict, but plain dicts (e.g. in tests) don't,
+        # so look up the lowercase key to be safe in both scenarios.
+        response.headers.get("content-type", "")
+        # MIME types are also case-insensitive
         # (https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types)
         .lower()
         .startswith("application/pdf")
@@ -3270,11 +3289,6 @@ def download_pdf_in_stream(
 
 @app.task(
     bind=True,
-    autoretry_for=(
-        ConnectionError,
-        Timeout,
-    ),
-    max_retries=5,
     ignore_result=True,
 )
 def download_qp_scotus_pdf(self, docket_id: int) -> None:
@@ -3321,57 +3335,513 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         docket_id,
         qp_url,
     )
-    try:
-        with requests.get(
-            qp_url,
-            stream=True,
-            timeout=60,
-            headers={"User-Agent": "Free Law Project"},
-        ) as response:
-            response.raise_for_status()
-            if not is_pdf(response):
-                logger.warning(
-                    "SCOTUS PDF download: Expected application/pdf for docket %s "
-                    "from %s; aborting.",
-                    docket_id,
-                    qp_url,
-                )
-                return None
-            with NamedTemporaryFile(prefix="scotus_qp_", suffix=".pdf") as tmp:
-                # Download the PDF into a tmp file to avoid using too much memory
-                for chunk in response.iter_content(chunk_size=8 * 1024):
-                    if chunk:
-                        tmp.write(chunk)
-
-                # Ensure the buffer is flushed to disk before reading the file
-                tmp.flush()
-                # Move the file pointer to the beginning so it reads the whole file
-                tmp.seek(0)
-
-                filename = f"{docket_id}-qp.pdf"
-                scotus_meta.questions_presented_file.save(
-                    filename,
-                    File(tmp),
-                    save=True,
-                )
-            logger.info(
-                "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
+    with download_pdf_in_stream(qp_url, docket_id, "scotus_qp_") as result:
+        if result is None:
+            logger.error(
+                "Failed to download QP file for SCOTUS Docket %s from URL %s.",
                 docket_id,
-            )
-    except RequestException as exc:
-        if self.request.retries == self.max_retries:
-            logger.warning(
-                "SCOTUS PDF download: Unable to download %s for docket %s. "
-                "Exception was: %s",
                 qp_url,
-                docket_id,
-                str(exc),
             )
             return None
-        logger.info(
-            "SCOTUS PDF download: Ran into a RequestException. Retrying."
+
+        tmp, _ = result
+        filename = f"{docket_id}-qp.pdf"
+        scotus_meta.questions_presented_file.save(
+            filename, File(tmp), save=True
         )
-        raise self.retry(exc=exc)
+    logger.info(
+        "SCOTUS PDF download: Stored Questions Presented PDF for docket %s.",
+        docket_id,
+    )
+
+
+def enrich_scotus_attachments(docket_entries: list[dict[str, Any]]) -> None:
+    """Add sequential attachment numbers and pacer_doc_id to SCOTUS attachments.
+
+    :param docket_entries: A list of docket entry dictionaries.
+    :return: None. The input list is changed in place.
+    """
+
+    for entry in docket_entries:
+        attachments = entry.setdefault("attachments", [])
+        main_doc_short_desc = (
+            attachments[0]["description"] if attachments else ""
+        )
+        entry["pacer_doc_id"] = ""
+
+        for idx, attachment in enumerate(attachments, start=1):
+            attachment["attachment_number"] = idx
+            attachment["pacer_doc_id"] = ""
+
+        entry["short_description"] = main_doc_short_desc
+
+
+def merge_scotus_document(
+    docket_entry: SCOTUSDocketEntry,
+    doc_data: dict[str, Any],
+    download_file: bool = True,
+) -> tuple[bool, int]:
+    """Merge a single SCOTUSDocument attachment into CL.
+
+    Checks if the document exists, creating a SCOTUSDocument object if it does
+    not. Then, if the document is new or the filename has changed,
+    fetch the attachment PDF, store it, and compute metadata.
+
+    :param docket_entry: The docket entry this attachment belongs to.
+    :param doc_data: The attachment data to merge.
+    :param download_file: Whether to trigger the PDF download and extraction
+    chain. Set to False when bulk importing to avoid overwhelming Celery
+    workers.
+    :return: Tuple with entries:
+        - A flag indicating whether the document was created.
+        - The pk of the SCOTUSDocument object.
+    """
+    document_number = doc_data["document_number"]
+    url = doc_data["document_url"]
+    description = doc_data.get("description", "")
+    attachment_number = doc_data["attachment_number"]
+
+    # Retrieve existing object or create new one
+    scotus_document, created = SCOTUSDocument.objects.get_or_create(
+        docket_entry=docket_entry,
+        document_number=document_number,
+        attachment_number=attachment_number,
+        defaults={
+            "description": description,
+            "url": url,
+        },
+    )
+
+    # Check if the filename has changed for existing documents
+    file_name_changed = False
+    if not created:
+        old_file_name = extract_file_name_from_url(scotus_document.url)
+        new_file_name = extract_file_name_from_url(url)
+        file_name_changed = old_file_name != new_file_name
+
+        # Update the fields
+        scotus_document.description = description
+        scotus_document.url = url
+        scotus_document.save(
+            update_fields=["description", "url", "date_modified"]
+        )
+
+    if download_file and (created or file_name_changed):
+        chain(
+            download_scotus_document_pdf.si(scotus_document.pk),
+            extract_pdf_document.s(
+                check_if_needed=False, model_name="search.SCOTUSDocument"
+            ),
+        ).apply_async()
+
+    return created, scotus_document.pk
+
+
+def merge_scotus_docket_entry(
+    docket: Docket,
+    sequence_number: str,
+    input_docket_entry: dict[str, Any],
+    download_file: bool = True,
+) -> tuple[bool, int | None]:
+    """Merges a SCOTUS docket entry into CL.
+
+    :param docket: The docket this entry belongs to.
+    :param sequence_number: The sequence number of the docket entry.
+    :param input_docket_entry: The docket entry being merged.
+    :param download_file: Whether to trigger PDF download and extraction.
+    :return: Tuple with the following entries:
+        - A flag which is set to true when the SCOTUSDocketEntry was created.
+        - The pk of the updated SCOTUSDocketEntry object.
+    """
+    with transaction.atomic():
+        # Acquire lock on the docket to prevent race conditions
+        Docket.objects.select_for_update().get(pk=docket.pk)
+        entry_number = input_docket_entry.get("document_number")
+        date_filed = input_docket_entry["date_filed"]
+        description = input_docket_entry["description"]
+        if entry_number:
+            params = {
+                "docket": docket,
+                "entry_number": entry_number,
+            }
+            try:
+                de = SCOTUSDocketEntry.objects.get(**params)
+                de_created = False
+            except SCOTUSDocketEntry.DoesNotExist:
+                de = SCOTUSDocketEntry(**params)
+                de_created = True
+            except SCOTUSDocketEntry.MultipleObjectsReturned:
+                logger.error(
+                    "Multiple matching SCOTUSDocketEntries found for entry_number "
+                    "%s on Docket %s.",
+                    entry_number,
+                    docket.pk,
+                )
+                return False, None
+
+        else:
+            normalize_long_description(input_docket_entry)
+            try:
+                de = SCOTUSDocketEntry.objects.get(
+                    docket=docket,
+                    description=input_docket_entry["description"],
+                    date_filed=input_docket_entry["date_filed"],
+                )
+                de_created = False
+            except SCOTUSDocketEntry.DoesNotExist:
+                # Check if sequence_number already exists
+                try:
+                    de = SCOTUSDocketEntry.objects.get(
+                        docket=docket,
+                        sequence_number=sequence_number,
+                    )
+                    de_created = False
+                except SCOTUSDocketEntry.DoesNotExist:
+                    de = SCOTUSDocketEntry(
+                        docket=docket,
+                        date_filed=date_filed,
+                        sequence_number=sequence_number,
+                    )
+                    de_created = True
+                except SCOTUSDocketEntry.MultipleObjectsReturned:
+                    logger.error(
+                        "Multiple matching SCOTUSDocketEntries found for sequence_number "
+                        "%s on Docket %s.",
+                        sequence_number,
+                        docket.pk,
+                    )
+                    return False, None
+            except SCOTUSDocketEntry.MultipleObjectsReturned:
+                logger.error(
+                    "Multiple matching unnumbered SCOTUSDocketEntries found for description "
+                    "%s on Docket %s.",
+                    input_docket_entry["description"],
+                    docket.pk,
+                )
+                return False, None
+
+        # Update fields
+        de.sequence_number = sequence_number
+        de.description = description
+        de.date_filed = date_filed
+        de.save()
+
+        # Merge attachments
+        attachments = input_docket_entry["attachments"]
+        for document in attachments:
+            merge_scotus_document(de, document, download_file=download_file)
+        return de_created, de.pk
+
+
+def add_scotus_docket_entries(
+    docket: Docket,
+    docket_entries: list[dict[str, Any]],
+    download_file: bool = True,
+) -> None:
+    """Add or update SCOTUS docket entries for a docket.
+
+    :param docket: The Docket to add entries to.
+    :param docket_entries: List of docket entry dicts from the scraper.
+    :param download_file: Whether to trigger PDF download and extraction.
+    :return: A three-tuple containing:
+        - List of SCOTUSDocketEntry PKs that were created or updated
+        - List of SCOTUSDocument PKs that were created
+        - List of SCOTUSDocument PKs that were updated
+    """
+    sequence_numbers = create_docket_entry_sequence_numbers(
+        docket_entries, "date_filed"
+    )
+    for sequence_number, docket_entry in zip(
+        sequence_numbers, docket_entries, strict=True
+    ):
+        de_created, de_pk = merge_scotus_docket_entry(
+            docket,
+            sequence_number,
+            docket_entry,
+            download_file=download_file,
+        )
+        if de_pk is None:
+            logger.warning(
+                "Failed to merge SCOTUSDocketEntry with sequence number %s "
+                "on Docket %s",
+                sequence_number,
+                docket.pk,
+            )
+            continue
+
+
+def merge_scotus_docket(
+    report_data: dict[str, Any],
+    download_file: bool = True,
+) -> tuple[Docket, bool]:
+    """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
+
+    This will create or update the Docket row for the SCOTUS and
+    then create or update the related ScotusDocketMetadata instance.
+
+    :param report_data: A dictionary containing parsed SCOTUS docket data.
+    :param download_file: Whether to trigger PDF download and extraction.
+    :return: A two-tuple: the created or updated Docket instance, whether the
+    QP file should be downloaded.
+    """
+    with transaction.atomic():
+        court = Court.objects.get(pk="scotus")
+        docket_number = report_data["docket_number"]
+        if not docket_number:
+            raise ValueError(
+                "Docket number can't be missing in SCOTUS dockets."
+            )
+
+        case_name = report_data.get("case_name", "")
+        date_filed = report_data.get("date_filed")
+        lower_court_name = report_data.get("lower_court")
+
+        d = async_to_sync(find_docket_object)(
+            court.pk,
+            None,
+            docket_number,
+            None,
+            None,
+            None,
+        )
+
+        if d.pk:
+            # If the docket already exists, compound the SCRAPER source.
+            d.add_scraper_source()
+        else:
+            # Add SCRAPER source by default if it's a new Docket.
+            d.source = Docket.SCRAPER
+
+        d.docket_number = docket_number
+        d.docket_number_raw = docket_number
+        d.case_name = case_name if case_name else d.case_name
+        d.date_filed = date_filed if date_filed else d.date_filed
+        d.appeal_from_str = (
+            lower_court_name if lower_court_name else d.appeal_from_str
+        )
+        if lower_court_name:
+            lower_court = find_court_object_by_name(
+                lower_court_name, bankruptcy=False
+            )
+            d.appeal_from = (
+                lower_court if lower_court is not None else d.appeal_from
+            )
+
+        lower_court_case_numbers = report_data.get("lower_court_case_numbers")
+        lower_court_case_numbers_raw = report_data.get(
+            "lower_court_case_numbers_raw"
+        )
+        lower_court_decision_date = report_data.get(
+            "lower_court_decision_date"
+        )
+        lower_court_rehearing_denied_date = report_data.get(
+            "lower_court_rehearing_denied_date"
+        )
+        if (
+            lower_court_case_numbers
+            or lower_court_decision_date
+            or lower_court_rehearing_denied_date
+        ):
+            oci = d.originating_court_information
+            # Create originating_court_information if missing
+            oci = OriginatingCourtInformation() if not oci else oci
+
+            oci.docket_number = (
+                ", ".join(lower_court_case_numbers)
+                if lower_court_case_numbers
+                else oci.docket_number
+            )
+            oci.docket_number_raw = (
+                lower_court_case_numbers_raw
+                if lower_court_case_numbers_raw
+                else oci.docket_number_raw
+            )
+            oci.date_judgment = (
+                lower_court_decision_date
+                if lower_court_decision_date
+                else oci.date_judgment
+            )
+            oci.date_rehearing_denied = (
+                lower_court_rehearing_denied_date
+                if lower_court_rehearing_denied_date
+                else oci.date_rehearing_denied
+            )
+            oci.save()
+            d.originating_court_information = oci
+        d.save()
+
+        # Merge ScotusDocketMetadata
+        defaults = {
+            "capital_case": bool(report_data.get("capital_case")),
+            "date_discretionary_court_decision": report_data.get(
+                "discretionary_court_decision"
+            ),
+        }
+        if links := report_data.get("links", ""):
+            defaults["linked_with"] = links
+
+        if qp_url := report_data.get("questions_presented"):
+            # Some pages use relative URLs (e.g. "../qp/14-00556qp.pdf"
+            # found in 14-556.html). Resolve them against the SCOTUS base
+            # URL so we always store an absolute URL.
+            if not qp_url.startswith("http"):
+                qp_url = urljoin("https://www.supremecourt.gov/", qp_url)
+            defaults["questions_presented_url"] = qp_url
+
+        scotus_metadata, _ = ScotusDocketMetadata.objects.update_or_create(
+            docket=d,
+            defaults=defaults,
+        )
+        download_qp = bool(
+            qp_url and not scotus_metadata.questions_presented_file
+        )
+
+    # Merge Parties
+    if report_data["parties"]:
+        normalized_parties = normalize_scotus_parties(report_data["parties"])
+        add_parties_and_attorneys(d, normalized_parties)
+
+    # Docket entries merger:
+    enrich_scotus_attachments(report_data["docket_entries"])
+    add_scotus_docket_entries(
+        d, report_data["docket_entries"], download_file=download_file
+    )
+
+    return d, download_qp
+
+
+@app.task(bind=True)
+def process_scotus_docket(
+    self,
+    report_data: dict[str, Any],
+    download_file: bool = True,
+) -> None:
+    """Process and merge a SCOTUS docket report.
+
+    This task merges the provided SCOTUS docket report data into the database,
+    triggers the asynchronous download of related PDFs, and controls task
+    chaining behavior based on whether new RECAPDocument records were created.
+
+    :param self: The Celery task instance.
+    :param report_data: Parsed SCOTUS docket report data.
+    :param download_file: Whether to trigger PDF download and extraction.
+    :return: None
+    """
+    docket, download_qp = merge_scotus_docket(
+        report_data, download_file=download_file
+    )
+    if download_qp:
+        download_qp_scotus_pdf.delay(docket.pk)
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+)
+def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
+    """Download a PDF for a SCOTUS document.
+
+    :param self: The Celery task instance
+    :param doc_pk: The primary key of the SCOTUSDocument instance
+        to update the attachment for.
+    """
+    try:
+        doc = SCOTUSDocument.objects.get(pk=doc_pk)
+    except SCOTUSDocument.DoesNotExist:
+        logger.warning(
+            "SCOTUS document PDF download: SCOTUSDocument %s does not exist; skipping.",
+            doc_pk,
+        )
+        self.request.chain = None
+        return None
+
+    url = doc.url
+    logger.info(
+        "SCOTUS PDF download: Fetching PDF for SCOTUSDocument %s from %s",
+        doc_pk,
+        url,
+    )
+    with download_pdf_in_stream(url, doc_pk, "scotus_") as result:
+        if result is None:
+            logger.error(
+                "Failed to download attachment PDF for SCOTUSDocument %s from URL %s.",
+                doc_pk,
+                url,
+            )
+            self.request.chain = None
+            return None
+
+        tmp, sha1_hash = result
+        filename = (
+            f"scotus.{doc.docket_entry.docket.docket_number}."
+            f"{doc.document_number}."
+            f"{doc.attachment_number or 0}.pdf"
+        )
+        downloaded_file = File(tmp)
+        doc.filepath_local.save(filename, downloaded_file, save=False)
+        doc.file_size = downloaded_file.size
+        doc.sha1 = sha1_hash
+        response = async_to_sync(doc_page_count_service)(doc)
+        if response.is_success:
+            doc.page_count = int(response.text)
+        assert isinstance(doc.page_count, (int | type(None))), (
+            "page_count must be an int or None."
+        )
+        doc.save()
+        return doc_pk
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def download_and_parse_scotus_docket(
+    self: Task, bucket: str, s3_key: str
+) -> dict[str, Any] | None:
+    """Download a SCOTUS docket file from S3 and parse it.
+
+    :param self: The Celery task instance.
+    :param bucket: The S3 bucket name.
+    :param s3_key: The S3 key for the docket file.
+    :return: Parsed docket data dict.
+    """
+
+    logger.info("Downloading and parsing SCOTUS file: %s.", s3_key)
+    storage = AWSMediaStorage(bucket_name=bucket)
+    with storage.open(s3_key, "rb") as f:
+        content = f.read().decode("utf-8")
+
+    ext = s3_key.rsplit(".", 1)[-1].lower()
+    parser_map: dict[str, type] = {
+        "json": SCOTUSDocketReport,
+        "html": SCOTUSDocketReportHTML,
+        "htm": SCOTUSDocketReportHTM,
+    }
+    if not (parser_cls := parser_map.get(ext)):
+        logger.error("Unsupported file extension: %s for %s", ext, s3_key)
+        self.request.chain = None
+        return None
+
+    parser = parser_cls()
+    parser._parse_text(content)
+    return parser.data
+
+
+def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
+    """Trigger the SCOTUS docket ingestion task that processes a SCOTUS
+    docket report, downloads and merges related documents, and extracts
+    document text from the resulting PDFs.
+
+    :param docket_data: Parsed SCOTUS docket report data.
+    :return: None.
+    """
+    process_scotus_docket.delay(docket_data)
 
 
 @app.task(
