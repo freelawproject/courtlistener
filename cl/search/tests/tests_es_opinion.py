@@ -3095,6 +3095,25 @@ class RelatedSearchTest(
         self.assertIn("Voutila", h2_content)
         self.assertIn("Bonvini", h2_content)
 
+    def test_related_search_pagination_depth_limit(self) -> None:
+        """Verify related queries are limited to 5 pages max."""
+        seed_pk = self.opinion_1.pk
+
+        params = {"type": "o", "q": f"related:{seed_pk}"}
+        params.update(
+            {f"stat_{s}": "on" for s, v in PRECEDENTIAL_STATUS.NAMES}
+        )
+
+        # Page 5 should work
+        params["page"] = 5
+        r = self.client.get(reverse("show_results"), params)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+        # Page 6 should be denied
+        params["page"] = 6
+        r = self.client.get(reverse("show_results"), params)
+        self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
+
     async def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
         seed_pk = self.opinion_cluster_3.pk  # case name cluster 3

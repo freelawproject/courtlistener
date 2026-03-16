@@ -15,11 +15,12 @@
     {'href': '#the-apis', 'text': 'The APIs', 'children': [
       {'href': '#dockets', 'text': 'Dockets'},
       {'href': '#courts', 'text': 'Courts'},
-      {'href': '#docker-entries', 'text': 'Docker Entries'},
+      {'href': '#docket-entries', 'text': 'Docket Entries'},
       {'href': '#documents', 'text': 'Documents'},
       {'href': '#parties', 'text': 'Parties'},
       {'href': '#attorneys', 'text': 'Attorneys'},
       {'href': '#orig-court-info', 'text': 'Originating Court Info'},
+      {'href': '#bankruptcy-information-endpoint', 'text': 'Bankruptcy Info'},
       {'href': '#integrated-db', 'text': 'Integrated Database'},
       ]},
     {'href': '#fast-doc-lookup', 'text': 'Fast Document Lookup'},
@@ -126,7 +127,7 @@ curl -v \
     <p>You can generally cache this API. It does not change often.</p>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="docker-entries">
+  <c-layout-with-navigation.section id="docket-entries">
     <h3>Docket Entries <small> — <code>{% url "docketentry-list" version=version %}</code></small></h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
@@ -287,6 +288,12 @@ curl -v \
     <p><code>Originating Court Information</code> represents the information gathered at an appellate court about a case when it was in a lower court or administrative body.</p>
     <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.</p>
     <p>Cross-walking from the upper court docket to the lower is possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="bankruptcy-information-endpoint">
+    <h3>Bankruptcy Information <small> — <code class="whitespace-nowrap">{% url 'bankruptcyinformation-list' version=version %}</code></small></h3>
+    <p><code>Bankruptcy Information</code> represents metadata specific to PACER bankruptcy dockets, such as details about the bankruptcy case, including the chapter, trustee information, and key dates.</p>
+    <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, it is only populated for dockets acquired from bankruptcy courts via PACER, so it does not apply to other types of cases.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="integrated-db">

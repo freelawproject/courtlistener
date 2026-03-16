@@ -2,6 +2,7 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 
 import redis
+from django.conf import settings
 from django.db import OperationalError, connections
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
@@ -80,7 +81,7 @@ def tally_stat(
     inc=1,
     date_logged=None,
     prometheus_handler_key="",
-) -> int:
+) -> int | None:
     """Tally an event's occurrence to Redis.
 
     Will assume the following overridable values:
@@ -88,7 +89,7 @@ def tally_stat(
        - the event happened once.
     """
     if not switch_is_active("increment-stats"):
-        return
+        return None
 
     current_dt = now()
     if date_logged is None:
@@ -117,10 +118,13 @@ def check_elasticsearch() -> bool:
 
     it retrieves the cluster health information and returns:
 
+    * True:  if Elasticsearch is disabled for this environment.
     * True:  if the cluster health status is "green" (healthy).
     * False: if the cluster health is not "green" or an error occurs
               during connection or health retrieval.
     """
+    if settings.ELASTICSEARCH_DISABLED:
+        return True
     try:
         es = es_connections.get_connection()
         cluster_health = es.cluster.health()

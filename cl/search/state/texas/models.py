@@ -79,7 +79,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
-    url = models.URLField()
+    url = models.URLField(max_length=250)
 
     class Meta:
         app_label = "search"
