@@ -62,6 +62,10 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/utils/document-number/pdf/",
         "timeout": 60,
     },
+    "check-redactions": {
+        "url": f"{DOCTOR_HOST}/utils/check-redactions/pdf/",
+        "timeout": 10,
+    },
     # Converter Endpoints
     "generate-thumbnail": {
         "url": f"{DOCTOR_HOST}/convert/pdf/thumbnail/",
