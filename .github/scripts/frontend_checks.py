@@ -330,8 +330,8 @@ def _has_ancestor_link_styling(lines: list[str], line_idx: int) -> bool:
         ln = lines[j]
         # Closing tags mean we entered a sibling subtree — increase depth
         depth += len(re.findall(r"</\w", ln))
-        # Opening tags (excluding <a> itself) decrease depth
-        opens = re.findall(r"<(?!/)(?!a[\s>])\w", ln)
+        # Opening tags decrease depth
+        opens = re.findall(r"<(?!/)\w", ln)
         if opens:
             depth -= len(opens)
             if depth <= 0:
