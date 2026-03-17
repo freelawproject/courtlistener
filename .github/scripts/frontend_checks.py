@@ -319,10 +319,10 @@ def check_sync_notice(lines: list[str]) -> list[tuple[int, str]]:
 def _has_ancestor_link_styling(lines: list[str], line_idx: int) -> bool:
     """Check whether an ancestor element styles links via ``[&_a]:``.
 
-    Scans backward from *line_idx* (0-based) looking for an opening tag
-    whose class contains a Tailwind ``[&_a]:`` descendant selector, which
-    styles child ``<a>`` elements without requiring a class on the ``<a>``
-    itself.
+    Tailwind's arbitrary variant syntax ``[&_a]:`` applies styles to all
+    descendant ``<a>`` elements, so the link itself doesn't need a class.
+
+    See: https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants
     """
     ancestor_re = re.compile(r"\[&_a\]:")
     depth = 0
@@ -871,6 +871,22 @@ def format_summary_markdown(findings: list[Finding]) -> str:
             # Escape pipe characters in message
             msg = f.message.replace("|", "\\|")
             lines.append(f"| `{f.file}` | {f.line} | {f.check} | {msg} |")
+        lines.append("")
+
+    # Add help sections for specific checks
+    bare_link_findings = [f for f in findings if f.check == "check_bare_links"]
+    if bare_link_findings:
+        lines.append("### Help: Unstyled links")
+        lines.append("")
+        lines.append(
+            "Links in redesign templates need Tailwind styling classes. Common fixes:"
+        )
+        lines.append(
+            '- Add classes directly: `<a class="text-primary-600 hover:underline" ...>`'
+        )
+        lines.append(
+            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:text-primary-600 [&_a]:hover:underline">`'
+        )
         lines.append("")
 
     return "\n".join(lines)
