@@ -316,6 +316,73 @@ def check_sync_notice(lines: list[str]) -> list[tuple[int, str]]:
     return []
 
 
+def _has_ancestor_link_styling(lines: list[str], line_idx: int) -> bool:
+    """Check whether an ancestor element styles links via ``[&_a]:``.
+
+    Tailwind's arbitrary variant syntax ``[&_a]:`` applies styles to all
+    descendant ``<a>`` elements, so the link itself doesn't need a class.
+
+    See: https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants
+    """
+    ancestor_re = re.compile(r"\[&_a\]:")
+    depth = 0
+    for j in range(line_idx - 1, -1, -1):
+        ln = lines[j]
+        # Closing tags mean we entered a sibling subtree — increase depth
+        depth += len(re.findall(r"</\w", ln))
+        # Opening tags decrease depth
+        opens = re.findall(r"<(?!/)\w", ln)
+        if opens:
+            depth -= len(opens)
+            if depth <= 0:
+                tag = _get_full_tag(lines, j)
+                if ancestor_re.search(tag):
+                    return True
+    return False
+
+
+def _link_wraps_visual_content(
+    lines: list[str], line_idx: int, col: int
+) -> bool:
+    """Check whether an ``<a>`` tag only wraps visual elements.
+
+    Links that wrap images or SVGs don't need text-styling classes.
+    Recognised visual patterns: ``<img>``, ``<svg>``, ``{% svg %}``.
+    """
+    # Find end of the <a ...> opening tag
+    content = ""
+    found_close = False
+    for j in range(line_idx, len(lines)):
+        segment = lines[j] if j != line_idx else lines[j][col:]
+        gt = segment.find(">")
+        if gt != -1:
+            content = segment[gt + 1 :]
+            found_close = True
+            start_line = j
+            break
+    if not found_close:
+        return False
+
+    # Collect content until </a>
+    for j in range(start_line, len(lines)):
+        if j != start_line:
+            content += " " + lines[j]
+        end = content.find("</a>")
+        if end != -1:
+            content = content[:end]
+            break
+    else:
+        return False
+
+    # Strip visual elements and whitespace — if nothing remains, it's
+    # a visual-only link.
+    inner = content.strip()
+    inner = re.sub(r"<img\b[^>]*/?>", "", inner)
+    inner = re.sub(r"<svg\b.*?</svg>", "", inner, flags=re.DOTALL)
+    inner = re.sub(r"\{%\s*svg\b[^%]*%\}", "", inner)
+    return inner.strip() == ""
+
+
 def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
     """Flag <a> tags without class attribute (heuristic)."""
     results = []
@@ -327,6 +394,10 @@ def check_bare_links(lines: list[str]) -> list[tuple[int, str]]:
         for m in a_tag_re.finditer(line):
             full_tag = _get_full_tag(lines, i - 1, col=m.start())
             if not class_re.search(full_tag):
+                if _has_ancestor_link_styling(lines, i - 1):
+                    continue
+                if _link_wraps_visual_content(lines, i - 1, m.start()):
+                    continue
                 results.append(
                     (
                         i,
@@ -800,6 +871,22 @@ def format_summary_markdown(findings: list[Finding]) -> str:
             # Escape pipe characters in message
             msg = f.message.replace("|", "\\|")
             lines.append(f"| `{f.file}` | {f.line} | {f.check} | {msg} |")
+        lines.append("")
+
+    # Add help sections for specific checks
+    bare_link_findings = [f for f in findings if f.check == "check_bare_links"]
+    if bare_link_findings:
+        lines.append("### Help: Unstyled links")
+        lines.append("")
+        lines.append(
+            "Links in redesign templates need Tailwind styling classes. Common fixes:"
+        )
+        lines.append(
+            '- Add classes directly: `<a class="text-primary-600 hover:underline" ...>`'
+        )
+        lines.append(
+            '- Style from a parent using [descendant selectors](https://tailwindcss.com/docs/hover-focus-and-other-states#styling-based-on-descendants): `<div class="[&_a]:text-primary-600 [&_a]:hover:underline">`'
+        )
         lines.append("")
 
     return "\n".join(lines)
