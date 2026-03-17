@@ -4218,19 +4218,19 @@ def merge_texas_document(
 def merge_texas_docket_entry(
     docket: Docket,
     sequence_number: str,
-    appellate_brief: bool,
-    input_docket_entry: TexasCaseEvent
-    | TexasAppellateBrief
-    | TexasSupremeCourtCaseEvent
-    | TexasSupremeCourtAppellateBrief,
+    case_event: TexasCaseEvent | TexasSupremeCourtCaseEvent,
+    appellate_brief: TexasAppellateBrief
+    | TexasSupremeCourtAppellateBrief
+    | None = None,
     download_attachments: bool = True,
 ) -> MergeResult:
     """Merges a Texas docket entry into CL.
 
     :param docket: The docket this entry belongs to.
     :param sequence_number: The sequence number of the docket entry.
-    :param appellate_brief: Whether the docket entry is an appellate brief.
-    :param input_docket_entry: The docket entry being merged.
+    :param case_event: The docket entry information being merged.
+    :param appellate_brief: Appellate brief information if the docket entry is
+        an appellate brief, None otherwise.
     :param download_attachments: Whether to download docket entry attachments.
 
     :return: Tuple with the following entries
@@ -4245,12 +4245,13 @@ def merge_texas_docket_entry(
         sequence_number,
         docket.pk,
     )
+    appellate_brief_flag = bool(appellate_brief)
     Docket.objects.select_for_update().get(pk=docket.pk)
     docket_entries = TexasDocketEntry.objects.filter(
         docket=docket,
-        date_filed=input_docket_entry["date"],
-        entry_type=input_docket_entry["type"],
-        appellate_brief=appellate_brief,
+        date_filed=case_event["date"],
+        entry_type=case_event["type"],
+        appellate_brief=appellate_brief_flag,
     )
 
     docket_entry = None
@@ -4260,21 +4261,20 @@ def merge_texas_docket_entry(
         pass
     except TexasDocketEntry.MultipleObjectsReturned:
         # More filtering needed
-        matching_sequence_number = docket_entries.filter(
+        matching_sequence_numbers = docket_entries.filter(
             sequence_number=sequence_number
-        ).first()
-        logger.info(
-            "Multiple matching TexasDocketEntries found for sequence number %s on Docket %s.",
-            sequence_number,
-            docket.pk,
         )
-        if matching_sequence_number:
-            logger.info(
-                "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
+        try:
+            docket_entry = matching_sequence_numbers.get()
+        except TexasDocketEntry.MultipleObjectsReturned:
+            logger.error(
+                "Multiple matching TexasDocketEntries found for sequence number %s on Docket %s.",
                 sequence_number,
                 docket.pk,
             )
-            docket_entry = matching_sequence_number
+            docket_entry = matching_sequence_numbers.first()
+        except TexasDocketEntry.DoesNotExist:
+            pass
     else:
         logger.info(
             "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
@@ -4284,23 +4284,20 @@ def merge_texas_docket_entry(
 
     created = False
     if not docket_entry:
-        logger.error(
-            "No existing TexasDocketEntry found for sequence number %s on Docket %s. Creating new entry.",
-            sequence_number,
-            docket.pk,
-        )
         docket_entry = TexasDocketEntry(
             docket=docket,
-            date_filed=input_docket_entry["date"],
-            entry_type=input_docket_entry["type"],
-            appellate_brief=appellate_brief,
+            date_filed=case_event["date"],
+            entry_type=case_event["type"],
+            appellate_brief=appellate_brief_flag,
         )
         created = True
 
     docket_entry.sequence_number = sequence_number
-    docket_entry.description = input_docket_entry.get("description", "")
-    docket_entry.disposition = input_docket_entry.get("disposition", "")
-    docket_entry.remarks = input_docket_entry.get("remarks", "")
+    docket_entry.description = (
+        appellate_brief["description"] if appellate_brief else ""
+    )
+    docket_entry.disposition = case_event["disposition"]
+    docket_entry.remarks = case_event.get("remarks", "")
     docket_entry.save()
 
     logger.info(
@@ -4312,7 +4309,7 @@ def merge_texas_docket_entry(
         merge_texas_document(
             docket_entry, document, download_attachments=download_attachments
         )
-        for document in input_docket_entry["attachments"]
+        for document in case_event["attachments"]
     ]
 
     return MergeResult(
@@ -4321,6 +4318,58 @@ def merge_texas_docket_entry(
         success=all(r.success for r in document_results),
         pk=docket_entry.pk,
     )
+
+
+def merge_texas_docket_entries(
+    docket: Docket,
+    case_events: list[TexasCaseEvent] | list[TexasSupremeCourtCaseEvent],
+    appellate_briefs: list[TexasAppellateBrief]
+    | list[TexasSupremeCourtAppellateBrief],
+    download_attachments: bool = True,
+) -> MergeResult:
+    """
+    Merges a list of Texas case events and Texas appellate briefs for a given
+    docket into CL.
+
+    :param docket: The parent docket.
+    :param case_events: Scraped case events.
+    :param appellate_briefs: Scraped appellate briefs.
+    :param download_attachments: Whether to download attachments.
+
+    :return: The result of the attempted merge operation.
+    """
+    brief_iter = iter(appellate_briefs)
+    next_brief = next(brief_iter, None)
+
+    create = False
+    update = False
+    success = True
+    for i, (case_event, sequence_number) in enumerate(
+        zip(case_events, create_docket_entry_sequence_numbers(case_events))
+    ):
+        appellate_brief = None
+        if (
+            next_brief is not None
+            and case_event["date"] == next_brief["date"]
+            and case_event["type"] == next_brief["type"]
+            and case_event["attachments"] == next_brief["attachments"]
+        ):
+            appellate_brief = next_brief
+            next_brief = next(brief_iter, None)
+
+        merge_result = merge_texas_docket_entry(
+            docket,
+            sequence_number,
+            case_event,
+            appellate_brief,
+            download_attachments=download_attachments,
+        )
+
+        create = merge_result.create or create
+        update = merge_result.update or update
+        success = merge_result.success and success
+
+    return MergeResult(create=create, update=update, success=success, pk=None)
 
 
 def normalize_texas_parties(
@@ -4652,41 +4701,6 @@ def merge_texas_case_transfers(
     )
 
 
-def generate_texas_appellate_brief_flags(
-    case_events: list[TexasCaseEvent],
-    appellate_briefs: list[TexasAppellateBrief],
-) -> list[bool]:
-    """Generates a list of booleans indicating whether the corresponding entry
-    in the list of TexasCaseEvents is in the list of TexasAppellateBriefs.
-
-    The "Appellate Briefs" table in TAMES appears to always be a subset of the
-    case events table. Therefore, we simply use the case events table to
-    generate docket entries and set an "appellate_brief" flag to indicate
-    whether the entry appears in the appellate briefs table. This method
-    generates those flags given the list of case events and the list of
-    appellate briefs.
-
-    :param case_events: A list of TexasCaseEvent objects.
-    :param appellate_briefs: A list of TexasAppellateBrief objects.
-    :return: A list of booleans indicating whether the corresponding entry is
-    an appellate brief."""
-    brief_iter = iter(appellate_briefs)
-    next_brief = next(brief_iter, None)
-    flags = []
-    for case_event in case_events:
-        if (
-            next_brief is not None
-            and case_event["date"] == next_brief["date"]
-            and case_event["type"] == next_brief["type"]
-            and case_event["attachments"] == next_brief["attachments"]
-        ):
-            flags.append(True)
-            next_brief = next(brief_iter, None)
-        else:
-            flags.append(False)
-    return flags
-
-
 def merge_texas_docket(
     docket_data: TexasCourtOfAppealsDocket
     | TexasCourtOfCriminalAppealsDocket
@@ -4790,22 +4804,12 @@ def merge_texas_docket(
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
 
-    entry_merge_results = [
-        merge_texas_docket_entry(
-            docket,
-            sequence_number,
-            appellate_brief,
-            entry,
-            download_attachments=download_attachments,
-        )
-        for sequence_number, appellate_brief, entry in zip(
-            create_docket_entry_sequence_numbers(docket_data["case_events"]),
-            generate_texas_appellate_brief_flags(
-                docket_data["case_events"], docket_data["appellate_briefs"]
-            ),
-            docket_data["case_events"],
-        )
-    ]
+    entry_merge_result = merge_texas_docket_entries(
+        docket,
+        docket_data["case_events"],
+        docket_data["appellate_briefs"],
+        download_attachments=download_attachments,
+    )
 
     merge_case_transfer_result = merge_texas_case_transfers(
         docket, docket_data
@@ -4816,21 +4820,21 @@ def merge_texas_docket(
         or trial_court_result.create
         or originating_court_merge_result.create
         or merge_case_transfer_result.create
-        or any(r.create for r in entry_merge_results)
+        or entry_merge_result.create
     )
     update = (
         party_merge_result.update
         or trial_court_result.update
         or originating_court_merge_result.update
         or merge_case_transfer_result.update
-        or any(r.update for r in entry_merge_results)
+        or entry_merge_result.update
     )
     success = (
         party_merge_result.success
         and trial_court_result.success
         and originating_court_merge_result.success
         and merge_case_transfer_result.success
-        and all(r.success for r in entry_merge_results)
+        and entry_merge_result.success
     )
     if not success:
         logger.error(

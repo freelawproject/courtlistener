@@ -240,23 +240,35 @@ class TexasFinalCourtDocketDictFactory(TexasCommonDataDictFactory):
         if not create:
             return
         if obj["court_id"] == CourtID.SUPREME_COURT.value:
-            obj["case_events"] = map(
-                lambda ce: TexasSupremeCourtCaseEventDictFactory(
-                    date=ce["date"],
-                    type=ce["type"],
-                    attachments=ce["attachments"],
-                    disposition=ce["disposition"],
-                ),
-                obj["case_events"],
+            obj["case_events"] = list(
+                map(
+                    lambda ce: TexasSupremeCourtCaseEventDictFactory(
+                        date=ce["date"],
+                        type=ce["type"],
+                        attachments=ce["attachments"],
+                        disposition=ce["disposition"],
+                        remarks=ce.get(
+                            "remarks",
+                            TexasSupremeCourtCaseEventDictFactory.remarks,
+                        ),
+                    ),
+                    obj["case_events"],
+                )
             )
-            obj["appellate_briefs"] = map(
-                lambda ab: TexasSupremeCourtAppellateBriefDictFactory(
-                    date=ab["date"],
-                    type=ab["type"],
-                    attachments=ab["attachments"],
-                    description=ab["description"],
-                ),
-                obj["appellate_briefs"],
+            obj["appellate_briefs"] = list(
+                map(
+                    lambda ab: TexasSupremeCourtAppellateBriefDictFactory(
+                        date=ab["date"],
+                        type=ab["type"],
+                        attachments=ab["attachments"],
+                        description=ab["description"],
+                        remarks=ab.get(
+                            "remarks",
+                            TexasSupremeCourtAppellateBriefDictFactory.remarks,
+                        ),
+                    ),
+                    obj["appellate_briefs"],
+                )
             )
         if obj["is_direct_appeal"]:
             obj["appeals_court"] = TexasAppellateCourtInfoDictFactory(

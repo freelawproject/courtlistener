@@ -86,7 +86,6 @@ from cl.corpus_importer.tasks import (
     classify_case_name_by_llm,
     download_texas_document_pdf,
     generate_ia_json,
-    generate_texas_appellate_brief_flags,
     get_and_save_free_document_report,
     merge_texas_case_transfers,
     merge_texas_docket,
@@ -2239,9 +2238,34 @@ class TexasMergerTest(TestCase):
             ],
         )
 
-    def test_generate_appellate_brief_flags(self):
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_parties",
+        return_value=MergeResult.created(1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_case_transfers",
+        return_value=MergeResult.created(1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_trial_court_data",
+        return_value=MergeResult.created(1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_docket_originating_court",
+        return_value=MergeResult.created(1),
+    )
+    def test_merge_docket_entries_integration(
+        self,
+        mock_texas_oci,
+        mock_texas_tcd,
+        mock_texas_transfers,
+        mock_texas_parties,
+    ):
         n_events = fake.random_int(min=0, max=30)
-        case_events = [TexasCaseEventDictFactory() for _ in range(n_events)]
+        case_events = sorted(
+            [TexasSupremeCourtCaseEventDictFactory() for _ in range(n_events)],
+            key=lambda ce: ce["date"],
+        )
 
         if len(case_events) == 0:
             appellate_brief_indices = []
@@ -2251,26 +2275,71 @@ class TexasMergerTest(TestCase):
             )
 
         appellate_briefs = [
-            TexasAppellateBriefDictFactory(
+            TexasSupremeCourtAppellateBriefDictFactory(
                 date=case_events[i]["date"],
                 type=case_events[i]["type"],
                 attachments=case_events[i]["attachments"],
+                remarks=case_events[i]["remarks"],
             )
             for i in appellate_brief_indices
         ]
-
-        appellate_brief_flags = generate_texas_appellate_brief_flags(
-            case_events, appellate_briefs
-        )
 
         actual_flags = [
             True if i in appellate_brief_indices else False
             for i in range(len(case_events))
         ]
 
-        assert appellate_brief_flags == actual_flags, (
-            f"Incorrect appellate brief flags ({appellate_brief_flags}!={actual_flags}).\nCase events: {case_events}\nAppellate briefs: {appellate_briefs}"
+        docket_dict = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            case_events=case_events,
+            appellate_briefs=appellate_briefs,
         )
+        original_docket_entries = [
+            e["pk"] for e in TexasDocketEntry.objects.all().values("pk")
+        ]
+        merge_result = merge_texas_docket(docket_dict)
+
+        docket_entries = list(
+            TexasDocketEntry.objects.exclude(
+                pk__in=original_docket_entries
+            ).order_by("sequence_number")
+        )
+        self.assertEqual(
+            len(docket_entries),
+            len(case_events),
+            f"Generated {len(docket_entries)} docket entries from {len(case_events)} input case events.",
+        )
+
+        ab_index = 0
+        for i, docket_entry in enumerate(docket_entries):
+            self.assertEqual(
+                docket_entry.appellate_brief,
+                actual_flags[i],
+                f"Docket entry {i} has the wrong appellate brief flag (found {docket_entry.appellate_brief}, expected {actual_flags[i]}).",
+            )
+            self.assertEqual(
+                docket_entry.remarks,
+                case_events[i]["remarks"],
+                f"Docket entry {i} has the wrong remarks (found {docket_entry.remarks}, expected {case_events[i]['remarks']}).",
+            )
+            self.assertEqual(
+                docket_entry.disposition,
+                case_events[i]["disposition"],
+                f"Docket entry {i} has the wrong disposition (found {docket_entry.disposition}, expected {case_events[i]['disposition']}).",
+            )
+            if actual_flags[i]:
+                self.assertEqual(
+                    docket_entry.description,
+                    appellate_briefs[ab_index]["description"],
+                    f"Docket entry {i} has the wrong description (found {docket_entry.description}, expected {appellate_briefs[ab_index]['description']}).",
+                )
+                ab_index += 1
+            else:
+                self.assertEqual(
+                    docket_entry.description,
+                    "",
+                    f"Docket entry {i} should not have description (found {docket_entry.description}).",
+                )
 
     def test_merge_texas_document_new_document(self):
         """Can we correctly add a new attachment to an existing docket entry?"""
@@ -2428,15 +2497,22 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_entry_new_entry(self):
         """Can we correctly handle a docket entry?"""
-        docket_entry = self.get_random_docket_entry_dict(
+        case_event = TexasCaseEventDictFactory(
             attachments=[TexasCaseDocumentDictFactory()],
             date=date.fromisoformat("2025-01-02"),
             type="Brief",
         )
+        appellate_brief = None
+        if fake.boolean():
+            appellate_brief = TexasAppellateBriefDictFactory(
+                date=case_event["date"],
+                type=case_event["type"],
+                attachments=case_event["attachments"],
+            )
 
         with self.captureOnCommitCallbacks(execute=True):
             output = merge_texas_docket_entry(
-                self.docket_coa1, "2025-01-02.000", True, docket_entry
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
         assert output.create is True
@@ -2445,15 +2521,13 @@ class TexasMergerTest(TestCase):
         assert output.pk is not None
         created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == docket_entry["type"]
-        assert created_docket_entry.disposition == docket_entry.get(
-            "disposition", ""
+        assert created_docket_entry.entry_type == case_event["type"]
+        assert created_docket_entry.disposition == case_event["disposition"]
+        assert created_docket_entry.description == (
+            appellate_brief["description"] if appellate_brief else ""
         )
-        assert created_docket_entry.description == docket_entry.get(
-            "description", ""
-        )
-        assert created_docket_entry.remarks == docket_entry.get("remarks", "")
-        assert created_docket_entry.date_filed == docket_entry["date"]
+        assert created_docket_entry.remarks == case_event.get("remarks", "")
+        assert created_docket_entry.date_filed == case_event["date"]
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
@@ -2462,11 +2536,22 @@ class TexasMergerTest(TestCase):
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
-        js_docket_entry = self.get_random_docket_entry_dict()
+        case_event = TexasCaseEventDictFactory(
+            attachments=[TexasCaseDocumentDictFactory()],
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+        appellate_brief = None
+        if fake.boolean():
+            appellate_brief = TexasAppellateBriefDictFactory(
+                date=case_event["date"],
+                type=case_event["type"],
+                attachments=case_event["attachments"],
+            )
 
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_docket_entry(
-                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
         pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
@@ -2479,7 +2564,7 @@ class TexasMergerTest(TestCase):
         # noop
         with self.captureOnCommitCallbacks(execute=True):
             output = merge_texas_docket_entry(
-                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
         assert output.create is False
@@ -2489,31 +2574,38 @@ class TexasMergerTest(TestCase):
         assert output.pk == pk
         created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == js_docket_entry["type"]
-        assert created_docket_entry.disposition == js_docket_entry.get(
-            "disposition", ""
+        assert created_docket_entry.entry_type == case_event["type"]
+        assert created_docket_entry.disposition == case_event["disposition"]
+        assert created_docket_entry.description == (
+            appellate_brief["description"] if appellate_brief else ""
         )
-        assert created_docket_entry.description == js_docket_entry.get(
-            "description", ""
-        )
-        assert created_docket_entry.remarks == js_docket_entry.get(
-            "remarks", ""
-        )
-        assert created_docket_entry.date_filed == js_docket_entry["date"]
+        assert created_docket_entry.remarks == case_event.get("remarks", "")
+        assert created_docket_entry.date_filed == case_event["date"]
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == len(js_docket_entry["attachments"])
+        assert n_attachments == len(case_event["attachments"])
         assert self.extract_pdf_document_mock.call_count == 0
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
-        js_docket_entry = self.get_random_docket_entry_dict()
-        initial_n_attachments = len(js_docket_entry["attachments"])
+        case_event = TexasCaseEventDictFactory(
+            attachments=[TexasCaseDocumentDictFactory()],
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+        appellate_brief = None
+        if fake.boolean():
+            appellate_brief = TexasAppellateBriefDictFactory(
+                date=case_event["date"],
+                type=case_event["type"],
+                attachments=case_event["attachments"],
+            )
+        initial_n_attachments = len(case_event["attachments"])
 
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_docket_entry(
-                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
         pk = result.pk
         documents = TexasDocument.objects.filter(docket_entry_id=pk)
@@ -2523,10 +2615,10 @@ class TexasMergerTest(TestCase):
         # Reset call count
         self.extract_pdf_document_mock.reset_mock()
 
-        js_docket_entry["attachments"].append(TexasCaseDocumentDictFactory())
+        case_event["attachments"].append(TexasCaseDocumentDictFactory())
         with self.captureOnCommitCallbacks(execute=True):
             output = merge_texas_docket_entry(
-                self.docket_coa1, "2025-01-02.000", True, js_docket_entry
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
         assert output.create is True
@@ -2536,17 +2628,13 @@ class TexasMergerTest(TestCase):
         assert output.pk == pk
         created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == js_docket_entry["type"]
-        assert created_docket_entry.remarks == js_docket_entry.get(
-            "remarks", ""
+        assert created_docket_entry.entry_type == case_event["type"]
+        assert created_docket_entry.remarks == case_event.get("remarks", "")
+        assert created_docket_entry.description == (
+            appellate_brief["description"] if appellate_brief else ""
         )
-        assert created_docket_entry.description == js_docket_entry.get(
-            "description", ""
-        )
-        assert created_docket_entry.disposition == js_docket_entry.get(
-            "disposition", ""
-        )
-        assert created_docket_entry.date_filed == js_docket_entry["date"]
+        assert created_docket_entry.disposition == case_event["disposition"]
+        assert created_docket_entry.date_filed == case_event["date"]
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
@@ -2573,16 +2661,21 @@ class TexasMergerTest(TestCase):
             disposition="Second entry",
         )
 
-        js_docket_entry = TexasCaseEventDictFactory(
+        case_event = TexasCaseEventDictFactory(
             attachments=[],
             disposition="Updated disposition",
             date=date.fromisoformat("2025-01-02"),
             type="Brief",
         )
+        appellate_brief = TexasAppellateBriefDictFactory(
+            date=case_event["date"],
+            type=case_event["type"],
+            attachments=case_event["attachments"],
+        )
 
         # Should match the second entry by sequence number
         output = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-02.001", True, js_docket_entry
+            self.docket_coa1, "2025-01-02.001", case_event, appellate_brief
         )
 
         assert output.create is False
@@ -2590,7 +2683,7 @@ class TexasMergerTest(TestCase):
         assert output.success is True
         assert output.pk == existing_entry_2.pk
         updated_entry = TexasDocketEntry.objects.get(pk=output.pk)
-        assert updated_entry.disposition == js_docket_entry["disposition"]
+        assert updated_entry.disposition == case_event["disposition"]
         assert updated_entry.sequence_number == "2025-01-02.001"
         # Ensure the first entry was not modified
         existing_entry_1.refresh_from_db()
@@ -2608,16 +2701,21 @@ class TexasMergerTest(TestCase):
             disposition="Original description",
         )
 
-        js_docket_entry = TexasCaseEventDictFactory(
+        case_event = TexasCaseEventDictFactory(
             attachments=[],
             disposition="Updated disposition",
             date=date.fromisoformat("2025-01-04"),
             type="Brief",
         )
+        appellate_brief = TexasAppellateBriefDictFactory(
+            date=case_event["date"],
+            type=case_event["type"],
+            attachments=case_event["attachments"],
+        )
 
         # Should update existing entry and change its sequence number
         output = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-04.001", True, js_docket_entry
+            self.docket_coa1, "2025-01-04.001", case_event, appellate_brief
         )
 
         assert output.create is False
@@ -2625,7 +2723,7 @@ class TexasMergerTest(TestCase):
         assert output.success is True
         assert output.pk == existing_entry.pk
         updated_entry = TexasDocketEntry.objects.get(pk=output.pk)
-        assert updated_entry.disposition == js_docket_entry["disposition"]
+        assert updated_entry.disposition == case_event["disposition"]
         assert updated_entry.sequence_number == "2025-01-04.001"
 
     def test_merge_texas_docket_entry_multiple_matches_without_sequence(self):
@@ -2647,17 +2745,21 @@ class TexasMergerTest(TestCase):
             sequence_number="2025-01-03.001",
             disposition="Second entry",
         )
-
-        js_docket_entry = TexasCaseEventDictFactory(
+        case_event = TexasCaseEventDictFactory(
             attachments=[],
             disposition="New third entry",
             date=date.fromisoformat("2025-01-03"),
             type="Brief",
         )
+        appellate_brief = TexasAppellateBriefDictFactory(
+            date=case_event["date"],
+            type=case_event["type"],
+            attachments=case_event["attachments"],
+        )
 
         # Should create a new entry since no sequence number matches
         output = merge_texas_docket_entry(
-            self.docket_coa1, "2025-01-03.002", True, js_docket_entry
+            self.docket_coa1, "2025-01-03.002", case_event, appellate_brief
         )
 
         assert output.create is True
@@ -2666,7 +2768,7 @@ class TexasMergerTest(TestCase):
         assert output.pk is not None
         assert output.pk not in (existing_entry_1.pk, existing_entry_2.pk)
         new_entry = TexasDocketEntry.objects.get(pk=output.pk)
-        assert new_entry.disposition == js_docket_entry["disposition"]
+        assert new_entry.disposition == case_event["disposition"]
         assert new_entry.sequence_number == "2025-01-03.002"
         # Ensure existing entries were not modified
         existing_entry_1.refresh_from_db()
