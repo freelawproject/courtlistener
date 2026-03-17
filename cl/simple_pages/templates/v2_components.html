@@ -24,6 +24,7 @@
         {'href': '#data-table', 'text': 'Data table'},
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
+        {'href': '#menu-button', 'text': 'Menu button'},
       ]},
       {'href': '#pure-markup', 'text': 'Pure markup', 'children': [
       {'href': '#support-banner', 'text': 'Support plea banner'},
@@ -900,6 +901,85 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+
+  {# MENU BUTTON #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="menu-button">
+    <h2 class="mt-6 mb-3">Menu button</h2>
+    <p>A button that opens a dropdown menu with keyboard navigation support. Implements the <a href="https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/" target="_blank" rel="noopener noreferrer" class="text-primary-500 hover:underline">ARIA menu-button pattern</a>.</p>
+    <h4 class="mt-3">Demo</h4>
+    <c-menu-button>
+      <c-slot name="button_content">Open Menu</c-slot>
+      <c-slot name="menu_content">
+        <c-menu-button.item href="#" icon="bell_outline">Alerts</c-menu-button.item>
+        <c-menu-button.item href="#" icon="bookmark">Notes</c-menu-button.item>
+        <c-menu-button.divider />
+        <c-menu-button.item href="#" icon="avatar_outline">Account</c-menu-button.item>
+      </c-slot>
+    </c-menu-button>
+
+    <c-library.list title="Slots">
+      <c-library.item only>
+        <c-slot name="label"><code>button_content</code></c-slot>
+        <c-slot name="description">Content for the trigger button</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>menu_content</code></c-slot>
+        <c-slot name="description">Menu items (use <code>c-menu-button.item</code> and <code>c-menu-button.divider</code>)</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Props">
+      <c-library.item optional only>
+        <c-slot name="label"><code>button_class</code></c-slot>
+        <c-slot name="description">CSS classes for the trigger button. Defaults to <code>btn-primary</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>menu_class</code></c-slot>
+        <c-slot name="description">CSS classes for the dropdown menu.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>position</code></c-slot>
+        <c-slot name="description">Anchor position (bottom-start, bottom-end, etc.). Defaults to <code>bottom-start</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>widget_aria_label</code></c-slot>
+        <c-slot name="description">Aria label for the widget wrapper.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>trigger_aria_label</code></c-slot>
+        <c-slot name="description">Aria label for the trigger button.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>menu_aria_label</code></c-slot>
+        <c-slot name="description">Aria label for the menu.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Sub-components">
+      <c-library.item only>
+        <c-slot name="label"><code>c-menu-button.item</code></c-slot>
+        <c-slot name="description">A menu item. Props: href, tag (a|button), icon, icon_class, item_class, li_class</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-menu-button.divider</code></c-slot>
+        <c-slot name="description">A visual divider line between menu items.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-menu-button&gt;
+  &lt;c-slot name="button_content"&gt;Open Menu&lt;/c-slot&gt;
+  &lt;c-slot name="menu_content"&gt;
+    &lt;c-menu-button.item href="#" icon="bell_outline"&gt;Alerts&lt;/c-menu-button.item&gt;
+    &lt;c-menu-button.item href="#" icon="bookmark"&gt;Notes&lt;/c-menu-button.item&gt;
+    &lt;c-menu-button.divider /&gt;
+    &lt;c-menu-button.item href="#" icon="avatar_outline"&gt;Account&lt;/c-menu-button.item&gt;
+  &lt;/c-slot&gt;
+&lt;/c-menu-button&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
 
   {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
