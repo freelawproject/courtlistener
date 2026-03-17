@@ -6,8 +6,8 @@ package, but instead of using that whole package, we just create a little tool
 for cycling over read databases defined in API_READ_DATABASES.
 
 ``ReplicaRouter`` is a Django DATABASE_ROUTER that checks a ``ContextVar``
-set via middleware.  When the var is truthy, all reads are directed to a
-replica; writes always fall through to the default database.
+set by the ``ReplicaRoutingMiddleware``.  When the var is truthy, all reads are
+directed to a replica; writes always fall through to the default database.
 """
 
 import itertools
