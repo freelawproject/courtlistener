@@ -26,6 +26,13 @@ def _get_replica_list():
         return replicas
 
     dbs = settings.API_READ_DATABASES
+    if isinstance(dbs, str):
+        dbs = [dbs]
+
+    # Filter out any aliases not actually configured in DATABASES.
+    dbs = [db for db in dbs if db in settings.DATABASES]
+    if not dbs:
+        dbs = ["default"]
 
     # Shuffle the list so the first database isn't slammed during startup.
     random.shuffle(dbs)
@@ -34,6 +41,9 @@ def _get_replica_list():
     return replicas
 
 
-def get_api_read_db():
-    """Returns the alias of a read database."""
+def get_api_read_db() -> str:
+    """Return the alias of a read database.
+
+    Falls back to ``"default"`` when no replicas are configured.
+    """
     return next(_get_replica_list())
