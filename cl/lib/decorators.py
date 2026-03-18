@@ -259,6 +259,7 @@ FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
     r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
     re.IGNORECASE | re.MULTILINE,
 )
+_SPACES_RE = re.compile(r"\s+")
 
 
 def document_model(model: type[models.Model]) -> type[models.Model]:
@@ -266,7 +267,6 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
     Decorator for Django models to use docstrings to populate unset
     help_text and db_comment field attributes.
     """
-    spaces_re = re.compile(r"\s+")
     model_fields: dict[str, models.Field] = dict(
         [(field.name, field) for field in model._meta.local_fields]
     )
@@ -281,7 +281,7 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
         [
             (
                 field_name,
-                spaces_re.sub(" ", docstring.replace("\n", " ")),
+                _SPACES_RE.sub(" ", docstring).strip(),
             )
             for field_name, docstring in ivar_docs
             if field_name in model_fields

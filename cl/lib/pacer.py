@@ -74,7 +74,7 @@ def lookup_and_save(new, debug=False):
 
     if d is None:
         ds = Docket.objects.filter(
-            docket_number=new.docket_number, court=new.court
+            docket_number_raw=new.docket_number, court=new.court
         ).order_by("-date_filed")
         count = ds.count()
         if count < 1:

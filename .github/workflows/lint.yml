@@ -105,3 +105,4 @@ jobs:
           cl/scrapers/management/commands/cl_scrape_oral_arguments.py \
           cl/scrapers/management/commands/refresh_scrapers_status_view.py \
           cl/scrapers/views.py \
+          cl/corpus_importer/management/commands/import_scotus_dockets.py
