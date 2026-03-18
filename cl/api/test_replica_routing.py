@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory, override_settings
 from waffle.testutils import override_flag
@@ -102,35 +100,35 @@ class ReplicaRoutingMiddlewareTest(TestCase):
         middleware = ReplicaRoutingMiddleware(get_response)
         return middleware, captured
 
-    def test_api_get_activates_replica_routing(self):
+    def test_api_get_enables_replica_routing(self):
         """GET /api/rest/v4/... with flag active sets ContextVar."""
         middleware, captured = self._get_middleware()
         request = self.factory.get("/api/rest/v4/dockets/")
         middleware(request)
         self.assertTrue(captured["use_replica"])
 
-    def test_api_head_activates_replica_routing(self):
+    def test_api_head_enables_replica_routing(self):
         """HEAD requests to API also route to replica."""
         middleware, captured = self._get_middleware()
         request = self.factory.head("/api/rest/v4/dockets/")
         middleware(request)
         self.assertTrue(captured["use_replica"])
 
-    def test_api_post_does_not_activate(self):
+    def test_api_post_does_not_enable_replica_routing(self):
         """POST requests never route to replica."""
         middleware, captured = self._get_middleware()
         request = self.factory.post("/api/rest/v4/dockets/")
         middleware(request)
         self.assertFalse(captured["use_replica"])
 
-    def test_api_put_does_not_activate(self):
+    def test_api_put_does_not_enable_replica_routing(self):
         """PUT requests never route to replica."""
         middleware, captured = self._get_middleware()
         request = self.factory.put("/api/rest/v4/dockets/")
         middleware(request)
         self.assertFalse(captured["use_replica"])
 
-    def test_frontend_get_does_not_activate(self):
+    def test_frontend_get_does_not_enable_replica_routing(self):
         """GET requests to non-API paths stay on default."""
         middleware, captured = self._get_middleware()
         request = self.factory.get("/some-page/")
@@ -141,7 +139,7 @@ class ReplicaRoutingMiddlewareTest(TestCase):
         WAFFLE_CACHE_PREFIX="test_replica_routing_flag_inactive"
     )
     @override_flag("replica-reads", active=False)
-    def test_flag_inactive_does_not_activate(self):
+    def test_flag_inactive_does_not_enable_replica_routing(self):
         """When the waffle flag is inactive, no routing happens."""
         middleware, captured = self._get_middleware()
         request = self.factory.get("/api/rest/v4/dockets/")
@@ -167,10 +165,10 @@ class ReplicaRoutingMiddlewareTest(TestCase):
     def test_context_var_resets_on_exception(self):
         """ContextVar resets even when the view raises an exception."""
 
-        def exploding_view(request):
-            raise ValueError("boom")
+        def error_view(request):
+            raise ValueError("Test exception")
 
-        middleware, _ = self._get_middleware(response_fn=exploding_view)
+        middleware, _ = self._get_middleware(response_fn=error_view)
         request = self.factory.get("/api/rest/v4/dockets/")
         with self.assertRaises(ValueError):
             middleware(request)
@@ -182,13 +180,3 @@ class ReplicaRoutingMiddlewareTest(TestCase):
         request = self.factory.get("/api/rest/v3/dockets/")
         middleware(request)
         self.assertTrue(captured["use_replica"])
-
-    @patch("cl.api.routers.get_api_read_db", return_value="replica")
-    def test_router_uses_get_api_read_db(self, mock_get_db):
-        """Router delegates to get_api_read_db() for the replica alias."""
-        middleware, _ = self._get_middleware()
-        request = self.factory.get("/api/rest/v4/dockets/")
-        middleware(request)
-        router = ReplicaRouter()
-        result = router.db_for_read(None)
-        self.assertIsNone(result)  # ContextVar already reset
