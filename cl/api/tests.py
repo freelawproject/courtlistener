@@ -14,6 +14,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
 from django.core.cache import caches
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
@@ -34,10 +35,26 @@ from rest_framework_xml.renderers import XMLRenderer
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
-from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
+from cl.api.factories import (
+    APIThrottleFactory,
+    WebhookEventFactory,
+    WebhookFactory,
+)
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    ThrottleType,
+    WebhookEvent,
+    WebhookEventType,
+)
 from cl.api.pagination import VersionBasedPagination
-from cl.api.utils import LoggingMixin, get_logging_prefix, invert_user_logs
+from cl.api.utils import (
+    LoggingMixin,
+    detect_unknown_filter_params,
+    get_all_throttle_overrides,
+    get_logging_prefix,
+    invert_user_logs,
+    is_valid_filter_param,
+)
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -57,6 +74,7 @@ from cl.disclosures.api_views import (
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
@@ -64,7 +82,6 @@ from cl.people_db.api_views import (
     AttorneyViewSet,
     EducationViewSet,
     PartyViewSet,
-    PersonDisclosureViewSet,
     PersonViewSet,
     PoliticalAffiliationViewSet,
     RetentionEventViewSet,
@@ -102,6 +119,7 @@ from cl.search.api_views import (
     RECAPDocumentViewSet,
     TagViewSet,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -112,10 +130,10 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.filters import CourtFilter, DocketFilter, OpinionFilter
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
-    SOURCES,
     ClusterRedirection,
     Court,
     Docket,
@@ -1737,6 +1755,34 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
             results[0]["attorneys"][0]["attorney_id"], self.attorney_2.pk
         )
 
+    async def test_docket_party_name_filter_no_duplicates(self) -> None:
+        """Verify filtering by party name doesn't return duplicate dockets."""
+        self.path = reverse("docket-list", kwargs={"version": "v4"})
+
+        # Create two parties with matching names on the same docket
+        attorney_1 = await Attorney.objects.aget(pk=self.attorney.pk)
+        party1 = await sync_to_async(PartyFactory)(
+            name="First Corp LLC", attorneys=[attorney_1], docket=self.docket
+        )
+
+        attorney_2 = await Attorney.objects.aget(pk=self.attorney_2.pk)
+        party2 = await sync_to_async(PartyFactory)(
+            name="Second Corp Inc", attorneys=[attorney_2], docket=self.docket
+        )
+        await sync_to_async(PartyTypeFactory.create)(
+            docket=self.docket, party=party1, name="Plaintiff"
+        )
+        await sync_to_async(PartyTypeFactory)(
+            docket=self.docket, party=party2, name="Defendant"
+        )
+
+        self.q = {
+            "id": self.docket.id,
+            "parties__name__icontains": "Corp",
+        }
+        # Should return exactly 1 result, not 2 duplicates
+        await self.assertCountInResults(1)
+
 
 class DRFSearchAppAndAudioAppApiFilterTest(
     AudioTestCase, FilteringCountTestMixin
@@ -1868,10 +1914,10 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
         # Multiple choice filter
 
-        sources = [SOURCES.COURT_WEBSITE]
+        sources = [ClusterSources.COURT_WEBSITE]
         self.q = {"source": sources}
         await self.assertCountInResults(2)
-        sources.append(SOURCES.COURT_M_RESOURCE)
+        sources.append(ClusterSources.COURT_M_RESOURCE)
         await self.assertCountInResults(3)
 
     async def test_opinion_cited_filters(self) -> None:
@@ -2580,18 +2626,6 @@ class V4DRFPaginationTest(TestCase):
             secondary_cursor_key="date_modified",
             non_cursor_key="date_dob",
             viewset=PersonViewSet,
-        )
-
-    async def test_disclosuretypeahead_endpoint(self):
-        """Test the V4 PersonDisclosure endpoint confirming that their
-        cursor and page number pagination works properly."""
-
-        await self._base_test_for_v4_endpoints(
-            endpoint="disclosuretypeahead-list",
-            default_ordering="-id",
-            secondary_cursor_key="date_modified",
-            non_cursor_key="name_last",
-            viewset=PersonDisclosureViewSet,
         )
 
     async def test_positions_endpoint(self):
@@ -3625,23 +3659,6 @@ class CacheListApiResponseTest(TestCase):
         # Delete the fake key after the test
         self.cache.delete(fake_cache_key)
 
-    def test_can_ignore_invalid_filters(
-        self, mock_get_logging_prefix, mock_cache_key_method
-    ):
-        """
-        Test that a response is cached when there are invalid filters.
-        """
-        fake_cache_key = "cache_no_filter_no_pagination"
-        mock_cache_key_method.return_value = fake_cache_key
-
-        # Call the helper method to check caching behavior with invalid filters
-        path = reverse("docket-list", kwargs={"version": "v4"})
-        params = {"evil_filter": "1"}
-        self._check_cached_request(path, params, cache_key=fake_cache_key)
-
-        # Delete the fake key after the test
-        self.cache.delete(fake_cache_key)
-
     def test_no_filters_count_request_cached(
         self, mock_get_logging_prefix, mock_cache_key_method
     ):
@@ -4172,6 +4189,19 @@ class ClusterRedirectionTest(TestCase):
         self.assertEqual(response.json()["detail"], message)
         self.assertEqual(response.status_code, HTTPStatus.GONE)
 
+    async def test_non_integer_cluster_id_returns_404(self):
+        """Test that a non-integer cluster ID returns 404 instead of
+        raising a ValueError."""
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        for bad_pk in ("undefined", "abc"):
+            with self.subTest(pk=bad_pk):
+                url = reverse(
+                    "opinioncluster-detail",
+                    kwargs={"version": "v4", "pk": bad_pk},
+                )
+                response = await api_client.get(url)
+                self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
 
 class TestOpinionViewsetXMLRendering(TestCase):
     @classmethod
@@ -4406,3 +4436,270 @@ class BankruptcyInformationAPITests(TestCase):
             {"id", "docket_number", "bankruptcy_information"},
         )
         self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
+
+
+class UnknownFilterParameterBlockingTests(TestCase):
+    """Integration tests for unknown filter parameter blocking."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.court = CourtFactory(id="test")
+
+    def test_unknown_params_return_400(self) -> None:
+        """Unknown filter parameters return a 400 response."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {"invalid_param": "value"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        data = response.json()
+        self.assertIn("detail", data)
+        self.assertIn("unknown_params", data)
+        self.assertIn("invalid_param", data["unknown_params"])
+
+    def test_framework_params_always_accepted(self) -> None:
+        """Standard framework parameters (page, order_by, etc.) are never
+        rejected."""
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("court-list", kwargs={"version": "v4"}),
+            {
+                "page": "1",
+                "order_by": "id",
+                "format": "json",
+                "fields": "id,full_name",
+                "omit": "resource_uri",
+            },
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+
+class UnknownFilterParameterUtilsTests(SimpleTestCase):
+    """Unit tests for unknown filter parameter utility functions."""
+
+    def test_is_valid_filter_param_direct_filters(self) -> None:
+        """Verify that is_valid_filter_param validates direct filters."""
+        self.assertTrue(is_valid_filter_param("id", CourtFilter))
+        self.assertTrue(is_valid_filter_param("date_modified", CourtFilter))
+        self.assertFalse(is_valid_filter_param("invalid", CourtFilter))
+        # Test lookup variants with OpinionFilter which has them
+        self.assertTrue(is_valid_filter_param("id__gte", OpinionFilter))
+
+    def test_is_valid_filter_param_handles_none(self) -> None:
+        """Verify that is_valid_filter_param handles None filterset."""
+        self.assertFalse(is_valid_filter_param("id", None))
+
+    def test_is_valid_filter_param_nested_related_filters(self) -> None:
+        """Verify that is_valid_filter_param handles nested RelatedFilters."""
+        # Valid nested RelatedFilter paths
+        self.assertTrue(is_valid_filter_param("cluster", OpinionFilter))
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket", OpinionFilter)
+        )
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket__court", OpinionFilter)
+        )
+        self.assertTrue(
+            is_valid_filter_param("cluster__docket__court__id", OpinionFilter)
+        )
+
+        # Invalid nested paths
+        self.assertFalse(
+            is_valid_filter_param("cluster__invalid", OpinionFilter)
+        )
+        self.assertFalse(
+            is_valid_filter_param("cluster__docket__invalid", OpinionFilter)
+        )
+
+    def test_detect_unknown_filter_params(self) -> None:
+        """Verify detection of unknown parameters."""
+        query_params = {
+            "id": "test",  # valid
+            "page": "1",  # framework param
+            "invalid": "value",  # unknown
+        }
+
+        unknown = detect_unknown_filter_params(query_params, CourtFilter)
+
+        self.assertEqual(unknown, {"invalid"})
+
+    def test_detect_unknown_filter_params_all_valid(self) -> None:
+        """Verify no unknowns when all params are valid."""
+        query_params = {
+            "id": "test",
+            "page": "1",
+            "order_by": "id",
+        }
+
+        unknown = detect_unknown_filter_params(query_params, CourtFilter)
+
+        self.assertEqual(unknown, set())
+
+    def test_is_valid_filter_param_max_depth_prevents_dos(self) -> None:
+        """Verify that deeply nested circular filters are rejected.
+
+        This prevents DOS attacks where an attacker creates params like:
+        clusters__docket__clusters__docket__... (repeated many times)
+        """
+        # Build a deeply nested circular filter path that exceeds max depth
+        deep_circular_path = "__".join(
+            ["clusters", "docket"] * 10
+        )  # 20 levels deep
+
+        # Should be rejected due to depth limit, not cause recursion error
+        self.assertFalse(
+            is_valid_filter_param(deep_circular_path, DocketFilter)
+        )
+
+
+class APIThrottleModelTest(TestCase):
+    """Tests for the APIThrottle model."""
+
+    def test_rate_validation_accepts_valid_formats(self) -> None:
+        """Test that rate validation accepts valid rate formats."""
+        valid_rates = [
+            "100/hour",
+            "1000/day",
+            "60/min",
+            "5000/hour",
+            "10/second",
+        ]
+
+        for rate in valid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                # Should not raise
+                throttle.clean()
+
+    def test_rate_validation_rejects_invalid_formats(self) -> None:
+        """Test that rate validation rejects invalid rate formats."""
+        invalid_rates = [
+            "invalid",
+            "100",
+            "/hour",
+            "abc/hour",
+            "100/",
+            "100/invalid",
+            "100/2h",  # number before unit is invalid
+        ]
+
+        for rate in invalid_rates:
+            with self.subTest(rate=rate):
+                throttle = APIThrottleFactory.build(rate=rate, blocked=False)
+                with self.assertRaises(ValidationError) as ctx:
+                    throttle.clean()
+                self.assertIn("rate", ctx.exception.message_dict)
+
+    def test_blocked_user_does_not_require_rate(self) -> None:
+        """Test that blocked users don't need a rate."""
+        throttle = APIThrottleFactory.build(blocked=True, rate="")
+        # Should not raise
+        throttle.clean()
+
+    def test_non_blocked_user_requires_rate(self) -> None:
+        """Test that non-blocked users must have a rate."""
+        throttle = APIThrottleFactory.build(blocked=False, rate="")
+        with self.assertRaises(ValidationError) as ctx:
+            throttle.clean()
+        self.assertIn("rate", ctx.exception.message_dict)
+
+
+class ThrottleOverrideIntegrationTest(TestCase):
+    """Integration tests for throttle overrides using the APIThrottle model."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_get_all_throttle_overrides_returns_dict(self) -> None:
+        """Test that get_all_throttle_overrides returns a dict of overrides."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="10000/hour",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertFalse(blocked)
+        self.assertEqual(rate, "10000/hour")
+
+    def test_get_all_throttle_overrides_returns_blocked_status(self) -> None:
+        """Test that blocked users are correctly returned."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            blocked=True,
+            rate="",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(throttle.user.username, overrides)
+        blocked, rate = overrides[throttle.user.username]
+        self.assertTrue(blocked)
+        self.assertEqual(rate, "")
+
+    def test_throttle_overrides_are_cached(self) -> None:
+        """Test that throttle overrides are cached."""
+        # Create a throttle
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="5000/hour",
+        )
+
+        # First call
+        overrides1 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides1)
+
+        # Delete the throttle from DB
+        throttle.delete()
+
+        # Second call should still return cached result
+        overrides2 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(throttle.user.username, overrides2)
+
+        # Clear cache and call again
+        clear_tiered_cache()
+        overrides3 = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(throttle.user.username, overrides3)
+
+    def test_different_throttle_types_have_separate_caches(self) -> None:
+        """Test that API and CITATION_LOOKUP have separate cache entries."""
+        api_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="10000/hour",
+        )
+        citation_throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="120/min",
+        )
+
+        api_overrides = get_all_throttle_overrides(ThrottleType.API)
+        citation_overrides = get_all_throttle_overrides(
+            ThrottleType.CITATION_LOOKUP
+        )
+
+        self.assertIn(api_throttle.user.username, api_overrides)
+        self.assertNotIn(citation_throttle.user.username, api_overrides)
+
+        self.assertIn(citation_throttle.user.username, citation_overrides)
+        self.assertNotIn(api_throttle.user.username, citation_overrides)
+
+    async def test_citation_lookup_page_loads_with_throttle_override(
+        self,
+    ) -> None:
+        """Test citation lookup help page loads for user with custom rate."""
+        throttle = await sync_to_async(APIThrottleFactory)(
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="500/hour",
+        )
+        client = AsyncClient()
+        await sync_to_async(client.force_login)(throttle.user)
+        response = await client.get(reverse("citation_lookup_api"))
+        self.assertEqual(response.status_code, HTTPStatus.OK)
