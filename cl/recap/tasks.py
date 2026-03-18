@@ -40,6 +40,13 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
+from juriscraper.state.texas import (
+    TexasCourtOfAppealsScraper,
+    TexasCourtOfCriminalAppealsScraper,
+    TexasSupremeCourtScraper,
+)
+from juriscraper.state.texas.common import CourtID
+from juriscraper.state.texas.email import TamesEmail
 from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
@@ -3699,18 +3706,39 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         else:
             raise self.retry(exc=exc)
 
-    # TODO Implement once Texas email parser is ready
-    # texas_email_parser = TexasEmail()
-    # texas_email._parse_text
-    # data = texas_email.data
+    texas_email_parser = TamesEmail()
+    texas_email_parser._parse_text(body)
+    email_data = texas_email_parser.data
+
+    match email_data.court_id:
+        case CourtID.SUPREME_COURT.value:
+            docket_parser = TexasSupremeCourtScraper()
+        case CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+            docket_parser = TexasCourtOfCriminalAppealsScraper()
+        case CourtID.UNKNOWN.value:
+            async_to_sync(mark_pq_status)(
+                epq,
+                "Unknown Texas court ID in email notification.",
+                PROCESSING_STATUS.FAILED,
+                "status_message",
+            )
+            return None
+        case _:
+            docket_parser = TexasCourtOfAppealsScraper(
+                court_id=email_data.court_id
+            )
+
+    res = httpx.get(email_data.url)
+    docket_parser._parse_text(res.text)
+    docket_data = docket_parser.data
 
     try:
-        # d = merge_texas_docket(data)
+        # d = merge_texas_docket(docket_data)
         pass
     except Exception as e:
         async_to_sync(mark_pq_status)(
             epq,
-            f"SCOTUS docket update error: {e}",
+            f"Texas docket update error: {e}",
             PROCESSING_STATUS.FAILED,
             "status_message",
         )
@@ -3721,7 +3749,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             de_id=None,
             rd_id=None,
         )
-        msg = f"Texas docket {data['docket_number']} updated successfully."
+        msg = f"Texas docket {docket_data['docket_number']} updated successfully."
         status = PROCESSING_STATUS.SUCCESSFUL
         async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
 
