@@ -3091,7 +3091,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Add docket with no document
         mock_date = now().replace(
-            day=29, hour=0, minute=0, second=0, microsecond=0
+            day=28, hour=0, minute=0, second=0, microsecond=0
         )
         with (
             time_machine.travel(mock_date, tick=False),

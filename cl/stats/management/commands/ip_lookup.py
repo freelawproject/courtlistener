@@ -78,7 +78,23 @@ class Command(BaseCommand):
             f"Found: {len(found_ips)}, Not found: {len(not_found)}"
         )
 
-    def _print_result(self, ip: str, user_pk: str, date_str: str) -> None:
+    def _print_result(
+        self,
+        ip: str,
+        user_pk: str | int,
+        date_str: str,
+    ) -> None:
+        """Print the result for an IP address lookup.
+
+        :param ip: The IP address that was looked up.
+        :param user_pk: The user PK from Redis. May be a numeric string, an
+            int, or a non-numeric string like "AnonymousUser".
+        :param date_str: The date the IP was found.
+        """
+        if not str(user_pk).isdigit():
+            self.stdout.write(f"\n{ip}\n  User: {user_pk}\n  Date: {date_str}")
+            return
+
         try:
             user = User.objects.get(pk=int(user_pk))
             admin_url = reverse("admin:auth_user_change", args=[user.pk])

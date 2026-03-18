@@ -15,6 +15,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import (
     Case,
     CharField,
+    CheckConstraint,
     F,
     Prefetch,
     Q,
@@ -38,19 +39,22 @@ from model_utils import FieldTracker
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
+from cl.lib.decorators import document_model
 from cl.lib.model_helpers import (
     CSVExportMixin,
-    document_model,
+    is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_pdf_path,
     make_recap_path,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.storage import IncrementingAWSMediaStorage
+from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
+from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
 from cl.search.state.texas.models import *
 from cl.users.models import User
@@ -90,185 +94,16 @@ class PRECEDENTIAL_STATUS:
         return reverse_names.get(name)
 
 
-class SOURCES:
-    COURT_WEBSITE = "C"
-    PUBLIC_RESOURCE = "R"
-    COURT_M_RESOURCE = "CR"
-    LAWBOX = "L"
-    LAWBOX_M_COURT = "LC"
-    LAWBOX_M_RESOURCE = "LR"
-    LAWBOX_M_COURT_RESOURCE = "LCR"
-    MANUAL_INPUT = "M"
-    INTERNET_ARCHIVE = "A"
-    BRAD_HEATH_ARCHIVE = "H"
-    COLUMBIA_ARCHIVE = "Z"
-    HARVARD_CASELAW = "U"
-    COURT_M_HARVARD = "CU"
-    DIRECT_COURT_INPUT = "D"
-    ANON_2020 = "Q"
-    ANON_2020_M_HARVARD = "QU"
-    COURT_M_RESOURCE_M_HARVARD = "CRU"
-    DIRECT_COURT_INPUT_M_HARVARD = "DU"
-    LAWBOX_M_HARVARD = "LU"
-    LAWBOX_M_COURT_M_HARVARD = "LCU"
-    LAWBOX_M_RESOURCE_M_HARVARD = "LRU"
-    LAWBOX_M_COURT_RESOURCE_M_HARVARD = "LCRU"
-    MANUAL_INPUT_M_HARVARD = "MU"
-    PUBLIC_RESOURCE_M_HARVARD = "RU"
-    COLUMBIA_M_INTERNET_ARCHIVE = "ZA"
-    COLUMBIA_M_DIRECT_COURT_INPUT = "ZD"
-    COLUMBIA_M_COURT = "ZC"
-    COLUMBIA_M_BRAD_HEATH_ARCHIVE = "ZH"
-    COLUMBIA_M_LAWBOX_COURT = "ZLC"
-    COLUMBIA_M_LAWBOX_RESOURCE = "ZLR"
-    COLUMBIA_M_LAWBOX_COURT_RESOURCE = "ZLCR"
-    COLUMBIA_M_RESOURCE = "ZR"
-    COLUMBIA_M_COURT_RESOURCE = "ZCR"
-    COLUMBIA_M_LAWBOX = "ZL"
-    COLUMBIA_M_MANUAL = "ZM"
-    COLUMBIA_M_ANON_2020 = "ZQ"
-    COLUMBIA_ARCHIVE_M_HARVARD = "ZU"
-    COLUMBIA_M_LAWBOX_M_HARVARD = "ZLU"
-    COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD = "ZDU"
-    COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD = "ZLRU"
-    COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD = "ZLCRU"
-    COLUMBIA_M_COURT_M_HARVARD = "ZCU"
-    COLUMBIA_M_MANUAL_INPUT_M_HARVARD = "ZMU"
-    COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
-    COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
-    RECAP = "G"
-    NAMES = (
-        (COURT_WEBSITE, "court website"),
-        (PUBLIC_RESOURCE, "public.resource.org"),
-        (COURT_M_RESOURCE, "court website merged with resource.org"),
-        (LAWBOX, "lawbox"),
-        (LAWBOX_M_COURT, "lawbox merged with court"),
-        (LAWBOX_M_RESOURCE, "lawbox merged with resource.org"),
-        (LAWBOX_M_COURT_RESOURCE, "lawbox merged with court and resource.org"),
-        (MANUAL_INPUT, "manual input"),
-        (INTERNET_ARCHIVE, "internet archive"),
-        (BRAD_HEATH_ARCHIVE, "brad heath archive"),
-        (COLUMBIA_ARCHIVE, "columbia archive"),
-        (COLUMBIA_M_INTERNET_ARCHIVE, "columbia merged with internet archive"),
-        (
-            COLUMBIA_M_DIRECT_COURT_INPUT,
-            "columbia merged with direct court input",
-        ),
-        (COLUMBIA_M_COURT, "columbia merged with court"),
-        (
-            COLUMBIA_M_BRAD_HEATH_ARCHIVE,
-            "columbia merged with brad heath archive",
-        ),
-        (COLUMBIA_M_LAWBOX_COURT, "columbia merged with lawbox and court"),
-        (
-            COLUMBIA_M_LAWBOX_RESOURCE,
-            "columbia merged with lawbox and resource.org",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_COURT_RESOURCE,
-            "columbia merged with lawbox, court, and resource.org",
-        ),
-        (COLUMBIA_M_RESOURCE, "columbia merged with resource.org"),
-        (
-            COLUMBIA_M_COURT_RESOURCE,
-            "columbia merged with court and resource.org",
-        ),
-        (COLUMBIA_M_LAWBOX, "columbia merged with lawbox"),
-        (COLUMBIA_M_MANUAL, "columbia merged with manual input"),
-        (COLUMBIA_M_ANON_2020, "columbia merged with 2020 anonymous database"),
-        (
-            HARVARD_CASELAW,
-            "Harvard, Library Innovation Lab Case Law Access Project",
-        ),
-        (COURT_M_HARVARD, "court website merged with Harvard"),
-        (DIRECT_COURT_INPUT, "direct court input"),
-        (ANON_2020, "2020 anonymous database"),
-        (ANON_2020_M_HARVARD, "2020 anonymous database merged with Harvard"),
-        (COURT_M_HARVARD, "court website merged with Harvard"),
-        (
-            COURT_M_RESOURCE_M_HARVARD,
-            "court website merged with public.resource.org and Harvard",
-        ),
-        (
-            DIRECT_COURT_INPUT_M_HARVARD,
-            "direct court input merged with Harvard",
-        ),
-        (LAWBOX_M_HARVARD, "lawbox merged with Harvard"),
-        (
-            LAWBOX_M_COURT_M_HARVARD,
-            "Lawbox merged with court website and Harvard",
-        ),
-        (
-            LAWBOX_M_RESOURCE_M_HARVARD,
-            "Lawbox merged with public.resource.org and with Harvard",
-        ),
-        (MANUAL_INPUT_M_HARVARD, "Manual input merged with Harvard"),
-        (PUBLIC_RESOURCE_M_HARVARD, "public.resource.org merged with Harvard"),
-        (COLUMBIA_ARCHIVE_M_HARVARD, "columbia archive merged with Harvard"),
-        (
-            COLUMBIA_M_LAWBOX_M_HARVARD,
-            "columbia archive merged with Lawbox and Harvard",
-        ),
-        (
-            COLUMBIA_M_DIRECT_COURT_INPUT_M_HARVARD,
-            "columbia archive merged with direct court input and Harvard",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_M_RESOURCE_M_HARVARD,
-            "columbia archive merged with lawbox, public.resource.org and Harvard",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_M_COURT_RESOURCE_M_HARVARD,
-            "columbia archive merged with lawbox, court website, public.resource.org and Harvard",
-        ),
-        (
-            COLUMBIA_M_COURT_M_HARVARD,
-            "columbia archive merged with court website and Harvard",
-        ),
-        (
-            COLUMBIA_M_MANUAL_INPUT_M_HARVARD,
-            "columbia archive merged with manual input and Harvard",
-        ),
-        (
-            COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD,
-            "columbia archive merged with public.resource.org and Harvard",
-        ),
-        (
-            COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
-            "columbia archive merged with lawbox, court website and Harvard",
-        ),
-        (
-            RECAP,
-            "recap",
-        ),
+class DocketNumberSources:
+    ORIGINAL = 0
+    AUTOMATED = 1
+    MANUAL = 2
+
+    CHOICES = (
+        (ORIGINAL, "Original from source"),
+        (AUTOMATED, "Automatically cleaned using heuristics and LLM"),
+        (MANUAL, "Manually cleaned by a human"),
     )
-
-    # use a frozenset since the order of characters is arbitrary
-    parts_to_source_mapper = {frozenset(name[0]): name[0] for name in NAMES}
-
-    @classmethod
-    def merge_sources(cls, source1: str, source2: str) -> str:
-        """Merge source values
-
-        Use this to merge sources when merging clusters
-
-        :param source1: a source
-        :param source2: other source
-        :return: a source which merges the input sources
-        """
-        if source1 in source2:
-            return source2
-        if source2 in source1:
-            return source1
-
-        unique_parts = frozenset(source1 + source2)
-        if cls.parts_to_source_mapper.get(unique_parts):
-            return cls.parts_to_source_mapper.get(unique_parts)
-
-        # Unexpected case
-        if len(source1) > len(source2):
-            return source1
-        return source2
 
 
 @pghistory.track()
@@ -628,6 +463,15 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         default="",
     )
+    docket_number_source = models.PositiveSmallIntegerField(
+        help_text=(
+            "The source of the docket number, "
+            "whether they came from the original source, "
+            "were automatically cleaned, or were manually cleaned."
+        ),
+        choices=DocketNumberSources.CHOICES,
+        default=DocketNumberSources.ORIGINAL,
+    )
     federal_dn_office_code = models.CharField(
         help_text="A one digit statistical code (either alphabetic or numeric) "
         "of the office within the federal district. In this "
@@ -821,6 +665,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "date_reargument_denied",
         ]
     )
+    docket_number_raw_tracker = FieldTracker(fields=["docket_number_raw"])
 
     class Meta:
         constraints = [
@@ -848,15 +693,22 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     def save(self, update_fields=None, *args, **kwargs):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if self.docket_number and not self.docket_number_core:
-            self.docket_number_core = (
-                make_scotus_docket_number_core(self.docket_number)
-                if self.court_id == "scotus"
-                else make_docket_number_core(self.docket_number)
-            )
+        if self.docket_number_raw and not self.docket_number_core:
+            if self.court_id == "scotus":
+                self.docket_number_core = make_scotus_docket_number_core(
+                    self.docket_number_raw
+                )
+            elif is_texas_court(self.court_id):
+                self.docket_number_core = make_texas_docket_number_core(
+                    self.docket_number_raw
+                )
+            else:
+                self.docket_number_core = make_docket_number_core(
+                    self.docket_number_raw
+                )
 
         if self.source in self.RECAP_SOURCES():
-            for field in ["pacer_case_id", "docket_number"]:
+            for field in ["pacer_case_id", "docket_number_raw"]:
                 if (
                     field == "pacer_case_id"
                     and getattr(self, "court", None)
@@ -947,6 +799,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
         )
         return build_authority_opinions_query(opinions)
 
+    def add_scraper_source(self) -> None:
+        if self.source in self.NON_SCRAPER_SOURCES():
+            self.source = self.source + self.SCRAPER
+
     def add_idb_source(self):
         if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
@@ -988,7 +844,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
             f"https://ecf.{self.pacer_court_id}.uscourts.gov"
             f"{path}"
             "servlet=CaseSummary.jsp&"
-            f"caseNum={self.docket_number}&"
+            f"caseNum={self.docket_number_raw}&"
             "incOrigDkt=Y&"
             "incDktEntries=Y"
         )
@@ -996,7 +852,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def pacer_acms_url(self):
         return (
             f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
-            f"{self.docket_number}"
+            f"{self.docket_number_raw}"
         )
 
     @property
@@ -1598,9 +1454,9 @@ class RECAPDocument(
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
-            from cl.scrapers.tasks import extract_recap_pdf
+            from cl.scrapers.tasks import extract_pdf_document
 
-            tasks.append(extract_recap_pdf.si(self.pk))
+            tasks.append(extract_pdf_document.si(self.pk))
 
         if len(tasks) > 0:
             chain(*tasks)()
@@ -2445,10 +2301,10 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: {}".format(
-            ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES)
+            ", ".join(f"{t[0]} ({t[1]})" for t in ClusterSources.NAMES)
         ),
         max_length=10,
-        choices=SOURCES.NAMES,
+        choices=ClusterSources.NAMES,
         blank=True,
     )
     procedural_history = models.TextField(
@@ -2597,6 +2453,18 @@ class OpinionCluster(AbstractDateTimeModel):
         help_text="The case PDF from the Caselaw Access Project for this cluster",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
+    filepath_xml_scan = models.FileField(
+        help_text="The XML obtained from LLM containing all available metadata and opinion(s).",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
+    filepath_pdf_scan = models.FileField(
+        help_text="The case PDF from the Scanning Project",
+        upload_to=make_upload_path,
+        storage=S3PrivateUUIDStorage(),
         blank=True,
     )
     arguments = models.TextField(
@@ -3323,6 +3191,9 @@ class Opinion(AbstractDateTimeModel):
     xml_harvard = models.TextField(
         help_text="XML of Harvard CaseLaw Access Project opinion", blank=True
     )
+    xml_scan = models.TextField(
+        help_text="XML of Scanning Project", blank=True
+    )
     html_with_citations = models.TextField(
         help_text=(
             "HTML of the document with citation links and other "
@@ -3443,6 +3314,112 @@ class OpinionJoinedBy(Opinion.joined_by.through):
 
     class Meta:
         proxy = True
+
+
+class OpinionContent(AbstractDateTimeModel):
+    """Stores normalized opinion text content.
+
+    Each Opinion can have multiple OpinionContent records, one per content type.
+    This normalized structure replaces the previous wide table design that had
+    separate fields for each content source (plain_text, html, html_lawbox, etc.).
+
+    Future work: Add fields from Opinion model (sha1, download_url,
+    local_path, etc.) so existing content can be copied from Opinion
+    to OpinionContent, enabling full versioning support.
+    """
+
+    SCRAPERS = 1
+    HARVARD_CAP = 2
+    ANON_2020 = 3
+    COLUMBIA_ARCHIVE = 4
+    LAWBOX = 5
+    RECAP = 6
+    FLP_SCANNING = 7
+    SOURCES = (
+        (SCRAPERS, "Got from juriscraper"),
+        (HARVARD_CAP, "Got from the Harvard Case Law Access Project"),
+        (ANON_2020, "Got from 2020 anonymous database"),
+        (COLUMBIA_ARCHIVE, "Got from Columbia archive"),
+        (LAWBOX, "Got from Lawbox"),
+        (RECAP, "Free opinions on RECAP"),
+        (FLP_SCANNING, "Got from FLP Scanning Project"),
+    )
+
+    DEFAULT = 0
+    OCR = 1
+    LLM = 2
+    EXTRACTION_METHOD = (
+        (DEFAULT, "Extracted by opening the document and getting the text"),
+        (OCR, "Extracted via OCR"),
+        (
+            LLM,
+            "Extracted via LLM",
+        ),
+    )
+    opinion = models.ForeignKey(
+        Opinion,
+        help_text="The opinion this content belongs to",
+        related_name="contents",
+        on_delete=models.CASCADE,
+    )
+    content = models.TextField(
+        help_text="The text content of the opinion",
+        blank=True,
+    )
+    source = models.SmallIntegerField(
+        help_text="Source of the opinions content",
+        choices=SOURCES,
+    )
+    extraction_type = models.SmallIntegerField(
+        help_text="Method used to extract the opinion content",
+        choices=EXTRACTION_METHOD,
+    )
+    is_main_version = models.BooleanField(
+        help_text="True if this is the most up to date or official version of the Opinion's content"
+    )
+    sha1 = models.CharField(
+        help_text=(
+            "unique ID for the document, as generated via SHA1 of the "
+            "binary file or text data"
+        ),
+        max_length=40,
+        blank=True,
+    )
+    page_count = models.IntegerField(
+        help_text="The number of pages in the document, if known",
+        blank=True,
+        null=True,
+    )
+    download_url = models.URLField(
+        help_text=(
+            "The URL where the item was originally scraped. Note that "
+            "these URLs may often be dead due to the court or the bulk "
+            "provider changing their website. We keep the original link "
+            "here given that it often contains valuable metadata."
+        ),
+        max_length=500,
+        db_index=True,
+        null=True,
+        blank=True,
+    )
+    local_path = models.FileField(
+        help_text=(
+            "The location in AWS S3 where the original opinion file is "
+            f"stored. {s3_warning_note}"
+        ),
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+        db_index=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["sha1"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.pk} - {self.opinion.cluster.case_name}"
 
 
 class OpinionsCited(models.Model):
@@ -3980,10 +3957,30 @@ class CaseTransfer(AbstractDateTimeModel):
     Represents any transfer of a docket between two courts whether that be
     an appeal, workload balancing, or docket merging.
 
+    The `x_court` and `x_docket_number` fields must always be set and at least
+    one of `origin_docket` or `destination_docket` must be set to ensure
+    that transfers are associated with dockets in the DB. The reason for
+    (effectively) duplicating the docket number via `x_docket` and
+    `x_docket_number` is to allow populating transfers even if only one end is
+    in the DB. This allows us to track transfers from untracked courts to
+    tracked courts (e.g. appeals from trial courts) and to populate transfers
+    during the initial docket merging step independently of the order dockets
+    are merged in.
+
+    The intended way to populate this table in a merger is to:
+
+    1. Lookup if a transfer with matching origin and destination courts and\
+       docket numbers exists;
+    2. If it does, update the missing foreign key on that entry;
+    3. Otherwise, create a new entry with only origin or destination docket\
+       field set depending on which you have.
+
     :ivar origin_court: The court this transfer originates from.
-    :ivar origin_docket: The docket this transfer originates from.
+    :ivar origin_docket_number: The ID of the docket this transfer originates from.
+    :ivar origin_docket: The docket object this transfer originates from.
     :ivar destination_court: The court the docket is being transferred to.
-    :ivar destination_docket: The case docket in the destination court.
+    :ivar destination_docket_number: The ID of the case docket in the destination court.
+    :ivar destination_docket: The docket object in the destination court.
     :ivar transfer_date: The date this transfer occurred.
     :ivar transfer_type: The type of transfer (appeal, work sharing, etc.).
     """
@@ -4007,22 +4004,193 @@ class CaseTransfer(AbstractDateTimeModel):
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_court",
     )
+    origin_docket_number = models.TextField()
     origin_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_origin_docket",
+        blank=True,
+        null=True,
     )
     destination_court = models.ForeignKey(
         "search.Court",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_court",
     )
+    destination_docket_number = models.TextField()
     destination_docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
         related_name="case_transfer_destination_docket",
+        blank=True,
+        null=True,
     )
     transfer_date = models.DateField()
     transfer_type = models.SmallIntegerField(
         choices=transfer_type_choices.items(),
     )
+
+    class Meta:
+        constraints = [
+            CheckConstraint(
+                condition=Q(origin_docket__isnull=False)
+                | Q(destination_docket__isnull=False),
+                name="docket_at_least_one_fk_set",
+            )
+        ]
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocketEntry(AbstractDateTimeModel, CSVExportMixin):
+    """
+    Represents a docket entry in a SCOTUS docket.
+
+    :ivar docket: The Docket this entry is associated with.
+    :ivar entry_number: Entry number on the SCOTUS Docket page.
+    :ivar description: For appellate brief events, a short description of
+    the brief.
+    :ivar date_filed: The date that SCOTUS indicates this entry was filed.
+    :ivar sequence_number: CL-generated field to keep entries in the same
+    order they appear in SCOTUS. Concatenation of filing date (in ISO format)
+    and the index in the SCOTUS table.
+    """
+
+    docket = models.ForeignKey(
+        "search.Docket",
+        on_delete=models.CASCADE,
+    )
+    entry_number = models.IntegerField(
+        null=True,
+        blank=True,
+    )
+    description = models.TextField(blank=True)
+    date_filed = models.DateField(
+        null=True,
+        blank=True,
+    )
+    sequence_number = models.CharField(
+        max_length=16,
+    )
+
+    class Meta:
+        ordering = ["-sequence_number"]
+
+
+@pghistory.track()
+@document_model
+class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
+    """
+    Represents an attachment to a SCOTUS docket entry.
+
+    :ivar docket_entry: The Docket this document is associated with.
+    :ivar description: The description of this file in SCOTUS.
+    :ivar document_number: The document number on the docket page in SCOTUS.
+    :ivar attachment_number: The attachment number on the docket page in SCOTUS.
+    :ivar url: The download URL that SCOTUS provided for this document.
+    """
+
+    docket_entry = models.ForeignKey(
+        SCOTUSDocketEntry, on_delete=models.CASCADE
+    )
+    description = models.TextField(blank=True)
+    document_number = models.IntegerField(
+        blank=True,
+        null=True,
+    )
+    attachment_number = models.SmallIntegerField(
+        blank=True,
+        null=True,
+    )
+    url = models.URLField(max_length=1000)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["document_number"]),
+            models.Index(fields=["filepath_local"]),
+        ]
+        unique_together = (
+            "docket_entry",
+            "document_number",
+            "attachment_number",
+        )
+        ordering = ("document_number", "attachment_number")
+
+    def __str__(self) -> str:
+        return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
+    @property
+    def needs_extraction(self):
+        """Does the item need extraction and does it have all the right
+        fields? Items needing OCR still need extraction.
+        """
+        return (
+            self.ocr_status is None or self.ocr_status == self.OCR_NEEDED
+        ) and self.filepath_local
+
+    @property
+    def file_name(self) -> str:
+        """Extract the filename from the url."""
+        from cl.corpus_importer.utils import extract_file_name_from_url
+
+        return extract_file_name_from_url(self.url)
+
+
+@pghistory.track()
+@document_model
+class TrialCourtData(AbstractDateTimeModel):
+    """
+    Trial court information for cases which have moved at least twice since
+    originating in a trial court. This is useful because
+    `originating_court_information` only captures info from the court directly
+    below in the appellate chain, and `CaseTransfer` similarly only goes one
+    step at a time. This model lets us store data from the very first time a
+    case appeared.
+
+    :ivar docket: The docket in the higher court that this information is
+        associated with.
+    :ivar docket_number_trial: The docket number of the trial court case with
+        (potentially) some cleanup applied. May be blank if not available for a
+        given state.
+    :ivar docket_number_raw_trial: The raw trial court docket number value as
+        found on the source, with no cleaning or transformations applied. May
+        be blank.
+    :ivar judge_str: The name of the judge who presided over the case. May be
+        blank if this information is not available.
+    :ivar judge: The entry in people_db.Person for the judge who presided over
+        this case if available.
+    :ivar reporter: The court reporter listed for this case. May be blank if
+        this information is not available.
+    :ivar date_filed: The date this case was originally filed. May be blank if
+        this information is not available.
+    :ivar court_name: The name of the court this case was filed in as it
+        appears in the source. May be blank if this information is not
+        available.
+    :ivar court: A foreign key to the Court object corresponding to the court
+        this case was heard in. May be blank if the court is not in the
+        database or is unavailable in the source.
+    :ivar punishment: The punishment assigned in criminal cases if available.
+    :ivar county: The county the trial court is located in if available.
+    """
+
+    docket = models.OneToOneField(
+        Docket,
+        on_delete=models.CASCADE,
+    )
+    docket_number_trial = models.CharField(blank=True, default="")
+    docket_number_raw_trial = models.CharField(
+        blank=True,
+        default="",
+    )
+    judge_str = models.TextField(blank=True)
+    judge = models.ForeignKey(
+        "people_db.Person", blank=True, null=True, on_delete=models.SET_NULL
+    )
+    reporter = models.TextField(blank=True)
+    date_filed = models.DateField(blank=True, null=True)
+    court_name = models.TextField(blank=True)
+    court = models.ForeignKey(
+        Court, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    punishment = models.TextField(blank=True)
+    county = models.TextField(blank=True)

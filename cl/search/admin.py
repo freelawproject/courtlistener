@@ -24,14 +24,18 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     SearchQuery,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.search.utils import seal_documents
 from cl.visualizations.models import SCOTUSMap
 
@@ -57,6 +61,18 @@ class OpinionAdmin(CursorPaginatorAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("cluster")
+
+
+@admin.register(OpinionContent)
+class OpinionContentAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("opinion",)
+    search_fields = ("content",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("source",)
+    list_display = ("__str__", "source", "extraction_type")
 
 
 @admin.register(Citation)
@@ -564,3 +580,126 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+class SCOTUSDocumentInline(admin.StackedInline):
+    model = SCOTUSDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(SCOTUSDocketEntry)
+class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (SCOTUSDocumentInline,)
+    search_help_text = (
+        "Search SCOTUSDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "date_filed",
+        "entry_number",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
+
+
+@admin.register(SCOTUSDocument)
+class SCOTUSDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by SCOTUSDocument Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+class TexasDocumentInline(admin.StackedInline):
+    model = TexasDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(TexasDocument)
+class TexasDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "media_version_id",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = (
+        "Search by Texas Document media version ID (exact match)."
+    )
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(TexasDocketEntry)
+class TexasDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (TexasDocumentInline,)
+    search_help_text = (
+        "Search TexasDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "appellate_brief",
+        "get_trunc_description",
+        "get_trunc_remarks",
+        "disposition",
+        "date_filed",
+        "entry_type",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Texas docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
+
+    @admin.display(description="Remarks")
+    def get_trunc_remarks(self, obj):
+        return trunc(obj.remarks, 35, ellipsis="...")

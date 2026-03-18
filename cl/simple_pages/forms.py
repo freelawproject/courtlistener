@@ -1,8 +1,15 @@
 import re
-from typing import Any
+from typing import Any, Literal
 
 from django import forms
+from django.conf import settings
 from hcaptcha.fields import hCaptchaField
+
+SEALING_KEYWORDS_REGEX = re.compile(
+    r"urgent|seal(ing|ed)?|redact(ed)?|pseudonym|anonymi(ty|ze)|"
+    r"press[\.\s]?coverage|time[\.\s]?sensitive",
+    re.I,
+)
 
 
 class ContactForm(forms.Form):
@@ -304,15 +311,38 @@ class ContactForm(forms.Form):
         """Subject line for this submission."""
         return f"[CourtListener] Contact: {self.cleaned_data['phone_number']}"
 
-    def render_email_body(self, user_agent: str = "Unknown") -> str:
-        """Plain-text email body built from cleaned_data. Includes all relevant fields for the issue type."""
+    def render_email_body(
+        self,
+        user_agent: str = "Unknown",
+        target: Literal["jira", "zoho_desk"] = "jira",
+    ) -> str:
+        """Build the email body from cleaned_data.
+
+        The output includes a common header (subject, name, email, and issue
+        type), followed by issue-type-specific fields (such as partnership
+        details or technical support context) and the user's free-text message.
+
+        The output format depends on the target parameter:
+
+        - When target is "jira", the output is plain text with newline separators
+        and format email addresses as with angle brackets.
+        - When target is "zoho_desk", the output uses HTML line breaks.
+
+        :param user_agent: The submitter's browser User-Agent string.
+        :param target: Output format target, either "jira" or "zoho_desk", which
+            determines line separators and email formatting.
+        :return: The formatted body string.
+        """
         cd = self.cleaned_data
         issue_type_label = self.get_issue_type_display()
+
+        email = cd.get("email", "")
+        email_display = email if target == "zoho_desk" else f"<{email}>"
 
         lines: list[str] = [
             f"Subject: {cd.get('phone_number', '')}",
             f"From: {cd.get('name', '')}",
-            f"User Email: <{cd.get('email', '')}>",
+            f"User Email: {email_display}",
             f"Issue Type: {issue_type_label}",
             "",
         ]
@@ -355,4 +385,40 @@ class ContactForm(forms.Form):
         lines.append("")
         lines.append(f"Browser: {user_agent}")
 
-        return "\n".join(lines)
+        separator = "<br>" if target == "zoho_desk" else "\n"
+        return separator.join(lines)
+
+    def _is_sealing_order(self) -> bool:
+        """Check if this submission should be treated as a sealing order."""
+        cd = self.cleaned_data
+        email = cd.get("email", "")
+        if email.lower().endswith(("@uscourts.gov", "@usdoj.gov")):
+            return True
+        if cd.get("issue_type") != self.REMOVAL_REQUEST:
+            return False
+        text = f"{cd.get('phone_number', '')} {cd.get('message', '')}"
+        return bool(SEALING_KEYWORDS_REGEX.search(text))
+
+    def get_zoho_request_type(self) -> str:
+        """Return the Zoho Desk category for this submission.
+
+        Submissions from government email domains (@uscourts.gov,
+        @usdoj.gov) or Case Removal requests whose subject or message
+        contain sealing-related keywords are recategorized as
+        "Sealing Order".
+        """
+        if self._is_sealing_order():
+            return "Sealing Order"
+        return self.get_issue_type_display()
+
+    def get_zoho_assignee_id(self) -> str:
+        """Return the Zoho Desk agent ID for this submission's issue type.
+
+        Returns empty string for unassigned tickets (sealing orders)
+        and issue types without a configured agent.
+        """
+        if self._is_sealing_order():
+            return ""
+        return settings.ZOHO_DESK_AGENT_ASSIGNMENTS.get(
+            self.cleaned_data.get("issue_type", ""), ""
+        )

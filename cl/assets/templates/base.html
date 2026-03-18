@@ -169,7 +169,7 @@
                 <li><a href="https://free.law/about/" tabindex="200">About</a></li>
                 <li><a href="{% url "faq" %}" tabindex="201">FAQ</a></li>
                 <li class="visible-xs">
-                  <a href="https://donate.free.law/forms/membership"
+                  <a href="https://free.law/membership/"
                      tabindex="203">Become a Member</a>
                 </li>
                 <li>
@@ -298,7 +298,7 @@
                  data-toggle="dropdown">Financial Disclosures&nbsp;<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_fd" %}" tabindex="501">Search Financial Disclosures</a>
+                  <a href="{% url "financial_disclosures_home" %}" tabindex="501">Search Financial Disclosures</a>
                 </li>
                 <li>
                   <a href="{% url "coverage_fds" %}" tabindex="502">About this Collection</a>
@@ -312,9 +312,9 @@
           <ul class="nav navbar-nav navbar-right">
             <li
               class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-              <a href="https://donate.free.law/forms/membership"
+              <a href="https://free.law/membership/"
                  tabindex="600"
-                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Donate</a>
+                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Join FLP</a>
             </li>
           </ul>
         </div>
@@ -369,7 +369,7 @@
               <a href="{% url "help_home" %}" tabindex="11001">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
             </div>
             <div class="footer-item">
-              <a href="https://donate.free.law/forms/membership" tabindex="11002">Donate</a>
+              <a href="https://donate.free.law/forms/supportflp" tabindex="11002">Donate</a>
             </div>
           </div>
 
@@ -420,7 +420,7 @@
       </div>
     </div>
     <div class="col-sm-4 text-right" id="donate-image">
-      <a href="https://donate.free.law/forms/membership"  tabindex="11014">
+      <a href="https://donate.free.law/forms/supportflp"  tabindex="11014">
         <img src="{% static "png/donate-button.png" %}"
              alt="Donate to support our work"
              height="75"

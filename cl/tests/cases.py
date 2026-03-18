@@ -11,7 +11,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from lxml.html import HtmlElement
@@ -720,13 +720,16 @@ class SearchAlertsAssertions:
     def _assert_date_updated(self, date_to_compare, html_content, txt_content):
         """Confirm that date_updated is properly set in the alert email."""
 
+        # Use localtime() to normalize DST, matching the email template which
+        # applies |localtime before |date formatting.
+        localized_date = localtime(date_to_compare)
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             html_content,
         )
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             txt_content,
         )
 

@@ -47,6 +47,7 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    DocketDocumentPlain,
     ESOpinionDocumentPlain,
     ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
@@ -61,7 +62,7 @@ from cl.search.types import (
     SearchAlertHitType,
 )
 
-COMMON_QUERY_PARAMS = {"type", "order_by"}
+COMMON_QUERY_PARAMS = {"type", "order_by", "semantic", "highlight"}
 
 
 @dataclass
@@ -416,6 +417,11 @@ def scheduled_alert_hits_limit_reached(
     """Check if the alert hits limit has been reached for a specific alert-user
      combination.
 
+    For child documents (RECAPDocument, Opinion), two limits are checked:
+        1. Per-parent limit: caps child hits per parent object.
+        2. Global alert limit: caps distinct parent objects per alert.
+    If either limit is reached, returns True.
+
     :param alert_pk: The alert_id.
     :param user_pk: The user_id.
     :param content_type: The related content_type.
@@ -424,56 +430,50 @@ def scheduled_alert_hits_limit_reached(
     :return: True if the limit has been reached, otherwise False.
     """
 
-    is_opinion_hit = content_type.model == "opinion" if content_type else False
-    if child_document and content_type:
-        # To limit child hits in case, count ScheduledAlertHits related to the
-        # alert, user and parent document.
-        hits_count = ScheduledAlertHit.objects.filter(
-            alert_id=alert_pk,
-            user_id=user_pk,
-            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-            content_type=content_type,
-            object_id=object_id,
-        ).count()
-        hits_per_result = (
-            settings.OPINION_HITS_PER_RESULT
-            if is_opinion_hit
-            else settings.RECAP_CHILD_HITS_PER_RESULT
-        )
-        hits_limit = hits_per_result + 1
-    else:
-        # To limit hits in an alert count ScheduledAlertHits related to the
-        # alert and user.
-        hits_count = (
-            ScheduledAlertHit.objects.filter(
-                alert_id=alert_pk,
-                user_id=user_pk,
-                hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-                content_type=content_type,
-            )
-            .only("object_id")
-            .distinct("object_id")
-        ).count()
-        hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT
+    base_filter = ScheduledAlertHit.objects.filter(
+        alert_id=alert_pk,
+        user_id=user_pk,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+    )
 
-    if hits_count >= hits_limit:
-        if child_document:
-            log_function = logger.error if is_opinion_hit else logger.info
-            log_function(
-                "Skipping child hit for Alert ID: %s and object_id %s, there "
-                "are %s child hits stored for this alert-instance.",
-                alert_pk,
-                object_id,
-                hits_count,
-            )
-        else:
-            logger.info(
-                "Skipping hit for Alert ID: %s, there are %s hits stored for "
-                "this alert.",
-                alert_pk,
-                hits_count,
-            )
+    # Child-specific per-parent limit
+    if child_document and content_type:
+        child_hits_count = base_filter.filter(object_id=object_id).count()
+        if child_hits_count > 0:
+            # Parent case already scheduled. Only enforce per-parent
+            # child limit.
+            is_opinion_hit = content_type.model == "opinion"
+            child_hits_limit = (
+                settings.OPINION_HITS_PER_RESULT
+                if is_opinion_hit
+                else settings.RECAP_CHILD_HITS_PER_RESULT
+            ) + 1
+            if child_hits_count >= child_hits_limit:
+                log_fn = logger.error if is_opinion_hit else logger.info
+                log_fn(
+                    "Skipping child hit for Alert ID: %s and object_id %s, there "
+                    "are %s child hits stored for this alert-instance.",
+                    alert_pk,
+                    object_id,
+                    child_hits_count,
+                )
+                return True
+            # Child limit not reached, allow this hit.
+            return False
+
+    # Global alert limit
+    global_hits_count = (
+        base_filter.only("object_id").distinct("object_id").count()
+    )
+    if global_hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
+        logger.info(
+            "Skipping hit for Alert ID: %s, there are %s distinct hits stored "
+            "for this alert.",
+            alert_pk,
+            global_hits_count,
+        )
         return True
+
     return False
 
 
@@ -709,7 +709,15 @@ def prepare_percolator_content(
             es_document_index = AudioDocument._index._name
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
-            es_document_index = DocketDocument._index._name
+            model = apps.get_model(app_label)
+            docket = model.objects.get(pk=document_id)
+            document_content_plain = DocketDocumentPlain().prepare(docket)
+            del document_content_plain["docket_child"]
+            documents_to_percolate = (
+                document_content_plain,
+                None,
+                None,
+            )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
             model = apps.get_model(app_label)
@@ -772,17 +780,52 @@ def set_skip_percolation_if_bankruptcy_data(
         d.skip_percolator_request = True
 
 
+def _exceeds_attorney_limit(
+    parties_data: list[dict[str, Any]], limit: int
+) -> bool:
+    """Check if total attorneys in parties data exceeds the given limit.
+
+    Stops counting early once the limit is exceeded for efficiency, since
+    parties data can be very large.
+
+    :param parties_data: A list of dicts containing the parties data.
+    :param limit: The maximum number of attorneys allowed.
+    :return: True if the total number of attorneys exceeds the limit.
+    """
+    count = 0
+    for party in parties_data:
+        count += len(party.get("attorneys", []))
+        if count > limit:
+            return True
+    return False
+
+
 def set_skip_percolation_if_parties_data(
     parties_data: list[dict[str, Any]], d: Docket
-) -> None:
+) -> bool:
     """Set skip percolation flag if parties data is present.
+
+    If parties data is available and the attorney count does not exceed the
+    limit, percolation is skipped during docket save(), since percolation
+    will be scheduled after merging and indexing parties.
 
     :param parties_data: A list of dicts containing the parties data.
     :param d: The docket to be saved.
-    :return: None
+    :return: True if the docket should be percolated after merging parties,
+    False otherwise.
     """
-    if parties_data:
-        d.skip_percolator_request = True
+    if not parties_data:
+        return False
+
+    if _exceeds_attorney_limit(
+        parties_data, settings.MAX_ATTORNEYS_TO_PERCOLATE
+    ):
+        # Party limit exceeded. Do not skip percolation. The docket will be
+        # percolated without considering parties via the ES signal processor.
+        return False
+
+    d.skip_percolator_request = True
+    return True
 
 
 def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:

@@ -4,9 +4,11 @@ import random
 import re
 from collections import defaultdict
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Any
+from urllib.parse import urlparse
 
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -31,6 +33,16 @@ from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+def extract_file_name_from_url(url: str) -> str:
+    """Extract the filename from a URL.
+
+    :param url: The URL to extract the filename from.
+    :return: The filename extracted from the URL path.
+    """
+    parsed_url = urlparse(url)
+    return parsed_url.path.split("/")[-1]
 
 
 class OpinionMatchingException(Exception):
@@ -396,13 +408,13 @@ def merge_docket_numbers(
     cl_docket = cluster.docket
     file_cleaned_docket = clean_docket_number(docket_number)
 
-    if cl_docket.docket_number:
+    if cl_docket.docket_number_raw:
         # Check if docket number exists
         # e.g. CL docket id #3952066 doesn't have
-        cl_clean_docket = clean_docket_number(cl_docket.docket_number)
+        cl_clean_docket = clean_docket_number(cl_docket.docket_number_raw)
         if (
             cl_clean_docket in file_cleaned_docket
-            and cl_docket.docket_number != file_cleaned_docket
+            and cl_docket.docket_number_raw != file_cleaned_docket
         ):
             return file_cleaned_docket
         else:
@@ -956,9 +968,9 @@ def content_too_different(
         return True
 
     # If a docket number exists: check against it.
-    if case.docket.docket_number is not None:
+    if case.docket.docket_number_raw is not None:
         clean_docket = clean_docket_number(docket)
-        if clean_docket not in case.docket.docket_number:
+        if clean_docket not in case.docket.docket_number_raw:
             return True
     return False
 
@@ -1268,3 +1280,34 @@ def get_iquery_pacer_courts_to_scrape() -> list[str]:
         )
         .values_list("pk", flat=True)
     )
+
+
+def create_docket_entry_sequence_numbers(
+    docket_entries: list[dict[str, Any]], date_field: str = "date"
+) -> list[str]:
+    """Calculates the sequence numbers for a list of docket entries to allow
+    consistent matching and merging.
+
+    :param docket_entries: A list of dictionaries, which must all include a
+    "date" field with the `date` type.
+    :param date_field: The date field to use for calculating the sequence numbers.
+    :return: A list of sequence numbers corresponding to the list of docket
+    entries.
+    """
+    dates = [d[date_field].isoformat() for d in docket_entries]
+    date_counts: dict[str, int] = {}
+    sequence_numbers = []
+    for entry_date in dates:
+        i = date_counts.get(entry_date, 1)
+        sequence_numbers.append(f"{entry_date}.{i:0>3}")
+        date_counts[entry_date] = i + 1
+
+    return sequence_numbers
+
+
+@dataclass
+class DownloadPDFResult:
+    """Result of a PDF download operation."""
+
+    success: bool
+    sha1: str | None = None

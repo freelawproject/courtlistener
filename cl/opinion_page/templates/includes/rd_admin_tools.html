@@ -1,21 +1,27 @@
 {# show the admin tools if applicable #}
-{% if perms.search.change_recapdocument or perms.search.change_docketentry or perms.search.change_docket %}
+{% if perms.search.view_recapdocument or perms.search.change_recapdocument or perms.search.delete_recapdocument or perms.search.view_docketentry or perms.search.change_docketentry or perms.search.delete_docketentry or perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
   <div class="sidebar-section">
     <h3><span>Admin</span></h3>
     <p>
-      {% if perms.search.change_docket and d%}
-        <a
-          href="{% url 'admin:search_docket_change' d.pk %}"
-          class="btn btn-primary btn-xs">Docket</a>
+      {% if d %}
+        {% if perms.search.view_docket or perms.search.change_docket or perms.search.delete_docket %}
+          <a
+            href="{% url 'admin:search_docket_change' d.pk %}"
+            class="btn btn-primary btn-xs">Docket</a>
+        {% endif %}
       {% endif %}
-      {% if perms.search.change_docketentry and de%}
-        <a
-          href="{% url 'admin:search_docketentry_change' de.pk %}"
-          class="btn btn-primary btn-xs">Docket Entry</a>
+      {% if de %}
+        {% if perms.search.view_docketentry or perms.search.change_docketentry or perms.search.delete_docketentry %}
+          <a
+            href="{% url 'admin:search_docketentry_change' de.pk %}"
+            class="btn btn-primary btn-xs">Docket Entry</a>
+        {% endif %}
       {% endif %}
-      {% if perms.search.change_recapdocument and rd%}
-        <a href="{% url 'admin:search_recapdocument_change' rd.pk %}"
-           class="btn btn-primary btn-xs">RECAP Document</a>
+      {% if rd %}
+        {% if perms.search.view_recapdocument or perms.search.change_recapdocument or perms.search.delete_recapdocument %}
+          <a href="{% url 'admin:search_recapdocument_change' rd.pk %}"
+             class="btn btn-primary btn-xs">RECAP Document</a>
+        {% endif %}
       {% endif %}
     </p>
   </div>
