@@ -3366,6 +3366,25 @@ class TexasMergerTest(TestCase):
         assert docket_sc.appeal_from_id == "txctapp1"
         assert docket_sc.appeal_from_str == self.texas_coa1.full_name
 
+    def test_merge_texas_docket_appeal_from_missing_court(self):
+        docket_dict = TexasFinalCourtDocketDictFactory.create(
+            is_direct_appeal=False,
+            appeals_court=TexasAppellateCourtInfoDictFactory(
+                court_id="texas_coa17", district="Not Real Court of Appeals"
+            ),
+        )
+
+        result = merge_texas_docket(docket_dict)
+
+        assert result.success is True
+
+        docket = Docket.objects.get(pk=result.pk)
+
+        assert (
+            docket.appeal_from_str == docket_dict["appeals_court"]["district"]
+        )
+        assert docket.appeal_from is None
+
     @patch(
         "cl.corpus_importer.tasks.merge_texas_case_transfers",
         return_value=MergeResult.created(1),

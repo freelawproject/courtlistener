@@ -4778,14 +4778,15 @@ def merge_texas_docket(
             lower_court_id = texas_js_court_id_to_court_id(
                 lower_court_data["court_id"]
             )
+            lower_court_name = lower_court_data["district"]
         else:
             lower_court_data = docket_data["originating_court"]
             lower_court_id = texas_originating_court_to_court_id(
                 lower_court_data
             )
+            lower_court_name = lower_court_data.get("name", "")
 
         # Assumes that we will only fail to generate a court ID for trial courts and never appellate courts
-        lower_court_name = lower_court_data.get("name", "")
         if lower_court_id:
             try:
                 lower_court = Court.objects.get(pk=lower_court_id)
@@ -4794,8 +4795,6 @@ def merge_texas_docket(
                     "Could not find lower court with ID %s to set appeal_from for Texas docket.",
                     lower_court_id,
                 )
-                if lower_court_data["court_type"] == CourtType.APPELLATE.value:
-                    lower_court_name = lower_court_data["district"]
             else:
                 docket.appeal_from = lower_court
                 lower_court_name = lower_court.full_name
