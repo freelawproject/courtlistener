@@ -4274,7 +4274,11 @@ def merge_texas_docket_entry(
             )
             docket_entry = matching_sequence_numbers.first()
         except TexasDocketEntry.DoesNotExist:
-            pass
+            logger.error(
+                "Could not find matching TexasDocketEntry with sequence number %s on Docket %s. Creating new docket entry, which may be a duplicate...",
+                sequence_number,
+                docket.pk,
+            )
     else:
         logger.info(
             "Found existing TexasDocketEntry for sequence number %s on Docket %s. Updating entry.",
@@ -4790,6 +4794,8 @@ def merge_texas_docket(
                     "Could not find lower court with ID %s to set appeal_from for Texas docket.",
                     lower_court_id,
                 )
+                if lower_court_data["court_type"] == CourtType.APPELLATE.value:
+                    lower_court_name = lower_court_data["district"]
             else:
                 docket.appeal_from = lower_court
                 lower_court_name = lower_court.full_name
