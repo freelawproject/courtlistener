@@ -3665,7 +3665,7 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     retry_backoff=2 * 60,
     retry_backoff_max=60 * 60,
 )
-def process_texas_email(self: Task, epq: EmailProcessingQueue) -> None:
+def process_texas_email(self: Task, epq_pk: int) -> None:
     """
     Task to process an email added to the queue by the .../tx/tames/alert\
     endpoint. If the email is a case notification email, fetch the docket page\
@@ -3673,9 +3673,10 @@ def process_texas_email(self: Task, epq: EmailProcessingQueue) -> None:
     queue indicating the email type was unrecognized.
 
     :param self: The Celery task
-    :param epq: The EmailProcessingQueue object representing the email to\
-        process
+    :param epq_pk: The PK of the EmailProcessingQueue object to process
     """
+    epq = EmailProcessingQueue.objects.get(pk=epq_pk)
+
     async_to_sync(mark_pq_status)(
         epq,
         "Processing TAMES CaseMail email",

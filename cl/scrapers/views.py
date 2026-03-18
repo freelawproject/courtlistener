@@ -1,4 +1,5 @@
-from attr import dataclass
+from dataclasses import dataclass
+
 from django.contrib.auth.models import User
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
@@ -121,7 +122,9 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        state = kwargs["state"]
+        site = kwargs["site"]
+        self.perform_create(serializer, state=state, site=site)
         headers = self.get_success_headers(serializer.data)
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
@@ -156,5 +159,5 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
             destination_emails=self.get_destination_emails_from_request_data(),
             source=processing_task_info.source,
         )
-        processing_task_info.task.delay(epq.id)
+        processing_task_info.task.delay(epq.pk)
         return epq
