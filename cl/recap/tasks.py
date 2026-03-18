@@ -3726,6 +3726,7 @@ def process_texas_email(self: Task, epq: EmailProcessingQueue) -> None:
 
     return None
 
+
 @app.task(
     autoretry_for=(
         httpx.ConnectError,
