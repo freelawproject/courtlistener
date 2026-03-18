@@ -25,6 +25,7 @@ from django.core.mail import EmailMessage
 from django.db.models import Prefetch, QuerySet
 from django.http import QueryDict
 from django.template import loader
+from elasticsearch.dsl import Document, Q, UpdateByQuery, connections
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -34,7 +35,6 @@ from elasticsearch.exceptions import (
     RequestError,
 )
 from elasticsearch.helpers import parallel_bulk, streaming_bulk
-from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
 from httpx import (
     HTTPStatusError,
     NetworkError,

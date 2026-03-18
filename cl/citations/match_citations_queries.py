@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl import Q
-from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit
+from elasticsearch.dsl import Q
+from elasticsearch.dsl.query import Query
+from elasticsearch.dsl.response import Hit
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer

@@ -15,7 +15,7 @@ from django.core.paginator import Paginator
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
 
