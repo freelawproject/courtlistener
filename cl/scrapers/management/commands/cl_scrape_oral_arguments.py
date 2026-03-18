@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Any
 
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from celery.canvas import chain
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -107,7 +107,7 @@ class Command(cl_scrape_opinions.Command):
     scrape_target_descr = "oral arguments"
     juriscraper_module_type = "oral_args"
 
-    def ingest_a_case(
+    async def ingest_a_case(
         self,
         item,
         next_case_date: date | None,
@@ -117,14 +117,14 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
-        content = async_to_sync(site.download_content)(
+        content = await site.download_content(
             item["download_urls"], media_root=settings.MEDIA_ROOT
         )
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         sha1_hash = sha1(force_bytes(content))
 
-        dup_checker.press_on(
+        await sync_to_async(dup_checker.press_on)(
             Audio,
             item["case_dates"],
             next_case_date,
@@ -139,16 +139,20 @@ class Command(cl_scrape_opinions.Command):
         )
         dup_checker.reset()
 
-        docket, audio_file = make_objects(item, court, sha1_hash, content)
+        docket, audio_file = await sync_to_async(make_objects)(
+            item, court, sha1_hash, content
+        )
 
-        save_everything(
+        await sync_to_async(save_everything)(
             items={"docket": docket, "audio_file": audio_file},
             backscrape=backscrape,
         )
-        chain(
-            process_audio_file.si(audio_file.pk),
-            transcribe_from_open_ai_api.si(audio_file.pk),
-        ).apply_async()
+        await sync_to_async(
+            chain(
+                process_audio_file.si(audio_file.pk),
+                transcribe_from_open_ai_api.si(audio_file.pk),
+            ).apply_async
+        )()
 
         logger.info(
             "Successfully added audio file %s: %s",

@@ -161,7 +161,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
         parsed_site = async_to_sync(site.parse)()
-        cl_scrape_opinions.Command().scrape_court(
+        async_to_sync(cl_scrape_opinions.Command().scrape_court)(
             parsed_site, full_crawl=True, ocr_available=False
         )
 
@@ -313,9 +313,9 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                 "cl.lib.celery_utils.get_task_wait"
             ) as patched_wait:
                 patched_wait.return_value = 0
-                cl_scrape_oral_arguments.Command().scrape_court(
-                    parsed_site, full_crawl=True
-                )
+                async_to_sync(
+                    cl_scrape_oral_arguments.Command().scrape_court
+                )(parsed_site, full_crawl=True)
 
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
@@ -368,7 +368,8 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         self.assertEqual(len(site.case_names), 2)
 
     @patch(
-        "cl.scrapers.management.commands.cl_scrape_opinions.Command.get_opinions_content"
+        "cl.scrapers.management.commands.cl_scrape_opinions.Command.get_opinions_content",
+        new_callable=mock.AsyncMock,
     )
     def test_scrape_multiple_opinions_per_cluster(
         self, patched_get_opinions_content
@@ -403,7 +404,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         mock_site.url = "111"
         mock_site.hash = "234"
 
-        cl_scrape_opinions.Command().scrape_court(mock_site)
+        async_to_sync(cl_scrape_opinions.Command().scrape_court)(mock_site)
 
         # a single cluster with 2 sub opinions was created
         clusters = OpinionCluster.objects.filter(
@@ -898,7 +899,9 @@ class ScrapeCitationsTest(TestCase):
                 new=mock.AsyncMock(return_value="placeholder"),
             ),
         ):
-            cl_back_scrape_citations.Command().scrape_court(self.mock_site)
+            async_to_sync(
+                cl_back_scrape_citations.Command().scrape_court
+            )(self.mock_site)
 
         citations = Citation.objects.filter(cluster=self.cluster).count()
         self.assertEqual(citations, 1, "Exactly 1 citation was expected")

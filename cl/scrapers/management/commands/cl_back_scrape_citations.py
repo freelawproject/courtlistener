@@ -9,7 +9,7 @@ downloaded. If we find an Opinion we don't have in the database,
 we ingest it as in a regular scrape
 """
 
-from asgiref.sync import async_to_sync
+from asgiref.sync import sync_to_async
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 from juriscraper.lib.exceptions import BadContentError
@@ -28,7 +28,7 @@ class Command(cl_back_scrape_opinions.Command):
     scrape_target_descr = "citations"
     juriscraper_module_type = "opinions"
 
-    def scrape_court(
+    async def scrape_court(
         self,
         site,
         full_crawl: bool = False,
@@ -49,7 +49,7 @@ class Command(cl_back_scrape_opinions.Command):
             it's case data
         """
         court_str = site.court_id.split(".")[-1].split("_")[0]
-        court = Court.objects.get(id=court_str)
+        court = await Court.objects.aget(id=court_str)
         dup_checker = DupChecker(court, full_crawl=True)
 
         for case in site:
@@ -63,7 +63,7 @@ class Command(cl_back_scrape_opinions.Command):
                 continue
 
             try:
-                content = async_to_sync(site.download_content)(
+                content = await site.download_content(
                     case["download_urls"], media_root=settings.MEDIA_ROOT
                 )
             except BadContentError:
@@ -72,7 +72,9 @@ class Command(cl_back_scrape_opinions.Command):
             sha1_hash = sha1(force_bytes(content))
 
             try:
-                cluster = Opinion.objects.get(sha1=sha1_hash).cluster
+                cluster = await sync_to_async(
+                    lambda: Opinion.objects.get(sha1=sha1_hash).cluster
+                )()
             except Opinion.DoesNotExist:
                 # populate special key to avoid downloading the file again
                 case["content"] = content
@@ -85,7 +87,9 @@ class Command(cl_back_scrape_opinions.Command):
                     citation or parallel_citation,
                 )
 
-                self.ingest_a_case(case, None, True, site, dup_checker, court)
+                await self.ingest_a_case(
+                    case, None, True, site, dup_checker, court
+                )
                 continue
 
             for cite in [citation, parallel_citation]:
@@ -96,11 +100,13 @@ class Command(cl_back_scrape_opinions.Command):
                 if not citation_candidate:
                     continue
 
-                if citation_is_duplicated(citation_candidate, cite):
+                if await sync_to_async(citation_is_duplicated)(
+                    citation_candidate, cite
+                ):
                     continue
 
                 try:
-                    citation_candidate.save()
+                    await citation_candidate.asave()
                     logger.info(
                         "Saved citation %s for cluster %s", cite, cluster
                     )
