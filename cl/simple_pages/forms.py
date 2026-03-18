@@ -27,7 +27,7 @@ class ContactForm(forms.Form):
     ISSUE_TYPE_CHOICES = [
         (SUPPORT_REQUEST, "General Support"),
         (PARTNERSHIPS, "Partnership Inquiry"),
-        (API_HELP, "Data or API Help"),
+        (API_HELP, "Data or API Support"),
         (DATA_QUALITY, "Report Data Quality Problem"),
         (RECAP_BUG, "RECAP Extension Bug"),
         (REMOVAL_REQUEST, "Case Removal Request"),
