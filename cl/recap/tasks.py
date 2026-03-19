@@ -68,6 +68,7 @@ from cl.corpus_importer.tasks import (
     get_document_number_for_appellate,
     is_docket_entry_sealed,
     is_pacer_doc_sealed,
+    merge_texas_docket,
     save_attachment_pq_from_text,
     update_rd_metadata,
 )
@@ -3663,9 +3664,9 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     autoretry_for=(
         botocore_exception.HTTPClientError,
         botocore_exception.ConnectionError,
-        requests.ConnectionError,
-        requests.RequestException,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.HTTPStatusError,
+        httpx.TimeoutException,
         RedisConnectionError,
     ),
     max_retries=10,
@@ -3729,12 +3730,21 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             )
 
     res = httpx.get(email_data.url)
+    res.raise_for_status()
     docket_parser._parse_text(res.text)
     docket_data = docket_parser.data
 
+    if not docket_data:
+        async_to_sync(mark_pq_status)(
+            epq,
+            "Failed to parse Texas docket.",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+        return None
+
     try:
-        # d = merge_texas_docket(docket_data)
-        pass
+        d = merge_texas_docket(docket_data, download_attachments=True)
     except Exception as e:
         async_to_sync(mark_pq_status)(
             epq,
@@ -3745,7 +3755,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     else:
         async_to_sync(associate_related_instances)(
             epq,
-            # d_id=d.pk,
+            d_id=d.pk,
             de_id=None,
             rd_id=None,
         )
