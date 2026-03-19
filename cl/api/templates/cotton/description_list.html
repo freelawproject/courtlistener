@@ -1,5 +1,9 @@
-<div class="overflow-auto">
-  <dl>
-    {{ slot }}
-  </dl>
-</div>
+<c-vars columns="1" class=""></c-vars>
+
+{% if columns != "1" %}
+<dl class="md:grid md:[&>div]:grid md:[&>div]:grid-rows-subgrid md:[&>div]:row-span-2 {{ class }}" style="--dl-cols: {{ columns }}; grid-template-columns: repeat(var(--dl-cols), minmax(0, 1fr));">
+{% else %}
+<dl class="{{ class }}">
+{% endif %}
+  {{ slot }}
+</dl>
