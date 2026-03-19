@@ -100,8 +100,14 @@ OAUTH2_PROVIDER = {
     },
     "DEFAULT_SCOPES": ["read"],
 
-    # Token settings
-    "ACCESS_TOKEN_EXPIRE_SECONDS": 3600,       # 1 hour
+    # JWT access tokens — MCP pods validate locally with the public key,
+    # no introspection call back to Django needed.
+    "ACCESS_TOKEN_GENERATOR": "oauth2_provider.generators.generate_jwt",
+    "OIDC_RSA_PRIVATE_KEY": env("OIDC_RSA_PRIVATE_KEY"),
+
+    # Token settings — short-lived access tokens (revocation is eventual
+    # with JWTs, so keep lifetime short). Refresh tokens handle re-auth.
+    "ACCESS_TOKEN_EXPIRE_SECONDS": 900,         # 15 minutes
     "REFRESH_TOKEN_EXPIRE_SECONDS": 86400 * 30, # 30 days
     "ROTATE_REFRESH_TOKEN": True,
 
@@ -264,82 +270,118 @@ in parallel.
 ## Architecture Diagram
 
 ```
-┌──────────────┐     ┌───────────────────────────────────────┐
-│  Claude.ai   │     │         CourtListener                 │
-│  (MCP Client)│     │                                       │
-│              │     │  ┌─────────────────────────────┐      │
-│  1. Discover ├────►│  │ /.well-known/oauth-*        │      │
-│              │     │  │ (metadata endpoints)        │      │
-│  2. Authorize├────►│  │                             │      │
-│     (browser)│     │  │ /o/authorize/               │      │
-│              │     │  │ (consent screen)            │      │
-│  3. Token    ├────►│  │                             │      │
-│     exchange │     │  │ /o/token/                   │      │
-│              │     │  │ (OAuth2 token endpoint)     │      │
-│              │     │  └─────────────────────────────┘      │
-│              │     │                                       │
-│  4. MCP calls├────►│  ┌─────────────────────────────┐      │
-│  (Bearer tok)│     │  │ /mcp/ (Streamable HTTP)     │      │
-│              │     │  │ Remote MCP Server           │      │
-│              │     │  │ (validates OAuth tokens,    │      │
-│              │     │  │  calls DRF API internally)  │      │
-│              │     │  └─────────────────────────────┘      │
-└──────────────┘     └───────────────────────────────────────┘
+                         ┌───────────────────────────────────────┐
+┌──────────────┐         │         CL Django Pod                 │
+│  Claude.ai   │         │                                       │
+│  (MCP Client)│         │  ┌─────────────────────────────┐      │
+│              │         │  │ /.well-known/oauth-*        │      │
+│  1. Discover ├────────►│  │ (metadata endpoints)        │      │
+│              │         │  │                             │      │
+│  2. Authorize├────────►│  │ /o/authorize/               │      │
+│     (browser)│         │  │ (consent screen)            │      │
+│              │         │  │                             │      │
+│  3. Token    ├────────►│  │ /o/token/                   │      │
+│     exchange │         │  │ (issues JWT, signed w/      │      │
+│              │         │  │  RSA private key)           │      │
+│              │         │  └─────────────────────────────┘      │
+│              │         └───────────────────────────────────────┘
+│              │
+│              │         ┌───────────────────────────────────────┐
+│              │         │         MCP Pod (stateless)           │
+│  4. MCP calls├────────►│                                       │
+│  (Bearer JWT)│         │  Validates JWT locally (RSA pub key)  │
+│              │         │  Calls CL REST API for data           │
+│              │◄────────│  Shared tool code w/ stdio transport  │
+└──────────────┘         └───────────────────────────────────────┘
+
+                         ┌───────────────────────────────────────┐
+┌──────────────┐         │  Local MCP (stdio, same codebase)     │
+│ Claude Code  │◄───────►│  uvx courtlistener-mcp                │
+│ / Desktop    │  stdio  │  Auth: COURTLISTENER_API_TOKEN env    │
+└──────────────┘         │  Calls CL REST API for data           │
+                         └───────────────────────────────────────┘
 ```
 
 ---
 
-## Key Decision: Where Does the MCP Server Live?
+## Architecture: Shared Tools, Two Transports, Separate Pods
 
-Two options:
+The `courtlistener-api-client` package contains **one shared set of tool
+definitions** used by both transports:
 
-### Option A: MCP Server as a Separate Service (current plan)
-- Lives in `courtlistener-api-client` repo
-- Deployed as a separate process
-- Proxies requests to CourtListener API
-- Pro: Clean separation, can be pip-installed for local use too
-- Con: Extra deployment, token forwarding complexity
+```
+courtlistener-api-client/
+├── courtlistener/
+│   ├── tools/              # Shared tool definitions & handlers
+│   │   ├── search.py       # search_case_law(), search_dockets(), etc.
+│   │   ├── citations.py
+│   │   └── opinions.py
+│   ├── mcp_stdio.py        # Entry point: uvx courtlistener-mcp (local)
+│   └── mcp_http.py         # Entry point: Streamable HTTP (remote pod)
+```
 
-### Option B: MCP Server Embedded in CourtListener Django
-- Add MCP endpoints directly to the Django app (e.g., `/mcp/`)
-- Use DRF + django-oauth-toolkit natively
-- Pro: Single deployment, direct DB access, OAuth works natively
-- Con: Couples MCP to the monolith, can't be pip-installed for local stdio use
+- **Local (stdio)**: `mcp_stdio.py` — reads `COURTLISTENER_API_TOKEN` from env,
+  calls CL REST API, communicates via stdin/stdout. Installed via `uvx`.
+- **Remote (HTTP)**: `mcp_http.py` — validates JWT Bearer tokens using RSA
+  public key (no DB, no Django dependency), calls CL REST API for data,
+  deployed in its own pod.
+- **OAuth provider**: Lives entirely in CL Django — issues JWTs, handles
+  authorize/token/refresh/revoke flows.
 
-**Recommendation**: **Hybrid approach**. Keep the `courtlistener-api-client`
-package for local stdio MCP use, but add a thin Streamable HTTP MCP endpoint
-inside CourtListener itself for the remote/Connector use case. This way:
-- OAuth tokens are validated directly by django-oauth-toolkit (no token forwarding)
-- The MCP endpoint has direct access to Django ORM (faster than proxying through REST)
-- Local users still `uvx courtlistener-mcp` with API tokens
-- The Connector points to `https://www.courtlistener.com/mcp/`
+### Why JWT + Separate Pod
+
+- **MCP pod is fully stateless** — no DB connection, no Django, no
+  introspection calls back to CL. Just needs the RSA public key.
+- **Scales independently** — spin up as many MCP pods as needed, CL Django
+  doesn't feel it.
+- **Clean separation** — MCP pod has zero coupling to CL's internals.
+- **Revocation trade-off** — JWT can't be instantly revoked, but with 15-min
+  access token lifetime + refresh token flow, this is a non-issue.
+- **Same tool code** — both stdio and HTTP transports import from `tools/`,
+  no duplication.
 
 ---
 
 ## Minimal Viable Implementation Checklist
 
+### CourtListener Django (OAuth provider)
 - [ ] `uv add django-oauth-toolkit`
 - [ ] Create `cl/settings/third_party/oauth2.py` with OAUTH2_PROVIDER config
+- [ ] Generate RSA key pair; add private key to Django secrets, public key to MCP pod config
 - [ ] Add `oauth2_provider` to INSTALLED_APPS
 - [ ] Add OAuth2Authentication to DRF auth classes
 - [ ] Include `oauth2_provider.urls` in URL config
 - [ ] Run migrations
-- [ ] Create consent template (`oauth2_provider/authorize.html`)
+- [ ] Create branded consent template (`oauth2_provider/authorize.html`)
 - [ ] Add `/.well-known/oauth-authorization-server` endpoint
 - [ ] Add `/.well-known/oauth-protected-resource` endpoint
 - [ ] Pre-register Claude as an OAuth application (via admin or data migration)
-- [ ] Add Streamable HTTP MCP endpoint at `/mcp/`
+
+### courtlistener-api-client (MCP server)
+- [ ] Refactor tools into shared `tools/` module
+- [ ] Add `mcp_http.py` entry point with Streamable HTTP transport
+- [ ] Add JWT validation middleware (RSA public key, no Django dependency)
+- [ ] Add Dockerfile / k8s manifests for MCP pod
+- [ ] Ensure `mcp_stdio.py` continues to work with API token auth
+
+### Deployment & Submission
+- [ ] Deploy MCP pod with RSA public key
+- [ ] Create test account for Anthropic reviewers
+- [ ] Add safety annotations to all MCP tools
 - [ ] Submit to Anthropic Connectors Directory
 
 ---
 
 ## What We Do NOT Need
 
+- **No Auth0 / Cognito / external auth service** — django-oauth-toolkit is the full provider
 - **No changes to existing API endpoints** — OAuth is additive
 - **No user migration** — existing token auth continues to work
 - **No new user model fields** — django-oauth-toolkit uses its own models
 - **No OIDC** (yet) — pure OAuth 2.1 is sufficient for MCP
 - **No dynamic client registration** (initially) — pre-register known clients
+- **No introspection endpoint** (with JWT) — MCP pod validates tokens locally
+- **No shared database** for MCP pod — fully stateless, just needs the public key
 
 ---
 
@@ -351,15 +393,20 @@ inside CourtListener itself for the remote/Connector use case. This way:
 2. **Rate limiting**: OAuth-authenticated requests should respect the same
    throttle infrastructure. `ExceptionalUserRateThrottle` already works per-user,
    so this should work automatically since OAuth tokens are tied to users.
+   MCP pod calls CL API with the user's token, so rate limits apply naturally.
 
-3. **Token lifetime**: MCP spec expects refresh tokens. django-oauth-toolkit
-   handles this natively with `ROTATE_REFRESH_TOKEN`.
+3. **Token lifetime**: JWT access tokens can't be instantly revoked, so keep
+   lifetime short (15 min). Refresh tokens handle re-auth transparently.
+   django-oauth-toolkit handles this natively with `ROTATE_REFRESH_TOKEN`.
 
-4. **CORS**: Current CORS only allows GET/HEAD/OPTIONS. OAuth endpoints need
-   POST. May need to extend CORS config for `/o/token/` at minimum.
+4. **CORS**: Current CORS only allows GET/HEAD/OPTIONS. OAuth token endpoint
+   needs POST. May need to extend CORS config for `/o/token/` at minimum.
 
 5. **HTTPS enforcement**: OAuth 2.1 requires HTTPS. CourtListener already
    enforces HTTPS in production.
+
+6. **RSA key rotation**: Start with a single key pair. Add JWKS endpoint
+   (`/.well-known/jwks.json`) later if key rotation becomes needed.
 
 ---
 
