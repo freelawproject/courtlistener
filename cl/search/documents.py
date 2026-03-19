@@ -2020,6 +2020,11 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
                 dims=settings.EMBEDDING_DIMENSIONS,
                 index=True,
                 similarity="dot_product",
+                # Explicitly set to `int8_hnsw` to match the index type used when
+                # this field was originally created under Elasticsearch 9.0, where
+                # `int8_hnsw` was the default for all float vectors regardless of
+                # dimensions.
+                index_options={"type": "int8_hnsw"},
             ),
         }
     )
