@@ -14,6 +14,7 @@ from cl.lib.admin import build_admin_url
 from cl.lib.string_utils import trunc
 from cl.search.models import (
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Claim,
     ClaimHistory,
@@ -34,6 +35,7 @@ from cl.search.models import (
     ScotusDocketMetadata,
     SCOTUSDocument,
     SearchQuery,
+    TrialCourtData,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.search.utils import seal_documents
@@ -373,6 +375,37 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
     raw_id_fields = ("docket",)
 
 
+@admin.register(CaseTransfer)
+class CaseTransferAdmin(CursorPaginatorAdmin):
+    raw_id_fields = (
+        "origin_court",
+        "origin_docket",
+        "destination_court",
+        "destination_docket",
+    )
+    list_display = (
+        "pk",
+        "origin_court",
+        "origin_docket_number",
+        "destination_court",
+        "destination_docket_number",
+        "transfer_date",
+        "transfer_type",
+    )
+    list_filter = (
+        "transfer_type",
+        "transfer_date",
+    )
+    search_fields = (
+        "origin_docket_number",
+        "destination_docket_number",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(CursorPaginatorAdmin):
     search_fields = (
@@ -528,6 +561,30 @@ class DocketAdmin(CursorPaginatorAdmin):
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
         )
+
+
+@admin.register(TrialCourtData)
+class TrialCourtDataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = (
+        "docket",
+        "judge",
+    )
+    autocomplete_fields = ("court",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_display = (
+        "__str__",
+        "docket_number_trial",
+        "court_name",
+        "date_filed",
+    )
+    search_help_text = "Search by docket ID or trial court docket number."
+    search_fields = (
+        "=docket__id",
+        "docket_number_trial",
+    )
 
 
 @admin.register(OpinionsCited)

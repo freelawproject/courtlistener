@@ -504,7 +504,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.9.0" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.68" },
+    { name = "juriscraper", specifier = ">=3.0.0" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "markdown2", specifier = ">=2.5.4" },
@@ -1855,7 +1855,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.8.4"
+version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1866,6 +1866,7 @@ dependencies = [
     { name = "feedparser" },
     { name = "geonamescache" },
     { name = "html5lib" },
+    { name = "httpx", extra = ["http2"] },
     { name = "lxml" },
     { name = "nh3" },
     { name = "python-dateutil" },
@@ -1873,9 +1874,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d1/40/0d63fde43d58e4968bf180651b72a872e1d1577b06c7d5d846bb38b963f5/juriscraper-2.8.4.tar.gz", hash = "sha256:7d752312fbb115c02a58dd543e31275d24aa5acf01a41a7118e77878cf76fac0", size = 385461, upload-time = "2026-03-17T21:45:30.341Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/f5/4c80d7a2520ad74713ce4e4ccec453f8e97d43920bfe5899fa8b4a981753/juriscraper-3.0.1.tar.gz", hash = "sha256:41a7f75b655bac3b8237dbb910242d290eee42fa4dc6e5ffbbb80af78592b60e", size = 385421, upload-time = "2026-03-19T01:38:46.037Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/f0/1fb2f9f71326c13ec81df9c915d0bd155fc6a172c8766e9c66a354751a55/juriscraper-2.8.4-py3-none-any.whl", hash = "sha256:02a2689949697b87516135d33f3a342151d228baeb6c800dc7c272696aeaf0bf", size = 611354, upload-time = "2026-03-17T21:45:28.398Z" },
+    { url = "https://files.pythonhosted.org/packages/42/f9/5813aed6741d04855d77880c0169edea0f06fecaff723e8f9e20476a819b/juriscraper-3.0.1-py3-none-any.whl", hash = "sha256:2e7cf5aed11df670e92d2c217b8e51827d808088f01bc8f23a4caddde7a6be5c", size = 611793, upload-time = "2026-03-19T01:38:44.016Z" },
 ]
 
 [[package]]
