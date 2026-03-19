@@ -3723,6 +3723,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 PROCESSING_STATUS.FAILED,
                 "status_message",
             )
+            self.request.chain = None
             return None
         case _:
             docket_parser = TexasCourtOfAppealsScraper(
@@ -3741,8 +3742,8 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             PROCESSING_STATUS.FAILED,
             "status_message",
         )
+        self.request.chain = None
         return None
-
     try:
         d = merge_texas_docket(docket_data, download_attachments=True)
     except Exception as e:
@@ -3759,9 +3760,12 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             de_id=None,
             rd_id=None,
         )
-        msg = f"Texas docket {docket_data['docket_number']} updated successfully."
-        status = PROCESSING_STATUS.SUCCESSFUL
-        async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"Texas docket {docket_data['docket_number']} updated successfully.",
+            PROCESSING_STATUS.SUCCESSFUL,
+            "status_message",
+        )
 
     return None
 
