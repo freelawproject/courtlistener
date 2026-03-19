@@ -95,6 +95,38 @@ Disallow: /wpd/
 Disallow: /txt/
 Disallow: /doc/
 
+# AI Bots (training, search/indexing, and user-initiated)
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Gemini-Deep-Research
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: FacebookBot
+User-agent: meta-externalagent
+User-agent: Amazonbot
+User-agent: Bytespider
+User-agent: CCBot
+User-agent: MistralAI-User
+Allow: /robots.txt
+Allow: /sitemap.xml
+Allow: /help/
+Allow: /faq/
+Allow: /feeds/
+Allow: /podcasts/
+Allow: /contact/
+Allow: /terms/
+Allow: /privacy/
+Allow: /removal/
+Allow: /donate/
+Disallow: /
+
 # Baidu, Blekko, Others
 # No support for robots meta tag nor x-robots-tag.
 # Be conservative; Block everything.
