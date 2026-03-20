@@ -376,6 +376,7 @@ dependencies = [
     { name = "eyecite" },
     { name = "factory-boy" },
     { name = "feedparser" },
+    { name = "google-genai" },
     { name = "gunicorn" },
     { name = "httplib2" },
     { name = "httpx", extra = ["http2"] },
@@ -492,6 +493,7 @@ requires-dist = [
     { name = "eyecite" },
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "feedparser", specifier = ">=6.0.12" },
+    { name = "google-genai", specifier = ">=1.59.0" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "httplib2", specifier = ">=0.31.0" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.28.1" },
@@ -502,7 +504,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.9.0" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.68" },
+    { name = "juriscraper", specifier = ">=3.0.0" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "markdown2", specifier = ">=2.5.4" },
@@ -1424,6 +1426,45 @@ wheels = [
 ]
 
 [[package]]
+name = "google-auth"
+version = "2.47.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyasn1-modules" },
+    { name = "rsa" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/60/3c/ec64b9a275ca22fa1cd3b6e77fefcf837b0732c890aa32d2bd21313d9b33/google_auth-2.47.0.tar.gz", hash = "sha256:833229070a9dfee1a353ae9877dcd2dec069a8281a4e72e72f77d4a70ff945da", size = 323719, upload-time = "2026-01-06T21:55:31.045Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/db/18/79e9008530b79527e0d5f79e7eef08d3b179b7f851cfd3a2f27822fbdfa9/google_auth-2.47.0-py3-none-any.whl", hash = "sha256:c516d68336bfde7cf0da26aab674a36fedcf04b37ac4edd59c597178760c3498", size = 234867, upload-time = "2026-01-06T21:55:28.6Z" },
+]
+
+[package.optional-dependencies]
+requests = [
+    { name = "requests" },
+]
+
+[[package]]
+name = "google-genai"
+version = "1.59.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "google-auth", extra = ["requests"] },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "sniffio" },
+    { name = "tenacity" },
+    { name = "typing-extensions" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/40/34/c03bcbc759d67ac3d96077838cdc1eac85417de6ea3b65b313fe53043eee/google_genai-1.59.0.tar.gz", hash = "sha256:0b7a2dc24582850ae57294209d8dfc2c4f5fcfde0a3f11d81dc5aca75fb619e2", size = 487374, upload-time = "2026-01-15T20:29:46.619Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/aa/53/6d00692fe50d73409b3406ae90c71bc4499c8ae7fac377ba16e283da917c/google_genai-1.59.0-py3-none-any.whl", hash = "sha256:59fc01a225d074fe9d1e626c3433da292f33249dadce4deb34edea698305a6df", size = 719099, upload-time = "2026-01-15T20:29:44.604Z" },
+]
+
+[[package]]
 name = "gunicorn"
 version = "23.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1814,7 +1855,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.8.2"
+version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1825,6 +1866,7 @@ dependencies = [
     { name = "feedparser" },
     { name = "geonamescache" },
     { name = "html5lib" },
+    { name = "httpx", extra = ["http2"] },
     { name = "lxml" },
     { name = "nh3" },
     { name = "python-dateutil" },
@@ -1832,9 +1874,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/7d/08f6ae8d33208baf889600697c57934fbb84545e93a93ac009f1c0b56cb7/juriscraper-2.8.2.tar.gz", hash = "sha256:c0c8d2a5940c7d4b23b8a2dbf2fbb4f78899e5c22946957dbf97bb60b76aed77", size = 383670, upload-time = "2026-03-02T23:05:47.782Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/f5/4c80d7a2520ad74713ce4e4ccec453f8e97d43920bfe5899fa8b4a981753/juriscraper-3.0.1.tar.gz", hash = "sha256:41a7f75b655bac3b8237dbb910242d290eee42fa4dc6e5ffbbb80af78592b60e", size = 385421, upload-time = "2026-03-19T01:38:46.037Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/5b/48d3d68b712df5d3a260dd6596edb47918ef226abbe919fbc1d30c273634/juriscraper-2.8.2-py3-none-any.whl", hash = "sha256:8b95b61c65586f1c851189e2fd7f7d57fb4f37925791c68200e4d7d0e26bb47e", size = 608526, upload-time = "2026-03-02T23:05:45.749Z" },
+    { url = "https://files.pythonhosted.org/packages/42/f9/5813aed6741d04855d77880c0169edea0f06fecaff723e8f9e20476a819b/juriscraper-3.0.1-py3-none-any.whl", hash = "sha256:2e7cf5aed11df670e92d2c217b8e51827d808088f01bc8f23a4caddde7a6be5c", size = 611793, upload-time = "2026-03-19T01:38:44.016Z" },
 ]
 
 [[package]]
@@ -2894,6 +2936,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/fb/d2/8920e102050a0de7bfabeb4c4614a49248cf8d5d7a8d01885fbb24dc767a/rich-14.2.0.tar.gz", hash = "sha256:73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4", size = 219990, upload-time = "2025-10-09T14:16:53.064Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/25/7a/b0178788f8dc6cafce37a212c99565fa1fe7872c70c6c9c1e1a372d9d88f/rich-14.2.0-py3-none-any.whl", hash = "sha256:76bc51fe2e57d2b1be1f96c524b890b816e334ab4c1e45888799bfaab0021edd", size = 243393, upload-time = "2025-10-09T14:16:51.245Z" },
+]
+
+[[package]]
+name = "rsa"
+version = "4.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyasn1" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/8a/22b7beea3ee0d44b1916c0c1cb0ee3af23b700b6da9f04991899d0c555d4/rsa-4.9.1.tar.gz", hash = "sha256:e7bdbfdb5497da4c07dfd35530e1a902659db6ff241e39d9953cad06ebd0ae75", size = 29034, upload-time = "2025-04-16T09:51:18.218Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/8d/0133e4eb4beed9e425d9a98ed6e081a55d195481b7632472be1af08d2f6b/rsa-4.9.1-py3-none-any.whl", hash = "sha256:68635866661c6836b8d39430f97a996acbd61bfa49406748ea243539fe239762", size = 34696, upload-time = "2025-04-16T09:51:17.142Z" },
 ]
 
 [[package]]
