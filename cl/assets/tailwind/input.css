@@ -87,12 +87,10 @@
   .alert {
     @apply px-4 py-3 text-sm rounded-[10px] border;
   }
-
   .alert-warning {
-    @apply alert text-yellow-700 bg-yellow-100 border-yellow-500;
+    @apply alert text-greyscale-950 bg-yellow-50 border-amber-450 border-2 rounded-2xl gap-2.5 p-4 self-stretch;
   }
-
-   .alert-danger {
+  .alert-danger {
     @apply alert bg-red-100 text-red-700 border-red-500;
   }
   .btn {
@@ -102,7 +100,7 @@
     @apply btn text-white bg-primary-600 hover:bg-primary-700 outline-none focus-visible:ring-4 focus-visible:ring-primary-300 disabled:bg-primary-100 disabled:text-primary-400;
   }
   .btn-outline {
-    @apply btn text-greyscale-700 hover:bg-greyscale-100 border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-200 disabled:border-greyscale-200 disabled:text-greyscale-400;
+    @apply btn bg-white text-greyscale-700 hover:bg-greyscale-400 hover:text-white border outline-none border-greyscale-300 focus-visible:ring-4 focus-visible:ring-greyscale-300 disabled:border-greyscale-200 disabled:text-greyscale-400;
   }
   .btn-dark {
     @apply btn text-white bg-greyscale-900 hover:bg-greyscale-800 outline-none focus-visible:ring-4 focus-visible:ring-greyscale-400 disabled:bg-greyscale-400 disabled:text-greyscale-200;
@@ -124,6 +122,10 @@
   }
   .input-text {
     @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
+  }
+  /* Screenshots used in Help pages */
+  .screenshot {
+    @apply rounded-2xl block max-w-full;
   }
 
   /* ----------- THIRD PARTY OVERRIDES ----------- */
@@ -204,6 +206,7 @@
   }
   .focus-container { /** provides focus state when a child input is focused */
     @apply [&:has(input:focus)]:outline [&:has(input:focus)]:outline-2 [&:has(input:focus)]:outline-primary-600 flex;
+    @apply [&:has(select:focus)]:outline [&:has(select:focus)]:outline-2 [&:has(select:focus)]:outline-primary-600 flex;
   }
   .capped-width {
     @apply w-full max-w-[--content-max-width] mx-auto;

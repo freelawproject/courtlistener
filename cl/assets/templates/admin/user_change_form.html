@@ -1,26 +1,12 @@
 {% extends "admin/change_form.html" %}
 
 {% block object-tools-items %}
-  {% if proxy_events_url %}
+  {% for link in custom_links %}
     <li>
-      <a class="historylink" href="{{ proxy_events_url }}">
-        UserProxy Events
+      <a class="historylink" href="{{ link.href }}">
+        {{ link.label }}
       </a>
     </li>
-  {% endif %}
-  {% if profile_events_url %}
-    <li>
-      <a class="historylink" href="{{ profile_events_url }}">
-        UserProfile Events
-      </a>
-    </li>
-  {% endif %}
-  {% if search_queries_url %}
-    <li>
-      <a class="historylink" href="{{ search_queries_url }}">
-        Search Queries
-      </a>
-    </li>
-  {% endif %}
+  {% endfor %}
   {{ block.super }}
 {% endblock object-tools-items %}

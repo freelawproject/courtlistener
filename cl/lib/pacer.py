@@ -74,7 +74,7 @@ def lookup_and_save(new, debug=False):
 
     if d is None:
         ds = Docket.objects.filter(
-            docket_number=new.docket_number, court=new.court
+            docket_number_raw=new.docket_number, court=new.court
         ).order_by("-date_filed")
         count = ds.count()
         if count < 1:
@@ -285,7 +285,7 @@ def process_docket_data(
         add_parties_and_attorneys(d, data["parties"])
         if data["parties"]:
             # Index or re-index parties only if the docket has parties.
-            index_docket_parties_in_es.delay(d.pk)
+            index_docket_parties_in_es.delay(d.pk, percolate_parties=False)
     return d.pk
 
 

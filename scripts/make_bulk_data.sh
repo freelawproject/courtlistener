@@ -20,11 +20,15 @@ curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
   | gpg --dearmor \
   -o /etc/apt/keyrings/postgresql.gpg
 
-echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+# Load the system codename
+source /etc/os-release
+CODENAME="$VERSION_CODENAME"
+
+echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt ${CODENAME}-pgdg main" \
   > /etc/apt/sources.list.d/pgdg.list
 
 apt-get update
-apt-get install -y postgresql-client-17
+apt-get install -y postgresql-client
 
 # We only need to set PGPASSWORD once
 export PGPASSWORD=$DB_PASSWORD
@@ -61,7 +65,8 @@ docket_fields='(id, date_created, date_modified, source, appeal_from_str,
 	       ia_date_first_change, view_count, date_blocked, blocked, appeal_from_id, assigned_to_id,
 	       court_id, idb_data_id, originating_court_information_id, referred_to_id,
 	       federal_dn_case_type, federal_dn_office_code, federal_dn_judge_initials_assigned,
-	       federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id
+	       federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id,
+           docket_number_raw, docket_number_source
 	       )'
 dockets_csv_filename="dockets-$(date -I).csv"
 
@@ -70,7 +75,7 @@ originatingcourtinformation_fields='(
 	       id, date_created, date_modified, docket_number, assigned_to_str,
 	       ordering_judge_str, court_reporter, date_disposed, date_filed, date_judgment,
 	       date_judgment_eod, date_filed_noa, date_received_coa, assigned_to_id,
-	       ordering_judge_id
+	       ordering_judge_id, docket_number_raw
 	       )'
 originatingcourtinformation_csv_filename="originating-court-information-$(date -I).csv"
 
@@ -112,7 +117,7 @@ search_opinion_joined_by_csv_filename="search_opinion_joined_by-$(date -I).csv"
 opinion_fields='(
 	       id, date_created, date_modified, author_str, per_curiam, joined_by_str,
 	       type, sha1, page_count, download_url, local_path, plain_text, html,
-	       html_lawbox, html_columbia, html_anon_2020, xml_harvard,
+	       html_lawbox, html_columbia, html_anon_2020, xml_harvard, xml_scan,
 	       html_with_citations, extracted_by_ocr, author_id, cluster_id
 	   )'
 opinions_csv_filename="opinions-$(date -I).csv"
@@ -125,7 +130,8 @@ opinionscited_csv_filename="citation-map-$(date -I).csv"
 
 # search_citation
 citation_fields='(
-	       id, volume, reporter, page, type, cluster_id
+	       id, volume, reporter, page, type, cluster_id, date_created,
+           date_modified
 	   )'
 citations_csv_filename="citations-$(date -I).csv"
 
@@ -415,7 +421,7 @@ export BULK_DB_NAME=courtlistener
 export PGPASSWORD=\$BULK_DB_PASSWORD
 
 echo "Loading schema to database: $schema_filename"
-psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER"
+psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER" --dbname "\$BULK_DB_NAME"
 
 EOF
 

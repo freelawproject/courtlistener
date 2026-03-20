@@ -383,23 +383,21 @@ orange|celery
     </c-layout-with-navigation.section>
 
     <c-layout-with-navigation.section id="linking">
-        <h3>Linking to Other
-            Items</h3>
+        <h3>Linking to Opinions</h3>
 
-        <p>One final thing you can do is link to other networks or opinions on
+        <p>One final thing you can do is link to opinions on
             CourtListener. This can be done as follows:
         </p>
         <c-code>
-As demonstrated in network #2, the doctrine has a long history starting at opinion #108713.
+The doctrine has a long history starting at opinion #108713.
         </c-code>
-        <p>Which creates a link to network #2.</p>
+        <p>Which creates a link to opinion #108713.</p>
         <div class="textbox">
-            <p>As demonstrated in
-               <a class="text-primary-600" href="{% url "view_visualization" pk=2 slug="md" %}">network #2</a>, the doctrine has a long history starting at
+            <p>The doctrine has a long history starting at
                <a class="text-primary-600" href="{% url "view_case" 108713 "md" %}">opinion #108713</a>.
             </p>
         </div>
-        <p>Whenever the word <em>network</em> or the word <em>opinion</em> is followed by a pound sign and a number, it will automatically be made into a link. Upper case or lower case letters will work.
+        <p>Whenever the word <em>opinion</em> is followed by a pound sign and a number, it will automatically be made into a link. Upper case or lower case letters will work.
         </p>
     </c-layout-with-navigation.section>
 </c-layout-with-navigation>

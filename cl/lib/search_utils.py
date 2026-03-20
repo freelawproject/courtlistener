@@ -10,22 +10,27 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
+from elasticsearch_dsl import A
 from elasticsearch_dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
+from waffle import flag_is_active
 
 from cl.citations.match_citations_queries import es_get_query_citation
 from cl.citations.utils import get_citation_depth_between_clusters
+from cl.lib.bot_detector import is_bot
 from cl.lib.crypto import sha256
 from cl.lib.elasticsearch_utils import (
+    build_es_base_query,
     build_es_main_query,
     compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
-    get_facet_dict_for_search_query,
+    has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
@@ -62,16 +67,25 @@ from cl.search.models import (
     OpinionCluster,
     SearchQuery,
 )
+from cl.stats.constants import StatMethod, StatMetric, StatQueryType
+from cl.stats.utils import tally_stat
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 logger = logging.getLogger(__name__)
 
 
-def check_pagination_depth(page_number):
-    """Check if the pagination is too deep (indicating a crawler)"""
+def check_pagination_depth(
+    page_number: int,
+    max_depth: int = settings.MAX_SEARCH_PAGINATION_DEPTH,
+) -> None:
+    """Check if the pagination is too deep (indicating a crawler)
 
-    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
+    :param page_number: The requested page number.
+    :param max_depth: Maximum allowed pagination depth.
+    :raises PermissionDenied: If page_number exceeds max_depth.
+    """
+    if page_number > max_depth:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -101,7 +115,7 @@ def make_get_string(
 
 
 def merge_form_with_courts(
-    courts: dict,
+    courts: QuerySet[Court],
     search_form: SearchForm,
 ) -> tuple[dict[str, list], str, str]:
     """Merges the courts dict with the values from the search form.
@@ -258,7 +272,14 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :param search_results: the dict returned by `do_es_search` function
     :return None
     """
+    if not flag_is_active(request, "store-search-queries"):
+        # Do not store search queries
+        return
+
+    if is_bot(request):
+        return
     is_error = search_results.get("error")
+    is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -267,6 +288,9 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         hit_cache=False,
         source=SearchQuery.WEBSITE,
         engine=SearchQuery.ELASTICSEARCH,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
     if is_error:
         # Leave `query_time_ms` as None if there is an error
@@ -292,6 +316,25 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
+    if is_bot(request):
+        return
+
+    is_semantic = has_semantic_params(request.GET)
+    query_type = (
+        StatQueryType.SEMANTIC if is_semantic else StatQueryType.KEYWORD
+    )
+    tally_stat(
+        StatMetric.SEARCH_RESULTS,
+        labels={
+            "query_type": query_type,
+            "method": StatMethod.API,
+        },
+    )
+
+    if not flag_is_active(request, "store-search-api-queries"):
+        # Do not store search queries in the DB
+        return
+
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -300,6 +343,9 @@ def store_search_api_query(
         hit_cache=False,
         source=SearchQuery.API,
         engine=engine,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
 
 
@@ -334,6 +380,69 @@ def retrieve_cached_search_results(
     if cached_results:
         return pickle.loads(cached_results), cache_key
     return None, cache_key
+
+
+def fetch_facets(
+    search_query: Search,
+    cd: CleanData,
+    search_form: SearchForm,
+    error: bool,
+) -> list:
+    """Fetch status facet counts, using the micro-cache when possible.
+
+    Builds a cache key that excludes stat_* params so toggling status
+    checkboxes reuses cached facet counts (the counts are the same even if the
+    facets are checked or unchecked).
+
+    :param search_query: The base Elasticsearch search query.
+    :param cd: Cleaned search parameters.
+    :param search_form: The search form to attach counts to.
+    :param error: Whether the search query had validation errors.
+    :return: A list of BoundField objects with count attributes set.
+    """
+    facet_cd = cd if not error else {"type": cd["type"]}
+    facet_cache_params = {
+        k: v for k, v in facet_cd.items() if not str(k).startswith("stat_")
+    }
+    facet_key_prefix = get_micro_cache_key("facet_counts_cache:")
+    cached_facets, facet_cache_key = retrieve_cached_search_results(
+        facet_cache_params, facet_key_prefix
+    )
+    facet_values: dict[str, int] = {}
+    if cached_facets and settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
+        facet_values = cached_facets  # type: ignore[assignment]
+    else:
+        facet_cd["just_facets_query"] = True
+        es_queries = build_es_base_query(search_query, facet_cd)
+        facet_query = es_queries.search_query
+        facet_query.aggs.bucket("status", A("terms", field="status.raw"))
+        facet_query = facet_query.extra(size=0)
+        response = facet_query.execute()
+        try:
+            buckets = response.aggregations.status.buckets
+            facet_values = {
+                group["key"]: group["doc_count"] for group in buckets
+            }
+        except (KeyError, AttributeError):
+            facet_values = {}
+        if settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
+            cache.set(
+                facet_cache_key,
+                pickle.dumps(facet_values),
+                settings.SEARCH_RESULTS_MICRO_CACHE,
+            )
+
+    facet_fields = []
+    for field in search_form:
+        if not field.html_name.startswith("stat_"):
+            continue
+        try:
+            count = facet_values[field.html_name.replace("stat_", "")]
+        except KeyError:
+            count = 0
+        field.count = count
+        facet_fields.append(field)
+    return facet_fields
 
 
 def get_results_from_paginator(
@@ -457,7 +566,14 @@ def fetch_and_paginate_results(
         return results, 1, False, main_total, child_total
 
     # Check pagination depth
-    check_pagination_depth(page)
+    query_string = clean_params.get("q", "")
+    is_related_query = bool(RELATED_PATTERN.search(query_string))
+    max_pagination_depth = (
+        settings.MAX_RELATED_SEARCH_PAGINATION_DEPTH
+        if is_related_query
+        else settings.MAX_SEARCH_PAGINATION_DEPTH
+    )
+    check_pagination_depth(page, max_pagination_depth)
 
     # Fetch results from ES
     hits, query_time, error, main_total, child_total = fetch_es_results(
@@ -527,6 +643,7 @@ def do_es_search(
     facet: bool = True,
     cache_key: str | None = None,
     is_csv_export: bool = False,
+    courts: QuerySet[Court] | None = None,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -539,11 +656,13 @@ def do_es_search(
     is set or used. Results are saved for six hours.
     :param is_csv_export: Indicates if the data being processed is intended for
     an export process.
+    :param courts: QuerySet of courts used in the jurisdiction picker.
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
+    if courts is None:
+        courts = Court.objects.filter(in_use=True)
     paged_results = None
-    courts = Court.objects.filter(in_use=True)
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
@@ -588,9 +707,7 @@ def do_es_search(
                 SEARCH_TYPES.DOCKETS,
             ]:
                 query_citation, missing_citations = es_get_query_citation(cd)
-                if cd["type"] in [
-                    SEARCH_TYPES.OPINION,
-                ]:
+                if cd["type"] == SEARCH_TYPES.OPINION:
                     missing_citations_str, suggested_query = (
                         remove_missing_citations(missing_citations, cd)
                     )
@@ -663,18 +780,12 @@ def do_es_search(
             search_form = _clean_form(
                 get_params, search_form.cleaned_data, courts
             )
-            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
-                # If the search query is valid, pass the cleaned data to filter and
-                # retrieve the correct number of opinions per status. Otherwise (if
-                # the query has errors), just provide a dictionary containing the
-                # search type to get the total number of opinions per status
-                facet_fields = get_facet_dict_for_search_query(
-                    search_query,
-                    cd if not error else {"type": cd["type"]},
-                    search_form,
+            if cd["type"] == SEARCH_TYPES.OPINION and facet:
+                facet_fields = fetch_facets(
+                    search_query, cd, search_form, error
                 )
 
-    courts, court_count_human, court_count = merge_form_with_courts(
+    courts_dict, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
     search_summary_str = search_form.as_text(court_count_human)
@@ -693,7 +804,7 @@ def do_es_search(
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
         "error": error,
-        "courts": courts,
+        "courts": courts_dict,
         "court_count_human": court_count_human,
         "court_count": court_count,
         "query_citation": query_citation,

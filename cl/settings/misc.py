@@ -43,10 +43,15 @@ GOOGLE_AUTH = {
 }
 
 
+################
+# Stats / Metrics
+################
+STAT_METRICS_PREFIX = "prometheus:stat:"
+
+
 ##############
 # Super Misc #
 ##############
-FUNDRAISING_MODE = env("FUNDRAISING_MODE", default=False)
 
 # Key for Follow the Money API
 FTM_KEY = env("FTM_KEY", default="")

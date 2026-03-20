@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import pytz
-from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
@@ -50,6 +49,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.models import SEARCH_TYPES, Docket
+from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -718,8 +718,10 @@ def query_and_send_alerts(
         )
 
     # Log and tally the total alerts sent
-    async_to_sync(tally_stat)(
-        f"alerts.sent.{rate}", inc=total_alerts_sent_count
+    tally_stat(
+        StatMetric.ALERTS_SENT,
+        inc=total_alerts_sent_count,
+        labels={"alert_type": StatAlertType.RECAP},
     )
     logger.info(f"Sent {total_alerts_sent_count} {rate} email alerts.")
 

@@ -20,9 +20,9 @@ from cl.people_db.models import (
 from cl.recap.models import PacerFetchQueue, ProcessingQueue
 from cl.scrapers.exceptions import MergingError
 from cl.scrapers.models import PACERMobilePageData
+from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
-    SOURCES,
     BankruptcyInformation,
     Citation,
     Claim,
@@ -278,7 +278,7 @@ cluster_fields_to_merge = [
     "scdb_decision_direction",
     "scdb_votes_majority",
     "scdb_votes_minority",
-    ("source", SOURCES.merge_sources),
+    ("source", ClusterSources.merge_sources),
     "procedural_history",
     "attorneys",
     "nature_of_suit",
@@ -324,6 +324,54 @@ def get_query_from_url(url: str, url_filter: str) -> Q:
         )
 
     return Q(download_url=url) | Q(download_url=extra_query)
+
+
+def group_opinions_by_url(query: Q) -> QuerySet:
+    """Get duplicate candidates queryset by grouping opinions by `download_url`
+
+    :param query: a Q object to filter the opinions
+    :return: the opinion groups queryset
+    """
+    qs = (
+        Opinion.objects.filter(query)
+        .exclude(Q(download_url="") | Q(download_url__isnull=True))
+        .values("download_url")
+        .annotate(
+            number_of_rows=Count("download_url"),
+            number_of_hashes=Count("sha1", distinct=True),
+        )
+        .order_by()
+        # compute the number of  distinct hashes to prevent colliding with
+        # actual duplicates, which will be handled in another command
+        .filter(number_of_rows__gte=2, number_of_hashes__gte=2)
+    )
+    return qs
+
+
+def get_same_url_opinions(
+    opinion_group: dict, seen_urls: set
+) -> QuerySet | None:
+    """Given a URL, get a queryset for all opinions with that URL
+
+    :param opinion_group: a dictionary with a 'download_url' key
+    :param seen_urls: a set to keep track of seen URLs.
+        Useful to skip urls we have already processed
+    :return: a queryset or None
+    """
+    standard_url = opinion_group["download_url"].replace("https", "http")
+    if standard_url in seen_urls:
+        return
+
+    seen_urls.add(standard_url)
+    download_url_query = get_query_from_url(
+        opinion_group["download_url"], "exact"
+    )
+    return (
+        Opinion.objects.filter(download_url_query)
+        .filter(cluster__source=ClusterSources.COURT_WEBSITE)
+        .select_related("cluster", "cluster__docket")
+        .order_by("-date_created")
+    )
 
 
 def clean_opinion_text(opinion: Opinion) -> str:
@@ -677,20 +725,8 @@ def merge_versions_by_download_url(
     else:
         query = Q()
 
-    qs = (
-        Opinion.objects.filter(query)
-        .filter(cluster__source=SOURCES.COURT_WEBSITE)
-        .exclude(Q(download_url="") | Q(download_url__isnull=True))
-        .values("download_url")
-        .annotate(
-            number_of_rows=Count("download_url"),
-            # compute the number of  distinct hashes to prevent colliding with
-            # actual duplicates, which are not versions
-            number_of_hashes=Count("sha1", distinct=True),
-        )
-        .order_by()
-        .filter(number_of_rows__gte=2, number_of_hashes__gte=2)
-    )
+    query = query & Q(cluster__source=ClusterSources.COURT_WEBSITE)
+    qs = group_opinions_by_url(query)
 
     # The groups queryset will look like
     # {'download_url': 'https://caseinfo.nvsupremecourt...',
@@ -701,25 +737,17 @@ def merge_versions_by_download_url(
         if limit and len(seen_urls) > limit:
             break
 
-        standard_url = group["download_url"].replace("https", "http")
-        if standard_url in seen_urls:
+        versions_queryset = get_same_url_opinions(group, seen_urls).exclude(
+            main_version__isnull=False
+        )
+        if versions_queryset is None:
             continue
-        seen_urls.add(standard_url)
 
-        logger.info("Processing group %s", group)
-
-        query = get_query_from_url(group["download_url"], "exact")
         # keep the latest opinion as the main version
         # exclude opinions that already have a main_version. If that main
         # version is a version of the current document, they will be updated
         # transitively
-        main, *versions = (
-            Opinion.objects.filter(query)
-            .filter(cluster__source=SOURCES.COURT_WEBSITE)
-            .exclude(main_version__isnull=False)
-            .select_related("cluster", "cluster__docket")
-            .order_by("-date_created")
-        )
+        main, *versions = versions_queryset
         merge_versions_by_text_similarity(main, versions, stats)
         stats["seen_urls"] = len(seen_urls)
 
@@ -729,6 +757,11 @@ def merge_versions_by_download_url(
 def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     """
     Make sure that the dockets have at least the same court_id and docket number
+
+    Special case: For New York courts, skip the docket number check since newer
+    versions may not have a docket number in the opinion text, which would
+    otherwise prevent versioning from working.
+
 
     :param docket: the main docket
     :param version_docket: the version docket
@@ -744,9 +777,16 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
         logger.error(log_template, "court_id", docket.id, version_docket.id)
         return False
 
-    if docket.docket_number != version_docket.docket_number:
+    # Special case for NY courts: allow versioning without matching docket numbers
+    # when at least one docket number is empty.
+    if docket.court_id.startswith("ny") and (
+        not docket.docket_number_raw or not version_docket.docket_number_raw
+    ):
+        return True
+
+    if docket.docket_number_raw != version_docket.docket_number_raw:
         logger.error(
-            log_template, "docket_number", docket.id, version_docket.id
+            log_template, "docket_number_raw", docket.id, version_docket.id
         )
         return False
 

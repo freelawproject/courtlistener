@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Tag APIs – CourtListener.com{% endblock %}
+{% block og_title %}Tag APIs – CourtListener.com{% endblock %}
+{% block description %}Use these APIs to create, organize, and manage tags on dockets.{% endblock %}
+{% block og_description %}Use these APIs to create, organize, and manage tags on dockets.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+{% block footer-scripts %}{% include "includes/anchors.html" %}{% endblock %}
+
+{% block content %}
+<!-- Back button for mobile -->
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
+  </h4>
+</div>
+
+<!-- Table of Contents sidebar -->
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#user-tags">User Tags</a>
+        <ul>
+          <li><a href="#user-tag-fields">Fields</a></li>
+          <li><a href="#user-tag-examples">Example Usage</a></li>
+        </ul>
+      </li>
+      <li><a href="#docket-tags">Docket Tags</a>
+        <ul>
+          <li><a href="#docket-tag-fields">Fields</a></li>
+          <li><a href="#docket-tag-examples">Example Usage</a></li>
+        </ul>
+      </li>
+      <li><a href="#related-apis">Related APIs</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Tag APIs</h1>
+  <p class="lead">Use these APIs to create, organize, and manage tags on dockets in our system.</p>
+  <p>Tags help you organize and share collections of cases. You can create public tags that others can view or keep them private for your own use. Tags can be described using markdown to create sharable collections.
+  </p>
+  <p>This page focuses on the tags API itself. To learn more about tags generally and how to use them in the web interface, read the tags documentation.</p>
+  <p>
+    <a href="{% url "tag_notes_help" %}" class="btn btn-lg btn-primary">Learn About Tags</a>
+  </p>
+
+  <h2 id="user-tags">User Tags <small>— <nobr><code>{% url "UserTag-list" version=version %}</code></nobr></small></h2>
+  <p>User Tags are collections you create to organize dockets. Each tag has a name, optional description, and can be made public or kept private.</p>
+
+  <h3 id="user-tag-fields">Fields</h3>
+  <ul>
+    <li><strong><code>name</code></strong> (required) — A unique slug for your tag (lowercase, no spaces)</li>
+    <li><strong><code>title</code></strong> (optional) — A human-friendly title for display</li>
+    <li><strong><code>description</code></strong> (optional) — Markdown description of the tag</li>
+    <li><strong><code>published</code></strong> (optional) — Boolean, whether the tag is public (default: false)</li>
+    <li><strong><code>view_count</code></strong> (read-only) — Number of times the tag page has been viewed</li>
+  </ul>
+
+  <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
+  <pre class="pre-scrollable">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "UserTag-list" version=version %}"</pre>
+
+  <h3 id="user-tag-examples">Example Usage</h3>
+
+  <h4>Creating a Tag</h4>
+  <p>Create a new tag with a POST request:</p>
+  <pre class="pre-scrollable">curl -X POST \
+  --data 'name=my-important-cases' \
+  --data 'title=My Important Cases' \
+  --data 'description=Cases I am tracking for work' \
+  --data 'published=false' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "UserTag-list" version=version %}"</pre>
+
+  <p>The response:</p>
+  <pre class="pre-scrollable">{
+  "id": 123,
+  "date_created": "2024-12-08T10:30:00.000000-08:00",
+  "date_modified": "2024-12-08T10:30:00.000000-08:00",
+  "user": 456,
+  "name": "my-important-cases",
+  "title": "My Important Cases",
+  "description": "Cases I am tracking for work",
+  "published": false,
+  "view_count": 0,
+  "dockets": []
+}</pre>
+
+  <h4>Updating a Tag</h4>
+  <p>Update a tag with a PATCH request:</p>
+  <pre class="pre-scrollable">curl -X PATCH \
+  --data 'published=true' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "UserTag-detail" version=version pk="123" %}"</pre>
+
+  <h4>Listing Your Tags</h4>
+  <p>List all your tags with a GET request:</p>
+  <pre class="pre-scrollable">curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "UserTag-list" version=version %}"</pre>
+
+  <h4>Deleting a Tag</h4>
+  <p>Delete a tag with a DELETE request:</p>
+  <pre class="pre-scrollable">curl -X DELETE \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "UserTag-detail" version=version pk="123" %}"</pre>
+
+
+  <h2 id="docket-tags">Docket Tags <small>— <nobr><code>{% url "DocketTag-list" version=version %}</code></nobr></small></h2>
+  <p>Docket Tags connect your User Tags to specific dockets. This is a many-to-many relationship managed through this API.</p>
+
+  <h3 id="docket-tag-fields">Fields</h3>
+  <ul>
+    <li><strong><code>tag</code></strong> (required) — The ID of the User Tag</li>
+    <li><strong><code>docket</code></strong> (required) — The ID of the docket to tag</li>
+  </ul>
+
+  <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
+  <pre class="pre-scrollable">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "DocketTag-list" version=version %}"</pre>
+
+  <h3 id="docket-tag-examples">Example Usage</h3>
+
+  <h4>Tagging a Docket</h4>
+  <p>Add a docket to a tag with a POST request:</p>
+  <pre class="pre-scrollable">curl -X POST \
+  --data 'tag=123' \
+  --data 'docket=456789' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "DocketTag-list" version=version %}"</pre>
+
+  <p>The response:</p>
+  <pre class="pre-scrollable">{
+  "id": 789,
+  "tag": 123,
+  "docket": 456789
+}</pre>
+
+  <h4>Listing Tagged Dockets</h4>
+  <p>To see all dockets tagged with a specific tag, filter by tag ID:</p>
+  <pre class="pre-scrollable">curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "DocketTag-list" version=version %}?tag=123"</pre>
+
+  <h4>Untagging a Docket</h4>
+  <p>To untag a docket, delete the Docket Tag object:</p>
+  <pre class="pre-scrollable">curl -X DELETE \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "DocketTag-detail" version=version pk="789" %}"</pre>
+
+
+  <h2 id="related-apis">Related APIs</h2>
+  <p>Tags are related to the Pray and Pay program, which allows you to request PACER documents for cases you're tracking. When using Pray and Pay, you can organize the cases you're monitoring using tags, making it easy to manage large collections of cases.</p>
+  <p><a class="btn btn-primary btn-lg" href="{% url "pray_and_pay_help" %}">Learn About Pray and Pay</a></p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

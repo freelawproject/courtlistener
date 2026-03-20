@@ -178,9 +178,11 @@ def create_or_update_zoho_account(
         return
 
     # Otherwise, create a new Lead
-    leads_module.create_record(
+    payload = (
         build_zoho_payload_from_user(user, leads_module.module_name)
+        | milestone_payload
     )
+    leads_module.create_record(payload)
 
 
 @app.task(ignore_result=True)

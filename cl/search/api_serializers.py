@@ -5,7 +5,6 @@ from django.conf import settings
 from elasticsearch_dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
-from waffle import flag_is_active
 
 from cl.api.utils import (
     DynamicFieldsMixin,
@@ -42,6 +41,7 @@ from cl.search.documents import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -95,6 +95,16 @@ class OriginalCourtInformationSerializer(
         fields = "__all__"
 
 
+class BankruptcyInformationSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    class Meta:
+        model = BankruptcyInformation
+        fields = "__all__"
+
+
 class DocketSerializer(
     RetrieveFilteredFieldsMixin,
     DynamicFieldsMixin,
@@ -133,6 +143,10 @@ class DocketSerializer(
         view_name="person-detail",
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
+    )
+    bankruptcy_information = serializers.HyperlinkedRelatedField(
+        read_only=True,
+        view_name="bankruptcyinformation-detail",
     )
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
@@ -477,9 +491,9 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
         """
         Returns the appropriate score serialization for a given result object.
 
-        If the `enable_semantic_search` flag is active, this method uses
-        `SemanticSearchScoreSerializer`, which includes both semantic and BM25
-        scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
+        If the `semantic` keyword is included in the query string with a truthy value,
+        this method uses `SemanticSearchScoreSerializer`, which includes both semantic
+        and BM25 scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
         context is not available, it also falls back to `ScoreDataSerializer`.
         """
         request = self.context.get("request", None)
@@ -488,9 +502,7 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
 
         semantic = request.GET.get("semantic", False)
         serializer_class = (
-            SemanticSearchScoreSerializer
-            if flag_is_active(request, "enable_semantic_search") and semantic
-            else ScoreDataSerializer
+            SemanticSearchScoreSerializer if semantic else ScoreDataSerializer
         )
         return serializer_class(obj).data
 

@@ -27,7 +27,7 @@ from django_ratelimit.core import get_header
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
-from rest_framework.exceptions import Throttled
+from rest_framework.exceptions import Throttled, ValidationError
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
@@ -39,20 +39,36 @@ from rest_framework_filters.filterset import related
 
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
+    APIThrottle,
+    ThrottleType,
     Webhook,
     WebhookEvent,
+    WebhookEventType,
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
+from cl.lib.decorators import tiered_cache
 from cl.lib.redis_utils import get_redis_interface
+from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
-from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
+from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
 from cl.users.tasks import (
     create_or_update_zoho_account,
     notify_failing_webhook,
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+# Map WebhookEventType integer values to StatWebhookEventType string values
+# for Prometheus metric labeling.
+WEBHOOK_EVENT_TYPE_TO_STAT: dict[int, StatWebhookEventType] = {
+    WebhookEventType.DOCKET_ALERT: StatWebhookEventType.DOCKET_ALERT,
+    WebhookEventType.SEARCH_ALERT: StatWebhookEventType.SEARCH_ALERT,
+    WebhookEventType.RECAP_FETCH: StatWebhookEventType.RECAP_FETCH,
+    WebhookEventType.OLD_DOCKET_ALERTS_REPORT: StatWebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+    WebhookEventType.PRAY_AND_PAY: StatWebhookEventType.PRAY_AND_PAY,
+}
+
 BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
     "exact",
@@ -91,6 +107,101 @@ class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
     id = serializers.ReadOnlyField()
 
 
+# Standard DRF/framework query parameters that are always valid
+VALID_FRAMEWORK_PARAMS: frozenset[str] = frozenset(
+    {
+        # Pagination
+        "page",
+        "page_size",
+        "cursor",
+        # Ordering
+        "order_by",
+        # Format
+        "format",
+        # Dynamic fields
+        "fields",
+        "omit",
+        # Counting (v4)
+        "count",
+    }
+)
+
+
+# Maximum allowed depth for nested filter validation to prevent DOS attacks
+# via circular filter references (e.g., clusters__docket__clusters__docket__...)
+MAX_FILTER_DEPTH = 4
+
+
+def is_valid_filter_param(
+    param: str,
+    filterset_class: type[FilterSet] | None,
+    depth: int = 0,
+) -> bool:
+    """Check if a parameter is valid for the given filterset.
+
+    Handles nested RelatedFilter lookups like 'cluster__docket__court' by
+    recursively traversing the RelatedFilter chain. Also handles negation
+    filters with '!' suffix (e.g., 'person!' means "not equal to").
+
+    :param param: The parameter name to validate.
+    :param filterset_class: The FilterSet class for validation.
+    :param depth: Current recursion depth (used internally to prevent DOS).
+    :return: True if the parameter is valid, False otherwise.
+    """
+    if filterset_class is None:
+        return False
+
+    # Prevent DOS via deeply nested circular filter references
+    if depth > MAX_FILTER_DEPTH:
+        return False
+
+    # Handle negation filter suffix (e.g., person! -> person)
+    if param.endswith("!"):
+        param = param[:-1]
+
+    base_filters = filterset_class.base_filters
+
+    # Direct match - parameter exists in base_filters
+    if param in base_filters:
+        return True
+
+    # Handle nested lookups (e.g., cluster__docket__court)
+    if LOOKUP_SEP not in param:
+        return False
+
+    # Split on first __ to get prefix and rest
+    prefix, rest = param.split(LOOKUP_SEP, 1)
+
+    # Check if prefix is a RelatedFilter
+    filter_instance = base_filters.get(prefix)
+    if not isinstance(filter_instance, RelatedFilter):
+        return False
+
+    # Recursively validate rest against the related filterset
+    related_filterset = filter_instance.filterset
+    return is_valid_filter_param(rest, related_filterset, depth + 1)
+
+
+def detect_unknown_filter_params(
+    query_params: dict[str, str],
+    filterset_class: type[FilterSet] | None,
+) -> set[str]:
+    """Detect unknown filter parameters in the request.
+
+    :param query_params: The query parameters from the request.
+    :param filterset_class: The FilterSet class for validation.
+    :return: Set of unknown parameter names.
+    """
+    unknown_params: set[str] = set()
+    for param in query_params:
+        if param in VALID_FRAMEWORK_PARAMS:
+            continue
+        if not is_valid_filter_param(param, filterset_class):
+            unknown_params.add(param)
+
+    return unknown_params
+
+
 class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     """Disable showing filters in the browsable API.
 
@@ -100,6 +211,51 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     """
 
     def to_html(self, request, queryset, view):
+        return ""
+
+
+class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
+    """Filter backend that validates query params against known filter fields.
+
+    Returns a 400 error for requests containing unknown filter parameters.
+    This prevents unfiltered queries caused by typos or invalid parameters.
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        """Validate query parameters without applying filters.
+
+        This backend only validates parameters and blocks unknown ones.
+        It does NOT apply filters itself - that's handled by
+        DisabledHTMLFilterBackend. Calling super().filter_queryset() would
+        apply filters twice, causing duplicate results from JOINs.
+
+        :param request: The DRF request object.
+        :param queryset: The queryset to filter.
+        :param view: The view instance.
+        :return: The queryset unchanged.
+        :raises ValidationError: If unknown parameters are found.
+        """
+        filterset_class = self.get_filterset_class(view, queryset)
+
+        # Skip validation for views without a filterset (e.g., search API views
+        # that use their own form-based validation)
+        if filterset_class is not None:
+            if unknown_params := detect_unknown_filter_params(
+                request.query_params, filterset_class
+            ):
+                raise ValidationError(
+                    {
+                        "detail": "Unknown filter parameters are not allowed.",
+                        "unknown_params": sorted(unknown_params),
+                    }
+                )
+
+        # Return queryset unchanged - actual filtering is done by
+        # DisabledHTMLFilterBackend
+        return queryset
+
+    def to_html(self, request, queryset, view):
+        """Return empty string to prevent template errors in browsable API."""
         return ""
 
 
@@ -260,38 +416,34 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         ) in view.filterset_class.base_filters.items():
             filter_parts = filter_name.split("__")
             filter_name = filter_parts[0]
-            attrs = OrderedDict()
+
+            if filter_name not in filters:
+                filters[filter_name] = OrderedDict(
+                    type=filter_type.__class__.__name__,
+                    lookup_types=[],
+                )
 
             # Type
-            attrs["type"] = filter_type.__class__.__name__
+            if len(filter_parts) == 1:
+                filters[filter_name]["type"] = filter_type.__class__.__name__
 
             # Lookup fields
             if len(filter_parts) > 1:
-                # Has a lookup type (__gt, __lt, etc.)
                 lookup_type = filter_parts[1]
-                if filters.get(filter_name) is not None:
-                    # We've done a filter with this name previously, just
-                    # append the value.
-                    attrs["lookup_types"] = filters[filter_name][
-                        "lookup_types"
-                    ]
-                    attrs["lookup_types"].append(lookup_type)
-                else:
-                    attrs["lookup_types"] = [lookup_type]
+                filters[filter_name]["lookup_types"].append(lookup_type)
             else:
-                # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
                     model_name = filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
-                    attrs["lookup_types"] = (
+                    filters[filter_name]["lookup_types"] = (
                         f"See available filters for '{model_name}'"
                     )
                 else:
-                    attrs["lookup_types"] = ["exact"]
+                    filters[filter_name]["lookup_types"].append("exact")
 
             # Do choices
             choices = filter_type.extra.get("choices", False)
             if choices:
-                attrs["choices"] = [
+                filters[filter_name]["choices"] = [
                     {
                         "value": choice_value,
                         "display_name": force_str(
@@ -300,9 +452,6 @@ class SimpleMetadataWithFilters(SimpleMetadata):
                     }
                     for choice_value, choice_name in choices
                 ]
-
-            # Wrap up.
-            filters[filter_name] = attrs
 
         metadata["filters"] = filters
 
@@ -569,6 +718,26 @@ class NoFilterCacheListMixin:
         return response
 
 
+@tiered_cache(timeout=300)  # 5 minute cache
+def get_all_throttle_overrides(
+    throttle_type: int,
+) -> dict[str, tuple[bool, str]]:
+    """Get all throttle overrides of a given type, cached for 5 minutes.
+
+    Loads all throttle overrides at once to avoid per-user DB hits since most
+    users don't have overrides.
+
+    :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
+    :return: Dictionary mapping username to (blocked, rate) tuples.
+    """
+    overrides: dict[str, tuple[bool, str]] = {}
+    for username, blocked, rate in APIThrottle.objects.filter(
+        throttle_type=throttle_type
+    ).values_list("user__username", "blocked", "rate"):
+        overrides[username] = (blocked, rate)
+    return overrides
+
+
 class ExceptionalUserRateThrottle(UserRateThrottle):
     def allow_request(self, request, view):
         """
@@ -586,12 +755,16 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
 
-        # Adjust if user has special privileges.
-        override_rate = settings.REST_FRAMEWORK["OVERRIDE_THROTTLE_RATES"].get(
-            request.user.username, None
-        )
-        if override_rate is not None:
-            self.num_requests, self.duration = self.parse_rate(override_rate)
+        # Check if user has a throttle override in the database
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        override = overrides.get(request.user.username)
+        if override is not None:
+            blocked, rate = override
+            if blocked:
+                # User is blocked - deny immediately
+                return self.throttle_failure()
+            if rate:
+                self.num_requests, self.duration = self.parse_rate(rate)
 
         # Drop any requests from the history which have now passed the
         # throttle duration
@@ -641,26 +814,40 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             "ident": request.user.pk,
         }
 
-    def get_citations_rate(self, request):
+    def get_citations_rate(self, request) -> str | None:
         """
-        Checks the settings for a custom citations API rate limit.
+        Check for a custom citations API rate limit from the database.
 
-        If the authenticated user has a custom rate limit set in the settings,
-        it returns that value. Otherwise, it returns the default rate limit.
+        If the authenticated user has a custom rate limit set in the database,
+        it returns that value. If blocked, returns None to signal denial.
+        Otherwise, it returns the default rate limit.
 
-        Args:
-            request: The request object with the user's data.
+        :param request: The request object with the user's data.
+        :return: Rate string (e.g., '100/hour'), or None if user is blocked.
         """
         default_rate = self.THROTTLE_RATES["citations"]
-        custom_rate = settings.REST_FRAMEWORK[
-            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
-        ].get(request.user.username, None)
-        return custom_rate or default_rate
+        overrides = get_all_throttle_overrides(ThrottleType.CITATION_LOOKUP)
+        override = overrides.get(request.user.username)
+        if override is not None:
+            blocked, rate = override
+            if blocked:
+                return None  # Signal that user is blocked
+            if rate:
+                return rate
+        return default_rate
 
     def throttle_request_by_citation_count(self, request, view):
-        max_num_citations, _ = self.parse_rate(
-            self.get_citations_rate(request)
-        )
+        rate = self.get_citations_rate(request)
+        if rate is None:
+            # User is blocked - deny request immediately
+            raise Throttled(
+                detail={
+                    "error_message": "Your account has been blocked from the citations API.",
+                    "wait_until": None,
+                }
+            )
+
+        max_num_citations, _ = self.parse_rate(rate)
 
         self.key = self.get_cache_key_for_citations(request, view)
         self.history = self.cache.get(self.key, [])
@@ -1123,6 +1310,14 @@ def update_webhook_event_after_request(
             # Only log successful webhook events and not debug.
             results = log_webhook_event(webhook_event.webhook.user.pk)
             handle_webhook_events(results, webhook_event.webhook.user)
+            event_type_label = WEBHOOK_EVENT_TYPE_TO_STAT.get(
+                webhook_event.webhook.event_type
+            )
+            if event_type_label:
+                tally_stat(
+                    StatMetric.WEBHOOKS_SENT,
+                    labels={"event_type": event_type_label},
+                )
     webhook_event.save()
 
 

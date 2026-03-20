@@ -3,7 +3,6 @@ import re
 import urllib.parse
 from datetime import UTC, datetime
 
-import waffle
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
@@ -254,7 +253,7 @@ def extract_q_value(query: str) -> str:
 
 
 @register.simple_tag(takes_context=True)
-def alerts_supported(context: RequestContext, search_type: str) -> str:
+def alerts_supported(context: RequestContext, search_type: str) -> bool:
     """Determine if search alerts are supported based on the search type and flag
     status.
 
@@ -264,10 +263,11 @@ def alerts_supported(context: RequestContext, search_type: str) -> str:
     :return: True if alerts are supported, False otherwise.
     """
 
-    request = context["request"]
-    if search_type == SEARCH_TYPES.RECAP:
-        return waffle.flag_is_active(request, "recap-alerts-active")
-    return search_type in (SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT)
+    return search_type in (
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.RECAP,
+    )
 
 
 @register.filter
@@ -413,6 +413,15 @@ def has_attr(obj, attr_name):
 
 
 @register.filter
+def get_item(obj, key):
+    """Get item using bracket notation. Works for dicts, forms, lists, etc."""
+    try:
+        return obj[key]
+    except (KeyError, TypeError, IndexError):
+        return ""
+
+
+@register.filter
 def get_attr(obj, attr_name):
     """Return the value of the attribute attr_name."""
     return getattr(obj, attr_name, "")
@@ -422,3 +431,9 @@ def get_attr(obj, attr_name):
 def get_request_value(request_get, field_name):
     """Simple tag to get value from request.GET given a field name"""
     return request_get.get(field_name, "")
+
+
+@register.simple_tag
+def render_field_with_id(field, field_id):
+    """Render a form field with a custom ID attribute."""
+    return field.as_widget(attrs={"id": field_id})

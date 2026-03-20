@@ -20,9 +20,9 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
     save_everything,
 )
 from cl.scrapers.tasks import extract_opinion_content
+from cl.search.cluster_sources import ClusterSources
 from cl.search.fields import CeilingDateField, FloorDateField
 from cl.search.models import (
-    SOURCES,
     Citation,
     Court,
     Docket,
@@ -411,7 +411,9 @@ class BaseCourtUploadForm(forms.Form):
                     "cite_page",
                     ValidationError(
                         format_html(
-                            f'Citation already in database. See: <a href="{cite.get_absolute_url()}">{cite.cluster.case_name}</a>',
+                            'Citation already in database. See: <a href="{}">{}</a>',
+                            cite.get_absolute_url(),
+                            cite.cluster.case_name,
                         )
                     ),
                 )
@@ -431,7 +433,9 @@ class BaseCourtUploadForm(forms.Form):
                 "pdf_upload",
                 ValidationError(
                     format_html(
-                        f'Document already in database. See: <a href="{op.get_absolute_url()}">{op.cluster.case_name}</a>',
+                        'Document already in database. See: <a href="{}">{}</a>',
+                        op.get_absolute_url(),
+                        op.cluster.case_name,
                     )
                 ),
             )
@@ -458,7 +462,7 @@ class BaseCourtUploadForm(forms.Form):
 
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
-            "cluster_source": SOURCES.DIRECT_COURT_INPUT,
+            "cluster_source": ClusterSources.DIRECT_COURT_INPUT,
             "disposition": self.cleaned_data.get("disposition", ""),
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data.get("publication_date"),
@@ -487,11 +491,16 @@ class BaseCourtUploadForm(forms.Form):
         sha1_hash = sha1(force_bytes(self.cleaned_data.get("pdf_upload")))
         court = Court.objects.get(pk=self.cleaned_data.get("court_str"))
 
-        docket, opinion, cluster, citations, _ = make_objects(
+        docket, opinions, cluster, citations, _ = make_objects(
             self.cleaned_data.get("item"),
             court,
-            sha1_hash,
-            self.cleaned_data.get("pdf_upload"),
+            [
+                (
+                    self.cleaned_data.get("item"),
+                    self.cleaned_data.get("pdf_upload"),
+                    sha1_hash,
+                )
+            ],
         )
 
         if not citations:
@@ -502,7 +511,7 @@ class BaseCourtUploadForm(forms.Form):
         save_everything(
             items={
                 "docket": docket,
-                "opinion": opinion,
+                "opinions": opinions,
                 "cluster": cluster,
                 "citations": citations,
             }
@@ -517,7 +526,7 @@ class BaseCourtUploadForm(forms.Form):
             docket.originating_court_information = originating_court
             docket.save()
 
-        extract_opinion_content.delay(opinion.pk, ocr_available=True)
+        extract_opinion_content.delay(opinions[0].pk, ocr_available=True)
 
         logging.info(
             "Successfully added object cluster: %s for %s",

@@ -3,11 +3,14 @@
   available and takes the keyword arguments described below:
 
   Parameters:
+    - title (optional): Title of the banner displayed in uppercase above the main text.
     - text: Text of the banner.
     - link: The URL for the button.
     - cookie_name: Name of the cookie used to remember if the user has already
     dismissed the banner. This prevents them from seeing the same message
     repeatedly.
+    - cookie_sleep_duration (optional): Number of days to snooze the banner after the
+    user has dismissed it. Defaults to 20.
     - responsive (optional): When `True`, text and button are in a row in larger screens,
     and in a column in smaller ones. When `False`, layout is always the same, with the
     button below the text.
@@ -36,12 +39,14 @@
 {% if cookie_name  not in request.COOKIES %}
   <div
     class="flex flex-column align-items-center{% if responsive %} flex-md-row{% endif %} alert-{% if variant %}{{ variant }}{% else %}danger{% endif %}"
-    style="border: 2px solid lightgray; padding-inline: 4rem; padding-block: 2rem; position: relative; gap: 1.5rem"
+    style="border: 2px solid lightgray; padding-left: 4rem; padding-right: 2.5rem; padding-block: 2rem; position: relative; gap: 1.5rem"
     data-dismissible-alert
   >
     {# Banner text #}
-    <p class="lead" style="margin: 0; flex-grow: 1">{{text}}</p>
-
+    <div style="flex-grow: 1">
+      <p class="text-uppercase">{{ title }}</p>
+      <p class="lead" style="margin: 0;">{{text}}</p>
+    </div>
     {# CTA Button #}
     <a
       href="{{link}}"
@@ -58,10 +63,10 @@
       class="close {% if responsive %}absolute-max-md{% else %}absolute{% endif %}"
       style="right: 1.4rem; top: 0.5rem; padding: 1rem"
       data-cookie-name="{{cookie_name}}"
-      data-duration="20"
+      data-duration="{% if cookie_sleep_duration %}{{ cookie_sleep_duration }}{% else %}20{% endif %}"
       aria-label="Close"
     >
-      <span aria-hidden="true" class="x-large">&times;</span>
+      <span aria-hidden="true" class="x-large" style="line-height: 0.5; height: 25px">&times;</span>
     </button>
   </div>
 {% endif %}

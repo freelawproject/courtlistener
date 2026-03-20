@@ -88,6 +88,9 @@ module.exports = {
           50: '#FFFAEB',
           400: '#FDB022',
         },
+        amber: {
+          450: '#FDB022',
+        },
         blue: {
           700: '#004EEB',
         },
@@ -104,6 +107,7 @@ module.exports = {
         lg: ['18px', '28px'],
         'lg-cooper': ['18px', '26px'],
         xl: ['20px', '28px'],
+        'display-xxs': ['18px', '28px'],
         'display-xs': ['24px', '32px'],
         'display-sm': ['30px', '38px'],
         'display-sm-cooper': ['28px', '44px'],

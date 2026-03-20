@@ -411,7 +411,7 @@ async def view_docket(
     return TemplateResponse(request, "docket.html", context)
 
 
-@cache_page_ignore_params(300)
+@cache_page_ignore_params(300, cache_alias="s3")
 async def view_docket_feed(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
@@ -980,7 +980,7 @@ async def get_opinions_queryset(sub_opinions_prefetch: str) -> QuerySet:
             ),
         )
     else:
-        prefetch = Prefetch(sub_opinions_prefetch)
+        prefetch = Prefetch(sub_opinions_prefetch)  # type: ignore[arg-type]
 
     return OpinionCluster.objects.prefetch_related(
         prefetch, "citations"
@@ -1041,7 +1041,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
     ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o_es"
     )
-
     # Default count when flag is disabled
     cited_by_count = 0
     related_cases_count = 0
@@ -1625,43 +1624,56 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
 
 @ensure_csrf_cookie
 async def block_item(request: HttpRequest) -> HttpResponse:
-    """Block an item from search results using AJAX"""
-    user = await request.auser()  # type: ignore[attr-defined]
-    if is_ajax(request) and user.is_superuser:  # type: ignore[union-attr]
-        obj_type = request.POST["type"]
-        pk = request.POST["id"]
-
-        if obj_type not in ["docket", "cluster"]:
-            return HttpResponseBadRequest(
-                "This view can not handle the provided type"
-            )
-
-        cluster: OpinionCluster | None = None
-        if obj_type == "cluster":
-            # Block the cluster
-            cluster = await aget_object_or_404(OpinionCluster, pk=pk)
-            if cluster is not None:
-                cluster.blocked = True
-                cluster.date_blocked = now()
-                await cluster.asave()
-
-        docket_pk = (
-            pk
-            if obj_type == "docket"
-            else cluster.docket_id
-            if cluster is not None
-            else None
-        )
-        if not docket_pk:
-            return HttpResponse("It worked")
-
-        d: Docket = await aget_object_or_404(Docket, pk=docket_pk)
-        d.blocked = True
-        d.date_blocked = now()
-        await d.asave()
-
-        return HttpResponse("It worked")
-    else:
+    """Block an item from search results using AJAX."""
+    if not is_ajax(request):
         return HttpResponseNotAllowed(
             permitted_methods=["POST"], content="Not an ajax request"
         )
+
+    user = await request.auser()  # type: ignore[attr-defined]
+    obj_type = request.POST["type"]
+    pk = request.POST["id"]
+
+    if obj_type not in ["docket", "cluster"]:
+        return HttpResponseBadRequest(
+            "This view can not handle the provided type"
+        )
+
+    has_change_docket = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+        "search.change_docket"
+    )
+    if not has_change_docket:
+        raise PermissionDenied("You lack permission to block this item.")
+
+    if obj_type == "cluster":
+        has_change_cluster = await sync_to_async(user.has_perm)(  # type: ignore[union-attr]
+            "search.change_opinioncluster"
+        )
+        if not has_change_cluster:
+            raise PermissionDenied("You lack permission to block this item.")
+
+    cluster: OpinionCluster | None = None
+    if obj_type == "cluster":
+        # Block the cluster
+        cluster = await aget_object_or_404(OpinionCluster, pk=pk)
+        if cluster is not None:
+            cluster.blocked = True
+            cluster.date_blocked = now()
+            await cluster.asave()
+
+    docket_pk = (
+        pk
+        if obj_type == "docket"
+        else cluster.docket_id
+        if cluster is not None
+        else None
+    )
+    if not docket_pk:
+        return HttpResponse("It worked")
+
+    d: Docket = await aget_object_or_404(Docket, pk=docket_pk)
+    d.blocked = True
+    d.date_blocked = now()
+    await d.asave()
+
+    return HttpResponse("It worked")

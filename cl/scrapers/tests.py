@@ -1,19 +1,22 @@
+import json
 import os
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
-from unittest import TestCase, mock
-from unittest.mock import patch
+from unittest import mock
+from unittest.mock import MagicMock, patch
 
+import httpx
+import responses
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
-from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
+from responses import matchers
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -47,6 +50,8 @@ from cl.scrapers.tasks import (
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
+    process_scotus_captcha_transcription,
+    subscribe_to_scotus_updates,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
@@ -56,6 +61,7 @@ from cl.scrapers.utils import (
     get_extension,
     update_or_create_docket,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import (
     ES_CHILD_ID,
     DocketDocument,
@@ -74,7 +80,6 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
-    SOURCES,
     Citation,
     ClusterRedirection,
     Court,
@@ -155,8 +160,8 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
         site = test_opinion_scraper.Site()
         site.method = "LOCAL"
-        parsed_site = site.parse()
-        cl_scrape_opinions.Command().scrape_court(
+        parsed_site = async_to_sync(site.parse)()
+        async_to_sync(cl_scrape_opinions.Command().scrape_court)(
             parsed_site, full_crawl=True, ocr_available=False
         )
 
@@ -288,7 +293,6 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                             msg="The source does not match.",
                         )
 
-    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
@@ -302,14 +306,14 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
-        parsed_site = site.parse()
+        parsed_site = async_to_sync(site.parse)()
 
         with self.captureOnCommitCallbacks(execute=True):
             with mock.patch(
                 "cl.lib.celery_utils.get_task_wait"
             ) as patched_wait:
                 patched_wait.return_value = 0
-                cl_scrape_oral_arguments.Command().scrape_court(
+                async_to_sync(cl_scrape_oral_arguments.Command().scrape_court)(
                     parsed_site, full_crawl=True
                 )
 
@@ -353,23 +357,107 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                 content["payload"]["results"][0]["local_path"]
             )
 
-    def test_parsing_xml_opinion_site_to_site_object(self) -> None:
+    async def test_parsing_xml_opinion_site_to_site_object(self) -> None:
         """Does a basic parse of a site reveal the right number of items?"""
-        site = test_opinion_scraper.Site().parse()
+        site = await test_opinion_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 6)
 
-    def test_parsing_xml_oral_arg_site_to_site_object(self) -> None:
+    async def test_parsing_xml_oral_arg_site_to_site_object(self) -> None:
         """Does a basic parse of an oral arg site work?"""
-        site = test_oral_arg_scraper.Site().parse()
+        site = await test_oral_arg_scraper.Site().parse()
         self.assertEqual(len(site.case_names), 2)
+
+    @patch(
+        "cl.scrapers.management.commands.cl_scrape_opinions.Command.get_opinions_content",
+        new_callable=mock.AsyncMock,
+    )
+    def test_scrape_multiple_opinions_per_cluster(
+        self, patched_get_opinions_content
+    ):
+        """Test if we can ingest multiple opinions per opinion cluster"""
+        # Define two opinions for the same cluster
+        op1 = {
+            "download_urls": "https://example.com/op1.pdf",
+            "types": Opinion.LEAD,
+        }
+        op2 = {
+            "download_urls": "https://example.com/op2.pdf",
+            "types": Opinion.DISSENT,
+        }
+        returned_cluster = {
+            "docket_numbers": "123-456",
+            "case_names": "Multiple Opinion Case",
+            "case_dates": date(2023, 1, 1),
+            "precedential_statuses": "Published",
+            "date_filed_is_approximate": False,
+            "blocked_statuses": False,
+            "sub_opinions": [op1, op2],
+        }
+        patched_get_opinions_content.return_value = [
+            (op1, b"111", "111"),
+            (op2, b"222", "222"),
+        ]
+
+        mock_site = MagicMock()
+        mock_site.__iter__.return_value = [returned_cluster]
+        mock_site.court_id = "test"
+        mock_site.url = "111"
+        mock_site.hash = "234"
+
+        async_to_sync(cl_scrape_opinions.Command().scrape_court)(mock_site)
+
+        # a single cluster with 2 sub opinions was created
+        clusters = OpinionCluster.objects.filter(
+            docket__docket_number="123-456"
+        )
+        self.assertEqual(clusters.count(), 1)
+        cluster = clusters.first()
+
+        opinions = Opinion.objects.filter(cluster=cluster)
+        self.assertEqual(opinions.count(), 2)
 
 
 class IngestionTest(TestCase):
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="test")
+        docket = DocketFactory(court=cls.court, appeal_from=cls.court)
+        cluster_1 = OpinionClusterFactory(docket=docket)
+        cluster_2 = OpinionClusterFactory(docket=docket)
+        cluster_3 = OpinionClusterFactory(docket=docket)
+        cls.doc_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_doc.doc",
+            type=Opinion.LEAD,
+            plain_text="",
+        )
+        cls.image_opinion = OpinionFactory(
+            cluster=cluster_2,
+            local_path="test/search/opinion_pdf_image_based.pdf",
+            plain_text="",
+        )
+        cls.pdf_opinion = OpinionFactory(
+            cluster=cluster_3,
+            local_path="test/search/opinion_pdf_text_based.pdf",
+            plain_text="",
+        )
+        cls.html_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_html.html",
+            plain_text="",
+            html="",
+        )
+        cls.wpd_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_wpd.wpd",
+            plain_text="",
+            html="",
+        )
+        cls.txt_opinion = OpinionFactory(
+            cluster=cluster_1,
+            local_path="test/search/opinion_text.txt",
+            plain_text="",
+        )
 
     def setUp(self) -> None:
         files = Opinion.objects.all()
@@ -383,42 +471,42 @@ class IngestionTest(TestCase):
 
     def test_doc_content_extraction(self) -> None:
         """Can we ingest a doc file?"""
-        doc_opinion = Opinion.objects.get(pk=1)
+        doc_opinion = Opinion.objects.get(pk=self.doc_opinion.pk)
         extract_opinion_content(doc_opinion.pk, ocr_available=False)
         doc_opinion.refresh_from_db()
         self.assertIn("indiana", doc_opinion.plain_text.lower())
 
     def test_image_based_pdf(self) -> None:
         """Can we ingest an image based pdf file?"""
-        image_opinion = Opinion.objects.get(pk=2)
+        image_opinion = Opinion.objects.get(pk=self.image_opinion.pk)
         extract_opinion_content(image_opinion.pk, ocr_available=True)
         image_opinion.refresh_from_db()
         self.assertIn("intelligence", image_opinion.plain_text.lower())
 
     def test_text_based_pdf(self) -> None:
         """Can we ingest a text based pdf file?"""
-        txt_opinion = Opinion.objects.get(pk=3)
-        extract_opinion_content(txt_opinion.pk, ocr_available=False)
-        txt_opinion.refresh_from_db()
-        self.assertIn("tarrant", txt_opinion.plain_text.lower())
+        pdf_opinion = Opinion.objects.get(pk=self.pdf_opinion.pk)
+        extract_opinion_content(pdf_opinion.pk, ocr_available=False)
+        pdf_opinion.refresh_from_db()
+        self.assertIn("tarrant", pdf_opinion.plain_text.lower())
 
     def test_html_content_extraction(self) -> None:
         """Can we ingest an html file?"""
-        html_opinion = Opinion.objects.get(pk=4)
+        html_opinion = Opinion.objects.get(pk=self.html_opinion.pk)
         extract_opinion_content(html_opinion.pk, ocr_available=False)
         html_opinion.refresh_from_db()
         self.assertIn("reagan", html_opinion.html.lower())
 
     def test_wpd_content_extraction(self) -> None:
         """Can we ingest a wpd file?"""
-        wpd_opinion = Opinion.objects.get(pk=5)
+        wpd_opinion = Opinion.objects.get(pk=self.wpd_opinion.pk)
         extract_opinion_content(wpd_opinion.pk, ocr_available=False)
         wpd_opinion.refresh_from_db()
         self.assertIn("greene", wpd_opinion.html.lower())
 
     def test_txt_content_extraction(self) -> None:
         """Can we ingest a txt file?"""
-        txt_opinion = Opinion.objects.get(pk=6)
+        txt_opinion = Opinion.objects.get(pk=self.txt_opinion.pk)
         extract_opinion_content(txt_opinion.pk, ocr_available=False)
         txt_opinion.refresh_from_db()
         self.assertIn("ideal", txt_opinion.plain_text.lower())
@@ -466,9 +554,8 @@ class ExtensionIdentificationTest(SimpleTestCase):
 
 
 class DupcheckerTest(TestCase):
-    fixtures = ["test_court.json"]
-
     def setUp(self) -> None:
+        CourtFactory(id="test")
         self.court = Court.objects.get(pk="test")
         self.dup_checkers = [
             DupChecker(self.court, full_crawl=True),
@@ -720,48 +807,45 @@ class AudioFileTaskTest(TestCase):
 class ScraperContentTypeTest(TestCase):
     def setUp(self):
         # Common mock setup for all tests
-        self.mock_response = mock.MagicMock()
+        self.mock_response = mock.AsyncMock(httpx.Response)
         self.mock_response.content = b"not empty"
         self.mock_response.headers = {"Content-Type": "application/pdf"}
         self.site = test_opinion_scraper.Site()
         self.site.method = "GET"
         self.logger = logger
 
-    @mock.patch("requests.Session.get")
-    def test_unexpected_content_type(self, mock_get):
+    @mock.patch("httpx.AsyncClient.get")
+    async def test_unexpected_content_type(self, mock_get):
         """Test when content type doesn't match scraper expectation."""
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = ["text/html"]
-        self.assertRaises(
-            UnexpectedContentTypeError,
-            self.site.download_content,
-            "/dummy/url/",
-        )
+        with self.assertRaises(UnexpectedContentTypeError):
+            await self.site.download_content("/dummy/url/")
 
-    @mock.patch("requests.Session.get")
-    def test_correct_content_type(self, mock_get):
+    @mock.patch("httpx.AsyncClient.get")
+    async def test_correct_content_type(self, mock_get):
         """Test when content type matches scraper expectation."""
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = ["application/pdf"]
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = self.site.download_content("/dummy/url/")
+            _ = await self.site.download_content("/dummy/url/")
 
             self.mock_response.headers = {
                 "Content-Type": "application/pdf;charset=utf-8"
             }
             mock_get.return_value = self.mock_response
-            _ = self.site.download_content("/dummy/url/")
+            _ = await self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
-    @mock.patch("requests.Session.get")
-    def test_no_content_type(self, mock_get):
+    @mock.patch("httpx.AsyncClient.get")
+    async def test_no_content_type(self, mock_get):
         """Test for no content type expected (ie. Montana)"""
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = None
 
         with mock.patch.object(self.logger, "error") as error_mock:
-            _ = self.site.download_content("/dummy/url/")
+            _ = await self.site.download_content("/dummy/url/")
             error_mock.assert_not_called()
 
 
@@ -810,10 +894,14 @@ class ScrapeCitationsTest(TestCase):
         with (
             mock.patch(f"{cmd}.sha1", side_effect=self.hashes),
             mock.patch.object(
-                self.mock_site, "download_content", return_value="placeholder"
+                self.mock_site,
+                "download_content",
+                new=mock.AsyncMock(return_value="placeholder"),
             ),
         ):
-            cl_back_scrape_citations.Command().scrape_court(self.mock_site)
+            async_to_sync(cl_back_scrape_citations.Command().scrape_court)(
+                self.mock_site
+            )
 
         citations = Citation.objects.filter(cluster=self.cluster).count()
         self.assertEqual(citations, 1, "Exactly 1 citation was expected")
@@ -975,7 +1063,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="12"),
                 date_filed=date(2020, 6, 1),
                 precedential_status="Published",
-                source=SOURCES.COURT_M_HARVARD,
+                source=ClusterSources.COURT_M_HARVARD,
             ),
             plain_text="""Docket Number: 2020-12
             Disposition: Affirmed
@@ -988,7 +1076,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="13"),
                 date_filed=date(2020, 7, 1),
                 precedential_status="Unpublished",
-                source=SOURCES.COURT_WEBSITE,
+                source=ClusterSources.COURT_WEBSITE,
             ),
             plain_text="Docket Number: 2020-13\nDisposition: Affirmed",
         )
@@ -998,7 +1086,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=self.docket_sc,
                 date_filed=date(2021, 6, 1),
                 precedential_status="Published",
-                source=SOURCES.COURT_WEBSITE,
+                source=ClusterSources.COURT_WEBSITE,
             ),
             plain_text="Some text with no matches",
             id=101,
@@ -1009,7 +1097,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="13"),
                 date_filed=date(2022, 6, 1),
                 precedential_status="Unpublished",
-                source=SOURCES.COURT_WEBSITE,
+                source=ClusterSources.COURT_WEBSITE,
             ),
             id=100,
             plain_text="Docket Number: 2022-13\n2022 VT 11",
@@ -1148,7 +1236,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         # Create related objects to the version docket so we can update their
         # references on merging
         version_docket_another_cluster = OpinionClusterFactory.create(
-            docket=version_docket, source=SOURCES.COURT_WEBSITE
+            docket=version_docket, source=ClusterSources.COURT_WEBSITE
         )
         version_audio = AudioWithParentsFactory.create(docket=version_docket)
 
@@ -1163,27 +1251,27 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             docket=main_docket,
             other_dates="",
             summary="",
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
         )
         cluster2 = OpinionClusterFactory.create(
             docket=main_docket,
             # other_dates should overwrite the empty field in the main cluster
             other_dates=other_dates,
             summary="",
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
         )
         cluster2_id = cluster2.id
         cluster3 = OpinionClusterFactory.create(
             docket=version_docket,
             other_dates="",
             summary=summary,
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
         )
         cluster4 = OpinionClusterFactory.create(
-            docket=DocketFactory.create(), source=SOURCES.COURT_WEBSITE
+            docket=DocketFactory.create(), source=ClusterSources.COURT_WEBSITE
         )
         cluster5 = OpinionClusterFactory.create(
-            docket=not_comparable_docket, source=SOURCES.COURT_WEBSITE
+            docket=not_comparable_docket, source=ClusterSources.COURT_WEBSITE
         )
 
         main_citation = CitationWithParentsFactory.create(
@@ -1219,7 +1307,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         should_ignore_version = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=version_docket, source=SOURCES.COURT_M_HARVARD
+                docket=version_docket, source=ClusterSources.COURT_M_HARVARD
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1491,7 +1579,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         should_ignore = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_M_HARVARD
+                docket=docket, source=ClusterSources.COURT_M_HARVARD
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1499,7 +1587,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
         previous_main = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_WEBSITE
+                docket=docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1507,7 +1595,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
         a_version = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_WEBSITE
+                docket=docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1515,7 +1603,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
         main = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket, source=SOURCES.COURT_WEBSITE
+                docket=docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text=plain_text,
@@ -1546,29 +1634,29 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.COURT_WEBSITE, SOURCES.COURT_WEBSITE
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE, ClusterSources.COURT_WEBSITE
             ),
-            SOURCES.COURT_WEBSITE,
+            ClusterSources.COURT_WEBSITE,
         )
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.COURT_WEBSITE,
-                SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             ),
-            SOURCES.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
         )
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.COURT_WEBSITE, SOURCES.PUBLIC_RESOURCE
+            ClusterSources.merge_sources(
+                ClusterSources.COURT_WEBSITE, ClusterSources.PUBLIC_RESOURCE
             ),
-            SOURCES.COURT_M_RESOURCE,
+            ClusterSources.COURT_M_RESOURCE,
         )
         self.assertEqual(
-            SOURCES.merge_sources(
-                SOURCES.HARVARD_CASELAW, SOURCES.COLUMBIA_M_COURT
+            ClusterSources.merge_sources(
+                ClusterSources.HARVARD_CASELAW, ClusterSources.COLUMBIA_M_COURT
             ),
-            SOURCES.COLUMBIA_M_COURT_M_HARVARD,
+            ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
         )
 
     def test_string_merging(self):
@@ -1639,7 +1727,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         version_candidate = OpinionFactory.create(
             cluster=OpinionClusterFactory(
-                docket=main_docket, source=SOURCES.COURT_WEBSITE
+                docket=main_docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text="something else...",
@@ -1650,7 +1738,7 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
 
         opinion = OpinionFactory.create(
             cluster=OpinionClusterFactory(
-                docket=main_docket, source=SOURCES.COURT_WEBSITE
+                docket=main_docket, source=ClusterSources.COURT_WEBSITE
             ),
             download_url=download_url,
             plain_text="something...",
@@ -1689,7 +1777,7 @@ class DeleteDuplicatesTest(TestCase):
         docket2 = DocketFactory.create(court=nev, docket_number=docket_number)
         same_cluster_fields = {
             "docket": docket,
-            "source": SOURCES.COURT_WEBSITE,
+            "source": ClusterSources.COURT_WEBSITE,
             "case_name": "something",
             "case_name_full": "something full",
             "precedential_status": "Precedential",
@@ -1717,7 +1805,7 @@ class DeleteDuplicatesTest(TestCase):
         # the factories will create different values which will stop the merge
         cls.should_not_merge = OpinionFactory.create(
             cluster=OpinionClusterFactory.create(
-                docket=docket2, source=SOURCES.COURT_WEBSITE
+                docket=docket2, source=ClusterSources.COURT_WEBSITE
             ),
             **same_opinion_fields,
         )
@@ -1740,6 +1828,38 @@ class DeleteDuplicatesTest(TestCase):
             cluster=cls.cluster_to_keep, **same_opinion_fields
         )
 
+        # for text comparison
+        coloctapp = CourtFactory.create(id="coloctapp")
+        dn = "2222"
+        docket = DocketFactory.create(court=coloctapp, docket_number=dn)
+        same_cluster_fields["docket"] = docket
+
+        # make sure we only delete identical opinions, after timestamp cleaning
+        cls.timestamped_op_do_not_delete = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="yyy",
+            plain_text="Something 20 Dec 2024 21:06:18 Something else",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+        cls.timestamped_op_to_delete = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="xxx",
+            plain_text="Something 19 Dec 2024 21:06:18",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+        cls.timestamped_op_to_keep = OpinionFactory.create(
+            cluster=OpinionClusterFactory.create(**same_cluster_fields),
+            sha1="zzzz",
+            plain_text="Something 01 Jan 2024 01:06:18",
+            author_str="author",
+            download_url="https://x.com/1",
+            author=None,
+        )
+
     def test_same_hash_duplicate_deletion(self):
         """Test that we can delete same hash duplicates
 
@@ -1749,7 +1869,7 @@ class DeleteDuplicatesTest(TestCase):
         """
         stats = defaultdict(lambda: 0)
         delete_duplicates.delete_same_hash_duplicates(
-            stats, [SOURCES.COURT_WEBSITE]
+            stats, [ClusterSources.COURT_WEBSITE]
         )
 
         try:
@@ -1815,3 +1935,223 @@ class DeleteDuplicatesTest(TestCase):
             ).exists(),
             "ClusterRedirection with proper values was not created",
         )
+
+    def test_delete_by_text_comparison(self):
+        """Test that we can delete opinions by text comparison"""
+        stats = defaultdict(lambda: 0)
+
+        delete_duplicates.delete_by_text_comparison(stats, "coloctapp")
+
+        try:
+            self.timestamped_op_to_delete.refresh_from_db()
+            self.fail("Timestamped opinion should be deleted")
+        except Opinion.DoesNotExist:
+            pass
+
+        try:
+            self.timestamped_op_do_not_delete.refresh_from_db()
+        except Opinion.DoesNotExist:
+            self.fail("Should not delete an opinion with different text")
+
+        try:
+            delete_duplicates.delete_by_text_comparison(stats, "scotus")
+            self.fail("Should raise error due to unsupported court")
+        except ValueError:
+            pass
+
+
+class SubscribeToSCOTUSTest(TestCase):
+    def setUp(self):
+        self.scotus = CourtFactory.create(id="scotus")
+        self.docket_number = "25-260"
+        self.docket_scotus = DocketFactory.create(
+            court=self.scotus, docket_number=self.docket_number
+        )
+        self.docket_pk = self.docket_scotus.pk
+
+        self.test_asset_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "scrapers"
+            / "test_assets"
+            / "scotus_subscription"
+        )
+
+    def add_response(self, file_name: str, **kwargs):
+        with open(
+            self.test_asset_dir / f"{file_name}.headers.json", "rb"
+        ) as f:
+            headers = json.load(f)
+
+        content_type = headers["Content-Type"]
+        body_extension = content_type.split(";")[0].split("/")[-1]
+        if (
+            "Content-Encoding" in headers
+            and headers["Content-Encoding"] == "gzip"
+        ):
+            body_extension = f"{body_extension}.gz"
+
+        with open(
+            self.test_asset_dir / f"{file_name}.body.{body_extension}", "rb"
+        ) as f:
+            body = f.read()
+
+        response = responses.Response(headers=headers, body=body, **kwargs)
+        responses.add(response)
+        return response
+
+    def test_transcription_cleaning(self):
+        messy = "RoMeo Juleett.; 5 Seven- .Three"
+        clean = process_scotus_captcha_transcription(messy)
+        self.assertEqual(clean, "rj573")
+
+    @responses.activate
+    @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")
+    @mock.patch("cl.scrapers.tasks.call_llm_transcription")
+    @mock.patch("cl.lib.celery_utils.get_task_wait")
+    def test_subscription_task(
+        self, mock_wait: MagicMock, mock_transcription: MagicMock
+    ):
+        scotus_root = "https://file.supremecourt.gov"
+        form_url = (
+            f"{scotus_root}/CaseNotification?caseNumber={self.docket_number}"
+        )
+        subscription_email = "scotus@recap.email"
+        captcha_solution = "mo9su"
+        captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
+        verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"
+        mock_wait.return_value = 0
+        mock_transcription.return_value = " ".join(
+            [c for c in captcha_solution]
+        )
+
+        self.add_response(
+            "1_get",
+            url=form_url,
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "2_post",
+            url=f"{scotus_root}/Captcha/Reset",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "3_get",
+            url=f"{scotus_root}/Captcha/audio?captchaId={captcha_id}",
+            method="GET",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                    }
+                )
+            ],
+        )
+        self.add_response(
+            "4_post",
+            url=f"{scotus_root}/Captcha/validate",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                        "Referer": form_url,
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "__RequestVerificationToken": verification_token,
+                        "captchaId": captcha_id,
+                        "captcha": captcha_solution,
+                    }
+                ),
+            ],
+        )
+        self.add_response(
+            "5_post",
+            url=f"{scotus_root}/CaseNotification/Subscribe",
+            method="POST",
+            match=[
+                matchers.header_matcher(
+                    {
+                        "User-Agent": "Free Law Project",
+                    }
+                ),
+                matchers.urlencoded_params_matcher(
+                    {
+                        "CaseNumber": self.docket_number,
+                        "Email": subscription_email,
+                        "btnRestart": "Enter another email",
+                        "btnSearch": "Return to Search",
+                        "WebDocketUrl": f"https://www.supremecourt.gov/search.aspx?filename=/docket/DocketFiles/html/Public/{self.docket_number}.html",
+                        "captcha": captcha_solution,
+                        "SubscribeButton": "Subscribe",
+                        "btnCancel": "Cancel",
+                        "__RequestVerificationToken": verification_token,
+                    }
+                ),
+            ],
+        )
+
+        subscribe_to_scotus_updates.delay(self.docket_pk).get()
+        self.assertEqual(
+            len(mock_transcription.mock_calls),
+            1,
+            "Should have requested exactly 1 transcription",
+        )
+
+
+class SetOrderingKeysTest(SimpleTestCase):
+    def test_set_ordering_keys(self):
+        """Test if set_ordering_keys correctly assigns ordering_key to multiple opinions"""
+        opinions_content = [
+            (
+                {"types": "030concurrence", "download_urls": "url1"},
+                b"",
+                "sha1",
+            ),
+            ({"types": "020lead", "download_urls": "url2"}, b"", "sha2"),
+            ({"types": "040dissent", "download_urls": "url3"}, b"", "sha3"),
+            (
+                {"types": "030concurrence", "download_urls": "url4"},
+                b"",
+                "sha4",
+            ),
+        ]
+
+        cl_scrape_opinions.set_ordering_keys(opinions_content)
+
+        # Expected order based on types and original index:
+        # 020lead (index 1) -> 1
+        # 030concurrence (index 0) -> 2
+        # 030concurrence (index 3) -> 3
+        # 040dissent (index 2) -> 4
+
+        self.assertEqual(opinions_content[1][0]["ordering_key"], 1)
+        self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
+        self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
+        self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
