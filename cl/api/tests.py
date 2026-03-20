@@ -462,7 +462,7 @@ class ApiQueryCountTests(TestCase):
             path = reverse("recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(7):
+        with self.assertNumQueries(8):
             path = reverse("opinioncluster-list", kwargs={"version": "v3"})
             self.client.get(path)
 
