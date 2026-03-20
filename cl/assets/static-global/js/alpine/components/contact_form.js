@@ -54,7 +54,7 @@ document.addEventListener('alpine:init', () => {
       // Fetch backend information: issue type options and Terms URL
       const issueTypeInput = this.$el.elements['issue_type'];
       if (issueTypeInput) this.issueType = issueTypeInput.value;
-      this.requiresDocCheck = JSON.parse(document.getElementById('requires-check-types').textContent);
+      this.requiresCheckTypes = JSON.parse(document.getElementById('requires-check-types').textContent);
       this.techTypes = JSON.parse(document.getElementById('tech-types').textContent);
       this.termsURL = JSON.parse(document.getElementById('terms-url').textContent);
     },
