@@ -1814,7 +1814,7 @@ class PrayerAPITests(PrayAndPayTestCase):
         self.assertIsNotNone(prayer_first)
         self.assertEqual(await prayer.acount(), 1)
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
-        self.assertTrue(prayer_first.via_api)
+        self.assertEqual(prayer_first.source, Prayer.API)
 
     async def test_duplicate_prayer_fails(self) -> None:
         """Ensure a user can't create multiple prayers for the same document

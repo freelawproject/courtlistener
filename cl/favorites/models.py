@@ -149,6 +149,12 @@ class Prayer(models.Model):
         (WAITING, "Still waiting for the document."),
         (GRANTED, "Prayer has been granted."),
     )
+    WEBSITE = 1
+    API = 2
+    SOURCES = (
+        (WEBSITE, "Website"),
+        (API, "API request"),
+    )
     date_created = models.DateTimeField(
         help_text="The time when this item was created",
         auto_now_add=True,
@@ -171,10 +177,11 @@ class Prayer(models.Model):
         choices=STATUSES,
         default=WAITING,
     )
-    via_api = models.BooleanField(
-        help_text="Whether the prayer was created via the API (unlimited)",
-        default=False, 
-        db_index=True
+    source = models.SmallIntegerField(
+        help_text="The interface used to create the prayer.",
+        choices=SOURCES,
+        default=WEBSITE,
+        db_index=True,
     )
 
     class Meta:

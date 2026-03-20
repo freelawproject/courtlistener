@@ -66,7 +66,9 @@ async def get_prayer_counts_in_bulk(
 
     prayer_counts = (
         Prayer.objects.filter(
-            recap_document__in=recap_documents, status=Prayer.WAITING
+            recap_document__in=recap_documents,
+            status=Prayer.WAITING,
+            source=Prayer.WEBSITE,
         )
         .values("recap_document")
         .annotate(count=Count("id"))
@@ -102,7 +104,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     """
 
     waiting_prayers = Prayer.objects.filter(
-        status=Prayer.WAITING, via_api=False
+        status=Prayer.WAITING, source=Prayer.WEBSITE
     ).values("recap_document_id")
 
     # Subquery to fetch the view_count from GenericCount
@@ -152,7 +154,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         .annotate(
             prayer_count=Count(
                 "prayers",
-                filter=Q(prayers__status=Prayer.WAITING, prayers__via_api=False),
+                filter=Q(prayers__status=Prayer.WAITING, prayers__source=Prayer.WEBSITE),
             ),
             view_count=view_count_subquery,
             doc_unavailable=Case(
@@ -291,13 +293,13 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
     # Send webhooks for all prayers, emails only for web UI prayers
     messages = []
-    web_ui_prayer_count = sum(1 for p in granted_prayers if not p.via_api)
+    web_ui_prayer_count = sum(1 for p in granted_prayers if p.source == Prayer.WEBSITE)
 
     for prayer in granted_prayers:
         for webhook in prayer.user.granted_prayer_webhooks:
             send_pray_and_pay_webhooks.delay(prayer.pk, webhook.pk)
 
-        if not prayer.via_api:
+        if prayer.source == Prayer.WEBSITE:
             context = {
                 "docket": docket,
                 "docket_entry": docket_entry,
@@ -369,7 +371,7 @@ async def get_lifetime_prayer_stats(
     if data is not None:
         return PrayerStats(**data)
 
-    prayer_by_status = Prayer.objects.filter(status=status, via_api=False)
+    prayer_by_status = Prayer.objects.filter(status=status, source=Prayer.WEBSITE)
 
     prayer_count = await prayer_by_status.acount()
 
@@ -406,7 +408,7 @@ def prayer_unavailable(instance: RECAPDocument, user_pk: int | None) -> None:
     if not user_prayer:
         return
 
-    if user_prayer.via_api:
+    if user_prayer.source == Prayer.API:
         return
 
     email_recipients = [

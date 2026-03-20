@@ -48,7 +48,7 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     class Meta:
         model = Prayer
         fields = "__all__"
-        read_only_fields = ("date_created",)
+        read_only_fields = ("date_created", "source")
 
     def validate(self, data):
         user = self.context["request"].user
