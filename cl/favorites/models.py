@@ -181,7 +181,6 @@ class Prayer(models.Model):
         help_text="The interface used to create the prayer.",
         choices=SOURCES,
         default=WEBSITE,
-        db_index=True,
     )
 
     class Meta:
