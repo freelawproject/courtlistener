@@ -22,6 +22,37 @@ FAIL = "error"
 WARN = "warning"
 
 # ---------------------------------------------------------------------------
+# Per-file skip directives
+# ---------------------------------------------------------------------------
+
+# Checks that can be skipped via <!-- frontend-checks-skip: ... --> comments.
+# Only advisory/context-dependent checks belong here — security, a11y, and
+# architecture checks must stay enforced.
+SKIPPABLE_CHECKS = {
+    "check_hardcoded_ids",
+    "check_new_stack_leakage",
+    "check_raw_css",
+    "check_include_in_v2",
+}
+
+_skip_directive_re = re.compile(r"<!--\s*frontend-checks-skip:\s*(.+?)\s*-->")
+
+
+def _parse_skip_checks(lines: list[str]) -> set[str]:
+    """Parse ``<!-- frontend-checks-skip: ... -->`` comments.
+
+    Returns the intersection of requested skips with SKIPPABLE_CHECKS,
+    so non-allowlisted checks cannot be bypassed.
+    """
+    skip: set[str] = set()
+    for line in lines:
+        m = _skip_directive_re.search(line)
+        if m:
+            skip.update(name.strip() for name in m.group(1).split(","))
+    return skip & SKIPPABLE_CHECKS
+
+
+# ---------------------------------------------------------------------------
 # File classification helpers
 # ---------------------------------------------------------------------------
 
@@ -662,7 +693,10 @@ def _apply_checks(
     findings: list[Finding],
 ) -> None:
     """Run a list of (check_fn, severity) pairs and collect findings."""
+    skip_checks = _parse_skip_checks(lines)
     for fn, severity in checks:
+        if fn.__name__ in skip_checks:
+            continue
         for line_no, msg in fn(lines):
             findings.append(
                 Finding(filepath, line_no, fn.__name__, severity, msg)
