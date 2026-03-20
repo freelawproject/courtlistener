@@ -293,7 +293,11 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
     # Send webhooks for all prayers, emails only for web UI prayers
     messages = []
-    web_ui_prayer_count = sum(1 for p in granted_prayers if p.source == Prayer.WEBSITE)
+    web_ui_prayer_count = Prayer.objects.filter(
+        recap_document=instance,
+        status=Prayer.GRANTED,
+        source=Prayer.WEBSITE,
+    ).count()
 
     for prayer in granted_prayers:
         for webhook in prayer.user.granted_prayer_webhooks:
