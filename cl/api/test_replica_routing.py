@@ -78,6 +78,7 @@ class ReplicaRouterTest(SimpleTestCase):
 @override_settings(
     DATABASES=DATABASES_WITH_REPLICA,
     WAFFLE_CACHE_PREFIX="test_replica_routing",
+    API_READ_DATABASES=["replica"],
 )
 @override_flag("replica-reads", active=True)
 class ReplicaRoutingMiddlewareTest(TestCase):
@@ -147,7 +148,6 @@ class ReplicaRoutingMiddlewareTest(TestCase):
         self.assertFalse(captured["use_replica"])
 
     @override_settings(DATABASES=DATABASES_WITHOUT_REPLICA)
-    @override_flag("replica-reads", active=True)
     def test_no_replica_db_configured(self):
         """When no replica DB is configured, routing is skipped."""
         middleware, captured = self._get_middleware()
