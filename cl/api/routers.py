@@ -81,17 +81,39 @@ class ReplicaRouter:
     """
 
     def db_for_read(self, model, **hints) -> str | None:
+        """
+        Return the replica DB alias for read queries when replica routing is active.
+
+        Checks the _use_replica ContextVar; if set, delegates to get_api_read_db()
+        to select the appropriate replica. Returns None to fall back to Django's
+        default routing when replica routing is inactive.
+        """
         if _use_replica.get(False):
             return get_api_read_db()
         return None
 
     def db_for_write(self, model, **hints) -> str | None:
+        """
+        Always defer write routing to Django's default behavior (primary database).
+        """
         return None
 
     def allow_relation(self, obj1, obj2, **hints) -> bool | None:
+        """
+        Unconditionally allow relations between any two model instances.
+
+        Prevents the router from blocking cross-database relations that may arise
+        when reads and writes are split across primary and replica databases.
+        """
         return True
 
     def allow_migrate(
         self, db, app_label, model_name=None, **hints
     ) -> bool | None:
+        """
+        Defer migration routing entirely to Django's default behavior.
+
+        Returning None ensures migrations are applied only to the primary database
+        without this router interfering.
+        """
         return None
