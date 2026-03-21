@@ -154,7 +154,10 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
         .annotate(
             prayer_count=Count(
                 "prayers",
-                filter=Q(prayers__status=Prayer.WAITING, prayers__source=Prayer.WEBSITE),
+                filter=Q(
+                    prayers__status=Prayer.WAITING,
+                    prayers__source=Prayer.WEBSITE,
+                ),
             ),
             view_count=view_count_subquery,
             doc_unavailable=Case(
@@ -375,7 +378,9 @@ async def get_lifetime_prayer_stats(
     if data is not None:
         return PrayerStats(**data)
 
-    prayer_by_status = Prayer.objects.filter(status=status, source=Prayer.WEBSITE)
+    prayer_by_status = Prayer.objects.filter(
+        status=status, source=Prayer.WEBSITE
+    )
 
     prayer_count = await prayer_by_status.acount()
 
