@@ -25,8 +25,8 @@ def _get_replica_list():
         return replicas
 
     dbs = settings.API_READ_DATABASES
-    if isinstance(dbs, str):
-        dbs = [dbs]
+    if not dbs:
+        dbs = ["default"]
 
     # Filter out any aliases not actually configured in DATABASES.
     dbs = [db for db in dbs if db in settings.DATABASES]

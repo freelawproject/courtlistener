@@ -44,7 +44,9 @@ if env("DB_REPLICA_HOST", default=""):
     }
 
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
-API_READ_DATABASES: list[str] = env.list("API_READ_DATABASES", default="")
+API_READ_DATABASES: list[str] | None = env.list(
+    "API_READ_DATABASES", default=None
+)
 DATABASE_ROUTERS: list[str] = ["cl.api.routers.ReplicaRouter"]
 
 ####################

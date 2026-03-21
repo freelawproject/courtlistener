@@ -52,6 +52,8 @@ class ReplicaRoutingMiddleware:
             return False
         if not request.path.startswith("/api/rest/"):
             return False
+        if not settings.API_READ_DATABASES:
+            return False
         if not any(
             db in settings.DATABASES for db in settings.API_READ_DATABASES
         ):
