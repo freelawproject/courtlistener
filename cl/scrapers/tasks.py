@@ -42,7 +42,7 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
-from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
@@ -945,16 +945,23 @@ def _login_tames(
 
     resp = session.post(CASEMAIL_LOGIN_URL, data=payload, timeout=30)
     resp.raise_for_status()
-    if "ctl00_ctl00_BaseContentPlaceHolder1_ContentPlaceHolder1_gvCaseWatch" not in resp.text:
+    if (
+        "ctl00_ctl00_BaseContentPlaceHolder1_ContentPlaceHolder1_gvCaseWatch"
+        not in resp.text
+    ):
         raise SubscriptionFailure("Login failed.")
 
+
 TAMES_FAILURES_CACHE_KEY = "scraper:tames:subscription_failures"
+TAMES_FAILURES_TTL = 60 * 60 * 24 * 28  # 4 weeks
 
 
-@app.task(bind=True,
-          max_retries=3,
-          retry_backoff=10,
-          autoretry_for=(SubscriptionFailure,))
+@app.task(
+    bind=True,
+    max_retries=3,
+    retry_backoff=10,
+    autoretry_for=(SubscriptionFailure,),
+)
 def subscribe_to_tames_cases(
     self: celery.Task,
     cases: list[dict[str, str]],
@@ -965,8 +972,8 @@ def subscribe_to_tames_cases(
     cases fail, the task retries with only the failed cases.
 
     On the first run, previously cached failures are merged into the input
-    list. On the final attempt, any remaining failures are persisted to the
-    S3 cache for the next invocation.
+    list. On the final attempt, any remaining failures are persisted to
+    Redis for the next invocation.
 
     :param self: The Celery task.
     :param cases: List of dicts, each with "court", "case", and "date_filed" keys.
@@ -980,12 +987,12 @@ def subscribe_to_tames_cases(
         user_name=tames_user["username"],
         defaults={"email": tames_user["email"]},
     )
-    cache = get_s3_cache("db_cache")
-    cache_key = make_s3_cache_key(TAMES_FAILURES_CACHE_KEY, None)
+    redis = get_redis_interface("CACHE")
 
     # On the first run, merge previously cached failures into the input list
     if self.request.retries == 0:
-        if cached_failures := cache.get(cache_key):
+        if cached_raw := redis.get(TAMES_FAILURES_CACHE_KEY):
+            cached_failures = json.loads(cached_raw)
             existing = {(c["court"], c["case"]) for c in cases}
             for failure in cached_failures:
                 if (failure["court"], failure["case"]) not in existing:
@@ -996,13 +1003,19 @@ def subscribe_to_tames_cases(
 
     try:
         _login_tames(session, tames_user)
-    except (requests.RequestException,SubscriptionFailure) as exc:
+    except (requests.RequestException, SubscriptionFailure):
         if self.request.retries == self.max_retries:
-            cache.set(cache_key, cases, None)
+            redis.set(
+                TAMES_FAILURES_CACHE_KEY,
+                json.dumps(cases),
+                ex=TAMES_FAILURES_TTL,
+            )
         raise self.retry(
-            args=(failed,),
-            exc=SubscriptionFailure(f"{len(failed)}/{len(cases)} cases failed"),
-            countdown=(10 * 2**self.request.retries)
+            args=(cases,),
+            exc=SubscriptionFailure(
+                f"Login failed, {len(cases)} cases not attempted"
+            ),
+            countdown=(10 * 2**self.request.retries),
         )
 
     html_parser = etree.HTMLParser()
@@ -1039,7 +1052,7 @@ def subscribe_to_tames_cases(
                 case["date_filed"], "%m/%d/%Y"
             ).date()
             successful_dates.add(date_filed)
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Failed to subscribe to TAMES case %s/%s",
                 court,
@@ -1050,11 +1063,15 @@ def subscribe_to_tames_cases(
     if successful_dates:
         subscription_tracker.include_subscriptions(successful_dates)
     if not failed:
-        cache.delete(cache_key)
+        redis.delete(TAMES_FAILURES_CACHE_KEY)
         return
 
     if self.request.retries == self.max_retries:
-        cache.set(cache_key, failed, None)
+        redis.set(
+            TAMES_FAILURES_CACHE_KEY,
+            json.dumps(failed),
+            ex=TAMES_FAILURES_TTL,
+        )
         logger.warning(
             "TAMES subscription exhausted retries with %d failures. "
             "Cached for next run.",
@@ -1065,5 +1082,5 @@ def subscribe_to_tames_cases(
     raise self.retry(
         args=(failed,),
         exc=SubscriptionFailure(f"{len(failed)}/{len(cases)} cases failed"),
-        countdown=(10 * 2**self.request.retries)
+        countdown=(10 * 2**self.request.retries),
     )
