@@ -44,7 +44,10 @@ if env("DB_REPLICA_HOST", default=""):
     }
 
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
-API_READ_DATABASES: list[str] = env("API_READ_DATABASES", default="replica")
+API_READ_DATABASES: list[str] | None = env.list(
+    "API_READ_DATABASES", default=None
+)
+DATABASE_ROUTERS: list[str] = ["cl.api.routers.ReplicaRouter"]
 
 ####################
 # Cache & Sessions #
@@ -134,6 +137,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django_ratelimit.middleware.RatelimitMiddleware",
     "waffle.middleware.WaffleMiddleware",
+    "cl.api.middleware.ReplicaRoutingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
