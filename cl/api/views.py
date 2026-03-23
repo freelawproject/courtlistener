@@ -349,3 +349,42 @@ class VersionedTemplateView(TemplateView):
         context = super().get_context_data(**kwargs)
         context["version"] = self.kwargs.get("version", "v4")
         return context
+
+
+async def wiki_data(request: HttpRequest) -> JsonResponse:
+    """Provide data for the external wiki's help pages.
+
+    Returns counts and settings used across several API documentation pages
+    so the wiki can display them via external data connectors.
+    """
+    cache_key = "wiki-data"
+    data = await cache.aget(cache_key)
+    if data is not None:
+        return JsonResponse(data)
+
+    court_count = await Court.objects.exclude(
+        jurisdiction=Court.TESTING_COURT
+    ).acount()
+    citation_count = await Citation.objects.acount()
+
+    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]
+    count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
+
+    fd_data = await get_coverage_data_fds()
+
+    data = {
+        "court_count": court_count,
+        "citation_count": citation_count,
+        "citation_lookup": {
+            "throttle_count": count,
+            "throttle_period": period,
+            "max_per_request": settings.MAX_CITATIONS_PER_REQUEST,
+        },
+        "financial_disclosures": {
+            "disclosures": fd_data["disclosures"],
+            "investments": fd_data["investments"],
+        },
+    }
+    one_day = 60 * 60 * 24
+    await cache.aset(cache_key, data, one_day)
+    return JsonResponse(data)
