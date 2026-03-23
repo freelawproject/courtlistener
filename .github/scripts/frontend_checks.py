@@ -25,7 +25,7 @@ WARN = "warning"
 # Per-file skip directives
 # ---------------------------------------------------------------------------
 
-# Checks that can be skipped via <!-- frontend-checks-skip: ... --> comments.
+# Checks that can be skipped via {# frontend-checks-skip: ... #} comments.
 # Only advisory/context-dependent checks belong here — security, a11y, and
 # architecture checks must stay enforced.
 SKIPPABLE_CHECKS = {
@@ -35,11 +35,11 @@ SKIPPABLE_CHECKS = {
     "check_include_in_v2",
 }
 
-_skip_directive_re = re.compile(r"<!--\s*frontend-checks-skip:\s*(.+?)\s*-->")
+_skip_directive_re = re.compile(r"\{#\s*frontend-checks-skip:\s*(.+?)\s*#\}")
 
 
 def _parse_skip_checks(lines: list[str]) -> set[str]:
-    """Parse ``<!-- frontend-checks-skip: ... -->`` comments.
+    """Parse ``{# frontend-checks-skip: ... #}`` comments.
 
     Returns the intersection of requested skips with SKIPPABLE_CHECKS,
     so non-allowlisted checks cannot be bypassed.
