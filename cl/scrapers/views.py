@@ -64,13 +64,8 @@ class StateEmailProcessingQueueSerializer(ModelSerializer):
         )
 
     def validate(self, attrs):
-        court_id = attrs["court"].pk
         mail = attrs["mail"]
         receipt = attrs["receipt"]
-
-        all_court_ids = Court.state_courts.all()
-        if not all_court_ids.filter(pk=court_id).exists():
-            raise ValidationError(f"{court_id} is not a state court ID.")
 
         for attr_name in [
             "message_id",
@@ -118,17 +113,6 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
 
     def get_destination_emails_from_request_data(self):
         return self.request.data.get("receipt", {}).get("recipients")
-
-    def retrieve(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        state = kwargs["state"]
-        site = kwargs["site"]
-        self.perform_create(serializer, state=state, site=site)
-        headers = self.get_success_headers(serializer.data)
-        return Response(
-            serializer.data, status=status.HTTP_201_CREATED, headers=headers
-        )
 
     def create(self, request, *args, **kwargs):
         state = kwargs["state"]

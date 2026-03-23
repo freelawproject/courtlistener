@@ -97,7 +97,7 @@ class RecapEmailSESStorage(S3Storage):
 
 
 class TexasEmailSESStorage(S3Storage):
-    bucket_name = "texas.email"
+    bucket_name = "texas-email"
 
 
 class S3PrivateLLMStorage(S3Storage):

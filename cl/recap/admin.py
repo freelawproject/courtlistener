@@ -77,7 +77,7 @@ def reprocess_failed_epq(modeladmin, request, queryset):
     for epq in queryset:
         if epq.source == EmailSource.STATE:
             if is_texas_court(epq.court):
-                process_texas_email.apply_async(epq.pk)
+                process_texas_email.delay(epq.pk)
         else:
             do_recap_document_fetch(epq, recap_email_user)
 

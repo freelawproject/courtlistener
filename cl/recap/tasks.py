@@ -141,8 +141,17 @@ logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
 
 
-def retrieve_email_from_queue(epq: EmailProcessingQueue, bucket: S3Storage):
-    message_id = epq.message_id
+def retrieve_email_from_queue(message_id: str, bucket: S3Storage) -> bytes:
+    """
+    Attempt to retrieve and decode an email from an S3 bucket.
+
+    :param message_id: The ID of the message to retrieve.
+    :param bucket: The S3 bucket to retrieve the email from.
+
+    :return: The decoded email as a bytes object.
+
+    :raise FileNotFoundError:
+    """
     # Try to read the file using utf-8.
     # If it fails, fallback on iso-8859-1
     try:
@@ -151,8 +160,6 @@ def retrieve_email_from_queue(epq: EmailProcessingQueue, bucket: S3Storage):
     except UnicodeDecodeError:
         with bucket.open(message_id, "rb") as f:
             return f.read().decode("iso-8859-1")
-    except FileNotFoundError as exc:
-        raise exc
 
 
 async def process_recap_upload(pq: ProcessingQueue) -> None:
@@ -3134,7 +3141,9 @@ def open_and_validate_email_notification(
     """
 
     try:
-        body = retrieve_email_from_queue(epq, RecapEmailSESStorage())
+        body = retrieve_email_from_queue(
+            epq.message_id, RecapEmailSESStorage()
+        )
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             msg = "File not found."
@@ -3693,7 +3702,9 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     )
 
     try:
-        body = retrieve_email_from_queue(epq, TexasEmailSESStorage())
+        body = retrieve_email_from_queue(
+            epq.message_id, TexasEmailSESStorage()
+        )
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             async_to_sync(mark_pq_status)(
@@ -3711,7 +3722,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     texas_email_parser._parse_text(body)
     email_data = texas_email_parser.data
 
-    match email_data.court_id:
+    match email_data["court_id"]:
         case CourtID.SUPREME_COURT.value:
             docket_parser = TexasSupremeCourtScraper()
         case CourtID.COURT_OF_CRIMINAL_APPEALS.value:
@@ -3727,10 +3738,16 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             return None
         case _:
             docket_parser = TexasCourtOfAppealsScraper(
-                court_id=email_data.court_id
+                court_id=email_data["court_id"]
             )
 
-    res = httpx.get(email_data.url)
+    res = httpx.get(
+        email_data["url"],
+        headers={
+            "User-Agent": "Free Law Project",
+        },
+        timeout=30.0,
+    )
     res.raise_for_status()
     docket_parser._parse_text(res.text)
     docket_data = docket_parser.data
@@ -3753,6 +3770,8 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             PROCESSING_STATUS.FAILED,
             "status_message",
         )
+        self.request.chain = None
+        return None
     else:
         async_to_sync(associate_related_instances)(
             epq,
