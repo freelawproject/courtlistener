@@ -97,12 +97,12 @@
     <li>Court details including jurisdiction and coverage information</li>
     <li>Financial disclosures, ABA ratings, and more</li>
   </ul>
-  <p>The MCP server provides access to over 20 API endpoints, giving your AI assistant the same data available to developers using our <a href="{% url "rest_docs" %}">REST API</a>.</p>
+  <p>The MCP server connects your AI assistant to over 20 API endpoints — the same data available through our <a href="{% url "rest_docs" %}">REST API</a>.</p>
 
-  <h3 id="citations">Analyze &amp; Verify Citations</h3>
-  <p>A standout feature: the MCP server can extract and verify legal citations directly from any text.</p>
+  <h3 id="citations">Extract &amp; Verify Citations</h3>
+  <p>Powered by <a href="https://github.com/freelawproject/eyecite" target="_blank" rel="noreferrer">eyecite</a>, the MCP server can extract and verify legal citations directly from any text.</p>
   <ul>
-    <li><strong>Extract Citations</strong>&mdash;Parses legal text locally using <a href="https://github.com/freelawproject/eyecite" target="_blank" rel="noreferrer">eyecite</a> to identify full case citations, short cites, <em>id.</em>, <em>supra</em>, and statutory references. Runs entirely on your machine with no API calls.</li>
+    <li><strong>Extract Citations</strong>&mdash;Identify and extract full case citations, short cites, <em>id.</em>, <em>supra</em>, and statutory references from any legal texts. Runs locally on your machine without API calls.</li>
     <li><strong>Verify Citations</strong>&mdash;Cross-references extracted citations against CourtListener's database to confirm case names, dates, and validity. Ideal for checking AI-generated legal text or reviewing briefs.</li>
   </ul>
 
@@ -112,6 +112,7 @@
     <li><strong>Search Alerts</strong>&mdash;Set up real-time, daily, weekly, or monthly alerts for case law and RECAP searches</li>
     <li><strong>Docket Alerts</strong>&mdash;Subscribe to updates on specific federal court dockets</li>
   </ul>
+  <p><a href="https://donate.free.law/forms/membership" target="_blank" rel="noreferrer">CourtListener members</a> get unlimited alerts, among other perks.</p>
 
   <h2 id="installation">Installation</h2>
   <p>The CourtListener MCP server runs locally on your computer and communicates with your AI application via standard input/output (stdio). You will need two things before you start:</p>
@@ -122,8 +123,8 @@
 
   <h3 id="claude-desktop">Claude Desktop</h3>
   <ol>
-    <li>Open Claude Desktop and navigate to <strong>Settings &gt; Developer &gt; Edit Config</strong>. This will open your configuration file.</li>
-    <li>Add the following to the file:</li>
+    <li>Open Claude Desktop and navigate to <strong>Settings &gt; Developer &gt; Edit Config</strong>. Open your configuration json file if not automatically opened.</li>
+    <li>Add the CourtListener MCP server to the <code>mcpServers</code> block of your configuration:</li>
   </ol>
   <pre>{
   "mcpServers": {
