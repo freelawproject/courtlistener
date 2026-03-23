@@ -197,16 +197,32 @@ def clean_texas_docket_number(docket_number: str | None) -> str:
         if regex.fullmatch(docket_number):
             return docket_number
 
-    # Try fullmatch on each whitespace-separated token (dirty input
-    # like "Case Number: 04-97-00972-CV"). We use fullmatch rather
-    # than search because these regexes were designed for fullmatch
-    # and can produce false positives with partial matching.
-    for token in docket_number.split():
+    tokens = [
+        # Strip leading and trailing punctuation from tokens since it's likely invalid.
+        re.compile(r"^[^a-z0-9]+|[^a-z0-9]+$", re.IGNORECASE).sub("", token)
+        for token in docket_number.split()
+    ]
+    matching_parts = []
+    for token in tokens:
         for regex in TEXAS_DN_REGEXES:
             if regex.fullmatch(token):
-                return token
+                matching_parts.append(token)
 
-    return ""
+    if len(matching_parts) == 0:
+        logger.warning(
+            "Could not find valid Texas docket number in string %s. Using empty string as clean docket number",
+            docket_number,
+        )
+        return ""
+
+    matching_parts.sort()
+    if len(matching_parts) > 1:
+        logger.warning(
+            "Found multiple docket numbers combined %s. Using %s as clean docket number.",
+            docket_number,
+            matching_parts[0],
+        )
+    return matching_parts[0]
 
 
 def make_texas_docket_number_core(docket_number: str | None) -> str:
