@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from django import forms
 from django.conf import settings
+from django.urls import reverse
+from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
 SEALING_KEYWORDS_REGEX = re.compile(
@@ -25,7 +27,7 @@ class ContactForm(forms.Form):
     ISSUE_TYPE_CHOICES = [
         (SUPPORT_REQUEST, "General Support"),
         (PARTNERSHIPS, "Partnership Inquiry"),
-        (API_HELP, "Data or API Help"),
+        (API_HELP, "Data or API Support"),
         (DATA_QUALITY, "Report Data Quality Problem"),
         (RECAP_BUG, "RECAP Extension Bug"),
         (REMOVAL_REQUEST, "Case Removal Request"),
@@ -34,6 +36,8 @@ class ContactForm(forms.Form):
     ]
 
     VALID_ISSUE_TYPES = [choice[0] for choice in ISSUE_TYPE_CHOICES]
+    TECH_ISSUE_TYPES = {API_HELP, RECAP_BUG}
+    DOCUMENTATION_CHECK_TYPES = {SUPPORT_REQUEST, API_HELP, RECAP_BUG}
 
     name = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control"})
@@ -42,8 +46,6 @@ class ContactForm(forms.Form):
     email = forms.EmailField(
         widget=forms.TextInput(attrs={"class": "form-control"})
     )
-
-    TECH_ISSUE_TYPES = {API_HELP, RECAP_BUG}
 
     # Build actual choices with additional, invalid options
     ISSUE_TYPE_FORM_CHOICES = [issue_type for issue_type in ISSUE_TYPE_CHOICES]
@@ -77,6 +79,10 @@ class ContactForm(forms.Form):
     )
 
     hcaptcha = hCaptchaField()
+
+    checked_documentation = forms.BooleanField(
+        required=False,
+    )
 
     # PARTNERSHIPS
 
@@ -221,6 +227,20 @@ class ContactForm(forms.Form):
         label="Links to screenshots, error messages, or logs (if any)",
     )
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # reverse() can't be called at class definition time because
+        # Django's URL configuration isn't loaded yet during import.
+        help_url = reverse("help_home")
+        self.fields["checked_documentation"].label = format_html(
+            'I have reviewed the <a href="https://wiki.free.law">wiki</a>,'
+            ' <a href="{}">documentation</a>, and'
+            ' <a href="https://github.com/freelawproject/courtlistener/'
+            'discussions">discussion forum</a>'
+            " for an answer to my question.",
+            help_url,
+        )
+
     def clean(self) -> dict[str, Any] | None:
         cleaned_data: dict[str, Any] | None = super().clean()
         if cleaned_data is None:
@@ -228,6 +248,15 @@ class ContactForm(forms.Form):
         subject = cleaned_data.get("phone_number", "")
 
         issue = cleaned_data.get("issue_type", "")
+
+        # Require documentation checkbox for support-type issues
+        if issue in self.DOCUMENTATION_CHECK_TYPES and not cleaned_data.get(
+            "checked_documentation"
+        ):
+            self.add_error(
+                "checked_documentation",
+                "Please review our documentation before submitting.",
+            )
 
         # Partnerships: check for required fields
         if issue == self.PARTNERSHIPS:
