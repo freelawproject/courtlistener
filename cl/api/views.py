@@ -367,7 +367,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     ).acount()
     citation_count = await Citation.objects.acount()
 
-    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]
+    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore[misc]
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
 
     fd_data = await get_coverage_data_fds()
@@ -378,7 +378,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
         "citation_lookup": {
             "throttle_count": count,
             "throttle_period": period,
-            "max_per_request": settings.MAX_CITATIONS_PER_REQUEST,
+            "max_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore[misc]
         },
         "financial_disclosures": {
             "disclosures": fd_data["disclosures"],
