@@ -26,6 +26,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         "message": "123456789012345678901",
         "email": "pandora@box.com",
         "hcaptcha": "xxx",
+        "checked_documentation": True,
     }
 
     async def test_multiple_requests_request(self, mock: MagicMock) -> None:
@@ -130,6 +131,41 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
+
+    async def test_documentation_checkbox_required(
+        self, mock: MagicMock
+    ) -> None:
+        """Is the documentation checkbox required for support-type issues?"""
+        for issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
+            with self.subTest(issue_type=issue_type):
+                msg = self.test_msg.copy()
+                msg["issue_type"] = issue_type
+                if issue_type in ContactForm.TECH_ISSUE_TYPES:
+                    msg["tech_description"] = "Something is broken"
+                del msg["checked_documentation"]
+
+                # Without checkbox, form is rejected
+                response = await self.async_client.post(
+                    reverse("contact"), msg
+                )
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+
+                # With checkbox, form is accepted
+                msg["checked_documentation"] = True
+                response = await self.async_client.post(
+                    reverse("contact"), msg
+                )
+                self.assertEqual(response.status_code, HTTPStatus.FOUND)
+
+    async def test_documentation_checkbox_not_required_for_other_types(
+        self, mock: MagicMock
+    ) -> None:
+        """Is the documentation checkbox skipped for non-support issue types?"""
+        msg = self.test_msg.copy()
+        msg["issue_type"] = "data_quality"
+        msg.pop("checked_documentation", None)
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
 
 class SimplePagesTest(SimpleUserDataMixin, TestCase):
@@ -277,7 +313,7 @@ class SealingOrderDetectionTest(SimpleTestCase):
         issue_type: str = ContactForm.REMOVAL_REQUEST,
         email: str = "test@example.com",
     ) -> ContactForm:
-        data = {
+        data: dict[str, Any] = {
             "name": "Test User",
             "email": email,
             "phone_number": subject,
@@ -285,6 +321,8 @@ class SealingOrderDetectionTest(SimpleTestCase):
             "message": message,
             "hcaptcha": "xxx",
         }
+        if issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
+            data["checked_documentation"] = True
         form = ContactForm(data)
         form.is_valid()
         return form
@@ -377,6 +415,7 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
             "message": "I need general help please",
             "email": "test@example.com",
             "hcaptcha": "xxx",
+            "checked_documentation": True,
         }
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
@@ -441,6 +480,7 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
             "message": "I have a question about a case",
             "email": "clerk@uscourts.gov",
             "hcaptcha": "xxx",
+            "checked_documentation": True,
         }
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
