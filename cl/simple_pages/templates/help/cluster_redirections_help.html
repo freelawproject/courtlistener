@@ -94,6 +94,7 @@
 
   <h3 id="api-users">API Users</h3>
   <p>The <a href="{% url "case_law_api_help" %}">Clusters API endpoint</a> supports cluster redirections. When requesting a redirected cluster, you will receive the appropriate HTTP status code (301 or 410) as described above.</p>
+  <p>Additionally, each cluster response includes a <code>cluster_redirections</code> field listing any old clusters that were redirected to it, with the original <code>deleted_cluster_id</code> and the redirection <code>reason</code>.</p>
 
   <h3 id="replication-users">Replication Users</h3>
   <p>If you use our <a href="{% url "replication_docs" %}">database replication service</a>, the <code>search_clusterredirection</code> table is included in your replica. You can query it directly to find redirections and understand how clusters have been merged or removed.</p>
