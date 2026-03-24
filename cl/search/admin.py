@@ -632,6 +632,17 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
     )
     list_filter = ("reason",)
 
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ClusterRedirection | None = None
+    ) -> bool:
+        """Prevent deletion of cluster redirections via the admin.
+
+        :param request: The HTTP request.
+        :param obj: The object being deleted, if any.
+        :returns: Always False.
+        """
+        return False
+
 
 @admin.register(ScotusDocketMetadata)
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
