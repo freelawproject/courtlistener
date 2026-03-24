@@ -632,15 +632,14 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
     )
     list_filter = ("reason",)
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ClusterRedirection | None = None
+    ) -> bool:
         """Prevent deletion of cluster redirections via the admin.
 
         :param request: The HTTP request.
-        :type request: HttpRequest
         :param obj: The object being deleted, if any.
-        :type obj: ClusterRedirection | None
         :returns: Always False.
-        :rtype: bool
         """
         return False
 
