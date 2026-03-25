@@ -1,12 +1,12 @@
 from collections.abc import Awaitable
 
 from asgiref.sync import iscoroutinefunction
-from django.conf import settings
 from django.http import HttpRequest, HttpResponseBase
 from waffle import flag_is_active
 
 from cl.api.routers import (
     SAFE_METHODS,
+    is_replica_configured,
     reset_replica_routing,
     set_replica_routing,
 )
@@ -56,10 +56,6 @@ class ReplicaRoutingMiddleware:
             return False
         if not request.path.startswith("/api/rest/"):
             return False
-        if not settings.API_READ_DATABASES:
-            return False
-        if not any(
-            db in settings.DATABASES for db in settings.API_READ_DATABASES
-        ):
+        if not is_replica_configured():
             return False
         return bool(flag_is_active(request, "replica-reads"))
