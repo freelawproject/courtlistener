@@ -29,6 +29,11 @@ class ReplicaRoutingMiddleware:
         self.get_response = get_response
         self.async_mode = iscoroutinefunction(self.get_response)
 
+    def _reset_auth_replica_token(self, request: HttpRequest) -> None:
+        """Disable replica routing enabled by DRF auth classes."""
+        if getattr(request, "_replica_routing_token", None) is not None:
+            set_replica_routing(False)
+
     def __call__(
         self, request: HttpRequest
     ) -> HttpResponseBase | Awaitable[HttpResponseBase]:
@@ -40,7 +45,10 @@ class ReplicaRoutingMiddleware:
                 return self.get_response(request)
             finally:
                 reset_replica_routing(token)
-        return self.get_response(request)
+
+        response = self.get_response(request)
+        self._reset_auth_replica_token(request)
+        return response
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
         if self._should_route_to_replica(request):
@@ -49,7 +57,10 @@ class ReplicaRoutingMiddleware:
                 return await self.get_response(request)
             finally:
                 reset_replica_routing(token)
-        return await self.get_response(request)
+
+        response = await self.get_response(request)
+        self._reset_auth_replica_token(request)
+        return response
 
     def _should_route_to_replica(self, request: HttpRequest) -> bool:
         if request.method not in SAFE_METHODS:
