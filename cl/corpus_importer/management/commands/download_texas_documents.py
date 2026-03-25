@@ -160,7 +160,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--batch-size",
             type=int,
-            default=1000,
+            default=10,
             help="The batch size for PDF extraction tasks "
             "(only used with --only-extraction).",
         )
