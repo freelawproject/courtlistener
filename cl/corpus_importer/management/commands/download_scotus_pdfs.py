@@ -1,48 +1,40 @@
 import time
 from itertools import batched
 
-from celery import chain
 from django.db.models import Q
 
 from cl.corpus_importer.tasks import download_scotus_document_pdf
+from cl.corpus_importer.utils import paginate_docs_queryset
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import SCOTUSDocument
 
 
-def download_and_extract_scotus_pdfs(
+def download_scotus_pdfs(
     download_queue: str,
-    extraction_queue: str,
     delay: float,
 ) -> None:
-    """Download and extract PDFs for SCOTUSDocuments missing a local file.
+    """Download PDFs for SCOTUSDocuments missing a local file.
 
     Queries SCOTUSDocument instances that have no filepath_local,
-    then schedules a download -> extraction chain for each.
+    then schedules a download task for each.
 
     :param download_queue: The celery queue for download tasks.
-    :param extraction_queue: The celery queue for extraction tasks.
     :param delay: Seconds to sleep between scheduling tasks.
     :return: None
     """
-    docs = (
-        SCOTUSDocument.objects.filter(filepath_local="")
-        .values_list("pk", flat=True)
-        .order_by()
+    docs = SCOTUSDocument.objects.filter(filepath_local="").values_list(
+        "pk", flat=True
     )
     count = docs.count()
     logger.info("Found %s SCOTUSDocuments needing download.", count)
-    throttle = CeleryThrottle(queue_name=extraction_queue)
+    throttle = CeleryThrottle(queue_name=download_queue)
     processed_count = 0
-    for pk in docs.iterator():
+    for pk in paginate_docs_queryset(docs):
         throttle.maybe_wait()
-        chain(
-            download_scotus_document_pdf.si(pk).set(queue=download_queue),
-            extract_pdf_document.s(
-                check_if_needed=False,
-                model_name="search.SCOTUSDocument",
-            ).set(queue=extraction_queue),
+        download_scotus_document_pdf.si(pk).set(
+            queue=download_queue
         ).apply_async()
         processed_count += 1
         if processed_count % 100 == 0:
@@ -64,15 +56,19 @@ def extract_scotus_pdfs(
     extraction_queue: str,
     chunk_size: int,
     delay: float,
+    page_limit: int,
 ) -> None:
     """Extract text from SCOTUSDocuments that have a file but incomplete OCR.
 
     Queries SCOTUSDocument instances that already have a filepath_local but
-    whose OCR status is not complete or unnecessary.
+    whose OCR status is not complete or unnecessary. Documents with a
+    page_count exceeding page_limit are skipped, allowing smaller documents
+    to be processed first.
 
     :param extraction_queue: The celery queue for extraction tasks.
     :param chunk_size: The number of items to extract per celery task batch.
     :param delay: Seconds to sleep between scheduling tasks.
+    :param page_limit: Skip documents with more pages than this value.
     :return: None
     """
     docs = (
@@ -82,13 +78,17 @@ def extract_scotus_pdfs(
             | Q(ocr_status=SCOTUSDocument.OCR_UNNECESSARY)
         )
         .values_list("pk", flat=True)
-        .order_by()
     )
-    count = docs.count()
-    logger.info("Found %s SCOTUSDocuments needing extraction.", count)
+    total_count = docs.count()
+    filtered_docs = docs.filter(
+        Q(page_count__lte=page_limit) | Q(page_count__isnull=True)
+    )
+    filtered_count = filtered_docs.count()
+    skipped_count = total_count - filtered_count
+    logger.info("Found %s SCOTUSDocuments needing extraction.", total_count)
     throttle = CeleryThrottle(queue_name=extraction_queue)
     processed_count = 0
-    for chunk in batched(docs.iterator(), chunk_size):
+    for chunk in batched(paginate_docs_queryset(filtered_docs), chunk_size):
         throttle.maybe_wait()
         processed_count += len(chunk)
         extract_pdf_document.si(
@@ -99,16 +99,22 @@ def extract_scotus_pdfs(
         logger.info(
             "Scheduled %s/%s (%s)",
             processed_count,
-            count,
-            f"{processed_count / count:.0%}",
+            total_count,
+            f"{processed_count / total_count:.0%}",
         )
         time.sleep(delay)
+    logger.info(
+        "Done. Scheduled %s, skipped %s (over %s pages).",
+        processed_count,
+        skipped_count,
+        page_limit,
+    )
 
 
 class Command(VerboseCommand):
     help = (
         "Download and extract PDFs for SCOTUSDocument instances. "
-        "By default, downloads missing PDFs and extracts them. "
+        "By default, downloads missing PDFs. "
         "Use --only-extraction to skip downloads and only extract "
         "already-downloaded files."
     )
@@ -141,6 +147,13 @@ class Command(VerboseCommand):
             "(only used with --only-extraction).",
         )
         parser.add_argument(
+            "--page-limit",
+            type=int,
+            default=50,
+            help="Skip documents with more pages than this value "
+            "(only used with --only-extraction).",
+        )
+        parser.add_argument(
             "--delay",
             type=float,
             default=1.0,
@@ -150,16 +163,20 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super().handle(*args, **options)
 
-        extraction_queue = options["extraction_queue"]
         delay = options["delay"]
 
         if options["only_extraction"]:
             chunk_size = options["chunk_size"]
-            logger.info("Extracting SCOTUSDocument PDFs (extraction only).")
-            extract_scotus_pdfs(extraction_queue, chunk_size, delay)
+            page_limit = options["page_limit"]
+            extraction_queue = options["extraction_queue"]
+            logger.info(
+                "Extracting SCOTUSDocument PDFs (page limit: %s).",
+                page_limit,
+            )
+            extract_scotus_pdfs(
+                extraction_queue, chunk_size, delay, page_limit
+            )
         else:
             download_queue = options["download_queue"]
-            logger.info("Downloading and extracting SCOTUSDocument PDFs.")
-            download_and_extract_scotus_pdfs(
-                download_queue, extraction_queue, delay
-            )
+            logger.info("Downloading SCOTUSDocument PDFs.")
+            download_scotus_pdfs(download_queue, delay)
