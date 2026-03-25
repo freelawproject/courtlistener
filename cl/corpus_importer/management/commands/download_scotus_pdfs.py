@@ -1,4 +1,5 @@
 import time
+from itertools import batched
 
 from django.db.models import Q
 
@@ -87,15 +88,11 @@ def extract_scotus_pdfs(
     logger.info("Found %s SCOTUSDocuments needing extraction.", total_count)
     throttle = CeleryThrottle(queue_name=extraction_queue)
     processed_count = 0
-    chunk: list[int] = []
-    for pk in paginate_docs_queryset(filtered_docs):
-        chunk.append(pk)
-        if len(chunk) < chunk_size:
-            continue
+    for chunk in batched(paginate_docs_queryset(filtered_docs), chunk_size):
         throttle.maybe_wait()
         processed_count += len(chunk)
         extract_pdf_document.si(
-            chunk,
+            list(chunk),
             check_if_needed=False,
             model_name="search.SCOTUSDocument",
         ).set(queue=extraction_queue).apply_async()
@@ -105,22 +102,7 @@ def extract_scotus_pdfs(
             total_count,
             f"{processed_count / total_count:.0%}",
         )
-        chunk = []
         time.sleep(delay)
-    if chunk:
-        throttle.maybe_wait()
-        processed_count += len(chunk)
-        extract_pdf_document.si(
-            chunk,
-            check_if_needed=False,
-            model_name="search.SCOTUSDocument",
-        ).set(queue=extraction_queue).apply_async()
-        logger.info(
-            "Scheduled %s/%s (%s)",
-            processed_count,
-            total_count,
-            f"{processed_count / total_count:.0%}",
-        )
     logger.info(
         "Done. Scheduled %s, skipped %s (over %s pages).",
         processed_count,
