@@ -49,7 +49,7 @@
     <c-code>COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, ESCAPE '\', HEADER);</c-code>
     <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:</p>
     <c-code>psql [various connection parameters] < schema.sql</c-code>
-    <p>Field definitions can be found in one of two ways. First, you can <a class="links-external" href="https://github.com/freelawproject/courtlistener">browse the CourtListener code base</a>, where all the fields and tables are defined in <code>models.py</code> files. Second, if you send an <code>HTTP OPTIONS</code> request to our <a class="links" href="{% url "rest_docs" %}">REST API, it will give you field definitions (though the API does not always correspond to the CSV files on a 1-to-1 basis).</p>
+    <p>Field definitions can be found in one of two ways. First, you can <a class="links-external" href="https://github.com/freelawproject/courtlistener">browse the CourtListener code base</a>, where all the fields and tables are defined in <code>models.py</code> files. Second, if you send an <code>HTTP OPTIONS</code> request to our <a class="links" href="{% url "rest_docs" %}">REST API</a>, it will give you field definitions (though the API does not always correspond to the CSV files on a 1-to-1 basis).</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="schemas">
