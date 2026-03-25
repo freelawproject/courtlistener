@@ -29,18 +29,15 @@ def extract_texas_documents(
     :param page_limit: Skip documents with more pages than this value.
     :return: None
     """
-    docs = (
-        TexasDocument.objects.exclude(
-            Q(filepath_local="")
-            | Q(
-                ocr_status__in=(
-                    TexasDocument.OCR_UNNECESSARY,
-                    TexasDocument.OCR_COMPLETE,
-                )
+    docs = TexasDocument.objects.exclude(
+        Q(filepath_local="")
+        | Q(
+            ocr_status__in=(
+                TexasDocument.OCR_UNNECESSARY,
+                TexasDocument.OCR_COMPLETE,
             )
         )
-        .values_list("pk", "page_count")
-    )
+    ).values_list("pk", "page_count")
     count = docs.count()
     logger.info("Found %s TexasDocuments needing extraction.", count)
     throttle = CeleryThrottle(queue_name=extraction_queue)
@@ -104,9 +101,8 @@ def download_texas_documents(
     :param delay: Seconds to sleep between scheduling tasks.
     :return: None
     """
-    docs = (
-        TexasDocument.objects.filter(filepath_local="")
-        .values_list("pk", flat=True)
+    docs = TexasDocument.objects.filter(filepath_local="").values_list(
+        "pk", flat=True
     )
     count = docs.count()
     logger.info("Found %s TexasDocuments needing download.", count)
