@@ -52,13 +52,9 @@ def paginate_docs_queryset(
     Uses pk > last_pk ordering to avoid server-side cursors that hold
     open DB connections (which time out during long celery waits).
 
-    Works with both flat (.values_list("pk", flat=True)) and tuple
-    (.values_list("pk", "field")) querysets. The first element of each
-    row must be the pk.
-
-    :param queryset: A .values_list() queryset where pk is the first field.
+    :param queryset: A .values_list("pk", flat=True) queryset.
     :param batch_size: Number of rows to fetch per query.
-    :return: Yields individual rows (ints if flat, tuples otherwise).
+    :return: Yields individual pk values.
     """
     last_pk = 0
     while True:
@@ -68,8 +64,7 @@ def paginate_docs_queryset(
         if not batch:
             break
         yield from batch
-        last_item = batch[-1]
-        last_pk = last_item if isinstance(last_item, int) else last_item[0]
+        last_pk = batch[-1]
 
 
 def extract_file_name_from_url(url: str) -> str:

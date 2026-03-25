@@ -76,18 +76,19 @@ def extract_scotus_pdfs(
             Q(ocr_status=SCOTUSDocument.OCR_COMPLETE)
             | Q(ocr_status=SCOTUSDocument.OCR_UNNECESSARY)
         )
-        .values_list("pk", "page_count")
+        .values_list("pk", flat=True)
     )
-    count = docs.count()
-    logger.info("Found %s SCOTUSDocuments needing extraction.", count)
+    total_count = docs.count()
+    filtered_docs = docs.filter(
+        Q(page_count__lte=page_limit) | Q(page_count__isnull=True)
+    )
+    filtered_count = filtered_docs.count()
+    skipped_count = total_count - filtered_count
+    logger.info("Found %s SCOTUSDocuments needing extraction.", total_count)
     throttle = CeleryThrottle(queue_name=extraction_queue)
     processed_count = 0
-    skipped_count = 0
     chunk: list[int] = []
-    for pk, page_count in paginate_docs_queryset(docs):
-        if page_count is not None and page_count > page_limit:
-            skipped_count += 1
-            continue
+    for pk in paginate_docs_queryset(filtered_docs):
         chunk.append(pk)
         if len(chunk) < chunk_size:
             continue
@@ -101,8 +102,8 @@ def extract_scotus_pdfs(
         logger.info(
             "Scheduled %s/%s (%s)",
             processed_count,
-            count,
-            f"{processed_count / count:.0%}",
+            total_count,
+            f"{processed_count / total_count:.0%}",
         )
         chunk = []
         time.sleep(delay)
@@ -117,8 +118,8 @@ def extract_scotus_pdfs(
         logger.info(
             "Scheduled %s/%s (%s)",
             processed_count,
-            count,
-            f"{processed_count / count:.0%}",
+            total_count,
+            f"{processed_count / total_count:.0%}",
         )
     logger.info(
         "Done. Scheduled %s, skipped %s (over %s pages).",
