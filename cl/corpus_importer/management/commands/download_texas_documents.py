@@ -1,10 +1,9 @@
 import time
-from itertools import batched
 
-from celery import chain
 from django.db.models import Q
 
 from cl.corpus_importer.tasks import download_texas_document_pdf, logger
+from cl.corpus_importer.utils import paginate_docs_queryset
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.scrapers.tasks import extract_pdf_document
@@ -12,16 +11,22 @@ from cl.search.models import TexasDocument
 
 
 def extract_texas_documents(
-    extraction_queue: str, batch_size: int, delay: float
+    extraction_queue: str,
+    batch_size: int,
+    delay: float,
+    page_limit: int,
 ) -> None:
-    """
-    Run the extraction task for TexasDocument instances where ocr_status is not
-    OCR_UNNECESSARY or OCR_COMPLETE.
+    """Run the extraction task for TexasDocument instances needing OCR.
+
+    Queries TexasDocument instances that already have a filepath_local but
+    whose OCR status is not complete or unnecessary. Documents with a
+    page_count exceeding page_limit are skipped, allowing smaller documents
+    to be processed first.
 
     :param extraction_queue: The celery queue for PDF extraction tasks.
     :param batch_size: The batch size for PDF extraction tasks.
     :param delay: Seconds to sleep between scheduling tasks.
-
+    :param page_limit: Skip documents with more pages than this value.
     :return: None
     """
     docs = (
@@ -34,71 +39,83 @@ def extract_texas_documents(
                 )
             )
         )
-        .values_list("pk", flat=True)
-        .order_by()
+        .values_list("pk", "page_count")
     )
     count = docs.count()
     logger.info("Found %s TexasDocuments needing extraction.", count)
     throttle = CeleryThrottle(queue_name=extraction_queue)
     processed_count = 0
-    for pks in batched(docs.iterator(), batch_size):
+    skipped_count = 0
+    chunk: list[int] = []
+    for pk, page_count in paginate_docs_queryset(docs):
+        if page_count is not None and page_count > page_limit:
+            skipped_count += 1
+            continue
+        chunk.append(pk)
+        if len(chunk) < batch_size:
+            continue
         throttle.maybe_wait()
+        processed_count += len(chunk)
         extract_pdf_document.si(
-            pks=pks,
+            pks=chunk,
             check_if_needed=False,
             model_name="search.TexasDocument",
         ).set(queue=extraction_queue).apply_async()
-        processed_count += 1
-        if processed_count % 100 == 0:
-            logger.info(
-                "Scheduled %s/%s (%s)",
-                processed_count,
-                count,
-                f"{processed_count / count:.0%}",
-            )
+        logger.info(
+            "Scheduled %s/%s (%s)",
+            processed_count,
+            count,
+            f"{processed_count / count:.0%}",
+        )
+        chunk = []
         time.sleep(delay)
+    if chunk:
+        throttle.maybe_wait()
+        processed_count += len(chunk)
+        extract_pdf_document.si(
+            pks=chunk,
+            check_if_needed=False,
+            model_name="search.TexasDocument",
+        ).set(queue=extraction_queue).apply_async()
+        logger.info(
+            "Scheduled %s/%s (%s)",
+            processed_count,
+            count,
+            f"{processed_count / count:.0%}",
+        )
     logger.info(
-        "Scheduled %s/%s",
+        "Done. Scheduled %s, skipped %s (over %s pages).",
         processed_count,
-        count,
+        skipped_count,
+        page_limit,
     )
 
 
-def download_and_extract_texas_documents(
-    download_queue: str, extraction_queue: str, delay: float
+def download_texas_documents(
+    download_queue: str,
+    delay: float,
 ) -> None:
-    """
-    Download and extract attachments for TexasDocument with a missing or stale
-    local file.
+    """Download PDFs for TexasDocument instances missing a local file.
 
-    Queries TexasDocument instances that have no filepath_local, then schedules
-    a download -> extraction chain for each.
+    Queries TexasDocument instances that have no filepath_local, then
+    schedules a download task for each.
 
     :param download_queue: The celery queue for download tasks.
-    :param extraction_queue: The celery queue for extraction tasks.
     :param delay: Seconds to sleep between scheduling tasks.
-
     :return: None
     """
     docs = (
         TexasDocument.objects.filter(filepath_local="")
         .values_list("pk", flat=True)
-        .order_by()
     )
     count = docs.count()
-    logger.info(
-        "Found %s TexasDocuments needing download and extraction.", count
-    )
-    throttle = CeleryThrottle(queue_name=extraction_queue)
+    logger.info("Found %s TexasDocuments needing download.", count)
+    throttle = CeleryThrottle(queue_name=download_queue)
     processed_count = 0
-    for pk in docs.iterator():
+    for pk in paginate_docs_queryset(docs):
         throttle.maybe_wait()
-        chain(
-            download_texas_document_pdf.si(pk).set(queue=download_queue),
-            extract_pdf_document.s(
-                check_if_needed=False,
-                model_name="search.TexasDocument",
-            ).set(queue=extraction_queue),
+        download_texas_document_pdf.si(pk).set(
+            queue=download_queue
         ).apply_async()
         processed_count += 1
         if processed_count % 100 == 0:
@@ -117,7 +134,12 @@ def download_and_extract_texas_documents(
 
 
 class Command(VerboseCommand):
-    help = "Download and extract PDFs for TexasDocument instances which have missing or stale local files."
+    help = (
+        "Download and extract PDFs for TexasDocument instances. "
+        "By default, downloads missing PDFs. "
+        "Use --only-extraction to skip downloads and only extract "
+        "already-downloaded files."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -134,15 +156,24 @@ class Command(VerboseCommand):
         )
         parser.add_argument(
             "--only-extraction",
-            type=bool,
+            action="store_true",
             default=False,
-            help="Skip downloading attachments and only run the extraction task.",
+            help="Only extract text from already-downloaded PDFs. "
+            "Skips the download step.",
         )
         parser.add_argument(
             "--batch-size",
             type=int,
             default=1000,
-            help="The batch size for PDF extraction tasks. Only used if --only-extraction is true.",
+            help="The batch size for PDF extraction tasks "
+            "(only used with --only-extraction).",
+        )
+        parser.add_argument(
+            "--page-limit",
+            type=int,
+            default=50,
+            help="Skip documents with more pages than this value "
+            "(only used with --only-extraction).",
         )
         parser.add_argument(
             "--delay",
@@ -154,19 +185,20 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super().handle(*args, **options)
 
-        extraction_queue = options["extraction_queue"]
         delay = options["delay"]
-        only_extraction = options["only_extraction"]
 
-        if only_extraction:
+        if options["only_extraction"]:
             batch_size = options["batch_size"]
-            logger.info("Running extraction for TexasDocuments...")
-            extract_texas_documents(extraction_queue, batch_size, delay)
+            page_limit = options["page_limit"]
+            extraction_queue = options["extraction_queue"]
+            logger.info(
+                "Extracting TexasDocument PDFs (page limit: %s).",
+                page_limit,
+            )
+            extract_texas_documents(
+                extraction_queue, batch_size, delay, page_limit
+            )
         else:
             download_queue = options["download_queue"]
-            logger.info(
-                "Downloading and extracting TexasDocument attachments..."
-            )
-            download_and_extract_texas_documents(
-                download_queue, extraction_queue, delay
-            )
+            logger.info("Downloading TexasDocument PDFs.")
+            download_texas_documents(download_queue, delay)
