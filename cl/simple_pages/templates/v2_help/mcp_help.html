@@ -4,8 +4,8 @@
 {% block title %}Model Context Protocol (MCP) Server – CourtListener.com{% endblock %}
 {% block og_title %}Model Context Protocol (MCP) Server – CourtListener.com{% endblock %}
 
-{% block description %}CourtListener is developing an MCP server to enable AI assistants to access legal data through our APIs.{% endblock %}
-{% block og_description %}CourtListener is developing an MCP server to enable AI assistants to access legal data through our APIs.{% endblock %}
+{% block description %}CourtListener's MCP server gives AI assistants direct access to millions of court opinions, federal dockets, judge profiles, and more.{% endblock %}
+{% block og_description %}CourtListener's MCP server gives AI assistants direct access to millions of court opinions, federal dockets, judge profiles, and more.{% endblock %}
 
 
 {% block content %}
@@ -14,81 +14,101 @@
   :nav_items="[
     {'href': '#about', 'text': 'Overview'},
     {'href': '#what-is-mcp', 'text': 'What is MCP?'},
-    {'href': '#features', 'text': 'Planned Features', 'children': [
-      {'href': '#search-tools', 'text': 'Search Tools'},
-      {'href': '#data-access', 'text': 'Data Access'},
+    {'href': '#features', 'text': 'What Can It Do?', 'children': [
+      {'href': '#search', 'text': 'Search'},
+      {'href': '#detailed-records', 'text': 'Detailed Records'},
+      {'href': '#citations', 'text': 'Citations'},
+      {'href': '#alerts', 'text': 'Alerts'},
     ]},
-    {'href': '#getting-started', 'text': 'Getting Started'},
+    {'href': '#installation', 'text': 'Installation', 'children': [
+      {'href': '#claude-desktop', 'text': 'Claude Desktop'},
+      {'href': '#claude-code', 'text': 'Claude Code'},
+      {'href': '#other-clients', 'text': 'Other Clients'},
+    ]},
     {'href': '#authentication', 'text': 'Authentication'},
-    {'href': '#stay-informed', 'text': 'Stay Informed'},
+    {'href': '#feedback', 'text': 'Feedback'},
   ]"
 >
   <section id="about">
     <h1>Model Context Protocol (MCP) Server</h1>
-    <p class="text-lg text-greyscale-600">We are developing an MCP server that will enable AI assistants to access CourtListener's legal data.</p>
-    <div class="bg-primary-50 border border-primary-200 rounded-lg p-4 my-6">
-      <p class="text-primary-800 font-medium"><strong>Coming Soon:</strong> This feature is currently in development. The information on this page describes our planned implementation and may change as development progresses.</p>
-    </div>
-    <p>The Model Context Protocol (MCP) server will allow AI tools like Claude, ChatGPT, and other large language models to seamlessly access CourtListener's extensive legal databases. This will enable AI assistants to provide more accurate and comprehensive answers to legal research questions by giving them direct access to case law, PACER data, judge information, and more.
-    </p>
+    <p class="text-lg text-greyscale-600">CourtListener's MCP server gives AI assistants direct access to our legal databases&mdash;millions of court opinions, federal dockets, judge profiles, and more. Instead of relying on training data alone, your AI assistant can search and retrieve live data from CourtListener while you chat.</p>
   </section>
 
   <c-layout-with-navigation.section id="what-is-mcp">
     <h2>What is the Model Context Protocol?</h2>
-    <p>The <a class="text-primary-600" href="https://modelcontextprotocol.io/" target="_blank" rel="noreferrer">Model Context Protocol</a> is an open standard that allows AI applications to connect to external data sources and tools. Instead of relying solely on their training data, AI assistants using MCP can query live databases and APIs to retrieve current, accurate information.
+    <p>The <a class="text-primary-600" href="https://modelcontextprotocol.io/" target="_blank" rel="noreferrer">Model Context Protocol</a> (MCP) is an open standard that lets AI applications connect to external data sources. When your AI assistant has CourtListener's MCP server installed, it can query our databases in real time to answer your legal research questions with current, verifiable information.
     </p>
-    <p>When you use an AI assistant that has CourtListener's MCP server installed, the assistant will be able to:</p>
-    <ul class="list-disc ml-5 pl-6 space-y-2">
-      <li>Search for case law across hundreds of jurisdictions</li>
-      <li>Look up specific court opinions by citation</li>
-      <li>Access PACER docket information from the RECAP Archive</li>
-      <li>Find judge profiles and their authored opinions</li>
-      <li>Retrieve oral argument recordings and transcripts</li>
-    </ul>
+    <p>Compatible AI applications include Claude Desktop, Claude Code, Cursor, Windsurf, and any other application that supports MCP.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="features">
-    <h2>Planned Features</h2>
-    <p>Our MCP server will provide tools that map to CourtListener's comprehensive <a class="text-primary-600" href="{% url "rest_docs" %}">REST APIs</a>, giving AI assistants the same powerful search and data access capabilities available to developers.
-    </p>
-    <p>We want to build an MCP server that meets your needs. If you have ideas for features, use cases, or specific tools you would like to see, please share them in our <a class="text-primary-600" href="https://github.com/freelawproject/foresight/discussions/88" target="_blank" rel="noreferrer">GitHub discussion</a>. You can also vote on existing suggestions to help us prioritize development. The MCP server and its underlying Python SDK are being developed at <a class="text-primary-600" href="https://github.com/freelawproject/courtlistener-api-client" target="_blank" rel="noreferrer">courtlistener-api-client</a>.
-    </p>
+    <h2>What Can It Do?</h2>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="search-tools">
-    <h3>Search Tools</h3>
-    <p>AI assistants will be able to perform sophisticated searches across our databases:</p>
+  <c-layout-with-navigation.section id="search">
+    <h3>Search Across CourtListener</h3>
+    <p>Search millions of records using the same powerful engine behind the CourtListener website:</p>
     <ul class="list-disc ml-5 pl-6 space-y-2">
-      <li><strong>Case Law Search:</strong> Search millions of court opinions using keywords, citations, dates, courts, and judges. Supports the same <a class="text-primary-600" href="{% url "advanced_search" %}">advanced query syntax</a> available on the website.</li>
-      <li><strong>RECAP Search:</strong> Search federal court dockets and filings from our <a class="text-primary-600" href="{% url "coverage_recap" %}">RECAP Archive</a>, which contains millions of PACER documents.</li>
-      <li><strong>Citation Lookup:</strong> Look up cases by their legal citation using our <a class="text-primary-600" href="{% url "citation_lookup_api" %}">Citation Lookup API</a>.</li>
-      <li><strong>Oral Arguments:</strong> Search oral argument recordings and transcripts from appellate courts.</li>
+      <li><strong>Case Law</strong>&mdash;Search court opinions by keyword, citation, date range, court, judge, and more across hundreds of jurisdictions</li>
+      <li><strong>RECAP Dockets &amp; Documents</strong>&mdash;Search federal court dockets and filings from our RECAP Archive, containing millions of PACER documents</li>
+      <li><strong>Judges</strong>&mdash;Find judges by name, court, appointer, political affiliation, law school, and other biographical details</li>
+      <li><strong>Oral Arguments</strong>&mdash;Search oral argument recordings from appellate courts</li>
     </ul>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="data-access">
-    <h3>Data Access</h3>
-    <p>Beyond search, AI assistants will be able to retrieve detailed information about specific items:</p>
+  <c-layout-with-navigation.section id="detailed-records">
+    <h3>Look Up Detailed Records</h3>
+    <p>Retrieve complete information about any item in our database:</p>
     <ul class="list-disc ml-5 pl-6 space-y-2">
-      <li><strong>Opinion Details:</strong> Full text of court opinions, metadata, and citation information.</li>
-      <li><strong>Docket Information:</strong> Complete docket sheets including all filings and parties.</li>
-      <li><strong>Judge Profiles:</strong> Biographical information about judges, their positions, and authored opinions.</li>
-      <li><strong>Court Information:</strong> Details about courts, their jurisdictions, and coverage in our database.</li>
+      <li>Full text of court opinions with metadata and citation information</li>
+      <li>Complete docket sheets including all entries, parties, and attorneys</li>
+      <li>Judge profiles with positions, education, and authored opinions</li>
+      <li>Court details including jurisdiction and coverage information</li>
+      <li>Financial disclosures, ABA ratings, and more</li>
+    </ul>
+    <p>The MCP server connects your AI assistant to over 20 API endpoints — the same data available through our <a href="{% url "rest_docs" %}" class="text-primary-600 hover:underline">REST API</a>.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="citations">
+    <h3>Extract &amp; Verify Citations</h3>
+    <p>Powered by <a href="https://github.com/freelawproject/eyecite" target="_blank" rel="noreferrer" class="text-primary-600 hover:underline">eyecite</a>, the MCP server can extract and verify legal citations directly from any text.</p>
+    <ul class="list-disc ml-5 pl-6 space-y-2">
+      <li><strong>Extract Citations</strong>&mdash;Identify and extract full case citations, short cites, <em>id.</em>, <em>supra</em>, and statutory references from any legal texts. Runs locally on your machine without API calls.</li>
+      <li><strong>Verify Citations</strong>&mdash;Cross-references extracted citations against CourtListener's database to confirm case names, dates, and validity. Ideal for checking AI-generated legal text or reviewing briefs.</li>
     </ul>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="getting-started">
-    <h2>Getting Started</h2>
-    <p>When the MCP server launches, you will be able to install it in compatible AI applications. The installation process will vary depending on the AI tool you use.
-    </p>
-    <p>For local MCP servers (like those used with Claude Desktop), installation will involve adding a configuration to your AI application that references the CourtListener MCP package:
-    </p>
+  <c-layout-with-navigation.section id="alerts">
+    <h3>Manage Alerts</h3>
+    <p>Create and manage CourtListener alerts without leaving your AI assistant:</p>
+    <ul class="list-disc ml-5 pl-6 space-y-2">
+      <li><strong>Search Alerts</strong>&mdash;Set up real-time, daily, weekly, or monthly alerts for case law and RECAP searches</li>
+      <li><strong>Docket Alerts</strong>&mdash;Subscribe to updates on specific federal court dockets</li>
+    </ul>
+    <p><a class="text-primary-600" href="https://donate.free.law/forms/membership" target="_blank" rel="noreferrer">CourtListener members</a> get unlimited alerts, among other perks.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="installation">
+    <h2>Installation</h2>
+    <p>The CourtListener MCP server runs locally on your computer and communicates with your AI application via standard input/output (stdio). You will need two things before you start:</p>
+    <ol class="list-decimal ml-5 pl-6 space-y-2">
+      <li><strong>uv</strong>&mdash;A fast Python package manager. If you do not have it, install it by following the instructions at <a class="text-primary-600" href="https://docs.astral.sh/uv/getting-started/installation/" target="_blank" rel="noreferrer">docs.astral.sh/uv</a>.</li>
+      <li><strong>A CourtListener API token</strong>&mdash;<a class="text-primary-600" href="{% url "register" %}">Create a free account</a> if you do not have one, then get your token from your <a class="text-primary-600" href="{% url "view_api" %}">API settings page</a>.</li>
+    </ol>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="claude-desktop">
+    <h3>Claude Desktop</h3>
+    <ol class="list-decimal ml-5 pl-6 space-y-2">
+      <li>Open Claude Desktop and navigate to <strong>Settings &gt; Developer &gt; Edit Config</strong>. Open your configuration json file if not automatically opened.</li>
+      <li>Add the CourtListener MCP server to the <code>mcpServers</code> block of your configuration:</li>
+    </ol>
     <c-code>
 {
   "mcpServers": {
     "courtlistener": {
       "command": "uvx",
-      "args": ["--from", "courtlistener", "courtlistener-mcp"],
+      "args": ["--from", "courtlistener-api-client[mcp]", "courtlistener-mcp"],
       "env": {
         "COURTLISTENER_API_TOKEN": "your-api-token"
       }
@@ -96,35 +116,48 @@
   }
 }
     </c-code>
-    <p class="text-sm text-greyscale-500">Note: This configuration is subject to change. Final installation instructions will be provided when the MCP server is released.</p>
+    <ol class="list-decimal ml-5 pl-6 space-y-2" start="3">
+      <li>Replace <code>your-api-token</code> with your actual token and save the file. Restart Claude Desktop for the changes to take effect.</li>
+    </ol>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="claude-code">
+    <h3>Claude Code</h3>
+    <p>Run this single command in your terminal:</p>
+    <c-code>
+claude mcp add courtlistener -e COURTLISTENER_API_TOKEN=your-api-token -- uvx --from "courtlistener-api-client[mcp]" courtlistener-mcp
+    </c-code>
+    <p>Replace <code>your-api-token</code> with your actual token.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="other-clients">
+    <h3>Cursor, Windsurf, and Other MCP Clients</h3>
+    <p>Most MCP-compatible applications use a similar JSON configuration. Add a server entry with:</p>
+    <ul class="list-disc ml-5 pl-6 space-y-2">
+      <li><strong>Command:</strong> <code>uvx</code></li>
+      <li><strong>Args:</strong> <code>["--from", "courtlistener-api-client[mcp]", "courtlistener-mcp"]</code></li>
+      <li><strong>Environment variable:</strong> <code>COURTLISTENER_API_TOKEN</code> set to your token</li>
+    </ul>
+    <p>Consult your application's documentation for where to place the MCP server configuration.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="authentication">
     <h2>Authentication</h2>
-    <p>The MCP server will use CourtListener API tokens for authentication. This means:</p>
+    <p>The MCP server uses your CourtListener API token for authentication:</p>
     <ul class="list-disc ml-5 pl-6 space-y-2">
-      <li>You will need a <a class="text-primary-600" href="{% url "rest_docs" %}">CourtListener API account</a> to use the MCP server.</li>
-      <li>Your existing API token will work with the MCP server.</li>
-      <li>API rate limits and usage policies will apply to MCP requests just as they do to direct API calls.</li>
+      <li>You need a free CourtListener account to use the MCP server.</li>
+      <li>Your existing API token works with the MCP server.</li>
+      <li>Standard API rate limits and usage policies apply to MCP requests just as they do to direct API calls.</li>
       <li>Organizations with commercial API agreements can use MCP under the same terms.</li>
     </ul>
-    <p>If you do not yet have a CourtListener account, you can <a class="text-primary-600" href="{% url "register" %}">create one for free</a>. API tokens are available in <a class="text-primary-600" href="{% url "view_api" %}">your profile settings</a> after registration.
+    <p>If you do not yet have an account, you can <a class="text-primary-600" href="{% url "register" %}">create one for free</a>. API tokens are available in your <a class="text-primary-600" href="{% url "view_api" %}">profile settings</a> after registration.
     </p>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="stay-informed">
-    <h2>Stay Informed</h2>
-    <p>We will announce the MCP server launch through our usual channels:</p>
-    <ul class="list-disc ml-5 pl-6 space-y-2">
-      <li>The <a class="text-primary-600" href="https://free.law/blog/" target="_blank" rel="noreferrer">Free Law Project blog</a></li>
-      <li>Our <a class="text-primary-600" href="https://bsky.app/profile/free.law" target="_blank" rel="noreferrer">Bluesky</a> account</li>
-      <li>The <a class="text-primary-600" href="https://lists.freelawproject.org/cgi-bin/mailman/listinfo/announce" target="_blank" rel="noreferrer">Free Law Project announcement mailing list</a></li>
-    </ul>
-    <p>If you have questions about the MCP server or would like to be notified when it launches, please <a class="text-primary-600" href="{% url "contact" %}">contact us</a>.
+  <c-layout-with-navigation.section id="feedback">
+    <h2>Feedback and Contributions</h2>
+    <p>We want this MCP server to meet your needs. If you have ideas for features, encounter issues, or want to contribute, visit the <a class="text-primary-600" href="https://github.com/freelawproject/courtlistener-api-client" target="_blank" rel="noreferrer">courtlistener-api-client</a> repository on GitHub.
     </p>
-    <a class="btn-primary flex w-fit" href="{% url "contact" %}">
-      Contact Us
-    </a>
   </c-layout-with-navigation.section>
 
   <section>
