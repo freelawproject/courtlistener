@@ -18,6 +18,8 @@ from django.conf import settings
 
 replicas = None
 
+SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
+
 
 def _get_replica_list():
     global replicas

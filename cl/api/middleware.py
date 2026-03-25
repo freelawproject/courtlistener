@@ -5,7 +5,11 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponseBase
 from waffle import flag_is_active
 
-from cl.api.routers import reset_replica_routing, set_replica_routing
+from cl.api.routers import (
+    SAFE_METHODS,
+    reset_replica_routing,
+    set_replica_routing,
+)
 
 
 class ReplicaRoutingMiddleware:
@@ -48,7 +52,7 @@ class ReplicaRoutingMiddleware:
         return await self.get_response(request)
 
     def _should_route_to_replica(self, request: HttpRequest) -> bool:
-        if request.method not in ("GET", "HEAD", "OPTIONS"):
+        if request.method not in SAFE_METHODS:
             return False
         if not request.path.startswith("/api/rest/"):
             return False
