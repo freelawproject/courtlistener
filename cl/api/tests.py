@@ -462,7 +462,7 @@ class ApiQueryCountTests(TestCase):
             path = reverse("recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(7):
+        with self.assertNumQueries(8):
             path = reverse("opinioncluster-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -4201,6 +4201,30 @@ class ClusterRedirectionTest(TestCase):
                 )
                 response = await api_client.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_cluster_redirections_nested_field(self):
+        """Test that cluster_redirections appears as a nested field on
+        the OpinionCluster detail endpoint with correct data."""
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.redirect_to_cluster.pk},
+        )
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        data = response.json()
+
+        self.assertIn("cluster_redirections", data)
+        redirections = data["cluster_redirections"]
+        self.assertEqual(len(redirections), 1)
+
+        redirection = redirections[0]
+        expected_fields = {"date_created", "deleted_cluster_id", "reason"}
+        self.assertEqual(set(redirection.keys()), expected_fields)
+        self.assertEqual(
+            redirection["deleted_cluster_id"], self.deleted_cluster_id
+        )
+        self.assertEqual(redirection["reason"], ClusterRedirection.VERSION)
 
 
 class TestOpinionViewsetXMLRendering(TestCase):
