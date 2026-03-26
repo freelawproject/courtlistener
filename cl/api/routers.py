@@ -65,6 +65,11 @@ def get_api_read_db() -> str:
 _use_replica: ContextVar[bool] = ContextVar("_use_replica", default=False)
 
 
+def is_replica_routing_active() -> bool:
+    """Return whether replica routing is currently enabled."""
+    return _use_replica.get(False)
+
+
 def set_replica_routing(enabled: bool) -> Token[bool]:
     """Set whether the current context should route reads to a replica.
 
