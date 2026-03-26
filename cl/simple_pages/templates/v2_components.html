@@ -339,8 +339,8 @@ Sample code here.
     <h2 class="mt-6 mb-3">Description list</h2>
     <p>Highly customizable description list components. Can be used to create a change log, terms list, or grid of metadata. If creating a single column, <code>c-description-item</code> isn't needed. Use that to ensure elements are lined up correctly across rows within a grid display.</p>
 
-    <h4 class="mt-3">Demo — Multi-column grid</h4>
-    <c-description-list columns="3">
+    <h4 class="mt-3">Demo — Responsive multi-column grid</h4>
+    <c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       <c-description-item>
         <c-description-term>Term</c-description-term>
         <c-description-details>Description of the term.</c-description-details>
@@ -373,7 +373,7 @@ Sample code here.
     </c-description-list>
 
     <h4 class="mt-3">Demo — Rich content values</h4>
-    <c-description-list columns="2">
+    <c-description-list class="grid grid-cols-1 md:grid-cols-2">
       <c-description-item>
         <c-description-term>Related links</c-description-term>
         <c-description-details>
@@ -393,7 +393,7 @@ Sample code here.
     </c-description-list>
 
     <h4 class="mt-3">Demo — Class overrides</h4>
-    <c-description-list columns="2" class="gap-4">
+    <c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <c-description-item>
         <c-description-term class="text-primary-600">Styled term</c-description-term>
         <c-description-details class="italic">Styled description with extra gap.</c-description-details>
@@ -406,12 +406,8 @@ Sample code here.
 
     <c-library.list title="Props" only>
       <c-library.item only>
-        <c-slot name="label"><code>c-description-list</code> — <code>columns</code></c-slot>
-        <c-slot name="description"><code>"1"</code> (default) for stacked layout. Any other number (e.g., <code>"2"</code>, <code>"3"</code>) for a responsive multi-column grid on desktop. When using multiple columns, wrap each term/details pair in <code>&lt;c-description-item&gt;</code>.</c-slot>
-      </c-library.item>
-      <c-library.item only>
         <c-slot name="label"><code>c-description-list</code> — <code>class</code></c-slot>
-        <c-slot name="description">Additional CSS classes merged onto the <code>&lt;dl&gt;</code> container.</c-slot>
+        <c-slot name="description">CSS classes merged onto the <code>&lt;dl&gt;</code> container. Use Tailwind grid utilities (e.g., <code>grid grid-cols-1 md:grid-cols-3</code>) to control responsive column layout. When using multiple columns, wrap each term/details pair in <code>&lt;c-description-item&gt;</code>.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>c-description-item</code> — <code>class</code></c-slot>
@@ -456,8 +452,8 @@ Sample code here.
   &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
 &lt;/c-description-list&gt;
 
-{# Multi-column grid — wrap pairs in c-description-item #}
-&lt;c-description-list columns="3"&gt;
+{# Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop #}
+&lt;c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
     &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
@@ -469,7 +465,7 @@ Sample code here.
 &lt;/c-description-list&gt;
 
 {# With class overrides #}
-&lt;c-description-list columns="2" class="gap-4"&gt;
+&lt;c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
   &lt;c-description-item&gt;
     &lt;c-description-term class="text-primary-600"&gt;Styled term&lt;/c-description-term&gt;
     &lt;c-description-details class="italic"&gt;Styled description.&lt;/c-description-details&gt;
