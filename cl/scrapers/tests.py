@@ -2211,7 +2211,9 @@ class AccountSubscriptionIncludeTest(TestCase):
             {date(2025, 2, 20), date(2025, 4, 1)}
         )
         self.subscription.refresh_from_db()
-        self.assertEqual(self.subscription.first_subscription, date(2025, 2, 20))
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 2, 20)
+        )
         self.assertEqual(self.subscription.last_subscription, date(2025, 4, 1))
 
     def test_inner_dates_do_not_change_window(self):
@@ -2220,8 +2222,12 @@ class AccountSubscriptionIncludeTest(TestCase):
             {date(2025, 3, 5), date(2025, 3, 10)}
         )
         self.subscription.refresh_from_db()
-        self.assertEqual(self.subscription.first_subscription, date(2025, 3, 1))
-        self.assertEqual(self.subscription.last_subscription, date(2025, 3, 15))
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 3, 1)
+        )
+        self.assertEqual(
+            self.subscription.last_subscription, date(2025, 3, 15)
+        )
 
 
 TAMES_ASSET_DIR = (
@@ -2267,12 +2273,8 @@ class SubscribeToTamesCasesTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.login_get_html = (
-            TAMES_ASSET_DIR / "login_get.html"
-        ).read_text()
-        cls.login_post_html = (
-            TAMES_ASSET_DIR / "login_post.html"
-        ).read_text()
+        cls.login_get_html = (TAMES_ASSET_DIR / "login_get.html").read_text()
+        cls.login_post_html = (TAMES_ASSET_DIR / "login_post.html").read_text()
         cls.case_add_success_html = (
             TAMES_ASSET_DIR / "case_add_success.html"
         ).read_text()
@@ -2378,9 +2380,7 @@ class SubscribeToTamesCasesTest(TestCase):
         subscribe_to_tames_cases.apply(args=([new_case],))
 
         self.tracker.refresh_from_db()
-        self.assertEqual(
-            self.tracker.first_subscription, date(2024, 12, 1)
-        )
+        self.assertEqual(self.tracker.first_subscription, date(2024, 12, 1))
         self.assertEqual(self.tracker.last_subscription, date(2025, 1, 15))
         # Cache should be cleared since everything succeeded
         self.mock_redis.delete.assert_called_once_with(
