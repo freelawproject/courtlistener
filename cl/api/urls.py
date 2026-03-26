@@ -334,6 +334,11 @@ urlpatterns = [
         ),
         name="replication_docs",
     ),
+    path(
+        "api/rest/v4/wiki-data/",
+        views.wiki_data,
+        name="wiki_data",
+    ),
     re_path(
         r"^api/rest/v4/coverage/opinions/",
         views.coverage_data_opinions,
