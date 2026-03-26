@@ -60,6 +60,7 @@ class StateEmailProcessingQueueSerializer(ModelSerializer):
         fields = "__all__"
         read_only_fields = (
             "error_message",
+            "recap_documents",
             "status",
         )
 

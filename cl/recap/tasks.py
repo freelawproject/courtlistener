@@ -3747,6 +3747,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             "User-Agent": "Free Law Project",
         },
         timeout=30.0,
+        follow_redirects=True,
     )
     res.raise_for_status()
     docket_parser._parse_text(res.text)

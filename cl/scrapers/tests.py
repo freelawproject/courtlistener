@@ -9,8 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import responses
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
 from django.utils.timezone import now
@@ -27,8 +28,15 @@ from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
+from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.factories import PersonFactory
+from cl.recap.models import (
+    PROCESSING_STATUS,
+    EmailProcessingQueue,
+    EmailSource,
+)
+from cl.recap.tasks import process_texas_email
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -97,6 +105,7 @@ from cl.tests.cases import (
     TransactionTestCase,
 )
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
+from cl.tests.utils import AsyncAPIClient
 from cl.users.factories import UserProfileWithParentsFactory
 
 
@@ -2155,3 +2164,94 @@ class SetOrderingKeysTest(SimpleTestCase):
         self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
         self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
         self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
+
+
+@mock.patch("cl.recap.tasks.httpx.get")
+@mock.patch("cl.recap.tasks.TexasEmailSESStorage")
+class TexasCaseMailIntegrationTest(TestCase):
+    """Integration test for the Texas CaseMail email processing flow.
+
+    Covers: POST endpoint → EPQ creation → process_texas_email task →
+    email retrieval → parsing → docket scrape → merge → EPQ status update.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        court_id = "txctapp1"
+        test_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "scrapers"
+            / "test_assets"
+            / "texas_email"
+        )
+
+        with (
+            open(test_dir / "texas_coa01_notification.txt", "rb") as email_f,
+            open(
+                test_dir / "01-24-00089-CV.html", encoding="utf-8"
+            ) as docket_f,
+            open(
+                test_dir / "texas_coa01_post_data.json", encoding="utf-8"
+            ) as post_f,
+        ):
+            texas_email_content = email_f.read()
+            docket_html_content = docket_f.read()
+            texas_post_data = json.load(post_f)
+        cls.post_data = texas_post_data
+        cls.email_data = texas_email_content
+        cls.html_data = docket_html_content
+
+        cls.docket_number_coa1 = "01-24-00089-CV"
+        cls.texas_coa1 = CourtFactory.create(
+            id=court_id, jurisdiction=Court.STATE_APPELLATE
+        )
+        cls.docket_coa1 = DocketFactory.create(
+            court=cls.texas_coa1,
+            docket_number=cls.docket_number_coa1,
+            docket_number_core=make_texas_docket_number_core(
+                cls.docket_number_coa1
+            ),
+        )
+
+    def setUp(self):
+        self.async_client = AsyncAPIClient()
+        self.user = User.objects.get(username="recap-email")
+        token = f"Token {self.user.auth_token.key}"
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = "/api/rest/v4/state/tx/tames/alerts/"
+
+    async def test_full_texas_email_processing_flow(
+        self,
+        mock_storage_cls,
+        mock_httpx_get,
+    ):
+        """Test the complete flow from endpoint POST through task
+        execution to successful EPQ update."""
+        mock_storage = mock_storage_cls.return_value
+        mock_storage.open = mock.mock_open(read_data=self.email_data)
+
+        mock_response = mock.MagicMock()
+        mock_response.text = self.html_data
+        mock_httpx_get.return_value = mock_response
+
+        with mock.patch.object(process_texas_email, "delay") as mock_delay:
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await EmailProcessingQueue.objects.acount(), 1)
+
+        epq = await EmailProcessingQueue.objects.afirst()
+
+        self.assertEqual(epq.message_id, "test-texas-email-id")
+        self.assertEqual(epq.destination_emails, ["tames@recap.email"])
+        self.assertEqual(epq.source, EmailSource.STATE)
+
+        mock_delay.assert_called_once_with(epq.pk)
+        await sync_to_async(process_texas_email)(epq.pk)
+        epq.refresh_from_db()
+        self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+        mock_storage.open.assert_called_with("test-texas-email-id", "rb")
