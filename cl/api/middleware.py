@@ -47,10 +47,9 @@ class ReplicaRoutingMiddleware:
                 reset_replica_routing(token)
 
         try:
-            response = self.get_response(request)
+            return self.get_response(request)
         finally:
             self._reset_auth_replica_token(request)
-        return response
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
         if self._should_route_to_replica(request):
@@ -61,10 +60,9 @@ class ReplicaRoutingMiddleware:
                 reset_replica_routing(token)
 
         try:
-            response = await self.get_response(request)
+            return await self.get_response(request)
         finally:
             self._reset_auth_replica_token(request)
-        return response
 
     def _should_route_to_replica(self, request: HttpRequest) -> bool:
         if request.method not in SAFE_METHODS:
