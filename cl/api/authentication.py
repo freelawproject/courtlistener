@@ -13,6 +13,7 @@ from waffle import flag_is_active
 from cl.api.routers import (
     SAFE_METHODS,
     is_replica_configured,
+    is_replica_routing_active,
     set_replica_routing,
 )
 
@@ -39,6 +40,8 @@ def _activate_replica_routing(
     """
     django_request: HttpRequest = request._request
 
+    if is_replica_routing_active():
+        return
     if django_request.method not in SAFE_METHODS:
         return
     if not is_replica_configured():
