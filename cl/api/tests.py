@@ -242,6 +242,28 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             header = f"REST API &ndash; {version_to_compare}"
             self.assertContains(response, header)
 
+    async def test_wiki_data_endpoint(self) -> None:
+        """Does the wiki data endpoint return the expected JSON structure?"""
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/json")
+        data = json.loads(r.content)
+        expected_keys = {
+            "court_count",
+            "citation_count",
+            "citation_lookup",
+            "financial_disclosures",
+        }
+        self.assertEqual(set(data.keys()), expected_keys)
+        self.assertIsInstance(data["court_count"], int)
+        self.assertIsInstance(data["citation_count"], int)
+        citation = data["citation_lookup"]
+        self.assertIn("throttle_count", citation)
+        self.assertIn("throttle_period", citation)
+        self.assertIn("max_per_request", citation)
+        self.assertIn("disclosures", data["financial_disclosures"])
+        self.assertIn("investments", data["financial_disclosures"])
+
 
 class CoverageTests(ESIndexTestCase, TestCase):
     @classmethod

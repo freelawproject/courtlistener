@@ -32,7 +32,7 @@
   <c-layout-with-navigation.section id="about">
     <h1>Case Law&nbsp;API</h1>
     <p class="lead">Use these APIs to access our huge and growing database of case law.</p>
-    <p>To learn more about this collection, including the cases it has and how we get new data each day, see <a class="text-primary-600" href="{% url "coverage_opinions" %}">Case Law Coverage</a>.</p>
+    <p>To learn more about this collection, including the cases it has and how we get new data each day, see <a class="links" href="{% url "coverage_opinions" %}">Case Law Coverage</a>.</p>
     <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.</p>
     <p>The four most important objects in this data set are courts, dockets, clusters, and opinions. Together, these hold most of the information from a single case:</p>
     <ul>
@@ -47,8 +47,8 @@
       <p>Another example is the opinion text. You <em>could</em> make it a field of the cluster, say, but, again, that wouldn't work, since it wouldn't be clear which opinion the text was a part of in a case with a dissent, concurrence, and majority opinion.</p>
       <p>There are two other objects in the case law database:</p>
     <ul>
-      <li><p><strong>Citation</strong> objects link together which opinion objects cite each other. For more information, see the <a class="text-primary-600" href="{% url "citation_api_help" %}">Citation help page</a>.</p></li>
-      <li><p><strong>Parenthetical</strong> objects are extracted from the opinion text when a decision explains a citation it relies on as authority. These are not yet available in an API (see <a class="underline" href="https://github.com/freelawproject/courtlistener/issues/4082">parentheticals issue on GitHub</a>), but are available as bulk data.</p></li>
+      <li><p><strong>Citation</strong> objects link together which opinion objects cite each other. For more information, see the <a class="links" href="{% url "citation_api_help" %}">Citation help page</a>.</p></li>
+      <li><p><strong>Parenthetical</strong> objects are extracted from the opinion text when a decision explains a citation it relies on as authority. These are not yet available in an API (see <a class="links-external" href="https://github.com/freelawproject/courtlistener/issues/4082">parentheticals issue on GitHub</a>), but are available as bulk data.</p></li>
     </ul>
   </c-layout-with-navigation.section>
 
@@ -61,7 +61,7 @@
     <c-docket-endpoint></c-docket-endpoint>
     <p>The name of a docket can change in response to the outside world, but the names of clusters do not change. Therefore, we have <code>case_name</code> fields on both the docket and the cluster.</p>
     <p>For example, a suit filed against the EPA administrator might be captioned <em>Petroleum Co. v. Regan</em>. That would go into the case name fields of the docket and any decisions that were issued. But if the administrator resigns before the case is resolved, the docket would get a new case name, <em>Petroleum Co. v. New Administrator</em>, while the case name fields on the clusters would not change.</p>
-    <p>For more information, see the <a class="text-primary-600" href="{% url "field_api_help" %}#case-names">advanced help on case names</a>.</p>
+    <p>For more information, see the <a class="links" href="{% url "field_api_help" %}#case-names">advanced help on case names</a>.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="cluster-endpoint">
@@ -78,9 +78,9 @@
     <ul>
       <li><p>The <code>id</code> field of the cluster is used in case law URLs on CourtListener.</p></li>
       <li><p>The <code>sub_opinions</code> field provides a list of the opinions that are linked to each cluster.</p></li>
-      <li><p>The <code>citations</code> field will contain a list of parallel citations for the cluster. See the <a class="text-primary-600" href="{% url "citation_api_help" %}">citation API</a> for details.</p></li>
-      <li><p>There are several fields with judge information, such as <code>judges</code>, <code>panel</code>, <code>non_participating_judges</code>, etc. Some of these fields contain strings and others are linked to records in our <a class="text-primary-600" href="{% url "judge_api_help" %}">judge API</a>. When we are able to normalize a judge's name into a record in the judge database, we do so. If not, we store their name in a string field for later normalization.</p></li>
-      <li><p>The <code>cluster_redirections</code> field lists any old clusters that have been redirected to this one (e.g., due to deduplication, versioning, or consolidation). Each entry includes the <code>deleted_cluster_id</code> and the <code>reason</code> for the redirection. See the <a class="text-primary-600" href="#cluster-redirections">Opinion Cluster Redirections</a> section below for more details.</p></li>
+      <li><p>The <code>citations</code> field will contain a list of parallel citations for the cluster. See the <a class="links" href="{% url "citation_api_help" %}">citation API</a> for details.</p></li>
+      <li><p>There are several fields with judge information, such as <code>judges</code>, <code>panel</code>, <code>non_participating_judges</code>, etc. Some of these fields contain strings and others are linked to records in our <a class="links" href="{% url "judge_api_help" %}">judge API</a>. When we are able to normalize a judge's name into a record in the judge database, we do so. If not, we store their name in a string field for later normalization.</p></li>
+      <li><p>The <code>cluster_redirections</code> field lists any old clusters that have been redirected to this one (e.g., due to deduplication, versioning, or consolidation). Each entry includes the <code>deleted_cluster_id</code> and the <code>reason</code> for the redirection. See the <a class="links" href="#cluster-redirections">Opinion Cluster Redirections</a> section below for more details.</p></li>
     </ul>
   </c-layout-with-navigation.section>
 
@@ -89,7 +89,7 @@
   <p>This API contains the text and other metadata about specific decisions.</p>
   <p>As with all other APIs, you can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:</p>
   <p class="alert alert-warning"><strong>Listen Up:</strong> When retrieving opinion text, prefer the <code>html_with_citations</code> field instead of <code>plain_text</code>. The <code>html_with_citations</code> field contains the raw text of the decision, and is the most reliable field for most purposes.<br><br>
-    Opinion URLs on the CourtListener website contain a <code>cluster_id</code>, not an <code>opinion_id</code>. If you want to look up a case using that ID, query the Cluster API. See <a class="text-primary-600" href="#by-url">Finding a Case by URL</a>, below.</p>
+    Opinion URLs on the CourtListener website contain a <code>cluster_id</code>, not an <code>opinion_id</code>. If you want to look up a case using that ID, query the Cluster API. See <a class="links" href="#by-url">Finding a Case by URL</a>, below.</p>
   <c-code>
 curl -v \
   -X OPTIONS \
@@ -99,8 +99,8 @@ curl -v \
   <p>A few notes:</p>
   <ul>
     <li><p>The <code>type</code> field indicates whether the item is a concurrence, lead opinion, dissent, etc. The values provided for this field are proceeded by numbers so that if they are sorted, they will also be sorted from highest priority to lowest. The most common type of opinion is a "Combined Opinion" this is what we label any opinion that either cannot be identified as a specific type, or that contains more than one type.</p></li>
-    <li><p>The <code>download_url</code> field contains the original location where we scraped the decision. Many courts do not maintain <a class="underline" href="https://www.w3.org/Provider/Style/URI.html">Cool URIs</a>, so this field is often unreliable.</p></li>
-    <li><p>The <code>local_path</code> field contains the path to the binary file for the decision, if we have one. To use it, see the <a class="text-primary-600" href="{% url "field_api_help" %}#downloads">advanced help on file download fields</a>.</p></li>
+    <li><p>The <code>download_url</code> field contains the original location where we scraped the decision. Many courts do not maintain <a class="links-external" href="https://www.w3.org/Provider/Style/URI.html">Cool URIs</a>, so this field is often unreliable.</p></li>
+    <li><p>The <code>local_path</code> field contains the path to the binary file for the decision, if we have one. To use it, see the <a class="links" href="{% url "field_api_help" %}#downloads">advanced help on file download fields</a>.</p></li>
     <li><p>The <code>opinions_cited</code> field has a list of other opinions cited by the one you are reviewing.</p></li>
     <li><p>The <code>ordering_key</code> field indicates the order of opinions within a cluster. This field is only populated for opinions ingested from Harvard or Columbia sources.</p></li>
     <li>
@@ -114,7 +114,7 @@ curl -v \
         <li><code>html</code> will be populated if we got the opinion from a court's website as a Word Perfect or HTML document, or if we got the opinion from Resource.org, which provided HTML documents.</li>
         <li><code>plain_text</code> will be populated if we got the opinion from a court's website as a PDF or Microsoft Word document.</li>
       </ul>
-      <p>Whichever field you choose, please use <a class="text-primary-600" href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> to omit unnecessary fields. This will make your system faster and ease the load on ours.</p>
+      <p>Whichever field you choose, please use <a class="links" href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> to omit unnecessary fields. This will make your system faster and ease the load on ours.</p>
     </li>
   </ul>
   </c-layout-with-navigation.section>
@@ -127,7 +127,7 @@ curl -v \
 
   <c-layout-with-navigation.section id="court-endpoint">
     <h3>Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>
-    {% include "includes/court-endpoint.html" %}
+    <c-court-endpoint></c-court-endpoint>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="examples">
@@ -215,12 +215,12 @@ curl -v \
       <li>For clusters, add: <code>&amp;docket__court=scotus</code></li>
       <li>For opinions, add: <code>&amp;cluster__docket__court=scotus</code></li>
     </ul>
-    <p>You may also find the <a class="text-primary-600" href="{% url "search_api_help" %}">search API</a> helpful, since it will do fuzzy docket searches.</p>
+    <p>You may also find the <a class="links" href="{% url "search_api_help" %}">search API</a> helpful, since it will do fuzzy docket searches.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="search">
     <h3>Making a Custom Case Law Corpus</h3>
-    <p>A common need by empirical researchers is a collection of case law about a particular topic. To build such a corpus, use the <a class="text-primary-600" href="{% url "search_api_help" %}">search API</a> to identify cases and use these APIs to download them.</p>
+    <p>A common need by empirical researchers is a collection of case law about a particular topic. To build such a corpus, use the <a class="links" href="{% url "search_api_help" %}">search API</a> to identify cases and use these APIs to download them.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="by-url">

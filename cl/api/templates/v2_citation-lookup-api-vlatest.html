@@ -29,7 +29,7 @@
     <h2><code class="text-display-xs font-semibold">{% url "citation-lookup-list" version=version %}</code></h2>
     <p class="lead">Use this API to look up citations in CourtListener's database of {{ cite_count|intcomma }} citations.</p>
     <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.</p>
-    <p>This API uses <a class="underline" href="https://free.law/open-source-tools#eyecite">Eyecite</a>, a tool we developed with <a class="underline" href="https://lil.law.harvard.edu/">Harvard Library Innovation Lab</a> to parse legal citations. To develop Eyecite, we analyzed more than 50 million citations going back more than two centuries. We believe we have identified every reporter abbreviation in American case law and that there is no case law citation that Eyecite cannot properly parse and interpret.</p>
+    <p>This API uses <a class="links-external" href="https://free.law/open-source-tools#eyecite">Eyecite</a>, a tool we developed with <a class="links-external" href="https://lil.law.harvard.edu/">Harvard Library Innovation Lab</a> to parse legal citations. To develop Eyecite, we analyzed more than 50 million citations going back more than two centuries. We believe we have identified every reporter abbreviation in American case law and that there is no case law citation that Eyecite cannot properly parse and interpret.</p>
     <p>This API uses the same authentication and serialization methods as the rest of the CourtListener APIs. It does not support filtering, pagination, ordering, or field selection.</p>
   </c-layout-with-navigation.section>
 
@@ -96,7 +96,7 @@ curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %
       </li>
       <li><p><code>error_message</code> — This field will contain additional details about any problems the lookup encounters.</p></li>
       <li>
-        <p><code>clusters</code> — This is a list of the CourtListener <a class="text-primary-600" href="{% url "rest_docs" %}#cluster-endpoint">cluster objects</a> that match the citation in your query. This key will contain multiple values when a citation matches more than one legal decision. This can happen when a citation is ambiguous or when multiple decisions are on a single page in a printed book (and thus share the same citation).</p>
+        <p><code>clusters</code> — This is a list of the CourtListener <a class="links" href="{% url "rest_docs" %}#cluster-endpoint">cluster objects</a> that match the citation in your query. This key will contain multiple values when a citation matches more than one legal decision. This can happen when a citation is ambiguous or when multiple decisions are on a single page in a printed book (and thus share the same citation).</p>
       </li>
     </ul>
   </c-layout-with-navigation.section>

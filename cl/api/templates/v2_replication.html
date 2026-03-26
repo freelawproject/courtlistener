@@ -15,15 +15,15 @@
   <c-layout-with-navigation.section id="overview">
     <h1>CourtListener Database Replication</h1>
     <p class="lead">The CourtListener Database Replication service is for researchers and organizations that need high-speed, granular access to the CourtListener database on an ongoing basis.</p>
-    <p>This service works by using PostgreSQL to create and maintain a table-based <a class="underline" href="https://www.postgresql.org/docs/current/logical-replication.html">logical replica</a> of our database allocated specifically for you. Once the replica has completed its first sync, you can query your replica of the CourtListener database using standard SQL commands. This provides an incredibly powerful way to access one of the largest open collections of American legal data.</p>
+    <p>This service works by using PostgreSQL to create and maintain a table-based <a class="links-external" href="https://www.postgresql.org/docs/current/logical-replication.html">logical replica</a> of our database allocated specifically for you. Once the replica has completed its first sync, you can query your replica of the CourtListener database using standard SQL commands. This provides an incredibly powerful way to access one of the largest open collections of American legal data.</p>
     <p>The following types of data are currently available as part of this service:</p>
     <ul>
-      <li><p><a class="text-primary-600" href="{% url "advanced_o" %}">Case Law</a></p></li>
-      <li><p><a class="text-primary-600" href="{% url "advanced_r" %}">RECAP Archive of PACER data</a></p></li>
-      <li><p>The <a class="underline" href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> civil data</p></li>
-      <li><p><a class="text-primary-600" href="{% url "advanced_oa" %}">Oral Arguments</a></p></li>
-      <li><p><a class="text-primary-600" href="{% url "financial_disclosures_home" %}">Financial Disclosures</a></p></li>
-      <li><p><a class="text-primary-600" href="{% url "advanced_p" %}">Judge and Appointer data</a></p></li>
+      <li><p><a class="links" href="{% url "advanced_o" %}">Case Law</a></p></li>
+      <li><p><a class="links" href="{% url "advanced_r" %}">RECAP Archive of PACER data</a></p></li>
+      <li><p>The <a class="links-external" href="https://www.fjc.gov/research/idb">FJC Integrated Database</a> civil data</p></li>
+      <li><p><a class="links" href="{% url "advanced_oa" %}">Oral Arguments</a></p></li>
+      <li><p><a class="links" href="{% url "financial_disclosures_home" %}">Financial Disclosures</a></p></li>
+      <li><p><a class="links" href="{% url "advanced_p" %}">Judge and Appointer data</a></p></li>
     </ul>
     <p>User data will never be shared as part of this service.</p>
     <p>If you are replicating case law data, note that opinion clusters may be merged, deduplicated, or sealed over time. See the <a class="text-primary-600" href="{% url "cluster_redirections_help" %}">Opinion Cluster Redirections</a> help page for details on how to handle these cases in your replica.</p>
@@ -33,7 +33,7 @@
 
   <c-layout-with-navigation.section id="how">
     <h2>How Logical Replication Works</h2>
-    <p><a class="underline" href="https://www.postgresql.org/docs/current/logical-replication.html">Logical replication</a> is a system supported by recent versions of PostgreSQL. Unlike older methods of database replication, which worked by shipping the database binary files across the network (so&#8209;called physical replication), logical replication works by streaming SQL commands from a "publisher" server to a "subscriber" server.</p>
+    <p><a class="links-external" href="https://www.postgresql.org/docs/current/logical-replication.html">Logical replication</a> is a system supported by recent versions of PostgreSQL. Unlike older methods of database replication, which worked by shipping the database binary files across the network (so&#8209;called physical replication), logical replication works by streaming SQL commands from a "publisher" server to a "subscriber" server.</p>
     <p>This form of replication provides a number of benefits over physical replication including the ability to have slightly different versions of the database installed, and the ability to only replicate certain tables from the publisher to the subscriber.</p>
   </c-layout-with-navigation.section>
 
@@ -55,7 +55,7 @@
     <p>Keeping these changes takes up space on our hard drive. If your server is down for too long, eventually we have to stop saving the information for you and a complete re-synchronization will be needed. We charge a fee for re-synchronization work.</p>
 
     <h3>Is there monitoring?</h3>
-    <p>Yes, we monitor replication around the clock using our own tools and those from our provider, AWS. Some of our <a class="underline" href="{% url "replication_status" %}">internal monitoring</a> is available.</p>
+    <p>Yes, we monitor replication around the clock using our own tools and those from our provider, AWS. Some of our <a class="links" href="{% url "replication_status" %}">internal monitoring</a> is available.</p>
 
     <h3>More questions?</h3>
     <p>If you have more questions, please send us an email. This service is a complicated one and we look forward to working with organizations and researchers to make it a success.</p>
