@@ -300,6 +300,7 @@ class OpinionClusterViewSet(
         "panel",
         "non_participating_judges",
         "citations",
+        "merged_clusters",
     ).order_by("-id")
 
     def retrieve(self, request, *args, **kwargs):
