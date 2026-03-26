@@ -41,7 +41,7 @@
   <c-layout-with-navigation.section id="about">
     <h1>RECAP APIs for&nbsp;PACER</h1>
     <p class="lead">Use these APIs to scrape PACER data and to upload data into CourtListener's database of federal court cases and filings.</p>
-    <p>Once data is gathered by these APIs, our <a class="text-primary-600" href="{% url "pacer_api_help" %}">PACER APIs and data model</a> can be used to retrieve dockets, entries, parties, and attorneys from our system.</p>
+    <p>Once data is gathered by these APIs, our <a class="links" href="{% url "pacer_api_help" %}">PACER APIs and data model</a> can be used to retrieve dockets, entries, parties, and attorneys from our system.</p>
     <p>The endpoints for RECAP are:</p>
     <ul>
       <li><p><code>{% url "pacerfetchqueue-list" version=version %}</code> &mdash; Use this API to scrape PACER data, including dockets, PDFs, and more.</p></li>
@@ -51,7 +51,7 @@
 
   <c-layout-with-navigation.section id="pacer-fetch">
     <h2>PACER Fetch <small> — <code>{% url "pacerfetchqueue-list" version=version %}</code></small></h2>
-    <p>Use this API to buy PACER content and add it to CourtListener so that it is available via our website, APIs, <a class="text-primary-600" href="{% url "webhooks_docs" %}">webhooks</a>, and <a class="text-primary-600" href="{% url "replication_docs" %}">replicated database</a>. This is <a class="underline" href="https://free.law/2019/11/05/pacer-fetch-api">a free API</a>, but it uses your PACER credentials to purchase and download PACER content. You'll still have to pay your PACER bill when it comes.</p>
+    <p>Use this API to buy PACER content and add it to CourtListener so that it is available via our website, APIs, <a class="links" href="{% url "webhooks_docs" %}">webhooks</a>, and <a class="links" href="{% url "replication_docs" %}">replicated database</a>. This is <a class="links-external" href="https://free.law/2019/11/05/pacer-fetch-api">a free API</a>, but it uses your PACER credentials to purchase and download PACER content. You'll still have to pay your PACER bill when it comes.</p>
     <p>Because downloading content from PACER takes time, this API is asynchronous. After you send an HTTP <code>POST</code>, it immediately responds with an ID for the request and places the request in a queue to be downloaded by our scrapers. Most requests are completed within seconds.</p>
     <p>As the request is processed, it will have a status code:</p>
     <c-data-table
@@ -75,7 +75,7 @@
 
   <c-layout-with-navigation.section id="monitoring">
     <h3>Monitoring Your Request</h3>
-    <p>To monitor your request, poll the API for your request, or use our <a class="text-primary-600" href="{% url "webhooks_docs" %}#recap-fetch">Fetch Webhook</a> to get immediate updates without polling.</p>
+    <p>To monitor your request, poll the API for your request, or use our <a class="links" href="{% url "webhooks_docs" %}#recap-fetch">Fetch Webhook</a> to get immediate updates without polling.</p>
     <p>We recommend using the webhook endpoint, since it reduces load on our servers.</p>
   </c-layout-with-navigation.section>
 
@@ -101,8 +101,8 @@
     <p>While we prefer not to have unhashed user passwords, PACER lacks any permissions-based or granular authentication system. This means that the only way we can act on your behalf is to have your credentials.</p>
     <p>Once we have your password, we work to rid ourselves of it as quickly as possible. We do not store it in our database or logs at any time. Instead, we use it to immediately log into the PACER system. That gives us cookies for your account, which we store in our in-memory database with a one hour expiration period. As soon as we have the cookies, we throw away your username and password.</p>
     <p>The result of this system is that we have your password until we have logged you in, and no longer. After that point, we only have a cache of your cookies for one hour.</p>
-    <p class="alert-warning"><strong>Listen Up!</strong> This API gets content on your behalf using <em>your</em> access rights. This means that if you use this API to request a sealed item from PACER, we will go get it and add it to our system, just like you asked. <strong>Do not do this</strong>. If you do this accidentally, <a class="text-primary-600" href="{% url "contact" %}">please get in touch</a> as soon as possible, so we can revert the error.</p>
-    <p>If you have questions about our approach, please see <a class="underline" href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.</p>
+    <p class="alert-warning"><strong>Listen Up!</strong> This API gets content on your behalf using <em>your</em> access rights. This means that if you use this API to request a sealed item from PACER, we will go get it and add it to our system, just like you asked. <strong>Do not do this</strong>. If you do this accidentally, <a class="links" href="{% url "contact" %}">please get in touch</a> as soon as possible, so we can revert the error.</p>
+    <p>If you have questions about our approach, please see <a class="links-external" href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="known-issues">
@@ -125,7 +125,7 @@ PacerLoginException: Did not get NextGenCSO cookie when attempting PACER login.
     <ol>
       <li><p>Set <code>request_type</code> field to <code>2</code>, which indicates PDFs.</p></li>
       <li><p>Set the <code>recap_document</code> field to the ID for the RECAP Document you wish to add to our system.</p>
-        <p>To identify the <code>recap_document</code> ID, look up the RECAP Document in <a class="text-primary-600" href="{% url "pacer_api_help" %}">our PACER API</a> and provide the CourtListener ID for the item.</p></li>
+        <p>To identify the <code>recap_document</code> ID, look up the RECAP Document in <a class="links" href="{% url "pacer_api_help" %}">our PACER API</a> and provide the CourtListener ID for the item.</p></li>
     </ol>
     <p>An example of downloading a PDF by <code>recap_document</code> ID might be:</p>
     <c-code>
@@ -211,12 +211,12 @@ curl -X POST \
 
   <c-layout-with-navigation.section id="pray-and-pay-api">
     <h2>Pray and Pay API <small>— <code>{% url "prayer-list" version=version %}</code></small></h2>
-    <p>Use the <a class="text-primary-600" href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> to monitor when PDFs are added to CourtListener. If a PACER document is not yet available in the RECAP Archive, you create a prayer for it via this API. Later, when another user purchases that document from PACER or the Fetch API, your prayer is "granted" and you are notified via webhook or email.</p>
+    <p>Use the <a class="links" href="{% url 'pray_and_pay_help' %}">Pray and Pay system</a> to monitor when PDFs are added to CourtListener. If a PACER document is not yet available in the RECAP Archive, you create a prayer for it via this API. Later, when another user purchases that document from PACER or the Fetch API, your prayer is "granted" and you are notified via webhook or email.</p>
     <p>This API enables you to programmatically create and manage prayers, making it ideal for:</p>
     <ul>
       <li><p><strong>Automated monitoring</strong> — Track when specific documents become available without manual checking.</p></li>
       <li><p><strong>Bulk document requests</strong> — Request multiple documents of interest efficiently.</p></li>
-      <li><p><strong>Workflow integration</strong> — Integrate document availability notifications into your systems via <a class="text-primary-600" href="{% url "webhooks_docs" %}#pray-and-pay">webhooks</a>.</p></li>
+      <li><p><strong>Workflow integration</strong> — Integrate document availability notifications into your systems via <a class="links" href="{% url "webhooks_docs" %}#pray-and-pay">webhooks</a>.</p></li>
     </ul>
     <p>To learn more about the Pray and Pay system itself, including how to fulfill prayers and contribute documents, see the help documentation:</p>
     <p><a class="btn btn-outline" href="{% url 'pray_and_pay_help' %}" >Pray and Pay Help</a></p>
@@ -241,7 +241,7 @@ curl -X POST \
 }
     </c-code>
     <p>The <code>status</code> field indicates whether the prayer is waiting (1) or has been granted (2). Newly created prayers always have status 1.</p>
-    <p>To identify the <code>recap_document</code> ID, look up the RECAP Document in <a class="text-primary-600" href="{% url "pacer_api_help" %}">our PACER API</a> and provide the CourtListener ID for the item.</p>
+    <p>To identify the <code>recap_document</code> ID, look up the RECAP Document in <a class="links" href="{% url "pacer_api_help" %}">our PACER API</a> and provide the CourtListener ID for the item.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="listing-prayers">
@@ -283,13 +283,13 @@ curl -X DELETE \
       <li><p>Many documents may be unavailable for purchase on PACER (sealed filings, delayed transcripts, etc.). After you create a prayer, our system checks PACER availability. If unavailable, you'll receive an email notification.</p></li>
       <li><p>Once a prayer is granted (the document becomes available), it cannot be deleted.</p></li>
     </ul>
-    <p>In the future, we may allow higher prayer limits on a per-account basis for API users who need to monitor hundreds of documents programmatically. If your organization has this need, please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to discuss options.</p>
+    <p>In the future, we may allow higher prayer limits on a per-account basis for API users who need to monitor hundreds of documents programmatically. If your organization has this need, please <a class="links" href="{% url "contact" %}">get in touch</a> to discuss options.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="recap-upload">
     <h2>RECAP Upload API <small>— <code>{% url "processingqueue-list" version=version %}</code></small></h2>
-    <p>This API is used by the RECAP extension and a handful of special partners to upload PACER content to the RECAP Archive. This API is not available to the public. If you have a collection of PACER data you wish to donate to the RECAP Archive so it is permanently available to the public, please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a>.</p>
-    <p>We describe the process for completing these uploads below, and you can see examples of them in <a class="underline" href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.</p>
+    <p>This API is used by the RECAP extension and a handful of special partners to upload PACER content to the RECAP Archive. This API is not available to the public. If you have a collection of PACER data you wish to donate to the RECAP Archive so it is permanently available to the public, please <a class="links" href="{% url "contact" %}">get in touch</a>.</p>
+    <p>We describe the process for completing these uploads below, and you can see examples of them in <a class="links-external" href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.</p>
     <p>When you make an upload, you create a <code>Processing Queue</code> object in the CourtListener system. This object will be returned in the HTTP response to your upload, so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:</p>
     <c-data-table
       safe
