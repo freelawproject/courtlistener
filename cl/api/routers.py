@@ -24,8 +24,8 @@ SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
 def is_replica_configured() -> bool:
     """Return True if at least one replica DB is listed in settings."""
     return bool(
-        settings.API_READ_DATABASES
-        and any(db in settings.DATABASES for db in settings.API_READ_DATABASES)
+        settings.API_READ_DATABASES  # type: ignore[misc]
+        and any(db in settings.DATABASES for db in settings.API_READ_DATABASES)  # type: ignore[misc]
     )
 
 
@@ -34,7 +34,7 @@ def _get_replica_list():
     if replicas is not None:
         return replicas
 
-    dbs = settings.API_READ_DATABASES
+    dbs = settings.API_READ_DATABASES  # type: ignore[misc]
     if not dbs:
         dbs = ["default"]
 
