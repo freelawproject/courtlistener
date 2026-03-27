@@ -54,7 +54,10 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
 )
-from cl.scrapers.management.commands.merge_opinion_versions import delete_version_related_objects, remove_document_from_es_index
+from cl.scrapers.management.commands.merge_opinion_versions import delete_version_related_objects
+from cl.search.tasks import remove_document_from_es_index
+from cl.search.documents import OpinionDocument, ES_CHILD_ID
+from cl.scrapers.utils import citation_is_duplicated, make_citation
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +66,15 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 
+
+def report_match(queryset, other_matched_ids, reporting_template):
+    matching_cluster = queryset.first()
+    logger.info(reporting_template, matching_cluster.case_name, matching_cluster.date_filed)
+    if other_matched_ids:
+        urls = " ".join([f"https://www.courtlistener.com/opinion/{i}/x/" for i in other_matched_ids])
+        logger.info("Clusters matched in other stages %s", urls)
+
+    return matching_cluster, "single"
 
 def find_existing_cluster(
     court_id: str,
@@ -107,28 +119,22 @@ def find_existing_cluster(
         .filter(docket__court_id=court_id)
         .filter(docket_q)
     )
+
     if qs.count() == 1:
-        logger.info("Perfect docket number match")
-        return qs.first(), "single"
+        return report_match(qs, best_multi_match_ids, "perfect docket number match %s %s")
 
     # Tier 1b: If docket matched multiple, disambiguate with citation
     if qs.count() > 1:
-        best_multi_match_ids.union(set(qs.values_list("id", flat=True)))
+        best_multi_match_ids.update(set(qs.values_list("id", flat=True)))
         if volume:
             qs_narrowed = qs.filter(**cite_dict)
             if qs_narrowed.count() == 1:
-                logger.info("Matched docket + citation")
-                if best_multi_match_ids:
-                    logger.info("Clusters matched in other stages %s", best_multi_match_ids)
-                return qs_narrowed.first(), "single"
+                return report_match(qs_narrowed, best_multi_match_ids, "Matched docket + citation %s %s")
             
             # Also try narrowing by date
             qs_narrowed = qs.filter(date_filed=date_filed)
             if qs_narrowed.count() == 1:
-                logger.info("Matched docket + citation + date_filed")
-                if best_multi_match_ids:
-                    logger.info("Clusters matched in other stages %s", best_multi_match_ids)
-                return qs_narrowed.first(), "single"
+                return report_match(qs_narrowed, best_multi_match_ids, "Matched docket + citation + date_filed %s %s")
 
     # Tier 1c: Search docket_number field with icontains (catches
     # formatting variations like "SC 16628" vs "SC16628, SC16629")
@@ -142,35 +148,24 @@ def find_existing_cluster(
             )
         )
         if qs.count() == 1:
-            logger.info("Matched by icontains docket number")
-            if best_multi_match_ids:
-                logger.info("Clusters matched in other stages %s", best_multi_match_ids)
-            return qs.first(), "single"
+            return report_match(qs, best_multi_match_ids, "Matched by icontains docket number %s %s")
         
         # Disambiguate with citation if multiple
         if qs.count() > 1:
-            best_multi_match_ids.union(set(qs.values_list("id", flat=True)))
+            best_multi_match_ids.update(set(qs.values_list("id", flat=True)))
             if volume:
                 qs_narrowed = qs.filter(**cite_dict)
                 if qs_narrowed.count() == 1:
-                    logger.info("Matched icontains docket + citation. Other matches %s", best_multi_match_ids)
-                    if best_multi_match_ids:
-                        logger.info("Clusters matched in other stages %s", best_multi_match_ids)
-
-                    return qs_narrowed.first(), "single"
-
+                    return report_match(qs_narrowed, best_multi_match_ids, "Matched icontains docket + citation %s %s")
+                
     # Tier 2: Match by citation alone (e.g., "345 Conn. 123")
     if volume:
         qs = OpinionCluster.objects.using(database).filter(docket__court_id=court_id, **cite_dict)
         if qs.count() == 1:
-            logger.info("Matched by citation alone")
-            if best_multi_match_ids:
-                logger.info("Clusters matched in other stages %s", best_multi_match_ids)
-
-            return qs.first(), "single"
+            return report_match(qs_narrowed, best_multi_match_ids, "Matched by citation alone %s %s")
         
         if qs.count() > 1:
-            best_multi_match_ids.union(set(qs.values_list("id", flat=True)))
+            best_multi_match_ids.update(set(qs.values_list("id", flat=True)))
 
     # Tier 3: Match by date + case name (loose)
     name_prefix = (
@@ -184,16 +179,24 @@ def find_existing_cluster(
         case_name__icontains=name_prefix,
     )
     if qs.count() == 1:
-        logger.info("Matched by loose name + date_filed")
-        if best_multi_match_ids:
-            logger.info("Clusters matched in other stages %s", best_multi_match_ids)
-        return qs.first(), "single"
+        return report_match(qs_narrowed, best_multi_match_ids, "Matched by loose name + date_filed %s %s")
     
     if qs.count() > 1:
-        best_multi_match_ids.union(set(qs.values_list("id", flat=True)))
+        best_multi_match_ids.update(set(qs.values_list("id", flat=True)))
 
     # If we found multiple matches but couldn't narrow to one, report it
     if best_multi_match_ids:
+        # check if they are actually sub opinions that need consolidation
+        sorted_ids = sorted(list(best_multi_match_ids))
+        if len(sorted_ids) > 1 and sorted_ids == list(range(sorted_ids[0], sorted_ids[1] + 1)):
+            logger.info("Multimatch that look like sub opinions needing consolidation")
+
+            def consolidate_cluster(cluster_ids:list):
+                # TODO
+                return OpinionCluster.objects.filter(id=cluster_ids[0]).first()
+            
+            return consolidate_cluster(sorted_ids), "consolidation"
+
         logger.warning(
             "MULTI_MATCH: %s matched %d clusters: %s — skipping to avoid duplicates",
             citation_str,
@@ -210,6 +213,7 @@ def attach_pdf_to_cluster(
     cluster: OpinionCluster,
     pdf_content: bytes,
     citation_str: str,
+    dry_run:bool
 ) -> bool:
     """Add a new opinion version with the PDF to an existing cluster.
 
@@ -224,6 +228,25 @@ def attach_pdf_to_cluster(
     """
     changed = False
 
+    # Add citation if not already present
+    citation_candidate = make_citation(citation_str, cluster, "conn")
+    if not citation_is_duplicated(citation_candidate, citation_str):
+        citation_candidate.save()
+        logger.info("Add citation to cluster %s %s", cluster.id, str(citation_candidate))
+    else:
+        logger.info("Citation already existed")
+
+    if dry_run:
+        return
+
+
+    # Check if this PDF has already been ingested (by SHA1)
+    sha1_hash = sha1(force_bytes(pdf_content))
+    if Opinion.objects.filter(sha1=sha1_hash).exists():
+        logger.debug("  PDF already ingested (sha1 match)")
+        return changed
+
+
     # Merge source to reflect this new data origin
     merged_source = ClusterSources.merge_sources(
         cluster.source, ClusterSources.MANUAL_INPUT
@@ -235,19 +258,6 @@ def attach_pdf_to_cluster(
         logger.info(
             "  Updated cluster %d source to %s", cluster.id, merged_source
         )
-
-    # Add citation if not already present
-    from cl.scrapers.utils import citation_is_duplicated, make_citation
-    citation_candidate = make_citation(citation_str, cluster, "conn")
-    if not citation_is_duplicated(citation_candidate, citation_str):
-        citation_candidate.save()
-        logger.info("Add citation to cluster %s %s", cluster.id, str(candidate_citation))
-
-    # Check if this PDF has already been ingested (by SHA1)
-    sha1_hash = sha1(force_bytes(pdf_content))
-    if Opinion.objects.filter(sha1=sha1_hash).exists():
-        logger.debug("  PDF already ingested (sha1 match)")
-        return changed
 
     # Create a new opinion with the PDF — this becomes the main version
     cf = ContentFile(pdf_content)
@@ -263,17 +273,13 @@ def attach_pdf_to_cluster(
     new_opinion.local_path.save(file_name, cf, save=False)
     new_opinion.save()
 
-    # Mark existing opinions as versions of the new one
-    # (main_version points to the current/main opinion;
-    # ordered_opinions filters these out automatically)
+    # adapted from merge opinion versions
     for version_opinion in cluster.sub_opinions.exclude(pk=new_opinion.pk):
         version_opinion.main_version = new_opinion
         version_opinion.html_with_citations = ""
         version_opinion.save()
         delete_version_related_objects(version_opinion)
         
-        from cl.search.documents import OpinionDocument, ES_CHILD_ID
-
         remove_document_from_es_index.delay(
             OpinionDocument.__name__,
             ES_CHILD_ID(version_opinion.id).OPINION,
@@ -336,7 +342,6 @@ def create_new_opinion(
     # Create citation
     citation = make_citation(opinion_data["citation"], cluster, court.id)
     if citation:
-        citation.cluster_id = cluster.pk
         citation.save()
 
     # Create opinion with PDF
@@ -398,6 +403,9 @@ def ingest_opinions(
         "failed": 0,
         "skipped": 0,
         "multi_match": 0,
+        "missing file": 0,
+        "no match": 0,
+        "consolidation": 0,
     }
 
     for opinion_data in opinions_data:
@@ -405,7 +413,15 @@ def ingest_opinions(
         date_filed = datetime.strptime(
             opinion_data["date_filed"][:10], "%Y-%m-%d"
         ).date()
-        logger.info("Trying to match opinion %s %s", opinion_data["case_name"], opinion_data["docket_number"])
+        
+        # max date_filed for Harvard CAP
+        from datetime import date
+        if date_filed <= date(2019,8,27):
+            print("Skip %s %s", citation_str, date_filed)
+            stats["skipped"] += 1
+            continue
+
+        logger.info("Trying to match opinion %s %s %s", opinion_data["case_name"], opinion_data["docket_number"], opinion_data["date_filed"])
         # Try to find an existing cluster
         cluster, match_type = find_existing_cluster(
             court_id=court_id,
@@ -422,18 +438,24 @@ def ingest_opinions(
             # find_existing_cluster.
             stats["multi_match"] += 1
             continue
-
+        
+        if match_type == "consolidation":
+            stats["consolidation"] += 1
+            continue
 
         # Load the PDF for this opinion
         source_file = opinion_data.get("source_file")
         if not source_file:
             logger.warning("  No source_file for %s, skipping PDF attachment", citation_str)
+            stats["missing file"] += 1
             continue
 
-        pdf_path = pdf_dir / source_file
+        pdf_path = Path(pdf_dir) / source_file
         if not pdf_path.exists():
             logger.warning("  PDF not found: %s", pdf_path)
+            stats["missing file"] += 1
             continue
+        
         pdf_content = pdf_path.read_bytes()
 
         if cluster:
@@ -446,15 +468,12 @@ def ingest_opinions(
             )
             stats["matched"] += 1
 
-            if dry_run:
-                continue
-
-            attach_pdf_to_cluster(cluster, pdf_content, citation_str)
+            attach_pdf_to_cluster(cluster, pdf_content, citation_str, dry_run)
         else:
             logger.info("NO MATCH: %s — %s", citation_str, opinion_data["case_name"])
 
             if dry_run:
-                stats["skipped"] += 1
+                stats["no match"] += 1
                 continue
 
             try:
@@ -466,14 +485,16 @@ def ingest_opinions(
                 )
                 stats["failed"] += 1
 
-    logger.info(
-        "Done. Matched: %d, Created: %d, Failed: %d, Skipped: %d, Multi-match: %d",
-        stats["matched"],
-        stats["created"],
-        stats["failed"],
-        stats["skipped"],
-        stats["multi_match"],
-    )
+    logger.info(stats)
+
+ingest_opinions(
+    metadata_path="/tmp/conn-opinion-metadata.json",
+    pdf_dir="/tmp/conn citations pdfs",
+    court_id="conn",
+    dry_run=True,
+    database="default",
+)
+
 
 
 def main() -> None:
