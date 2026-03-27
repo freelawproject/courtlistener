@@ -26,17 +26,15 @@ def download_scotus_pdfs(
     :param download_order: Sort order for the queryset by pk ("asc" or "desc").
     :return: None
     """
-    order_by = "pk" if download_order == "asc" else "-pk"
-    docs = (
-        SCOTUSDocument.objects.filter(filepath_local="")
-        .order_by(order_by)
-        .values_list("pk", flat=True)
+    desc = download_order == "desc"
+    docs = SCOTUSDocument.objects.filter(filepath_local="").values_list(
+        "pk", flat=True
     )
     count = docs.count()
     logger.info("Found %s SCOTUSDocuments needing download.", count)
     throttle = CeleryThrottle(queue_name=download_queue)
     processed_count = 0
-    for pk in paginate_docs_queryset(docs):
+    for pk in paginate_docs_queryset(docs, desc=desc):
         throttle.maybe_wait()
         download_scotus_document_pdf.si(pk).set(
             queue=download_queue
