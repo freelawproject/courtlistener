@@ -27,9 +27,11 @@ def download_scotus_pdfs(
     :return: None
     """
     order_by = "pk" if download_order == "asc" else "-pk"
-    docs = SCOTUSDocument.objects.filter(filepath_local="").order_by(
-        order_by
-    ).values_list("pk", flat=True)
+    docs = (
+        SCOTUSDocument.objects.filter(filepath_local="")
+        .order_by(order_by)
+        .values_list("pk", flat=True)
+    )
     count = docs.count()
     logger.info("Found %s SCOTUSDocuments needing download.", count)
     throttle = CeleryThrottle(queue_name=download_queue)
@@ -167,8 +169,7 @@ class Command(VerboseCommand):
             type=str,
             choices=["asc", "desc"],
             default="asc",
-            help="Sort order for downloading documents by pk "
-            "(default: asc).",
+            help="Sort order for downloading documents by pk (default: asc).",
         )
 
     def handle(self, *args, **options):

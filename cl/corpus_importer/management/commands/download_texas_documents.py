@@ -87,9 +87,11 @@ def download_texas_documents(
     :return: None
     """
     order_by = "pk" if download_order == "asc" else "-pk"
-    docs = TexasDocument.objects.filter(filepath_local="").order_by(
-        order_by
-    ).values_list("pk", flat=True)
+    docs = (
+        TexasDocument.objects.filter(filepath_local="")
+        .order_by(order_by)
+        .values_list("pk", flat=True)
+    )
     count = docs.count()
     logger.info("Found %s TexasDocuments needing download.", count)
     throttle = CeleryThrottle(queue_name=download_queue)
@@ -168,8 +170,7 @@ class Command(VerboseCommand):
             type=str,
             choices=["asc", "desc"],
             default="asc",
-            help="Sort order for downloading documents by pk "
-            "(default: asc).",
+            help="Sort order for downloading documents by pk (default: asc).",
         )
 
     def handle(self, *args, **options):
@@ -192,6 +193,4 @@ class Command(VerboseCommand):
             download_queue = options["download_queue"]
             logger.info("Downloading TexasDocument PDFs.")
             download_order = options["download_order"]
-            download_texas_documents(
-                download_queue, delay, download_order
-            )
+            download_texas_documents(download_queue, delay, download_order)
