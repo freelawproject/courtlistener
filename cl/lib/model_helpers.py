@@ -80,8 +80,8 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
         No. 01A576 (01-8099) -> 01-8099  (prioritize NN-NNNN)
         No. 01-8148 (01A587) -> 01-8148  (prioritize NN-NNNN)
 
-    If multiple numbers of the same type are found (e.g., "01A576 01A578"),
-    a ValueError is raised.
+    When multiple numbers of the same type are found, the lexicographically
+    smallest one is selected to ensure deterministic behavior.
 
     :param docket_number: The docket number to clean.
     :return: The cleaned docket number or an empty string.
@@ -93,21 +93,24 @@ def clean_scotus_docket_number(docket_number: str | None) -> str:
     docket_number = docket_number.lower()
 
     scotus_m = re.findall(r"(?<![^ ,(])\d\d-\d+", docket_number)
-    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
 
     if len(scotus_m) == 1:
         return scotus_m[0]
     if len(scotus_m) > 1:
-        logger.error(
+        logger.warning(
             "Multiple NN-NNNN docket numbers found in: %s", docket_number
         )
-        return ""
+        return min(scotus_m)
+
+    scotus_a_m = re.findall(r"\b\d{2}a\d{1,5}\b", docket_number)
 
     if len(scotus_a_m) == 1:
         return scotus_a_m[0]
     if len(scotus_a_m) > 1:
-        logger.error("Multiple NNA docket numbers found in: %s", docket_number)
-        return ""
+        logger.warning(
+            "Multiple NNA docket numbers found in: %s", docket_number
+        )
+        return min(scotus_a_m)
 
     return ""
 
@@ -194,16 +197,32 @@ def clean_texas_docket_number(docket_number: str | None) -> str:
         if regex.fullmatch(docket_number):
             return docket_number
 
-    # Try fullmatch on each whitespace-separated token (dirty input
-    # like "Case Number: 04-97-00972-CV"). We use fullmatch rather
-    # than search because these regexes were designed for fullmatch
-    # and can produce false positives with partial matching.
-    for token in docket_number.split():
+    tokens = [
+        # Strip leading and trailing punctuation from tokens since it's likely invalid.
+        re.compile(r"^[^a-z0-9]+|[^a-z0-9]+$", re.IGNORECASE).sub("", token)
+        for token in docket_number.split()
+    ]
+    matching_parts = []
+    for token in tokens:
         for regex in TEXAS_DN_REGEXES:
             if regex.fullmatch(token):
-                return token
+                matching_parts.append(token)
 
-    return ""
+    if len(matching_parts) == 0:
+        logger.warning(
+            "Could not find valid Texas docket number in string %s. Using empty string as clean docket number",
+            docket_number,
+        )
+        return ""
+
+    matching_parts.sort()
+    if len(matching_parts) > 1:
+        logger.warning(
+            "Found multiple docket numbers combined %s. Using %s as clean docket number.",
+            docket_number,
+            matching_parts[0],
+        )
+    return matching_parts[0]
 
 
 def make_texas_docket_number_core(docket_number: str | None) -> str:
@@ -333,6 +352,7 @@ def make_pdf_path(instance, filename, thumbs=False):
         ClaimHistory,
         RECAPDocument,
         ScotusDocketMetadata,
+        SCOTUSDocument,
         TexasDocument,
     )
 
@@ -354,6 +374,10 @@ def make_pdf_path(instance, filename, thumbs=False):
         slug = slugify(Path(filename).stem)
         file_name = f"gov.scotus.{slug}.pdf"
         return str(Path("scotus") / "qp" / file_name)
+    elif isinstance(instance, SCOTUSDocument):
+        slug = slugify(Path(filename).stem)
+        file_name = f"gov.scotus.{slug}.pdf"
+        return str(Path("scotus") / "documents" / file_name)
     elif isinstance(instance, TexasDocument):
         slug = slugify(Path(filename).stem)
         court_id = instance.docket_entry.docket.court_id

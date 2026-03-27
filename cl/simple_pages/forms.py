@@ -1,8 +1,17 @@
 import re
-from typing import Any
+from typing import Any, Literal
 
 from django import forms
+from django.conf import settings
+from django.urls import reverse
+from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
+
+SEALING_KEYWORDS_REGEX = re.compile(
+    r"urgent|seal(ing|ed)?|redact(ed)?|pseudonym|anonymi(ty|ze)|"
+    r"press[\.\s]?coverage|time[\.\s]?sensitive",
+    re.I,
+)
 
 
 class ContactForm(forms.Form):
@@ -18,7 +27,7 @@ class ContactForm(forms.Form):
     ISSUE_TYPE_CHOICES = [
         (SUPPORT_REQUEST, "General Support"),
         (PARTNERSHIPS, "Partnership Inquiry"),
-        (API_HELP, "Data or API Help"),
+        (API_HELP, "Data or API Support"),
         (DATA_QUALITY, "Report Data Quality Problem"),
         (RECAP_BUG, "RECAP Extension Bug"),
         (REMOVAL_REQUEST, "Case Removal Request"),
@@ -27,6 +36,8 @@ class ContactForm(forms.Form):
     ]
 
     VALID_ISSUE_TYPES = [choice[0] for choice in ISSUE_TYPE_CHOICES]
+    TECH_ISSUE_TYPES = {API_HELP, RECAP_BUG}
+    DOCUMENTATION_CHECK_TYPES = {SUPPORT_REQUEST, API_HELP, RECAP_BUG}
 
     name = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control"})
@@ -35,8 +46,6 @@ class ContactForm(forms.Form):
     email = forms.EmailField(
         widget=forms.TextInput(attrs={"class": "form-control"})
     )
-
-    TECH_ISSUE_TYPES = {API_HELP, RECAP_BUG}
 
     # Build actual choices with additional, invalid options
     ISSUE_TYPE_FORM_CHOICES = [issue_type for issue_type in ISSUE_TYPE_CHOICES]
@@ -70,6 +79,10 @@ class ContactForm(forms.Form):
     )
 
     hcaptcha = hCaptchaField()
+
+    checked_documentation = forms.BooleanField(
+        required=False,
+    )
 
     # PARTNERSHIPS
 
@@ -214,6 +227,20 @@ class ContactForm(forms.Form):
         label="Links to screenshots, error messages, or logs (if any)",
     )
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # reverse() can't be called at class definition time because
+        # Django's URL configuration isn't loaded yet during import.
+        help_url = reverse("help_home")
+        self.fields["checked_documentation"].label = format_html(
+            'I have reviewed the <a href="https://wiki.free.law">wiki</a>,'
+            ' <a href="{}">documentation</a>, and'
+            ' <a href="https://github.com/freelawproject/courtlistener/'
+            'discussions">discussion forum</a>'
+            " for an answer to my question.",
+            help_url,
+        )
+
     def clean(self) -> dict[str, Any] | None:
         cleaned_data: dict[str, Any] | None = super().clean()
         if cleaned_data is None:
@@ -221,6 +248,15 @@ class ContactForm(forms.Form):
         subject = cleaned_data.get("phone_number", "")
 
         issue = cleaned_data.get("issue_type", "")
+
+        # Require documentation checkbox for support-type issues
+        if issue in self.DOCUMENTATION_CHECK_TYPES and not cleaned_data.get(
+            "checked_documentation"
+        ):
+            self.add_error(
+                "checked_documentation",
+                "Please review our documentation before submitting.",
+            )
 
         # Partnerships: check for required fields
         if issue == self.PARTNERSHIPS:
@@ -304,15 +340,38 @@ class ContactForm(forms.Form):
         """Subject line for this submission."""
         return f"[CourtListener] Contact: {self.cleaned_data['phone_number']}"
 
-    def render_email_body(self, user_agent: str = "Unknown") -> str:
-        """Plain-text email body built from cleaned_data. Includes all relevant fields for the issue type."""
+    def render_email_body(
+        self,
+        user_agent: str = "Unknown",
+        target: Literal["jira", "zoho_desk"] = "jira",
+    ) -> str:
+        """Build the email body from cleaned_data.
+
+        The output includes a common header (subject, name, email, and issue
+        type), followed by issue-type-specific fields (such as partnership
+        details or technical support context) and the user's free-text message.
+
+        The output format depends on the target parameter:
+
+        - When target is "jira", the output is plain text with newline separators
+        and format email addresses as with angle brackets.
+        - When target is "zoho_desk", the output uses HTML line breaks.
+
+        :param user_agent: The submitter's browser User-Agent string.
+        :param target: Output format target, either "jira" or "zoho_desk", which
+            determines line separators and email formatting.
+        :return: The formatted body string.
+        """
         cd = self.cleaned_data
         issue_type_label = self.get_issue_type_display()
+
+        email = cd.get("email", "")
+        email_display = email if target == "zoho_desk" else f"<{email}>"
 
         lines: list[str] = [
             f"Subject: {cd.get('phone_number', '')}",
             f"From: {cd.get('name', '')}",
-            f"User Email: <{cd.get('email', '')}>",
+            f"User Email: {email_display}",
             f"Issue Type: {issue_type_label}",
             "",
         ]
@@ -355,4 +414,40 @@ class ContactForm(forms.Form):
         lines.append("")
         lines.append(f"Browser: {user_agent}")
 
-        return "\n".join(lines)
+        separator = "<br>" if target == "zoho_desk" else "\n"
+        return separator.join(lines)
+
+    def _is_sealing_order(self) -> bool:
+        """Check if this submission should be treated as a sealing order."""
+        cd = self.cleaned_data
+        email = cd.get("email", "")
+        if email.lower().endswith(("@uscourts.gov", "@usdoj.gov")):
+            return True
+        if cd.get("issue_type") != self.REMOVAL_REQUEST:
+            return False
+        text = f"{cd.get('phone_number', '')} {cd.get('message', '')}"
+        return bool(SEALING_KEYWORDS_REGEX.search(text))
+
+    def get_zoho_request_type(self) -> str:
+        """Return the Zoho Desk category for this submission.
+
+        Submissions from government email domains (@uscourts.gov,
+        @usdoj.gov) or Case Removal requests whose subject or message
+        contain sealing-related keywords are recategorized as
+        "Sealing Order".
+        """
+        if self._is_sealing_order():
+            return "Sealing Order"
+        return self.get_issue_type_display()
+
+    def get_zoho_assignee_id(self) -> str:
+        """Return the Zoho Desk agent ID for this submission's issue type.
+
+        Returns empty string for unassigned tickets (sealing orders)
+        and issue types without a configured agent.
+        """
+        if self._is_sealing_order():
+            return ""
+        return settings.ZOHO_DESK_AGENT_ASSIGNMENTS.get(
+            self.cleaned_data.get("issue_type", ""), ""
+        )

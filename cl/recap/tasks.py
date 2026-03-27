@@ -11,6 +11,7 @@ from multiprocessing import process
 from typing import Any
 from zipfile import ZipFile
 
+import httpx
 import requests
 from asgiref.sync import async_to_sync, sync_to_async
 from botocore import exceptions as botocore_exception
@@ -72,7 +73,10 @@ from cl.corpus_importer.utils import (
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.filesizes import convert_size_to_bytes
-from cl.lib.microservice_utils import doc_page_count_service
+from cl.lib.microservice_utils import (
+    check_redactions_service,
+    doc_page_count_service,
+)
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     ProxyPacerSession,
@@ -114,6 +118,7 @@ from cl.recap.utils import (
     find_subdocket_pdf_rds_from_data,
     get_court_id_from_fetch_queue,
     get_main_rds,
+    send_bad_redaction_email,
     sort_acms_docket_entries,
 )
 from cl.scrapers.tasks import (
@@ -486,7 +491,7 @@ async def process_recap_pdf(pk, subdocket_replication: bool = False):
     if not existing_document and not pq.debug:
         await sync_to_async(
             chain(
-                extract_pdf_document.si(rd.pk),
+                extract_pdf_document.si(rd.pk), check_pdf_redactions.si(rd.pk)
             ).apply_async
         )()
 
@@ -1877,7 +1882,7 @@ def create_or_merge_from_idb_chunk(idb_chunk):
                 docket_number_core=idb_row.docket_number,
                 court=idb_row.district,
             )
-            .exclude(docket_number__icontains="cr")
+            .exclude(docket_number_raw__icontains="cr")
             .exclude(case_name__icontains="sealed")
             .exclude(case_name__icontains="suppressed")
             .exclude(case_name__icontains="search warrant")
@@ -1917,7 +1922,13 @@ def update_docket_from_hidden_api(data):
         return None
 
     d = Docket.objects.get(pk=data["pass_through"])
-    d.docket_number = data["docket_number"]
+
+    # need to populate the docket number for tests to pass until we
+    # activate the docket_number_raw cleaning flag. This will be overriden by
+    # the clean docket_number_raw value once cleaning is activated
+    if not d.docket_number:
+        d.docket_number = data["docket_number"]
+    d.docket_number_raw = data["docket_number"] or d.docket_number_raw
     d.pacer_case_id = data["pacer_case_id"]
     try:
         d.save()
@@ -2412,7 +2423,7 @@ def fetch_pacer_case_id_and_title(s, fq, court_id):
         # We lack the pacer_case_id either on the docket or from the
         # submission. Look it up.
         docket_number = fq.docket_number or getattr(
-            fq.docket, "docket_number", None
+            fq.docket, "docket_number_raw", None
         )
 
         report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
@@ -2572,7 +2583,7 @@ def fetch_appellate_docket(self, fq_pk):
     )
 
     docket_number = fq.docket_number or getattr(
-        fq.docket, "docket_number", None
+        fq.docket, "docket_number_raw", None
     )
     start_time = now()
     try:
@@ -3631,3 +3642,35 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
         process_recap_email.si(epq.pk, user.pk),
         extract_pdf_document.s(),
     ).apply_async()
+
+
+@app.task(
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
+    max_retries=2,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def check_pdf_redactions(rd_pk: int) -> None:
+    """Check a RECAPDocument PDF for bad redactions using X-Ray.
+
+    Runs as a background Celery task so it doesn't block PDF ingestion.
+
+    :param rd_pk: The PK of the RECAPDocument to check
+    """
+    rd = RECAPDocument.objects.get(pk=rd_pk)
+    try:
+        redaction_response = async_to_sync(check_redactions_service)(rd)
+    except Exception:
+        logger.error("Redaction check failed for RD %s", rd_pk, exc_info=True)
+        raise
+
+    if not redaction_response.is_success:
+        return
+
+    redaction_data = redaction_response.json()
+    if not redaction_data.get("error") and redaction_data.get("results"):
+        send_bad_redaction_email(rd, redaction_data["results"])

@@ -18,6 +18,7 @@ from cl.lib.admin import (
 from cl.lib.string_utils import trunc
 from cl.search.models import (
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Claim,
     ClaimHistory,
@@ -28,13 +29,17 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     SearchQuery,
+    TrialCourtData,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.visualizations.models import SCOTUSMap
@@ -61,6 +66,18 @@ class OpinionAdmin(CursorPaginatorAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("cluster")
+
+
+@admin.register(OpinionContent)
+class OpinionContentAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("opinion",)
+    search_fields = ("content",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("source",)
+    list_display = ("__str__", "source", "extraction_type")
 
 
 @admin.register(Citation)
@@ -361,6 +378,37 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
     raw_id_fields = ("docket",)
 
 
+@admin.register(CaseTransfer)
+class CaseTransferAdmin(CursorPaginatorAdmin):
+    raw_id_fields = (
+        "origin_court",
+        "origin_docket",
+        "destination_court",
+        "destination_docket",
+    )
+    list_display = (
+        "pk",
+        "origin_court",
+        "origin_docket_number",
+        "destination_court",
+        "destination_docket_number",
+        "transfer_date",
+        "transfer_type",
+    )
+    list_filter = (
+        "transfer_type",
+        "transfer_date",
+    )
+    search_fields = (
+        "origin_docket_number",
+        "destination_docket_number",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
 @admin.register(RECAPDocument)
 class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
     change_form_template = "admin/change_form_with_custom_links.html"
@@ -540,6 +588,30 @@ class DocketAdmin(CursorPaginatorAdmin):
         )
 
 
+@admin.register(TrialCourtData)
+class TrialCourtDataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = (
+        "docket",
+        "judge",
+    )
+    autocomplete_fields = ("court",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_display = (
+        "__str__",
+        "docket_number_trial",
+        "court_name",
+        "date_filed",
+    )
+    search_help_text = "Search by docket ID or trial court docket number."
+    search_fields = (
+        "=docket__id",
+        "docket_number_trial",
+    )
+
+
 @admin.register(OpinionsCited)
 class OpinionsCitedAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
@@ -585,11 +657,79 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
     )
     list_filter = ("reason",)
 
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ClusterRedirection | None = None
+    ) -> bool:
+        """Prevent deletion of cluster redirections via the admin.
+
+        :param request: The HTTP request.
+        :param obj: The object being deleted, if any.
+        :returns: Always False.
+        """
+        return False
+
 
 @admin.register(ScotusDocketMetadata)
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+class SCOTUSDocumentInline(admin.StackedInline):
+    model = SCOTUSDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(SCOTUSDocketEntry)
+class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (SCOTUSDocumentInline,)
+    search_help_text = (
+        "Search SCOTUSDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "date_filed",
+        "entry_number",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
+
+
+@admin.register(SCOTUSDocument)
+class SCOTUSDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by SCOTUSDocument Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
 
 
 class TexasDocumentInline(admin.StackedInline):

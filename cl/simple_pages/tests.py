@@ -5,12 +5,15 @@ from unittest.mock import MagicMock, patch
 from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
+from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SimpleUserDataMixin
-from cl.tests.cases import TestCase
+from cl.simple_pages.forms import ContactForm
+from cl.tests.cases import SimpleTestCase, TestCase
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
@@ -23,6 +26,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         "message": "123456789012345678901",
         "email": "pandora@box.com",
         "hcaptcha": "xxx",
+        "checked_documentation": True,
     }
 
     async def test_multiple_requests_request(self, mock: MagicMock) -> None:
@@ -127,6 +131,41 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
+
+    async def test_documentation_checkbox_required(
+        self, mock: MagicMock
+    ) -> None:
+        """Is the documentation checkbox required for support-type issues?"""
+        for issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
+            with self.subTest(issue_type=issue_type):
+                msg = self.test_msg.copy()
+                msg["issue_type"] = issue_type
+                if issue_type in ContactForm.TECH_ISSUE_TYPES:
+                    msg["tech_description"] = "Something is broken"
+                del msg["checked_documentation"]
+
+                # Without checkbox, form is rejected
+                response = await self.async_client.post(
+                    reverse("contact"), msg
+                )
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+
+                # With checkbox, form is accepted
+                msg["checked_documentation"] = True
+                response = await self.async_client.post(
+                    reverse("contact"), msg
+                )
+                self.assertEqual(response.status_code, HTTPStatus.FOUND)
+
+    async def test_documentation_checkbox_not_required_for_other_types(
+        self, mock: MagicMock
+    ) -> None:
+        """Is the documentation checkbox skipped for non-support issue types?"""
+        msg = self.test_msg.copy()
+        msg["issue_type"] = "data_quality"
+        msg.pop("checked_documentation", None)
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
 
 class SimplePagesTest(SimpleUserDataMixin, TestCase):
@@ -262,3 +301,189 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         self.assertIn(
             "with 4 minutes of recordings (and counting).", r.content.decode()
         )
+
+
+@patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
+class SealingOrderDetectionTest(SimpleTestCase):
+    def _make_form(
+        self,
+        subject: str = "Test subject",
+        message: str = "http://example.com",
+        issue_type: str = ContactForm.REMOVAL_REQUEST,
+        email: str = "test@example.com",
+    ) -> ContactForm:
+        data: dict[str, Any] = {
+            "name": "Test User",
+            "email": email,
+            "phone_number": subject,
+            "issue_type": issue_type,
+            "message": message,
+            "hcaptcha": "xxx",
+        }
+        if issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
+            data["checked_documentation"] = True
+        form = ContactForm(data)
+        form.is_valid()
+        return form
+
+    def test_sealing_keywords_trigger_recategorization(
+        self, mock_captcha: MagicMock
+    ) -> None:
+        keywords = [
+            "urgent",
+            "sealing",
+            "sealed",
+            "redacted",
+            "pseudonym",
+            "anonymity",
+            "press coverage",
+            "time sensitive",
+        ]
+        for keyword in keywords:
+            with self.subTest(keyword=keyword):
+                form = self._make_form(
+                    message=f"Please this is {keyword} http://example.com",
+                )
+                self.assertEqual(form.get_zoho_request_type(), "Sealing Order")
+                self.assertEqual(form.get_zoho_assignee_id(), "")
+
+    def test_removal_without_keywords_stays_removal(
+        self, mock_captcha: MagicMock
+    ) -> None:
+        form = self._make_form(
+            subject="Remove my case",
+            message="Please remove http://example.com/case/123",
+        )
+        self.assertEqual(form.get_zoho_request_type(), "Case Removal Request")
+
+    def test_sealing_keyword_in_subject(self, mock_captcha: MagicMock) -> None:
+        form = self._make_form(
+            subject="Urgent sealing order needed",
+            message="Please see http://example.com/case/123",
+        )
+        self.assertEqual(form.get_zoho_request_type(), "Sealing Order")
+        self.assertEqual(form.get_zoho_assignee_id(), "")
+
+    def test_uscourts_gov_email_treated_as_sealing(
+        self, mock_captcha: MagicMock
+    ) -> None:
+        form = self._make_form(
+            email="clerk@uscourts.gov",
+            issue_type=ContactForm.SUPPORT_REQUEST,
+            message="General question",
+        )
+        self.assertEqual(form.get_zoho_request_type(), "Sealing Order")
+        self.assertEqual(form.get_zoho_assignee_id(), "")
+
+    def test_usdoj_gov_email_treated_as_sealing(
+        self, mock_captcha: MagicMock
+    ) -> None:
+        form = self._make_form(
+            email="attorney@usdoj.gov",
+            issue_type=ContactForm.DATA_QUALITY,
+            message="Data issue",
+        )
+        self.assertEqual(form.get_zoho_request_type(), "Sealing Order")
+        self.assertEqual(form.get_zoho_assignee_id(), "")
+
+    def test_non_gov_email_not_treated_as_sealing(
+        self, mock_captcha: MagicMock
+    ) -> None:
+        form = self._make_form(
+            email="user@gmail.com",
+            issue_type=ContactForm.SUPPORT_REQUEST,
+            message="General question",
+        )
+        self.assertEqual(form.get_zoho_request_type(), "General Support")
+
+
+@override_flag("zoho-desk-tickets", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_zoho_routing")
+@patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
+class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
+    """Test that form submissions route to the correct Zoho service."""
+
+    @patch("cl.simple_pages.views.create_zoho_desk_ticket")
+    async def test_support_request_creates_desk_ticket(
+        self, mock_task: MagicMock, mock_captcha: MagicMock
+    ) -> None:
+        msg = {
+            "name": "Test User",
+            "phone_number": "Help needed",
+            "issue_type": "support",
+            "message": "I need general help please",
+            "email": "test@example.com",
+            "hcaptcha": "xxx",
+            "checked_documentation": True,
+        }
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["request_type"], "General Support")
+
+    @patch("cl.simple_pages.views.create_zoho_desk_ticket")
+    async def test_partnership_creates_desk_ticket(
+        self, mock_task: MagicMock, mock_captcha: MagicMock
+    ) -> None:
+        msg = {
+            "name": "Partner Person",
+            "phone_number": "Partnership request",
+            "issue_type": "partnerships",
+            "email": "partner@example.com",
+            "message": "",
+            "partner_background": ["founder"],
+            "partner_current_work": "Building legal tech",
+            "partner_prior_outreach": "Talked to some orgs",
+            "partner_team_size": "2_5",
+            "partner_founded_year": "2024",
+            "partner_funding_total": "none",
+            "partner_funding_stage": "pre_seed",
+            "partner_ideal_outcome": "API access",
+            "hcaptcha": "xxx",
+        }
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["email"], "partner@example.com")
+        self.assertEqual(call_kwargs["request_type"], "Partnership Inquiry")
+
+    @patch("cl.simple_pages.views.create_zoho_desk_ticket")
+    async def test_removal_with_sealing_keyword_is_recategorized(
+        self, mock_task: MagicMock, mock_captcha: MagicMock
+    ) -> None:
+        msg = {
+            "name": "Test User",
+            "phone_number": "Please seal my case",
+            "issue_type": "removal",
+            "message": "Urgent sealing order http://example.com/case",
+            "email": "test@example.com",
+            "hcaptcha": "xxx",
+        }
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["request_type"], "Sealing Order")
+        self.assertEqual(call_kwargs["assignee_id"], "")
+
+    @patch("cl.simple_pages.views.create_zoho_desk_ticket")
+    async def test_uscourts_email_routed_as_sealing(
+        self, mock_task: MagicMock, mock_captcha: MagicMock
+    ) -> None:
+        msg = {
+            "name": "Court Clerk",
+            "phone_number": "General inquiry",
+            "issue_type": "support",
+            "message": "I have a question about a case",
+            "email": "clerk@uscourts.gov",
+            "hcaptcha": "xxx",
+            "checked_documentation": True,
+        }
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["request_type"], "Sealing Order")
+        self.assertEqual(call_kwargs["assignee_id"], "")
