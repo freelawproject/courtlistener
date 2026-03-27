@@ -281,7 +281,9 @@ class TamesPollerTest(TestCase):
         # Court required by merge_texas_docket (hard lookup at line 4720)
         CourtFactory.create(id="tex")
 
-        with open(self.test_asset_dir / "cossup_case.html", encoding="utf-8") as f:
+        with open(
+            self.test_asset_dir / "cossup_case.html", encoding="utf-8"
+        ) as f:
             case_html = f.read()
 
         target = make_search_row("24-0340", court_code="cossup")
