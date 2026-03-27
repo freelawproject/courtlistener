@@ -86,17 +86,15 @@ def download_texas_documents(
     :param download_order: Sort order for the queryset by pk ("asc" or "desc").
     :return: None
     """
-    order_by = "pk" if download_order == "asc" else "-pk"
-    docs = (
-        TexasDocument.objects.filter(filepath_local="")
-        .order_by(order_by)
-        .values_list("pk", flat=True)
+    desc = download_order == "desc"
+    docs = TexasDocument.objects.filter(filepath_local="").values_list(
+        "pk", flat=True
     )
     count = docs.count()
     logger.info("Found %s TexasDocuments needing download.", count)
     throttle = CeleryThrottle(queue_name=download_queue)
     processed_count = 0
-    for pk in paginate_docs_queryset(docs):
+    for pk in paginate_docs_queryset(docs, desc=desc):
         throttle.maybe_wait()
         download_texas_document_pdf.si(pk).set(
             queue=download_queue
