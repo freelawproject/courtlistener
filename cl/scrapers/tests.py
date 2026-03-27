@@ -17,6 +17,7 @@ from django.test import SimpleTestCase
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
+from juriscraper.state.texas.common import CourtID
 from responses import matchers
 
 from cl.alerts.factories import AlertFactory
@@ -97,6 +98,9 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
+)
+from cl.search.state.texas.factories import (
+    TexasCourtOfAppealsDocketDictFactory,
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
@@ -2168,6 +2172,7 @@ class SetOrderingKeysTest(SimpleTestCase):
 
 @mock.patch("cl.recap.tasks.httpx.get")
 @mock.patch("cl.recap.tasks.TexasEmailSESStorage")
+@mock.patch("cl.recap.tasks.TexasCourtOfAppealsScraper")
 class TexasCaseMailIntegrationTest(TestCase):
     """Integration test for the Texas CaseMail email processing flow.
 
@@ -2189,18 +2194,13 @@ class TexasCaseMailIntegrationTest(TestCase):
         with (
             open(test_dir / "texas_coa01_notification.txt", "rb") as email_f,
             open(
-                test_dir / "01-24-00089-CV.html", encoding="utf-8"
-            ) as docket_f,
-            open(
                 test_dir / "texas_coa01_post_data.json", encoding="utf-8"
             ) as post_f,
         ):
             texas_email_content = email_f.read()
-            docket_html_content = docket_f.read()
             texas_post_data = json.load(post_f)
         cls.post_data = texas_post_data
         cls.email_data = texas_email_content
-        cls.html_data = docket_html_content
 
         cls.docket_number_coa1 = "01-24-00089-CV"
         cls.texas_coa1 = CourtFactory.create(
@@ -2214,6 +2214,11 @@ class TexasCaseMailIntegrationTest(TestCase):
             ),
         )
 
+        cls.docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=cls.docket_number_coa1,
+        )
+
     def setUp(self):
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
@@ -2223,19 +2228,27 @@ class TexasCaseMailIntegrationTest(TestCase):
 
     async def test_full_texas_email_processing_flow(
         self,
+        mock_coa_scraper,
         mock_storage_cls,
         mock_httpx_get,
     ):
         """Test the complete flow from endpoint POST through task
         execution to successful EPQ update."""
+        fake_docket_html = "hi"
+
         mock_storage = mock_storage_cls.return_value
         mock_storage.open = mock.mock_open(read_data=self.email_data)
 
-        mock_response = mock.MagicMock()
-        mock_response.text = self.html_data
+        mock_response = MagicMock()
+        mock_response.text = fake_docket_html
         mock_httpx_get.return_value = mock_response
 
-        with mock.patch.object(process_texas_email, "delay") as mock_delay:
+        mock_scraper_instance = mock_coa_scraper.return_value
+        mock_parse_text = MagicMock()
+        mock_scraper_instance._parse_text = mock_parse_text
+        mock_scraper_instance.data = self.docket_data
+
+        with patch.object(process_texas_email, "delay") as mock_delay:
             response = await self.async_client.post(
                 self.path, self.post_data, format="json"
             )
@@ -2251,7 +2264,18 @@ class TexasCaseMailIntegrationTest(TestCase):
 
         mock_delay.assert_called_once_with(epq.pk)
         await sync_to_async(process_texas_email)(epq.pk)
-        epq.refresh_from_db()
+        await epq.arefresh_from_db()
         self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
 
         mock_storage.open.assert_called_with("test-texas-email-id", "rb")
+
+        mock_httpx_get.assert_called_once_with(
+            "https://search.txcourts.gov/Case.aspx?cn=01-24-00089-CV",
+            headers={"User-Agent": "Free Law Project"},
+            timeout=30.0,
+            follow_redirects=True,
+        )
+
+        mock_parse_text.assert_called_once_with(fake_docket_html)
+
+        self.assertEqual(await Docket.objects.acount(), 1)

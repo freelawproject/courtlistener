@@ -3750,6 +3750,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         follow_redirects=True,
     )
     res.raise_for_status()
+
     docket_parser._parse_text(res.text)
     docket_data = docket_parser.data
 
