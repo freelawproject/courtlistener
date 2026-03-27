@@ -14,6 +14,7 @@ from cl.search.models import SCOTUSDocument
 def download_scotus_pdfs(
     download_queue: str,
     delay: float,
+    download_order: str = "asc",
 ) -> None:
     """Download PDFs for SCOTUSDocuments missing a local file.
 
@@ -22,8 +23,10 @@ def download_scotus_pdfs(
 
     :param download_queue: The celery queue for download tasks.
     :param delay: Seconds to sleep between scheduling tasks.
+    :param download_order: Sort order for the queryset by pk ("asc" or "desc").
     :return: None
     """
+    desc = download_order == "desc"
     docs = SCOTUSDocument.objects.filter(filepath_local="").values_list(
         "pk", flat=True
     )
@@ -31,7 +34,7 @@ def download_scotus_pdfs(
     logger.info("Found %s SCOTUSDocuments needing download.", count)
     throttle = CeleryThrottle(queue_name=download_queue)
     processed_count = 0
-    for pk in paginate_docs_queryset(docs):
+    for pk in paginate_docs_queryset(docs, desc=desc):
         throttle.maybe_wait()
         download_scotus_document_pdf.si(pk).set(
             queue=download_queue
@@ -159,6 +162,13 @@ class Command(VerboseCommand):
             default=1.0,
             help="Seconds to sleep between scheduling tasks.",
         )
+        parser.add_argument(
+            "--download-order",
+            type=str,
+            choices=["asc", "desc"],
+            default="asc",
+            help="Sort order for downloading documents by pk (default: asc).",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -179,4 +189,5 @@ class Command(VerboseCommand):
         else:
             download_queue = options["download_queue"]
             logger.info("Downloading SCOTUSDocument PDFs.")
-            download_scotus_pdfs(download_queue, delay)
+            download_order = options["download_order"]
+            download_scotus_pdfs(download_queue, delay, download_order)
