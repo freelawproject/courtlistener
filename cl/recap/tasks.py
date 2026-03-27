@@ -17,8 +17,10 @@ from asgiref.sync import async_to_sync, sync_to_async
 from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -262,6 +264,7 @@ async def associate_related_instances(
     d_id: int | None = None,
     de_id: int | None = None,
     rd_id: int | list[int] | None = None,
+    model_name: str = "search.RECAPDocument",
 ) -> None:
     """Associate the related upload instances.
 
@@ -273,11 +276,32 @@ async def associate_related_instances(
     :param rd_id: The RECAPDocument PK to associate with this upload. Only
     applies to document uploads (obviously). If the pq is a EmailProcessingQueue
     this param accepts a list of RDs Pks.
+    :param model_name: The name of the model that the rd_id list should point
+        to. Only used when pq is EmailProcessingQueue.
     :return: None
     """
 
     if isinstance(pq, EmailProcessingQueue):
-        await pq.recap_documents.aadd(*rd_id)
+        if not rd_id:
+            logger.error(
+                "rd_id must be a list when pq is EmailProcessingQueue."
+            )
+            return
+        if isinstance(rd_id, list):
+            rd_ids = rd_id
+        else:
+            rd_ids = [rd_id]
+        # Kept for compatibility
+        if model_name == "search.RECAPDocument":
+            await pq.recap_documents.aadd(*rd_ids)
+        # It's okay to overwrite these because we should only be calling this
+        # method once per email.
+        document_model = apps.get_model(model_name)
+        pq.content_type = await sync_to_async(
+            ContentType.objects.get_for_model
+        )(document_model)
+        pq.object_ids = rd_ids
+        await pq.asave()
     else:
         pq.docket_id = d_id
         pq.docket_entry_id = de_id
@@ -286,7 +310,7 @@ async def associate_related_instances(
 
 
 async def mark_pq_status(
-    pq: ProcessingQueue,
+    pq: ProcessingQueue | EmailProcessingQueue,
     msg: str,
     status: int,
     message_property_name: str = "error_message",
@@ -3764,7 +3788,9 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         self.request.chain = None
         return None
     try:
-        d = merge_texas_docket(docket_data, download_attachments=True)
+        (d, changed_documents) = merge_texas_docket(
+            docket_data, download_attachments=True
+        )
     except Exception as e:
         async_to_sync(mark_pq_status)(
             epq,
@@ -3779,7 +3805,8 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             epq,
             d_id=d.pk,
             de_id=None,
-            rd_id=None,
+            rd_id=changed_documents,
+            model_name="search.TexasDocument",
         )
         async_to_sync(mark_pq_status)(
             epq,

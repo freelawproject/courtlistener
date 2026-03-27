@@ -2511,7 +2511,7 @@ class TexasMergerTest(TestCase):
             )
 
         with self.captureOnCommitCallbacks(execute=True):
-            output = merge_texas_docket_entry(
+            (output, _) = merge_texas_docket_entry(
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
@@ -2550,7 +2550,7 @@ class TexasMergerTest(TestCase):
             )
 
         with self.captureOnCommitCallbacks(execute=True):
-            result = merge_texas_docket_entry(
+            (result, _) = merge_texas_docket_entry(
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
         pk = result.pk
@@ -2563,7 +2563,7 @@ class TexasMergerTest(TestCase):
 
         # noop
         with self.captureOnCommitCallbacks(execute=True):
-            output = merge_texas_docket_entry(
+            (output, _) = merge_texas_docket_entry(
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
@@ -2604,7 +2604,7 @@ class TexasMergerTest(TestCase):
         initial_n_attachments = len(case_event["attachments"])
 
         with self.captureOnCommitCallbacks(execute=True):
-            result = merge_texas_docket_entry(
+            (result, _) = merge_texas_docket_entry(
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
         pk = result.pk
@@ -2617,7 +2617,7 @@ class TexasMergerTest(TestCase):
 
         case_event["attachments"].append(TexasCaseDocumentDictFactory())
         with self.captureOnCommitCallbacks(execute=True):
-            output = merge_texas_docket_entry(
+            (output, _) = merge_texas_docket_entry(
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
@@ -2674,7 +2674,7 @@ class TexasMergerTest(TestCase):
         )
 
         # Should match the second entry by sequence number
-        output = merge_texas_docket_entry(
+        (output, _) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-02.001", case_event, appellate_brief
         )
 
@@ -2714,7 +2714,7 @@ class TexasMergerTest(TestCase):
         )
 
         # Should update existing entry and change its sequence number
-        output = merge_texas_docket_entry(
+        (output, _) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-04.001", case_event, appellate_brief
         )
 
@@ -2758,7 +2758,7 @@ class TexasMergerTest(TestCase):
         )
 
         # Should create a new entry since no sequence number matches
-        output = merge_texas_docket_entry(
+        (output, _) = merge_texas_docket_entry(
             self.docket_coa1, "2025-01-03.002", case_event, appellate_brief
         )
 
@@ -3323,7 +3323,7 @@ class TexasMergerTest(TestCase):
             transfer_from=None,
         )
 
-        result = merge_texas_docket(docket_data)
+        (result, _) = merge_texas_docket(docket_data)
 
         assert result.success is True
         assert result.pk == self.docket_coa1.pk
@@ -3355,7 +3355,7 @@ class TexasMergerTest(TestCase):
             is_direct_appeal=False,
         )
 
-        result = merge_texas_docket(docket_data)
+        (result, _) = merge_texas_docket(docket_data)
 
         assert result.success is True
         assert result.pk == docket_sc.pk
@@ -3374,7 +3374,7 @@ class TexasMergerTest(TestCase):
             ),
         )
 
-        result = merge_texas_docket(docket_dict)
+        (result, _) = merge_texas_docket(docket_dict)
 
         assert result.success is True
 
@@ -3391,7 +3391,7 @@ class TexasMergerTest(TestCase):
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_docket_entry",
-        return_value=MergeResult.created(1),
+        return_value=[MergeResult.created(1), [1]],
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_parties",
@@ -3415,7 +3415,7 @@ class TexasMergerTest(TestCase):
             transfer_from=None,
         )
 
-        result = merge_texas_docket(docket_data)
+        (result, _) = merge_texas_docket(docket_data)
 
         assert result.success is True
         assert result.pk is not None

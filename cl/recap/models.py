@@ -1,11 +1,17 @@
+import logging
+
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db.models import QuerySet
 
 from cl.lib.model_helpers import make_path
 from cl.lib.models import AbstractDateTimeModel, AbstractFile
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.recap.constants import DATASET_SOURCES, NOO_CODES, NOS_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
+
+logger = logging.getLogger(__name__)
 
 
 class UPLOAD_TYPE:
@@ -267,8 +273,12 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         text.
     :ivar status_message: Any errors that occurred while processing an item.
     :ivar recap_documents: Document(s) created from the PACER email, processed\
-        as a function of this queue.
+        as a function of this queue. Kept for compatibility; use get_related_objects
+        in the future.
     :ivar source: The source of this email notification.
+    :ivar related_model: The type of model that was created or updated by this
+        email.
+    :ivar object_ids: The PKs of models created or updated by this email.
     """
 
     uploader = models.ForeignKey(
@@ -322,6 +332,21 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         default=EmailSource.PACER,
         help_text="The source of this email notification.",
     )
+    related_model = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        null=True,
+    )
+    object_ids = models.JSONField(default=list)
+
+    def get_related_objects(self) -> QuerySet | None:
+        if not self.related_model:
+            logger.warning(
+                "Call to EmailProcessingQueue.get_related_objects() with null related_model."
+            )
+            return None
+        model_class = self.related_model.model_class()
+        return model_class.objects.filter(pk__in=self.object_ids)
 
     def __str__(self) -> str:
         return f"EmailProcessingQueue: {self.pk} in court {self.court_id}"

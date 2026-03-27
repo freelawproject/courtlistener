@@ -4223,7 +4223,7 @@ def merge_texas_docket_entry(
     | TexasSupremeCourtAppellateBrief
     | None = None,
     download_attachments: bool = True,
-) -> MergeResult:
+) -> tuple[MergeResult, list[int]]:
     """Merges a Texas docket entry into CL.
 
     :param docket: The docket this entry belongs to.
@@ -4233,12 +4233,8 @@ def merge_texas_docket_entry(
         an appellate brief, None otherwise.
     :param download_attachments: Whether to download docket entry attachments.
 
-    :return: Tuple with the following entries
-    - A flag indicating whether the docket entry or an attached document needed
-    to be created or updated,
-    - A flag which is set to true when the create/update operations are all
-    either successful or unnecessary,
-    - The primary key of the updated TexasDocketEntry object.
+    :return: Tuple with the results of the merge operation and the PKs of any
+        TexasDocument objects that were created or updated during the operation.
     """
     logger.info(
         "Merging TexasDocketEntry with sequence number %s into Docket %s",
@@ -4316,11 +4312,18 @@ def merge_texas_docket_entry(
         for document in case_event["attachments"]
     ]
 
-    return MergeResult(
-        create=created or any(r.create for r in document_results),
-        update=not created or any(r.update for r in document_results),
-        success=all(r.success for r in document_results),
-        pk=docket_entry.pk,
+    return (
+        MergeResult(
+            create=created or any(r.create for r in document_results),
+            update=not created or any(r.update for r in document_results),
+            success=all(r.success for r in document_results),
+            pk=docket_entry.pk,
+        ),
+        [
+            result.pk
+            for result in document_results
+            if result.update or result.create
+        ],
     )
 
 
@@ -4330,7 +4333,7 @@ def merge_texas_docket_entries(
     appellate_briefs: list[TexasAppellateBrief]
     | list[TexasSupremeCourtAppellateBrief],
     download_attachments: bool = True,
-) -> MergeResult:
+) -> tuple[MergeResult, list[int]]:
     """
     Merges a list of Texas case events and Texas appellate briefs for a given
     docket into CL.
@@ -4340,7 +4343,8 @@ def merge_texas_docket_entries(
     :param appellate_briefs: Scraped appellate briefs.
     :param download_attachments: Whether to download attachments.
 
-    :return: The result of the attempted merge operation.
+    :return: Tuple with the result of the attempted merge operation and the PKs
+        of any TexasDocument objects created or updated during the operation.
     """
     brief_iter = iter(appellate_briefs)
     next_brief = next(brief_iter, None)
@@ -4348,6 +4352,7 @@ def merge_texas_docket_entries(
     create = False
     update = False
     success = True
+    changed_documents = []
     for i, (case_event, sequence_number) in enumerate(
         zip(case_events, create_docket_entry_sequence_numbers(case_events))
     ):
@@ -4360,8 +4365,7 @@ def merge_texas_docket_entries(
         ):
             appellate_brief = next_brief
             next_brief = next(brief_iter, None)
-
-        merge_result = merge_texas_docket_entry(
+        (merge_result, docs) = merge_texas_docket_entry(
             docket,
             sequence_number,
             case_event,
@@ -4372,8 +4376,12 @@ def merge_texas_docket_entries(
         create = merge_result.create or create
         update = merge_result.update or update
         success = merge_result.success and success
+        changed_documents += docs
 
-    return MergeResult(create=create, update=update, success=success, pk=None)
+    return (
+        MergeResult(create=create, update=update, success=success, pk=None),
+        changed_documents,
+    )
 
 
 def normalize_texas_parties(
@@ -4710,13 +4718,14 @@ def merge_texas_docket(
     | TexasCourtOfCriminalAppealsDocket
     | TexasSupremeCourtDocket,
     download_attachments: bool = True,
-) -> MergeResult:
+) -> tuple[MergeResult, list[int]]:
     """Merges scraped data from a Texas docket into the `Docket` table.
 
     :param docket_data: The scraped Texas docket data.
     :param download_attachments: Whether to download docket entry attachments.
 
-    :return: The result of the merge operation."""
+    :return: A tuple with the result of the merge operation and the PKs of any
+        TexasDocument objects created or updated during the operation."""
     court = Court.objects.get(
         pk=texas_js_court_id_to_court_id(docket_data["court_id"])
     )
@@ -4725,7 +4734,7 @@ def merge_texas_docket(
 
     if docket_data["court_type"] == CourtType.UNKNOWN.value:
         logger.error("Texas docket %s has unknown court type", docket_number)
-        return MergeResult.failed()
+        return (MergeResult.failed(), [])
 
     with transaction.atomic():
         docket = None
@@ -4809,7 +4818,7 @@ def merge_texas_docket(
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
 
-    entry_merge_result = merge_texas_docket_entries(
+    (entry_merge_result, changed_documents) = merge_texas_docket_entries(
         docket,
         docket_data["case_events"],
         docket_data["appellate_briefs"],
@@ -4849,11 +4858,14 @@ def merge_texas_docket(
             court.pk,
         )
 
-    return MergeResult(
-        create=create,
-        update=update,
-        success=success,
-        pk=docket.pk,
+    return (
+        MergeResult(
+            create=create,
+            update=update,
+            success=success,
+            pk=docket.pk,
+        ),
+        changed_documents,
     )
 
 
@@ -4911,7 +4923,7 @@ def texas_ingest_docket_task(
         return MergeResult.failed()
     return merge_texas_docket(
         docket_data, download_attachments=download_attachments
-    )
+    )[0]
 
 
 @app.task(
