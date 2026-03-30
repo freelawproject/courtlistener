@@ -3,7 +3,7 @@ from itertools import batched
 
 from django.db.models import Q
 
-from cl.corpus_importer.tasks import download_texas_document_pdf, logger
+from cl.corpus_importer.tasks import download_texas_document, logger
 from cl.corpus_importer.utils import paginate_docs_queryset
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
@@ -76,7 +76,7 @@ def download_texas_documents(
     delay: float,
     download_order: str = "asc",
 ) -> None:
-    """Download PDFs for TexasDocument instances missing a local file.
+    """Download documents for TexasDocument instances missing a local file.
 
     Queries TexasDocument instances that have no filepath_local, then
     schedules a download task for each.
@@ -96,9 +96,7 @@ def download_texas_documents(
     processed_count = 0
     for pk in paginate_docs_queryset(docs, desc=desc):
         throttle.maybe_wait()
-        download_texas_document_pdf.si(pk).set(
-            queue=download_queue
-        ).apply_async()
+        download_texas_document.si(pk).set(queue=download_queue).apply_async()
         processed_count += 1
         if processed_count % 100 == 0:
             logger.info(
@@ -117,8 +115,8 @@ def download_texas_documents(
 
 class Command(VerboseCommand):
     help = (
-        "Download and extract PDFs for TexasDocument instances. "
-        "By default, downloads missing PDFs. "
+        "Download and extract documents for TexasDocument instances. "
+        "By default, downloads missing documents. "
         "Use --only-extraction to skip downloads and only extract "
         "already-downloaded files."
     )
@@ -189,6 +187,6 @@ class Command(VerboseCommand):
             )
         else:
             download_queue = options["download_queue"]
-            logger.info("Downloading TexasDocument PDFs.")
+            logger.info("Downloading TexasDocument documents.")
             download_order = options["download_order"]
             download_texas_documents(download_queue, delay, download_order)

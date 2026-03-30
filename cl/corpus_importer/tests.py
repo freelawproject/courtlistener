@@ -84,7 +84,7 @@ from cl.corpus_importer.signals import (
 from cl.corpus_importer.tasks import (
     MergeResult,
     classify_case_name_by_llm,
-    download_texas_document_pdf,
+    download_texas_document,
     generate_ia_json,
     get_and_save_free_document_report,
     merge_texas_case_transfers,
@@ -2169,7 +2169,7 @@ class TexasMergerTest(TestCase):
     def setUp(self):
         """Set up texas merger tests"""
         self.download_task_patch = patch(
-            "cl.corpus_importer.tasks.download_texas_document_pdf.si"
+            "cl.corpus_importer.tasks.download_texas_document.si"
         )
         self.download_task_mock = self.download_task_patch.start()
         self.extract_pdf_document_patch = patch(
@@ -2178,10 +2178,10 @@ class TexasMergerTest(TestCase):
         self.extract_pdf_document_mock = (
             self.extract_pdf_document_patch.start()
         )
-        self.download_pdf_patch = patch(
-            "cl.corpus_importer.tasks.download_pdf_in_stream"
+        self.download_document_patch = patch(
+            "cl.corpus_importer.tasks.download_document_in_stream"
         )
-        self.download_pdf_mock = self.download_pdf_patch.start()
+        self.download_document_mock = self.download_document_patch.start()
 
     @classmethod
     def setUpTestData(cls):
@@ -2206,7 +2206,7 @@ class TexasMergerTest(TestCase):
         """Tear down patches"""
         self.download_task_patch.stop()
         self.extract_pdf_document_patch.stop()
-        self.download_pdf_patch.stop()
+        self.download_document_patch.stop()
 
     def get_random_docket_entry_dict(self, **kwargs):
         return fake.random_element(
@@ -2455,9 +2455,10 @@ class TexasMergerTest(TestCase):
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
     @responses.activate
     def test_merge_texas_document_plaintext_extraction(
-        self, pcs_mock, throttle_mock
+        self, ext_mock, pcs_mock, throttle_mock
     ):
         """
         Ensure plaintext extraction is triggered by `merge_texas_document`.
@@ -2466,7 +2467,7 @@ class TexasMergerTest(TestCase):
         # Stop the mocks just for this test
         self.download_task_patch.stop()
         self.extract_pdf_document_patch.stop()
-        self.download_pdf_patch.stop()
+        self.download_document_patch.stop()
 
         input_document = TexasCaseDocumentDictFactory()
 
@@ -2962,12 +2963,13 @@ class TexasMergerTest(TestCase):
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
     @responses.activate
     def test_download_texas_document_pdf_success(
-        self, pcs_mock, throttle_mock
+        self, ext_mock, pcs_mock, throttle_mock
     ):
         """Can we successfully download a PDF for a TexasDocument?"""
-        self.download_pdf_patch.stop()
+        self.download_document_patch.stop()
         texas_document = TexasDocumentFactory.create()
 
         def get_test_pdf(
@@ -2984,7 +2986,7 @@ class TexasMergerTest(TestCase):
 
         pcs_mock.return_value = httpx.Response(200, text="1")
 
-        result = download_texas_document_pdf(texas_document.pk)
+        result = download_texas_document(texas_document.pk)
 
         assert result is not None
         texas_document.refresh_from_db()
@@ -2993,32 +2995,167 @@ class TexasMergerTest(TestCase):
         assert pdf_response.call_count == 1
         assert pcs_mock.call_count == 1
 
-    def test_download_texas_document_pdf_document_not_found(self):
+    def test_download_texas_document_not_found(self):
         """Do we handle a missing TexasDocument gracefully?"""
         non_existent_pk = 99999
 
-        result = download_texas_document_pdf(non_existent_pk)
+        result = download_texas_document(non_existent_pk)
 
         assert result is None
-        self.download_pdf_mock.assert_not_called()
+        self.download_document_mock.assert_not_called()
 
-    def test_download_texas_document_pdf_download_failure(self):
-        """Do we handle a failed PDF download gracefully?"""
+    def test_download_texas_document_download_failure(self):
+        """Do we handle a failed document download gracefully?"""
         texas_document = TexasDocumentFactory.create(
             url="https://example.com/sample.pdf",
         )
 
-        # Mock failed PDF download
-        self.download_pdf_mock.return_value.__enter__.return_value = None
+        # Mock failed download
+        self.download_document_mock.return_value.__enter__.return_value = None
 
-        result = download_texas_document_pdf(texas_document.pk)
+        result = download_texas_document(texas_document.pk)
 
         assert result is None
-        self.download_pdf_mock.assert_called_once_with(
-            "https://example.com/sample.pdf", texas_document.pk, "texas_"
+        self.download_document_mock.assert_called_once_with(
+            "https://example.com/sample.pdf",
+            texas_document.pk,
+            "texas_",
+            require_pdf=False,
         )
         texas_document.refresh_from_db()
         assert not texas_document.filepath_local
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    def test_download_texas_document_html(self, ext_mock, throttle_mock):
+        """Does an HTML document get saved to filepath_local?"""
+        from tempfile import NamedTemporaryFile
+
+        texas_document = TexasDocumentFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"<html>test</html>")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "abc123sha1",
+            )
+
+            result = download_texas_document(texas_document.pk)
+
+        # HTML is extractable, so pk is returned and chain continues
+        assert result == texas_document.pk
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert texas_document.sha1 == "abc123sha1"
+        assert ".html" in texas_document.filepath_local.name
+        # No page_count for non-PDFs
+        assert texas_document.page_count is None
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".mp3")
+    def test_download_texas_document_mp3_breaks_chain(
+        self, ext_mock, throttle_mock
+    ):
+        """Does an MP3 get saved but skip the extract chain?"""
+        from tempfile import NamedTemporaryFile
+
+        texas_document = TexasDocumentFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake mp3 data")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "mp3sha1hash",
+            )
+
+            result = download_texas_document(texas_document.pk)
+
+        # MP3 is not extractable — pk returned but chain broken
+        assert result == texas_document.pk
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert texas_document.sha1 == "mp3sha1hash"
+        assert ".mp3" in texas_document.filepath_local.name
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".docx")
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    def test_download_texas_document_unknown_extension_logged(
+        self, logger_mock, ext_mock, throttle_mock
+    ):
+        """Do we log a warning for unknown file types but still save them?"""
+        from tempfile import NamedTemporaryFile
+
+        texas_document = TexasDocumentFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake docx data")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "docxsha1",
+            )
+
+            result = download_texas_document(texas_document.pk)
+
+        assert result == texas_document.pk
+        # Should log a warning about the unknown extension
+        logger_mock.warning.assert_any_call(
+            "Texas document download: Unexpected file extension "
+            "'%s' for TexasDocument %s from %s. Proceeding anyway.",
+            ".docx",
+            texas_document.pk,
+            texas_document.url,
+        )
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert texas_document.sha1 == "docxsha1"
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @responses.activate
+    def test_download_texas_document_wpd_extracts_text(self, throttle_mock):
+        """Does a WPD file get downloaded, stored, and its text extracted?"""
+        self.download_task_patch.stop()
+        self.extract_pdf_document_patch.stop()
+        self.download_document_patch.stop()
+
+        input_document = TexasCaseDocumentDictFactory()
+
+        wpd_path = settings.MEDIA_ROOT / "test/search/opinion_wpd.wpd"
+
+        def get_test_wpd(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with open(wpd_path, "rb") as f:
+                return (
+                    200,
+                    {"Content-Type": "application/octet-stream"},
+                    f.read(),
+                )
+
+        response = responses.add_callback(
+            responses.GET,
+            input_document["document_url"],
+            callback=get_test_wpd,
+        )
+
+        docket_entry = self.docket_coa1_entry
+        with self.captureOnCommitCallbacks(execute=True):
+            result = merge_texas_document(docket_entry, input_document)
+        document = TexasDocument.objects.get(pk=result.pk)
+
+        self.assertEqual(response.call_count, 1)
+        self.assertTrue(document.filepath_local)
+        self.assertIn(".wpd", document.filepath_local.name)
+        # page_count should not be set for non-PDFs
+        self.assertIsNone(document.page_count)
+        # WPD extraction should produce text
+        self.assertTrue(document.plain_text)
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""

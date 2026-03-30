@@ -193,6 +193,7 @@ from cl.recap.models import (
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
+from cl.scrapers.utils import get_extension
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -3259,19 +3260,22 @@ def is_pdf(response: Response) -> bool:
 
 
 @contextmanager
-def download_pdf_in_stream(
+def download_document_in_stream(
     url: str,
     identifier: str | int,
     temp_prefix: str = "scotus_",
+    require_pdf: bool = True,
 ) -> Iterator[tuple[IO[bytes], str] | None]:
-    """Download a PDF in stream and yield a temporary file to avoid using too
-    much memory
+    """Download a file in stream and yield a temporary file to avoid using
+    too much memory.
 
-    :param url: The URL to download the PDF from
+    :param url: The URL to download from.
     :param identifier: An identifier for logging (docket_id, rd.pk, etc.)
-    :param temp_prefix: Prefix for the temporary file name
-    :yields: A NamedTemporaryFile positioned at the beginning, or None if
-    the response is not a PDF
+    :param temp_prefix: Prefix for the temporary file name.
+    :param require_pdf: If True, abort when Content-Type is not
+        application/pdf. Set to False to accept any file type.
+    :yields: A (NamedTemporaryFile, sha1_hex) tuple, or None if the
+        download failed or the content-type check failed.
     """
 
     @retry(
@@ -3292,7 +3296,7 @@ def download_pdf_in_stream(
             headers={"User-Agent": "Free Law Project"},
         ) as response:
             response.raise_for_status()
-            if not is_pdf(response):
+            if require_pdf and not is_pdf(response):
                 logger.warning(
                     "PDF download: Expected application/pdf for %s from %s; aborting.",
                     identifier,
@@ -3310,6 +3314,16 @@ def download_pdf_in_stream(
     with NamedTemporaryFile(prefix=temp_prefix, suffix=".pdf") as tmp:
         result = download_to_file(tmp)
         yield (tmp, result.sha1) if result.success else None
+
+
+def download_pdf_in_stream(
+    url: str,
+    identifier: str | int,
+    temp_prefix: str = "scotus_",
+):
+    return download_document_in_stream(
+        url, identifier, temp_prefix, require_pdf=True
+    )
 
 
 @app.task(
@@ -3869,28 +3883,32 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     process_scotus_docket.delay(docket_data)
 
 
+KNOWN_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
+EXTRACTABLE_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd"}
+
+
 @app.task(
     bind=True,
     ignore_result=True,
-    # No retries because download_pdf_in_stream already has retry logic
+    # No retries because download_document_in_stream already has retry logic
 )
 @throttle_task("2/s")
-def download_texas_document_pdf(
-    self: Task, texas_document_pk: int
-) -> int | None:
-    """Download a PDF and return its path.
+def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
+    """Download a Texas document and store it in filepath_local.
+
+    Accepts any file type. PDF-specific processing (page count) is only
+    performed for PDFs. For non-extractable types (.mp3, unknown), the
+    extract chain is broken so extract_pdf_document is skipped.
 
     :param self: The Celery task instance.
-    :param texas_document_pk: The primary key of the TexasDocument instance to
-    update the attachment for.
-
-    :return: The primary key of the downloaded TexasDocument instance, or None
-    if the process failed."""
+    :param texas_document_pk: The primary key of the TexasDocument instance.
+    :return: The pk of the downloaded TexasDocument, or None on failure.
+    """
     try:
         texas_document = TexasDocument.objects.get(pk=texas_document_pk)
     except TexasDocument.DoesNotExist:
         logger.warning(
-            "Texas document PDF download: TexasDocument %s does not exist; skipping.",
+            "Texas document download: TexasDocument %s does not exist; skipping.",
             texas_document_pk,
         )
         self.request.chain = None
@@ -3898,23 +3916,40 @@ def download_texas_document_pdf(
 
     url = texas_document.url
     logger.info(
-        "Texas PDF download: Fetching PDF for TexasDocument %s from %s",
+        "Texas document download: Fetching document for TexasDocument %s from %s",
         texas_document_pk,
         url,
     )
 
-    with download_pdf_in_stream(url, texas_document.pk, "texas_") as result:
+    with download_document_in_stream(
+        url, texas_document.pk, "texas_", require_pdf=False
+    ) as result:
         if result is None:
             logger.error(
-                "Failed to download attachment PDF for TexasDocument %s from URL %s.",
+                "Failed to download document for TexasDocument %s from URL %s.",
                 texas_document.pk,
                 url,
             )
             self.request.chain = None
             return None
+
         tmp, sha1_hash = result
+        content = tmp.read()
+        tmp.seek(0)
+
+        extension = get_extension(content)
+        if extension not in KNOWN_TEXAS_EXTENSIONS:
+            logger.warning(
+                "Texas document download: Unexpected file extension "
+                "'%s' for TexasDocument %s from %s. Proceeding anyway.",
+                extension,
+                texas_document.pk,
+                url,
+            )
+
         filename = (
-            f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
+            f"{texas_document.media_id}"
+            f"-{texas_document.media_version_id}{extension}"
         )
         downloaded_file = File(tmp)
         texas_document.filepath_local.save(
@@ -3922,10 +3957,17 @@ def download_texas_document_pdf(
         )
         texas_document.file_size = downloaded_file.size
         texas_document.sha1 = sha1_hash
-        response = async_to_sync(doc_page_count_service)(texas_document)
-        if response.is_success:
-            texas_document.page_count = int(response.text)
+
+        if extension == ".pdf":
+            response = async_to_sync(doc_page_count_service)(texas_document)
+            if response.is_success:
+                texas_document.page_count = int(response.text)
+
         texas_document.save()
+
+        if extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
+            self.request.chain = None
+
         return texas_document_pk
 
 
@@ -4196,7 +4238,7 @@ def merge_texas_document(
                 # prevent mypy from complaining.
                 (
                     lambda pk: lambda: chain(
-                        download_texas_document_pdf.si(pk),
+                        download_texas_document.si(pk),
                         extract_pdf_document.s(
                             check_if_needed=False,
                             model_name="search.TexasDocument",
