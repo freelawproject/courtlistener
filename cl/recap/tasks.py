@@ -3788,9 +3788,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         self.request.chain = None
         return None
     try:
-        (d, changed_documents) = merge_texas_docket(
-            docket_data, download_attachments=True
-        )
+        result = merge_texas_docket(docket_data, download_attachments=True)
     except Exception as e:
         async_to_sync(mark_pq_status)(
             epq,
@@ -3801,9 +3799,14 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         self.request.chain = None
         return None
     else:
+        docket_pks = result.creates.get("Docket", set())
+        changed_documents = list(
+            result.creates.get("TexasDocument", set())
+            | result.updates.get("TexasDocument", set())
+        )
         async_to_sync(associate_related_instances)(
             epq,
-            d_id=d.pk,
+            d_id=next(iter(docket_pks), None),
             de_id=None,
             rd_id=changed_documents,
             model_name="search.TexasDocument",
