@@ -2266,6 +2266,20 @@ class TexasCaseMailIntegrationTest(TestCase):
         await sync_to_async(process_texas_email)(epq.pk)
         await epq.arefresh_from_db()
         self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
+        epq_rm = await EmailProcessingQueue.objects.select_related(
+            "related_model"
+        ).aget(pk=epq.pk)
+        self.assertEqual(epq_rm.related_model.model, "texasdocument")
+        self.assertEqual(
+            len(epq.object_ids),
+            sum(
+                (
+                    len(ce["attachments"])
+                    for ce in self.docket_data["case_events"]
+                ),
+                0,
+            ),
+        )
 
         mock_storage.open.assert_called_with("test-texas-email-id", "rb")
 

@@ -297,7 +297,7 @@ async def associate_related_instances(
         # It's okay to overwrite these because we should only be calling this
         # method once per email.
         document_model = apps.get_model(model_name)
-        pq.content_type = await sync_to_async(
+        pq.related_model = await sync_to_async(
             ContentType.objects.get_for_model
         )(document_model)
         pq.object_ids = rd_ids
