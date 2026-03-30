@@ -3962,7 +3962,7 @@ class MergeResult[T = int]:
                 for k in a.updates.keys() | b.updates.keys()
             },
             failures={
-                k: a.failures.get(k, []) + b.failures.get(k, [])
+                k: [*a.failures.get(k, []), *b.failures.get(k, [])]
                 for k in a.failures.keys() | b.failures.keys()
             },
         )
