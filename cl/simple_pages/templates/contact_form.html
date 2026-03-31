@@ -7,6 +7,7 @@
 {% block head %}
   {# Fetch issue types and terms URL #}
   {{ form.TECH_ISSUE_TYPES|uniq|json_script:"tech-types" }}
+  {{ form.DOCUMENTATION_CHECK_TYPES|uniq|json_script:"requires-check-types" }}
   {% url "terms" as terms_url %}
   {{ terms_url|add:"#removal"|json_script:"terms-url" }}
 
@@ -230,6 +231,22 @@
           {% if form.message.errors %}
             <p class="help-block">
               {% for error in form.message.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
+
+        <div class="form-group" x-show="issue.requiresDocCheck" x-cloak>
+          <div class="checkbox">
+            <label>
+              {{ form.checked_documentation }}
+              {{ form.checked_documentation.label }}
+            </label>
+          </div>
+          {% if form.checked_documentation.errors %}
+            <p class="help-block">
+              {% for error in form.checked_documentation.errors %}
                 {{ error|escape }}
               {% endfor %}
             </p>

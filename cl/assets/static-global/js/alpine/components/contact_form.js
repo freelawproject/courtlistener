@@ -12,6 +12,7 @@ document.addEventListener('alpine:init', () => {
         isTechnicalSupport: isTechSupport,
         isNotTechnicalSupport: !isTechSupport,
         hasAdditionalFields: isPartnershipsInquiry || isTechSupport,
+        requiresDocCheck: this.requiresCheckTypes.includes(this.issueType),
         noType: !this.issueType,
         isValidType: this.issueType && this.issueType !== 'legal',
       };
@@ -23,7 +24,7 @@ document.addEventListener('alpine:init', () => {
       const discussionsLink =
         'For community help and to see what others are discussing, visit the <a href="https://github.com/freelawproject/courtlistener/discussions">CourtListener Discussion</a> forum.';
       const hints = {
-        support: `<strong>Need a hand with CourtListener?</strong> First, check the other options above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>${discussionsLink}`,
+        support: `<strong>Need a hand with CourtListener?</strong> This option goes to our general inbox. Doublecheck the other options in the dropdown above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>${discussionsLink}`,
         api: `<a href="https://free.law">Free Law Project</a> makes it possible for you and your team to access our data. ${discussionsLink}`,
         recap:
           'Having trouble with the <a href="https://free.law/recap">RECAP extension</a>? Include your browser and version, the page/court link you were on, what you expected, and what happened instead.',
@@ -53,6 +54,7 @@ document.addEventListener('alpine:init', () => {
       // Fetch backend information: issue type options and Terms URL
       const issueTypeInput = this.$el.elements['issue_type'];
       if (issueTypeInput) this.issueType = issueTypeInput.value;
+      this.requiresCheckTypes = JSON.parse(document.getElementById('requires-check-types').textContent);
       this.techTypes = JSON.parse(document.getElementById('tech-types').textContent);
       this.termsURL = JSON.parse(document.getElementById('terms-url').textContent);
     },

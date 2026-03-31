@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import itertools
 import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
@@ -21,6 +23,11 @@ from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.state.texas import (
+    TexasOriginatingAppellateCourt,
+    TexasOriginatingDistrictCourt,
+)
+from juriscraper.state.texas.common import CourtID, CourtType
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
@@ -33,6 +40,48 @@ from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+PAGINATION_BATCH_SIZE = 2000
+
+
+def paginate_docs_queryset(
+    queryset: QuerySet,
+    batch_size: int = PAGINATION_BATCH_SIZE,
+    desc: bool = False,
+) -> Generator:
+    """Paginate a queryset using pk-based keyset pagination.
+
+    Uses pk-based filtering to avoid server-side cursors that hold
+    open DB connections (which time out during long celery waits).
+
+    :param queryset: A .values_list("pk", flat=True) queryset.
+    :param batch_size: Number of rows to fetch per query.
+    :param desc: If True, iterate in descending pk order.
+    :return: Yields individual pk values.
+    """
+    if desc:
+        # No upper-bound sentinel exists for PKs, so None means
+        # "first page, no filter yet"; subsequent pages use pk__lt.
+        last_pk: int | None = None
+        while True:
+            page = queryset.order_by("-pk")
+            if last_pk is not None:
+                page = page.filter(pk__lt=last_pk)
+            batch = list(page[:batch_size])
+            if not batch:
+                break
+            yield from batch
+            last_pk = batch[-1]
+    else:
+        last_pk_asc = 0
+        while True:
+            batch = list(
+                queryset.filter(pk__gt=last_pk_asc).order_by("pk")[:batch_size]
+            )
+            if not batch:
+                break
+            yield from batch
+            last_pk_asc = batch[-1]
 
 
 def extract_file_name_from_url(url: str) -> str:
@@ -1311,3 +1360,49 @@ class DownloadPDFResult:
 
     success: bool
     sha1: str | None = None
+
+
+def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
+    """Translates a Juriscraper Texas court ID to a CourtListener Court ID.
+
+    :param js_court_id: The court ID extracted from Juriscraper.
+    :return: The corresponding Court ID or None if invalid."""
+    if js_court_id == CourtID.SUPREME_COURT.value:
+        return "tex"
+    if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+        return "texcrimapp"
+    if js_court_id == CourtID.UNKNOWN.value:
+        logger.error("Unknown court ID: %s", js_court_id)
+        return None
+    # Court of appeals
+    appellate_number = str(int(js_court_id.removeprefix("texas_coa")))
+    return f"txctapp{appellate_number}"
+
+
+def texas_originating_court_to_court_id(
+    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
+) -> str | None:
+    """Attempts to translate Juriscraper Texas originating court data to a
+    CourtListener Court ID.
+
+    :param court_data: The originating court data from Juriscraper.
+    :return: The matching Court ID or None if no court could be found."""
+    court_type = court_data["court_type"]
+    match court_type:
+        case CourtType.APPELLATE.value:
+            return texas_js_court_id_to_court_id(court_data["court_id"])
+        case CourtType.DISTRICT.value:
+            district_number = court_data["district"]
+            if district_number:
+                if district_number > 1:
+                    district_number = district_number + 1
+                return f"texdistct{district_number}"
+            return "texdistct"
+        case CourtType.BUSINESS.value:
+            return "texbizct"
+        case CourtType.MUNICIPAL.value:
+            return "texctyct"
+        case CourtType.PROBATE.value:
+            return "texprobct"
+    # County, justice, and unknown court types
+    return None

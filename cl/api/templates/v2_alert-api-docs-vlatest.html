@@ -24,7 +24,7 @@
   <c-layout-with-navigation.section id="about">
     <h1>Legal Alert&nbsp;APIs</h1>
     <p class="lead">Use these APIs to create, modify, list, and delete search and docket alerts in our system.</p>
-    <p>Once configured, alerts can notify you by email or with a <a class="text-primary-600" href="{% url "webhooks_docs" %}">webhook event sent to your server</a>.</p>
+    <p>Once configured, alerts can notify you by email or with a <a class="links" href="{% url "webhooks_docs" %}">webhook event sent to your server</a>.</p>
     <p>This page focuses on the alerts API itself. To learn more about alerts generally, read the alert documentation.</p>
     <p><a href="{% url "alert_help" %}" class="btn-primary">Learn About Alerts</a></p>
   </c-layout-with-navigation.section>
@@ -32,7 +32,7 @@
   <c-layout-with-navigation.section id="search">
     <h2>Search Alerts <small>— <code>{% url "alert-list" version=version %}</code></small></h2>
     <p>Search Alerts update you when there is new information in our search engine.</p>
-    <p>This system scales to support thousands or even millions of alerts, allowing organizations to stay updated about numerous topics. This is a powerful system when used with <a class="text-primary-600" href="{% url "webhooks_docs" %}">webhooks</a>.</p>
+    <p>This system scales to support thousands or even millions of alerts, allowing organizations to stay updated about numerous topics. This is a powerful system when used with <a class="links" href="{% url "webhooks_docs" %}">webhooks</a>.</p>
     <p>Search alerts have three required fields and one optional field:</p>
     <ul>
       <li><strong><code>name</code></strong> &mdash; A human-friendly name for the alert.</li>
@@ -61,7 +61,7 @@ curl -X OPTIONS \
 
   <c-layout-with-navigation.section id="example">
     <h3>Example Usage</h3>
-    <p>Let's say we want to know about case law involving Apple Inc. On the front end, we search for "Apple Inc" (in quotes) and <a class="text-primary-600" href="/?q=%22Apple%20Inc%22&type=o">get query parameters</a> like:</p>
+    <p>Let's say we want to know about case law involving Apple Inc. On the front end, we search for "Apple Inc" (in quotes) and <a class="links" href="/?q=%22Apple%20Inc%22&type=o">get query parameters</a> like:</p>
     <c-code>
   q=%22Apple%20Inc%22&type=o
     </c-code>
@@ -113,14 +113,14 @@ curl -X GET \
   <c-layout-with-navigation.section id="dockets">
     <h2>Docket Alerts <small>— <code>{% url "docket-alert-list" version=version %}</code></small></h2>
     <p>Docket Alerts keep you updated about cases by sending notifications by email or webhook whenever there is new information in our system. Use this API to create, modify, list, and delete Docket Alerts.</p>
-    <p>Docket Alerts are always sent as soon as an update is available. See <a class="text-primary-600" href="{% url "alert_help" %}">the help page on Docket Alerts</a> to learn more about how we get updates.</p>
+    <p>Docket Alerts are always sent as soon as an update is available. See <a class="links" href="{% url "alert_help" %}">the help page on Docket Alerts</a> to learn more about how we get updates.</p>
     <p>Docket Alerts have two fields you can set:</p>
     <ul>
       <li><p><strong><code>docket</code></strong> — Required: The docket you want to subscribe to or unsubscribe from.</p></li>
       <li>
         <p><strong><code>alert_type</code></strong> — Whether to subscribe or unsubscribe from the docket.</p>
-        <p>This field is part of <a class="text-primary-600" href="{% url 'recap_email_help' %}">@recap.email</a>'s auto-subscribe feature. If you are not using @recap.email or have auto-subscribe disabled, you can ignore this field.</p>
-        <p>If you are using @recap.email and have auto-subscribe enabled <a class="text-primary-600" href="{% url "view_recap_email" %}">in your profile</a>, Docket Alerts will be automatically created for you as CourtListener receives notifications about cases. To permanently unsubscribe from a case for which you are receiving notifications from PACER, create an "Unsubscription" for the case.</p>
+        <p>This field is part of <a class="links" href="{% url 'recap_email_help' %}">@recap.email</a>'s auto-subscribe feature. If you are not using @recap.email or have auto-subscribe disabled, you can ignore this field.</p>
+        <p>If you are using @recap.email and have auto-subscribe enabled <a class="links" href="{% url "view_recap_email" %}">in your profile</a>, Docket Alerts will be automatically created for you as CourtListener receives notifications about cases. To permanently unsubscribe from a case for which you are receiving notifications from PACER, create an "Unsubscription" for the case.</p>
       </li>
     </ul>
     <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
