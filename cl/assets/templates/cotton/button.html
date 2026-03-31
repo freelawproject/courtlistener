@@ -23,9 +23,7 @@
 
   class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ link_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ link_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ link_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ link_grey_dis }}{% else %}{{ primary }} {{ link_primary_dis }}{% endif %}{% endif %} {{ class }}"
   {{ attrs }}
->
-  {{ slot }}
-</a>
+>{{ slot }}</a>
 {% elif touch_target %}
 <button
   type="{{ type }}"
@@ -33,9 +31,7 @@
   class="min-h-13 h-fit min-w-13 w-fit flex justify-center items-center focus-visible:outline-none group"
   {{ attrs }}
 >
-  <span class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }}{% elif variant == 'dark' %}{{ dark }}{% elif variant == 'ghost' %}{{ ghost }}{% elif variant == 'grey' %}{{ grey }}{% else %}{{ primary }}{% endif %} group-focus-visible:ring-4 group-focus-visible:ring-greyscale-300{% endif %} {{ class }}">
-    {{ slot }}
-  </span>
+  <span class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }}{% elif variant == 'dark' %}{{ dark }}{% elif variant == 'ghost' %}{{ ghost }}{% elif variant == 'grey' %}{{ grey }}{% else %}{{ primary }}{% endif %} group-focus-visible:ring-4 group-focus-visible:ring-greyscale-300{% endif %} {{ class }}">{{ slot }}</span>
 </button>
 {% else %}
 <button
@@ -43,9 +39,7 @@
 
   class="{% if variant %}{{ base }} {% if size == 'xl' %}{{ xl }}{% else %}{{ md }}{% endif %} {% if variant == 'outline' %}{{ outline }} {{ btn_outline_dis }}{% elif variant == 'dark' %}{{ dark }} {{ btn_dark_dis }}{% elif variant == 'ghost' %}{{ ghost }} {{ btn_ghost_dis }}{% elif variant == 'grey' %}{{ grey }} {{ btn_grey_dis }}{% else %}{{ primary }} {{ btn_primary_dis }}{% endif %}{% endif %} {{ class }}"
   {{ attrs }}
->
-  {{ slot }}
-</button>
+>{{ slot }}</button>
 {% endif %}
 
 {% endwith %}{% endwith %}{% endwith %}{% endwith %}{% endwith %}
