@@ -20,19 +20,19 @@
       </div>
       <div class="pl-4">
         <ol
-          class="list-decimal [&_a]:text-primary-600 marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
-          <li><a href="{% url "alert_help" %}">Help with search and docket alerts</a></li>
-          <li><a href="{% url "recap_email_help" %}">Help with @recap.email</a></li>
-          <li><a href="{% url "advanced_search" %}">Help with advanced search parameters</a></li>
-          <li><a href="{% url "citegeist_help" %}">How search results are ranked</a></li>
-          <li><a href="{% url "relative_dates" %}">Help with relative date queries</a></li>
-          <li><a href="{% url "tag_notes_help" %}">Learn how to tag dockets and save notes</a></li>
-          <li><a href="{% url "feeds_info" %}">Learn about RSS feeds</a></li>
-          <li><a href="{% url "podcasts" %}">Learn about our Podcasts</a></li>
-          <li><a href="{% url "markdown_help" %}">Help formatting with Markdown</a></li>
-          <li><a href="{% url "donation_help" %}">Help with your donations</a></li>
-          <li><a href="{% url "delete_help" %}">Help deleting your account</a></li>
-          <li><a href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></li>
+          class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
+          <li><a class="links" href="{% url "alert_help" %}">Help with search and docket alerts</a></li>
+          <li><a class="links" href="{% url "recap_email_help" %}">Help with @recap.email</a></li>
+          <li><a class="links" href="{% url "advanced_search" %}">Help with advanced search parameters</a></li>
+          <li><a class="links" href="{% url "citegeist_help" %}">How search results are ranked</a></li>
+          <li><a class="links" href="{% url "relative_dates" %}">Help with relative date queries</a></li>
+          <li><a class="links" href="{% url "tag_notes_help" %}">Learn how to tag dockets and save notes</a></li>
+          <li><a class="links" href="{% url "feeds_info" %}">Learn about RSS feeds</a></li>
+          <li><a class="links" href="{% url "podcasts" %}">Learn about our Podcasts</a></li>
+          <li><a class="links" href="{% url "markdown_help" %}">Help formatting with Markdown</a></li>
+          <li><a class="links" href="{% url "donation_help" %}">Help with your donations</a></li>
+          <li><a class="links" href="{% url "delete_help" %}">Help deleting your account</a></li>
+          <li><a class="links" href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></li>
         </ol>
       </div>
     </div>
@@ -43,13 +43,13 @@
         <p class="text-sm font-normal text-greyscale-600">We've built some of the biggest open datasets in the world. Learn more about them:</p>
       </div>
       <div class="pl-4">
-        <ol class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal [&_a]:text-primary-600 space-y-2">
-          <li><a href="{% url "coverage" %}">Coverage Homepage</a></li>
-          <li><a href="{% url "coverage_recap" %}">PACER Data Coverage</a></li>
-          <li><a href="{% url "coverage_opinions" %}">Case Law Coverage</a></li>
-          <li><a href="{% url "coverage_fds" %}">Financial Disclosure Coverage</a></li>
-          <li><a href="https://free.law/datasets#judges-db" target="_blank" rel="noreferrer">Judge Coverage</a></li>
-          <li><a href="{% url "coverage_oa" %}">Oral Argument Recording Coverage</a></li>
+        <ol class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
+          <li><a class="links" href="{% url "coverage" %}">Coverage Homepage</a></li>
+          <li><a class="links" href="{% url "coverage_recap" %}">PACER Data Coverage</a></li>
+          <li><a class="links" href="{% url "coverage_opinions" %}">Case Law Coverage</a></li>
+          <li><a class="links" href="{% url "coverage_fds" %}">Financial Disclosure Coverage</a></li>
+          <li><a class="links-external" href="https://free.law/datasets#judges-db" target="_blank" rel="noopener noreferrer">Judge Coverage</a></li>
+          <li><a class="links" href="{% url "coverage_oa" %}">Oral Argument Recording Coverage</a></li>
         </ol>
       </div>
     </div>
@@ -62,42 +62,42 @@
       <div class="pl-4">
         <ol
             class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal
-             [&_a]:text-primary-600 space-y-4">
+             space-y-4">
           <li>
             <p class="mb-2 text-greyscale-800">API Documentation</p>
             <ul class="list-disc pl-3 space-y-2">
               <li class="marker:text-greyscale-200">
-                <a href="{% url "rest_docs" %}">REST API Overview</a>
+                <a class="links" href="{% url "rest_docs" %}">REST API Overview</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "citation_lookup_api" %}">Citation Lookup API</a>
+                <a class="links" href="{% url "citation_lookup_api" %}">Citation Lookup API</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "search_api_help" %}">Search API</a>
+                <a class="links" href="{% url "search_api_help" %}">Search API</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "case_law_api_help" %}">Case Law APIs</a>
+                <a class="links" href="{% url "case_law_api_help" %}">Case Law APIs</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "pacer_api_help" %}">PACER Data APIs</a>
+                <a class="links" href="{% url "pacer_api_help" %}">PACER Data APIs</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "recap_api_help" %}">RECAP APIs</a>
+                <a class="links" href="{% url "recap_api_help" %}">RECAP APIs</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "judge_api_help" %}">Judge APIs</a>
+                <a class="links" href="{% url "judge_api_help" %}">Judge APIs</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "financial_disclosures_api_help" %}">Financial Disclosure APIs</a>
+                <a class="links" href="{% url "financial_disclosures_api_help" %}">Financial Disclosure APIs</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "citation_api_help" %}">Citation APIs</a>
+                <a class="links" href="{% url "citation_api_help" %}">Citation APIs</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "alert_api_help" %}">Alert APIs</a>
+                <a class="links" href="{% url "alert_api_help" %}">Alert APIs</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "visualization_api_help" %}">Supreme Court Visualization APIs</a>
+                <a class="links" href="{% url "visualization_api_help" %}">Supreme Court Visualization APIs</a>
               </li>
             </ul>
           </li>
@@ -105,17 +105,17 @@
             <p class="mb-2 text-greyscale-800">Webhook Documentation</p>
             <ul class="list-disc pl-3 space-y-2">
               <li class="marker:text-greyscale-200">
-                <a href="{% url "webhooks_docs" %}">Webhook Overview</a>
+                <a class="links" href="{% url "webhooks_docs" %}">Webhook Overview</a>
               </li>
               <li class="marker:text-greyscale-200">
-                <a href="{% url "webhooks_getting_started" %}">Getting Started</a>
+                <a class="links" href="{% url "webhooks_getting_started" %}">Getting Started</a>
               </li>
             </ul>
           </li>
-          <li><a href="{% url "mcp_help" %}">MCP Server for AI Assistants</a> <span class="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full ml-1">Coming Soon</span></li>
-          <li><a href="{% url "bulk_data_index" %}">Bulk Data Documentation</a></li>
-          <li><a href="{% url "replication_docs" %}">Replication Documentation</a></li>
-          <li><a href="{% url "api_index" %}">Data Services on CourtListener</a></li>
+          <li><a class="links" href="{% url "mcp_help" %}">MCP Server for AI Assistants</a> <span class="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full ml-1">Coming Soon</span></li>
+          <li><a class="links" href="{% url "bulk_data_index" %}">Bulk Data Documentation</a></li>
+          <li><a class="links" href="{% url "replication_docs" %}">Replication Documentation</a></li>
+          <li><a class="links" href="{% url "api_index" %}">Data Services on CourtListener</a></li>
         </ol>
       </div>
     </div>

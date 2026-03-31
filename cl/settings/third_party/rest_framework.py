@@ -28,9 +28,9 @@ REST_FRAMEWORK = {
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.BasicAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        "cl.api.authentication.ReplicaRoutingBasicAuthentication",
+        "cl.api.authentication.ReplicaRoutingTokenAuthentication",
+        "cl.api.authentication.ReplicaRoutingSessionAuthentication",
     ),
     # Rendering and Parsing
     "DEFAULT_PARSER_CLASSES": (
