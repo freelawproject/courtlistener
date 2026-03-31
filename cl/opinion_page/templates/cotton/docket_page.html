@@ -31,124 +31,168 @@
   {% endif %}
 </hgroup>
 
+{% if perms.search.change_docket and docket.blocked %}
+  <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
+{% endif %}
+
 {# TODO: Action buttons — blocked on #7063 (button component). Add note, tags, alerts, PACER link. #}
 
-{# METADATA — stand-in flat list; swap to <c-description-list columns="4"> after #7126 lands #}
-<c-description-list>
+{# METADATA #}
+<c-description-list class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
   {% if docket.source in docket.RECAP_SOURCES %}
-    <c-description-term>Last Updated</c-description-term>
-    <c-description-details>{{ docket.date_modified|timezone:timezone }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Last Updated</c-description-term>
+      <c-description-details>{{ docket.date_modified|timezone:timezone }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.panel_str %}
-    <c-description-term>Panel</c-description-term>
-    <c-description-details>{{ docket.panel_str }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Panel</c-description-term>
+      <c-description-details>{{ docket.panel_str }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.assigned_to or docket.assigned_to_str %}
-    <c-description-term>Assigned To</c-description-term>
-    <c-description-details>
-      {% if docket.assigned_to %}
-        <a class="text-primary-600" href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
-      {% elif docket.assigned_to_str %}
-        <a class="text-primary-600" href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;" rel="nofollow">{{ docket.assigned_to_str }}</a>
-      {% endif %}
-    </c-description-details>
+    <c-description-item>
+      <c-description-term>Assigned To</c-description-term>
+      <c-description-details>
+        {% if docket.assigned_to %}
+          <a class="links" href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+        {% elif docket.assigned_to_str %}
+          <a class="links" href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;" rel="nofollow">{{ docket.assigned_to_str }}</a>
+        {% endif %}
+      </c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.referred_to or docket.referred_to_str %}
-    <c-description-term>Referred To</c-description-term>
-    <c-description-details>
-      {% if docket.referred_to %}
-        <a class="text-primary-600" href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
-      {% elif docket.referred_to_str %}
-        <a class="text-primary-600" href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;" rel="nofollow">{{ docket.referred_to_str }}</a>
-      {% endif %}
-    </c-description-details>
+    <c-description-item>
+      <c-description-term>Referred To</c-description-term>
+      <c-description-details>
+        {% if docket.referred_to %}
+          <a class="links" href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+        {% elif docket.referred_to_str %}
+          <a class="links" href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;" rel="nofollow">{{ docket.referred_to_str }}</a>
+        {% endif %}
+      </c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.date_cert_granted %}
-    <c-description-term>Date Certiorari Granted</c-description-term>
-    <c-description-details>{{ docket.date_cert_granted }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date Certiorari Granted</c-description-term>
+      <c-description-details>{{ docket.date_cert_granted }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.date_cert_denied %}
-    <c-description-term>Date Certiorari Denied</c-description-term>
-    <c-description-details>{{ docket.date_cert_denied }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date Certiorari Denied</c-description-term>
+      <c-description-details>{{ docket.date_cert_denied }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.date_argued %}
-    <c-description-term>Date Argued</c-description-term>
-    <c-description-details>{{ docket.date_argued }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date Argued</c-description-term>
+      <c-description-details>{{ docket.date_argued }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
-  <c-description-term>Citation</c-description-term>
-  <c-description-details>{% citation docket %}</c-description-details>
+  <c-description-item>
+    <c-description-term>Citation</c-description-term>
+    <c-description-details>{% citation docket %}</c-description-details>
+  </c-description-item>
 
   {% if docket.date_reargued %}
-    <c-description-term>Date Reargued</c-description-term>
-    <c-description-details>{{ docket.date_reargued }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date Reargued</c-description-term>
+      <c-description-details>{{ docket.date_reargued }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.date_reargument_denied %}
-    <c-description-term>Date Reargument Denied</c-description-term>
-    <c-description-details>{{ docket.date_reargument_denied }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date Reargument Denied</c-description-term>
+      <c-description-details>{{ docket.date_reargument_denied }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.date_filed %}
-    <c-description-term>Date Filed</c-description-term>
-    <c-description-details>{{ docket.date_filed }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date Filed</c-description-term>
+      <c-description-details>{{ docket.date_filed }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.date_terminated %}
-    <c-description-term>Date Terminated</c-description-term>
-    <c-description-details>{{ docket.date_terminated }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date Terminated</c-description-term>
+      <c-description-details>{{ docket.date_terminated }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.date_last_filing %}
-    <c-description-term>Date of Last Known Filing</c-description-term>
-    <c-description-details>{{ docket.date_last_filing }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Date of Last Known Filing</c-description-term>
+      <c-description-details>{{ docket.date_last_filing }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.cause %}
-    <c-description-term>Cause</c-description-term>
-    <c-description-details>
-      <a class="text-primary-600" href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;" rel="nofollow">{{ docket.cause }}</a>
-    </c-description-details>
+    <c-description-item>
+      <c-description-term>Cause</c-description-term>
+      <c-description-details>
+        <a class="links" href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;" rel="nofollow">{{ docket.cause }}</a>
+      </c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.nature_of_suit %}
-    <c-description-term>Nature of Suit</c-description-term>
-    <c-description-details>
-      <a class="text-primary-600" href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;" rel="nofollow">{{ docket.nature_of_suit }}</a>
-    </c-description-details>
+    <c-description-item>
+      <c-description-term>Nature of Suit</c-description-term>
+      <c-description-details>
+        <a class="links" href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;" rel="nofollow">{{ docket.nature_of_suit }}</a>
+      </c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.jury_demand %}
-    <c-description-term>Jury Demand</c-description-term>
-    <c-description-details>
-      <a class="text-primary-600" href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;" rel="nofollow">{{ docket.jury_demand }}</a>
-    </c-description-details>
+    <c-description-item>
+      <c-description-term>Jury Demand</c-description-term>
+      <c-description-details>
+        <a class="links" href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;" rel="nofollow">{{ docket.jury_demand }}</a>
+      </c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.jurisdiction_type %}
-    <c-description-term>Jurisdiction Type</c-description-term>
-    <c-description-details>{{ docket.jurisdiction_type }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Jurisdiction Type</c-description-term>
+      <c-description-details>{{ docket.jurisdiction_type }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.mdl_status %}
-    <c-description-term>MDL Status</c-description-term>
-    <c-description-details>{{ docket.mdl_status }}</c-description-details>
+    <c-description-item>
+      <c-description-term>MDL Status</c-description-term>
+      <c-description-details>{{ docket.mdl_status }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.appellate_fee_status %}
-    <c-description-term>Fee Status</c-description-term>
-    <c-description-details>{{ docket.appellate_fee_status }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Fee Status</c-description-term>
+      <c-description-details>{{ docket.appellate_fee_status }}</c-description-details>
+    </c-description-item>
   {% endif %}
 
   {% if docket.appellate_case_type_information %}
-    <c-description-term>Case Type Information</c-description-term>
-    <c-description-details>{{ docket.appellate_case_type_information }}</c-description-details>
+    <c-description-item>
+      <c-description-term>Case Type Information</c-description-term>
+      <c-description-details>{{ docket.appellate_case_type_information }}</c-description-details>
+    </c-description-item>
   {% endif %}
 </c-description-list>
 
@@ -158,33 +202,45 @@
     <h2 class="mt-6">Bankruptcy Information</h2>
     <c-description-list>
       {% if bankr_info.date_converted %}
-        <c-description-term>Date Converted</c-description-term>
-        <c-description-details>{{ bankr_info.date_converted|date:"N j, Y" }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Date Converted</c-description-term>
+          <c-description-details>{{ bankr_info.date_converted|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if bankr_info.date_last_to_file_claims %}
-        <c-description-term>Last Date to File Claims</c-description-term>
-        <c-description-details>{{ bankr_info.date_last_to_file_claims|date:"N j, Y" }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Last Date to File Claims</c-description-term>
+          <c-description-details>{{ bankr_info.date_last_to_file_claims|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if bankr_info.date_last_to_file_govt %}
-        <c-description-term>Last Date to File Claims (Gov't)</c-description-term>
-        <c-description-details>{{ bankr_info.date_last_to_file_govt|date:"N j, Y" }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Last Date to File Claims (Gov't)</c-description-term>
+          <c-description-details>{{ bankr_info.date_last_to_file_govt|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if bankr_info.date_debtor_dismissed %}
-        <c-description-term>Date Debtor Dismissed</c-description-term>
-        <c-description-details>{{ bankr_info.date_debtor_dismissed|date:"N j, Y" }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Date Debtor Dismissed</c-description-term>
+          <c-description-details>{{ bankr_info.date_debtor_dismissed|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if bankr_info.chapter %}
-        <c-description-term>Chapter</c-description-term>
-        <c-description-details>{{ bankr_info.chapter }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Chapter</c-description-term>
+          <c-description-details>{{ bankr_info.chapter }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if bankr_info.trustee_str %}
-        <c-description-term>Trustee</c-description-term>
-        <c-description-details>{{ bankr_info.trustee_str }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Trustee</c-description-term>
+          <c-description-details>{{ bankr_info.trustee_str }}</c-description-details>
+        </c-description-item>
       {% endif %}
     </c-description-list>
   {% endif %}
@@ -196,78 +252,96 @@
     <h2 class="mt-6">Originating Court Information</h2>
     <c-description-list>
       {% if docket.appeal_from or docket.appeal_from_str %}
-        <c-description-term>Appealed From</c-description-term>
-        <c-description-details>
-          {% if docket.appeal_from %}
-            {{ docket.appeal_from.short_name }}
-          {% elif docket.appeal_from_str %}
-            {{ docket.appeal_from_str }}
-          {% endif %}
-          {% if og_info.docket_number %}
+        <c-description-item>
+          <c-description-term>Appealed From</c-description-term>
+          <c-description-details>
             {% if docket.appeal_from %}
-              (<a class="text-primary-600"
-                  href="/?type=r&amp;docket_number={{ og_info.docket_number }}&amp;court={{ docket.appeal_from.pk }}"
-                  rel="nofollow"
-                  title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }}</a>)
-            {% elif og_info.administrative_link %}
-              (<a class="underline" href="{{ og_info.administrative_link }}" target="_blank" rel="noreferrer">{{ og_info.docket_number }}</a>)
-            {% else %}
-              ({{ og_info.docket_number }})
+              {{ docket.appeal_from.short_name }}
+            {% elif docket.appeal_from_str %}
+              {{ docket.appeal_from_str }}
             {% endif %}
-          {% endif %}
-        </c-description-details>
+            {% if og_info.docket_number %}
+              {% if docket.appeal_from %}
+                (<a class="links"
+                    href="/?type=r&amp;docket_number={{ og_info.docket_number }}&amp;court={{ docket.appeal_from.pk }}"
+                    rel="nofollow"
+                    title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }}</a>)
+              {% elif og_info.administrative_link %}
+                (<a class="links-external" href="{{ og_info.administrative_link }}" target="_blank" rel="noreferrer">{{ og_info.docket_number }}</a>)
+              {% else %}
+                ({{ og_info.docket_number }})
+              {% endif %}
+            {% endif %}
+          </c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.court_reporter %}
-        <c-description-term>Court Reporter</c-description-term>
-        <c-description-details>{{ og_info.court_reporter }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Court Reporter</c-description-term>
+          <c-description-details>{{ og_info.court_reporter }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.assigned_to or og_info.assigned_to_str %}
-        <c-description-term>Trial Judge</c-description-term>
-        <c-description-details>
-          {% if og_info.assigned_to %}
-            <a class="text-primary-600" href="{{ og_info.assigned_to.get_absolute_url }}">{{ og_info.assigned_to.name_full }}</a>
-          {% elif og_info.assigned_to_str %}
-            <a class="text-primary-600" href="/?type=r&amp;assigned_to=&quot;{{ og_info.assigned_to_str }}&quot;" rel="nofollow">{{ og_info.assigned_to_str }}</a>
-          {% endif %}
-        </c-description-details>
+        <c-description-item>
+          <c-description-term>Trial Judge</c-description-term>
+          <c-description-details>
+            {% if og_info.assigned_to %}
+              <a class="links" href="{{ og_info.assigned_to.get_absolute_url }}">{{ og_info.assigned_to.name_full }}</a>
+            {% elif og_info.assigned_to_str %}
+              <a class="links" href="/?type=r&amp;assigned_to=&quot;{{ og_info.assigned_to_str }}&quot;" rel="nofollow">{{ og_info.assigned_to_str }}</a>
+            {% endif %}
+          </c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.ordering_judge or og_info.ordering_judge_str %}
-        <c-description-term>Ordering Judge</c-description-term>
-        <c-description-details>
-          {% if og_info.ordering_judge %}
-            <a class="text-primary-600" href="{{ og_info.ordering_judge.get_absolute_url }}">{{ og_info.ordering_judge.name_full }}</a>
-          {% elif og_info.ordering_judge_str %}
-            <a class="text-primary-600" href="/?type=r&amp;assigned_to=&quot;{{ og_info.ordering_judge_str }}&quot;" rel="nofollow">{{ og_info.ordering_judge_str }}</a>
-          {% endif %}
-        </c-description-details>
+        <c-description-item>
+          <c-description-term>Ordering Judge</c-description-term>
+          <c-description-details>
+            {% if og_info.ordering_judge %}
+              <a class="links" href="{{ og_info.ordering_judge.get_absolute_url }}">{{ og_info.ordering_judge.name_full }}</a>
+            {% elif og_info.ordering_judge_str %}
+              <a class="links" href="/?type=r&amp;assigned_to=&quot;{{ og_info.ordering_judge_str }}&quot;" rel="nofollow">{{ og_info.ordering_judge_str }}</a>
+            {% endif %}
+          </c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.date_filed %}
-        <c-description-term>Date Filed</c-description-term>
-        <c-description-details>{{ og_info.date_filed }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Date Filed</c-description-term>
+          <c-description-details>{{ og_info.date_filed }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.date_judgment %}
-        <c-description-term>Date Order/Judgment</c-description-term>
-        <c-description-details>{{ og_info.date_judgment }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Date Order/Judgment</c-description-term>
+          <c-description-details>{{ og_info.date_judgment }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.date_judgment_eod %}
-        <c-description-term>Date Order/Judgment EOD</c-description-term>
-        <c-description-details>{{ og_info.date_judgment_eod }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Date Order/Judgment EOD</c-description-term>
+          <c-description-details>{{ og_info.date_judgment_eod }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.date_filed_noa %}
-        <c-description-term>Date NOA Filed</c-description-term>
-        <c-description-details>{{ og_info.date_filed_noa }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Date NOA Filed</c-description-term>
+          <c-description-details>{{ og_info.date_filed_noa }}</c-description-details>
+        </c-description-item>
       {% endif %}
 
       {% if og_info.date_received_coa %}
-        <c-description-term>Date Rec'd COA</c-description-term>
-        <c-description-details>{{ og_info.date_received_coa }}</c-description-details>
+        <c-description-item>
+          <c-description-term>Date Rec'd COA</c-description-term>
+          <c-description-details>{{ og_info.date_received_coa }}</c-description-details>
+        </c-description-item>
       {% endif %}
     </c-description-list>
   {% endif %}
@@ -279,7 +353,7 @@
   <ul>
     {% for af in docket.audio_files.all %}
       <li>
-        <a class="text-primary-600" href="{{ af.get_absolute_url }}{% querystring %}">
+        <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
           {{ af|best_case_name|safe|v_wrapper }}
         </a>
         <br/>
