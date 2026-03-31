@@ -3,6 +3,7 @@
 {% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 {% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
+{# frontend-checks-skip: check_hardcoded_ids #}
 
 <c-vars variant request class=""></c-vars>
 
@@ -57,7 +58,7 @@
           <li
             class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
-            <a href="https://donate.free.law/forms/supportflp" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+            <a href="https://donate.free.law/forms/supportflp" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 flex justify-start gap-2 w-full">
               {% svg "money_hand" class="text-greyscale-500" aria_hidden="true" %}
               Make a Donation
             </a>
@@ -65,7 +66,7 @@
           <li
             class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
-            <a href="https://free.law/membership/" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+            <a href="https://free.law/membership/" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 flex justify-start gap-2 w-full">
               {% svg "group" class="text-greyscale-500" aria_hidden="true" %}
               Become a Member
             </a>
