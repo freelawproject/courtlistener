@@ -1,9 +1,4 @@
-{% load extras %}
-{% load humanize %}
-{% load svg_tags %}
-{% load text_filters %}
-{% load tz %}
-{% load component_tags %}
+{% load component_tags extras humanize svg_tags text_filters tz %}
 {% require_script "js/alpine/components/docket_page.js" %}
 
 <c-vars
@@ -15,6 +10,7 @@
   timezone=""
   has_alert=""
   note_form=""
+  tab_content_id="tab-content"
 />
 
 {# Filed date eyebrow #}
@@ -345,7 +341,7 @@
   </div>
 
   {# Tab content #}
-  <div id="tab-content" class="bg-greyscale-100 rounded-b-2xl md:rounded-tr-2xl p-4">
+  <div id="{{ tab_content_id }}" class="bg-greyscale-100 rounded-b-2xl md:rounded-tr-2xl p-4">
     {{ slot }}
   </div>
 {% else %}

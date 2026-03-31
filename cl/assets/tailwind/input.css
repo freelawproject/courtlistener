@@ -225,6 +225,6 @@
     -ms-overflow-style: none;
   }
   .scrollbar-none::-webkit-scrollbar {
-    display: none;
+    @apply hidden;
   }
 }
