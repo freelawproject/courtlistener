@@ -40,7 +40,7 @@
 
   {# MOBILE tabs #}
   <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4">
-    <select aria-label="Select {{ title }} tabs" @change="handleChange" class="w-full">
+    <select aria-label="Select {{ title }} tabs" x-on:change="handleChange" class="w-full">
       <template x-for="tab in tabs">
         <option
           x-text="tab"
