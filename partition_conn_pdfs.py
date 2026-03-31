@@ -391,14 +391,41 @@ def redact_following_text(pdf_path: Path, next_docket_number: str) -> bool:
         start_y = _find_opinion_start_y(last_page, next_docket_number)
         page_height = last_page.height
 
+        # Find the lowest header separator on the last page.  The page
+        # header block (CT Law Journal line, citation header, short case
+        # name) spans three horizontal separators in the top ~180pt.
+        # We redact everything up to the last separator in that block.
+        h_lines = sorted(
+            [
+                line
+                for line in last_page.lines
+                if abs(line["top"] - line["bottom"]) < 1
+                and line["top"] < 200  # only separators in the header region
+            ],
+            key=lambda line: line["top"],
+        )
+        last_header_separator_y = (
+            h_lines[-1]["top"] if h_lines else None
+        )
+
     if start_y is None:
         return False
 
     tmp_path = str(pdf_path) + ".tmp"
     doc = fitz.open(pdf_path)
     last_fitz_page = doc[-1]
-    redact_rect = fitz.Rect(0, start_y, last_fitz_page.rect.width, page_height)
-    last_fitz_page.add_redact_annot(redact_rect, fill=[1, 1, 1])
+
+    # Redact the next opinion's body text (case name block to bottom)
+    body_rect = fitz.Rect(0, start_y, last_fitz_page.rect.width, page_height)
+    last_fitz_page.add_redact_annot(body_rect, fill=[1, 1, 1])
+
+    # Redact the page header (everything up to the last header separator)
+    if last_header_separator_y is not None:
+        header_rect = fitz.Rect(
+            0, 0, last_fitz_page.rect.width, last_header_separator_y + 2
+        )
+        last_fitz_page.add_redact_annot(header_rect, fill=[1, 1, 1])
+
     last_fitz_page.apply_redactions()
     doc.save(tmp_path, deflate=True)
     doc.close()
@@ -679,6 +706,44 @@ def main() -> None:
             logger.warning("  %s", m)
     else:
         logger.info("Redaction consistency check passed")
+
+    # --- Sanity check: last-page header should be redacted (not show
+    # the next opinion's citation).  Only checks for the specific next
+    # opinion's citation, ignoring unrelated citations that appear in
+    # body text or footnotes.
+    if not args.dry_run:
+        foreign_header_issues: list[str] = []
+
+        for idx in range(len(all_opinions) - 1):
+            op = all_opinions[idx]
+            if not op.get("needs_last_page_redaction"):
+                continue
+
+            next_cite = all_opinions[idx + 1]["citation"]
+            output_path = args.output_dir / op["source_file"]
+            with pdfplumber.open(output_path) as pdf:
+                last_page = pdf.pages[-1]
+                text = (
+                    last_page.extract_text(**EXTRACT_TEXT_KWARGS) or ""
+                )
+                header_text = "\n".join(text.split("\n")[:3])
+                if next_cite in header_text:
+                    foreign_header_issues.append(
+                        f"{op['source_file']} last page: "
+                        f"header still has {next_cite}"
+                    )
+
+        if foreign_header_issues:
+            logger.warning(
+                "Foreign last-page header citations (%d):",
+                len(foreign_header_issues),
+            )
+            for issue in foreign_header_issues:
+                logger.warning("  %s", issue)
+        else:
+            logger.info(
+                "Last-page header check passed for all redacted PDFs"
+            )
 
     # Write metadata
     args.metadata_out.parent.mkdir(parents=True, exist_ok=True)
