@@ -5,6 +5,8 @@
 {% require_script "js/alpine/plugins/intersect" defer=True %}
 {% require_script "js/alpine/plugins/collapse" defer=True %}
 {% require_script "js/alpine/plugins/focus" defer=True %}
+{# frontend-checks-skip: check_hardcoded_ids #}
+{# This component is a singleton so hardcoded IDs are intentional #}
 
 <c-vars nav_items ></c-vars>
 {{ nav_items|json_script:"nav-items" }}
