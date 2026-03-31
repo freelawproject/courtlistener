@@ -1,6 +1,7 @@
 {% load svg_tags component_tags %}
-{% require_script "js/alpine/plugins/ui@3.14.8" defer=True %}
-{% require_script "js/alpine/plugins/anchor@3.14.8" defer=True %}
+{% require_script "js/alpine/components/menu_button" %}
+{% require_script "js/alpine/plugins/ui" defer=True %}
+{% require_script "js/alpine/plugins/anchor" defer=True %}
 
 <c-vars
   button_class="btn-primary"
@@ -12,7 +13,7 @@
 />
 
 <article
-  x-data
+  x-data="menuButton"
   x-menu
   class="relative"
   aria-label="{{ widget_aria_label }}"
