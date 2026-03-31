@@ -340,34 +340,102 @@ Sample code here.
   {# DESCRIPTION LIST #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="description-list">
     <h2 class="mt-6 mb-3">Description list</h2>
+    <p>Highly customizable description list components. Can be used to create a change log, terms list, or grid of metadata. If creating a single column, <code>c-description-item</code> isn't needed. Use that to ensure elements are lined up correctly across rows within a grid display.</p>
 
-    <h4 class="mt-3">Demo</h4>
+    <h4 class="mt-3">Demo — Responsive multi-column grid</h4>
+    <c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <c-description-item>
+        <c-description-term>Term</c-description-term>
+        <c-description-details>Description of the term.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Another term</c-description-term>
+        <c-description-details>Another description.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Third term</c-description-term>
+        <c-description-details>Third description.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Fourth term</c-description-term>
+        <c-description-details>A longer description that wraps to demonstrate how subgrid keeps terms aligned across columns.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Fifth term</c-description-term>
+        <c-description-details>Fifth description.</c-description-details>
+      </c-description-item>
+    </c-description-list>
+
+    <h4 class="mt-3">Demo — Single column (default)</h4>
     <c-description-list>
       <c-description-term>Term</c-description-term>
       <c-description-details>Description of the term.</c-description-details>
 
       <c-description-term>Another term</c-description-term>
       <c-description-details>Another description.</c-description-details>
+    </c-description-list>
 
-      <c-description-term>Nuanced term</c-description-term>
-      <c-description-term>Alternative term</c-description-term>
-      <c-description-details>Description explaining both.</c-description-details>
+    <h4 class="mt-3">Demo — Rich content values</h4>
+    <c-description-list class="grid grid-cols-1 md:grid-cols-2">
+      <c-description-item>
+        <c-description-term>Related links</c-description-term>
+        <c-description-details>
+          See the <a href="#" class="text-primary-600">API documentation</a> for details on this endpoint.
+        </c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Nested HTML</c-description-term>
+        <c-description-details>
+          This release introduces:
+          <ul>
+            <li>A new <code>field_name</code> on the endpoint.</li>
+            <li>Support for <strong>bulk requests</strong>.</li>
+          </ul>
+        </c-description-details>
+      </c-description-item>
+    </c-description-list>
 
-      <c-description-term>Complicated term</c-description-term>
-      <c-description-details>Primary description.</c-description-details>
-      <c-description-details>Alternative description.</c-description-details>
+    <h4 class="mt-3">Demo — Class overrides</h4>
+    <c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <c-description-item>
+        <c-description-term class="text-primary-600">Styled term</c-description-term>
+        <c-description-details class="italic">Styled description with extra gap.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term class="text-primary-600">Another styled term</c-description-term>
+        <c-description-details class="italic">Another styled description.</c-description-details>
+      </c-description-item>
     </c-description-list>
 
     <c-library.list title="Props" only>
-      <p>No props</p>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-list</code> — <code>class</code></c-slot>
+        <c-slot name="description">CSS classes merged onto the <code>&lt;dl&gt;</code> container. Use Tailwind grid utilities (e.g., <code>grid grid-cols-1 md:grid-cols-3</code>) to control responsive column layout. When using multiple columns, wrap each term/details pair in <code>&lt;c-description-item&gt;</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-item</code> — <code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes merged onto the wrapper <code>&lt;div&gt;</code>. Used to group a term/details pair for multi-column layouts.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-term</code> — <code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes merged onto the <code>&lt;dt&gt;</code>. Default: <code>font-semibold</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-details</code> — <code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes merged onto the <code>&lt;dd&gt;</code>.</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-library.list title="Slots" only>
       <c-library.item only>
         <c-slot name="label"><code>c-description-list</code> default</c-slot>
         <c-slot name="description">
-          Combinations of <code>c-description-term</code> and <code>c-description-details</code> elements.
+          <code>c-description-item</code> wrappers (for multi-column) or bare <code>c-description-term</code> and <code>c-description-details</code> elements (for single-column).
         </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-item</code> default</c-slot>
+        <c-slot name="description">A <code>c-description-term</code> and one or more <code>c-description-details</code> elements.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>c-description-term</code> default</c-slot>
@@ -381,20 +449,30 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
+{# Single column (default) #}
 &lt;c-description-list&gt;
   &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
-  &lt;c-description-details&gt;Description of the term.&lt;/c-description-details&gt;
+  &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
+&lt;/c-description-list&gt;
 
-  &lt;c-description-term&gt;Another term&lt;/c-description-term&gt;
-  &lt;c-description-details&gt;Another description.&lt;/c-description-details&gt;
+{# Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop #}
+&lt;c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"&gt;
+  &lt;c-description-item&gt;
+    &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
+    &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
+  &lt;/c-description-item&gt;
+  &lt;c-description-item&gt;
+    &lt;c-description-term&gt;Another term&lt;/c-description-term&gt;
+    &lt;c-description-details&gt;Another description.&lt;/c-description-details&gt;
+  &lt;/c-description-item&gt;
+&lt;/c-description-list&gt;
 
-  &lt;c-description-term&gt;Nuanced term&lt;/c-description-term&gt;
-  &lt;c-description-term&gt;Alternative term&lt;/c-description-term&gt;
-  &lt;c-description-details&gt;Description explaining both.&lt;/c-description-details&gt;
-
-  &lt;c-description-term&gt;Complicated term&lt;/c-description-term&gt;
-  &lt;c-description-details&gt;Primary description.&lt;/c-description-details&gt;
-  &lt;c-description-details&gt;Alternative description.&lt;/c-description-details&gt;
+{# With class overrides #}
+&lt;c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
+  &lt;c-description-item&gt;
+    &lt;c-description-term class="text-primary-600"&gt;Styled term&lt;/c-description-term&gt;
+    &lt;c-description-details class="italic"&gt;Styled description.&lt;/c-description-details&gt;
+  &lt;/c-description-item&gt;
 &lt;/c-description-list&gt;
       </c-code>
     </c-expansion-panel>
