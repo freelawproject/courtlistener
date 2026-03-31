@@ -1,11 +1,15 @@
 from collections.abc import Awaitable
 
 from asgiref.sync import iscoroutinefunction
-from django.conf import settings
 from django.http import HttpRequest, HttpResponseBase
 from waffle import flag_is_active
 
-from cl.api.routers import reset_replica_routing, set_replica_routing
+from cl.api.routers import (
+    SAFE_METHODS,
+    is_replica_configured,
+    reset_replica_routing,
+    set_replica_routing,
+)
 
 
 class ReplicaRoutingMiddleware:
@@ -25,6 +29,11 @@ class ReplicaRoutingMiddleware:
         self.get_response = get_response
         self.async_mode = iscoroutinefunction(self.get_response)
 
+    def _reset_auth_replica_token(self, request: HttpRequest) -> None:
+        """Disable replica routing enabled by DRF auth classes."""
+        if getattr(request, "_replica_routing_token", None) is not None:
+            set_replica_routing(False)
+
     def __call__(
         self, request: HttpRequest
     ) -> HttpResponseBase | Awaitable[HttpResponseBase]:
@@ -36,7 +45,11 @@ class ReplicaRoutingMiddleware:
                 return self.get_response(request)
             finally:
                 reset_replica_routing(token)
-        return self.get_response(request)
+
+        try:
+            return self.get_response(request)
+        finally:
+            self._reset_auth_replica_token(request)
 
     async def __acall__(self, request: HttpRequest) -> HttpResponseBase:
         if self._should_route_to_replica(request):
@@ -45,17 +58,17 @@ class ReplicaRoutingMiddleware:
                 return await self.get_response(request)
             finally:
                 reset_replica_routing(token)
-        return await self.get_response(request)
+
+        try:
+            return await self.get_response(request)
+        finally:
+            self._reset_auth_replica_token(request)
 
     def _should_route_to_replica(self, request: HttpRequest) -> bool:
-        if request.method not in ("GET", "HEAD", "OPTIONS"):
+        if request.method not in SAFE_METHODS:
             return False
         if not request.path.startswith("/api/rest/"):
             return False
-        if not settings.API_READ_DATABASES:
-            return False
-        if not any(
-            db in settings.DATABASES for db in settings.API_READ_DATABASES
-        ):
+        if not is_replica_configured():
             return False
         return bool(flag_is_active(request, "replica-reads"))
