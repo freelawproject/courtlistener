@@ -123,6 +123,15 @@
   .input-text {
     @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
   }
+  .links {
+    @apply underline text-primary-600 hover:text-primary-800;
+  }
+  .links-external {
+    @apply links after:w-4 after:h-4 after:inline-block after:ml-1 after:bg-current;
+  }
+  .links-external::after {
+    mask: url("/static/svg/external.svg") no-repeat center/contain;
+  }
   /* Screenshots used in Help pages */
   .screenshot {
     @apply rounded-2xl block max-w-full;

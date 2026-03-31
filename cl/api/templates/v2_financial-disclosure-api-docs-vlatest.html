@@ -37,10 +37,10 @@
   <c-layout-with-navigation.section id="about">
     <h1>Financial Disclosures&nbsp;API</h1>
     <p class="lead">Use these APIs to work with financial disclosure records of current and former federal judges.</p>
-    <p>This data was collected from senate records and information requests we sent to the federal judiciary. You can learn more about which disclosures are included and the limitations of these APIs on <a class="text-primary-600" href="{% url "coverage_fds" %}">our coverage page for financial disclosures</a>.</p>
-    <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by <a class="underline" href="https://www.law.cornell.edu/uscode/text/5/13103">Title I of the Ethics in Government Act of 1978</a>. The Act requires that designated federal officials publicly disclose their personal financial interests to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.</p>
-    <p>These APIs were used by the Wall Street Journal in <a class="underline" href="https://www.wsj.com/articles/131-federal-judges-broke-the-law-by-hearing-cases-where-they-had-a-financial-interest-11632834421">their 17-part exposé</a> about the hidden conflicts of federal judges. That led to Congress passing the Courthouse Ethics and Transparency Act to put this information online. It was also used by ProPublica in <a class="underline" href="https://www.propublica.org/article/clarence-thomas-scotus-undisclosed-luxury-travel-gifts-crow">their Pulitzer prize winning reporting</a> about failures to disclose gifts and perks.</p>
-    <p>This data is updated in partnership with organizations using it. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> if you would like to work together to process and ingest the latest disclosure records.</p>
+    <p>This data was collected from senate records and information requests we sent to the federal judiciary. You can learn more about which disclosures are included and the limitations of these APIs on <a class="links" href="{% url "coverage_fds" %}">our coverage page for financial disclosures</a>.</p>
+    <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by <a class="links-external" href="https://www.law.cornell.edu/uscode/text/5/13103">Title I of the Ethics in Government Act of 1978</a>. The Act requires that designated federal officials publicly disclose their personal financial interests to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.</p>
+    <p>These APIs were used by the Wall Street Journal in <a class="links-external" href="https://www.wsj.com/articles/131-federal-judges-broke-the-law-by-hearing-cases-where-they-had-a-financial-interest-11632834421">their 17-part exposé</a> about the hidden conflicts of federal judges. That led to Congress passing the Courthouse Ethics and Transparency Act to put this information online. It was also used by ProPublica in <a class="links-external" href="https://www.propublica.org/article/clarence-thomas-scotus-undisclosed-luxury-travel-gifts-crow">their Pulitzer prize winning reporting</a> about failures to disclose gifts and perks.</p>
+    <p>This data is updated in partnership with organizations using it. Please <a class="links" href="{% url "contact" %}">get in touch</a> if you would like to work together to process and ingest the latest disclosure records.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="apis">
@@ -100,7 +100,7 @@
 
   <c-layout-with-navigation.section id="understanding">
     <h3>Understanding the Fields</h3>
-    <p>Like most of our APIs, field definitions can be obtained by sending an HTTP <code>OPTIONS</code> request to any of the APIs. For example, this request, piped through <a class="underline" href="https://github.com/jqlang/jq"><code>jq</code></a>, shows you the fields of the Gifts API:</p>
+    <p>Like most of our APIs, field definitions can be obtained by sending an HTTP <code>OPTIONS</code> request to any of the APIs. For example, this request, piped through <a class="links-external" href="https://github.com/jqlang/jq"><code>jq</code></a>, shows you the fields of the Gifts API:</p>
   <c-code>
 curl -X OPTIONS "{% get_full_host %}{% url "gift-list" version=version %}" \
     | jq '.actions.POST'
@@ -250,28 +250,28 @@ curl "{% get_full_host %}{% url "investment-list" version=version %}?redacted=Tr
 curl "{% get_full_host %}{% url "investment-list" version=version %}?gross_value_code=P4&fields=investments" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
     </c-code>
-    <p>Additionally, you could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a class="text-primary-600" href="{% url "view_person" 1213 "ruth-bader-ginsburg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
+    <p>Additionally, you could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a class="links" href="{% url "view_person" 1213 "ruth-bader-ginsburg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
     <c-code>
 curl "{% get_full_host %}{% url "financialdisclosure-list" version=version %}?person=1213&fields=gifts" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
     </c-code>
-    <p>In 2024, we presented these APIs at the NICAR conference and created <a class="underline" href="https://github.com/freelawproject/talks/tree/main/talks/2024/march/NICAR/cracking_the_courts_panel/examples">many more examples</a> you can explore.</p>
+    <p>In 2024, we presented these APIs at the NICAR conference and created <a class="links-external" href="https://github.com/freelawproject/talks/tree/main/talks/2024/march/NICAR/cracking_the_courts_panel/examples">many more examples</a> you can explore.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="more">
     <h3>Learn More</h3>
     <p>The following references may help you learn more about these forms:</p>
     <ol>
-      <li><a class="underline" href="https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf">The official policies guiding financial disclosures</a></li>
-      <li><a class="underline" href="https://www.uscourts.gov/administration-policies/judiciary-financial-disclosure-reports">The reporting instructions given to judges and judicial employees</a></li>
-      <li><a class="underline" href="https://www.gao.gov/assets/gao-18-406.pdf">A GAO report on disclosures</a></li>
-      <li><a class="underline" href="https://www.govtrack.us/congress/bills/95/s555">The Ethics in Government Act establishing disclosure rules</a></li>
+      <li><a class="links-external" href="https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf">The official policies guiding financial disclosures</a></li>
+      <li><a class="links-external" href="https://www.uscourts.gov/administration-policies/judiciary-financial-disclosure-reports">The reporting instructions given to judges and judicial employees</a></li>
+      <li><a class="links-external" href="https://www.gao.gov/assets/gao-18-406.pdf">A GAO report on disclosures</a></li>
+      <li><a class="links-external" href="https://www.govtrack.us/congress/bills/95/s555">The Ethics in Government Act establishing disclosure rules</a></li>
     </ol>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="security">
     <h3>Security</h3>
-    <p>Please report any security or privacy concerns to <a class="underline" href="mailto:security@free.law">security@free.law</a>.</p>
+    <p>Please report any security or privacy concerns to <a class="links-external" href="mailto:security@free.law">security@free.law</a>.</p>
   </c-layout-with-navigation.section>
 
   <c-support-plea-banner />
