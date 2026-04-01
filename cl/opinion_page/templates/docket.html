@@ -1,3 +1,8 @@
+{% extends "docket_tabs.html" %}
+{% load extras %}
+{% load admin_urls %}
+{% load static %}
+
 {% comment %}
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                               ATTENTION!                                ║
@@ -7,10 +12,6 @@
 ║ cl/opinion_page/templates/v2_docket.html                                ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 {% endcomment %}
-{% extends "docket_tabs.html" %}
-{% load extras %}
-{% load admin_urls %}
-{% load static %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} - CourtListener.com{% endblock %}
