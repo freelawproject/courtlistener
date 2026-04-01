@@ -4485,7 +4485,7 @@ def merge_texas_docket_originating_court(
             "Skipping merge of OCI for Texas docket %s due to unknown originating court type.",
             docket.docket_number,
         )
-        return MergeResult.failed()
+        return MergeResult.unnecessary(None)
 
     created = False
     if not docket.originating_court_information:
@@ -4590,7 +4590,7 @@ def merge_texas_case_transfers(
                     docket.docket_number,
                 )
 
-                return MergeResult.failed()
+                return MergeResult.unnecessary(None)
 
             logger.warning(
                 "Found Texas SC docket with originating information but no appellate information (docket number %s). Falling back to using trial court to create appeal type transfer.",
