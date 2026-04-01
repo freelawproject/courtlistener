@@ -4633,36 +4633,42 @@ def merge_texas_case_transfers(
                     transfer_from["court_id"]
                 )
 
-                try:
-                    coa_transfer_origin_court = Court.objects.get(
-                        pk=coa_transfer_origin_court_id
-                    )
-                except Court.DoesNotExist:
-                    logger.error(
-                        "Court with ID %s not found while populating CaseTransfer.origin_court.",
-                        coa_transfer_origin_court_id,
+                if not coa_transfer_origin_court_id:
+                    logger.warning(
+                        "Could not determine origin court for workload transfer of docket %s. Skipping workload transfer.",
+                        docket.docket_number,
                     )
                 else:
-                    # Texas Government Code 73.001 (accessed 2026-02-23)
-                    coa_transfer_type = (
-                        CaseTransfer.JURISDICTION
-                        if docket_data["court_id"]
-                        == CourtID.FIFTEENTH_COURT_OF_APPEALS.value
-                        else CaseTransfer.WORKLOAD
-                    )
-                    transfers.append(
-                        CaseTransfer(
-                            origin_court=coa_transfer_origin_court,
-                            origin_docket_number=transfer_from[
-                                "origin_docket"
-                            ],
-                            destination_court=docket.court,
-                            destination_docket_number=docket.docket_number,
-                            destination_docket=docket,
-                            transfer_date=coa_transfer_date,
-                            transfer_type=coa_transfer_type,
+                    try:
+                        coa_transfer_origin_court = Court.objects.get(
+                            pk=coa_transfer_origin_court_id
                         )
-                    )
+                    except Court.DoesNotExist:
+                        logger.error(
+                            "Court with ID %s not found while populating CaseTransfer.origin_court.",
+                            coa_transfer_origin_court_id,
+                        )
+                    else:
+                        # Texas Government Code 73.001 (accessed 2026-02-23)
+                        coa_transfer_type = (
+                            CaseTransfer.JURISDICTION
+                            if docket_data["court_id"]
+                            == CourtID.FIFTEENTH_COURT_OF_APPEALS.value
+                            else CaseTransfer.WORKLOAD
+                        )
+                        transfers.append(
+                            CaseTransfer(
+                                origin_court=coa_transfer_origin_court,
+                                origin_docket_number=transfer_from[
+                                    "origin_docket"
+                                ],
+                                destination_court=docket.court,
+                                destination_docket_number=docket.docket_number,
+                                destination_docket=docket,
+                                transfer_date=coa_transfer_date,
+                                transfer_type=coa_transfer_type,
+                            )
+                        )
         case _:
             logger.error(
                 "Unrecognized Texas court ID %s and type %s while creating CaseTransfer",
