@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name='AccountSubscription',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('scraper', models.IntegerField(choices=[(1, 'Texas')], help_text='The scraper/site the account is for.')),
+                ('scraper', models.IntegerField(choices=[(1, 'TAMES CaseMail')], help_text='The scraper/site the account is for.')),
                 ('email', models.EmailField(help_text='The email address for the account.', max_length=254)),
                 ('user_name', models.CharField(help_text='The username of the account.', max_length=30)),
                 ('first_subscription', models.DateField(help_text='The date of the first subscription.')),
