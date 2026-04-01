@@ -107,7 +107,7 @@ class PACERMobilePageData(AbstractDateTimeModel):
 
 
 class Scraper(models.IntegerChoices):
-    TEXAS = 1, "Texas"
+    TAMES = 1, "TAMES CaseMail"
 
 
 class AccountSubscription(models.Model):
@@ -124,11 +124,9 @@ class AccountSubscription(models.Model):
     )
     first_subscription = models.DateField(
         help_text="The date of the first subscription.",
-        default=date.today,
     )
     last_subscription = models.DateField(
         help_text="The date of the last subscription.",
-        default=date.today,
     )
 
     class Meta:

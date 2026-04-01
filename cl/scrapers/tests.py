@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import responses
+import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -2164,7 +2165,7 @@ class SetOrderingKeysTest(SimpleTestCase):
 class AccountSubscriptionIncludeTest(TestCase):
     def setUp(self):
         self.subscription = AccountSubscription.objects.create(
-            scraper=Scraper.TEXAS,
+            scraper=Scraper.TAMES,
             email="test@example.com",
             user_name="testuser",
             first_subscription=date(2025, 3, 1),
@@ -2219,14 +2220,14 @@ class SubscribeToTamesCasesTest(TestCase):
         # Pre-create the tracker so get_or_create finds it
         # (avoids date.today() defaults polluting assertions).
         self.tracker = AccountSubscription.objects.create(
-            scraper=Scraper.TEXAS,
+            scraper=Scraper.TAMES,
             email="test@example.com",
             user_name="testuser",
             first_subscription=date(2025, 1, 15),
             last_subscription=date(2025, 1, 15),
         )
         self.mock_redis = MagicMock()
-        self.mock_redis.get.return_value = None
+        self.mock_redis.smembers.return_value = set()
         self.redis_patcher = mock.patch(
             "cl.scrapers.tasks.get_redis_interface",
             return_value=self.mock_redis,
@@ -2286,8 +2287,10 @@ class SubscribeToTamesCasesTest(TestCase):
         self.tracker.refresh_from_db()
         self.assertEqual(self.tracker.first_subscription, date(2025, 1, 15))
         self.assertEqual(self.tracker.last_subscription, date(2025, 2, 20))
-        self.mock_redis.delete.assert_called_once_with(
-            TAMES_FAILURES_CACHE_KEY
+        self.mock_redis.srem.assert_called_once_with(
+            TAMES_FAILURES_CACHE_KEY,
+            json.dumps(cases[0], sort_keys=True),
+            json.dumps(cases[1], sort_keys=True),
         )
 
     @responses.activate
@@ -2316,11 +2319,11 @@ class SubscribeToTamesCasesTest(TestCase):
         self.assertEqual(self.tracker.first_subscription, date(2025, 1, 15))
         self.assertEqual(self.tracker.last_subscription, date(2025, 1, 15))
 
-        # The failed case should be cached in Redis
-        self.mock_redis.set.assert_called_once()
-        _key, cached_json = self.mock_redis.set.call_args.args[:2]
-        self.assertEqual(_key, TAMES_FAILURES_CACHE_KEY)
-        self.assertEqual(json.loads(cached_json), [bad_case])
+        # The failed case should be cached in Redis as a SET member
+        self.mock_redis.sadd.assert_called_once_with(
+            TAMES_FAILURES_CACHE_KEY,
+            json.dumps(bad_case, sort_keys=True),
+        )
 
     @responses.activate
     @mock.patch("django.conf.settings.TAMES_USER", TAMES_USER_JSON)
@@ -2331,7 +2334,9 @@ class SubscribeToTamesCasesTest(TestCase):
             "case": "23-9999",
             "date_filed": "12/01/2024",
         }
-        self.mock_redis.get.return_value = json.dumps([cached_case])
+        self.mock_redis.smembers.return_value = {
+            json.dumps(cached_case, sort_keys=True)
+        }
 
         self._add_login_responses()
         # One response for the new case, one for the cached case
@@ -2348,9 +2353,11 @@ class SubscribeToTamesCasesTest(TestCase):
         self.tracker.refresh_from_db()
         self.assertEqual(self.tracker.first_subscription, date(2024, 12, 1))
         self.assertEqual(self.tracker.last_subscription, date(2025, 1, 15))
-        # Cache should be cleared since everything succeeded
-        self.mock_redis.delete.assert_called_once_with(
-            TAMES_FAILURES_CACHE_KEY
+        # Successful cases should be removed from the cache
+        self.mock_redis.srem.assert_called_once_with(
+            TAMES_FAILURES_CACHE_KEY,
+            json.dumps(new_case, sort_keys=True),
+            json.dumps(cached_case, sort_keys=True),
         )
 
     @responses.activate
@@ -2365,4 +2372,31 @@ class SubscribeToTamesCasesTest(TestCase):
         ]
         subscribe_to_tames_cases.apply(args=(cases,))
 
-        self.mock_redis.set.assert_not_called()
+        self.mock_redis.sadd.assert_not_called()
+
+    @responses.activate
+    @mock.patch("django.conf.settings.TAMES_USER", TAMES_USER_JSON)
+    @time_machine.travel("2026-03-31", tick=False)
+    def test_new_subscription_uses_case_dates_not_today(self):
+        """When no tracker exists, first/last_subscription should reflect
+        the case dates, not today's date.
+        """
+        # Remove the pre-created tracker so get_or_create must create one
+        self.tracker.delete()
+
+        self._add_login_responses()
+        self._add_case_add_response()
+        self._add_case_add_response()
+
+        cases = [
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            {"court": "cossup", "case": "24-0002", "date_filed": "02/20/2025"},
+        ]
+        subscribe_to_tames_cases.apply(args=(cases,))
+
+        tracker = AccountSubscription.objects.get(
+            scraper=Scraper.TAMES, user_name="testuser"
+        )
+        # Dates should match the cases, NOT today (2026-04-01)
+        self.assertEqual(tracker.first_subscription, date(2025, 1, 15))
+        self.assertEqual(tracker.last_subscription, date(2025, 2, 20))

@@ -953,14 +953,13 @@ def _login_tames(
 
 
 TAMES_FAILURES_CACHE_KEY = "scraper:tames:subscription_failures"
+TAMES_SUBSCRIPTION_LOCK_KEY = "scraper:tames:subscription_lock"
 TAMES_FAILURES_TTL = 60 * 60 * 24 * 28  # 4 weeks
 
 
 @app.task(
     bind=True,
     max_retries=3,
-    retry_backoff=10,
-    autoretry_for=(SubscriptionFailure,),
 )
 def subscribe_to_tames_cases(
     self: celery.Task,
@@ -982,105 +981,122 @@ def subscribe_to_tames_cases(
     if not settings.TAMES_USER:  # type: ignore[misc]
         raise ConfigurationException("TAMES_USER must be set.")
     tames_user = json.loads(settings.TAMES_USER)
-    subscription_tracker, _created = AccountSubscription.objects.get_or_create(
-        scraper=Scraper.TEXAS,
-        user_name=tames_user["username"],
-        defaults={"email": tames_user["email"]},
-    )
+
     redis = get_redis_interface("CACHE")
+    with redis.lock(
+        TAMES_SUBSCRIPTION_LOCK_KEY, timeout=60, blocking_timeout=0
+    ):
+        # On the first run, merge previously cached failures into the input list
+        if self.request.retries == 0:
+            if cached_members := redis.smembers(TAMES_FAILURES_CACHE_KEY):
+                existing = {(c["court"], c["case"]) for c in cases}
+                for member in cached_members:
+                    failure = json.loads(member)
+                    if (failure["court"], failure["case"]) not in existing:
+                        cases.append(failure)
 
-    # On the first run, merge previously cached failures into the input list
-    if self.request.retries == 0:
-        if cached_raw := redis.get(TAMES_FAILURES_CACHE_KEY):
-            cached_failures = json.loads(cached_raw)
-            existing = {(c["court"], c["case"]) for c in cases}
-            for failure in cached_failures:
-                if (failure["court"], failure["case"]) not in existing:
-                    cases.append(failure)
+        session = requests.Session()
+        session.headers.update({"User-Agent": "Free Law Project"})
 
-    session = requests.Session()
-    session.headers.update({"User-Agent": "Free Law Project"})
-
-    try:
-        _login_tames(session, tames_user)
-    except (requests.RequestException, SubscriptionFailure):
-        if self.request.retries == self.max_retries:
-            redis.set(
-                TAMES_FAILURES_CACHE_KEY,
-                json.dumps(cases),
-                ex=TAMES_FAILURES_TTL,
+        try:
+            _login_tames(session, tames_user)
+        except (requests.RequestException, SubscriptionFailure):
+            if self.request.retries == self.max_retries:
+                redis.sadd(
+                    TAMES_FAILURES_CACHE_KEY,
+                    *[json.dumps(c, sort_keys=True) for c in cases],
+                )
+                redis.expire(TAMES_FAILURES_CACHE_KEY, TAMES_FAILURES_TTL)
+            raise self.retry(
+                args=(cases,),
+                exc=SubscriptionFailure(
+                    f"Login failed, {len(cases)} cases not attempted"
+                ),
+                countdown=(10 * 2**self.request.retries),
             )
+
+        html_parser = etree.HTMLParser()
+        failed: list[dict[str, str]] = []
+        succeeded: list[dict[str, str]] = []
+        successful_dates: set[date] = set()
+        for case in cases:
+            court = case["court"]
+            case_number = case["case"]
+            try:
+                resp = session.get(
+                    CASEMAIL_CASE_ADD_URL,
+                    params={
+                        "coa": court,
+                        "FullCaseNumber": case_number,
+                        "cID": court,
+                    },
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                tree = etree.fromstring(resp.text, html_parser)
+                messages = tree.xpath(CASEMAIL_MESSAGE_XPATH)
+                message = "No message found"
+                if isinstance(messages, list) and messages:
+                    first_msg = messages[0]
+                    if isinstance(first_msg, etree._Element):
+                        message = first_msg.text or message
+                logger.info(
+                    "TAMES subscription for %s/%s: %s",
+                    court,
+                    case_number,
+                    message,
+                )
+                date_filed = datetime.strptime(
+                    case["date_filed"], "%m/%d/%Y"
+                ).date()
+                successful_dates.add(date_filed)
+                succeeded.append(case)
+            except Exception:
+                logger.exception(
+                    "Failed to subscribe to TAMES case %s/%s",
+                    court,
+                    case_number,
+                )
+                failed.append(case)
+
+        if successful_dates:
+            subscription_tracker, _created = (
+                AccountSubscription.objects.get_or_create(
+                    scraper=Scraper.TAMES,
+                    user_name=tames_user["username"],
+                    defaults={
+                        "email": tames_user["email"],
+                        "first_subscription": min(successful_dates),
+                        "last_subscription": max(successful_dates),
+                    },
+                )
+            )
+            subscription_tracker.include_subscriptions(successful_dates)
+        if succeeded:
+            redis.srem(
+                TAMES_FAILURES_CACHE_KEY,
+                *[json.dumps(c, sort_keys=True) for c in succeeded],
+            )
+        if not failed:
+            return
+
+        if self.request.retries == self.max_retries:
+            redis.sadd(
+                TAMES_FAILURES_CACHE_KEY,
+                *[json.dumps(c, sort_keys=True) for c in failed],
+            )
+            redis.expire(TAMES_FAILURES_CACHE_KEY, TAMES_FAILURES_TTL)
+            logger.warning(
+                "TAMES subscription exhausted retries with %d failures. "
+                "Cached for next run.",
+                len(failed),
+            )
+            return
+
         raise self.retry(
-            args=(cases,),
+            args=(failed,),
             exc=SubscriptionFailure(
-                f"Login failed, {len(cases)} cases not attempted"
+                f"{len(failed)}/{len(cases)} cases failed"
             ),
             countdown=(10 * 2**self.request.retries),
         )
-
-    html_parser = etree.HTMLParser()
-    failed: list[dict[str, str]] = []
-    successful_dates: set[date] = set()
-    for case in cases:
-        court = case["court"]
-        case_number = case["case"]
-        try:
-            resp = session.get(
-                CASEMAIL_CASE_ADD_URL,
-                params={
-                    "coa": court,
-                    "FullCaseNumber": case_number,
-                    "cID": court,
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            tree = etree.fromstring(resp.text, html_parser)
-            messages = tree.xpath(CASEMAIL_MESSAGE_XPATH)
-            message = "No message found"
-            if isinstance(messages, list) and messages:
-                first_msg = messages[0]
-                if isinstance(first_msg, etree._Element):
-                    message = first_msg.text or message
-            logger.info(
-                "TAMES subscription for %s/%s: %s",
-                court,
-                case_number,
-                message,
-            )
-            date_filed = datetime.strptime(
-                case["date_filed"], "%m/%d/%Y"
-            ).date()
-            successful_dates.add(date_filed)
-        except Exception:
-            logger.exception(
-                "Failed to subscribe to TAMES case %s/%s",
-                court,
-                case_number,
-            )
-            failed.append(case)
-
-    if successful_dates:
-        subscription_tracker.include_subscriptions(successful_dates)
-    if not failed:
-        redis.delete(TAMES_FAILURES_CACHE_KEY)
-        return
-
-    if self.request.retries == self.max_retries:
-        redis.set(
-            TAMES_FAILURES_CACHE_KEY,
-            json.dumps(failed),
-            ex=TAMES_FAILURES_TTL,
-        )
-        logger.warning(
-            "TAMES subscription exhausted retries with %d failures. "
-            "Cached for next run.",
-            len(failed),
-        )
-        return
-
-    raise self.retry(
-        args=(failed,),
-        exc=SubscriptionFailure(f"{len(failed)}/{len(cases)} cases failed"),
-        countdown=(10 * 2**self.request.retries),
-    )
