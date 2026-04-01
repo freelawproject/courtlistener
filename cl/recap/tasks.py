@@ -3799,15 +3799,12 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         self.request.chain = None
         return None
     else:
-        docket_pks = result.creates.get("Docket", set())
         changed_documents = list(
             result.creates.get("TexasDocument", set())
             | result.updates.get("TexasDocument", set())
         )
         async_to_sync(associate_related_instances)(
             epq,
-            d_id=next(iter(docket_pks), None),
-            de_id=None,
             rd_id=changed_documents,
             model_name="search.TexasDocument",
         )
