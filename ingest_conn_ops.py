@@ -251,13 +251,16 @@ def _load_pdf(pdf_dir: Path, source_file: str | None) -> bytes | None:
     return pdf_path.read_bytes()
 
 
-def get_opinion_type_from_name(cluster):
-    """The scraper itself relies on the case name to extract opinion types"""
-    clean_text = re.sub(r"[\n\r\t\s]+", " ", cluster.case_name).replace("–", "-")
+def get_opinion_type_from_name(cluster) -> str:
+    """The scraper itself relies on the case name to extract opinion types
 
-    is_concurrence = "concur" in clean_text.lower()
-    is_dissent = "dissent" in clean_text.lower()
-    is_appendix = "appendix" in clean_text.lower()
+    For example "State v. Williams (Concurrence & Dissent)", current cluster 10600944
+    """
+    clean_text = re.sub(r"[\n\r\t\s]+", " ", cluster.case_name).replace("–", "-").lower()
+
+    is_concurrence = "concur" in clean_text
+    is_dissent = "dissent" in clean_text
+    is_appendix = "appendix" in clean_text
 
     if is_concurrence and is_dissent:
         op_type = Opinion.CONCUR_IN_PART
@@ -284,6 +287,10 @@ def get_opinion_type_from_text(opinion:Opinion):
 
     # focus on the text after the disclaimer
     index = opinion.plain_text[:100].find("****************")
+    if index == -1:
+        logger.warning("Unexpected versioned file without disclaimer")
+        return None
+    
     target_text = opinion.plain_text[index:index+1000]
 
     # Only lead opinions have the sylalbus block
@@ -304,6 +311,7 @@ def get_opinion_type_from_text(opinion:Opinion):
     if concurrence:
         return Opinion.CONCURRENCE
     
+    return None
 
 @transaction.atomic
 def consolidate_clusters(
@@ -337,13 +345,19 @@ def consolidate_clusters(
     for cluster in clusters_to_delete:
         op_type = get_opinion_type_from_name(cluster)
         
-        if op_type not in [Opinion.LEAD, Opinion.COMBINED]:
-            if "(" in cluster.case_name:
-                cluster.case_name = cluster.case_name.rsplit("(")[0]
-                cluster.docket.case_name = cluster.docket.case_name.rsplit("(")[0]
-            if "(" in cluster_to_keep.case_name:
-                cluster_to_keep.case_name = cluster_to_keep.case_name.rsplit("(")[0]
-                cluster_to_keep.docket.case_name = cluster_to_keep.docket.case_name.rsplit("(")[0]
+        if cluster.sub_opinions.all().count() == 1:
+            sub_op = cluster.sub_opinions.first()
+            sub_op.type = op_type
+            sub_op.save()
+
+        if "(" in cluster.case_name:
+            cluster.case_name = cluster.case_name.rsplit("(", 1)[0].strip()
+            cluster.docket.case_name = cluster.docket.case_name.rsplit("(", 1)[0].strip()
+        
+        # should only go once into this conditional
+        if "(" in cluster_to_keep.case_name:
+            cluster_to_keep.case_name = cluster_to_keep.case_name.rsplit("(", 1)[0].strip()
+            cluster_to_keep.docket.case_name = cluster_to_keep.docket.case_name.rsplit("(", 1)[0].strip()
 
         # Merge metadata (case_name, judges, etc.)
         merge_metadata(cluster_to_keep, cluster, error_on_diff=True)
@@ -363,8 +377,9 @@ def consolidate_clusters(
             opinion.cluster = cluster_to_keep
             if opinion.type == Opinion.COMBINED:
                 op_type = get_opinion_type_from_text(opinion)
-                logger.info("Got opinion type %s for op %s", op_type, opinion.id)
-                opinion.type = op_type
+                if op_type:
+                    logger.info("Got opinion type %s for op %s", op_type, opinion.id)
+                    opinion.type = op_type
             opinion.save()
 
     # Redirect references and clean up
