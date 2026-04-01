@@ -244,7 +244,7 @@ def _load_pdf(pdf_dir: Path, source_file: str | None) -> bytes | None:
     if not source_file:
         logger.warning("  No source_file, skipping")
         return None
-    pdf_path = pdf_dir / source_file
+    pdf_path = Path(pdf_dir) / source_file
     if not pdf_path.exists():
         logger.warning("  PDF not found: %s", pdf_path)
         return None
@@ -380,6 +380,8 @@ def consolidate_clusters(
                 if op_type:
                     logger.info("Got opinion type %s for op %s", op_type, opinion.id)
                     opinion.type = op_type
+                else:
+                    logger.info("Failed assigning a type to %s", opinion.id)
             opinion.save()
 
     # Redirect references and clean up
@@ -456,6 +458,7 @@ def attach_pdf_to_cluster(
         return changed
 
     # Merge source to reflect this new data origin
+    """
     merged_source = ClusterSources.merge_sources(
         cluster.source, ClusterSources.MANUAL_INPUT
     )
@@ -466,7 +469,7 @@ def attach_pdf_to_cluster(
         logger.info(
             "  Updated cluster %d source to %s", cluster.id, merged_source
         )
-
+    """
     # Create a new opinion with the PDF — this becomes the main version
     cf = ContentFile(pdf_content)
     extension = get_extension(pdf_content)
@@ -483,7 +486,7 @@ def attach_pdf_to_cluster(
 
     # Mark existing opinions as versions and clean up their related objects
     # (adapted from merge_opinion_versions — same cluster, no docket merge)
-    for version_opinion in cluster.sub_opinions.exclude(pk=new_opinion.pk):
+    for version_opinion in cluster.sub_opinions.exclude(pk=new_opinion.pk, main_version__isnull=True):
         version_opinion.main_version = new_opinion
         version_opinion.html_with_citations = ""
         version_opinion.save()
@@ -693,6 +696,8 @@ def ingest_opinions(
                     "  Failed to create opinion for %s", citation_str
                 )
                 stats["failed"] += 1
+
+        logger.info("Finished processing %s", opinion_data)
 
     logger.info("Results: %s", stats)
 
