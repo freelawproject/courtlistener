@@ -3,7 +3,10 @@ from itertools import batched
 
 from django.db.models import Q
 
-from cl.corpus_importer.tasks import download_texas_document_pdf, logger
+from cl.corpus_importer.tasks import (
+    download_texas_document_pdf_unthrottled,
+    logger,
+)
 from cl.corpus_importer.utils import paginate_docs_queryset
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
@@ -119,7 +122,7 @@ def download_texas_documents(
     processed_count = 0
     for pk in paginate_docs_queryset(docs, desc=desc):
         throttle.maybe_wait()
-        download_texas_document_pdf.si(pk).set(
+        download_texas_document_pdf_unthrottled.si(pk).set(
             queue=download_queue
         ).apply_async()
         processed_count += 1
