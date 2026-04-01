@@ -17,8 +17,10 @@ from asgiref.sync import async_to_sync, sync_to_async
 from botocore import exceptions as botocore_exception
 from celery import Task
 from celery.canvas import chain
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -40,10 +42,18 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
+from juriscraper.state.texas import (
+    TexasCourtOfAppealsScraper,
+    TexasCourtOfCriminalAppealsScraper,
+    TexasSupremeCourtScraper,
+)
+from juriscraper.state.texas.common import CourtID
+from juriscraper.state.texas.email import TamesEmail
 from lxml.etree import ParserError
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import ReadTimeoutError
+from storages.backends.s3 import S3Storage
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.alerts.utils import (
@@ -60,6 +70,7 @@ from cl.corpus_importer.tasks import (
     get_document_number_for_appellate,
     is_docket_entry_sealed,
     is_pacer_doc_sealed,
+    merge_texas_docket,
     save_attachment_pq_from_text,
     update_rd_metadata,
 )
@@ -86,7 +97,7 @@ from cl.lib.pacer_session import (
     get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import get_document_filename
-from cl.lib.storage import RecapEmailSESStorage
+from cl.lib.storage import RecapEmailSESStorage, TexasEmailSESStorage
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -130,6 +141,27 @@ from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
+
+
+def retrieve_email_from_queue(message_id: str, bucket: S3Storage) -> bytes:
+    """
+    Attempt to retrieve and decode an email from an S3 bucket.
+
+    :param message_id: The ID of the message to retrieve.
+    :param bucket: The S3 bucket to retrieve the email from.
+
+    :return: The decoded email as a bytes object.
+
+    :raise FileNotFoundError:
+    """
+    # Try to read the file using utf-8.
+    # If it fails, fallback on iso-8859-1
+    try:
+        with bucket.open(message_id, "rb") as f:
+            return f.read().decode("utf-8")
+    except UnicodeDecodeError:
+        with bucket.open(message_id, "rb") as f:
+            return f.read().decode("iso-8859-1")
 
 
 async def process_recap_upload(pq: ProcessingQueue) -> None:
@@ -232,6 +264,7 @@ async def associate_related_instances(
     d_id: int | None = None,
     de_id: int | None = None,
     rd_id: int | list[int] | None = None,
+    model_name: str = "search.RECAPDocument",
 ) -> None:
     """Associate the related upload instances.
 
@@ -243,11 +276,32 @@ async def associate_related_instances(
     :param rd_id: The RECAPDocument PK to associate with this upload. Only
     applies to document uploads (obviously). If the pq is a EmailProcessingQueue
     this param accepts a list of RDs Pks.
+    :param model_name: The name of the model that the rd_id list should point
+        to. Only used when pq is EmailProcessingQueue.
     :return: None
     """
 
     if isinstance(pq, EmailProcessingQueue):
-        await pq.recap_documents.aadd(*rd_id)
+        if not rd_id:
+            logger.error(
+                "rd_id must be a list when pq is EmailProcessingQueue."
+            )
+            return
+        if isinstance(rd_id, list):
+            rd_ids = rd_id
+        else:
+            rd_ids = [rd_id]
+        # Kept for compatibility
+        if model_name == "search.RECAPDocument":
+            await pq.recap_documents.aadd(*rd_ids)
+        # It's okay to overwrite these because we should only be calling this
+        # method once per email.
+        document_model = apps.get_model(model_name)
+        pq.related_model = await sync_to_async(
+            ContentType.objects.get_for_model
+        )(document_model)
+        pq.object_ids = rd_ids
+        await pq.asave()
     else:
         pq.docket_id = d_id
         pq.docket_entry_id = de_id
@@ -256,7 +310,7 @@ async def associate_related_instances(
 
 
 async def mark_pq_status(
-    pq: ProcessingQueue,
+    pq: ProcessingQueue | EmailProcessingQueue,
     msg: str,
     status: int,
     message_property_name: str = "error_message",
@@ -3110,16 +3164,10 @@ def open_and_validate_email_notification(
     or None otherwise, the raw notification body to store in next steps.
     """
 
-    message_id = epq.message_id
-    bucket = RecapEmailSESStorage()
-    # Try to read the file using utf-8.
-    # If it fails fallback on iso-8859-1
     try:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("utf-8")
-    except UnicodeDecodeError:
-        with bucket.open(message_id, "rb") as f:
-            body = f.read().decode("iso-8859-1")
+        body = retrieve_email_from_queue(
+            epq.message_id, RecapEmailSESStorage()
+        )
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             msg = "File not found."
@@ -3642,6 +3690,132 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
         process_recap_email.si(epq.pk, user.pk),
         extract_pdf_document.s(),
     ).apply_async()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+        httpx.NetworkError,
+        httpx.HTTPStatusError,
+        httpx.TimeoutException,
+        RedisConnectionError,
+    ),
+    max_retries=10,
+    retry_backoff=2 * 60,
+    retry_backoff_max=60 * 60,
+)
+def process_texas_email(self: Task, epq_pk: int) -> None:
+    """
+    Task to process an email added to the queue by the .../tx/tames/alert\
+    endpoint. If the email is a case notification email, fetch the docket page\
+    and return the scraped data. Otherwise, set an error in the processing\
+    queue indicating the email type was unrecognized.
+
+    :param self: The Celery task
+    :param epq_pk: The PK of the EmailProcessingQueue object to process
+    """
+    epq = EmailProcessingQueue.objects.get(pk=epq_pk)
+
+    async_to_sync(mark_pq_status)(
+        epq,
+        "Processing TAMES CaseMail email",
+        PROCESSING_STATUS.IN_PROGRESS,
+        "status_message",
+    )
+
+    try:
+        body = retrieve_email_from_queue(
+            epq.message_id, TexasEmailSESStorage()
+        )
+    except FileNotFoundError as exc:
+        if self.request.retries == self.max_retries:
+            async_to_sync(mark_pq_status)(
+                epq,
+                "File not found.",
+                PROCESSING_STATUS.FAILED,
+                "status_message",
+            )
+            self.request.chain = None
+            return None
+        else:
+            raise self.retry(exc=exc)
+
+    texas_email_parser = TamesEmail()
+    texas_email_parser._parse_text(body)
+    email_data = texas_email_parser.data
+
+    match email_data["court_id"]:
+        case CourtID.SUPREME_COURT.value:
+            docket_parser = TexasSupremeCourtScraper()
+        case CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+            docket_parser = TexasCourtOfCriminalAppealsScraper()
+        case CourtID.UNKNOWN.value:
+            async_to_sync(mark_pq_status)(
+                epq,
+                "Unknown Texas court ID in email notification.",
+                PROCESSING_STATUS.FAILED,
+                "status_message",
+            )
+            self.request.chain = None
+            return None
+        case _:
+            docket_parser = TexasCourtOfAppealsScraper(
+                court_id=email_data["court_id"]
+            )
+
+    res = httpx.get(
+        email_data["url"],
+        headers={
+            "User-Agent": "Free Law Project",
+        },
+        timeout=30.0,
+        follow_redirects=True,
+    )
+    res.raise_for_status()
+
+    docket_parser._parse_text(res.text)
+    docket_data = docket_parser.data
+
+    if not docket_data:
+        async_to_sync(mark_pq_status)(
+            epq,
+            "Failed to parse Texas docket.",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+        self.request.chain = None
+        return None
+    try:
+        result = merge_texas_docket(docket_data, download_attachments=True)
+    except Exception as e:
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"Texas docket update error: {e}",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+        self.request.chain = None
+        return None
+    else:
+        changed_documents = list(
+            result.creates.get("TexasDocument", set())
+            | result.updates.get("TexasDocument", set())
+        )
+        async_to_sync(associate_related_instances)(
+            epq,
+            rd_id=changed_documents,
+            model_name="search.TexasDocument",
+        )
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"Texas docket {docket_data['docket_number']} updated successfully.",
+            PROCESSING_STATUS.SUCCESSFUL,
+            "status_message",
+        )
+
+    return None
 
 
 @app.task(
