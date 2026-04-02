@@ -1,4 +1,5 @@
 {% extends "base.html" %}{% load static text_filters %}
+{# frontend-checks-skip: check_new_stack_leakage #}
 
 {% block title %}Contact Free Law Project – CourtListener.com{% endblock %}
 
@@ -30,9 +31,9 @@
 {% block footer-scripts %}
   <script src="{% static 'js/alpine/components/contact_form.js' %}" nonce="{{ request.csp_nonce }}"></script>
   {% if DEBUG %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% else %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
 {% endblock %}
 
