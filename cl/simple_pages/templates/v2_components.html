@@ -903,17 +903,17 @@ Sample code here.
       ]"
     >
       <tr class="border-b-greyscale-200 border-b">
-        <c-flex-cell align="data-center">First service</c-flex-cell>
-        <c-flex-cell align="data-center">Fast</c-flex-cell>
-        <c-flex-cell align="data-center">Great</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">First service</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Fast</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Great</c-flex-cell>
       </tr>
       <tr class="border-b-greyscale-200 border-b">
-        <c-flex-cell align="data-center">Second service</c-flex-cell>
-        <c-flex-cell align="data-center">Slow</c-flex-cell>
-        <c-flex-cell align="data-center">Good</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Second service</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Slow</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Good</c-flex-cell>
       </tr>
       <tr>
-        <c-flex-cell align="data-center">Third service</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Third service</c-flex-cell>
         <td class="align-top text-sm font-normal p-2 text-start" colspan="2">This cell spans two columns using a raw td with colspan.</td>
       </tr>
     </c-flex-table>
@@ -948,9 +948,9 @@ Sample code here.
       </c-library.item>
 
       <c-library.item optional only>
-        <c-slot name="label"><code>c-flex-cell</code>: <code>align</code></c-slot>
+        <c-slot name="label"><code>c-flex-cell</code>: <code>class</code></c-slot>
         <c-slot name="description">
-          Alignment for the cell content. Accepts the same values as the table's <code>align</code> prop: <code>center</code>, <code>data-center</code>, or left-aligned by default.
+          Additional CSS classes appended to the cell's defaults (<code>align-middle text-sm font-normal px-2.5 py-4 text-start</code>). Use to override alignment (e.g., <code>text-center</code>) or add custom styling. Other HTML attributes are passed through via <code>attrs</code>.
         </c-slot>
       </c-library.item>
     </c-library.list>
@@ -987,17 +987,17 @@ Sample code here.
   ]"
 &gt;
   &lt;tr class="border-b-greyscale-200 border-b"&gt;
-    &lt;c-flex-cell align="data-center"&gt;First service&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell align="data-center"&gt;Fast&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell align="data-center"&gt;Great&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;First service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Fast&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Great&lt;/c-flex-cell&gt;
   &lt;/tr&gt;
   &lt;tr class="border-b-greyscale-200 border-b"&gt;
-    &lt;c-flex-cell align="data-center"&gt;Second service&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell align="data-center"&gt;Slow&lt;/c-flex-cell&gt;
-    &lt;c-flex-cell align="data-center"&gt;Good&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Second service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Slow&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Good&lt;/c-flex-cell&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
-    &lt;c-flex-cell align="data-center"&gt;Third service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Third service&lt;/c-flex-cell&gt;
     &lt;td class="align-top text-sm font-normal p-2 text-start" colspan="2"&gt;This cell spans two columns using a raw td with colspan.&lt;/td&gt;
   &lt;/tr&gt;
 &lt;/c-flex-table&gt;
