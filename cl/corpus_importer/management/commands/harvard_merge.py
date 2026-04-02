@@ -291,25 +291,10 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
     :param cluster: cluster object
     :return: None
     """
-    new_cluster_source = cluster.source + ClusterSources.HARVARD_CASELAW
-
-    if new_cluster_source in [
-        ClusterSources.COURT_M_HARVARD,
-        ClusterSources.ANON_2020_M_HARVARD,
-        ClusterSources.COURT_M_RESOURCE_M_HARVARD,
-        ClusterSources.DIRECT_COURT_INPUT_M_HARVARD,
-        ClusterSources.LAWBOX_M_HARVARD,
-        ClusterSources.LAWBOX_M_COURT_M_HARVARD,
-        ClusterSources.LAWBOX_M_RESOURCE_M_HARVARD,
-        ClusterSources.LAWBOX_M_COURT_RESOURCE_M_HARVARD,
-        ClusterSources.MANUAL_INPUT_M_HARVARD,
-        ClusterSources.PUBLIC_RESOURCE_M_HARVARD,
-        ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
-    ]:
-        cluster.source = new_cluster_source
-        cluster.save()
-    else:
-        raise ClusterSourceException("Unexpected cluster source")
+    cluster.source = ClusterSources.merge_sources(
+        cluster.source, ClusterSources.HARVARD_CASELAW
+    )
+    cluster.save()
 
 
 def save_headmatter(harvard_data: dict[str, Any]) -> dict[str, Any]:
