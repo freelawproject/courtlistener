@@ -181,7 +181,7 @@
                       <span>Sponsored By</span>
                     </h3>
                     <p>This opinion added to CourtListener with support from v|Lex.</p>
-                    <a href="https://www.vlex.com" rel="sponsored" target="_blank">
+                    <a href="https://www.vlex.com" rel="sponsored noopener noreferrer" target="_blank">
                         <img id="vlex" src="{% static "img/vlex-logo-150-75.png" %}" alt="v|lex logo" class="img-responsive" width="150" height="75" >
                     </a>
                 </div>
@@ -219,7 +219,7 @@
                       <li><a href="{% url "alert_help" %}#citation-alerts">Learn More</a></li>
                     </ul>
                   </div>
-                  {% if pdf_path %}
+                  {% if download_file_path %}
                       {% include "includes/add_download_button.html" %}
                   {% endif %}
                   {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
@@ -251,7 +251,7 @@
 
                         {% if cluster.docket.court_id == 'scotus' and cluster.scbd %}
                             <li><strong>Supreme Court DB ID:</strong>
-                                <a href="http://scdb.wustl.edu/analysisCaseDetail.php?cid={{ cluster.scdb_id }}-01" target="_blank">
+                                <a href="http://scdb.wustl.edu/analysisCaseDetail.php?cid={{ cluster.scdb_id }}-01" target="_blank" rel="noopener noreferrer">
                                     {{ cluster.scdb_id }}
                                 </a><i class="gray fa fa-external-link"></i>
                             </li>
