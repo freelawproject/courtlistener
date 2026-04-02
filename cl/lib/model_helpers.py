@@ -196,18 +196,19 @@ def normalize_texas_appellate_docket_number(docket_number: str) -> str:
     if not cr_ending and not cv_ending:
         return docket_number
     parts = [part for part in docket_number.split("-") if part]
+    if len(parts) < 2:
+        return docket_number
     suffix = parts.pop()
-    if sum(len(part) for part in parts) != 9:
-        if len(parts) != 3:
-            return docket_number
-        int_parts = []
-        for part in parts:
-            if not re.fullmatch(r"^\d+$", part):
-                return docket_number
-            int_parts.append(int(part))
-        return f"{int_parts[0]:0>2}-{int_parts[1]:0>2}-{int_parts[2]:0>5}-{suffix}"
+    if not all(part.isdigit() for part in parts):
+        return docket_number
+    # Three numeric parts (e.g. "09-01-404"): zero-pad to NN-NN-NNNNN
+    if len(parts) == 3:
+        return f"{int(parts[0]):0>2}-{int(parts[1]):0>2}-{int(parts[2]):0>5}-{suffix}"
+    # Joined digits total 9 (e.g. "0199-01326"): re-slice to NN-NN-NNNNN
     joined = "".join(parts)
-    return f"{joined[0:2]}-{joined[2:4]}-{joined[4:]}-{suffix}"
+    if len(joined) == 9:
+        return f"{joined[:2]}-{joined[2:4]}-{joined[4:]}-{suffix}"
+    return docket_number
 
 
 def clean_texas_docket_number(docket_number: str | None) -> str:
