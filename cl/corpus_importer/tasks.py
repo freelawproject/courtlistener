@@ -83,6 +83,7 @@ from juriscraper.state.texas.court_of_appeals import (
     TexasCourtOfAppealsDocket,
     TexasCourtOfAppealsScraper,
 )
+from juriscraper.state.texas.missing_file import is_missing_file_page
 from openai import (
     APIConnectionError,
     APIError,
@@ -3916,6 +3917,16 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
         return None
 
     url = texas_document.url
+    if url.endswith(" (i)"):
+        logger.error(
+            "Texas document download: TexasDocument %s has an invalid "
+            "URL: %s. Skipping.",
+            texas_document_pk,
+            url,
+        )
+        task.request.chain = None
+        return None
+
     logger.info(
         "Texas document download: Fetching document for TexasDocument %s from %s",
         texas_document_pk,
@@ -3947,6 +3958,18 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
                 texas_document.pk,
                 url,
             )
+
+        if extension == ".html" and is_missing_file_page(content):
+            logger.error(
+                "Texas document download: TexasDocument %s at %s "
+                "returned a missing file page.",
+                texas_document.pk,
+                url,
+            )
+            texas_document.url = f"{url} (i)"
+            texas_document.save()
+            task.request.chain = None
+            return None
 
         filename = (
             f"{texas_document.media_id}"
