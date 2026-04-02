@@ -3891,9 +3891,7 @@ KNOWN_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
 EXTRACTABLE_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd"}
 
 
-def _download_texas_document(
-    task: Task, texas_document_pk: int
-) -> int | None:
+def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
     """Download a Texas document and save it locally.
 
     Accepts any file type. PDF-specific processing (page count) is only
@@ -3984,9 +3982,7 @@ def _download_texas_document(
     # No retries because download_document_in_stream already has retry logic
 )
 @throttle_task("2/s")
-def download_texas_document(
-    self: Task, texas_document_pk: int
-) -> int | None:
+def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
     """Throttled version of the Texas document download task.
 
     :param self: The Celery task instance.
