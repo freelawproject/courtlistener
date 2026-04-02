@@ -2172,12 +2172,10 @@ class TexasMergerTest(TestCase):
             "cl.corpus_importer.tasks.download_texas_document.si"
         )
         self.download_task_mock = self.download_task_patch.start()
-        self.extract_pdf_document_patch = patch(
-            "cl.recap.tasks.extract_pdf_document.s"
+        self.extract_document_patch = patch(
+            "cl.corpus_importer.tasks.extract_formatted_text_document.s"
         )
-        self.extract_pdf_document_mock = (
-            self.extract_pdf_document_patch.start()
-        )
+        self.extract_document_mock = self.extract_document_patch.start()
         self.download_document_patch = patch(
             "cl.corpus_importer.tasks.download_document_in_stream"
         )
@@ -2205,7 +2203,7 @@ class TexasMergerTest(TestCase):
     def tearDown(self):
         """Tear down patches"""
         self.download_task_patch.stop()
-        self.extract_pdf_document_patch.stop()
+        self.extract_document_patch.stop()
         self.download_document_patch.stop()
 
     def get_random_docket_entry_dict(self, **kwargs):
@@ -2466,7 +2464,7 @@ class TexasMergerTest(TestCase):
         pcs_mock.return_value = httpx.Response(200, text="1")
         # Stop the mocks just for this test
         self.download_task_patch.stop()
-        self.extract_pdf_document_patch.stop()
+        self.extract_document_patch.stop()
         self.download_document_patch.stop()
 
         input_document = TexasCaseDocumentDictFactory()
@@ -2533,7 +2531,7 @@ class TexasMergerTest(TestCase):
             docket_entry_id=created_docket_entry.id
         ).count()
         assert n_attachments == 1
-        assert self.extract_pdf_document_mock.call_count == 1
+        assert self.extract_document_mock.call_count == 1
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
@@ -2560,7 +2558,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_pdf_document_mock.reset_mock()
+        self.extract_document_mock.reset_mock()
 
         # noop
         with self.captureOnCommitCallbacks(execute=True):
@@ -2586,7 +2584,7 @@ class TexasMergerTest(TestCase):
             docket_entry_id=created_docket_entry.id
         ).count()
         assert n_attachments == len(case_event["attachments"])
-        assert self.extract_pdf_document_mock.call_count == 0
+        assert self.extract_document_mock.call_count == 0
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
@@ -2614,7 +2612,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_pdf_document_mock.reset_mock()
+        self.extract_document_mock.reset_mock()
 
         case_event["attachments"].append(TexasCaseDocumentDictFactory())
         with self.captureOnCommitCallbacks(execute=True):
@@ -2640,7 +2638,7 @@ class TexasMergerTest(TestCase):
             docket_entry_id=created_docket_entry.id
         ).count()
         assert n_attachments == initial_n_attachments + 1
-        assert self.extract_pdf_document_mock.call_count == 1
+        assert self.extract_document_mock.call_count == 1
 
     def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
         """When multiple entries match by date/type/brief, use the one with matching sequence number."""
@@ -3074,12 +3072,14 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # MP3 is not extractable — pk returned but chain broken
-        assert result == texas_document.pk
+        # MP3 is not extractable — chain broken, None returned
+        assert result is None
         texas_document.refresh_from_db()
         assert texas_document.filepath_local
         assert texas_document.sha1 == "mp3sha1hash"
         assert ".mp3" in texas_document.filepath_local.name
+        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert not texas_document.plain_text
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".docx")
@@ -3103,7 +3103,8 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        assert result == texas_document.pk
+        # Unknown extension is not extractable — chain broken, None returned
+        assert result is None
         # Should log a warning about the unknown extension
         logger_mock.warning.assert_any_call(
             "Texas document download: Unexpected file extension "
@@ -3115,13 +3116,14 @@ class TexasMergerTest(TestCase):
         texas_document.refresh_from_db()
         assert texas_document.filepath_local
         assert texas_document.sha1 == "docxsha1"
+        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @responses.activate
     def test_download_texas_document_wpd_extracts_text(self, throttle_mock):
         """Does a WPD file get downloaded, stored, and its text extracted?"""
         self.download_task_patch.stop()
-        self.extract_pdf_document_patch.stop()
+        self.extract_document_patch.stop()
         self.download_document_patch.stop()
 
         input_document = TexasCaseDocumentDictFactory()
@@ -3156,6 +3158,66 @@ class TexasMergerTest(TestCase):
         self.assertIsNone(document.page_count)
         # WPD extraction should produce text
         self.assertTrue(document.plain_text)
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    def test_html_download_and_extraction_strips_tags(
+        self, ext_mock, microservice_mock, throttle_mock
+    ):
+        """Does an HTML document get downloaded with text extracted and
+        HTML tags stripped, ending with OCR_UNNECESSARY?"""
+        from tempfile import NamedTemporaryFile
+
+        from asgiref.sync import async_to_sync
+
+        from cl.scrapers.tasks import extract_formatted_text_document_base
+
+        texas_document = TexasDocumentFactory.create()
+        html_content = (
+            "<html><body><p>Hello <strong>world</strong></p></body></html>"
+        )
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(html_content.encode())
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "htmlsha1hash",
+            )
+
+            download_result = download_texas_document(texas_document.pk)
+
+        # HTML is extractable — pk returned and chain continues
+        assert download_result == texas_document.pk
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert ".html" in texas_document.filepath_local.name
+
+        # Mock Doctor returning HTML content
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": html_content,
+                "extracted_by_ocr": False,
+            },
+        )
+
+        # Run extraction with strip_html_tags=True (as the management
+        # command's extract_texas_documents does for HTML docs)
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            model_name="search.TexasDocument",
+            strip_html_tags=True,
+        )
+
+        texas_document.refresh_from_db()
+        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert "<" not in texas_document.plain_text
+        assert "Hello" in texas_document.plain_text
+        assert "world" in texas_document.plain_text
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""

@@ -7,8 +7,24 @@ from cl.corpus_importer.tasks import download_texas_document, logger
 from cl.corpus_importer.utils import paginate_docs_queryset
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
-from cl.scrapers.tasks import extract_pdf_document
+from cl.scrapers.tasks import extract_formatted_text_document
 from cl.search.models import TexasDocument
+
+
+def _base_extraction_queryset() -> Q:
+    """Return the exclusion filter shared by all extraction queries."""
+    return (
+        Q(filepath_local="")
+        | Q(
+            filepath_local__endswith=".mp3",
+        )
+        | Q(
+            ocr_status__in=(
+                TexasDocument.OCR_UNNECESSARY,
+                TexasDocument.OCR_COMPLETE,
+            ),
+        )
+    )
 
 
 def extract_texas_documents(
@@ -17,52 +33,71 @@ def extract_texas_documents(
     delay: float,
     page_limit: int,
 ) -> None:
-    """Run the extraction task for TexasDocument instances needing OCR.
+    """Run the extraction task for TexasDocument instances needing extraction.
 
     Queries TexasDocument instances that already have a filepath_local but
-    whose OCR status is not complete or unnecessary. Documents with a
-    page_count exceeding page_limit are skipped, allowing smaller documents
-    to be processed first.
+    whose OCR status is not complete or unnecessary. MP3 files are excluded
+    since they cannot be text-extracted. HTML documents are extracted with
+    strip_html_tags=True so that plain_text contains plain text. Documents
+    with a page_count exceeding page_limit are skipped, allowing smaller
+    documents to be processed first.
 
-    :param extraction_queue: The celery queue for PDF extraction tasks.
-    :param batch_size: The batch size for PDF extraction tasks.
+    :param extraction_queue: The celery queue for extraction tasks.
+    :param batch_size: The batch size for extraction tasks.
     :param delay: Seconds to sleep between scheduling tasks.
     :param page_limit: Skip documents with more pages than this value.
     :return: None
     """
-    docs = TexasDocument.objects.exclude(
-        Q(filepath_local="")
-        | Q(
-            ocr_status__in=(
-                TexasDocument.OCR_UNNECESSARY,
-                TexasDocument.OCR_COMPLETE,
-            )
-        )
-    ).values_list("pk", flat=True)
-    total_count = docs.count()
-    filtered_docs = docs.filter(
-        Q(page_count__lte=page_limit) | Q(page_count__isnull=True)
+    base_exclude = _base_extraction_queryset()
+    page_filter = Q(page_count__lte=page_limit) | Q(page_count__isnull=True)
+
+    html_docs = (
+        TexasDocument.objects.exclude(base_exclude)
+        .filter(filepath_local__endswith=".html")
+        .filter(page_filter)
+        .values_list("pk", flat=True)
     )
-    filtered_count = filtered_docs.count()
-    skipped_count = total_count - filtered_count
-    logger.info("Found %s TexasDocuments needing extraction.", total_count)
+    other_docs = (
+        TexasDocument.objects.exclude(
+            base_exclude | Q(filepath_local__endswith=".html")
+        )
+        .filter(page_filter)
+        .values_list("pk", flat=True)
+    )
+
+    total_count = html_docs.count() + other_docs.count()
+    all_docs_count = (
+        TexasDocument.objects.exclude(base_exclude).values_list(
+            "pk", flat=True
+        )
+    ).count()
+    skipped_count = all_docs_count - total_count
+    logger.info(
+        "Found %s TexasDocuments needing extraction (%s HTML, %s other).",
+        all_docs_count,
+        html_docs.count(),
+        other_docs.count(),
+    )
+
     throttle = CeleryThrottle(queue_name=extraction_queue)
     processed_count = 0
-    for chunk in batched(paginate_docs_queryset(filtered_docs), batch_size):
-        throttle.maybe_wait()
-        processed_count += len(chunk)
-        extract_pdf_document.si(
-            pks=list(chunk),
-            check_if_needed=False,
-            model_name="search.TexasDocument",
-        ).set(queue=extraction_queue).apply_async()
-        logger.info(
-            "Scheduled %s/%s (%s)",
-            processed_count,
-            total_count,
-            f"{processed_count / total_count:.0%}",
-        )
-        time.sleep(delay)
+    for docs, strip_html in [(html_docs, True), (other_docs, False)]:
+        for chunk in batched(paginate_docs_queryset(docs), batch_size):
+            throttle.maybe_wait()
+            processed_count += len(chunk)
+            extract_formatted_text_document.si(
+                pks=list(chunk),
+                check_if_needed=False,
+                model_name="search.TexasDocument",
+                strip_html_tags=strip_html,
+            ).set(queue=extraction_queue).apply_async()
+            logger.info(
+                "Scheduled %s/%s (%s)",
+                processed_count,
+                total_count,
+                f"{processed_count / total_count:.0%}",
+            )
+            time.sleep(delay)
     logger.info(
         "Done. Scheduled %s, skipped %s (over %s pages).",
         processed_count,

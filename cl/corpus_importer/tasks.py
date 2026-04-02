@@ -192,7 +192,11 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
+from cl.scrapers.tasks import (
+    extract_formatted_text_document,
+    extract_pdf_document,
+    extract_pdf_document_base,
+)
 from cl.scrapers.utils import get_extension
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
@@ -3897,8 +3901,9 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
     """Download a Texas document and store it in filepath_local.
 
     Accepts any file type. PDF-specific processing (page count) is only
-    performed for PDFs. For non-extractable types (.mp3, unknown), the
-    extract chain is broken so extract_pdf_document is skipped.
+    performed for PDFs. Non-PDF documents are marked as OCR_UNNECESSARY.
+    For non-extractable types (.mp3, unknown), the extract chain is
+    broken so extract_formatted_text_document is skipped.
 
     :param self: The Celery task instance.
     :param texas_document_pk: The primary key of the TexasDocument instance.
@@ -3934,7 +3939,7 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
             return None
 
         tmp, sha1_hash = result
-        content = tmp.read()
+        content = tmp.read(8192)
         tmp.seek(0)
 
         extension = get_extension(content)
@@ -3962,11 +3967,14 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
             response = async_to_sync(doc_page_count_service)(texas_document)
             if response.is_success:
                 texas_document.page_count = int(response.text)
+        else:
+            texas_document.ocr_status = TexasDocument.OCR_UNNECESSARY
 
         texas_document.save()
 
         if extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
             self.request.chain = None
+            return None
 
         return texas_document_pk
 
@@ -4239,7 +4247,7 @@ def merge_texas_document(
                 (
                     lambda pk: lambda: chain(
                         download_texas_document.si(pk),
-                        extract_pdf_document.s(
+                        extract_formatted_text_document.s(
                             check_if_needed=False,
                             model_name="search.TexasDocument",
                         ),
