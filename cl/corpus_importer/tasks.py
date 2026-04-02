@@ -3891,23 +3891,21 @@ KNOWN_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
 EXTRACTABLE_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd"}
 
 
-@app.task(
-    bind=True,
-    ignore_result=True,
-    # No retries because download_document_in_stream already has retry logic
-)
-@throttle_task("2/s")
-def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
-    """Download a Texas document and store it in filepath_local.
+def _download_texas_document(
+    task: Task, texas_document_pk: int
+) -> int | None:
+    """Download a Texas document and save it locally.
 
     Accepts any file type. PDF-specific processing (page count) is only
     performed for PDFs. Non-PDF documents are marked as OCR_UNNECESSARY.
     For non-extractable types (.mp3, unknown), the extract chain is
     broken so extract_formatted_text_document is skipped.
 
-    :param self: The Celery task instance.
-    :param texas_document_pk: The primary key of the TexasDocument instance.
-    :return: The pk of the downloaded TexasDocument, or None on failure.
+    :param task: The Celery task instance (used to break the chain on failure).
+    :param texas_document_pk: The primary key of the TexasDocument instance to
+    update the attachment for.
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed.
     """
     try:
         texas_document = TexasDocument.objects.get(pk=texas_document_pk)
@@ -3916,7 +3914,7 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
             "Texas document download: TexasDocument %s does not exist; skipping.",
             texas_document_pk,
         )
-        self.request.chain = None
+        task.request.chain = None
         return None
 
     url = texas_document.url
@@ -3935,7 +3933,7 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
                 texas_document.pk,
                 url,
             )
-            self.request.chain = None
+            task.request.chain = None
             return None
 
         tmp, sha1_hash = result
@@ -3967,16 +3965,56 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
             response = async_to_sync(doc_page_count_service)(texas_document)
             if response.is_success:
                 texas_document.page_count = int(response.text)
-        else:
+        elif extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
+            # A slight misnomer, this is a flag for needing the rest of the plain_text extraction pipeline
             texas_document.ocr_status = TexasDocument.OCR_UNNECESSARY
 
         texas_document.save()
 
         if extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
-            self.request.chain = None
+            task.request.chain = None
             return None
 
         return texas_document_pk
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+    # No retries because download_document_in_stream already has retry logic
+)
+@throttle_task("2/s")
+def download_texas_document(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Throttled version of the Texas document download task.
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance.
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed.
+    """
+    return _download_texas_document(self, texas_document_pk)
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+)
+def download_texas_document_unthrottled(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Unthrottled version of the Texas document download task.
+
+    Use this when the caller already handles throttling (e.g. via
+    CeleryThrottle).
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance.
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed.
+    """
+    return _download_texas_document(self, texas_document_pk)
 
 
 class MergeResult[T = int](NamedTuple):
