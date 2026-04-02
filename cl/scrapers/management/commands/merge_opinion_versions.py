@@ -45,8 +45,8 @@ MIN_SEQUENCE_SIMILARITY_STRICT = 0.9
 MIN_SEQUENCE_SIMILARITY_LOOSE = 0.7
 
 # Length ratio threshold to prevent merging texts with vastly different lengths
-# A ratio of 0.5 means texts must be within 2x length of each other
-MIN_LENGTH_RATIO = 0.5
+# A ratio of 0.7 means the shorter text must be at least 70% of the longer
+MIN_LENGTH_RATIO = 0.7
 
 DRY_RUN = False
 
@@ -399,14 +399,11 @@ def passes_length_ratio_check(
     :param text1: first text to compare
     :param text2: second text to compare
     :param min_ratio: minimum acceptable ratio of shorter to longer text.
-        Default 0.5 means texts must be within 2x length of each other.
+        Default 0.7 means the shorter text must be at least 70% of the longer.
     :return: tuple of (passes_check, length_ratio)
     """
     len1, len2 = len(text1), len(text2)
 
-    # Handle edge cases
-    if len1 == 0 and len2 == 0:
-        return True, 1.0
     if len1 == 0 or len2 == 0:
         return False, 0.0
 
