@@ -9,6 +9,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
 
 from cl.lib.courts import (
@@ -17,15 +18,20 @@ from cl.lib.courts import (
     lookup_child_courts_cache,
 )
 from cl.lib.date_time import midnight_pt
+from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
+    clean_scotus_docket_number,
+    clean_texas_docket_number,
     is_docket_number,
+    is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_scotus_docket_number_core,
+    make_texas_docket_number_core,
     make_upload_path,
 )
 from cl.lib.pacer import (
@@ -49,6 +55,7 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.search_index_utils import get_parties_from_case_name_bankr
 from cl.lib.sqlcommenter import QueryWrapper, SqlCommenter, add_sql_comment
 from cl.lib.string_utils import normalize_dashes, trunc
@@ -424,6 +431,71 @@ class TestModelHelpers(TestCase):
         # an empty string.
         self.assertEqual(make_docket_number_core(None), "")
 
+    def test_is_texas_court(self) -> None:
+        """Can we identify Texas courts?"""
+        test_cases = [
+            ("tex", True),
+            ("texcrimapp", True),
+            ("txctapp01", True),
+            ("texdistct127", True),
+            ("texcrimdistct127", True),
+            ("texctyct001", True),
+            ("scotus", False),
+            ("ca5", False),
+            ("txwd", False),  # Federal district in Texas
+        ]
+        for court_id, expected in test_cases:
+            with self.subTest(court_id=court_id):
+                self.assertEqual(is_texas_court(court_id), expected)
+
+    def test_clean_texas_docket_number(self) -> None:
+        """Can we extract Texas docket numbers from dirty input?"""
+        test_cases = [
+            ("Case Number: AP-77,129; 04-97-00972-CV", "04-97-00972-CV"),
+            ("Case Number: 04-97-00972-CV", "04-97-00972-CV"),
+            ("Case Number: 04-97-00972-CV; AP-77,129", "04-97-00972-CV"),
+            ("AP-77,129, 04-97-00972-CV, and WR-70,849-04", "04-97-00972-CV"),
+            ("04-97-00972-CV", "04-97-00972-CV"),
+            ("AP-77,129", "AP-77,129"),
+            ("WR-70,849-04", "WR-70,849-04"),
+            ("A-4369-A", "A-4369-A"),
+            (None, ""),
+            ("", ""),
+            ("garbage text", ""),
+        ]
+        for i, (input_dn, expected) in enumerate(test_cases):
+            with self.subTest(input_dn=input_dn):
+                self.assertEqual(
+                    clean_texas_docket_number(input_dn),
+                    expected,
+                    f"Failed test case {i}",
+                )
+
+    def test_texas_docket_number_core(self) -> None:
+        """Can we correctly normalize Texas docket numbers?"""
+        self.assertEqual(
+            make_texas_docket_number_core("04-97-00972-CV"), "049700972cv"
+        )
+        self.assertEqual(
+            make_texas_docket_number_core("01-18-00277-CR"), "011800277cr"
+        )
+        self.assertEqual(make_texas_docket_number_core("AP-77,129"), "ap77129")
+        self.assertEqual(
+            make_texas_docket_number_core("WR-70,849-04"), "wr7084904"
+        )
+        self.assertEqual(make_texas_docket_number_core("A-4369-A"), "a4369a")
+        self.assertEqual(make_texas_docket_number_core("C-2302"), "c2302")
+
+        # Dirty input should be cleaned first, then normalized
+        self.assertEqual(
+            make_texas_docket_number_core("Case Number: 04-97-00972-CV"),
+            "049700972cv",
+        )
+
+        # Invalid input returns empty string
+        self.assertEqual(make_texas_docket_number_core("garbage text"), "")
+        self.assertEqual(make_texas_docket_number_core(None), "")
+
     def test_avoid_generating_docket_number_core(self) -> None:
         """Can we avoid generating docket_number_core when the docket number
         format doesn't match a valid format or if a string contains more than
@@ -471,9 +543,6 @@ class TestModelHelpers(TestCase):
             "12-cv-01032-JKG-MJL": "12-cv-01032",
             "Nos. 212-213, Dockets 27264, 27265": "",
             "Nos. 12-213, Dockets 27264, 27265": "12-213",
-            # SCOTUS A Dockets.
-            "Docket: 16A989": "16a989",
-            "Case  17A80": "17a80",
         }
 
         for raw, expected in test_cases.items():
@@ -514,6 +583,15 @@ class TestModelHelpers(TestCase):
             ("06-10672", "06010672"),
             # Non-matching SCOTUS docket numbers
             ("23-cv-001", ""),
+            # Mixed formats: NN-NNNN is prioritized over NNA
+            ("No. 01A576 (01-8099)", "01008099"),
+            ("No. 01-8148 (01A587)", "01008148"),
+            # Single NN-NNNN with multiple NNA is still valid
+            ("No. 01-8148 01A578 01A578", "01008148"),
+            # Multiple NN-NNNN: picks lexicographically smallest
+            ("No. 01-8149 01-8148", "01008148"),
+            # Multiple NNA: picks lexicographically smallest
+            ("No. 01A578 01A576", "01A00576"),
         ]
 
         for input_value, expected in test_cases:
@@ -521,6 +599,75 @@ class TestModelHelpers(TestCase):
                 self.assertEqual(
                     make_scotus_docket_number_core(input_value), expected
                 )
+
+    @mock.patch("cl.lib.model_helpers.logger")
+    def test_making_scotus_docket_number_core_logs_multiple(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """Test that multiple docket numbers of the same type log a
+        warning and return the lexicographically smallest match.
+        """
+        warning_cases = [
+            ("No. 01A578 01A576", "01A00576"),
+            ("No. 01-8149 01-8148", "01008148"),
+        ]
+        for input_value, expected in warning_cases:
+            with self.subTest(input=input_value):
+                mock_logger.reset_mock()
+                result = make_scotus_docket_number_core(input_value)
+                self.assertEqual(result, expected)
+                mock_logger.warning.assert_called_once()
+
+    def test_clean_scotus_docket_number(self) -> None:
+        """Test clean_scotus_docket_number prioritizes NN-NNNN format."""
+        test_cases = {
+            # Empty/None inputs
+            None: "",
+            "": "",
+            # Single NN-NNNN format
+            "No. 01-8148": "01-8148",
+            "12-33112": "12-33112",
+            # Single NNA format
+            "16A985": "16a985",
+            "Docket: 01A576": "01a576",
+            # Mixed: NN-NNNN takes priority
+            "No. 01A576 (01-8099)": "01-8099",
+            "No. 01-8148 (01A587)": "01-8148",
+            # Single NN-NNNN with multiple NNA is valid
+            "No. 01-8148 01A578 01A579": "01-8148",
+            # Multiple NN-NNNN: picks lexicographically smallest
+            "No. 01-8149 01-8148": "01-8148",
+            "01-8200, 01-8100": "01-8100",
+            # Lexicographic sort picks "01-10" over "01-9" (not numerically
+            # smaller, but deterministic regardless of input order)
+            "01-9, 01-10": "01-10",
+            "01-10, 01-9": "01-10",
+            # Multiple NNA: picks lexicographically smallest
+            "No. 01A578 01A576": "01a576",
+            # No matches
+            "23-cv-001": "",
+        }
+        for raw, expected in test_cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(clean_scotus_docket_number(raw), expected)
+
+    @mock.patch("cl.lib.model_helpers.logger")
+    def test_clean_scotus_docket_number_logs_multiple(
+        self, mock_logger: mock.MagicMock
+    ) -> None:
+        """Test that multiple same-type docket numbers log a warning and
+        return the lexicographically smallest match."""
+        warning_cases = [
+            ("No. 01A578 01A576", "01a576"),
+            ("No. 01-8149 01-8148", "01-8148"),
+            ("01-8148, 01-8149 01A578", "01-8148"),
+        ]
+        for raw, expected in warning_cases:
+            with self.subTest(raw=raw):
+                mock_logger.reset_mock()
+                result = clean_scotus_docket_number(raw)
+                self.assertEqual(result, expected)
+                mock_logger.warning.assert_called_once()
 
 
 class S3PrivateUUIDStorageTest(TestCase):
@@ -1589,14 +1736,14 @@ class TestAddSqlComment(SimpleTestCase):
         sql = "SELECT * FROM users;"
         result = add_sql_comment(sql, user_id=42)
         self.assertTrue(result.endswith(";"))
-        self.assertIn("/* user_id='42' */;", result)
+        self.assertIn("/* user_id='42' */", result)
 
     def test_sql_not_ending_with_semicolon(self) -> None:
         """Is the comment appended at the end for SQL without semicolon?"""
         sql = "SELECT * FROM users"
         result = add_sql_comment(sql, user_id=42)
         self.assertFalse(result.endswith(";"))
-        self.assertTrue(result.endswith("/* user_id='42' */"))
+        self.assertTrue(result.startswith("/* user_id='42' */"))
 
     def test_none_values_filtered_out(self) -> None:
         """Are None values filtered from the comment?"""
@@ -1658,7 +1805,7 @@ class TestQueryWrapper(TestCase):
         request = self.request_factory.get("/no-resolver/")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIsNone(result["user_id"])
         self.assertIsNone(result["url"])
@@ -1670,7 +1817,7 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch("test-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/test/path/")
@@ -1683,7 +1830,7 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch("test-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIn("user_id", result)
         self.assertIn("url", result)
@@ -1698,7 +1845,7 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch("anon-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertIsNone(result["user_id"])
         self.assertEqual(result["url"], "/anonymous/path/")
@@ -1711,9 +1858,47 @@ class TestQueryWrapper(TestCase):
         request.resolver_match = self.MockResolverMatch(view_name="test-view")
 
         wrapper = QueryWrapper(request)
-        result = wrapper.get_context
+        result = wrapper.get_context()
 
         self.assertEqual(result["url"], "/very/long…")
+
+    def test_get_context_with_unevaluated_lazy_user(self) -> None:
+        """Does get_context handle unevaluated SimpleLazyObject without recursion?
+
+        When request.user is a SimpleLazyObject that hasn't been evaluated,
+        accessing is_authenticated would trigger a database query to fetch
+        the user. That query would go through the SQL commenter again, causing
+        infinite recursion. This test verifies we handle this case correctly.
+        """
+        request = self.request_factory.get("/lazy/user/path/")
+        # Create an unevaluated SimpleLazyObject (simulating Django's lazy user)
+        request.user = SimpleLazyObject(lambda: self.user)
+        request.resolver_match = self.MockResolverMatch("lazy-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        # User should be None since the lazy object hasn't been evaluated
+        self.assertIsNone(result["user_id"])
+        self.assertEqual(result["url"], "/lazy/user/path/")
+        self.assertEqual(result["url-name"], "lazy-view")
+
+    def test_get_context_with_evaluated_lazy_user(self) -> None:
+        """Does get_context return user_id for an evaluated SimpleLazyObject?"""
+        request = self.request_factory.get("/lazy/user/path/")
+        lazy_user = SimpleLazyObject(lambda: self.user)
+        # Force evaluation of the lazy object
+        _ = lazy_user.pk  # type: ignore[attr-defined]
+        request.user = lazy_user
+        request.resolver_match = self.MockResolverMatch("lazy-view")
+
+        wrapper = QueryWrapper(request)
+        result = wrapper.get_context()
+
+        # User should be set since the lazy object has been evaluated
+        self.assertEqual(result["user_id"], self.user.pk)
+        self.assertEqual(result["url"], "/lazy/user/path/")
+        self.assertEqual(result["url-name"], "lazy-view")
 
 
 class TestSqlCommenterMiddleware(TestCase):
@@ -2204,3 +2389,213 @@ Case No. 1:25-cv-01340-RTG   Document 1 filed 04/29/25   USDC Colorado   pg 1
             needs_ocr(header_text),
             msg="Should need OCR with only headers/pagination",
         )
+
+
+class TestS3CacheHelpers(TestCase):
+    """Tests for the S3 cache helper functions in cl/lib/s3_cache.py"""
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_get_s3_cache_returns_fallback_in_development(self) -> None:
+        """In development mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        # In development, should return db_cache, not s3
+        # We verify by checking the cache backend class name
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_get_s3_cache_returns_fallback_in_testing(self) -> None:
+        """In testing mode, get_s3_cache should return the fallback cache."""
+        cache = get_s3_cache("db_cache")
+        self.assertIn("DatabaseCache", cache.__class__.__name__)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_get_s3_cache_returns_s3_in_production(self) -> None:
+        """In production mode, get_s3_cache should return the S3 cache."""
+        mock_s3_cache = MagicMock()
+        mock_caches = {"s3": mock_s3_cache, "db_cache": MagicMock()}
+
+        with patch("cl.lib.s3_cache.caches", mock_caches):
+            with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+                cache = get_s3_cache("db_cache")
+                self.assertEqual(cache, mock_s3_cache)
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_no_prefix_in_development(self) -> None:
+        """In development mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=True)
+    def test_make_s3_cache_key_no_prefix_in_testing(self) -> None:
+        """In testing mode, cache key should not have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        result = make_s3_cache_key(base_key, timeout)
+        self.assertEqual(result, base_key)
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_adds_prefix_in_production(self) -> None:
+        """In production mode, cache key should have time-based prefix."""
+        base_key = "clusters-mlt-es:123"
+        timeout = 60 * 60 * 24 * 7  # 7 days
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, timeout)
+            self.assertEqual(result, f"7-days:{base_key}")
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_rounds_up_days(self) -> None:
+        """Days calculation should round up (e.g., 1.5 days -> 2 days)."""
+        base_key = "test-key"
+
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            # 1 day exactly
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 24), "1-days:test-key"
+            )
+
+            # 1.5 days -> rounds to 2
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 36), "2-days:test-key"
+            )
+
+            # 6 hours -> rounds to 1
+            self.assertEqual(
+                make_s3_cache_key(base_key, 60 * 60 * 6), "1-days:test-key"
+            )
+
+    @override_settings(DEVELOPMENT=False, TESTING=False)
+    def test_make_s3_cache_key_persistent_in_production(self) -> None:
+        """In production, timeout=None should use persistent prefix."""
+        base_key = "clusters-mlt-es:123"
+        with patch("cl.lib.s3_cache.switch_is_active", return_value=True):
+            result = make_s3_cache_key(base_key, None)
+            self.assertEqual(result, f"persistent:{base_key}")
+
+    @override_settings(DEVELOPMENT=True, TESTING=False)
+    def test_make_s3_cache_key_persistent_no_prefix_in_dev(self) -> None:
+        """In dev/test, timeout=None should return key unchanged."""
+        base_key = "clusters-mlt-es:123"
+        result = make_s3_cache_key(base_key, None)
+        self.assertEqual(result, base_key)
+
+
+class TieredCacheTest(SimpleTestCase):
+    """Tests for the tiered_cache decorator."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.call_count = 0
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_caches_result(self) -> None:
+        """Test that tiered_cache caches the result of a function."""
+
+        @tiered_cache(timeout=60)
+        def expensive_function(x: int) -> int:
+            self.call_count += 1
+            return x * 2
+
+        # First call should execute the function
+        result1 = expensive_function(5)
+        self.assertEqual(result1, 10)
+        self.assertEqual(self.call_count, 1)
+
+        # Second call should return cached result
+        result2 = expensive_function(5)
+        self.assertEqual(result2, 10)
+        self.assertEqual(self.call_count, 1)  # Still 1, not called again
+
+    def test_different_args_produce_different_cache_keys(self) -> None:
+        """Test that different arguments produce different cache entries."""
+
+        @tiered_cache(timeout=60)
+        def multiply(x: int, y: int) -> int:
+            self.call_count += 1
+            return x * y
+
+        # First call with (2, 3)
+        result1 = multiply(2, 3)
+        self.assertEqual(result1, 6)
+        self.assertEqual(self.call_count, 1)
+
+        # Call with different args (3, 4)
+        result2 = multiply(3, 4)
+        self.assertEqual(result2, 12)
+        self.assertEqual(self.call_count, 2)
+
+        # Call again with (2, 3) - should be cached
+        result3 = multiply(2, 3)
+        self.assertEqual(result3, 6)
+        self.assertEqual(self.call_count, 2)
+
+    def test_memory_cache_is_checked_before_redis(self) -> None:
+        """Test that memory cache is checked before Redis cache."""
+
+        @tiered_cache(timeout=60)
+        def get_value() -> str:
+            self.call_count += 1
+            return "value"
+
+        # First call populates both caches
+        result1 = get_value()
+        self.assertEqual(result1, "value")
+        self.assertEqual(self.call_count, 1)
+
+        # Clear Redis cache but leave memory cache (clear only tiered: keys)
+        r = get_redis_interface("CACHE")
+        keys = list(r.scan_iter(match=":1:tiered:*"))
+        if keys:
+            r.delete(*keys)
+
+        # Second call should still return cached result from memory
+        result2 = get_value()
+        self.assertEqual(result2, "value")
+        self.assertEqual(self.call_count, 1)
+
+    def test_redis_cache_populates_memory_cache(self) -> None:
+        """Test that reading from Redis cache also populates memory cache."""
+
+        @tiered_cache(timeout=60)
+        def get_data() -> dict:
+            self.call_count += 1
+            return {"key": "value"}
+
+        # First call
+        result1 = get_data()
+        self.assertEqual(result1, {"key": "value"})
+        self.assertEqual(self.call_count, 1)
+
+        # Clear only memory cache, leave Redis cache intact
+        _memory_cache.clear()
+
+        # Second call should read from Redis and repopulate memory
+        result2 = get_data()
+        self.assertEqual(result2, {"key": "value"})
+        self.assertEqual(self.call_count, 1)  # Still 1, read from Redis
+
+    def test_kwargs_affect_cache_key(self) -> None:
+        """Test that keyword arguments are included in cache key."""
+
+        @tiered_cache(timeout=60)
+        def greet(name: str, greeting: str = "Hello") -> str:
+            self.call_count += 1
+            return f"{greeting}, {name}!"
+
+        result1 = greet("Alice", greeting="Hello")
+        self.assertEqual(result1, "Hello, Alice!")
+        self.assertEqual(self.call_count, 1)
+
+        result2 = greet("Alice", greeting="Hi")
+        self.assertEqual(result2, "Hi, Alice!")
+        self.assertEqual(self.call_count, 2)
+
+        result3 = greet("Alice", greeting="Hello")
+        self.assertEqual(result3, "Hello, Alice!")
+        self.assertEqual(self.call_count, 2)  # Cached

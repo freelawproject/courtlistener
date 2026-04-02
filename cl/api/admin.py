@@ -1,6 +1,37 @@
 from django.contrib import admin
 
-from cl.api.models import Webhook, WebhookEvent
+from cl.api.models import APIThrottle, Webhook, WebhookEvent
+
+
+@admin.register(APIThrottle)
+class APIThrottleAdmin(admin.ModelAdmin):
+    raw_id_fields = ("user",)
+    list_display = (
+        "user",
+        "throttle_type",
+        "blocked",
+        "rate",
+        "date_created",
+    )
+    list_filter = (
+        "throttle_type",
+        "blocked",
+    )
+    search_fields = (
+        "user__username",
+        "user__email",
+        "user__pk",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+class APIThrottleInline(admin.TabularInline):
+    model = APIThrottle
+    extra = 0
+    raw_id_fields = ("user",)
 
 
 @admin.register(Webhook)

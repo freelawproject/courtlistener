@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.dateformat import format
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from elasticsearch_dsl import Q, connections
 from waffle.testutils import override_switch
 
@@ -47,6 +47,7 @@ from cl.people_db.factories import (
     PartyFactory,
     PartyTypeFactory,
 )
+from cl.people_db.models import Attorney
 from cl.recap.factories import DocketWithBankruptcyDataFactory
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -60,6 +61,7 @@ from cl.search.documents import (
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CitationWithParentsFactory,
+    CourtFactory,
     DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
@@ -70,7 +72,12 @@ from cl.search.models import Docket, RECAPDocument
 from cl.search.tasks import (
     index_docket_parties_in_es,
 )
-from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    MockTallyStatMixin,
+    SearchAlertsAssertions,
+    TestCase,
+)
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -80,8 +87,13 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_sweep",
 )
 @override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPAlertsSweepIndexTest")
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
+    MockTallyStatMixin,
+    RECAPSearchTestCase,
+    ESIndexTestCase,
+    TestCase,
+    SearchAlertsAssertions,
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -133,16 +145,12 @@ class RECAPAlertsSweepIndexTest(
             )
 
     def setUp(self):
+        super().setUp()
         self.r = get_redis_interface("CACHE")
-        self.r_stats = get_redis_interface("STATS")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
             self.r.delete(*keys)
-
-        stat_keys = self.r_stats.keys("alerts.sent.*")
-        if stat_keys:
-            self.r_stats.delete(*stat_keys)
 
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
@@ -1898,7 +1906,7 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Send scheduled Monthly alerts and check assertions.
-        current_date = now().replace(day=1, hour=8)
+        current_date = localtime(now()).replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
             call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
             alerts_runtime_naive = datetime.datetime.now()
@@ -2155,16 +2163,16 @@ class RECAPAlertsSweepIndexTest(
                 pacer_doc_id="0190645981",
                 plain_text="plain text lorem",
             )
+        self.mock_tally_stat.reset_mock()
         with time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
 
-        # Confirm Stat object is properly created and updated.
-        key = f"alerts.sent.{now().date().isoformat()}"
-        count = int(self.r_stats.get(key) or 0)
-        self.assertEqual(count, 1, "Wrong number of stats alerts sent.")
+        # Confirm tally_stat was called once by the RT command.
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(self.mock_tally_stat.call_args.kwargs["inc"], 1)
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -2315,9 +2323,13 @@ class RECAPAlertsSweepIndexTest(
             1,
         )
 
-        # Confirm Stat object is properly updated.
-        count = int(self.r_stats.get(key) or 0)
-        self.assertEqual(count, 2, "Wrong number of stats objects.")
+        # Confirm total stat increment is 2: 1 from RT + 1 from sweep.
+        # (tally_stat may be called more than twice since the sweep command
+        # calls it separately for RT and DLY rates, some with inc=0.)
+        total_inc = sum(
+            c.kwargs["inc"] for c in self.mock_tally_stat.call_args_list
+        )
+        self.assertEqual(total_inc, 2)
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:
@@ -2687,6 +2699,11 @@ class RECAPAlertsPercolatorTest(
         )
         with time_machine.travel(cls.mock_date, tick=False):
             super().setUpTestData()
+            cls.court = CourtFactory(
+                id="cand",
+                jurisdiction="FB",
+                citation_string="California Bank.",
+            )
             cls.docket_3 = DocketFactory(
                 court=cls.court,
                 case_name="SUBPOENAS SERVED OFF",
@@ -2732,14 +2749,56 @@ class RECAPAlertsPercolatorTest(
                 enabled=True,
             )
 
-    def setUp(self):
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        # Parties with 1 attorney to use "under limit".
+        cls.parties_one_attorney = [
+            {
+                "attorneys": [
+                    {
+                        "contact": "Littler Mendelson LCC\n3344 Peachtree Road, NE\nSuite 1000\nAtlanta, GA 30326-4083\n404-443-000\nFax: 404-000-000\nEmail: lpp@mail.com\n",
+                        "name": "John Limit Attorney",
+                        "roles": ["LEAD ATTORNEY"],
+                    },
+                ],
+                "date_terminated": None,
+                "extra_info": "",
+                "name": "Defendant Janet Dolor",
+                "type": "Defendant",
+            },
+        ]
 
+        # Parties with 2 attorneys to use as "over limit".
+        cls.parties_two_attorneys = [
+            {
+                "attorneys": [
+                    {
+                        "contact": "Littler Test LCC\n3344 Peachtree Road, NE\nSuite 1000\nAtlanta, GA 30326-4083\n404-443-000\nFax: 404-000-000\nEmail: lpp@mail.com\n",
+                        "name": "John Limit Attorney",
+                        "roles": ["ATTORNEY TO BE NOTICED"],
+                    },
+                    {
+                        "contact": "Littler Test LCC\n3344 Peachtree Road, NE\nSuite 1000\nAtlanta, GA 30326-4083\n404-443-000\nFax: 404-000-000\nEmail: lpp@mail.com\n",
+                        "name": "Jane Limit Attorney",
+                        "roles": ["ATTORNEY TO BE NOTICED"],
+                    },
+                ],
+                "date_terminated": None,
+                "extra_info": "",
+                "name": "Defendant Janet Dolor",
+                "type": "Defendant",
+            },
+        ]
+
+    def _clean_alert_hits(self):
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys("alert_hits_percolator:*")
         if keys:
             self.r.delete(*keys)
+
+    def setUp(self):
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
+        self._clean_alert_hits()
 
         self.percolator_call_count = 0
 
@@ -4240,6 +4299,7 @@ class RECAPAlertsPercolatorTest(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
                 docket_number="1:21-bk-1234",
+                docket_number_raw="1:21-bk-1234",
                 source=Docket.RECAP,
                 pacer_case_id="999555",
             )
@@ -4394,6 +4454,353 @@ class RECAPAlertsPercolatorTest(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
 
+    @override_settings(MAX_ATTORNEYS_TO_PERCOLATE=1)
+    def test_skip_parties_percolation_when_attorneys_exceed_limit(
+        self, mock_prefix
+    ) -> None:
+        """Confirm that when the number of attorneys exceeds
+        MAX_ATTORNEYS_TO_PERCOLATE, percolation is skipped on docket
+        save and index_docket_parties_in_es is not called, so no percolation
+        happens at all.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Attorney Limit",
+                query='atty_name="John Limit Attorney"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Percolation should be skipped on docket save.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = Docket(
+                court=self.court,
+                case_name="Attorney Limit Case",
+                docket_number="1:21-bk-9999",
+                docket_number_raw="1:21-bk-9999",
+                source=Docket.RECAP,
+                pacer_case_id="999888",
+            )
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_two_attorneys, docket
+            )
+            docket.save()
+            add_parties_and_attorneys(docket, self.parties_two_attorneys)
+
+        # Confirm the attorney count from the dict matches the DB count.
+        dict_attorney_count = sum(
+            len(p.get("attorneys", [])) for p in self.parties_two_attorneys
+        )
+        db_attorney_count = (
+            Attorney.objects.filter(roles__docket=docket).distinct().count()
+        )
+        self.assertEqual(dict_attorney_count, db_attorney_count)
+
+        # No alert matched via percolation.
+        self.reset_and_assert_percolator_count(expected=0)
+        # set_skip_percolation_if_parties_data should return False.
+        self.assertFalse(percolate_parties)
+        # skip_percolator_request should not exist.
+        self.assertFalse(getattr(docket, "skip_percolator_request", False))
+
+        # When attorneys are within the limit, percolation should be skipped
+        # on docket save and happen after merging parties.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.refresh_from_db()
+            docket.case_name = "Attorney Limit Updated"
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_one_attorney, docket
+            )
+            docket.save()
+
+        # No percolation on docket save since skip was set.
+        self.reset_and_assert_percolator_count(expected=0)
+        # skip_percolator_request should be True.
+        self.assertTrue(docket.skip_percolator_request)
+        # set_skip_percolation_if_parties_data should return True.
+        self.assertTrue(percolate_parties)
+
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ):
+            add_parties_and_attorneys(docket, self.parties_one_attorney)
+            index_docket_parties_in_es.delay(docket.pk)
+
+        # Percolation is performed upon the merging of parties.
+        self.reset_and_assert_percolator_count(expected=1)
+
+        docket.delete()
+
+    def test_recap_document_parties_percolation_based_on_attorney_limit(
+        self, mock_prefix
+    ) -> None:
+        """Confirm that parties data is included or excluded from
+        percolation based on the attorney count relative to
+        MAX_ATTORNEYS_TO_PERCOLATE for RECAPDocuments.
+        """
+
+        docket = DocketFactory(
+            court=self.court,
+            case_name="Party Limit Docket Case",
+            date_filed=datetime.date(2025, 8, 16),
+            docket_number="1:21-bk-7888",
+            source=Docket.RECAP,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Cross Party Limit",
+                query='party_name="Janet Dolor"&q=MOTION Sed que ipsa&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            non_party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Non-Party RD Limit",
+                query="q=MOTION Sed que ipsa&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Under limit: parties are percolated, both alerts should match.
+        with (
+            self.subTest("Under limit - parties percolated"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=10),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            alert_de = DocketEntryFactory(
+                docket=docket,
+                entry_number=2,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION Sed que ipsa quae ab illo inventore",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File Party Limit Test",
+                document_number="2",
+                pacer_doc_id="01803665243326",
+            )
+            add_parties_and_attorneys(docket, self.parties_one_attorney)
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # Both alerts should match since parties are within the limit.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(party_alert.name, html_content)
+        self.assertIn(non_party_alert.name, html_content)
+
+        mail.outbox.clear()
+        rd.delete()
+        alert_de.delete()
+
+        # Over limit: parties excluded, only non-party alert matches.
+        with (
+            self.subTest("Over limit - parties excluded"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=1),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            alert_de = DocketEntryFactory(
+                docket=docket,
+                entry_number=3,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION Sed que ipsa quae ab illo inventore",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File Party Limit Test",
+                document_number="3",
+                pacer_doc_id="01803665243327",
+            )
+            add_parties_and_attorneys(docket, self.parties_two_attorneys)
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # The party-based alert should not match since parties data is
+        # excluded from percolation due to attorney count exceeding the
+        # limit. The non-party alert should still match.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(non_party_alert.name, html_content)
+        self.assertNotIn(party_alert.name, html_content)
+
+        rd.delete()
+        alert_de.delete()
+        docket.delete()
+
+    def test_docket_parties_percolation_based_on_attorney_limit(
+        self, mock_prefix
+    ) -> None:
+        """Confirm that parties data is included or excluded from
+        percolation based on the attorney count relative to
+        MAX_ATTORNEYS_TO_PERCOLATE for Dockets.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Docket Party Limit",
+                query='atty_name="John Limit Attorney"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            non_party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Non-Party Docket Limit",
+                query='case_name="Attorney Limit Docket Case"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Under the limit: parties are percolated, both alerts should match.
+        with (
+            self.subTest("Under limit - parties percolated"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=10),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = Docket(
+                court=self.court,
+                case_name="Attorney Limit Docket Case",
+                docket_number="1:21-bk-8888",
+                docket_number_raw="1:21-bk-8888",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2025, 8, 16),
+                pacer_case_id="324242",
+            )
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_one_attorney, docket
+            )
+            docket.save()
+
+        with (
+            self.subTest("Under limit - parties percolated"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=10),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.refresh_from_db()
+            add_parties_and_attorneys(docket, self.parties_one_attorney)
+            index_docket_parties_in_es.delay(
+                docket.pk, percolate_parties=percolate_parties
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # Both alerts should match since parties are within the limit.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(party_alert.name, html_content)
+        self.assertIn(non_party_alert.name, html_content)
+
+        # Cleanup for next test.
+        mail.outbox.clear()
+        self._clean_alert_hits()
+
+        # Over the limit: parties excluded, only non-party alert matches.
+        with (
+            self.subTest("Over limit - parties excluded"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=1),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.skip_percolator_request = False  # Restart status
+            docket.case_name = "Attorney Limit Docket Case 2"
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_two_attorneys, docket
+            )
+
+            docket.save()
+            add_parties_and_attorneys(docket, self.parties_two_attorneys)
+            index_docket_parties_in_es.delay(
+                docket.pk, percolate_parties=percolate_parties
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # The party-based alert should not match since parties data is
+        # excluded from percolation due to attorney count exceeding the
+        # limit. The non-party alert should still match.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(non_party_alert.name, html_content)
+        self.assertNotIn(party_alert.name, html_content)
+
+        docket.delete()
+
     def test_case_only_alerts(self, mock_prefix) -> None:
         """Confirm that case-only alerts are properly sent and that they are
         triggered only once per case. This means that if a Docket or a
@@ -4432,6 +4839,7 @@ class RECAPAlertsPercolatorTest(
                 cause="405 Civil",
                 jurisdiction_type="U.S. Government Defendant",
                 jury_demand="1,000,000",
+                date_filed=datetime.date(2024, 8, 19),
             )
 
         # Send scheduled Weekly alerts.

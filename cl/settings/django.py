@@ -43,8 +43,25 @@ if env("DB_REPLICA_HOST", default=""):
         },
     }
 
+if env("DB_READ_REPLICA_HOST", default=""):
+    DATABASES["read-replica"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_READ_REPLICA_NAME", default="courtlistener"),
+        "USER": env("DB_READ_REPLICA_USER", default="postgres"),
+        "PASSWORD": env("DB_READ_REPLICA_PASSWORD", default="postgres"),
+        "HOST": env("DB_READ_REPLICA_HOST", default=""),
+        "PORT": "",
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": {
+            "sslmode": env("DB_READ_REPLICA_SSL_MODE", default="prefer"),
+        },
+    }
+
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
-API_READ_DATABASES: list[str] = env("API_READ_DATABASES", default="replica")
+API_READ_DATABASES: list[str] | None = env.list(
+    "API_READ_DATABASES", default=None
+)
+DATABASE_ROUTERS: list[str] = ["cl.api.routers.ReplicaRouter"]
 
 ####################
 # Cache & Sessions #
@@ -79,7 +96,6 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 INSTALL_ROOT = Path(__file__).resolve().parents[2]
 STATICFILES_DIRS = (INSTALL_ROOT / "cl/assets/static-global/",)
 DEBUG = env.bool("DEBUG", default=True)
-DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 MEDIA_ROOT = env("MEDIA_ROOT", default=INSTALL_ROOT / "cl/assets/media/")
 STATIC_URL = env.str("STATIC_URL", default="static/")
 STATIC_ROOT = INSTALL_ROOT / "cl/assets/static/"
@@ -135,6 +151,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django_ratelimit.middleware.RatelimitMiddleware",
     "waffle.middleware.WaffleMiddleware",
+    "cl.api.middleware.ReplicaRoutingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
@@ -154,6 +171,7 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.humanize",
     "django.contrib.messages",
+    "django.contrib.postgres",
     "django.contrib.sessions",
     "django.contrib.sites",
     "django.contrib.sitemaps",
@@ -173,6 +191,7 @@ INSTALLED_APPS = [
     "pghistory",
     "pgtrigger",
     # CourtListener Apps
+    "cl.ai",
     "cl.alerts",
     "cl.audio",
     "cl.api",
@@ -253,7 +272,6 @@ MESSAGE_TAGS = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
-FORMS_URLFIELD_ASSUME_HTTPS = True
 
 SILENCED_SYSTEM_CHECKS = [
     # Allow index names >30 characters, because we aren’t using Oracle

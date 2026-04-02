@@ -84,17 +84,27 @@ class IncrementalNewTemplateMiddleware:
         return response
 
     def process_template_response(self, request, response):
-        use_new_design = flag_is_active(request, "use_new_design")
-        is_template_resp = isinstance(response, TemplateResponse)
-        rendered = response.is_rendered
-
-        if not use_new_design or not is_template_resp or rendered:
+        # don't remove short-circuit evaluation as flag_is_active hits the db
+        if (
+            not isinstance(response, TemplateResponse)
+            or response.is_rendered
+            or not flag_is_active(request, "use_new_design")
+        ):
             return response
 
         # {response.template_name} could return a list if TemplateView is used directly
         old_template = response.template_name
-        if isinstance(old_template, list | tuple):
-            old_template = old_template[0]
+        if isinstance(old_template, (list, tuple)):
+            # Check if the first template exists anywhere in the project
+            try:
+                get_template(old_template[0])
+                old_template = old_template[0]
+            except TemplateDoesNotExist:
+                old_template = (
+                    old_template[1]
+                    if len(old_template) > 1
+                    else old_template[0]
+                )
 
         if not isinstance(old_template, str):
             return response

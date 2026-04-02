@@ -1,0 +1,226 @@
+import time
+from itertools import batched
+
+from django.db.models import Q
+
+from cl.corpus_importer.tasks import download_scotus_document_pdf
+from cl.corpus_importer.utils import paginate_docs_queryset
+from cl.lib.celery_utils import CeleryThrottle
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.indexing_utils import (
+    get_last_parent_document_id_processed,
+    log_last_document_indexed,
+)
+from cl.scrapers.tasks import extract_pdf_document
+from cl.search.models import SCOTUSDocument
+
+
+def compose_redis_key() -> str:
+    """Compose a Redis key for SCOTUS PDF download log.
+    :return: A Redis key as a string.
+    """
+    return "scotus_pdf_download:log"
+
+
+def download_scotus_pdfs(
+    download_queue: str,
+    delay: float,
+    download_order: str = "asc",
+    auto_resume: bool = False,
+) -> None:
+    """Download PDFs for SCOTUSDocuments missing a local file.
+
+    Queries SCOTUSDocument instances that have no filepath_local,
+    then schedules a download task for each.
+
+    :param download_queue: The celery queue for download tasks.
+    :param delay: Seconds to sleep between scheduling tasks.
+    :param download_order: Sort order for the queryset by pk ("asc" or "desc").
+    :param auto_resume: Resume from last pk stored in Redis.
+    :return: None
+    """
+    desc = download_order == "desc"
+    docs = SCOTUSDocument.objects.filter(filepath_local="").values_list(
+        "pk", flat=True
+    )
+
+    if auto_resume:
+        last_pk = get_last_parent_document_id_processed(compose_redis_key())
+        if last_pk:
+            logger.info("Auto-resuming from pk %s.", last_pk)
+            if desc:
+                docs = docs.filter(pk__lt=last_pk)
+            else:
+                docs = docs.filter(pk__gt=last_pk)
+
+    count = docs.count()
+    logger.info("Found %s SCOTUSDocuments needing download.", count)
+    throttle = CeleryThrottle(queue_name=download_queue)
+    processed_count = 0
+    for pk in paginate_docs_queryset(docs, desc=desc):
+        throttle.maybe_wait()
+        download_scotus_document_pdf.si(pk).set(
+            queue=download_queue
+        ).apply_async()
+        processed_count += 1
+        if processed_count % 100 == 0:
+            logger.info(
+                "Scheduled %s/%s (%s)",
+                processed_count,
+                count,
+                f"{processed_count / count:.0%}",
+            )
+            log_last_document_indexed(pk, compose_redis_key())
+        time.sleep(delay)
+    logger.info(
+        "Scheduled %s/%s",
+        processed_count,
+        count,
+    )
+
+
+def extract_scotus_pdfs(
+    extraction_queue: str,
+    chunk_size: int,
+    delay: float,
+    page_limit: int,
+) -> None:
+    """Extract text from SCOTUSDocuments that have a file but incomplete OCR.
+
+    Queries SCOTUSDocument instances that already have a filepath_local but
+    whose OCR status is not complete or unnecessary. Documents with a
+    page_count exceeding page_limit are skipped, allowing smaller documents
+    to be processed first.
+
+    :param extraction_queue: The celery queue for extraction tasks.
+    :param chunk_size: The number of items to extract per celery task batch.
+    :param delay: Seconds to sleep between scheduling tasks.
+    :param page_limit: Skip documents with more pages than this value.
+    :return: None
+    """
+    docs = (
+        SCOTUSDocument.objects.exclude(filepath_local="")
+        .exclude(
+            Q(ocr_status=SCOTUSDocument.OCR_COMPLETE)
+            | Q(ocr_status=SCOTUSDocument.OCR_UNNECESSARY)
+        )
+        .values_list("pk", flat=True)
+    )
+    total_count = docs.count()
+    filtered_docs = docs.filter(
+        Q(page_count__lte=page_limit) | Q(page_count__isnull=True)
+    )
+    filtered_count = filtered_docs.count()
+    skipped_count = total_count - filtered_count
+    logger.info("Found %s SCOTUSDocuments needing extraction.", total_count)
+    throttle = CeleryThrottle(queue_name=extraction_queue)
+    processed_count = 0
+    for chunk in batched(paginate_docs_queryset(filtered_docs), chunk_size):
+        throttle.maybe_wait()
+        processed_count += len(chunk)
+        extract_pdf_document.si(
+            list(chunk),
+            check_if_needed=False,
+            model_name="search.SCOTUSDocument",
+        ).set(queue=extraction_queue).apply_async()
+        logger.info(
+            "Scheduled %s/%s (%s)",
+            processed_count,
+            total_count,
+            f"{processed_count / total_count:.0%}",
+        )
+        time.sleep(delay)
+    logger.info(
+        "Done. Scheduled %s, skipped %s (over %s pages).",
+        processed_count,
+        skipped_count,
+        page_limit,
+    )
+
+
+class Command(VerboseCommand):
+    help = (
+        "Download and extract PDFs for SCOTUSDocument instances. "
+        "By default, downloads missing PDFs. "
+        "Use --only-extraction to skip downloads and only extract "
+        "already-downloaded files."
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--download-queue",
+            type=str,
+            default="celery",
+            help="The celery queue for PDF download tasks.",
+        )
+        parser.add_argument(
+            "--extraction-queue",
+            type=str,
+            default="celery",
+            help="The celery queue for PDF extraction tasks.",
+        )
+        parser.add_argument(
+            "--only-extraction",
+            action="store_true",
+            default=False,
+            help="Only extract text from already-downloaded PDFs. "
+            "Skips the download step.",
+        )
+        parser.add_argument(
+            "--chunk-size",
+            type=int,
+            default=10,
+            help="The number of PDFs to extract in a single celery task "
+            "(only used with --only-extraction).",
+        )
+        parser.add_argument(
+            "--page-limit",
+            type=int,
+            default=50,
+            help="Skip documents with more pages than this value "
+            "(only used with --only-extraction).",
+        )
+        parser.add_argument(
+            "--delay",
+            type=float,
+            default=1.0,
+            help="Seconds to sleep between scheduling tasks.",
+        )
+        parser.add_argument(
+            "--download-order",
+            type=str,
+            choices=["asc", "desc"],
+            default="asc",
+            help="Sort order for downloading documents by pk (default: asc).",
+        )
+        parser.add_argument(
+            "--auto-resume",
+            action="store_true",
+            default=False,
+            help="Resume from last pk stored in Redis.",
+        )
+
+    def handle(self, *args, **options):
+        super().handle(*args, **options)
+
+        delay = options["delay"]
+
+        if options["only_extraction"]:
+            chunk_size = options["chunk_size"]
+            page_limit = options["page_limit"]
+            extraction_queue = options["extraction_queue"]
+            logger.info(
+                "Extracting SCOTUSDocument PDFs (page limit: %s).",
+                page_limit,
+            )
+            extract_scotus_pdfs(
+                extraction_queue, chunk_size, delay, page_limit
+            )
+        else:
+            download_queue = options["download_queue"]
+            logger.info("Downloading SCOTUSDocument PDFs.")
+            download_order = options["download_order"]
+            auto_resume = options["auto_resume"]
+            download_scotus_pdfs(
+                download_queue, delay, download_order, auto_resume
+            )

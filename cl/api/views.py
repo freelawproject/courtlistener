@@ -13,6 +13,8 @@ from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 
+from cl.api.models import ThrottleType
+from cl.api.utils import get_all_throttle_overrides
 from cl.lib.elasticsearch_utils import (
     do_es_alert_estimation_query,
     get_court_opinions_counts,
@@ -147,10 +149,16 @@ async def citation_lookup_api(
     default_throttle_rate = parse_throttle_rate_for_template(rate)
     custom_throttle_rate = None
     if request.user and request.user.is_authenticated:
-        rate = settings.REST_FRAMEWORK[  # type: ignore
-            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
-        ].get(request.user.username, None)
-        custom_throttle_rate = parse_throttle_rate_for_template(rate)
+        overrides = await sync_to_async(get_all_throttle_overrides)(
+            ThrottleType.CITATION_LOOKUP
+        )
+        override = overrides.get(request.user.username)
+        if override is not None:
+            blocked, custom_rate = override
+            if not blocked and custom_rate:
+                custom_throttle_rate = parse_throttle_rate_for_template(
+                    custom_rate
+                )
 
     return TemplateResponse(
         request,
@@ -341,3 +349,42 @@ class VersionedTemplateView(TemplateView):
         context = super().get_context_data(**kwargs)
         context["version"] = self.kwargs.get("version", "v4")
         return context
+
+
+async def wiki_data(request: HttpRequest) -> JsonResponse:
+    """Provide data for the external wiki's help pages.
+
+    Returns counts and settings used across several API documentation pages
+    so the wiki can display them via external data connectors.
+    """
+    cache_key = "wiki-data"
+    data = await cache.aget(cache_key)
+    if data is not None:
+        return JsonResponse(data)
+
+    court_count = await Court.objects.exclude(
+        jurisdiction=Court.TESTING_COURT
+    ).acount()
+    citation_count = await Citation.objects.acount()
+
+    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore[misc]
+    count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
+
+    fd_data = await get_coverage_data_fds()
+
+    data = {
+        "court_count": court_count,
+        "citation_count": citation_count,
+        "citation_lookup": {
+            "throttle_count": count,
+            "throttle_period": period,
+            "max_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore[misc]
+        },
+        "financial_disclosures": {
+            "disclosures": fd_data["disclosures"],
+            "investments": fd_data["investments"],
+        },
+    }
+    one_day = 60 * 60 * 24
+    await cache.aset(cache_key, data, one_day)
+    return JsonResponse(data)

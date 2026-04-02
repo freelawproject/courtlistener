@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
+from django.http import QueryDict
 from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -60,6 +61,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
+    CaseTransferFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
@@ -71,6 +73,7 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
+from cl.search.forms import SearchForm
 from cl.search.llm_models import CleanDocketNumber, DocketItem
 from cl.search.management.commands import populate_docket_number_raw
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
@@ -83,6 +86,7 @@ from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    CaseTransfer,
     Citation,
     ClusterRedirection,
     Court,
@@ -91,6 +95,7 @@ from cl.search.models import (
     DocketEvent,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     RECAPDocument,
     SearchQuery,
     sort_cites,
@@ -283,6 +288,68 @@ class ModelTest(TestCase):
         op_5 = OpinionFactory(cluster=cluster, type="Lead Opinion")
         self.assertEqual(op_5.ordering_key, None)
 
+    def test_opinion_content_model(self):
+        """Verify the correct creation of OpinionContent object"""
+        self.docket = Docket.objects.create(
+            case_name="People v. Curry",
+            court_id="cal",
+            source=Docket.SCANNING_PROJECT,
+        )
+        self.oc = OpinionCluster.objects.create(
+            case_name="People v. Curry",
+            docket=self.docket,
+            date_filed=datetime.date(2023, 11, 25),
+        )
+
+        op_content = """
+            <opinion type="majority">
+              <p id="p1214-1" pgmap="1214">
+                The above-captioned matter is transferred to the Court of Appeal, Third Appellate District, with directions to vacate its decision and reconsider the cause in light of our decision in People v. Braden (2023) <citation case_name="People v. Braden" volume="14" reporter="Cal.5th" page="791" court="Cal." year="2023">14 Cal.5th 791</citation>, <citation volume="308" reporter="Cal.Rptr.3d" page="846">308 Cal.Rptr.3d 846</citation>, <citation volume="529" reporter="P.3d" page="1116">529 P.3d 1116</citation>, and to provide any other relief to which defendant is entitled. (Cal. Rules of Court, rule 8.528(d).) As explained in Standing Order Exercising Authority Under California Rules of Court, Rule 8.1115(e)(3), Upon Grant of Review or Transfer of a Matter with an Underlying Published Court of Appeal Opinion, Administrative Order 2021-04-21, and California Rules of Court, rule 8.1115(e)(3), corresponding comment, par. 3, the opinion is hereby rendered either “depublished” or “not citable.”
+              </p>
+              <p id="p1214-2" pgmap="1214">Votes: Guerrero, C.J., Corrigan, Liu, Kruger, Groban, Jenkins and Evans, JJ.</p>
+            </opinion>
+        """
+
+        self.op = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
+
+        self.op_c = OpinionContent.objects.create(
+            opinion=self.op,
+            content=op_content,
+            source=OpinionContent.FLP_SCANNING,
+            extraction_type=OpinionContent.LLM,
+            is_main_version=True,
+        )
+
+        self.assertEqual(self.op_c.opinion, self.op)
+        self.assertEqual(self.op_c.content, op_content)
+        self.assertEqual(self.op_c.source, OpinionContent.FLP_SCANNING)
+        self.assertEqual(self.op_c.extraction_type, OpinionContent.LLM)
+
+    def test_opinion_content_str(self):
+        """Test the __str__ method of the OpinionContent model."""
+        self.docket = Docket.objects.create(
+            case_name="People v. Curry",
+            court_id="cal",
+            source=Docket.SCANNING_PROJECT,
+        )
+        self.oc = OpinionCluster.objects.create(
+            case_name="People v. Curry",
+            docket=self.docket,
+            date_filed=datetime.date(2023, 11, 25),
+        )
+        self.op = Opinion.objects.create(cluster=self.oc, type="Lead Opinion")
+        self.op_c = OpinionContent.objects.create(
+            opinion=self.op,
+            content="test content",
+            source=OpinionContent.FLP_SCANNING,
+            extraction_type=OpinionContent.LLM,
+            is_main_version=True,
+        )
+        self.assertEqual(
+            str(self.op_c),
+            f"{self.op_c.pk} - {self.oc.case_name}",
+        )
+
 
 class DocketValidationTest(TestCase):
     @classmethod
@@ -302,15 +369,19 @@ class DocketValidationTest(TestCase):
         """Is blank pacer_case_id denied in not appellate dockets?"""
         with self.assertRaises(ValidationError):
             Docket.objects.create(
-                source=Docket.RECAP, court=self.court, docket_number="12-1233"
+                source=Docket.RECAP,
+                court=self.court,
+                docket_number_raw="12-1233",
+                docket_number="12-1233",
             )
 
         appellate = Docket.objects.create(
             source=Docket.RECAP,
             court=self.court_appellate,
             docket_number="12-1234",
+            docket_number_raw="12-1234",
         )
-        self.assertEqual(appellate.docket_number, "12-1234")
+        self.assertEqual(appellate.docket_number_raw, "12-1234")
 
     def test_creating_a_recap_docket_with_docket_number_blank(self) -> None:
         """Is blank docket_number denied?"""
@@ -330,6 +401,7 @@ class DocketValidationTest(TestCase):
         Docket.objects.create(
             source=Docket.RECAP,
             docket_number="asdf",
+            docket_number_raw="asdf",
             pacer_case_id="asdf",
             court_id=self.court.pk,
         )
@@ -338,6 +410,7 @@ class DocketValidationTest(TestCase):
                 Docket.objects.create(
                     source=Docket.RECAP_AND_SCRAPER,
                     docket_number="asdf",
+                    docket_number_raw="asdf",
                     pacer_case_id="asdf",
                     court_id=self.court.pk,
                 )
@@ -1582,6 +1655,10 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         self.assertIn("The input is too long to process.", r.data["detail"])
 
 
+@override_settings()
+@override_settings(WAFFLE_CACHE_PREFIX="test_opinion_search_functional")
+@override_flag("ui_flag_for_o_es", active=True)
+@override_flag("citing_and_related_enabled", active=True)
 class OpinionSearchFunctionalTest(BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -2174,11 +2251,13 @@ class CaptionTest(TestCase):
 
     async def test_simple_caption(self) -> None:
         c, _ = await Court.objects.aget_or_create(
-            pk="ca1", defaults={"position": 1}
+            pk="ca1", defaults={"position": 1}, citation_string="1st Cir."
         )
-        d = await Docket.objects.acreate(source=0, court=c)
+        docket = await Docket.objects.acreate(source=0, court=c)
         cluster = await OpinionCluster.objects.acreate(
-            case_name="foo", docket=d, date_filed=datetime.date(1984, 1, 1)
+            case_name="foo",
+            docket=docket,
+            date_filed=datetime.date(1984, 1, 1),
         )
         await Citation.objects.acreate(
             cluster=cluster,
@@ -2187,9 +2266,10 @@ class CaptionTest(TestCase):
             reporter="F.2d",
             page="44",
         )
+        caption = await cluster.acaption()
         self.assertEqual(
             "foo, 22 F.2d 44&nbsp;(1st&nbsp;Cir.&nbsp;1984)",
-            await cluster.acaption(),
+            caption,
         )
 
     async def test_scotus_caption(self) -> None:
@@ -3710,10 +3790,17 @@ class PopulateDocketNumberRawCommandTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.dn = "1111"
-        cls.docket = DocketFactory(docket_number=cls.dn, docket_number_raw="")
+        # cannot create a Docket with empty string as docket_number_raw,
+        # will emulate the change in the test
+        cls.docket = DocketFactory(
+            docket_number=cls.dn, docket_number_raw="xxxx"
+        )
 
     def test_populate_docket_number_raw(self):
         """Does the command properly copies docket_number_raw into docket number?"""
+        Docket.objects.filter(id=self.docket.id).update(docket_number_raw="")
+        self.docket.events.all().delete()
+
         populate_docket_number_raw.Command().handle(
             start_id=self.docket.id,
             end_id=self.docket.id + 10,
@@ -3854,3 +3941,294 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             {str(self.docket_4.id)},
             "Redis cache set should contain docket_4 only",
         )
+
+
+class CaseTransferFillNullDocketsTest(TestCase):
+    """Tests for CaseTransfer.fill_null_dockets."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.appellate_court = CourtFactory.create(
+            jurisdiction=Court.STATE_APPELLATE,
+        )
+        cls.supreme_court = CourtFactory.create(
+            jurisdiction=Court.STATE_SUPREME,
+        )
+
+    def test_fills_missing_origin_docket(self):
+        """Does fill_null_dockets populate a missing origin_docket FK?"""
+        origin_docket = DocketFactory.create(court=self.appellate_court)
+        destination_docket = DocketFactory.create(court=self.supreme_court)
+        transfer = CaseTransferFactory.create(
+            origin_court=origin_docket.court,
+            origin_docket=None,
+            origin_docket_number=origin_docket.docket_number,
+            destination_court=destination_docket.court,
+            destination_docket=destination_docket,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.origin_docket_id == origin_docket.pk
+
+    def test_fills_missing_destination_docket(self):
+        """Does fill_null_dockets populate a missing destination_docket FK?"""
+        origin_docket = DocketFactory.create(court=self.appellate_court)
+        destination_docket = DocketFactory.create(court=self.supreme_court)
+        transfer = CaseTransferFactory.create(
+            origin_court=origin_docket.court,
+            origin_docket=origin_docket,
+            destination_court=destination_docket.court,
+            destination_docket=None,
+            destination_docket_number=destination_docket.docket_number,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.destination_docket == destination_docket
+
+    def test_leaves_already_populated_dockets_unchanged(self):
+        """Does fill_null_dockets leave already-populated FKs alone?"""
+        origin = DocketFactory.create()
+        destination = DocketFactory.create()
+        transfer = CaseTransferFactory.create(
+            origin_court=origin.court,
+            origin_docket=origin,
+            destination_court=destination.court,
+            destination_docket=destination,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.origin_docket == origin
+        assert transfer.destination_docket == destination
+
+    def test_no_match_leaves_null(self):
+        """Does fill_null_dockets leave FK null when no docket is found?"""
+        destination_docket = DocketFactory.create()
+        transfer = CaseTransferFactory.create(
+            origin_court=CourtFactory.create(),
+            origin_docket=None,
+            origin_docket_number=destination_docket.docket_number
+            + "dontmatch",
+            destination_court=destination_docket.court,
+            destination_docket=destination_docket,
+        )
+
+        CaseTransfer.fill_null_dockets()
+
+        transfer.refresh_from_db()
+        assert transfer.origin_docket is None
+
+
+class SearchFormCourtCleanTest(TestCase):
+    """Tests that SearchForm.clean() correctly normalizes court selection inputs."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
+        cls.court_ca2 = CourtFactory(id="ca2", jurisdiction="F")
+
+    def test_picker_syntax_is_normalized_into_court_field(self) -> None:
+        """Picker syntax populates canonical 'court' filter."""
+
+        # Single court selected via picker
+        form = SearchForm(
+            QueryDict("q=test&type=o&court_scotus=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        self.assertEqual(cd["court"], "scotus")
+
+        # Multiple courts selected via picker
+        form = SearchForm(
+            QueryDict("q=test&type=o&court_scotus=on&court_ca1=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        self.assertTrue(cd["court_scotus"])
+        self.assertTrue(cd["court_ca1"])
+        court_ids = set(cd["court"].split())
+        self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_picker_court_logic_is_preserved(self) -> None:
+        """Canonical `court` param populates individual `court_<id>` for frontend picker."""
+        form = SearchForm(
+            QueryDict("q=test&type=o&court=scotus+ca1"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        self.assertTrue(cd["court_scotus"])
+        self.assertTrue(cd["court_ca1"])
+        court_ids = set(cd["court"].split())
+        self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_picker_and_canonical_inputs_are_merged(self) -> None:
+        """When both picker and canonical params are present, they are merged."""
+        form = SearchForm(
+            QueryDict("q=test&type=o&court=scotus+ca1&court_ca1=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        court_ids = set(cd["court"].split())
+        self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_no_court_selection_results_in_empty_court_filter(self) -> None:
+        """With no court selection, all picker booleans default to True"""
+        form = SearchForm(
+            QueryDict("q=test&type=o"),
+            courts=[self.court_scotus, self.court_ca1],
+        )
+        self.assertTrue(form.is_valid())
+        cd = form.cleaned_data
+        # All courts default to True
+        self.assertTrue(cd["court_scotus"])
+        self.assertTrue(cd["court_ca1"])
+        # But court field stays empty — no ES filter
+        self.assertEqual(cd["court"], "")
+
+
+class DocketSignalTest(TestCase):
+    def setUp(self):
+        self.clean_docket_func_path = (
+            "cl.search.signals.clean_docket_number_raw_and_update_redis_cache"
+        )
+        self.court = CourtFactory(id="test")
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_on_creation(self):
+        """Verify cleaning runs when a new non-RECAP docket is created."""
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            Docket.objects.create(
+                court=self.court,
+                docket_number_raw="2023-cv-00001",
+                source=Docket.SCRAPER,  # source != Docket.RECAP
+            )
+            self.assertTrue(mocked_cleaner.called)
+            self.assertEqual(mocked_cleaner.call_count, 1)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_on_field_change(self):
+        """Verify cleaning runs when docket_number_raw is updated."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="2023-cv-00001",
+            source=Docket.SCRAPER,
+        )
+        new_docket_number = "2023-cv-13-00001"
+        self.assertNotEqual(docket.docket_number_raw, new_docket_number)
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = new_docket_number
+            docket.save()
+
+            self.assertTrue(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_does_not_trigger_when_value_is_the_same(self):
+        """Verify cleaning does not run if the field did not change"""
+        dn = "2023-cv-00001"
+        docket = Docket.objects.create(
+            court=self.court, docket_number_raw=dn, source=Docket.SCRAPER
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = dn
+            docket.save()
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_does_not_trigger_on_other_field_change(self):
+        """Verify cleaning does not run if a different field is updated."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="123-ABC",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.case_name = "Changed another field"
+            docket.save()
+
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_respects_recap_source(self):
+        """Verify cleaning does not run if the source is RECAP."""
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            Docket.objects.create(
+                court=self.court,
+                docket_number_raw="123-ABC",
+                source=Docket.RECAP,
+                pacer_case_id="111",
+            )
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_triggers_with_explicit_update_fields(self):
+        """Verify cleaning runs when save(update_fields) includes
+        docket_number_raw."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="2023-cv-00001",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = "2023-cv-99999"
+            docket.save(update_fields=["docket_number_raw"])
+
+            self.assertTrue(mocked_cleaner.called)
+            self.assertEqual(mocked_cleaner.call_count, 1)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_skipped_with_explicit_unrelated_update_fields(self):
+        """Verify cleaning does not run when save(update_fields) excludes
+        docket_number_raw, even if the field was changed in memory."""
+        docket = Docket.objects.create(
+            court=self.court,
+            docket_number_raw="123-ABC",
+            source=Docket.SCRAPER,
+        )
+
+        with mock.patch(self.clean_docket_func_path) as mocked_cleaner:
+            docket.docket_number_raw = "999-XYZ"
+            docket.case_name = "New name"
+            docket.save(update_fields=["case_name"])
+
+            self.assertFalse(mocked_cleaner.called)
+
+    @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+    def test_signal_no_recursion_from_cleaner(self):
+        """Verify the cleaner's internal save does not cause infinite
+        recursion. The cleaner calls save(update_fields=["docket_number", ...])
+        which re-triggers the signal, but the guard returns early."""
+        from cl.search.docket_number_cleaner import (
+            clean_docket_number_raw_and_update_redis_cache,
+        )
+
+        court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+
+        with mock.patch(
+            self.clean_docket_func_path,
+            wraps=clean_docket_number_raw_and_update_redis_cache,
+        ) as wrapped_cleaner:
+            docket = Docket.objects.create(
+                court=court_scotus,
+                docket_number_raw="12-1234-ag",
+                source=Docket.SCRAPER,
+            )
+
+            # The cleaner should have been called exactly once (on create),
+            # not recursively when it saved the cleaned docket_number.
+            self.assertEqual(wrapped_cleaner.call_count, 1)
+            docket.refresh_from_db()
+            self.assertEqual(docket.docket_number, "12-1234-AG")

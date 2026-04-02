@@ -43,6 +43,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     BankruptcyInformation,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -283,6 +284,15 @@ class CitationSerializer(ModelSerializer):
         )
 
 
+class ClusterRedirectionSerializer(ModelSerializer):
+    class Meta:
+        model = ClusterRedirection
+        exclude = (
+            "id",
+            "cluster",
+        )
+
+
 class OpinionClusterSerializer(
     RetrieveFilteredFieldsMixin,
     DynamicFieldsMixin,
@@ -317,6 +327,9 @@ class OpinionClusterSerializer(
         style={"base_template": "input.html"},
     )
     citations = CitationSerializer(many=True)
+    cluster_redirections = ClusterRedirectionSerializer(
+        many=True, read_only=True, source="merged_clusters"
+    )
 
     class Meta:
         model = OpinionCluster

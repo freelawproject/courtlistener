@@ -3,6 +3,7 @@
 {% require_script "js/alpine/composables/focus.js" %}
 {% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
 {% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
+{# frontend-checks-skip: check_hardcoded_ids #}
 
 <c-vars variant request class=""></c-vars>
 
@@ -57,7 +58,7 @@
           <li
             class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
-            <a href="https://donate.free.law/forms/supportflp" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+            <a href="https://donate.free.law/forms/supportflp" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 flex justify-start gap-2 w-full">
               {% svg "money_hand" class="text-greyscale-500" aria_hidden="true" %}
               Make a Donation
             </a>
@@ -65,7 +66,7 @@
           <li
             class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
           >
-            <a href="https://donate.free.law/forms/membership" target="_blank" class="px-4 py-1.5 flex justify-start gap-2 w-full">
+            <a href="https://free.law/membership/" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 flex justify-start gap-2 w-full">
               {% svg "group" class="text-greyscale-500" aria_hidden="true" %}
               Become a Member
             </a>
@@ -127,12 +128,12 @@
         aria-labelledby="advanced-filters-title"
         class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 md:overflow-visible overflow-auto max-h-[--desktop-header-filters-height]"
         x-show="advancedFiltersExpandedDesktop"
-        x-on:keyup.esc.window="toggleAdvancedFiltersDesktop"
+        x-on:keyup.esc.window="closeAdvancedFiltersDesktopIfOpen"
         x-collapse.duration.250ms
       >
         <div class="capped-width">
           <h2 id="advanced-filters-title" class="sr-only">Advanced filters</h2>
-          <c-corpus-search.filters :request="request" :search_form="search_form" only/>
+          <c-corpus-search.filters :request="request" :search_form="search_form" form_prefix="desktop" only/>
         </div>
       </div>
     </div>
@@ -145,7 +146,7 @@
     {# MOBILE SEARCH TRIGGER + DIALOG #}
     {% if variant != "homepage" %}
       <c-corpus-search class="md:hidden" only>
-        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" only>
+        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" form_prefix="mobile" only>
           <c-slot name="trigger_button">
             <c-dialog.trigger-button>
               {% svg "magnifier" class="text-greyscale-400 w-5 h-5" %}
@@ -161,7 +162,7 @@
         <button
           id="header-profile-trigger"
           x-on:click="openProfileMenu"
-          class="bg-white btn-outline hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
+          class="bg-white btn-outline hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 hover:text-greyscale-800 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
           type="button"
           aria-haspopup="menu"
           aria-controls="header-profile-menu"
@@ -233,17 +234,6 @@
               >
                 {% svg "tag" aria_hidden="true" class="text-greyscale-400" %}
                 Tags
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url "view_visualizations" %}"
-                role="menuitem"
-                aria-label="Go to Visualizations page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "graph_up" aria_hidden="true" class="text-greyscale-400" %}
-                Visualizations
               </a>
             </li>
             <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">

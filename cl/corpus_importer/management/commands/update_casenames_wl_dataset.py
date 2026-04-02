@@ -193,7 +193,7 @@ def query_possible_matches(
 
     for citation in valid_citations:
         citation_query = Q(**citation) & Q(
-            cluster__docket__docket_number__contains=docket_number,
+            cluster__docket__docket_number_raw__contains=docket_number,
             cluster__date_filed=date_filed,
         )
         citation_queries |= citation_query

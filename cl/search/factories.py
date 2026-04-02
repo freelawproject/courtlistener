@@ -21,10 +21,11 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.lib.factories import RelatedFactoryVariableList
 from cl.people_db.factories import PersonFactory
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Court,
     Docket,
@@ -36,6 +37,8 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    TrialCourtData,
 )
 from cl.tests.providers import LegalProvider
 
@@ -92,7 +95,7 @@ class DocketFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
-    docket_number_raw = Faker("federal_district_docket_number")
+    docket_number_raw = SelfAttribute("docket_number")
     slug = Faker("slug")
     date_argued = Faker("date_object")
     view_count = 0
@@ -188,7 +191,7 @@ class OpinionClusterFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     date_filed = Faker("date")
     slug = Faker("slug")
-    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
+    source = FuzzyChoice(ClusterSources.NAMES, getter=lambda c: c[0])
     precedential_status = FuzzyChoice(
         PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
     )
@@ -371,6 +374,17 @@ class BankruptcyInformationFactory(DjangoModelFactory):
     trustee_str = Faker("name_female")
 
 
+class SCOTUSDocketEntryFactory(DjangoModelFactory):
+    class Meta:
+        model = SCOTUSDocketEntry
+
+    docket = SubFactory(DocketFactory)
+    entry_number = Faker("random_int", min=1, max=1000)
+    description = Faker("text", max_nb_chars=750)
+    date_filed = Faker("date")
+    sequence_number = Faker("numerify", text="########")
+
+
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
     """Make a OpinionsCitedByRECAPDocument with parents"""
 
@@ -399,18 +413,43 @@ class EmbeddingsDataFactory(DictFactory):
     embeddings = List([SubFactory(EmbeddingDataFactory)])
 
 
-class SCOTUSAttachmentFactory(DictFactory):
+class SCOTUSAttachmentDataFactory(DictFactory):
     document_url = Faker("url")
     description = Faker("text", max_nb_chars=20)
     document_number = Faker("pyint", min_value=1, max_value=1000)
 
 
-class SCOTUSDocketEntryFactory(DictFactory):
-    attachments = List([SubFactory(SCOTUSAttachmentFactory)])
+class SCOTUSDocketEntryDataFactory(DictFactory):
+    attachments = List([SubFactory(SCOTUSAttachmentDataFactory)])
     date_filed = Faker("date_object")
     description = Faker("text", max_nb_chars=20)
     description_html = Faker("text", max_nb_chars=20)
     document_number = Faker("pyint", min_value=1, max_value=1000)
+
+
+class SCOTUSAttorneyDataFactory(DictFactory):
+    """Factory for SCOTUS attorney dicts."""
+
+    address = Faker("street_address")
+    city = Faker("city")
+    email = Faker("email")
+    is_counsel_of_record = Faker("boolean")
+    name = Faker("name")
+    phone = Faker("phone_number")
+    state = Faker("state_abbr")
+    title = Faker("company")
+    zip = Faker("postcode")
+
+
+class SCOTUSPartyDataFactory(DictFactory):
+    """Factory for SCOTUS party dicts."""
+
+    attorneys = List([SubFactory(SCOTUSAttorneyDataFactory)])
+    name = Faker("company")
+    type = Faker(
+        "random_element",
+        elements=["Petitioner", "Respondent", "Amicus Curiae"],
+    )
 
 
 class ScotusDocketDataFactory(DictFactory):
@@ -426,5 +465,50 @@ class ScotusDocketDataFactory(DictFactory):
     lower_court_decision_date = Faker("date_object")
     lower_court_rehearing_denied_date = Faker("date_object")
     questions_presented = Faker("url")
-    docket_entries = List([SubFactory(SCOTUSDocketEntryFactory)])
-    parties = []
+    docket_entries = List([SubFactory(SCOTUSDocketEntryDataFactory)])
+    parties = List([SubFactory(SCOTUSPartyDataFactory)])
+
+
+class CaseTransferFactory(DjangoModelFactory):
+    origin_court = SubFactory(CourtFactory)
+    origin_docket_number = LazyAttribute(
+        lambda ct: ct.origin_docket.docket_number if ct.origin_docket else None
+    )
+    origin_docket = SubFactory(DocketFactory)
+    destination_court = SubFactory(CourtFactory)
+    destination_docket_number = LazyAttribute(
+        lambda ct: ct.destination_docket.docket_number
+        if ct.destination_docket
+        else None
+    )
+    destination_docket = SubFactory(DocketFactory)
+    transfer_date = Faker("date_object")
+    transfer_type = Faker(
+        "random_element",
+        elements=(
+            CaseTransfer.APPEAL,
+            CaseTransfer.WORKLOAD,
+            CaseTransfer.MERGE,
+            CaseTransfer.JURISDICTION,
+        ),
+    )
+
+    class Meta:
+        model = CaseTransfer
+
+
+class TrialCourtDataFactory(DjangoModelFactory):
+    docket = SubFactory(DocketFactory)
+    docket_number_trial = Faker("federal_district_docket_number")
+    docket_number_raw_trial = SelfAttribute("docket_number_trial")
+    judge_str = Faker("name")
+    judge = SubFactory(PersonFactory)
+    reporter = Faker("name")
+    date_filed = Faker("date_object")
+    court_name = Faker("court_name")
+    court = SubFactory(CourtFactory)
+    punishment = Faker("pystr")
+    county = Faker("pystr")
+
+    class Meta:
+        model = TrialCourtData

@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # Install uv
 # https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
-COPY --from=ghcr.io/astral-sh/uv:0.7 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.9.22 /uv /uvx /bin/
 
 ENV \
     # Set PGSSLCERT at a dummy location ro avoid a SSL error connection.
@@ -31,8 +31,8 @@ ENV \
     # Unbuffer Python output for instant logging
     PYTHONUNBUFFERED=1
 
-ARG BUILD_ENV=prod
 FROM build-base AS python-base
+ARG BUILD_ENV=prod
 
 WORKDIR /opt/courtlistener
 

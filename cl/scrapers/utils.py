@@ -14,7 +14,6 @@ from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from lxml import html
 from reporters_db import REPORTERS
-from requests import Response, Session
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.utils import winnow_case_name
@@ -157,27 +156,20 @@ def get_child_court(child_court_name: str, court_id: str) -> Court | None:
     return child_court
 
 
-@retry(
-    (
-        httpx.NetworkError,
-        httpx.TimeoutException,
-    ),
-    tries=3,
-    delay=5,
-    backoff=2,
-    logger=logger,
-)
-def test_for_meta_redirections(r: Response) -> tuple[bool, str | None]:
+async def test_for_meta_redirections(
+    r: httpx.Response,
+) -> tuple[bool, str | None]:
     """Test for meta data redirections
 
     :param r: A response object
     :return:  A boolean and value
     """
-    extension = async_to_sync(microservice)(
+    response = await microservice(
         service="buffer-extension",
         file=r.content,
         params={"mime": True},
-    ).text
+    )
+    extension = response.text
 
     if extension == ".html":
         html_tree = html.fromstring(r.text)
@@ -199,15 +191,17 @@ def test_for_meta_redirections(r: Response) -> tuple[bool, str | None]:
     return False, None
 
 
-def follow_redirections(r: Response, s: Session) -> Response:
+async def follow_redirections(
+    r: httpx.Response, s: httpx.AsyncClient
+) -> httpx.Response:
     """
     Parse and recursively follow meta refresh redirections if they exist until
     there are no more.
     """
-    redirected, url = test_for_meta_redirections(r)
+    redirected, url = await test_for_meta_redirections(r)
     if redirected:
         logger.info(f"Following a meta redirection to: {url.encode()}")
-        r = follow_redirections(s.get(url), s)
+        r = await follow_redirections(await s.get(url), s)
     return r
 
 
@@ -271,8 +265,8 @@ def get_existing_docket(
     # with juriscraper string formatting
     # https://github.com/freelawproject/juriscraper/pull/1166
     lookup = Q(court_id=court_id) & (
-        Q(docket_number=docket_number.replace(";", ""))
-        | Q(docket_number=docket_number)
+        Q(docket_number_raw=docket_number.replace(";", ""))
+        | Q(docket_number_raw=docket_number)
     )
 
     # Special case where docket numbers are the same and repeated

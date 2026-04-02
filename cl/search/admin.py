@@ -10,13 +10,15 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from cl.alerts.models import DocketAlert
-from cl.lib.admin import build_admin_url
-from cl.lib.cloud_front import invalidate_cloudfront
-from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.admin import (
+    AdminLinkConfig,
+    SealableDocumentAdmin,
+    generate_admin_links,
+)
 from cl.lib.string_utils import trunc
-from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Claim,
     ClaimHistory,
@@ -27,14 +29,19 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionContent,
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
     ScotusDocketMetadata,
+    SCOTUSDocument,
     SearchQuery,
+    TrialCourtData,
 )
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.visualizations.models import SCOTUSMap
 
 
@@ -59,6 +66,18 @@ class OpinionAdmin(CursorPaginatorAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("cluster")
+
+
+@admin.register(OpinionContent)
+class OpinionContentAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("opinion",)
+    search_fields = ("content",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("source",)
+    list_display = ("__str__", "source", "extraction_type")
 
 
 @admin.register(Citation)
@@ -359,9 +378,45 @@ class BankruptcyInformationAdmin(admin.ModelAdmin):
     raw_id_fields = ("docket",)
 
 
+@admin.register(CaseTransfer)
+class CaseTransferAdmin(CursorPaginatorAdmin):
+    raw_id_fields = (
+        "origin_court",
+        "origin_docket",
+        "destination_court",
+        "destination_docket",
+    )
+    list_display = (
+        "pk",
+        "origin_court",
+        "origin_docket_number",
+        "destination_court",
+        "destination_docket_number",
+        "transfer_date",
+        "transfer_type",
+    )
+    list_filter = (
+        "transfer_type",
+        "transfer_date",
+    )
+    search_fields = (
+        "origin_docket_number",
+        "destination_docket_number",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
 @admin.register(RECAPDocument)
-class RECAPDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = ("pk__exact",)
+class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+    change_form_template = "admin/change_form_with_custom_links.html"
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by RECAP Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry", "tags")
     readonly_fields = (
         "date_created",
@@ -369,59 +424,39 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
     )
     actions = ("seal_documents",)
 
+    # SealableDocumentAdmin config
+    seal_url_name = "recapdocument_seal_confirmation"
+    seal_link_label = "Seal Document"
+    seal_heading_template = "Seal RECAP Document #{pk}?"
+    seal_model = RECAPDocument
+    seal_change_url_name = "admin:search_recapdocument_change"
+
+    def get_seal_documents(self, obj):
+        return [obj]
+
+    def get_search_results(
+        self, request: HttpRequest, queryset: QuerySet, search_term: str
+    ) -> tuple[QuerySet, bool]:
+        """Override to search by pk without varchar casting.
+
+        Django 6.0.1 casts non-text fields to CharField for text lookups,
+        which prevents index usage on large tables. This method handles
+        pk searches with direct integer comparison.
+
+        See: https://github.com/freelawproject/courtlistener/issues/6790
+        """
+        if not search_term:
+            return queryset, False
+
+        try:
+            pk_value = int(search_term.strip())
+            return queryset.filter(pk=pk_value), False
+        except ValueError:
+            return queryset.none(), False
+
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
-        ia_failures = []
-        deleted_filepaths = []
-        for rd in queryset:
-            # Thumbnail
-            if rd.thumbnail:
-                deleted_filepaths.append(rd.thumbnail.name)
-                rd.thumbnail.delete()
-
-            # PDF
-            if rd.filepath_local:
-                deleted_filepaths.append(rd.filepath_local.name)
-                rd.filepath_local.delete()
-
-            # Internet Archive
-            if rd.filepath_ia:
-                url = rd.filepath_ia
-                r = delete_from_ia(url)
-                if not r.ok:
-                    ia_failures.append(url)
-
-            # Clean up other fields and call save()
-            # Important to use save() to ensure these changes are updated in ES
-            rd.date_upload = None
-            rd.is_available = False
-            rd.is_sealed = True
-            rd.sha1 = ""
-            rd.page_count = None
-            rd.file_size = None
-            rd.ia_upload_failure_count = None
-            rd.filepath_ia = ""
-            rd.thumbnail_status = THUMBNAIL_STATUSES.NEEDED
-            rd.plain_text = ""
-            rd.ocr_status = None
-            rd.save()
-
-        # Do a CloudFront invalidation
-        invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
-
-        if ia_failures:
-            self.message_user(
-                request,
-                f"Failed to remove {len(ia_failures)} item(s) from Internet "
-                "Archive. Please do so by hand. Sorry. The URL(s): "
-                f"{ia_failures}.",
-            )
-        else:
-            self.message_user(
-                request,
-                f"Successfully sealed and removed {queryset.count()} "
-                "document(s).",
-            )
+        self._seal_and_report(request, queryset=queryset)
 
 
 class RECAPDocumentInline(admin.StackedInline):
@@ -436,7 +471,8 @@ class RECAPDocumentInline(admin.StackedInline):
 
 
 @admin.register(DocketEntry)
-class DocketEntryAdmin(CursorPaginatorAdmin):
+class DocketEntryAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+    change_form_template = "admin/change_form_with_custom_links.html"
     inlines = (RECAPDocumentInline,)
     search_help_text = (
         "Search DocketEntries by Docket ID or RECAP sequence number."
@@ -460,6 +496,28 @@ class DocketEntryAdmin(CursorPaginatorAdmin):
         "date_modified",
     )
     list_filter = ("date_filed", "date_created", "date_modified")
+    actions = ("seal_docket_entry_documents",)
+
+    # SealableDocumentAdmin config
+    seal_url_name = "docketentry_seal_confirmation"
+    seal_link_label = "Seal Documents"
+    seal_heading_template = "Seal documents in Docket Entry #{pk}?"
+    seal_model = DocketEntry
+    seal_change_url_name = "admin:search_docketentry_change"
+
+    def get_seal_documents(self, obj):
+        return list(
+            obj.recap_documents.all().order_by(
+                "document_number", "attachment_number"
+            )
+        )
+
+    @admin.action(description="Seal documents for selected docket entries")
+    def seal_docket_entry_documents(
+        self, request: HttpRequest, queryset: QuerySet
+    ) -> None:
+        docs = RECAPDocument.objects.filter(docket_entry__in=queryset)
+        self._seal_and_report(request, queryset=docs)
 
     @admin.display(description="Docket entry")
     def get_pk(self, obj):
@@ -480,7 +538,7 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
 
 @admin.register(Docket)
 class DocketAdmin(CursorPaginatorAdmin):
-    change_form_template = "admin/docket_change_form.html"
+    change_form_template = "admin/change_form_with_custom_links.html"
     prepopulated_fields = {"slug": ["case_name"]}
     list_display = (
         "__str__",
@@ -512,21 +570,46 @@ class DocketAdmin(CursorPaginatorAdmin):
     def change_view(self, request, object_id, form_url="", extra_context=None):
         """Add links to pre-filtered related admin pages."""
         extra_context = extra_context or {}
-        query_params = {"docket": object_id}
-
-        extra_context["docket_entries_url"] = build_admin_url(
-            DocketEntry,
-            query_params,
-        )
-
-        extra_context["docket_alerts_url"] = build_admin_url(
-            DocketAlert,
-            query_params,
-        )
-
+        custom_links: list[AdminLinkConfig] = [
+            {
+                "label": "View Docket Entries",
+                "model_class": DocketEntry,
+                "query_params": {"docket": object_id},
+            },
+            {
+                "label": "View Docket Alerts",
+                "model_class": DocketAlert,
+                "query_params": {"docket": object_id},
+            },
+        ]
+        extra_context["custom_links"] = generate_admin_links(custom_links)
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
         )
+
+
+@admin.register(TrialCourtData)
+class TrialCourtDataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = (
+        "docket",
+        "judge",
+    )
+    autocomplete_fields = ("court",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_display = (
+        "__str__",
+        "docket_number_trial",
+        "court_name",
+        "date_filed",
+    )
+    search_help_text = "Search by docket ID or trial court docket number."
+    search_fields = (
+        "=docket__id",
+        "docket_number_trial",
+    )
 
 
 @admin.register(OpinionsCited)
@@ -574,8 +657,142 @@ class ClusterRedirectionAdmin(admin.ModelAdmin):
     )
     list_filter = ("reason",)
 
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ClusterRedirection | None = None
+    ) -> bool:
+        """Prevent deletion of cluster redirections via the admin.
+
+        :param request: The HTTP request.
+        :param obj: The object being deleted, if any.
+        :returns: Always False.
+        """
+        return False
+
 
 @admin.register(ScotusDocketMetadata)
 class ScotusDocketMetadataAdmin(CursorPaginatorAdmin):
     raw_id_fields = ("docket",)
     list_display = ("__str__",)
+
+
+class SCOTUSDocumentInline(admin.StackedInline):
+    model = SCOTUSDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(SCOTUSDocketEntry)
+class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (SCOTUSDocumentInline,)
+    search_help_text = (
+        "Search SCOTUSDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "date_filed",
+        "entry_number",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
+
+
+@admin.register(SCOTUSDocument)
+class SCOTUSDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by SCOTUSDocument Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+class TexasDocumentInline(admin.StackedInline):
+    model = TexasDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(TexasDocument)
+class TexasDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "media_version_id",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = (
+        "Search by Texas Document media version ID (exact match)."
+    )
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(TexasDocketEntry)
+class TexasDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (TexasDocumentInline,)
+    search_help_text = (
+        "Search TexasDocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "appellate_brief",
+        "get_trunc_description",
+        "get_trunc_remarks",
+        "disposition",
+        "date_filed",
+        "entry_type",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Texas docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
+
+    @admin.display(description="Remarks")
+    def get_trunc_remarks(self, obj):
+        return trunc(obj.remarks, 35, ellipsis="...")

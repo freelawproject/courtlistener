@@ -14,6 +14,7 @@
         {'href': '#eyebrow', 'text': 'Eyebrow'},
         {'href': '#banner', 'text': 'Banner'},
         {'href': '#copy', 'text': 'Copy to clipboard'},
+        {'href': '#description-list', 'text': 'Description list'},
       ]},
       {'href': '#layout-components', 'text': 'Layout components', 'children': [
         {'href': '#expansion', 'text': 'Expansion panel'},
@@ -37,9 +38,9 @@
     <p>If these aren't enough for your needs and you make a new component or tweak one of the existing ones, make sure to:</p>
     <ul class="list-disc pl-4">
       <li>Save the html in one of the <code>/templates/cotton/</code> directories for Django to pick it up automatically.</li>
-      <li>Read the docs! We use <a class="underline" href="https://django-cotton.com/docs/usage-patterns" target="_blank">Django Cotton</a> for components,
-        <a class="underline" href="https://alpinejs.dev/directives/data" target="_blank">AlpineJS</a> for interactivity, and
-        <a class="underline" href="https://v3.tailwindcss.com/docs/utility-first" target="_blank">Tailwind CSS</a> for styling.</li>
+      <li>Read the docs! We use <a class="links-external" href="https://django-cotton.com/docs/usage-patterns" target="_blank" rel="noopener noreferrer">Django Cotton</a> for components,
+        <a class="links-external" href="https://alpinejs.dev/directives/data" target="_blank" rel="noopener noreferrer">AlpineJS</a> for interactivity, and
+        <a class="links-external" href="https://v3.tailwindcss.com/docs/utility-first" target="_blank" rel="noopener noreferrer">Tailwind CSS</a> for styling.</li>
       <li>Add your new component to this page with some helpful notes so other developers know to use it!</li>
     </ul>
   </section>
@@ -95,7 +96,7 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <c-two-column-list
       key="some_field"
-      link_class="underline"
+      link_class="links"
       class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
       :list="[
         {'some_field': 'First item is retrieved from custom key.'},
@@ -116,7 +117,7 @@ Sample code here.
       <c-library.item optional only>
         <c-slot name="label"><code>link_class</code></c-slot>
         <c-slot name="description">
-          CSS classes to add to links. For accessibility, <a class="underline" href="https://accessibleweb.com/question-answer/do-links-need-to-be-underlined/" target="_blank" rel="noopener noreferrer">it's recommended all links are always underlined</a>.
+          CSS classes to add to links. For accessibility, <a class="links-external" href="https://accessibleweb.com/question-answer/do-links-need-to-be-underlined/" target="_blank" rel="noopener noreferrer">it's recommended all links are always underlined</a>.
         </c-slot>
       </c-library.item>
       <c-library.item optional only>
@@ -147,7 +148,7 @@ Sample code here.
       <c-code>
 &lt;c-two-column-list
   key="some_field"
-  link_class="underline"
+  link_class="links"
   class="my-4 p-6 border border-greyscale-500 rounded-xl bg-greyscale-50 text-greyscale-600"
   :list="[
     {'some_field': 'First item is retrieved from custom key.'},
@@ -308,8 +309,8 @@ Sample code here.
         <c-slot name="description">
           Text to be copied to clipboard when clicking the button, or when pressing either the <kbd>Enter</kbd> or <kbd>Space</kbd> keys on focus.
           <br><strong>Important:</strong> Some characters, like double quotation marks, could break syntax. To pass a string that includes any of these characters, escape them with
-          <a class="underline" href="https://www.w3schools.com/html/html_entities.asp" target="_blank" rel="noopener noreferrer">HTML entities</a>, or use
-          <a class="underline" href="https://docs.djangoproject.com/en/5.1/ref/templates/builtins/#escapejs" target="_blank" rel="noopener noreferrer">Django's built-in <code>escapejs</code> filter</a> to do it for you.
+          <a class="links-external" href="https://www.w3schools.com/html/html_entities.asp" target="_blank" rel="noopener noreferrer">HTML entities</a>, or use
+          <a class="links-external" href="https://docs.djangoproject.com/en/5.1/ref/templates/builtins/#escapejs" target="_blank" rel="noopener noreferrer">Django's built-in <code>escapejs</code> filter</a> to do it for you.
         </c-slot>
       </c-library.item>
     </c-library.list>
@@ -329,6 +330,147 @@ Sample code here.
 &gt;
   Click to copy
 &lt;/c-copy-to-clipboard&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DESCRIPTION LIST #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="description-list">
+    <h2 class="mt-6 mb-3">Description list</h2>
+    <p>Highly customizable description list components. Can be used to create a change log, terms list, or grid of metadata. If creating a single column, <code>c-description-item</code> isn't needed. Use that to ensure elements are lined up correctly across rows within a grid display.</p>
+
+    <h4 class="mt-3">Demo — Responsive multi-column grid</h4>
+    <c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <c-description-item>
+        <c-description-term>Term</c-description-term>
+        <c-description-details>Description of the term.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Another term</c-description-term>
+        <c-description-details>Another description.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Third term</c-description-term>
+        <c-description-details>Third description.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Fourth term</c-description-term>
+        <c-description-details>A longer description that wraps to demonstrate how subgrid keeps terms aligned across columns.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Fifth term</c-description-term>
+        <c-description-details>Fifth description.</c-description-details>
+      </c-description-item>
+    </c-description-list>
+
+    <h4 class="mt-3">Demo — Single column (default)</h4>
+    <c-description-list>
+      <c-description-term>Term</c-description-term>
+      <c-description-details>Description of the term.</c-description-details>
+
+      <c-description-term>Another term</c-description-term>
+      <c-description-details>Another description.</c-description-details>
+    </c-description-list>
+
+    <h4 class="mt-3">Demo — Rich content values</h4>
+    <c-description-list class="grid grid-cols-1 md:grid-cols-2">
+      <c-description-item>
+        <c-description-term>Related links</c-description-term>
+        <c-description-details>
+          See the <a href="#" class="text-primary-600">API documentation</a> for details on this endpoint.
+        </c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term>Nested HTML</c-description-term>
+        <c-description-details>
+          This release introduces:
+          <ul>
+            <li>A new <code>field_name</code> on the endpoint.</li>
+            <li>Support for <strong>bulk requests</strong>.</li>
+          </ul>
+        </c-description-details>
+      </c-description-item>
+    </c-description-list>
+
+    <h4 class="mt-3">Demo — Class overrides</h4>
+    <c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <c-description-item>
+        <c-description-term class="text-primary-600">Styled term</c-description-term>
+        <c-description-details class="italic">Styled description with extra gap.</c-description-details>
+      </c-description-item>
+      <c-description-item>
+        <c-description-term class="text-primary-600">Another styled term</c-description-term>
+        <c-description-details class="italic">Another styled description.</c-description-details>
+      </c-description-item>
+    </c-description-list>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-list</code> — <code>class</code></c-slot>
+        <c-slot name="description">CSS classes merged onto the <code>&lt;dl&gt;</code> container. Use Tailwind grid utilities (e.g., <code>grid grid-cols-1 md:grid-cols-3</code>) to control responsive column layout. When using multiple columns, wrap each term/details pair in <code>&lt;c-description-item&gt;</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-item</code> — <code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes merged onto the wrapper <code>&lt;div&gt;</code>. Used to group a term/details pair for multi-column layouts.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-term</code> — <code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes merged onto the <code>&lt;dt&gt;</code>. Default: <code>font-semibold</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-details</code> — <code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes merged onto the <code>&lt;dd&gt;</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-list</code> default</c-slot>
+        <c-slot name="description">
+          <code>c-description-item</code> wrappers (for multi-column) or bare <code>c-description-term</code> and <code>c-description-details</code> elements (for single-column).
+        </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-item</code> default</c-slot>
+        <c-slot name="description">A <code>c-description-term</code> and one or more <code>c-description-details</code> elements.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-term</code> default</c-slot>
+        <c-slot name="description">The term or label being defined.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-description-details</code> default</c-slot>
+        <c-slot name="description">The description or value for the preceding term.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+{# Single column (default) #}
+&lt;c-description-list&gt;
+  &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
+  &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
+&lt;/c-description-list&gt;
+
+{# Responsive multi-column grid: 1 col mobile, 2 tablet, 4 desktop #}
+&lt;c-description-list class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"&gt;
+  &lt;c-description-item&gt;
+    &lt;c-description-term&gt;Term&lt;/c-description-term&gt;
+    &lt;c-description-details&gt;Description.&lt;/c-description-details&gt;
+  &lt;/c-description-item&gt;
+  &lt;c-description-item&gt;
+    &lt;c-description-term&gt;Another term&lt;/c-description-term&gt;
+    &lt;c-description-details&gt;Another description.&lt;/c-description-details&gt;
+  &lt;/c-description-item&gt;
+&lt;/c-description-list&gt;
+
+{# With class overrides #}
+&lt;c-description-list class="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
+  &lt;c-description-item&gt;
+    &lt;c-description-term class="text-primary-600"&gt;Styled term&lt;/c-description-term&gt;
+    &lt;c-description-details class="italic"&gt;Styled description.&lt;/c-description-details&gt;
+  &lt;/c-description-item&gt;
+&lt;/c-description-list&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -371,7 +513,7 @@ Sample code here.
       For this feature to work, the elements referenced need to implement the intersect listener with the <code>show</code> method.
     </p>
     <p>This uses Alpine's intersect plugin, so the x-intersect directive can be used with
-    <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank">modifiers</a> for more control;
+    <a class="links-external" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank" rel="noopener noreferrer">modifiers</a> for more control;
     see <code>x-intersect.margin.-100px="show"</code> in the new alerts help page, which adds a negative margin to the
     intersect handler, preventing the event to be fired immediately when the element enters the viewport.</p>
     <h4 class="mt-3">Demo</h4>
@@ -447,7 +589,7 @@ Sample code here.
             However, if you need to tweak or remove the section's intersect behavior, you can swap the sub-component for a native <code>&lt;section&gt;</code> element and it will preserve proper spacing and layout.
           </div>
           <div>
-            For further reference, check Alpine's docs on <a class="underline" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank" rel="noopener noreferrer">intersect modifiers</a>.
+            For further reference, check Alpine's docs on <a class="links-external" href="https://alpinejs.dev/plugins/intersect#modifiers" target="_blank" rel="noopener noreferrer">intersect modifiers</a>.
           </div>
         </c-slot>
       </c-library.item>
@@ -455,7 +597,7 @@ Sample code here.
         <c-slot name="label"><code>c-layout-with-navigation.section</code> default</c-slot>
         <c-slot name="description">
           A section's content which should probably have a heading.
-          <br>For further reference check the <a class="underline" href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/section" target="_blank" rel="noopener noreferrer">mdn web docs</a> on the <code>&lt;section&gt;</code> element.
+          <br>For further reference check the <a class="links-external" href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/section" target="_blank" rel="noopener noreferrer">mdn web docs</a> on the <code>&lt;section&gt;</code> element.
         </c-slot>
       </c-library.item>
     </c-library.list>

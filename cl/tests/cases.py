@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from typing import cast
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
@@ -11,7 +12,7 @@ from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from lxml.html import HtmlElement
@@ -47,6 +48,29 @@ class RestartRateLimitMixin:
     def tearDownClass(cls):
         cls.restart_rate_limit()
         super().tearDownClass()
+
+
+class MockTallyStatMixin:
+    """Mock ``tally_stat`` so tests never read/write shared Redis stat keys.
+
+    Tests assert on ``self.mock_tally_stat`` (a standard ``MagicMock``)
+    instead of querying Redis.  All known command-level import sites are
+    patched to the *same* mock, so ``call_count`` and ``call_args_list``
+    reflect every invocation regardless of which command triggered it.
+    """
+
+    tally_stat_module_paths: list[str] = [
+        "cl.alerts.management.commands.cl_send_scheduled_alerts.tally_stat",
+        "cl.alerts.management.commands.cl_send_recap_alerts.tally_stat",
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.mock_tally_stat = mock.MagicMock()
+        for path in self.tally_stat_module_paths:
+            patcher = mock.patch(path, self.mock_tally_stat)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
 
 class RestartSentEmailQuotaMixin:
@@ -720,13 +744,16 @@ class SearchAlertsAssertions:
     def _assert_date_updated(self, date_to_compare, html_content, txt_content):
         """Confirm that date_updated is properly set in the alert email."""
 
+        # Use localtime() to normalize DST, matching the email template which
+        # applies |localtime before |date formatting.
+        localized_date = localtime(date_to_compare)
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             html_content,
         )
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             txt_content,
         )
 

@@ -122,8 +122,7 @@ class VersionBasedPagination(PageNumberPagination):
             # Build and include the count URL:
             count_url = self.request.build_absolute_uri()
             count_url = replace_query_param(count_url, "count", "on")
-            response.data["count"] = count_url
-            response.data.move_to_end("count", last=False)
+            response.data = {"count": count_url, **response.data}
             return response
 
         # Get paginated response for PageNumberPagination
@@ -234,12 +233,6 @@ class VersionBasedPagination(PageNumberPagination):
         :return: A new list containing both the original and reversed cursor fields.
         """
         return cursor_fields + [f"-{field}" for field in cursor_fields]
-
-
-class TinyAdjustablePagination(VersionBasedPagination):
-    page_size = 5
-    page_size_query_param = "page_size"
-    max_page_size = 20
 
 
 class MediumAdjustablePagination(VersionBasedPagination):

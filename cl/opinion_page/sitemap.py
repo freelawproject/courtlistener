@@ -1,8 +1,17 @@
 from datetime import datetime, timedelta
 
 from django.contrib import sitemaps
-from django.db.models import Q, QuerySet
+from django.db.models import (
+    CharField,
+    OuterRef,
+    Q,
+    QuerySet,
+    Subquery,
+    Value,
+)
+from django.db.models.functions import Coalesce, Concat
 
+from cl.favorites.models import GenericCount
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -78,15 +87,29 @@ class DocketSitemap(InfinitePaginatorSitemap):
 
     def items(self) -> QuerySet:
         # Give items ten days to get some views.
-        new_or_popular = Q(view_count__gt=10) | Q(
-            date_filed__gt=datetime.today() - timedelta(days=30)
+        recent_date = datetime.today() - timedelta(days=30)
+
+        view_count_subquery = Subquery(
+            GenericCount.objects.filter(
+                label=Concat(
+                    Value("d."),
+                    OuterRef("pk"),
+                    Value(":view"),
+                    output_field=CharField(),
+                )
+            ).values("value")[:1]
         )
+
         # Ordering should NOT be set here, define the ordering in the separate `ordering` property
-        return Docket.objects.filter(
-            new_or_popular,
-            source__in=Docket.RECAP_SOURCES(),
-            blocked=False,
-        ).only("view_count", "date_modified", "pk", "slug")
+        return (
+            Docket.objects.filter(
+                source__in=Docket.RECAP_SOURCES(),
+                blocked=False,
+            )
+            .annotate(view_counter=Coalesce(view_count_subquery, Value(0)))
+            .filter(Q(view_counter__gt=10) | Q(date_filed__gt=recent_date))
+            .only("date_modified", "pk", "slug")
+        )
 
     def lastmod(self, obj: Docket) -> datetime:
         return obj.date_modified
@@ -96,7 +119,7 @@ class DocketSitemap(InfinitePaginatorSitemap):
         return latest_modified.date_modified
 
     def priority(self, obj: Docket) -> float:
-        view_count = obj.view_count
+        view_count = obj.view_counter
         priority = 0.5
         if view_count <= 1:
             priority = 0.3
