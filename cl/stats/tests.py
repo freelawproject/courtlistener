@@ -677,16 +677,8 @@ class TallyStatWithLabelsTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
         self.prefix = get_stat_metrics_prefix()
-        # Clean up date-based keys for metrics this class uses
-        for pattern in [
-            "search.results*",
-            "alerts.sent*",
-            "webhooks.sent*",
-        ]:
-            keys = self.r.keys(pattern)
-            if keys:
-                self.r.delete(*keys)
-        # Clean up prometheus keys
+        # Only clean up prometheus keys (test-specific prefix, safe).
+        # Date-based keys use deltas so no cleanup needed here.
         for key in self.r.scan_iter(f"{self.prefix}*"):
             self.r.delete(key)
 
