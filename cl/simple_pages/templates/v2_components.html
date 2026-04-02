@@ -948,9 +948,16 @@ Sample code here.
       </c-library.item>
 
       <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-cell</code>: <code>header</code></c-slot>
+        <c-slot name="description">
+          Boolean. When present, renders a <code>&lt;th scope="row"&gt;</code> instead of <code>&lt;td&gt;</code> for row header cells.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
         <c-slot name="label"><code>c-flex-cell</code>: <code>class</code></c-slot>
         <c-slot name="description">
-          Additional CSS classes appended to the cell's defaults (<code>align-middle text-sm font-normal px-2.5 py-4 text-start</code>). Use to override alignment (e.g., <code>text-center</code>) or add custom styling. Other HTML attributes are passed through via <code>attrs</code>.
+          Additional CSS classes appended to the cell's defaults (<code>align-middle text-sm font-normal px-2.5 py-4</code>). Use to override alignment (e.g., <code>text-center</code>) or add custom styling. Other HTML attributes are passed through via <code>attrs</code>.
         </c-slot>
       </c-library.item>
     </c-library.list>
