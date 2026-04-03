@@ -2308,7 +2308,7 @@ class OpinionCluster(AbstractDateTimeModel):
             ", ".join(f"{t[0]} ({t[1]})" for t in ClusterSources.NAMES)
         ),
         max_length=10,
-        choices=ClusterSources.NAMES,
+        validators=[ClusterSources.validate_source],
         blank=True,
     )
     procedural_history = models.TextField(

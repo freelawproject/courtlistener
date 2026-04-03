@@ -2,8 +2,8 @@ from factory import Faker, SelfAttribute, SubFactory, post_generation
 from factory.django import DjangoModelFactory, FileField
 from factory.fuzzy import FuzzyChoice
 
+from cl.audio.audio_sources import AudioSources
 from cl.audio.models import Audio
-from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import DocketFactory
 
 
@@ -11,7 +11,7 @@ class AudioFactory(DjangoModelFactory):
     class Meta:
         model = Audio
 
-    source = FuzzyChoice(ClusterSources.NAMES, getter=lambda c: c[0])
+    source = FuzzyChoice(AudioSources.NAMES, getter=lambda c: c[0])
     case_name = Faker("case_name")
     sha1 = Faker("sha1")
     download_url = Faker("url")

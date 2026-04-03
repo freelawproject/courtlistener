@@ -1420,7 +1420,7 @@ class AudioTestCase(TestCase):
             local_path_original_file="mp3/2015/07/08/hong_liu_yang_v._loretta_e._lynch.mp3",
             local_path_mp3="test/audio/2.mp3",
             sha1="f540838e606f15585e713812c67537affc0df944",
-            source="CR",
+            source="H",
         )
 
     @classmethod
