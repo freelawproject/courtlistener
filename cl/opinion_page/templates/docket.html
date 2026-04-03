@@ -3,6 +3,16 @@
 {% load admin_urls %}
 {% load static %}
 
+{% comment %}
+╔══════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/opinion_page/templates/v2_docket.html                                ║
+╚══════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} - CourtListener.com{% endblock %}
 {% block description %}Docket for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
@@ -42,12 +52,12 @@
             data-toggle="modal" data-target="#modal-buy-pacer"
             class="open_buy_pacer_modal btn btn-lg btn-primary"
             target="_blank"
-            rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
+            rel="nofollow noreferrer"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
           {% else%}
             <a href="{{ docket.pacer_docket_url }}"
             class="btn btn-lg btn-primary"
             target="_blank"
-            rel="nofollow"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
+            rel="nofollow noreferrer"><i class="fa fa-external-link"></i>&nbsp;Buy Docket on PACER</a>
           {% endif %}
 
         </p>

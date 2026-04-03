@@ -25,6 +25,9 @@
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
       ]},
+      {'href': '#page-shells', 'text': 'Page shells', 'children': [
+        {'href': '#docket-page', 'text': 'Docket page'},
+      ]},
       {'href': '#pure-markup', 'text': 'Pure markup', 'children': [
       {'href': '#support-banner', 'text': 'Support plea banner'},
     ]},
@@ -978,6 +981,71 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+
+  {# DOCKET PAGE SHELL #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-page">
+    <h2 class="mt-6 mb-3">Docket page</h2>
+    <p>Page-specific shell for the docket page. Not a reusable UI component — this encapsulates the docket page layout including title, metadata, and tab navigation. Each docket tab template uses this component and passes its content via the default slot.</p>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket</code></c-slot>
+        <c-slot name="description">The Docket model instance (required).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>active_tab</code></c-slot>
+        <c-slot name="description">Which tab is active: <code>"entries"</code>, <code>"parties"</code>, <code>"idb"</code>, or <code>"authorities"</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:parties</code></c-slot>
+        <c-slot name="description">Bool — whether to show the Parties tab.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:has_idb_data</code></c-slot>
+        <c-slot name="description">Bool — whether to show the FJC IDB tab.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:authority_count</code></c-slot>
+        <c-slot name="description">Int — whether to show the Authorities tab (truthy if count > 0).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:timezone</code></c-slot>
+        <c-slot name="description">Court timezone string for date formatting.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:has_alert</code></c-slot>
+        <c-slot name="description">Bool — whether the user has an active docket alert.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:note_form</code></c-slot>
+        <c-slot name="description">NoteForm instance for the notes modal.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Tab content — rendered inside the tab panel area.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-page
+  :docket="docket"
+  active_tab="entries"
+  :parties="parties"
+  :has_idb_data="docket.idb_data"
+  :authority_count="docket.authority_count"
+  :timezone="timezone"
+  :has_alert="has_alert"
+  :note_form="note_form"
+&gt;
+  {# Tab content here #}
+&lt;/c-docket-page&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
 
   {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">

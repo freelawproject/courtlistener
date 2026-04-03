@@ -1,0 +1,426 @@
+{% load component_tags extras humanize svg_tags text_filters tz %}
+{% require_script "js/alpine/components/docket_page.js" %}
+
+<c-vars
+  docket=""
+  active_tab=""
+  parties=""
+  has_idb_data=""
+  authority_count=""
+  timezone=""
+  has_alert=""
+  note_form=""
+  tab_content_id="tab-content"
+/>
+
+{# Filed date eyebrow #}
+{% if docket.date_filed %}
+  <c-eyebrow class="mb-2">Filed: {{ docket.date_filed }}</c-eyebrow>
+{% endif %}
+
+{# Title and court #}
+<hgroup>
+  <h1 data-type="search.Docket" data-id="{{ docket.pk }}">
+    {{ docket|best_case_name|safe|v_wrapper }}
+    {% if docket.docket_number %}
+      (<span class="whitespace-nowrap">{{ docket.docket_number }}</span>)
+    {% endif %}
+  </h1>
+  {% if docket.court %}
+    <p class="text-display-xs font-semibold text-greyscale-900">{{ docket.court }}</p>
+  {% endif %}
+</hgroup>
+
+{% if perms.search.change_docket and docket.blocked %}
+  <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
+{% endif %}
+
+{# TODO: Action buttons — blocked on #7063 (button component). Add note, tags, alerts, PACER link. #}
+
+{# METADATA #}
+<c-description-list class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+  {% if docket.source in docket.RECAP_SOURCES %}
+    <c-description-item>
+      <c-description-term>Last Updated</c-description-term>
+      <c-description-details>{{ docket.date_modified|timezone:timezone }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.panel_str %}
+    <c-description-item>
+      <c-description-term>Panel</c-description-term>
+      <c-description-details>{{ docket.panel_str }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.assigned_to or docket.assigned_to_str %}
+    <c-description-item>
+      <c-description-term>Assigned To</c-description-term>
+      <c-description-details>
+        {% if docket.assigned_to %}
+          <a class="links" href="{{ docket.assigned_to.get_absolute_url }}">{{ docket.assigned_to.name_full }}</a>
+        {% elif docket.assigned_to_str %}
+          <a class="links" href="/?type=r&amp;assigned_to=&quot;{{ docket.assigned_to_str }}&quot;" rel="nofollow">{{ docket.assigned_to_str }}</a>
+        {% endif %}
+      </c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.referred_to or docket.referred_to_str %}
+    <c-description-item>
+      <c-description-term>Referred To</c-description-term>
+      <c-description-details>
+        {% if docket.referred_to %}
+          <a class="links" href="{{ docket.referred_to.get_absolute_url }}">{{ docket.referred_to.name_full }}</a>
+        {% elif docket.referred_to_str %}
+          <a class="links" href="/?type=r&amp;referred_to=&quot;{{ docket.referred_to_str }}&quot;" rel="nofollow">{{ docket.referred_to_str }}</a>
+        {% endif %}
+      </c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.date_cert_granted %}
+    <c-description-item>
+      <c-description-term>Date Certiorari Granted</c-description-term>
+      <c-description-details>{{ docket.date_cert_granted }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.date_cert_denied %}
+    <c-description-item>
+      <c-description-term>Date Certiorari Denied</c-description-term>
+      <c-description-details>{{ docket.date_cert_denied }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.date_argued %}
+    <c-description-item>
+      <c-description-term>Date Argued</c-description-term>
+      <c-description-details>{{ docket.date_argued }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  <c-description-item>
+    <c-description-term>Citation</c-description-term>
+    <c-description-details>{% citation docket %}</c-description-details>
+  </c-description-item>
+
+  {% if docket.date_reargued %}
+    <c-description-item>
+      <c-description-term>Date Reargued</c-description-term>
+      <c-description-details>{{ docket.date_reargued }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.date_reargument_denied %}
+    <c-description-item>
+      <c-description-term>Date Reargument Denied</c-description-term>
+      <c-description-details>{{ docket.date_reargument_denied }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.date_filed %}
+    <c-description-item>
+      <c-description-term>Date Filed</c-description-term>
+      <c-description-details>{{ docket.date_filed }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.date_terminated %}
+    <c-description-item>
+      <c-description-term>Date Terminated</c-description-term>
+      <c-description-details>{{ docket.date_terminated }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.date_last_filing %}
+    <c-description-item>
+      <c-description-term>Date of Last Known Filing</c-description-term>
+      <c-description-details>{{ docket.date_last_filing }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.cause %}
+    <c-description-item>
+      <c-description-term>Cause</c-description-term>
+      <c-description-details>
+        <a class="links" href="/?type=r&amp;cause=&quot;{{ docket.cause }}&quot;" rel="nofollow">{{ docket.cause }}</a>
+      </c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.nature_of_suit %}
+    <c-description-item>
+      <c-description-term>Nature of Suit</c-description-term>
+      <c-description-details>
+        <a class="links" href="/?type=r&amp;nature_of_suit=&quot;{{ docket.nature_of_suit }}&quot;" rel="nofollow">{{ docket.nature_of_suit }}</a>
+      </c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.jury_demand %}
+    <c-description-item>
+      <c-description-term>Jury Demand</c-description-term>
+      <c-description-details>
+        <a class="links" href="/?type=r&amp;q=juryDemand:&quot;{{ docket.jury_demand }}&quot;" rel="nofollow">{{ docket.jury_demand }}</a>
+      </c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.jurisdiction_type %}
+    <c-description-item>
+      <c-description-term>Jurisdiction Type</c-description-term>
+      <c-description-details>{{ docket.jurisdiction_type }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.mdl_status %}
+    <c-description-item>
+      <c-description-term>MDL Status</c-description-term>
+      <c-description-details>{{ docket.mdl_status }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.appellate_fee_status %}
+    <c-description-item>
+      <c-description-term>Fee Status</c-description-term>
+      <c-description-details>{{ docket.appellate_fee_status }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+
+  {% if docket.appellate_case_type_information %}
+    <c-description-item>
+      <c-description-term>Case Type Information</c-description-term>
+      <c-description-details>{{ docket.appellate_case_type_information }}</c-description-details>
+    </c-description-item>
+  {% endif %}
+</c-description-list>
+
+{# BANKRUPTCY INFORMATION #}
+{% with bankr_info=docket.bankruptcy_information %}
+  {% if bankr_info %}
+    <h2 class="mt-6">Bankruptcy Information</h2>
+    <c-description-list>
+      {% if bankr_info.date_converted %}
+        <c-description-item>
+          <c-description-term>Date Converted</c-description-term>
+          <c-description-details>{{ bankr_info.date_converted|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if bankr_info.date_last_to_file_claims %}
+        <c-description-item>
+          <c-description-term>Last Date to File Claims</c-description-term>
+          <c-description-details>{{ bankr_info.date_last_to_file_claims|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if bankr_info.date_last_to_file_govt %}
+        <c-description-item>
+          <c-description-term>Last Date to File Claims (Gov't)</c-description-term>
+          <c-description-details>{{ bankr_info.date_last_to_file_govt|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if bankr_info.date_debtor_dismissed %}
+        <c-description-item>
+          <c-description-term>Date Debtor Dismissed</c-description-term>
+          <c-description-details>{{ bankr_info.date_debtor_dismissed|date:"N j, Y" }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if bankr_info.chapter %}
+        <c-description-item>
+          <c-description-term>Chapter</c-description-term>
+          <c-description-details>{{ bankr_info.chapter }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if bankr_info.trustee_str %}
+        <c-description-item>
+          <c-description-term>Trustee</c-description-term>
+          <c-description-details>{{ bankr_info.trustee_str }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+    </c-description-list>
+  {% endif %}
+{% endwith %}
+
+{# ORIGINATING COURT INFORMATION #}
+{% with og_info=docket.originating_court_information %}
+  {% if og_info %}
+    <h2 class="mt-6">Originating Court Information</h2>
+    <c-description-list>
+      {% if docket.appeal_from or docket.appeal_from_str %}
+        <c-description-item>
+          <c-description-term>Appealed From</c-description-term>
+          <c-description-details>
+            {% if docket.appeal_from %}
+              {{ docket.appeal_from.short_name }}
+            {% elif docket.appeal_from_str %}
+              {{ docket.appeal_from_str }}
+            {% endif %}
+            {% if og_info.docket_number %}
+              {% if docket.appeal_from %}
+                (<a class="links"
+                    href="/?type=r&amp;docket_number={{ og_info.docket_number }}&amp;court={{ docket.appeal_from.pk }}"
+                    rel="nofollow"
+                    title="Search for this docket number in the RECAP Archive.">{{ og_info.docket_number }}</a>)
+              {% elif og_info.administrative_link %}
+                (<a class="links-external" href="{{ og_info.administrative_link }}" target="_blank" rel="noreferrer">{{ og_info.docket_number }}</a>)
+              {% else %}
+                ({{ og_info.docket_number }})
+              {% endif %}
+            {% endif %}
+          </c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.court_reporter %}
+        <c-description-item>
+          <c-description-term>Court Reporter</c-description-term>
+          <c-description-details>{{ og_info.court_reporter }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.assigned_to or og_info.assigned_to_str %}
+        <c-description-item>
+          <c-description-term>Trial Judge</c-description-term>
+          <c-description-details>
+            {% if og_info.assigned_to %}
+              <a class="links" href="{{ og_info.assigned_to.get_absolute_url }}">{{ og_info.assigned_to.name_full }}</a>
+            {% elif og_info.assigned_to_str %}
+              <a class="links" href="/?type=r&amp;assigned_to=&quot;{{ og_info.assigned_to_str }}&quot;" rel="nofollow">{{ og_info.assigned_to_str }}</a>
+            {% endif %}
+          </c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.ordering_judge or og_info.ordering_judge_str %}
+        <c-description-item>
+          <c-description-term>Ordering Judge</c-description-term>
+          <c-description-details>
+            {% if og_info.ordering_judge %}
+              <a class="links" href="{{ og_info.ordering_judge.get_absolute_url }}">{{ og_info.ordering_judge.name_full }}</a>
+            {% elif og_info.ordering_judge_str %}
+              <a class="links" href="/?type=r&amp;assigned_to=&quot;{{ og_info.ordering_judge_str }}&quot;" rel="nofollow">{{ og_info.ordering_judge_str }}</a>
+            {% endif %}
+          </c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.date_filed %}
+        <c-description-item>
+          <c-description-term>Date Filed</c-description-term>
+          <c-description-details>{{ og_info.date_filed }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.date_judgment %}
+        <c-description-item>
+          <c-description-term>Date Order/Judgment</c-description-term>
+          <c-description-details>{{ og_info.date_judgment }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.date_judgment_eod %}
+        <c-description-item>
+          <c-description-term>Date Order/Judgment EOD</c-description-term>
+          <c-description-details>{{ og_info.date_judgment_eod }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.date_filed_noa %}
+        <c-description-item>
+          <c-description-term>Date NOA Filed</c-description-term>
+          <c-description-details>{{ og_info.date_filed_noa }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+
+      {% if og_info.date_received_coa %}
+        <c-description-item>
+          <c-description-term>Date Rec'd COA</c-description-term>
+          <c-description-details>{{ og_info.date_received_coa }}</c-description-details>
+        </c-description-item>
+      {% endif %}
+    </c-description-list>
+  {% endif %}
+{% endwith %}
+
+{# ORAL ARGUMENT RECORDINGS #}
+{% if docket.audio_files.count %}
+  <h2 class="mt-6">Oral Argument Recordings</h2>
+  <ul>
+    {% for af in docket.audio_files.all %}
+      <li>
+        <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
+          {{ af|best_case_name|safe|v_wrapper }}
+        </a>
+        <br/>
+        {{ af.docket.date_argued|default_if_none:"" }}
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{# TAB NAVIGATION #}
+{% if parties or has_idb_data or authority_count %}
+  {# Desktop nav links #}
+  <nav class="hidden md:flex gap-1 mt-8 overflow-x-auto scrollbar-none" aria-label="Docket sections">
+    <a href="{{ docket.get_absolute_url }}"
+       {% if active_tab == 'entries' %}aria-current="page"{% endif %}
+       class="px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == 'entries' %}bg-greyscale-100 text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+      Docket Entries
+    </a>
+
+    {% if parties %}
+      <a href="{% url 'docket_parties' docket_id=docket.pk slug=docket.slug %}"
+         {% if active_tab == 'parties' %}aria-current="page"{% endif %}
+         class="px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == 'parties' %}bg-greyscale-100 text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+        Parties and Attorneys
+      </a>
+    {% endif %}
+
+    {% if has_idb_data %}
+      <a href="{% url 'docket_idb_data' docket_id=docket.pk slug=docket.slug %}"
+         {% if active_tab == 'idb' %}aria-current="page"{% endif %}
+         class="px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == 'idb' %}bg-greyscale-100 text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+        FJC Integrated Database
+      </a>
+    {% endif %}
+
+    {% if authority_count %}
+      <a href="{% url 'docket_authorities' docket_id=docket.pk slug=docket.slug %}"
+         {% if active_tab == 'authorities' %}aria-current="page"{% endif %}
+         class="px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == 'authorities' %}bg-greyscale-100 text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+        Authorities
+      </a>
+    {% endif %}
+  </nav>
+
+  {# Mobile select #}
+  <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4 mt-8" x-data="docketPage">
+    <select x-on:change="navigateToSelected" aria-label="Select docket section" class="w-full">
+      <option value="{{ docket.get_absolute_url }}" {% if active_tab == 'entries' %}selected{% endif %}>Docket Entries</option>
+      {% if parties %}
+        <option value="{% url 'docket_parties' docket_id=docket.pk slug=docket.slug %}" {% if active_tab == 'parties' %}selected{% endif %}>Parties and Attorneys</option>
+      {% endif %}
+      {% if has_idb_data %}
+        <option value="{% url 'docket_idb_data' docket_id=docket.pk slug=docket.slug %}" {% if active_tab == 'idb' %}selected{% endif %}>FJC Integrated Database</option>
+      {% endif %}
+      {% if authority_count %}
+        <option value="{% url 'docket_authorities' docket_id=docket.pk slug=docket.slug %}" {% if active_tab == 'authorities' %}selected{% endif %}>Authorities</option>
+      {% endif %}
+    </select>
+  </div>
+
+  {# Tab content #}
+  <div id="{{ tab_content_id }}" class="bg-greyscale-100 rounded-b-2xl md:rounded-tr-2xl p-4">
+    {{ slot }}
+  </div>
+{% else %}
+  {# No tabs needed — just show the content #}
+  <div class="mt-8">
+    {{ slot }}
+  </div>
+{% endif %}
