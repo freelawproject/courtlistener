@@ -76,7 +76,7 @@ REGEX_DATE = re.compile(
     re.DOTALL,
 )
 REGEX_DOCKET_AND_NAME = re.compile(
-    r"(?P<name>\n{1,}?\s*[A-Z\d][A-Z0-9)(,.v \n*'&#:-]+)\n"
+    r"(?P<name>\n{1,}?\s*[A-Z\d][A-Z0-9)(,.v \n*'&#:\u2019-]+)\n"
     r"\(?\s*(?P<docket>(?:SC|AC) [\d-]+)(\s*\n|\))"
 )
 REGEX_ORDER_START = re.compile(
@@ -130,7 +130,7 @@ def extract_opinions_from_pdf(pdf_path: Path, pages_text: Sequence[str | None]) 
 
         if len(name) < 5:
             direct_match = re.search(
-                r"(?P<name>[A-Z][A-Z .,'&*\d-]+v\.\s+[A-Z][A-Z .,'&*\d\n-]+)\n"
+                r"(?P<name>[A-Z][A-Z .,'&*\d\u2019-]+v\.\s+[A-Z][A-Z .,'&*\d\n\u2019-]+)\n"
                 rf"\(?\s*{re.escape(docket)}",
                 page,
             )

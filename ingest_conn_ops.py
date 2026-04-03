@@ -78,7 +78,7 @@ logging.basicConfig(
 )
 
 # Max date_filed for Harvard CAP data for conn court
-CAP_GAP_START = date(2019, 8, 28)
+CAP_GAP_START = date(2019, 8, 22)
 
 
 def find_existing_cluster(
@@ -286,15 +286,15 @@ def get_opinion_type_from_text(opinion:Opinion):
     """
 
     # focus on the text after the disclaimer
-    index = opinion.plain_text[:100].find("****************")
+    index = opinion.plain_text[500:].find("****************")
     if index == -1:
         logger.warning("Unexpected versioned file without disclaimer")
         return None
     
-    target_text = opinion.plain_text[index:index+1000]
+    target_text = opinion.plain_text[index:index+2000]
 
     # Only lead opinions have the sylalbus block
-    if "Syllabus" in target_text:
+    if "Syllabus" in target_text or "Procedural History":
         return Opinion.LEAD
     if "APPENDIX" in target_text:
         return Opinion.ADDENDUM
