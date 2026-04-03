@@ -195,7 +195,11 @@ from cl.search.state.texas.factories import (
     TexasSupremeCourtAppellateBriefDictFactory,
     TexasSupremeCourtCaseEventDictFactory,
 )
-from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
+from cl.search.state.texas.models import (
+    ProcessingState,
+    TexasDocketEntry,
+    TexasDocument,
+)
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
@@ -2494,6 +2498,7 @@ class TexasMergerTest(TestCase):
         self.assertEqual(response.call_count, 1)
         self.assertEqual(document.url, input_document["document_url"])
         self.assertTrue(document.filepath_local)
+        self.assertEqual(document.processing_state, ProcessingState.SUMMARIZED)
         self.assertIn("UNITED", document.plain_text)
 
     def test_merge_texas_docket_entry_new_entry(self):
@@ -2992,6 +2997,7 @@ class TexasMergerTest(TestCase):
         texas_document.refresh_from_db()
         assert texas_document.filepath_local is not None
         assert texas_document.page_count == 1
+        assert texas_document.processing_state == ProcessingState.DOWNLOADED
         assert pdf_response.call_count == 1
         assert pcs_mock.call_count == 1
 
@@ -3050,6 +3056,7 @@ class TexasMergerTest(TestCase):
         assert texas_document.filepath_local
         assert texas_document.sha1 == "abc123sha1"
         assert ".html" in texas_document.filepath_local.name
+        assert texas_document.processing_state == ProcessingState.DOWNLOADED
         # No page_count for non-PDFs
         assert texas_document.page_count is None
 
@@ -3081,6 +3088,7 @@ class TexasMergerTest(TestCase):
         assert texas_document.sha1 == "mp3sha1hash"
         assert ".mp3" in texas_document.filepath_local.name
         assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert texas_document.processing_state == ProcessingState.DOWNLOADED
         assert not texas_document.plain_text
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
@@ -3119,6 +3127,7 @@ class TexasMergerTest(TestCase):
         assert texas_document.filepath_local
         assert texas_document.sha1 == "docxsha1"
         assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert texas_document.processing_state == ProcessingState.DOWNLOADED
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @responses.activate
@@ -3160,6 +3169,7 @@ class TexasMergerTest(TestCase):
         self.assertIsNone(document.page_count)
         # WPD extraction should produce text
         self.assertTrue(document.plain_text)
+        self.assertEqual(document.processing_state, ProcessingState.SUMMARIZED)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
@@ -3217,6 +3227,7 @@ class TexasMergerTest(TestCase):
 
         texas_document.refresh_from_db()
         assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert texas_document.processing_state == ProcessingState.SUMMARIZED
         assert "<" not in texas_document.plain_text
         assert "Hello" in texas_document.plain_text
         assert "world" in texas_document.plain_text

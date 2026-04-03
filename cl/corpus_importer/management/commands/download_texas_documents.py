@@ -15,7 +15,7 @@ from cl.lib.indexing_utils import (
     log_last_document_indexed,
 )
 from cl.scrapers.tasks import extract_formatted_text_document
-from cl.search.models import TexasDocument
+from cl.search.state.texas.models import ProcessingState, TexasDocument
 
 
 def _base_extraction_queryset() -> Q:
@@ -51,10 +51,10 @@ def extract_texas_documents(
 
     Queries TexasDocument instances that already have a filepath_local but
     whose OCR status is not complete or unnecessary. MP3 files are excluded
-    since they cannot be text-extracted. HTML documents are extracted with
-    strip_html_tags=True so that plain_text contains plain text. Documents
-    with a page_count exceeding page_limit are skipped, allowing smaller
-    documents to be processed first.
+    since they cannot be text-extracted. Non-PDF documents (HTML, WPD) are
+    extracted with strip_html_tags=True so that plain_text contains plain
+    text rather than markup. Documents with a page_count exceeding
+    page_limit are skipped, allowing smaller documents to be processed first.
 
     :param extraction_queue: The celery queue for extraction tasks.
     :param batch_size: The batch size for extraction tasks.
@@ -65,21 +65,21 @@ def extract_texas_documents(
     base_exclude = _base_extraction_queryset()
     page_filter = Q(page_count__lte=page_limit) | Q(page_count__isnull=True)
 
-    html_docs = (
+    pdf_docs = (
         TexasDocument.objects.exclude(base_exclude)
-        .filter(filepath_local__endswith=".html")
+        .filter(filepath_local__endswith=".pdf")
         .filter(page_filter)
         .values_list("pk", flat=True)
     )
-    other_docs = (
+    non_pdf_docs = (
         TexasDocument.objects.exclude(
-            base_exclude | Q(filepath_local__endswith=".html")
+            base_exclude | Q(filepath_local__endswith=".pdf")
         )
         .filter(page_filter)
         .values_list("pk", flat=True)
     )
 
-    total_count = html_docs.count() + other_docs.count()
+    total_count = pdf_docs.count() + non_pdf_docs.count()
     all_docs_count = (
         TexasDocument.objects.exclude(base_exclude).values_list(
             "pk", flat=True
@@ -87,15 +87,15 @@ def extract_texas_documents(
     ).count()
     skipped_count = all_docs_count - total_count
     logger.info(
-        "Found %s TexasDocuments needing extraction (%s HTML, %s other).",
+        "Found %s TexasDocuments needing extraction (%s PDF, %s other).",
         all_docs_count,
-        html_docs.count(),
-        other_docs.count(),
+        pdf_docs.count(),
+        non_pdf_docs.count(),
     )
 
     throttle = CeleryThrottle(queue_name=extraction_queue)
     processed_count = 0
-    for docs, strip_html in [(html_docs, True), (other_docs, False)]:
+    for docs, strip_html in [(non_pdf_docs, True), (pdf_docs, False)]:
         for chunk in batched(paginate_docs_queryset(docs), batch_size):
             throttle.maybe_wait()
             processed_count += len(chunk)
@@ -138,9 +138,10 @@ def download_texas_documents(
     :return: None
     """
     desc = download_order == "desc"
-    docs = TexasDocument.objects.filter(filepath_local="").values_list(
-        "pk", flat=True
-    )
+    docs = TexasDocument.objects.filter(
+        filepath_local="",
+        processing_state=ProcessingState.PENDING,
+    ).values_list("pk", flat=True)
 
     if auto_resume:
         last_pk = get_last_parent_document_id_processed(compose_redis_key())

@@ -10,6 +10,23 @@ from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 __all__ = ["TexasDocketEntry", "TexasDocument"]
 
 
+class ProcessingState:
+    PENDING = 0
+    DOWNLOADED = 1
+    BAD_URL = 2
+    SUMMARIZED = 3
+    SUMMARY_FAILED = 4
+    SEALED = 5
+    CHOICES = (
+        (PENDING, "Pending"),
+        (DOWNLOADED, "Downloaded"),
+        (BAD_URL, "Bad URL"),
+        (SUMMARIZED, "Summarized"),
+        (SUMMARY_FAILED, "Summary Failed"),
+        (SEALED, "Sealed"),
+    )
+
+
 @pghistory.track()
 @document_model
 class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
@@ -80,6 +97,12 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
     url = models.URLField(max_length=250)
+    processing_state = models.SmallIntegerField(
+        choices=ProcessingState.CHOICES,
+        default=ProcessingState.PENDING,
+        help_text="The processing state of the document.",
+        db_comment="The processing state of the document.",
+    )
 
     class Meta:
         app_label = "search"

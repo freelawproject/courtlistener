@@ -1,4 +1,5 @@
 from lxml import html
+from lxml.html import HtmlElement
 
 
 def is_missing_file_page(html_string: str | bytes) -> bool:
@@ -8,8 +9,10 @@ def is_missing_file_page(html_string: str | bytes) -> bool:
     :return: True if the page contains the TAMES missing file error
     """
     tree = html.fromstring(html_string)
-    error_span = tree.xpath('//*[@id="ctl00_ContentPlaceHolder1_lblError"]')
-    if not error_span:
+    results = tree.xpath('//*[@id="ctl00_ContentPlaceHolder1_lblError"]')
+    if not isinstance(results, list) or not results:
         return False
-    text = error_span[0].text_content().strip()
-    return text == "File not found."
+    element = results[0]
+    if not isinstance(element, HtmlElement):
+        return False
+    return element.text_content().strip() == "File not found."

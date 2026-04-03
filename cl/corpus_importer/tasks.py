@@ -217,7 +217,11 @@ from cl.search.models import (
     Tag,
     TrialCourtData,
 )
-from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
+from cl.search.state.texas.models import (
+    ProcessingState,
+    TexasDocketEntry,
+    TexasDocument,
+)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3916,16 +3920,16 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
         task.request.chain = None
         return None
 
-    url = texas_document.url
-    if url.endswith(" (i)"):
+    if texas_document.processing_state == ProcessingState.BAD_URL:
         logger.error(
-            "Texas document download: TexasDocument %s has an invalid "
-            "URL: %s. Skipping.",
+            "Texas document download: TexasDocument %s has a bad URL. "
+            "Skipping.",
             texas_document_pk,
-            url,
         )
         task.request.chain = None
         return None
+
+    url = texas_document.url
 
     logger.info(
         "Texas document download: Fetching document for TexasDocument %s from %s",
@@ -3966,7 +3970,7 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
                 texas_document.pk,
                 url,
             )
-            texas_document.url = f"{url} (i)"
+            texas_document.processing_state = ProcessingState.BAD_URL
             texas_document.save()
             task.request.chain = None
             return None
@@ -3981,6 +3985,7 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
         )
         texas_document.file_size = downloaded_file.size
         texas_document.sha1 = sha1_hash
+        texas_document.processing_state = ProcessingState.DOWNLOADED
 
         if extension == ".pdf":
             response = async_to_sync(doc_page_count_service)(texas_document)
@@ -4307,6 +4312,7 @@ def merge_texas_document(
                         extract_formatted_text_document.s(
                             check_if_needed=False,
                             model_name="search.TexasDocument",
+                            strip_html_tags=True,
                         ),
                     ).apply_async()
                 )(texas_document.pk)
