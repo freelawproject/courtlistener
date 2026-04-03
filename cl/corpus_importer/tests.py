@@ -1,5 +1,6 @@
 import json
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from unittest import mock
 from unittest.mock import call, patch
 
@@ -81,6 +82,7 @@ from cl.corpus_importer.signals import (
     handle_update_latest_case_id_and_schedule_iquery_sweep,
     update_latest_case_id_and_schedule_iquery_sweep,
 )
+from cl.corpus_importer.state.texas.missing_file import is_missing_file_page
 from cl.corpus_importer.tasks import (
     MergeResult,
     classify_case_name_by_llm,
@@ -5688,3 +5690,25 @@ class LlmTest(TestCase):
                 for message in called_messages
             )
         )
+
+
+class TamesMissingFileTest(SimpleTestCase):
+    """Test detection of TAMES 'File not found' error pages."""
+
+    test_dir = (
+        Path(settings.INSTALL_ROOT)
+        / "cl"
+        / "corpus_importer"
+        / "test_assets"
+    )
+
+    def test_missing_file_page_detected(self):
+        """Verify a TAMES 'File not found' page is correctly identified."""
+        fixture_path = self.test_dir / "missing_file.html"
+        with open(fixture_path, "rb") as f:
+            self.assertTrue(is_missing_file_page(f.read()))
+
+    def test_normal_page_not_flagged(self):
+        """Verify a normal HTML page is not flagged as missing."""
+        normal_html = b"<html><body><p>Normal page content</p></body></html>"
+        self.assertFalse(is_missing_file_page(normal_html))

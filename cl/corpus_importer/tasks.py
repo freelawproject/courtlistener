@@ -83,7 +83,6 @@ from juriscraper.state.texas.court_of_appeals import (
     TexasCourtOfAppealsDocket,
     TexasCourtOfAppealsScraper,
 )
-from juriscraper.state.texas.missing_file import is_missing_file_page
 from openai import (
     APIConnectionError,
     APIError,
@@ -116,6 +115,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
+from cl.corpus_importer.state.texas.missing_file import is_missing_file_page
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
     compute_binary_probe_jitter,
