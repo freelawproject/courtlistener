@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import responses
+import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -46,13 +47,17 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_download_url,
     passes_length_ratio_check,
 )
-from cl.scrapers.models import UrlHash
+from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
+    CASEMAIL_CASE_ADD_URL,
+    CASEMAIL_LOGIN_URL,
+    TAMES_FAILURES_CACHE_KEY,
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
     process_scotus_captcha_transcription,
     subscribe_to_scotus_updates,
+    subscribe_to_tames_cases,
 )
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import (
@@ -2189,3 +2194,243 @@ class SetOrderingKeysTest(SimpleTestCase):
         self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
         self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
         self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
+
+
+class AccountSubscriptionIncludeTest(TestCase):
+    def setUp(self):
+        self.subscription = AccountSubscription.objects.create(
+            scraper=Scraper.TAMES,
+            email="test@example.com",
+            user_name="testuser",
+            first_subscription=date(2025, 3, 1),
+            last_subscription=date(2025, 3, 15),
+        )
+
+    def test_new_dates_widen_window(self):
+        """Dates outside the existing window should expand it."""
+        self.subscription.include_subscriptions(
+            {date(2025, 2, 20), date(2025, 4, 1)}
+        )
+        self.subscription.refresh_from_db()
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 2, 20)
+        )
+        self.assertEqual(self.subscription.last_subscription, date(2025, 4, 1))
+
+    def test_inner_dates_do_not_change_window(self):
+        """Dates within the existing window should leave it unchanged."""
+        self.subscription.include_subscriptions(
+            {date(2025, 3, 5), date(2025, 3, 10)}
+        )
+        self.subscription.refresh_from_db()
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 3, 1)
+        )
+        self.assertEqual(
+            self.subscription.last_subscription, date(2025, 3, 15)
+        )
+
+
+TAMES_ASSET_DIR = (
+    Path(settings.INSTALL_ROOT)
+    / "cl"
+    / "scrapers"
+    / "test_assets"
+    / "tames_subscription"
+)
+TAMES_USER_JSON = json.dumps(
+    {
+        "username": "testuser",
+        "password": "testpass",
+        "email": "test@example.com",
+    }
+)
+
+
+class SubscribeToTamesCasesTest(TestCase):
+    """Tests for the subscribe_to_tames_cases Celery task."""
+
+    def setUp(self):
+        # Pre-create the tracker so get_or_create finds it
+        # (avoids date.today() defaults polluting assertions).
+        self.tracker = AccountSubscription.objects.create(
+            scraper=Scraper.TAMES,
+            email="test@example.com",
+            user_name="testuser",
+            first_subscription=date(2025, 1, 15),
+            last_subscription=date(2025, 1, 15),
+        )
+        self.mock_redis = MagicMock()
+        self.mock_redis.smembers.return_value = set()
+        self.redis_patcher = mock.patch(
+            "cl.scrapers.tasks.get_redis_interface",
+            return_value=self.mock_redis,
+        )
+        self.redis_patcher.start()
+
+    def tearDown(self):
+        self.redis_patcher.stop()
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.login_get_html = (TAMES_ASSET_DIR / "login_get.html").read_text()
+        cls.login_post_html = (TAMES_ASSET_DIR / "login_post.html").read_text()
+        cls.case_add_success_html = (
+            TAMES_ASSET_DIR / "case_add_success.html"
+        ).read_text()
+
+    def _add_login_responses(self, count: int = 1):
+        """Register mock responses for the TAMES login flow."""
+        for _ in range(count):
+            responses.add(
+                responses.GET,
+                CASEMAIL_LOGIN_URL,
+                body=self.login_get_html,
+                status=200,
+            )
+            responses.add(
+                responses.POST,
+                CASEMAIL_LOGIN_URL,
+                body=self.login_post_html,
+                status=200,
+            )
+
+    def _add_case_add_response(self, status=200, body=None):
+        responses.add(
+            responses.GET,
+            CASEMAIL_CASE_ADD_URL,
+            body=body or self.case_add_success_html,
+            status=status,
+        )
+
+    @responses.activate
+    @mock.patch("django.conf.settings.TAMES_USER", TAMES_USER_JSON)
+    def test_cases_successfully_subscribed(self):
+        """Cases that get a 200 response are treated as successful."""
+        self._add_login_responses()
+        self._add_case_add_response()
+        self._add_case_add_response()
+
+        cases = [
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            {"court": "cossup", "case": "24-0002", "date_filed": "02/20/2025"},
+        ]
+        subscribe_to_tames_cases.apply(args=(cases,))
+
+        self.tracker.refresh_from_db()
+        self.assertEqual(self.tracker.first_subscription, date(2025, 1, 15))
+        self.assertEqual(self.tracker.last_subscription, date(2025, 2, 20))
+        self.mock_redis.srem.assert_called_once_with(
+            TAMES_FAILURES_CACHE_KEY,
+            json.dumps(cases[0], sort_keys=True),
+            json.dumps(cases[1], sort_keys=True),
+        )
+
+    @responses.activate
+    @mock.patch("django.conf.settings.TAMES_USER", TAMES_USER_JSON)
+    @mock.patch.object(subscribe_to_tames_cases, "max_retries", 0)
+    def test_failed_cases_cached_in_redis(self):
+        """Cases that fail subscription are persisted to Redis."""
+        self._add_login_responses()
+        self._add_case_add_response()
+        self._add_case_add_response(status=500, body="Server Error")
+
+        good_case = {
+            "court": "cossup",
+            "case": "24-0001",
+            "date_filed": "01/15/2025",
+        }
+        bad_case = {
+            "court": "cossup",
+            "case": "24-0002",
+            "date_filed": "03/01/2025",
+        }
+        subscribe_to_tames_cases.apply(args=([good_case, bad_case],))
+
+        self.tracker.refresh_from_db()
+        # Only the successful case's date should be recorded
+        self.assertEqual(self.tracker.first_subscription, date(2025, 1, 15))
+        self.assertEqual(self.tracker.last_subscription, date(2025, 1, 15))
+
+        # The failed case should be cached in Redis as a SET member
+        self.mock_redis.sadd.assert_called_once_with(
+            TAMES_FAILURES_CACHE_KEY,
+            json.dumps(bad_case, sort_keys=True),
+        )
+
+    @responses.activate
+    @mock.patch("django.conf.settings.TAMES_USER", TAMES_USER_JSON)
+    def test_cached_failures_retried_and_cleared(self):
+        """Previously cached failures are merged in and cleared on success."""
+        cached_case = {
+            "court": "cossup",
+            "case": "23-9999",
+            "date_filed": "12/01/2024",
+        }
+        self.mock_redis.smembers.return_value = {
+            json.dumps(cached_case, sort_keys=True)
+        }
+
+        self._add_login_responses()
+        # One response for the new case, one for the cached case
+        self._add_case_add_response()
+        self._add_case_add_response()
+
+        new_case = {
+            "court": "cossup",
+            "case": "24-0001",
+            "date_filed": "01/15/2025",
+        }
+        subscribe_to_tames_cases.apply(args=([new_case],))
+
+        self.tracker.refresh_from_db()
+        self.assertEqual(self.tracker.first_subscription, date(2024, 12, 1))
+        self.assertEqual(self.tracker.last_subscription, date(2025, 1, 15))
+        # Successful cases should be removed from the cache
+        self.mock_redis.srem.assert_called_once_with(
+            TAMES_FAILURES_CACHE_KEY,
+            json.dumps(new_case, sort_keys=True),
+            json.dumps(cached_case, sort_keys=True),
+        )
+
+    @responses.activate
+    @mock.patch("django.conf.settings.TAMES_USER", TAMES_USER_JSON)
+    def test_successful_cases_not_cached(self):
+        """When all cases succeed, nothing is written to Redis."""
+        self._add_login_responses()
+        self._add_case_add_response()
+
+        cases = [
+            {"court": "cossup", "case": "24-0001", "date_filed": "02/01/2025"},
+        ]
+        subscribe_to_tames_cases.apply(args=(cases,))
+
+        self.mock_redis.sadd.assert_not_called()
+
+    @responses.activate
+    @mock.patch("django.conf.settings.TAMES_USER", TAMES_USER_JSON)
+    @time_machine.travel("2026-03-31", tick=False)
+    def test_new_subscription_uses_case_dates_not_today(self):
+        """When no tracker exists, first/last_subscription should reflect
+        the case dates, not today's date.
+        """
+        # Remove the pre-created tracker so get_or_create must create one
+        self.tracker.delete()
+
+        self._add_login_responses()
+        self._add_case_add_response()
+        self._add_case_add_response()
+
+        cases = [
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            {"court": "cossup", "case": "24-0002", "date_filed": "02/20/2025"},
+        ]
+        subscribe_to_tames_cases.apply(args=(cases,))
+
+        tracker = AccountSubscription.objects.get(
+            scraper=Scraper.TAMES, user_name="testuser"
+        )
+        # Dates should match the cases, NOT today (2026-04-01)
+        self.assertEqual(tracker.first_subscription, date(2025, 1, 15))
+        self.assertEqual(tracker.last_subscription, date(2025, 2, 20))
