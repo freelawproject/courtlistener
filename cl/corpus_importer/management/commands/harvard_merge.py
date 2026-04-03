@@ -14,7 +14,6 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
 )
 from cl.corpus_importer.utils import (
     AuthorException,
-    ClusterSourceException,
     DocketSourceException,
     EmptyOpinionException,
     JudgeException,
@@ -438,10 +437,6 @@ def merge_opinion_clusters(
     except DocketSourceException:
         logger.warning(
             msg=f"Docket source exception related to cluster id: {cluster_id}"
-        )
-    except ClusterSourceException:
-        logger.warning(
-            msg=f"Cluster source exception for cluster id: {cluster_id}"
         )
     except OpinionTypeException:
         logger.warning(
