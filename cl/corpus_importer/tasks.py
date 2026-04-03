@@ -3373,7 +3373,9 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         docket_id,
         qp_url,
     )
-    with download_document_in_stream(qp_url, docket_id, "scotus_qp_", require_pdf=True) as result:
+    with download_document_in_stream(
+        qp_url, docket_id, "scotus_qp_", require_pdf=True
+    ) as result:
         if result is None:
             logger.error(
                 "Failed to download QP file for SCOTUS Docket %s from URL %s.",
@@ -3799,7 +3801,9 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         doc_pk,
         url,
     )
-    with download_document_in_stream(url, doc_pk, "scotus_", require_pdf=True) as result:
+    with download_document_in_stream(
+        url, doc_pk, "scotus_", require_pdf=True
+    ) as result:
         if result is None:
             logger.error(
                 "Failed to download attachment PDF for SCOTUSDocument %s from URL %s.",
