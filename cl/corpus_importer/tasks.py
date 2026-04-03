@@ -3869,23 +3869,17 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     process_scotus_docket.delay(docket_data)
 
 
-@app.task(
-    bind=True,
-    ignore_result=True,
-    # No retries because download_pdf_in_stream already has retry logic
-)
-@throttle_task("2/s")
-def download_texas_document_pdf(
-    self: Task, texas_document_pk: int
+def _download_texas_document_pdf(
+    task: Task, texas_document_pk: int
 ) -> int | None:
-    """Download a PDF and return its path.
+    """Download a Texas document PDF and save it locally.
 
-    :param self: The Celery task instance.
+    :param task: The Celery task instance (used to break the chain on failure).
     :param texas_document_pk: The primary key of the TexasDocument instance to
     update the attachment for.
-
     :return: The primary key of the downloaded TexasDocument instance, or None
-    if the process failed."""
+    if the process failed.
+    """
     try:
         texas_document = TexasDocument.objects.get(pk=texas_document_pk)
     except TexasDocument.DoesNotExist:
@@ -3893,7 +3887,7 @@ def download_texas_document_pdf(
             "Texas document PDF download: TexasDocument %s does not exist; skipping.",
             texas_document_pk,
         )
-        self.request.chain = None
+        task.request.chain = None
         return None
 
     url = texas_document.url
@@ -3910,7 +3904,7 @@ def download_texas_document_pdf(
                 texas_document.pk,
                 url,
             )
-            self.request.chain = None
+            task.request.chain = None
             return None
         tmp, sha1_hash = result
         filename = (
@@ -3927,6 +3921,45 @@ def download_texas_document_pdf(
             texas_document.page_count = int(response.text)
         texas_document.save()
         return texas_document_pk
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+    # No retries because download_pdf_in_stream already has retry logic
+)
+@throttle_task("2/s")
+def download_texas_document_pdf(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Throttled version of the Texas document PDF download task.
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance.
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed.
+    """
+    return _download_texas_document_pdf(self, texas_document_pk)
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+)
+def download_texas_document_pdf_unthrottled(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Unthrottled version of the Texas document PDF download task.
+
+    Use this when the caller already handles throttling (e.g. via
+    CeleryThrottle).
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance.
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed.
+    """
+    return _download_texas_document_pdf(self, texas_document_pk)
 
 
 class MergeResult[T = int](NamedTuple):
