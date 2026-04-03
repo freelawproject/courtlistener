@@ -24,6 +24,7 @@
         {'href': '#data-table', 'text': 'Data table'},
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
+        {'href': '#button', 'text': 'Button'},
       ]},
       {'href': '#pure-markup', 'text': 'Pure markup', 'children': [
       {'href': '#support-banner', 'text': 'Support plea banner'},
@@ -977,6 +978,115 @@ Sample code here.
       </c-code>
     </c-expansion-panel>
   </section>
+
+
+  {# BUTTON #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="button">
+    <h2 class="mt-6 mb-3">Button</h2>
+    <p>A reusable button component with variant styling, element flexibility (<code>&lt;button&gt;</code> or <code>&lt;a&gt;</code>), and optional touch target mode. When <code>variant</code> is omitted, no built-in styling is applied — the caller controls all classes.</p>
+
+    <h3 class="mt-3">Demo</h3>
+
+    <h4 class="mt-3">Variants</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary">Primary</c-button>
+      <c-button variant="outline">Outline</c-button>
+      <c-button variant="dark">Dark</c-button>
+      <c-button variant="ghost">Ghost</c-button>
+      <c-button variant="grey">Grey</c-button>
+      <c-button class="rounded-full px-4 py-2 text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 focus-visible:ring-4 focus-visible:ring-purple-300">Custom</c-button>
+    </div>
+
+    <h4 class="mt-3">Sizes</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary">Default (40px)</c-button>
+      <c-button variant="primary" size="xl">XL (48px)</c-button>
+    </div>
+
+    <h4 class="mt-3">Links</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" href="#">Primary link</c-button>
+      <c-button variant="outline" href="#">Outline link</c-button>
+    </div>
+
+    <h4 class="mt-3">Disabled</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" disabled>Primary</c-button>
+      <c-button variant="outline" disabled>Outline</c-button>
+      <c-button variant="dark" disabled>Dark</c-button>
+      <c-button variant="ghost" disabled>Ghost</c-button>
+      <c-button variant="grey" disabled>Grey</c-button>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Visual style. Options: <code>primary</code>, <code>outline</code>, <code>dark</code>, <code>ghost</code>, <code>grey</code>. When omitted, no built-in styling is applied.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>size</code></c-slot>
+        <c-slot name="description">Button size. Default is 40px height. Set to <code>xl</code> for 48px. Only applies when <code>variant</code> is set.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>href</code></c-slot>
+        <c-slot name="description">If provided, renders as <code>&lt;a&gt;</code> instead of <code>&lt;button&gt;</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>type</code></c-slot>
+        <c-slot name="description">Button type attribute. Default: <code>button</code>. Only applies to <code>&lt;button&gt;</code> elements.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>touch_target</code></c-slot>
+        <c-slot name="description">When set, renders a larger outer <code>&lt;button&gt;</code> for touch area with an inner <code>&lt;span&gt;</code> for visual styling. Used by dialog trigger buttons.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes. Applied to the visual element (the <code>&lt;span&gt;</code> if <code>touch_target</code>, the element itself otherwise).</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Button content — text, icons, or both.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;h4&gt;Variants&lt;/h4&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary"&gt;Primary&lt;/c-button&gt;
+  &lt;c-button variant="outline"&gt;Outline&lt;/c-button&gt;
+  &lt;c-button variant="dark"&gt;Dark&lt;/c-button&gt;
+  &lt;c-button variant="ghost"&gt;Ghost&lt;/c-button&gt;
+  &lt;c-button variant="grey"&gt;Grey&lt;/c-button&gt;
+  &lt;c-button class="rounded-full px-4 py-2 text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 focus-visible:ring-4 focus-visible:ring-purple-300"&gt;Custom&lt;/c-button&gt;
+&lt;/div&gt;
+
+&lt;h4&gt;Sizes&lt;/h4&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary"&gt;Default (40px)&lt;/c-button&gt;
+  &lt;c-button variant="primary" size="xl"&gt;XL (48px)&lt;/c-button&gt;
+&lt;/div&gt;
+
+&lt;h4&gt;Links&lt;/h4&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary" href="#"&gt;Primary link&lt;/c-button&gt;
+  &lt;c-button variant="outline" href="#"&gt;Outline link&lt;/c-button&gt;
+&lt;/div&gt;
+
+&lt;h4&gt;Disabled&lt;/h4&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary" disabled&gt;Primary&lt;/c-button&gt;
+  &lt;c-button variant="outline" disabled&gt;Outline&lt;/c-button&gt;
+  &lt;c-button variant="dark" disabled&gt;Dark&lt;/c-button&gt;
+  &lt;c-button variant="ghost" disabled&gt;Ghost&lt;/c-button&gt;
+  &lt;c-button variant="grey" disabled&gt;Grey&lt;/c-button&gt;
+&lt;/div&gt;
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
 
 
   {# SUPPORT PLEA BANNER #}
