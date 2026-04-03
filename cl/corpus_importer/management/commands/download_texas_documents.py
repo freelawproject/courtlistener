@@ -15,7 +15,7 @@ from cl.lib.indexing_utils import (
     log_last_document_indexed,
 )
 from cl.scrapers.tasks import extract_formatted_text_document
-from cl.search.state.texas.models import ProcessingState, TexasDocument
+from cl.search.state.texas.models import TexasDocument
 
 
 def _base_extraction_queryset() -> Q:
@@ -140,7 +140,7 @@ def download_texas_documents(
     desc = download_order == "desc"
     docs = TexasDocument.objects.filter(
         filepath_local="",
-        processing_state=ProcessingState.PENDING,
+        processing_error__isnull=True,
     ).values_list("pk", flat=True)
 
     if auto_resume:

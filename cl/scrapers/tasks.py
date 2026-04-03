@@ -51,7 +51,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
-from cl.search.state.texas.models import ProcessingState, TexasDocument
+from cl.search.state.texas.models import ProcessingError, TexasDocument
 
 logger = logging.getLogger(__name__)
 
@@ -615,18 +615,11 @@ async def extract_formatted_text_document_base(
                 update_fields=["ocr_status", "plain_text"],
             )
         elif isinstance(rd, TexasDocument):
-            rd.processing_state = (
-                ProcessingState.SUMMARIZED
-                if has_content
-                else ProcessingState.SUMMARY_FAILED
-            )
-            await rd.asave(
-                update_fields=[
-                    "ocr_status",
-                    "plain_text",
-                    "processing_state",
-                ],
-            )
+            update_fields = ["ocr_status", "plain_text"]
+            if not has_content:
+                rd.processing_error = ProcessingError.EXTRACTION_FAILURE
+                update_fields.append("processing_error")
+            await rd.asave(update_fields=update_fields)
         else:
             await rd.asave(update_fields=["ocr_status", "plain_text"])
         processed.append(pk)

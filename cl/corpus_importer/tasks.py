@@ -115,7 +115,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
-from cl.corpus_importer.state.texas.missing_file import is_missing_file_page
+from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
     compute_binary_probe_jitter,
@@ -218,7 +218,7 @@ from cl.search.models import (
     TrialCourtData,
 )
 from cl.search.state.texas.models import (
-    ProcessingState,
+    ProcessingError,
     TexasDocketEntry,
     TexasDocument,
 )
@@ -3914,7 +3914,7 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
         task.request.chain = None
         return None
 
-    if texas_document.processing_state == ProcessingState.BAD_URL:
+    if texas_document.processing_error == ProcessingError.BAD_URL:
         logger.error(
             "Texas document download: TexasDocument %s has a bad URL. "
             "Skipping.",
@@ -3964,7 +3964,7 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
                 texas_document.pk,
                 url,
             )
-            texas_document.processing_state = ProcessingState.BAD_URL
+            texas_document.processing_error = ProcessingError.BAD_URL
             texas_document.save()
             task.request.chain = None
             return None
@@ -3979,7 +3979,6 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
         )
         texas_document.file_size = downloaded_file.size
         texas_document.sha1 = sha1_hash
-        texas_document.processing_state = ProcessingState.DOWNLOADED
 
         if extension == ".pdf":
             response = async_to_sync(doc_page_count_service)(texas_document)
