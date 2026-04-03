@@ -5696,10 +5696,7 @@ class TamesMissingFileTest(SimpleTestCase):
     """Test detection of TAMES 'File not found' error pages."""
 
     test_dir = (
-        Path(settings.INSTALL_ROOT)
-        / "cl"
-        / "corpus_importer"
-        / "test_assets"
+        Path(settings.INSTALL_ROOT) / "cl" / "corpus_importer" / "test_assets"
     )
 
     def test_missing_file_page_detected(self):

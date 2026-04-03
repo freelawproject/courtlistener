@@ -1,9 +1,7 @@
-from typing import Union
-
 from lxml import html
 
 
-def is_missing_file_page(html_string: Union[str, bytes]) -> bool:
+def is_missing_file_page(html_string: str | bytes) -> bool:
     """Check if a TAMES page is a 'File not found' error page.
 
     :param html_string: raw HTML string or bytes
