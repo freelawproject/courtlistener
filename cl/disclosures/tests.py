@@ -248,7 +248,7 @@ class DisclosureAPITest(TestCase):
     async def test_reimbursement_filtering(self) -> None:
         """Can we filter reimbursements by location?"""
         self.path = reverse("reimbursement-list", kwargs={"version": "v3"})
-        self.q = {"location__icontains": "hawaii"}
+        self.q = {"location__istartswith": "Honolulu"}
         r = await self.async_client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"], 1, msg="Failed Reimbursement filter"
@@ -257,7 +257,7 @@ class DisclosureAPITest(TestCase):
     async def test_spousal_income_filtering(self) -> None:
         """Can we filter spousal income by source_type?"""
         self.path = reverse("spouseincome-list", kwargs={"version": "v3"})
-        self.q = {"source_type__icontains": "trust fund"}
+        self.q = {"source_type__istartswith": "A big"}
         r = await self.async_client.get(self.path, self.q)
         self.assertEqual(
             r.json()["count"], 1, msg="Failed Spousal Income filter"
@@ -266,7 +266,7 @@ class DisclosureAPITest(TestCase):
     async def test_debt_filtering(self) -> None:
         """Can we filter debts by creditor?"""
         self.path = reverse("debt-list", kwargs={"version": "v3"})
-        self.q = {"creditor_name__icontains": "JP Morgan"}
+        self.q = {"creditor_name__istartswith": "JP Morgan"}
         r = await self.async_client.get(self.path, self.q)
         self.assertEqual(r.json()["count"], 1, msg="Failed Debt filter")
 
