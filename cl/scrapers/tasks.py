@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.utils.html import strip_tags
 from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
@@ -50,6 +51,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
+from cl.search.state.texas.models import ProcessingError, TexasDocument
 
 logger = logging.getLogger(__name__)
 
@@ -463,15 +465,17 @@ def extract_recap_pdf(
     max_retries=3,
     retry_backoff=10,
 )
-def extract_pdf_document(
+def extract_formatted_text_document(
     self,
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
     model_name: str = "search.RECAPDocument",
+    strip_html_tags: bool = False,
 ) -> list[int]:
-    """Celery task wrapper for `extract_pdf_document_base`
-    Extract the contents from a PDF if necessary.
+    """Celery task wrapper for `extract_formatted_text_document_base`.
+
+    Extract the contents from a document if necessary.
 
     In order to avoid the issue described [here](
     https://github.com/freelawproject/courtlistener/issues/2103#issuecomment-1206700403)
@@ -481,8 +485,8 @@ def extract_pdf_document(
     to sentry.
 
     To avoid logging every retry to sentry, a new base method was created:
-    extract_pdf_document_base that method should be used when a synchronous
-    call is needed within a parent task.
+    extract_formatted_text_document_base that method should be used when a
+    synchronous call is needed within a parent task.
 
     And this task wrapper should be used elsewhere for asynchronous calls
     (delay, async).
@@ -496,22 +500,53 @@ def extract_pdf_document(
     serialization errors during task initialization (see [this comment](
     https://github.com/freelawproject/courtlistener/pull/6761/changes/BASE..540fd91fa5e9e43a96926e891cdb2de83d31088b#r2717354169
     )).
+    :param strip_html_tags: Whether to strip HTML tags from the extracted
+    content. Use for HTML or WPD documents so that plain_text contains
+    plain text rather than markup.
 
     :return: A list of processed document pks.
     """
 
-    return async_to_sync(extract_pdf_document_base)(
-        pks, ocr_available, check_if_needed, model_name
+    return async_to_sync(extract_formatted_text_document_base)(
+        pks, ocr_available, check_if_needed, model_name, strip_html_tags
     )
 
 
-async def extract_pdf_document_base(
+@app.task(
+    bind=True,
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
+    max_retries=3,
+    retry_backoff=10,
+)
+def extract_pdf_document(
+    self,
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
     model_name: str = "search.RECAPDocument",
 ) -> list[int]:
-    """Extract the contents from a PDF if necessary.
+    """Thin wrapper around extract_formatted_text_document.
+
+    Kept so that existing Celery tasks referencing this name
+    continue to work until they are fully processed.
+    """
+    return async_to_sync(extract_pdf_document_base)(
+        pks, ocr_available, check_if_needed, model_name
+    )
+
+
+async def extract_formatted_text_document_base(
+    pks: int | list[int],
+    ocr_available: bool = True,
+    check_if_needed: bool = True,
+    model_name: str = "search.RECAPDocument",
+    strip_html_tags: bool = False,
+) -> list[int]:
+    """Extract the contents from a document if necessary.
 
     :param pks: The document pk or list of pks to work on.
     :param ocr_available: Whether it's necessary to perform OCR extraction.
@@ -519,6 +554,9 @@ async def extract_pdf_document_base(
     needs extraction.
     :param model_name: The name of the document model (inheriting from
     `AbstractPDF`) to operate on.
+    :param strip_html_tags: Whether to strip HTML tags from the extracted
+    content. Use for HTML or WPD documents so that plain_text contains
+    plain text rather than markup.
 
     :return: A list of processed document pks.
     """
@@ -544,6 +582,8 @@ async def extract_pdf_document_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
+        if strip_html_tags:
+            content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
         if ocr_available and ocr_needed:
             response = await microservice(
@@ -574,11 +614,33 @@ async def extract_pdf_document_base(
                 do_extraction=False,
                 update_fields=["ocr_status", "plain_text"],
             )
+        elif isinstance(rd, TexasDocument):
+            update_fields = ["ocr_status", "plain_text"]
+            if not has_content:
+                rd.processing_error = ProcessingError.EXTRACTION_FAILURE
+                update_fields.append("processing_error")
+            await rd.asave(update_fields=update_fields)
         else:
             await rd.asave(update_fields=["ocr_status", "plain_text"])
         processed.append(pk)
 
     return processed
+
+
+async def extract_pdf_document_base(
+    pks: int | list[int],
+    ocr_available: bool = True,
+    check_if_needed: bool = True,
+    model_name: str = "search.RECAPDocument",
+) -> list[int]:
+    """Thin wrapper around extract_formatted_text_document_base.
+
+    Kept as an orphan so that existing Celery tasks referencing this name
+    continue to work until they are fully processed.
+    """
+    return await extract_formatted_text_document_base(
+        pks, ocr_available, check_if_needed, model_name
+    )
 
 
 @app.task(
