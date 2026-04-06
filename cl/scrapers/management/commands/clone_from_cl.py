@@ -204,6 +204,7 @@ def clone_opinion_cluster(
         )
         sub_opinions_urls = cluster_data.pop("sub_opinions", [])
         filepath_json_harvard = cluster_data.pop("filepath_json_harvard", None)
+        cluster_data.pop("cluster_redirections", [])
 
         # delete unneeded fields
         clean_api_data(cluster_data)

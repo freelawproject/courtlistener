@@ -3,12 +3,26 @@ from itertools import batched
 
 from django.db.models import Q
 
-from cl.corpus_importer.tasks import download_texas_document_pdf, logger
+from cl.corpus_importer.tasks import (
+    download_texas_document_pdf_unthrottled,
+    logger,
+)
 from cl.corpus_importer.utils import paginate_docs_queryset
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.indexing_utils import (
+    get_last_parent_document_id_processed,
+    log_last_document_indexed,
+)
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import TexasDocument
+
+
+def compose_redis_key() -> str:
+    """Compose a Redis key for Texas document download log.
+    :return: A Redis key as a string.
+    """
+    return "texas_document_download:log"
 
 
 def extract_texas_documents(
@@ -75,6 +89,7 @@ def download_texas_documents(
     download_queue: str,
     delay: float,
     download_order: str = "asc",
+    auto_resume: bool = False,
 ) -> None:
     """Download PDFs for TexasDocument instances missing a local file.
 
@@ -84,19 +99,30 @@ def download_texas_documents(
     :param download_queue: The celery queue for download tasks.
     :param delay: Seconds to sleep between scheduling tasks.
     :param download_order: Sort order for the queryset by pk ("asc" or "desc").
+    :param auto_resume: Resume from last pk stored in Redis.
     :return: None
     """
     desc = download_order == "desc"
     docs = TexasDocument.objects.filter(filepath_local="").values_list(
         "pk", flat=True
     )
+
+    if auto_resume:
+        last_pk = get_last_parent_document_id_processed(compose_redis_key())
+        if last_pk:
+            logger.info("Auto-resuming from pk %s.", last_pk)
+            if desc:
+                docs = docs.filter(pk__lt=last_pk)
+            else:
+                docs = docs.filter(pk__gt=last_pk)
+
     count = docs.count()
     logger.info("Found %s TexasDocuments needing download.", count)
     throttle = CeleryThrottle(queue_name=download_queue)
     processed_count = 0
     for pk in paginate_docs_queryset(docs, desc=desc):
         throttle.maybe_wait()
-        download_texas_document_pdf.si(pk).set(
+        download_texas_document_pdf_unthrottled.si(pk).set(
             queue=download_queue
         ).apply_async()
         processed_count += 1
@@ -107,6 +133,7 @@ def download_texas_documents(
                 count,
                 f"{processed_count / count:.0%}",
             )
+            log_last_document_indexed(pk, compose_redis_key())
         time.sleep(delay)
     logger.info(
         "Scheduled %s/%s",
@@ -170,6 +197,12 @@ class Command(VerboseCommand):
             default="asc",
             help="Sort order for downloading documents by pk (default: asc).",
         )
+        parser.add_argument(
+            "--auto-resume",
+            action="store_true",
+            default=False,
+            help="Resume from last pk stored in Redis.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -191,4 +224,7 @@ class Command(VerboseCommand):
             download_queue = options["download_queue"]
             logger.info("Downloading TexasDocument PDFs.")
             download_order = options["download_order"]
-            download_texas_documents(download_queue, delay, download_order)
+            auto_resume = options["auto_resume"]
+            download_texas_documents(
+                download_queue, delay, download_order, auto_resume
+            )
