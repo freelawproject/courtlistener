@@ -477,9 +477,11 @@ class CaseTransferFactory(DjangoModelFactory):
     origin_docket = SubFactory(DocketFactory)
     destination_court = SubFactory(CourtFactory)
     destination_docket_number = LazyAttribute(
-        lambda ct: ct.destination_docket.docket_number
-        if ct.destination_docket
-        else None
+        lambda ct: (
+            ct.destination_docket.docket_number
+            if ct.destination_docket
+            else None
+        )
     )
     destination_docket = SubFactory(DocketFactory)
     transfer_date = Faker("date_object")

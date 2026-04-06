@@ -209,14 +209,18 @@ class TexasCourtOfAppealsDocketDictFactory(TexasCommonDataDictFactory):
         ),
     )
     transfer_from = LazyAttribute(
-        lambda d: TexasAppellateTransferDictFactory.create()
-        if random.random() < 0.1
-        else None
+        lambda d: (
+            TexasAppellateTransferDictFactory.create()
+            if random.random() < 0.1
+            else None
+        )
     )
     transfer_to = LazyAttribute(
-        lambda d: TexasAppellateTransferDictFactory.create()
-        if random.random() < 0.1
-        else None
+        lambda d: (
+            TexasAppellateTransferDictFactory.create()
+            if random.random() < 0.1
+            else None
+        )
     )
 
 

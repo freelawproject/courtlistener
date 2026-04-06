@@ -416,8 +416,8 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
             key: lambda x: render_string_or_list(x)
             for key in SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS.keys()
         }
-        transformations["absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        transformations["absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
         transformations["local_path"] = lambda x: (
             f"https://storage.courtlistener.com/{x}" if x else ""
@@ -987,8 +987,8 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
         }
 
         # Adds tranformation for relative URL and compute human-readable values
-        transformations["absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        transformations["absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
         transformations["religion"] = lambda x: dict(Person.RELIGIONS).get(
             x, x
@@ -1534,8 +1534,8 @@ class DocketDocument(
             for key in (hl_fields + list_fields)
         }
         # Add a transformation for relative URLs.
-        transformations["docket_absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        transformations["docket_absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
         return transformations
 
@@ -2307,8 +2307,8 @@ class OpinionClusterDocument(
         }
 
         # Add a transformation for relative URL
-        transformations["absolute_url"] = (
-            lambda x: f"https://www.courtlistener.com{x}"
+        transformations["absolute_url"] = lambda x: (
+            f"https://www.courtlistener.com{x}"
         )
 
         # Add a transformation to compute Human-readable values
