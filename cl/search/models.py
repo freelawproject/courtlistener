@@ -50,6 +50,7 @@ from cl.lib.model_helpers import (
     make_scotus_docket_number_core,
     make_texas_docket_number_core,
     make_upload_path,
+    normalize_texas_appellate_docket_number,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
@@ -4061,10 +4062,18 @@ class CaseTransfer(AbstractDateTimeModel):
         total_updated = 0
 
         for transfer in qs.iterator():
+            court = getattr(transfer, f"{side}_court")
+            docket_number = getattr(transfer, f"{side}_docket_number")
+
+            if court.jurisdiction == Court.STATE_APPELLATE:
+                docket_number = normalize_texas_appellate_docket_number(
+                    docket_number
+                )
+
             docket = async_to_sync(find_docket_object)(
                 court_id=getattr(transfer, f"{side}_court_id"),
                 pacer_case_id=None,
-                docket_number=getattr(transfer, f"{side}_docket_number"),
+                docket_number=docket_number,
                 federal_defendant_number=None,
                 federal_dn_judge_initials_assigned=None,
                 federal_dn_judge_initials_referred=None,

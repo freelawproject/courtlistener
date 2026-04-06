@@ -45,6 +45,7 @@ from cl.scrapers.management.commands import (
 from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_judge_names,
     merge_versions_by_download_url,
+    passes_length_ratio_check,
 )
 from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import (
@@ -1938,6 +1939,39 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             version_candidate.main_version_id is None,
             "Loose versioning should not pass when metadata differs ",
         )
+
+
+class LengthRatioCheckTest(SimpleTestCase):
+    """Tests for the passes_length_ratio_check function (Issue #6534)."""
+
+    def test_length_ratio_check(self):
+        """Test length ratio with various text lengths and thresholds."""
+        test_cases = [
+            # (len1, len2, min_ratio, expected_pass, expected_ratio)
+            (1000, 1000, 0.7, True, 1.0),
+            (1000, 800, 0.7, True, 0.8),
+            (1000, 700, 0.7, True, 0.7),
+            (1000, 699, 0.7, False, 0.699),
+            (1000, 100, 0.7, False, 0.1),
+            (1000, 600, 0.7, False, 0.6),
+            (1000, 600, 0.5, True, 0.6),
+            (1000, 350, 0.3, True, 0.35),
+        ]
+        for len1, len2, min_ratio, expected_pass, expected_ratio in test_cases:
+            with self.subTest(len1=len1, len2=len2, min_ratio=min_ratio):
+                passes, ratio = passes_length_ratio_check(
+                    "A" * len1, "B" * len2, min_ratio=min_ratio
+                )
+                self.assertEqual(passes, expected_pass)
+                self.assertAlmostEqual(ratio, expected_ratio, places=2)
+
+    def test_empty_texts_fail(self):
+        """Empty texts should fail to avoid grouping extraction errors."""
+        for text1, text2 in [("", ""), ("text", ""), ("", "text")]:
+            with self.subTest(text1=text1, text2=text2):
+                passes, ratio = passes_length_ratio_check(text1, text2)
+                self.assertFalse(passes)
+                self.assertEqual(ratio, 0.0)
 
 
 class DeleteDuplicatesTest(TestCase):
