@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import responses
-import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -2225,5 +2224,3 @@ class AccountSubscriptionIncludeTest(TestCase):
         self.assertEqual(
             self.subscription.last_subscription, date(2025, 3, 15)
         )
-
-

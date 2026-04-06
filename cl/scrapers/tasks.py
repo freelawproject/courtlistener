@@ -1,4 +1,3 @@
-import json
 import logging
 import random
 import re
@@ -893,5 +892,3 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     except Exception as e:
         logger.exception("Unexpected error during SCOTUS subscription")
         raise ScrapeFailed(str(e))
-
-

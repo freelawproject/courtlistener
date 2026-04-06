@@ -10,17 +10,14 @@ import responses
 import time_machine
 from django.conf import settings
 
-from cl.corpus_importer.tasks import MergeResult
+from cl.corpus_importer.tasks import TAMES_PENDING_SUBSCRIPTIONS_KEY
 from cl.scrapers.management.commands.tames_poller import (
     CASEMAIL_CASE_ADD_URL,
     CASEMAIL_LOGIN_URL,
-    TAMES_PENDING_SUBSCRIPTIONS_KEY,
     Command,
     subscribe_pending_cases,
 )
 from cl.scrapers.models import AccountSubscription, Scraper
-from cl.search.factories import CourtFactory
-from cl.search.models import Docket
 from cl.tests.cases import TestCase
 
 MODULE = "cl.scrapers.management.commands.tames_poller"
@@ -115,16 +112,16 @@ class TamesPollerTest(TestCase):
     """Integration tests for the TAMES poller _poll_cycle method."""
 
     def setUp(self) -> None:
-        self.test_asset_dir = (
-            Path(settings.INSTALL_ROOT)
-            / "cl"
-            / "scrapers"
-            / "test_assets"
-            / "tames_poller"
-        )
         self.cmd = Command()
-        mock.patch(f"{MODULE}.save_docket_response").start()
+        mock.patch(
+            f"{MODULE}.save_docket_response",
+            return_value=(
+                "test-bucket",
+                "responses/dockets/TAMESScraper/cossup/test",
+            ),
+        ).start()
         mock.patch(f"{MODULE}.subscribe_pending_cases").start()
+        mock.patch(f"{MODULE}.chain").start()
         self.addCleanup(mock.patch.stopall)
 
     # ------------------------------------------------------------------
@@ -144,19 +141,17 @@ class TamesPollerTest(TestCase):
         return redis
 
     # ------------------------------------------------------------------
-    # 1. Novel results → merge attempted
+    # 1. Novel results → celery chain dispatched
     # ------------------------------------------------------------------
-    @mock.patch(f"{MODULE}.parse_and_merge_texas_docket")
     @mock.patch(f"{MODULE}.RateLimitedRequestManager")
     @mock.patch(f"{MODULE}.TAMESScraper")
-    def test_novel_results_trigger_merge(
+    def test_novel_results_dispatch_chain(
         self,
         MockTAMES: MagicMock,
         MockRM: MagicMock,
-        mock_parse_merge: MagicMock,
     ) -> None:
         """When fresh URLs are not in the Redis cache, the poller should
-        backfill and attempt to merge every returned case."""
+        backfill and dispatch a celery chain for every returned case."""
         fresh_cases = make_search_rows(25)
         backfill_cases = make_search_rows(5)
 
@@ -165,27 +160,27 @@ class TamesPollerTest(TestCase):
             make_scraper_mock(backfill_cases),
         ]
         setup_rm(MockRM)
-        mock_parse_merge.return_value = MergeResult.created(1)
 
-        self.cmd._poll_cycle(get_options(), self._empty_redis(), None, TAMES_USER)
+        mock_chain = mock.patch(f"{MODULE}.chain").start()
+        self.cmd._poll_cycle(
+            get_options(), self._empty_redis(), None, TAMES_USER
+        )
 
         self.assertEqual(
-            mock_parse_merge.call_count,
+            mock_chain.return_value.apply_async.call_count,
             5,
-            "Should attempt to merge each backfill case",
+            "Should dispatch a chain for each backfill case",
         )
 
     # ------------------------------------------------------------------
-    # 2. Fully-cached results → merge skipped
+    # 2. Fully-cached results → backfill skipped
     # ------------------------------------------------------------------
-    @mock.patch(f"{MODULE}.parse_and_merge_texas_docket")
     @mock.patch(f"{MODULE}.RateLimitedRequestManager")
     @mock.patch(f"{MODULE}.TAMESScraper")
-    def test_cached_results_skip_merge(
+    def test_cached_results_skip_backfill(
         self,
         MockTAMES: MagicMock,
         MockRM: MagicMock,
-        mock_parse_merge: MagicMock,
     ) -> None:
         """When every fresh URL already exists in the Redis cache, the
         poller should skip backfill entirely."""
@@ -195,9 +190,12 @@ class TamesPollerTest(TestCase):
         MockTAMES.side_effect = [make_scraper_mock(cases)]
         setup_rm(MockRM)
 
-        self.cmd._poll_cycle(get_options(), self._primed_redis(cases), None, TAMES_USER)
+        mock_chain = mock.patch(f"{MODULE}.chain").start()
+        self.cmd._poll_cycle(
+            get_options(), self._primed_redis(cases), None, TAMES_USER
+        )
 
-        mock_parse_merge.assert_not_called()
+        mock_chain.return_value.apply_async.assert_not_called()
         self.assertEqual(
             MockTAMES.call_count,
             1,
@@ -207,18 +205,16 @@ class TamesPollerTest(TestCase):
     # ------------------------------------------------------------------
     # 3. Backfill by date range
     # ------------------------------------------------------------------
-    @mock.patch(f"{MODULE}.parse_and_merge_texas_docket")
     @mock.patch(f"{MODULE}.RateLimitedRequestManager")
     @mock.patch(f"{MODULE}.TAMESScraper")
     def test_backfill_by_date(
         self,
         MockTAMES: MagicMock,
         MockRM: MagicMock,
-        mock_parse_merge: MagicMock,
     ) -> None:
         """With --case-backfill-days the backfill scraper should receive
         a date range spanning that many days from today, and every case
-        yielded within that window should be processed."""
+        yielded within that window should be dispatched."""
         backfill_days = 5
         fresh_cases = make_search_rows(25)
         backfill_cases = make_search_rows(3)
@@ -229,8 +225,8 @@ class TamesPollerTest(TestCase):
             backfill_scraper,
         ]
         setup_rm(MockRM)
-        mock_parse_merge.return_value = MergeResult.created(1)
 
+        mock_chain = mock.patch(f"{MODULE}.chain").start()
         self.cmd._poll_cycle(
             get_options(case_backfill_days=backfill_days),
             self._empty_redis(),
@@ -242,24 +238,22 @@ class TamesPollerTest(TestCase):
         self.assertEqual(start, TODAY - timedelta(days=backfill_days))
         self.assertEqual(end, TODAY)
         self.assertEqual(
-            mock_parse_merge.call_count,
+            mock_chain.return_value.apply_async.call_count,
             3,
-            "All cases within the date window should be processed",
+            "All cases within the date window should be dispatched",
         )
 
     # ------------------------------------------------------------------
     # 4. Backfill by count
     # ------------------------------------------------------------------
-    @mock.patch(f"{MODULE}.parse_and_merge_texas_docket")
     @mock.patch(f"{MODULE}.RateLimitedRequestManager")
     @mock.patch(f"{MODULE}.TAMESScraper")
     def test_backfill_by_count(
         self,
         MockTAMES: MagicMock,
         MockRM: MagicMock,
-        mock_parse_merge: MagicMock,
     ) -> None:
-        """With --case-backfill-count the poller should stop processing
+        """With --case-backfill-count the poller should stop dispatching
         after exactly that many cases, even when more are available."""
         fresh_cases = make_search_rows(25)
         backfill_cases = make_search_rows(10)
@@ -269,8 +263,8 @@ class TamesPollerTest(TestCase):
             make_scraper_mock(backfill_cases),
         ]
         setup_rm(MockRM)
-        mock_parse_merge.return_value = MergeResult.created(1)
 
+        mock_chain = mock.patch(f"{MODULE}.chain").start()
         self.cmd._poll_cycle(
             get_options(case_backfill_count=5, case_backfill_days=None),
             self._empty_redis(),
@@ -279,86 +273,10 @@ class TamesPollerTest(TestCase):
         )
 
         self.assertEqual(
-            mock_parse_merge.call_count,
+            mock_chain.return_value.apply_async.call_count,
             5,
-            "Should stop after processing exactly 5 cases",
+            "Should stop after dispatching exactly 5 cases",
         )
-
-    # ------------------------------------------------------------------
-    # 5. New cases appear in the database
-    # ------------------------------------------------------------------
-    @mock.patch(f"{MODULE}.RateLimitedRequestManager")
-    @mock.patch(f"{MODULE}.TAMESScraper")
-    def test_new_cases_appear_in_db(
-        self,
-        MockTAMES: MagicMock,
-        MockRM: MagicMock,
-    ) -> None:
-        """After a successful poll cycle the parsed case should exist as
-        a Docket row in the database.  Uses the real parser and merge
-        pipeline — only external I/O (S3, Celery, TAMES HTTP) is mocked.
-        Attachment downloads are scheduled via on_commit and never fire
-        inside TestCase's always-rolled-back transaction."""
-        # Court required by merge_texas_docket (hard lookup at line 4720)
-        CourtFactory.create(id="tex")
-
-        with open(
-            self.test_asset_dir / "cossup_case.html", encoding="utf-8"
-        ) as f:
-            case_html = f.read()
-
-        target = make_search_row("24-0340", court_code="cossup")
-        fresh_cases = [target] + make_search_rows(24, start=100)
-        backfill_cases = [target]
-
-        MockTAMES.side_effect = [
-            make_scraper_mock(fresh_cases),
-            make_scraper_mock(backfill_cases),
-        ]
-        setup_rm(MockRM, case_html=case_html)
-
-        self.cmd._poll_cycle(get_options(), self._empty_redis(), None, TAMES_USER)
-
-        self.assertTrue(
-            Docket.objects.filter(docket_number="24-0340").exists(),
-            "Docket 24-0340 should exist in the database",
-        )
-
-    # ------------------------------------------------------------------
-    # 6. New cases are added to Redis pending set
-    # ------------------------------------------------------------------
-    @mock.patch(f"{MODULE}.parse_and_merge_texas_docket")
-    @mock.patch(f"{MODULE}.RateLimitedRequestManager")
-    @mock.patch(f"{MODULE}.TAMESScraper")
-    def test_new_cases_added_to_redis_set(
-        self,
-        MockTAMES: MagicMock,
-        MockRM: MagicMock,
-        mock_parse_merge: MagicMock,
-    ) -> None:
-        """When a case is newly created, it should be sadd-ed to the
-        pending subscriptions Redis SET."""
-        fresh_cases = make_search_rows(25)
-        backfill_cases = make_search_rows(2)
-
-        MockTAMES.side_effect = [
-            make_scraper_mock(fresh_cases),
-            make_scraper_mock(backfill_cases),
-        ]
-        setup_rm(MockRM)
-        mock_parse_merge.return_value = MergeResult.created(1)
-
-        redis = self._empty_redis()
-        self.cmd._poll_cycle(get_options(), redis, None, TAMES_USER)
-
-        self.assertEqual(
-            redis.sadd.call_count,
-            2,
-            "Each newly created case should be sadd-ed to Redis",
-        )
-        # Verify the key used
-        first_call_key = redis.sadd.call_args_list[0][0][0]
-        self.assertEqual(first_call_key, TAMES_PENDING_SUBSCRIPTIONS_KEY)
 
 
 class SubscribePendingCasesTest(TestCase):
@@ -368,9 +286,7 @@ class SubscribePendingCasesTest(TestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
         cls.login_get_html = (TAMES_ASSET_DIR / "login_get.html").read_text()
-        cls.login_post_html = (
-            TAMES_ASSET_DIR / "login_post.html"
-        ).read_text()
+        cls.login_post_html = (TAMES_ASSET_DIR / "login_post.html").read_text()
         cls.case_add_success_html = (
             TAMES_ASSET_DIR / "case_add_success.html"
         ).read_text()
@@ -453,9 +369,7 @@ class SubscribePendingCasesTest(TestCase):
         self.mock_redis.smembers.return_value = {case}
 
         # Return a page that doesn't have the expected login-success marker
-        responses.add(
-            responses.GET, CASEMAIL_LOGIN_URL, body="<html></html>"
-        )
+        responses.add(responses.GET, CASEMAIL_LOGIN_URL, body="<html></html>")
         responses.add(
             responses.POST, CASEMAIL_LOGIN_URL, body="<html>bad</html>"
         )

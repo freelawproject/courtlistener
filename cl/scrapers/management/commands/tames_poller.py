@@ -11,22 +11,20 @@ backfill infrastructure from back_scrape_dockets. Each cycle:
 import json
 import time
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import requests
+from celery import chain
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from juriscraper.state.texas import (
-    TexasCourtOfCriminalAppealsScraper,
-    TexasSupremeCourtScraper,
-)
-from juriscraper.state.texas.court_of_appeals import (
-    TexasCourtOfAppealsScraper,
-)
 from juriscraper.state.texas.tames import TAMESScraper
 from lxml import etree
 
-from cl.corpus_importer.tasks import MergeResult, merge_texas_docket
+from cl.corpus_importer.tasks import (
+    TAMES_PENDING_SUBSCRIPTIONS_KEY,
+    texas_corpus_download_task,
+    texas_ingest_docket_task,
+)
 from cl.lib.command_utils import logger
 from cl.lib.exceptions import SubscriptionFailure
 from cl.lib.redis_utils import get_redis_interface
@@ -47,8 +45,6 @@ CASEMAIL_MESSAGE_XPATH = (
     "//span[@id='ctl00_ctl00_BaseContentPlaceHolder1"
     "_ContentPlaceHolder1_lblMessage']/font"
 )
-TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
-
 shutdown_requested = False
 
 
@@ -70,7 +66,10 @@ def _login_tames(
 
     tree = etree.fromstring(resp.text, etree.HTMLParser())
     payload: dict[str, str] = {}
-    for input_tag in tree.xpath("//input[@type='hidden']"):
+    hidden_elements = cast(
+        list[etree._Element], tree.xpath("//input[@type='hidden']")
+    )
+    for input_tag in hidden_elements:
         if name := input_tag.get("name"):
             payload[name] = input_tag.get("value", "")
 
@@ -95,9 +94,7 @@ def _login_tames(
         raise SubscriptionFailure("Login failed.")
 
 
-def subscribe_pending_cases(
-    redis, tames_user: dict[str, str]
-) -> None:
+def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
     """Subscribe to all pending TAMES cases in the Redis SET.
 
     Logs in once, iterates through every member of the pending-subscriptions
@@ -160,10 +157,9 @@ def subscribe_pending_cases(
                 case_number,
                 message,
             )
-            date_filed = datetime.strptime(
-                case["date_filed"], "%m/%d/%Y"
-            ).date()
-            successful_dates.add(date_filed)
+            successful_dates.add(
+                datetime.strptime(case["date_filed"], "%m/%d/%Y").date()
+            )
             succeeded.append(member)
         except Exception:
             logger.exception(
@@ -195,41 +191,6 @@ def subscribe_pending_cases(
         len(succeeded),
         still_pending,
     )
-
-
-def parse_and_merge_texas_docket(
-    html_content: str, court_code: str
-) -> MergeResult:
-    """Parse a Texas docket HTML page and merge it into the database.
-
-    :param html_content: The HTML content of the docket page.
-    :param court_code: The TAMES court code (e.g., "cossup", "coscca",
-        "coa01").
-    :return: The result of the merge operation.
-    """
-    match court_code:
-        case "cossup":
-            parser = TexasSupremeCourtScraper()
-        case "coscca":
-            parser = TexasCourtOfCriminalAppealsScraper()
-        case code if code.startswith("coa"):
-            parser = TexasCourtOfAppealsScraper(court_code)
-        case _:
-            logger.error(
-                "Unrecognized Texas court code %s. Cannot parse docket.",
-                court_code,
-            )
-            return MergeResult.failed()
-
-    try:
-        parser._parse_text(html_content)
-    except Exception:
-        logger.exception(
-            "Error parsing Texas docket with court code %s", court_code
-        )
-        return MergeResult.failed()
-
-    return merge_texas_docket(parser.data)
 
 
 class Command(BaseCommand):
@@ -310,7 +271,7 @@ class Command(BaseCommand):
 
         if not settings.TAMES_USER:  # type: ignore[misc]
             raise CommandError("TAMES_USER must be set.")
-        tames_user: dict[str, str] = json.loads(settings.TAMES_USER)
+        tames_user: dict[str, str] = json.loads(settings.TAMES_USER)  # type: ignore[misc]
 
         redis = get_redis_interface("CACHE")
         courts = (
@@ -402,7 +363,6 @@ class Command(BaseCommand):
                 request_manager=search_request_manager
             )
 
-            new_case_count = 0
             case_count = 0
             for case in backfill_scraper.backfill(
                 courts or backfill_scraper.COURT_IDS,
@@ -419,7 +379,7 @@ class Command(BaseCommand):
                 court_code = case.get("court_code", "")
                 try:
                     case_response = case_request_manager.get(case_url)
-                    save_docket_response(
+                    bucket, base_key = save_docket_response(
                         case_response,
                         SCRAPER_CLASS_NAME,
                         dict(case),
@@ -429,42 +389,35 @@ class Command(BaseCommand):
                     logger.exception("Failed to fetch case URL %s", case_url)
                     continue
 
-                try:
-                    result = parse_and_merge_texas_docket(
-                        case_response.text, court_code
-                    )
-                except Exception:
-                    logger.exception("Failed to merge case %s", case_url)
-                else:
-                    if result.create and result.pk is not None:
-                        redis.sadd(
-                            TAMES_PENDING_SUBSCRIPTIONS_KEY,
-                            json.dumps(
-                                {
-                                    "court": court_code,
-                                    "case": case.get(
-                                        "case_number", ""
-                                    ),
-                                    "date_filed": case.get(
-                                        "date_filed", ""
-                                    ),
-                                },
-                                sort_keys=True,
-                            ),
-                        )
-                        new_case_count += 1
+                subscription_data = json.dumps(
+                    {
+                        "court": court_code,
+                        "case": case.get("case_number", ""),
+                        "date_filed": case.get("date_filed", ""),
+                    },
+                    sort_keys=True,
+                )
+                chain(
+                    texas_corpus_download_task.si(
+                        (bucket, f"{base_key}.html"),
+                        (bucket, f"{base_key}_meta.json"),
+                    ),
+                    texas_ingest_docket_task.s(
+                        subscription_data=subscription_data,
+                    ),
+                ).apply_async()
+
                 case_count += 1
 
                 if case_count % 100 == 0:
-                    logger.info("Processed %d cases", case_count)
+                    logger.info("Dispatched %d cases", case_count)
 
                 if backfill_count is not None and case_count >= backfill_count:
                     break
 
             logger.info(
-                "Backfill complete. Processed %d cases (%d new).",
+                "Backfill complete. Dispatched %d cases.",
                 case_count,
-                new_case_count,
             )
 
         subscribe_pending_cases(redis, tames_user)
