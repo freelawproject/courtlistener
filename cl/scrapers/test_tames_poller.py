@@ -6,13 +6,19 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
 
+import responses
 import time_machine
 from django.conf import settings
 
 from cl.corpus_importer.tasks import MergeResult
 from cl.scrapers.management.commands.tames_poller import (
+    CASEMAIL_CASE_ADD_URL,
+    CASEMAIL_LOGIN_URL,
+    TAMES_PENDING_SUBSCRIPTIONS_KEY,
     Command,
+    subscribe_pending_cases,
 )
+from cl.scrapers.models import AccountSubscription, Scraper
 from cl.search.factories import CourtFactory
 from cl.search.models import Docket
 from cl.tests.cases import TestCase
@@ -20,6 +26,19 @@ from cl.tests.cases import TestCase
 MODULE = "cl.scrapers.management.commands.tames_poller"
 FROZEN_DATE = "2026-03-26"
 TODAY = date(2026, 3, 26)
+
+TAMES_ASSET_DIR = (
+    Path(settings.INSTALL_ROOT)
+    / "cl"
+    / "scrapers"
+    / "test_assets"
+    / "tames_subscription"
+)
+TAMES_USER = {
+    "username": "testuser",
+    "password": "testpass",
+    "email": "test@example.com",
+}
 
 
 def make_search_row(
@@ -105,7 +124,7 @@ class TamesPollerTest(TestCase):
         )
         self.cmd = Command()
         mock.patch(f"{MODULE}.save_docket_response").start()
-        mock.patch(f"{MODULE}.subscribe_to_tames_cases").start()
+        mock.patch(f"{MODULE}.subscribe_pending_cases").start()
         self.addCleanup(mock.patch.stopall)
 
     # ------------------------------------------------------------------
@@ -148,7 +167,7 @@ class TamesPollerTest(TestCase):
         setup_rm(MockRM)
         mock_parse_merge.return_value = MergeResult.created(1)
 
-        self.cmd._poll_cycle(get_options(), self._empty_redis(), None)
+        self.cmd._poll_cycle(get_options(), self._empty_redis(), None, TAMES_USER)
 
         self.assertEqual(
             mock_parse_merge.call_count,
@@ -176,7 +195,7 @@ class TamesPollerTest(TestCase):
         MockTAMES.side_effect = [make_scraper_mock(cases)]
         setup_rm(MockRM)
 
-        self.cmd._poll_cycle(get_options(), self._primed_redis(cases), None)
+        self.cmd._poll_cycle(get_options(), self._primed_redis(cases), None, TAMES_USER)
 
         mock_parse_merge.assert_not_called()
         self.assertEqual(
@@ -216,6 +235,7 @@ class TamesPollerTest(TestCase):
             get_options(case_backfill_days=backfill_days),
             self._empty_redis(),
             None,
+            TAMES_USER,
         )
 
         _, (start, end) = backfill_scraper.backfill.call_args[0]
@@ -255,6 +275,7 @@ class TamesPollerTest(TestCase):
             get_options(case_backfill_count=5, case_backfill_days=None),
             self._empty_redis(),
             None,
+            TAMES_USER,
         )
 
         self.assertEqual(
@@ -296,9 +317,205 @@ class TamesPollerTest(TestCase):
         ]
         setup_rm(MockRM, case_html=case_html)
 
-        self.cmd._poll_cycle(get_options(), self._empty_redis(), None)
+        self.cmd._poll_cycle(get_options(), self._empty_redis(), None, TAMES_USER)
 
         self.assertTrue(
             Docket.objects.filter(docket_number="24-0340").exists(),
             "Docket 24-0340 should exist in the database",
         )
+
+    # ------------------------------------------------------------------
+    # 6. New cases are added to Redis pending set
+    # ------------------------------------------------------------------
+    @mock.patch(f"{MODULE}.parse_and_merge_texas_docket")
+    @mock.patch(f"{MODULE}.RateLimitedRequestManager")
+    @mock.patch(f"{MODULE}.TAMESScraper")
+    def test_new_cases_added_to_redis_set(
+        self,
+        MockTAMES: MagicMock,
+        MockRM: MagicMock,
+        mock_parse_merge: MagicMock,
+    ) -> None:
+        """When a case is newly created, it should be sadd-ed to the
+        pending subscriptions Redis SET."""
+        fresh_cases = make_search_rows(25)
+        backfill_cases = make_search_rows(2)
+
+        MockTAMES.side_effect = [
+            make_scraper_mock(fresh_cases),
+            make_scraper_mock(backfill_cases),
+        ]
+        setup_rm(MockRM)
+        mock_parse_merge.return_value = MergeResult.created(1)
+
+        redis = self._empty_redis()
+        self.cmd._poll_cycle(get_options(), redis, None, TAMES_USER)
+
+        self.assertEqual(
+            redis.sadd.call_count,
+            2,
+            "Each newly created case should be sadd-ed to Redis",
+        )
+        # Verify the key used
+        first_call_key = redis.sadd.call_args_list[0][0][0]
+        self.assertEqual(first_call_key, TAMES_PENDING_SUBSCRIPTIONS_KEY)
+
+
+class SubscribePendingCasesTest(TestCase):
+    """Tests for the subscribe_pending_cases function."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.login_get_html = (TAMES_ASSET_DIR / "login_get.html").read_text()
+        cls.login_post_html = (
+            TAMES_ASSET_DIR / "login_post.html"
+        ).read_text()
+        cls.case_add_success_html = (
+            TAMES_ASSET_DIR / "case_add_success.html"
+        ).read_text()
+
+    def setUp(self) -> None:
+        self.mock_redis = MagicMock()
+        self.tracker = AccountSubscription.objects.create(
+            scraper=Scraper.TAMES,
+            email="test@example.com",
+            user_name="testuser",
+            first_subscription=date(2025, 1, 15),
+            last_subscription=date(2025, 1, 15),
+        )
+
+    def _add_login_responses(self, count: int = 1) -> None:
+        for _ in range(count):
+            responses.add(
+                responses.GET,
+                CASEMAIL_LOGIN_URL,
+                body=self.login_get_html,
+                status=200,
+            )
+            responses.add(
+                responses.POST,
+                CASEMAIL_LOGIN_URL,
+                body=self.login_post_html,
+                status=200,
+            )
+
+    def _add_case_add_response(
+        self, status: int = 200, body: str | None = None
+    ) -> None:
+        responses.add(
+            responses.GET,
+            CASEMAIL_CASE_ADD_URL,
+            body=body or self.case_add_success_html,
+            status=status,
+        )
+
+    def test_empty_set_is_noop(self) -> None:
+        """When the pending set is empty, no login or requests are made."""
+        self.mock_redis.smembers.return_value = set()
+        subscribe_pending_cases(self.mock_redis, TAMES_USER)
+        self.mock_redis.srem.assert_not_called()
+
+    @responses.activate
+    def test_successful_cases_removed_from_redis(self) -> None:
+        """Successful subscriptions are srem-ed and tracker is updated."""
+        case1 = json.dumps(
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            sort_keys=True,
+        )
+        case2 = json.dumps(
+            {"court": "cossup", "case": "24-0002", "date_filed": "02/20/2025"},
+            sort_keys=True,
+        )
+        self.mock_redis.smembers.return_value = {case1, case2}
+
+        self._add_login_responses()
+        self._add_case_add_response()
+        self._add_case_add_response()
+
+        subscribe_pending_cases(self.mock_redis, TAMES_USER)
+
+        self.mock_redis.srem.assert_called_once()
+        call_args = self.mock_redis.srem.call_args
+        self.assertEqual(call_args[0][0], TAMES_PENDING_SUBSCRIPTIONS_KEY)
+        self.assertEqual(set(call_args[0][1:]), {case1, case2})
+        self.tracker.refresh_from_db()
+        self.assertEqual(self.tracker.first_subscription, date(2025, 1, 15))
+        self.assertEqual(self.tracker.last_subscription, date(2025, 2, 20))
+
+    @responses.activate
+    def test_login_failure_leaves_cases_pending(self) -> None:
+        """When login fails, no cases are removed from the set."""
+        case = json.dumps(
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            sort_keys=True,
+        )
+        self.mock_redis.smembers.return_value = {case}
+
+        # Return a page that doesn't have the expected login-success marker
+        responses.add(
+            responses.GET, CASEMAIL_LOGIN_URL, body="<html></html>"
+        )
+        responses.add(
+            responses.POST, CASEMAIL_LOGIN_URL, body="<html>bad</html>"
+        )
+
+        subscribe_pending_cases(self.mock_redis, TAMES_USER)
+
+        self.mock_redis.srem.assert_not_called()
+
+    @responses.activate
+    def test_partial_failure_removes_only_succeeded(self) -> None:
+        """When some cases fail, only succeeded cases are srem-ed."""
+        good = json.dumps(
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            sort_keys=True,
+        )
+        bad = json.dumps(
+            {"court": "cossup", "case": "24-0002", "date_filed": "03/01/2025"},
+            sort_keys=True,
+        )
+        self.mock_redis.smembers.return_value = {good, bad}
+
+        self._add_login_responses()
+
+        def case_add_callback(request):
+            """Return 500 for the bad case, 200 for everything else."""
+            if "24-0002" in request.url:
+                return (500, {}, "Server Error")
+            return (200, {}, self.case_add_success_html)
+
+        responses.add_callback(
+            responses.GET,
+            CASEMAIL_CASE_ADD_URL,
+            callback=case_add_callback,
+        )
+
+        subscribe_pending_cases(self.mock_redis, TAMES_USER)
+
+        self.mock_redis.srem.assert_called_once_with(
+            TAMES_PENDING_SUBSCRIPTIONS_KEY, good
+        )
+
+    @responses.activate
+    @time_machine.travel("2026-03-31", tick=False)
+    def test_new_tracker_uses_case_dates_not_today(self) -> None:
+        """When no tracker exists, dates should reflect the case dates."""
+        self.tracker.delete()
+
+        case = json.dumps(
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            sort_keys=True,
+        )
+        self.mock_redis.smembers.return_value = {case}
+
+        self._add_login_responses()
+        self._add_case_add_response()
+
+        subscribe_pending_cases(self.mock_redis, TAMES_USER)
+
+        tracker = AccountSubscription.objects.get(
+            scraper=Scraper.TAMES, user_name="testuser"
+        )
+        self.assertEqual(tracker.first_subscription, date(2025, 1, 15))
+        self.assertEqual(tracker.last_subscription, date(2025, 1, 15))

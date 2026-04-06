@@ -10,10 +10,11 @@ backfill infrastructure from back_scrape_dockets. Each cycle:
 
 import json
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import requests
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from juriscraper.state.texas import (
     TexasCourtOfCriminalAppealsScraper,
@@ -23,22 +24,177 @@ from juriscraper.state.texas.court_of_appeals import (
     TexasCourtOfAppealsScraper,
 )
 from juriscraper.state.texas.tames import TAMESScraper
+from lxml import etree
 
 from cl.corpus_importer.tasks import MergeResult, merge_texas_docket
 from cl.lib.command_utils import logger
+from cl.lib.exceptions import SubscriptionFailure
 from cl.lib.redis_utils import get_redis_interface
 from cl.scrapers.management.commands.back_scrape_dockets import (
     RateLimitedRequestManager,
     save_docket_response,
 )
-from cl.scrapers.tasks import subscribe_to_tames_cases
+from cl.scrapers.models import AccountSubscription, Scraper
 
 REDIS_KEY = "tames:polling:last_seen_cases"
 REDIS_TTL = 60 * 60 * 24 * 28  # 4 weeks
 FRESHNESS_CHECK_COUNT = 25
 SCRAPER_CLASS_NAME = "TAMESScraper"
 
+CASEMAIL_LOGIN_URL = "https://casemail.txcourts.gov/login.aspx"
+CASEMAIL_CASE_ADD_URL = "https://casemail.txcourts.gov/CaseAdd.aspx"
+CASEMAIL_MESSAGE_XPATH = (
+    "//span[@id='ctl00_ctl00_BaseContentPlaceHolder1"
+    "_ContentPlaceHolder1_lblMessage']/font"
+)
+TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
+
 shutdown_requested = False
+
+
+def _login_tames(
+    session: requests.Session, tames_user: dict[str, str]
+) -> None:
+    """Log in to the TAMES CaseMail system.
+
+    Fetches the login page, extracts ASP.NET hidden fields, and POSTs
+    credentials.
+
+    :param session: A requests session to authenticate.
+    :param tames_user: Dict with "username" and "password" keys.
+    :raises SubscriptionFailure: If login fails.
+    :raises requests.RequestException: If the login request fails.
+    """
+    resp = session.get(CASEMAIL_LOGIN_URL, timeout=30)
+    resp.raise_for_status()
+
+    tree = etree.fromstring(resp.text, etree.HTMLParser())
+    payload: dict[str, str] = {}
+    for input_tag in tree.xpath("//input[@type='hidden']"):
+        if name := input_tag.get("name"):
+            payload[name] = input_tag.get("value", "")
+
+    payload.update(
+        {
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtUserName": tames_user[
+                "username"
+            ],
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$txtPassword": tames_user[
+                "password"
+            ],
+            "ctl00$ctl00$BaseContentPlaceHolder1$ContentPlaceHolder1$cmdLogon": "Logon",
+        }
+    )
+
+    resp = session.post(CASEMAIL_LOGIN_URL, data=payload, timeout=30)
+    resp.raise_for_status()
+    if (
+        "ctl00_ctl00_BaseContentPlaceHolder1_ContentPlaceHolder1_gvCaseWatch"
+        not in resp.text
+    ):
+        raise SubscriptionFailure("Login failed.")
+
+
+def subscribe_pending_cases(
+    redis, tames_user: dict[str, str]
+) -> None:
+    """Subscribe to all pending TAMES cases in the Redis SET.
+
+    Logs in once, iterates through every member of the pending-subscriptions
+    SET, attempts to subscribe, and removes successful cases. Failed cases
+    remain in the SET for the next poll cycle.
+
+    :param redis: Redis interface (CACHE).
+    :param tames_user: Dict with "username", "password", "email" keys.
+    """
+    pending_members = redis.smembers(TAMES_PENDING_SUBSCRIPTIONS_KEY)
+    if not pending_members:
+        return
+
+    logger.info(
+        "Attempting subscription for %d pending cases.",
+        len(pending_members),
+    )
+
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Free Law Project"})
+
+    try:
+        _login_tames(session, tames_user)
+    except (requests.RequestException, SubscriptionFailure):
+        logger.warning(
+            "TAMES CaseMail login failed. %d cases remain pending.",
+            len(pending_members),
+        )
+        return
+
+    html_parser = etree.HTMLParser()
+    succeeded: list[str] = []
+    successful_dates: set[date] = set()
+
+    for member in pending_members:
+        case = json.loads(member)
+        court = case["court"]
+        case_number = case["case"]
+        try:
+            resp = session.get(
+                CASEMAIL_CASE_ADD_URL,
+                params={
+                    "coa": court,
+                    "FullCaseNumber": case_number,
+                    "cID": court,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            tree = etree.fromstring(resp.text, html_parser)
+            messages = tree.xpath(CASEMAIL_MESSAGE_XPATH)
+            message = "No message found"
+            if isinstance(messages, list) and messages:
+                first_msg = messages[0]
+                if isinstance(first_msg, etree._Element):
+                    message = first_msg.text or message
+            logger.info(
+                "TAMES subscription for %s/%s: %s",
+                court,
+                case_number,
+                message,
+            )
+            date_filed = datetime.strptime(
+                case["date_filed"], "%m/%d/%Y"
+            ).date()
+            successful_dates.add(date_filed)
+            succeeded.append(member)
+        except Exception:
+            logger.exception(
+                "Failed to subscribe to TAMES case %s/%s",
+                court,
+                case_number,
+            )
+
+    if succeeded:
+        redis.srem(TAMES_PENDING_SUBSCRIPTIONS_KEY, *succeeded)
+
+    if successful_dates:
+        subscription_tracker, _created = (
+            AccountSubscription.objects.get_or_create(
+                scraper=Scraper.TAMES,
+                user_name=tames_user["username"],
+                defaults={
+                    "email": tames_user["email"],
+                    "first_subscription": min(successful_dates),
+                    "last_subscription": max(successful_dates),
+                },
+            )
+        )
+        subscription_tracker.include_subscriptions(successful_dates)
+
+    still_pending = len(pending_members) - len(succeeded)
+    logger.info(
+        "Subscription complete: %d succeeded, %d still pending.",
+        len(succeeded),
+        still_pending,
+    )
 
 
 def parse_and_merge_texas_docket(
@@ -152,6 +308,10 @@ class Command(BaseCommand):
                 "--case-backfill-days must be specified."
             )
 
+        if not settings.TAMES_USER:  # type: ignore[misc]
+            raise CommandError("TAMES_USER must be set.")
+        tames_user: dict[str, str] = json.loads(settings.TAMES_USER)
+
         redis = get_redis_interface("CACHE")
         courts = (
             [c.strip() for c in options["courts"].split(",")]
@@ -166,7 +326,7 @@ class Command(BaseCommand):
         )
 
         while not shutdown_requested:
-            self._poll_cycle(options, redis, courts)
+            self._poll_cycle(options, redis, courts, tames_user)
 
             logger.info(
                 "Sleeping %d minutes before next poll.",
@@ -185,6 +345,7 @@ class Command(BaseCommand):
         options: dict[str, Any],
         redis,
         courts: list[str] | None,
+        tames_user: dict[str, str],
     ) -> None:
         today = date.today()
         poll_start = today - timedelta(days=options["poll_window_days"])
@@ -217,6 +378,7 @@ class Command(BaseCommand):
 
             if cached_urls and fresh_urls == cached_urls:
                 logger.info("No new cases detected. Skipping backfill.")
+                subscribe_pending_cases(redis, tames_user)
                 return
 
             logger.info(
@@ -240,7 +402,7 @@ class Command(BaseCommand):
                 request_manager=search_request_manager
             )
 
-            new_cases_for_subscription: list[dict[str, str]] = []
+            new_case_count = 0
             case_count = 0
             for case in backfill_scraper.backfill(
                 courts or backfill_scraper.COURT_IDS,
@@ -275,13 +437,22 @@ class Command(BaseCommand):
                     logger.exception("Failed to merge case %s", case_url)
                 else:
                     if result.create and result.pk is not None:
-                        new_cases_for_subscription.append(
-                            {
-                                "court": court_code,
-                                "case": case.get("case_number", ""),
-                                "date_filed": case.get("date_filed", ""),
-                            }
+                        redis.sadd(
+                            TAMES_PENDING_SUBSCRIPTIONS_KEY,
+                            json.dumps(
+                                {
+                                    "court": court_code,
+                                    "case": case.get(
+                                        "case_number", ""
+                                    ),
+                                    "date_filed": case.get(
+                                        "date_filed", ""
+                                    ),
+                                },
+                                sort_keys=True,
+                            ),
                         )
+                        new_case_count += 1
                 case_count += 1
 
                 if case_count % 100 == 0:
@@ -293,15 +464,10 @@ class Command(BaseCommand):
             logger.info(
                 "Backfill complete. Processed %d cases (%d new).",
                 case_count,
-                len(new_cases_for_subscription),
+                new_case_count,
             )
 
-        if new_cases_for_subscription:
-            subscribe_to_tames_cases.delay(new_cases_for_subscription)
-            logger.info(
-                "Queued subscription for %d new cases.",
-                len(new_cases_for_subscription),
-            )
+        subscribe_pending_cases(redis, tames_user)
 
         # -- Update Redis ------------------------------------------------------
         redis.set(
