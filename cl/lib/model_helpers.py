@@ -175,6 +175,42 @@ def is_texas_court(court_id: str) -> bool:
     )
 
 
+def normalize_texas_appellate_docket_number(docket_number: str) -> str:
+    """Normalizes a Texas appellate docket number pulled from the Appellate
+    Case Information table. Returns the original docket number with normalized
+    dashes and converted to lowercase if it can't be normalized into an
+    appellate docket number.
+
+    :param docket_number: The docket number to clean.
+    :return: The cleaned docket number."""
+
+    docket_number = normalize_dashes(docket_number.lower().strip())
+    cr_ending = docket_number.endswith("cr")
+    cv_ending = docket_number.endswith("cv")
+    if docket_number.endswith("r") and not cr_ending:
+        docket_number = docket_number[:-1] + "cr"
+        cr_ending = True
+    if docket_number.endswith("v") and not cv_ending:
+        docket_number = docket_number[:-1] + "cv"
+        cv_ending = True
+    if not cr_ending and not cv_ending:
+        return docket_number
+    parts = [part for part in docket_number.split("-") if part]
+    if len(parts) < 2:
+        return docket_number
+    suffix = parts.pop()
+    if not all(part.isdigit() for part in parts):
+        return docket_number
+    # Three numeric parts (e.g. "09-01-404"): zero-pad to NN-NN-NNNNN
+    if len(parts) == 3:
+        return f"{int(parts[0]):0>2}-{int(parts[1]):0>2}-{int(parts[2]):0>5}-{suffix}"
+    # Joined digits total 9 (e.g. "0199-01326"): re-slice to NN-NN-NNNNN
+    joined = "".join(parts)
+    if len(joined) == 9:
+        return f"{joined[:2]}-{joined[2:4]}-{joined[4:]}-{suffix}"
+    return docket_number
+
+
 def clean_texas_docket_number(docket_number: str | None) -> str:
     """Clean a Texas docket number by extracting the valid docket number
     from potentially dirty input using Juriscraper's regex patterns.
