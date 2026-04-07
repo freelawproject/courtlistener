@@ -3173,7 +3173,8 @@ class TexasMergerTest(TestCase):
 
         appeals_court = TexasAppellateCourtInfoDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
-            case_number=self.docket_number_coa1,
+            _n_cases=1,
+            case_number=[self.docket_number_coa1],
         )
         docket_data = TexasFinalCourtDocketDictFactory(
             court_id=CourtID.SUPREME_COURT.value,
@@ -3188,14 +3189,18 @@ class TexasMergerTest(TestCase):
         assert result.create is True
 
         transfers = CaseTransfer.objects.all()
-        assert transfers.count() == 1
+        self.assertEqual(transfers.count(), 1)
         transfer = transfers.first()
-        assert transfer.destination_court == self.texas_sc
-        assert transfer.destination_docket_number == docket_sc.docket_number
-        assert transfer.origin_court == self.texas_coa1
-        assert transfer.origin_docket_number == self.docket_number_coa1
-        assert transfer.transfer_type == CaseTransfer.APPEAL
-        assert transfer.transfer_date == docket_data["date_filed"]
+        self.assertEqual(transfer.destination_court, self.texas_sc)
+        self.assertEqual(
+            transfer.destination_docket_number, docket_sc.docket_number
+        )
+        self.assertEqual(transfer.origin_court, self.texas_coa1)
+        self.assertEqual(
+            transfer.origin_docket_number, self.docket_number_coa1
+        )
+        self.assertEqual(transfer.transfer_type, CaseTransfer.APPEAL)
+        self.assertEqual(transfer.transfer_date, docket_data["date_filed"])
 
     def test_merge_texas_case_transfers_cca_from_appellate(self):
         """Can we create a CaseTransfer for CCA from appellate court?"""
@@ -3203,7 +3208,8 @@ class TexasMergerTest(TestCase):
 
         appeals_court = TexasAppellateCourtInfoDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
-            case_number=self.docket_number_coa1,
+            _n_cases=1,
+            case_number=[self.docket_number_coa1],
         )
         docket_data = TexasFinalCourtDocketDictFactory(
             court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
@@ -3218,13 +3224,17 @@ class TexasMergerTest(TestCase):
         assert result.create is True
 
         transfers = CaseTransfer.objects.all()
-        assert transfers.count() == 1
+        self.assertEqual(transfers.count(), 1)
         transfer = transfers.first()
-        assert transfer.destination_court == self.texas_cca
-        assert transfer.destination_docket_number == docket_cca.docket_number
-        assert transfer.origin_court == self.texas_coa1
-        assert transfer.origin_docket_number == self.docket_number_coa1
-        assert transfer.transfer_type == CaseTransfer.APPEAL
+        self.assertEqual(transfer.destination_court, self.texas_cca)
+        self.assertEqual(
+            transfer.destination_docket_number, docket_cca.docket_number
+        )
+        self.assertEqual(transfer.origin_court, self.texas_coa1)
+        self.assertEqual(
+            transfer.origin_docket_number, self.docket_number_coa1
+        )
+        self.assertEqual(transfer.transfer_type, CaseTransfer.APPEAL)
 
     def test_merge_texas_case_transfers_cca_death_penalty_direct_appeal(
         self,
@@ -3309,6 +3319,22 @@ class TexasMergerTest(TestCase):
 
         transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
+
+    def test_merge_texas_case_transfers_multiple(self):
+        """Can we correctly handle multiple appellate transfers on one docket?"""
+
+        aci = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value, _n_cases=3
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            appeals_court=aci,
+            is_direct_appeal=False,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        transfers = CaseTransfer.objects.all()
+        self.assertEqual(transfers.count(), 3)
 
     def test_merge_texas_case_transfers_appellate_with_unknown_workload_transfer_court(
         self,

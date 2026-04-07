@@ -4576,13 +4576,13 @@ def merge_texas_case_transfers(
 
     originating_court = docket_data["originating_court"]
     oc_type = originating_court["court_type"]
-    oc_dn = originating_court["case"]
+    oc_dn: str = originating_court["case"]
     appeals_court = docket_data.get("appeals_court", {})
     ac_id = appeals_court.get("court_id", "")
-    ac_dn = appeals_court.get("case_number", "")
+    ac_dns: list[str] = appeals_court.get("case_number", [])
     trial_court_id = texas_originating_court_to_court_id(originating_court)
     appeal_transfer_origin_court_id: str | None = ""
-    appeal_transfer_origin_dn = ""
+    appeal_transfer_origin_dns: list[str] = []
 
     transfers = []
 
@@ -4604,7 +4604,7 @@ def merge_texas_case_transfers(
                 )
                 return MergeResult.failed()
 
-            appeal_transfer_origin_dn = oc_dn
+            appeal_transfer_origin_dns = [oc_dn]
             appeal_transfer_origin_court_id = trial_court_id
         case CourtID.COURT_OF_CRIMINAL_APPEALS.value:
             logger.info(
@@ -4612,7 +4612,7 @@ def merge_texas_case_transfers(
                 docket.docket_number,
             )
 
-            appeal_transfer_origin_dn = ac_dn
+            appeal_transfer_origin_dns = ac_dns
             appeal_transfer_origin_court_id = texas_js_court_id_to_court_id(
                 ac_id
             )
@@ -4630,21 +4630,21 @@ def merge_texas_case_transfers(
                 docket.docket_number,
             )
 
-            appeal_transfer_origin_dn = oc_dn
+            appeal_transfer_origin_dns = [oc_dn]
             appeal_transfer_origin_court_id = trial_court_id
         case CourtID.SUPREME_COURT.value:
             logger.info("Docket %s is a SC docket", docket.docket_number)
             appeal_transfer_origin_court_id = texas_js_court_id_to_court_id(
                 ac_id
             )
-            appeal_transfer_origin_dn = ac_dn
+            appeal_transfer_origin_dns = ac_dns
         case _ if docket_data["court_type"] == CourtType.APPELLATE.value:
             logger.info(
                 "Docket %s is an appellate docket", docket.docket_number
             )
 
             appeal_transfer_origin_court_id = trial_court_id
-            appeal_transfer_origin_dn = oc_dn
+            appeal_transfer_origin_dns = [oc_dn]
 
             transfer_from = docket_data.get("transfer_from")
             if transfer_from:
@@ -4722,7 +4722,7 @@ def merge_texas_case_transfers(
                 appeal_transfer_origin_court_id,
             )
         else:
-            transfers.append(
+            transfers.extend(
                 CaseTransfer(
                     destination_court=docket.court,
                     destination_docket_number=docket.docket_number,
@@ -4732,6 +4732,7 @@ def merge_texas_case_transfers(
                     transfer_date=docket_data["date_filed"],
                     transfer_type=CaseTransfer.APPEAL,
                 )
+                for appeal_transfer_origin_dn in appeal_transfer_origin_dns
             )
 
     results = [merge_case_transfer(transfer) for transfer in transfers]
