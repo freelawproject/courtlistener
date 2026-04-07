@@ -31,8 +31,8 @@ ENV \
     # Unbuffer Python output for instant logging
     PYTHONUNBUFFERED=1
 
-ARG BUILD_ENV=prod
 FROM build-base AS python-base
+ARG BUILD_ENV=prod
 
 WORKDIR /opt/courtlistener
 

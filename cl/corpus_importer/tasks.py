@@ -3869,23 +3869,17 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     process_scotus_docket.delay(docket_data)
 
 
-@app.task(
-    bind=True,
-    ignore_result=True,
-    # No retries because download_pdf_in_stream already has retry logic
-)
-@throttle_task("2/s")
-def download_texas_document_pdf(
-    self: Task, texas_document_pk: int
+def _download_texas_document_pdf(
+    task: Task, texas_document_pk: int
 ) -> int | None:
-    """Download a PDF and return its path.
+    """Download a Texas document PDF and save it locally.
 
-    :param self: The Celery task instance.
+    :param task: The Celery task instance (used to break the chain on failure).
     :param texas_document_pk: The primary key of the TexasDocument instance to
     update the attachment for.
-
     :return: The primary key of the downloaded TexasDocument instance, or None
-    if the process failed."""
+    if the process failed.
+    """
     try:
         texas_document = TexasDocument.objects.get(pk=texas_document_pk)
     except TexasDocument.DoesNotExist:
@@ -3893,7 +3887,7 @@ def download_texas_document_pdf(
             "Texas document PDF download: TexasDocument %s does not exist; skipping.",
             texas_document_pk,
         )
-        self.request.chain = None
+        task.request.chain = None
         return None
 
     url = texas_document.url
@@ -3910,7 +3904,7 @@ def download_texas_document_pdf(
                 texas_document.pk,
                 url,
             )
-            self.request.chain = None
+            task.request.chain = None
             return None
         tmp, sha1_hash = result
         filename = (
@@ -3927,6 +3921,45 @@ def download_texas_document_pdf(
             texas_document.page_count = int(response.text)
         texas_document.save()
         return texas_document_pk
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+    # No retries because download_pdf_in_stream already has retry logic
+)
+@throttle_task("2/s")
+def download_texas_document_pdf(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Throttled version of the Texas document PDF download task.
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance.
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed.
+    """
+    return _download_texas_document_pdf(self, texas_document_pk)
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+)
+def download_texas_document_pdf_unthrottled(
+    self: Task, texas_document_pk: int
+) -> int | None:
+    """Unthrottled version of the Texas document PDF download task.
+
+    Use this when the caller already handles throttling (e.g. via
+    CeleryThrottle).
+
+    :param self: The Celery task instance.
+    :param texas_document_pk: The primary key of the TexasDocument instance.
+    :return: The primary key of the downloaded TexasDocument instance, or None
+    if the process failed.
+    """
+    return _download_texas_document_pdf(self, texas_document_pk)
 
 
 class MergeResult[T = int](NamedTuple):
@@ -4485,7 +4518,7 @@ def merge_texas_docket_originating_court(
             "Skipping merge of OCI for Texas docket %s due to unknown originating court type.",
             docket.docket_number,
         )
-        return MergeResult.failed()
+        return MergeResult.unnecessary(None)
 
     created = False
     if not docket.originating_court_information:
@@ -4590,7 +4623,7 @@ def merge_texas_case_transfers(
                     docket.docket_number,
                 )
 
-                return MergeResult.failed()
+                return MergeResult.unnecessary(None)
 
             logger.warning(
                 "Found Texas SC docket with originating information but no appellate information (docket number %s). Falling back to using trial court to create appeal type transfer.",
@@ -4633,36 +4666,42 @@ def merge_texas_case_transfers(
                     transfer_from["court_id"]
                 )
 
-                try:
-                    coa_transfer_origin_court = Court.objects.get(
-                        pk=coa_transfer_origin_court_id
-                    )
-                except Court.DoesNotExist:
-                    logger.error(
-                        "Court with ID %s not found while populating CaseTransfer.origin_court.",
-                        coa_transfer_origin_court_id,
+                if not coa_transfer_origin_court_id:
+                    logger.warning(
+                        "Could not determine origin court for workload transfer of docket %s. Skipping workload transfer.",
+                        docket.docket_number,
                     )
                 else:
-                    # Texas Government Code 73.001 (accessed 2026-02-23)
-                    coa_transfer_type = (
-                        CaseTransfer.JURISDICTION
-                        if docket_data["court_id"]
-                        == CourtID.FIFTEENTH_COURT_OF_APPEALS.value
-                        else CaseTransfer.WORKLOAD
-                    )
-                    transfers.append(
-                        CaseTransfer(
-                            origin_court=coa_transfer_origin_court,
-                            origin_docket_number=transfer_from[
-                                "origin_docket"
-                            ],
-                            destination_court=docket.court,
-                            destination_docket_number=docket.docket_number,
-                            destination_docket=docket,
-                            transfer_date=coa_transfer_date,
-                            transfer_type=coa_transfer_type,
+                    try:
+                        coa_transfer_origin_court = Court.objects.get(
+                            pk=coa_transfer_origin_court_id
                         )
-                    )
+                    except Court.DoesNotExist:
+                        logger.error(
+                            "Court with ID %s not found while populating CaseTransfer.origin_court.",
+                            coa_transfer_origin_court_id,
+                        )
+                    else:
+                        # Texas Government Code 73.001 (accessed 2026-02-23)
+                        coa_transfer_type = (
+                            CaseTransfer.JURISDICTION
+                            if docket_data["court_id"]
+                            == CourtID.FIFTEENTH_COURT_OF_APPEALS.value
+                            else CaseTransfer.WORKLOAD
+                        )
+                        transfers.append(
+                            CaseTransfer(
+                                origin_court=coa_transfer_origin_court,
+                                origin_docket_number=transfer_from[
+                                    "origin_docket"
+                                ],
+                                destination_court=docket.court,
+                                destination_docket_number=docket.docket_number,
+                                destination_docket=docket,
+                                transfer_date=coa_transfer_date,
+                                transfer_type=coa_transfer_type,
+                            )
+                        )
         case _:
             logger.error(
                 "Unrecognized Texas court ID %s and type %s while creating CaseTransfer",
