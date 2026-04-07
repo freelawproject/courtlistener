@@ -1,0 +1,296 @@
+{% load component_tags svg_tags %}
+{% require_script "js/alpine/components/docket_filter.js" %}
+{% require_script "js/third_party/flatpickr/flatpickr@4.6.13" %}
+
+<c-vars
+  docket=""
+  form=""
+  page_obj=""
+  sort_order_asc="True"
+  htmx_target=""
+  class=""
+/>
+
+<div x-data="docketFilter" class="{{ class }}">
+  {# DESKTOP FORM — hidden on mobile #}
+  <form
+    action=""
+    method="get"
+    class="hidden md:block"
+    {% if htmx_target %}
+      hx-get=""
+      hx-target="{{ htmx_target }}"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+    {% endif %}
+  >
+    {% if form.errors %}
+      <p class="text-sm text-red-700 mb-2">There were errors applying your filters.</p>
+    {% endif %}
+
+    <div class="flex flex-wrap items-end gap-3">
+      {# Search #}
+      <div class="flex-1 max-w-xs">
+        <label for="de-search-desktop" class="sr-only">Search this docket</label>
+        <div class="flex">
+          <input
+            class="input-text rounded-r-none flex-1"
+            id="de-search-desktop"
+            autocomplete="off"
+            type="text"
+            placeholder="Search this docket"
+          />
+          <a
+            href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+            class="btn-primary rounded-l-none px-3"
+            title="Search"
+          >
+            {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
+          </a>
+        </div>
+      </div>
+
+      {# Date range #}
+      <div class="flex items-end gap-2">
+        <div>
+          <label for="filed-after-desktop" class="text-sm font-medium text-greyscale-700">Filed after</label>
+          <input
+            type="text"
+            name="filed_after"
+            id="filed-after-desktop"
+            data-flatpickr-after
+            value="{{ form.filed_after.value|default_if_none:'' }}"
+            class="input-text w-32"
+            placeholder="MM/DD/YYYY"
+          />
+        </div>
+        <div>
+          <label for="filed-before-desktop" class="text-sm font-medium text-greyscale-700">to</label>
+          <input
+            type="text"
+            name="filed_before"
+            id="filed-before-desktop"
+            data-flatpickr-before
+            value="{{ form.filed_before.value|default_if_none:'' }}"
+            class="input-text w-32"
+            placeholder="MM/DD/YYYY"
+          />
+        </div>
+      </div>
+
+      {# Document number range #}
+      <div class="flex items-end gap-2">
+        <div>
+          <label for="entry-gte-desktop" class="text-sm font-medium text-greyscale-700">Doc #</label>
+          <input
+            type="number"
+            name="entry_gte"
+            id="entry-gte-desktop"
+            value="{{ form.entry_gte.value|default_if_none:'' }}"
+            min="0"
+            class="input-text w-20"
+            placeholder="From"
+          />
+        </div>
+        <div>
+          <label for="entry-lte-desktop" class="text-sm font-medium text-greyscale-700">to</label>
+          <input
+            type="number"
+            name="entry_lte"
+            id="entry-lte-desktop"
+            value="{{ form.entry_lte.value|default_if_none:'' }}"
+            min="0"
+            class="input-text w-20"
+            placeholder="To"
+          />
+        </div>
+      </div>
+
+      {# Sort order #}
+      <fieldset class="flex items-end">
+        <legend class="sr-only">Sort order</legend>
+        <div class="flex rounded-lg border border-greyscale-300 overflow-hidden" role="radiogroup" aria-label="Sort order">
+          <label class="flex items-center gap-1 px-3 py-2 text-sm cursor-pointer {% if sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
+            <input type="radio" name="order_by" value="asc" {% if sort_order_asc %}checked{% endif %} class="sr-only" x-on:change="submitForm" />
+            {% svg "chevron" class="w-4 h-4 rotate-180" aria_hidden="true" %}
+            <span class="hidden lg:inline">Asc</span>
+          </label>
+          <label class="flex items-center gap-1 px-3 py-2 text-sm cursor-pointer border-l border-greyscale-300 {% if not sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
+            <input type="radio" name="order_by" value="desc" {% if not sort_order_asc %}checked{% endif %} class="sr-only" x-on:change="submitForm" />
+            {% svg "chevron" class="w-4 h-4" aria_hidden="true" %}
+            <span class="hidden lg:inline">Desc</span>
+          </label>
+        </div>
+      </fieldset>
+
+      {# Prev/Next — submit this form with page param #}
+      <div class="flex items-end gap-1 ml-auto">
+        {% if page_obj.has_previous %}
+          <button type="submit" name="page" value="{{ page_obj.previous_page_number }}" title="Previous page" class="btn-ghost px-2 py-2">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+            <span class="ml-1">Prev</span>
+          </button>
+        {% else %}
+          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+            <span class="ml-1">Prev</span>
+          </span>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <button type="submit" name="page" value="{{ page_obj.next_page_number }}" title="Next page" class="btn-ghost px-2 py-2">
+            <span class="mr-1">Next</span>
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+          </button>
+        {% else %}
+          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+            <span class="mr-1">Next</span>
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+          </span>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="sr-only">Filter</button>
+    </div>
+  </form>
+
+  {# MOBILE — search + prev/next + filter drawer #}
+  <div class="md:hidden">
+    <div class="flex items-end gap-3">
+      {# Search #}
+      <div class="flex-1">
+        <label for="de-search-mobile" class="sr-only">Search this docket</label>
+        <div class="flex">
+          <input
+            class="input-text rounded-r-none flex-1"
+            id="de-search-mobile"
+            autocomplete="off"
+            type="text"
+            placeholder="Search this docket"
+          />
+          <a
+            href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
+            class="btn-primary rounded-l-none px-3"
+            title="Search"
+          >
+            {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
+          </a>
+        </div>
+      </div>
+
+      {# Prev/Next — standalone links on mobile #}
+      <div class="flex items-end gap-1">
+        {% if page_obj.has_previous %}
+          <a href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="btn-ghost px-2 py-2">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+          </a>
+        {% else %}
+          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+          </span>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="btn-ghost px-2 py-2">
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+          </a>
+        {% else %}
+          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Filter drawer — contains its own form #}
+    <c-filter-drawer title="Filters" class="mt-3" {% if form.errors %}data-has-errors{% endif %}>
+      <form
+        action=""
+        method="get"
+        {% if htmx_target %}
+          hx-get=""
+          hx-target="{{ htmx_target }}"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+        {% endif %}
+      >
+        {% if form.errors %}
+          <p class="text-sm text-red-700 mb-3">There were errors applying your filters.</p>
+        {% endif %}
+
+        <div class="flex flex-col gap-4">
+          {# Date range #}
+          <div>
+            <label for="filed-after-mobile" class="text-sm font-medium text-greyscale-700">Filed after</label>
+            <input
+              type="text"
+              name="filed_after"
+              id="filed-after-mobile"
+              value="{{ form.filed_after.value|default_if_none:'' }}"
+              class="input-text w-full mt-1"
+              placeholder="MM/DD/YYYY"
+            />
+          </div>
+          <div>
+            <label for="filed-before-mobile" class="text-sm font-medium text-greyscale-700">Filed before</label>
+            <input
+              type="text"
+              name="filed_before"
+              id="filed-before-mobile"
+              value="{{ form.filed_before.value|default_if_none:'' }}"
+              class="input-text w-full mt-1"
+              placeholder="MM/DD/YYYY"
+            />
+          </div>
+
+          {# Document number range #}
+          <div>
+            <label for="entry-gte-mobile" class="text-sm font-medium text-greyscale-700">Document # from</label>
+            <input
+              type="number"
+              name="entry_gte"
+              id="entry-gte-mobile"
+              value="{{ form.entry_gte.value|default_if_none:'' }}"
+              min="0"
+              class="input-text w-full mt-1"
+              placeholder="From"
+            />
+          </div>
+          <div>
+            <label for="entry-lte-mobile" class="text-sm font-medium text-greyscale-700">Document # to</label>
+            <input
+              type="number"
+              name="entry_lte"
+              id="entry-lte-mobile"
+              value="{{ form.entry_lte.value|default_if_none:'' }}"
+              min="0"
+              class="input-text w-full mt-1"
+              placeholder="To"
+            />
+          </div>
+
+          {# Sort order #}
+          <fieldset>
+            <legend class="text-sm font-medium text-greyscale-700 mb-1">Sort order</legend>
+            <div class="flex rounded-lg border border-greyscale-300 overflow-hidden" role="radiogroup">
+              <label class="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-sm cursor-pointer {% if sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
+                <input type="radio" name="order_by" value="asc" {% if sort_order_asc %}checked{% endif %} class="sr-only" />
+                {% svg "chevron" class="w-4 h-4 rotate-180" aria_hidden="true" %}
+                Ascending
+              </label>
+              <label class="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-sm cursor-pointer border-l border-greyscale-300 {% if not sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
+                <input type="radio" name="order_by" value="desc" {% if not sort_order_asc %}checked{% endif %} class="sr-only" />
+                {% svg "chevron" class="w-4 h-4" aria_hidden="true" %}
+                Descending
+              </label>
+            </div>
+          </fieldset>
+        </div>
+
+        <c-slot name="footer">
+          <button type="submit" class="btn-primary w-full justify-center">
+            Apply filters
+          </button>
+        </c-slot>
+      </form>
+    </c-filter-drawer>
+  </div>
+</div>

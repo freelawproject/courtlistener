@@ -535,7 +535,28 @@ async def validate_for_wot(request: HttpRequest) -> HttpResponse:
 
 
 async def components(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "components.html", {"private": True})
+    # Mock page object for component library demos
+    class MockPaginator:
+        num_pages = 10
+
+    class MockPageObj:
+        number = 3
+        has_previous = True
+        has_next = True
+        has_other_pages = True
+        paginator = MockPaginator()
+
+        def previous_page_number(self) -> int:
+            return self.number - 1
+
+        def next_page_number(self) -> int:
+            return self.number + 1
+
+    return TemplateResponse(
+        request,
+        "components.html",
+        {"private": True, "demo_page_obj": MockPageObj()},
+    )
 
 
 async def ratelimited(

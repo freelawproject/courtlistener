@@ -1,0 +1,99 @@
+{% load humanize svg_tags %}
+
+<c-vars
+  page_obj=""
+  base_url=""
+  show_first=""
+  show_previous=""
+  show_page_indicator=""
+  show_next=""
+  show_last=""
+  class=""
+/>
+
+{% if page_obj.has_other_pages %}
+  <nav aria-label="Pagination" class="flex items-center justify-between gap-2 py-3 {{ class }}">
+    {# Left side: First + Previous #}
+    <div class="flex items-center gap-1">
+      {% if show_first %}
+        {% if page_obj.has_previous %}
+          <a href="{{ base_url }}{% querystring page=1 %}"
+             title="First page"
+             class="btn-outline px-2 py-1.5 hidden md:inline-flex">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+            {% svg "chevron" class="w-4 h-4 rotate-90 -ml-2.5" aria_hidden="true" %}
+            <span class="ml-1">First</span>
+          </a>
+        {% else %}
+          <span class="btn-outline px-2 py-1.5 hidden md:inline-flex opacity-40 pointer-events-none" aria-disabled="true">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+            {% svg "chevron" class="w-4 h-4 rotate-90 -ml-2.5" aria_hidden="true" %}
+            <span class="ml-1">First</span>
+          </span>
+        {% endif %}
+      {% endif %}
+
+      {% if show_previous %}
+        {% if page_obj.has_previous %}
+          <a href="{{ base_url }}{% querystring page=page_obj.previous_page_number %}"
+             rel="prev"
+             title="Previous page"
+             class="btn-outline px-2 py-1.5">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+            <span class="hidden md:inline ml-1">Previous</span>
+          </a>
+        {% else %}
+          <span class="btn-outline px-2 py-1.5 opacity-40 pointer-events-none" aria-disabled="true">
+            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
+            <span class="hidden md:inline ml-1">Previous</span>
+          </span>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {# Center: Page indicator #}
+    {% if show_page_indicator %}
+      <div class="text-sm text-greyscale-700">
+        <span class="hidden sm:inline">Page</span> {{ page_obj.number|intcomma }} of {{ page_obj.paginator.num_pages|intcomma }}
+      </div>
+    {% endif %}
+
+    {# Right side: Next + Last #}
+    <div class="flex items-center gap-1">
+      {% if show_next %}
+        {% if page_obj.has_next %}
+          <a href="{{ base_url }}{% querystring page=page_obj.next_page_number %}"
+             rel="next"
+             title="Next page"
+             class="btn-outline px-2 py-1.5">
+            <span class="hidden md:inline mr-1">Next</span>
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+          </a>
+        {% else %}
+          <span class="btn-outline px-2 py-1.5 opacity-40 pointer-events-none" aria-disabled="true">
+            <span class="hidden md:inline mr-1">Next</span>
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+          </span>
+        {% endif %}
+      {% endif %}
+
+      {% if show_last %}
+        {% if page_obj.has_next %}
+          <a href="{{ base_url }}{% querystring page=page_obj.paginator.num_pages %}"
+             title="Last page"
+             class="btn-outline px-2 py-1.5 hidden md:inline-flex">
+            <span class="mr-1">Last</span>
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+            {% svg "chevron" class="w-4 h-4 -rotate-90 -ml-2.5" aria_hidden="true" %}
+          </a>
+        {% else %}
+          <span class="btn-outline px-2 py-1.5 hidden md:inline-flex opacity-40 pointer-events-none" aria-disabled="true">
+            <span class="mr-1">Last</span>
+            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
+            {% svg "chevron" class="w-4 h-4 -rotate-90 -ml-2.5" aria_hidden="true" %}
+          </span>
+        {% endif %}
+      {% endif %}
+    </div>
+  </nav>
+{% endif %}

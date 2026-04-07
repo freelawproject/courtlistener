@@ -1,0 +1,74 @@
+{% load component_tags svg_tags %}
+{% require_script "js/alpine/composables/utils.js" %}
+{% require_script "js/alpine/components/filter_drawer.js" %}
+{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/ui@3.14.8" defer=True %}
+
+<c-vars
+  title="Filters"
+  class=""
+/>
+
+<div x-data="filterDrawer" x-id="drawerIdGroup" class="md:hidden {{ class }}">
+  {# Trigger button #}
+  <button
+    x-on:click="open"
+    x-bind:aria-controls="drawerId"
+    x-bind:aria-expanded="isOpen"
+    aria-haspopup="dialog"
+    type="button"
+    class="btn-outline"
+  >
+    {% svg "funnel" class="w-4 h-4" aria_hidden="true" %}
+    {{ title }}
+  </button>
+
+  {# Drawer panel #}
+  <div
+    x-show="isOpen"
+    x-bind:id="drawerId"
+    role="dialog"
+    aria-modal="true"
+    x-bind:aria-label="'{{ title }}'"
+    x-on:keyup.esc.stop.prevent="close"
+    x-cloak
+    class="fixed inset-0 z-40 overflow-hidden"
+  >
+    {# Overlay #}
+    <div
+      x-show="isOpen"
+      x-on:click.stop.prevent="close"
+      class="fixed inset-0 bg-greyscale-600/40"
+    ></div>
+
+    {# Panel — slides in from right #}
+    <div
+      x-show="isOpen"
+      x-trap.noscroll="isOpen"
+      class="fixed inset-y-0 right-0 z-50 flex flex-col w-80 max-w-full bg-white shadow-lg"
+    >
+      {# Header #}
+      <div class="flex items-center justify-between px-4 py-3 border-b border-greyscale-200">
+        <h2 class="text-lg font-semibold text-greyscale-900">{{ title }}</h2>
+        <button
+          x-on:click="close"
+          type="button"
+          class="btn-ghost p-1"
+          aria-label="Close filters"
+        >
+          {% svg "cross" class="w-5 h-5" aria_hidden="true" %}
+        </button>
+      </div>
+
+      {# Content — filter fields projected via slot #}
+      <div class="flex-1 overflow-y-auto px-4 py-4">
+        {{ slot }}
+      </div>
+
+      {# Footer with Apply button #}
+      <div class="px-4 py-3 border-t border-greyscale-200">
+        {{ footer }}
+      </div>
+    </div>
+  </div>
+</div>

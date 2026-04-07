@@ -24,6 +24,12 @@
         {'href': '#data-table', 'text': 'Data table'},
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
+        {'href': '#pagination', 'text': 'Pagination'},
+        {'href': '#filter-drawer', 'text': 'Filter drawer'},
+      ]},
+      {'href': '#page-shells', 'text': 'Page shells', 'children': [
+        {'href': '#docket-page', 'text': 'Docket page'},
+        {'href': '#docket-filter', 'text': 'Docket filter'},
       ]},
       {'href': '#pure-markup', 'text': 'Pure markup', 'children': [
       {'href': '#support-banner', 'text': 'Support plea banner'},
@@ -978,6 +984,177 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+
+  {# PAGINATION #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="pagination">
+    <h2 class="mt-6 mb-3">Pagination</h2>
+    <p>Reusable pagination controls with configurable button visibility. Accepts a Django page object and renders first/previous/next/last navigation with a page indicator. All buttons are responsive — labels hide on smaller screens, with <code>title</code> attributes for hover labels.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4">
+      <p class="text-sm text-greyscale-600 mb-2">Full pagination (all buttons):</p>
+      <c-pagination :page_obj="demo_page_obj" show_first="True" show_previous="True" show_page_indicator="True" show_next="True" show_last="True" />
+      <p class="text-sm text-greyscale-600 mb-2 mt-4">Prev/Next only:</p>
+      <c-pagination :page_obj="demo_page_obj" show_previous="True" show_next="True" />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:page_obj</code></c-slot>
+        <c-slot name="description">Django paginator page object (required). Provides <code>number</code>, <code>has_previous</code>, <code>has_next</code>, <code>paginator.num_pages</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>base_url</code></c-slot>
+        <c-slot name="description">Base URL for page links. Defaults to current path.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>show_first</code></c-slot>
+        <c-slot name="description">Show the "First" button. Default: off.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>show_previous</code></c-slot>
+        <c-slot name="description">Show the "Previous" button. Default: off.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>show_page_indicator</code></c-slot>
+        <c-slot name="description">Show the "Page X of Y" text. Default: off.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>show_next</code></c-slot>
+        <c-slot name="description">Show the "Next" button. Default: off.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>show_last</code></c-slot>
+        <c-slot name="description">Show the "Last" button. Default: off.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;!-- Full pagination (bottom of entries) --&gt;
+&lt;c-pagination
+  :page_obj="docket_entries"
+  show_first="True"
+  show_previous="True"
+  show_page_indicator="True"
+  show_next="True"
+  show_last="True"
+/&gt;
+
+&lt;!-- Prev/Next only (in toolbar) --&gt;
+&lt;c-pagination
+  :page_obj="docket_entries"
+  show_previous="True"
+  show_next="True"
+/&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# FILTER DRAWER #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="filter-drawer">
+    <h2 class="mt-6 mb-3">Filter drawer</h2>
+    <p>A mobile slide-in panel for filter controls. Only visible below the <code>md</code> breakpoint. Reuses the dialog composable for open/close, escape key, and auto-close on breakpoint change. Auto-opens when <code>data-has-errors</code> is present.</p>
+
+    <c-library.list title="Props" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>title</code></c-slot>
+        <c-slot name="description">Drawer header text. Default: <code>"Filters"</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Filter form fields rendered inside the drawer body.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>footer</code></c-slot>
+        <c-slot name="description">Footer content, typically an "Apply" submit button.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-filter-drawer title="Filters"&gt;
+  &lt;form action="" method="get"&gt;
+    &lt;!-- Filter fields here --&gt;
+    &lt;c-slot name="footer"&gt;
+      &lt;button type="submit" class="btn-primary w-full justify-center"&gt;
+        Apply filters
+      &lt;/button&gt;
+    &lt;/c-slot&gt;
+  &lt;/form&gt;
+&lt;/c-filter-drawer&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET PAGE SHELL #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-page">
+    <h2 class="mt-6 mb-3">Docket page</h2>
+    <p>Page-specific shell for the docket page. Not a reusable UI component — this encapsulates the docket page layout including title, metadata, and tab navigation. See branch <code>7067-docket-page-2</code>.</p>
+
+    <c-library.list title="Props" only>
+      <p>See component source for full prop list.</p>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Tab content — rendered inside the tab panel area.</c-slot>
+      </c-library.item>
+    </c-library.list>
+  </section>
+
+  {# DOCKET FILTER #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-filter">
+    <h2 class="mt-6 mb-3">Docket filter</h2>
+    <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button.</p>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket</code></c-slot>
+        <c-slot name="description">The Docket model instance (required).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:form</code></c-slot>
+        <c-slot name="description">DocketEntryFilterForm instance.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:page_obj</code></c-slot>
+        <c-slot name="description">Django paginator page object for prev/next controls.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>:sort_order_asc</code></c-slot>
+        <c-slot name="description">Bool — whether ascending sort is active. Default: <code>True</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>htmx_target</code></c-slot>
+        <c-slot name="description">CSS selector for the htmx swap target. When set, the form uses htmx instead of full page navigation.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-filter
+  :docket="docket"
+  :form="form"
+  :page_obj="docket_entries"
+  :sort_order_asc="sort_order_asc"
+  htmx_target="#docket-entries"
+/&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
 
   {# SUPPORT PLEA BANNER #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="support-banner">
