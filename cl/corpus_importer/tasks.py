@@ -4500,7 +4500,7 @@ def merge_texas_docket_originating_court(
 
     if texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["appeals_court"]
-        oc_dn = ocd["case_number"]
+        oc_dn = sorted(ocd["case_number"])[0]
         oc_reporter = ""
         oc_judge = ocd["justice"]
         oc_id = texas_js_court_id_to_court_id(ocd["court_id"])
