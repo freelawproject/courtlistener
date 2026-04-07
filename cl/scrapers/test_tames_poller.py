@@ -16,9 +16,10 @@ from cl.scrapers.management.commands.tames_poller import (
     CASEMAIL_LOGIN_URL,
     Command,
     subscribe_pending_cases,
+    verify_subscription_success,
 )
 from cl.scrapers.models import AccountSubscription, Scraper
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 
 MODULE = "cl.scrapers.management.commands.tames_poller"
 FROZEN_DATE = "2026-03-26"
@@ -95,7 +96,6 @@ def get_options(**overrides: object) -> dict:
     """Return default _poll_cycle options with optional overrides."""
     defaults: dict = {
         "polling_delay": 1,
-        "case_backfill_count": None,
         "case_backfill_days": 3,
         "poll_window_days": 7,
         "courts": None,
@@ -244,19 +244,22 @@ class TamesPollerTest(TestCase):
         )
 
     # ------------------------------------------------------------------
-    # 4. Backfill by count
+    # 4. Backfill stops at cached URL
     # ------------------------------------------------------------------
     @mock.patch(f"{MODULE}.RateLimitedRequestManager")
     @mock.patch(f"{MODULE}.TAMESScraper")
-    def test_backfill_by_count(
+    def test_backfill_stops_at_cached_url(
         self,
         MockTAMES: MagicMock,
         MockRM: MagicMock,
     ) -> None:
-        """With --case-backfill-count the poller should stop dispatching
-        after exactly that many cases, even when more are available."""
-        fresh_cases = make_search_rows(25)
-        backfill_cases = make_search_rows(10)
+        """When the backfill encounters a URL already in the Redis cache,
+        it should stop ingesting further cases."""
+        fresh_cases = make_search_rows(25, start=50)
+        # Backfill yields 10 cases; cases 1-5 are new, 6-10 overlap cache
+        old_cases = make_search_rows(5, start=1)
+        new_cases = make_search_rows(5, start=6)
+        backfill_cases = new_cases + old_cases
 
         MockTAMES.side_effect = [
             make_scraper_mock(fresh_cases),
@@ -266,8 +269,8 @@ class TamesPollerTest(TestCase):
 
         mock_chain = mock.patch(f"{MODULE}.chain").start()
         self.cmd._poll_cycle(
-            get_options(case_backfill_count=5, case_backfill_days=None),
-            self._empty_redis(),
+            get_options(),
+            self._primed_redis(old_cases),
             None,
             TAMES_USER,
         )
@@ -275,7 +278,7 @@ class TamesPollerTest(TestCase):
         self.assertEqual(
             mock_chain.return_value.apply_async.call_count,
             5,
-            "Should stop after dispatching exactly 5 cases",
+            "Should dispatch only the 5 new cases before hitting a cached URL",
         )
 
 
@@ -288,7 +291,7 @@ class SubscribePendingCasesTest(TestCase):
         cls.login_get_html = (TAMES_ASSET_DIR / "login_get.html").read_text()
         cls.login_post_html = (TAMES_ASSET_DIR / "login_post.html").read_text()
         cls.case_add_success_html = (
-            TAMES_ASSET_DIR / "case_add_success.html"
+            TAMES_ASSET_DIR / "casemail_successful_subscription.html"
         ).read_text()
 
     def setUp(self) -> None:
@@ -433,3 +436,102 @@ class SubscribePendingCasesTest(TestCase):
         )
         self.assertEqual(tracker.first_subscription, date(2025, 1, 15))
         self.assertEqual(tracker.last_subscription, date(2025, 1, 15))
+
+    @responses.activate
+    def test_unverified_subscription_not_counted(self) -> None:
+        """When CaseMail returns an unexpected message, the case stays
+        pending and is not counted as succeeded."""
+        case = json.dumps(
+            {"court": "cossup", "case": "24-0001", "date_filed": "01/15/2025"},
+            sort_keys=True,
+        )
+        self.mock_redis.smembers.return_value = {case}
+
+        self._add_login_responses()
+        self._add_case_add_response(
+            body="<html><body>"
+            "<span id='ctl00_ctl00_BaseContentPlaceHolder1"
+            "_ContentPlaceHolder1_lblMessage'>"
+            "Some unexpected error.</span>"
+            "</body></html>"
+        )
+
+        subscribe_pending_cases(self.mock_redis, TAMES_USER)
+
+        self.mock_redis.srem.assert_not_called()
+
+
+class VerifySubscriptionSuccessTest(SimpleTestCase):
+    """Tests for the verify_subscription_success function."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.real_success_html = (
+            TAMES_ASSET_DIR / "casemail_successful_subscription.html"
+        ).read_text()
+
+    def test_real_success_html(self) -> None:
+        """Real CaseMail success response is verified as successful."""
+        success, message = verify_subscription_success(self.real_success_html)
+        self.assertTrue(success)
+        self.assertEqual(message, "Case added successfully.")
+
+    def test_idempotent_already_in_list(self) -> None:
+        """A case already in the watch list is treated as successful."""
+        html = (
+            "<html><body>"
+            "<span id='ctl00_ctl00_BaseContentPlaceHolder1"
+            "_ContentPlaceHolder1_lblMessage'>"
+            "Case not added because it's currently in your list."
+            "</span></body></html>"
+        )
+        success, message = verify_subscription_success(html)
+        self.assertTrue(success)
+        self.assertEqual(
+            message,
+            "Case not added because it's currently in your list.",
+        )
+
+    def test_unexpected_message_is_failure(self) -> None:
+        """An unrecognised message is not treated as success."""
+        html = (
+            "<html><body>"
+            "<span id='ctl00_ctl00_BaseContentPlaceHolder1"
+            "_ContentPlaceHolder1_lblMessage'>"
+            "Something went wrong.</span></body></html>"
+        )
+        success, message = verify_subscription_success(html)
+        self.assertFalse(success)
+        self.assertEqual(message, "Something went wrong.")
+
+    def test_missing_span_is_failure(self) -> None:
+        """HTML with no message span returns failure."""
+        success, message = verify_subscription_success(
+            "<html><body></body></html>"
+        )
+        self.assertFalse(success)
+        self.assertEqual(message, "No message element found")
+
+    def test_empty_message_is_failure(self) -> None:
+        """A span with no text content returns failure."""
+        html = (
+            "<html><body>"
+            "<span id='ctl00_ctl00_BaseContentPlaceHolder1"
+            "_ContentPlaceHolder1_lblMessage'></span></body></html>"
+        )
+        success, message = verify_subscription_success(html)
+        self.assertFalse(success)
+        self.assertEqual(message, "Empty message")
+
+    def test_font_wrapped_message(self) -> None:
+        """Message inside a <font> child of the span is extracted."""
+        html = (
+            "<html><body>"
+            "<span id='ctl00_ctl00_BaseContentPlaceHolder1"
+            "_ContentPlaceHolder1_lblMessage'>"
+            "<font>Case added successfully.</font></span></body></html>"
+        )
+        success, message = verify_subscription_success(html)
+        self.assertTrue(success)
+        self.assertEqual(message, "Case added successfully.")

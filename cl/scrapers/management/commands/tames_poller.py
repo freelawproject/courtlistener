@@ -41,11 +41,48 @@ SCRAPER_CLASS_NAME = "TAMESScraper"
 
 CASEMAIL_LOGIN_URL = "https://casemail.txcourts.gov/login.aspx"
 CASEMAIL_CASE_ADD_URL = "https://casemail.txcourts.gov/CaseAdd.aspx"
-CASEMAIL_MESSAGE_XPATH = (
+CASEMAIL_MESSAGE_SPAN_XPATH = (
     "//span[@id='ctl00_ctl00_BaseContentPlaceHolder1"
-    "_ContentPlaceHolder1_lblMessage']/font"
+    "_ContentPlaceHolder1_lblMessage']"
 )
+CASEMAIL_SUCCESS_MESSAGES = {
+    "Case added successfully.",
+    "Case not added because it's currently in your list.",
+}
 shutdown_requested = False
+
+
+def verify_subscription_success(html: str) -> tuple[bool, str]:
+    """Check whether a CaseMail CaseAdd response indicates success.
+
+    Parses the response HTML and extracts the status message from the
+    lblMessage span.  Both a fresh add and an idempotent "already in
+    your list" response are treated as successful. Note that it is
+    possible to subscribe successfully to cases that do not exist.
+
+    :param html: Raw HTML from the CaseMail CaseAdd endpoint.
+    :returns: ``(is_success, message_text)`` where *message_text* is the
+        extracted message or a fallback description when no message is
+        found.
+    """
+    tree = etree.fromstring(html, etree.HTMLParser())
+    spans = cast(list[etree._Element], tree.xpath(CASEMAIL_MESSAGE_SPAN_XPATH))
+    if not spans:
+        return False, "No message element found"
+
+    span = spans[0]
+    # The message may be directly in the span or inside a <font> child.
+    font_children = cast(list[etree._Element], span.xpath("font"))
+    if font_children:
+        message = font_children[0].text or ""
+    else:
+        message = span.text or ""
+    message = message.strip()
+
+    if not message:
+        return False, "Empty message"
+
+    return message in CASEMAIL_SUCCESS_MESSAGES, message
 
 
 def _login_tames(
@@ -125,7 +162,6 @@ def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
         )
         return
 
-    html_parser = etree.HTMLParser()
     succeeded: list[str] = []
     successful_dates: set[date] = set()
 
@@ -144,19 +180,21 @@ def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
                 timeout=30,
             )
             resp.raise_for_status()
-            tree = etree.fromstring(resp.text, html_parser)
-            messages = tree.xpath(CASEMAIL_MESSAGE_XPATH)
-            message = "No message found"
-            if isinstance(messages, list) and messages:
-                first_msg = messages[0]
-                if isinstance(first_msg, etree._Element):
-                    message = first_msg.text or message
+            success, message = verify_subscription_success(resp.text)
             logger.info(
                 "TAMES subscription for %s/%s: %s",
                 court,
                 case_number,
                 message,
             )
+            if not success:
+                logger.warning(
+                    "Subscription not confirmed for %s/%s: %s",
+                    court,
+                    case_number,
+                    message,
+                )
+                continue
             successful_dates.add(
                 datetime.strptime(case["date_filed"], "%m/%d/%Y").date()
             )
@@ -207,15 +245,9 @@ class Command(BaseCommand):
             help="Minutes to sleep between poll cycles.",
         )
         parser.add_argument(
-            "--case-backfill-count",
-            type=int,
-            default=None,
-            help="Maximum number of cases to backfill per cycle.",
-        )
-        parser.add_argument(
             "--case-backfill-days",
             type=int,
-            default=3,
+            default=1,
             help="Number of days to look back for backfill.",
         )
         parser.add_argument(
@@ -259,15 +291,6 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         global shutdown_requested
-
-        if (
-            options["case_backfill_count"] is None
-            and options["case_backfill_days"] is None
-        ):
-            raise CommandError(
-                "At least one of --case-backfill-count or "
-                "--case-backfill-days must be specified."
-            )
 
         if not settings.TAMES_USER:  # type: ignore[misc]
             raise CommandError("TAMES_USER must be set.")
@@ -315,6 +338,7 @@ class Command(BaseCommand):
         cached_urls: set[str] = (
             set(json.loads(cached_raw)) if cached_raw else set()
         )
+        found_stop = False
 
         with (
             RateLimitedRequestManager(
@@ -348,7 +372,6 @@ class Command(BaseCommand):
             )
 
             # -- Backfill ------------------------------------------------------
-            backfill_count = options["case_backfill_count"]
             backfill_days = options["case_backfill_days"]
 
             if backfill_days is not None:
@@ -375,6 +398,14 @@ class Command(BaseCommand):
                 if not case_url:
                     logger.warning("Case without case_url: %s", case)
                     continue
+
+                if case_url in cached_urls:
+                    logger.info(
+                        "Reached cached case %s. Stopping backfill.",
+                        case_url,
+                    )
+                    found_stop = True
+                    break
 
                 court_code = case.get("court_code", "")
                 try:
@@ -412,13 +443,14 @@ class Command(BaseCommand):
                 if case_count % 100 == 0:
                     logger.info("Dispatched %d cases", case_count)
 
-                if backfill_count is not None and case_count >= backfill_count:
-                    break
-
             logger.info(
                 "Backfill complete. Dispatched %d cases.",
                 case_count,
             )
+            if not found_stop:
+                logger.error(
+                    "Did not find known case when scraping. Likely gap."
+                )
 
         subscribe_pending_cases(redis, tames_user)
 

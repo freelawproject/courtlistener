@@ -110,7 +110,7 @@ class Scraper(models.IntegerChoices):
     TAMES = 1, "TAMES CaseMail"
 
 
-class AccountSubscription(models.Model):
+class AccountSubscription(AbstractDateTimeModel):
     scraper = models.IntegerField(
         help_text="The scraper/site the account is for.",
         choices=Scraper.choices,
