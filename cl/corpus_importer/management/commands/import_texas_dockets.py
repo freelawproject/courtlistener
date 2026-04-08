@@ -23,8 +23,10 @@ class Command(CorpusImporterCommand):
     ) -> Iterable[tuple[tuple[str, str], tuple[str, str]]]:
         meta_rows = filter(
             # Filter only for meta files which are not duplicates (don't end in "_X") and not for search result scrapes
-            lambda r: "searches" not in r[1]
-            and Path(r[1]).name.endswith("_meta.json"),
+            lambda r: (
+                "searches" not in r[1]
+                and Path(r[1]).name.endswith("_meta.json")
+            ),
             map(lambda r: (r[0].strip(), r[1].strip()), csv_reader),
         )
 

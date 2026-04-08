@@ -924,9 +924,9 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
         opinions = []
         for op in soup.find_all(
             lambda tag: (
-                tag.name == "opinion" and tag.get("data-type") is None
+                (tag.name == "opinion" and tag.get("data-type") is None)
+                or tag.get("data-type") == "opinion"
             )
-            or tag.get("data-type") == "opinion"
         ):
             opinions.append(op.text)
         opinion_text = "".join(
@@ -934,9 +934,12 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
                 op.text
                 for op in soup.find_all(
                     lambda tag: (
-                        tag.name == "opinion" and tag.get("data-type") is None
+                        (
+                            tag.name == "opinion"
+                            and tag.get("data-type") is None
+                        )
+                        or tag.get("data-type") == "opinion"
                     )
-                    or tag.get("data-type") == "opinion"
                 )
             ]
         )

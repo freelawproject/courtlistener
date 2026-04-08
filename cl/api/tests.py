@@ -663,8 +663,9 @@ class ApiEventCreationTestCase(TestCase):
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
@@ -696,8 +697,9 @@ class ApiEventCreationTestCase(TestCase):
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        side_effect=lambda *args,
-        **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+        side_effect=lambda *args, **kwargs: (
+            f"{get_logging_prefix(*args, **kwargs)}-Test"
+        ),
     )
     async def test_api_logged_correctly_v4(
         self, mock_logging_prefix, mock_zoho_task
