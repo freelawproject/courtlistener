@@ -11,6 +11,7 @@ from elasticsearch_dsl import DenseVector
 from elasticsearch_dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
+from cl.audio.audio_sources import AudioSources
 from cl.audio.models import Audio
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.custom_filters.templatetags.extras import render_string_or_list
@@ -422,9 +423,8 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
         transformations["local_path"] = lambda x: (
             f"https://storage.courtlistener.com/{x}" if x else ""
         )
-        transformations["source"] = lambda x: dict(ClusterSources.NAMES).get(
-            x, x
-        )
+        _audio_names = dict(AudioSources.NAMES)
+        transformations["source"] = lambda x: _audio_names.get(x, x)
         return transformations
 
     def prepare_absolute_url(self, instance):
@@ -2312,9 +2312,7 @@ class OpinionClusterDocument(
         )
 
         # Add a transformation to compute Human-readable values
-        transformations["source"] = lambda x: dict(ClusterSources.NAMES).get(
-            x, x
-        )
+        transformations["source"] = ClusterSources.get_display_name
         transformations["status"] = lambda x: dict(
             PRECEDENTIAL_STATUS.NAMES
         ).get(x, x)

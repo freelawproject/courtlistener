@@ -129,13 +129,6 @@ class DocketSourceException(Exception):
         self.message = message
 
 
-class ClusterSourceException(Exception):
-    """An exception for wrong cluster source"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
 class DateException(Exception):
     """Error found in date merger."""
 
