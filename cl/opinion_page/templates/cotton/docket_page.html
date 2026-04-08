@@ -35,7 +35,27 @@
   <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
 {% endif %}
 
-{# TODO: Action buttons — blocked on #7063 (button component). Add note, tags, alerts, PACER link. #}
+{# Action buttons — placeholders only. TODO: Refactor with menu button component when that component is available. #}
+<div class="flex flex-wrap gap-2 mt-4">
+  <c-button variant="outline">
+    {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
+    Add a Note
+  </c-button>
+  <c-button variant="outline">
+    {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
+    Tags
+  </c-button>
+  <c-button variant="outline">
+    {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
+    Get Alerts
+  </c-button>
+  {% if docket.pacer_docket_url %}
+    <c-button variant="outline">
+      {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+      View on PACER
+    </c-button>
+  {% endif %}
+</div>
 
 {# METADATA #}
 <c-description-list class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
