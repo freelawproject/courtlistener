@@ -11,6 +11,7 @@ import httpx
 import responses
 from asgiref.sync import async_to_sync
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
 from django.utils.timezone import now
@@ -1623,8 +1624,8 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         # should ignore due to OpinionCluster.source
         self.assertEqual(should_ignore.main_version, None)
 
-    def test_source_merging(self):
-        """Can we merge both Docket and Cluster sources?"""
+    def test_docket_source_merging(self):
+        """Can we merge Docket sources?"""
         self.assertEqual(
             Docket.merge_sources(Docket.SCRAPER, Docket.SCRAPER_AND_HARVARD),
             Docket.SCRAPER_AND_HARVARD,
@@ -1634,31 +1635,202 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             Docket.SCRAPER + Docket.DIRECT_INPUT,
         )
 
-        self.assertEqual(
-            ClusterSources.merge_sources(
-                ClusterSources.COURT_WEBSITE, ClusterSources.COURT_WEBSITE
+    def test_cluster_source_merging_base_plus_base(self):
+        """Merging two base ClusterSources produces the explicit
+        combination."""
+        test_cases = (
+            # (source1, source2, expected)
+            # Same source returns itself
+            (
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COURT_WEBSITE,
             ),
-            ClusterSources.COURT_WEBSITE,
+            # Two-char combinations
+            (
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.PUBLIC_RESOURCE,
+                ClusterSources.COURT_M_RESOURCE,
+            ),
+            (
+                ClusterSources.LAWBOX,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.LAWBOX_M_COURT,
+            ),
+            (
+                ClusterSources.LAWBOX,
+                ClusterSources.PUBLIC_RESOURCE,
+                ClusterSources.LAWBOX_M_RESOURCE,
+            ),
+            (
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.LAWBOX,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.LAWBOX_M_HARVARD,
+            ),
+            (
+                ClusterSources.MANUAL_INPUT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.MANUAL_INPUT_M_HARVARD,
+            ),
+            (
+                ClusterSources.PUBLIC_RESOURCE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.PUBLIC_RESOURCE_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_COURT,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
+            ),
         )
-        self.assertEqual(
-            ClusterSources.merge_sources(
+        for source1, source2, expected in test_cases:
+            with self.subTest(source1=source1, source2=source2):
+                self.assertEqual(
+                    ClusterSources.merge_sources(source1, source2),
+                    expected,
+                )
+                # Order should not matter
+                self.assertEqual(
+                    ClusterSources.merge_sources(source2, source1),
+                    expected,
+                )
+
+    def test_cluster_source_merging_composite_plus_base(self):
+        """Merging a composite ClusterSource with a base source produces the
+        explicit combination."""
+        test_cases = (
+            # (composite, base, expected)
+            # Three-char combinations from composite + base
+            (
+                ClusterSources.COURT_M_RESOURCE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COURT_M_RESOURCE_M_HARVARD,
+            ),
+            (
+                ClusterSources.LAWBOX_M_COURT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.LAWBOX_M_COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.LAWBOX_M_RESOURCE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.LAWBOX_M_RESOURCE_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_LAWBOX_COURT,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_COURT,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX_COURT,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_COURT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+            ),
+            # Four-char combinations from composite + base
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX_COURT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX_M_HARVARD,
                 ClusterSources.COURT_WEBSITE,
                 ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             ),
-            ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
-        )
-        self.assertEqual(
-            ClusterSources.merge_sources(
-                ClusterSources.COURT_WEBSITE, ClusterSources.PUBLIC_RESOURCE
+            (
+                ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             ),
-            ClusterSources.COURT_M_RESOURCE,
-        )
-        self.assertEqual(
-            ClusterSources.merge_sources(
-                ClusterSources.HARVARD_CASELAW, ClusterSources.COLUMBIA_M_COURT
+            # Composite already contains the base source
+            (
+                ClusterSources.COURT_M_HARVARD,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COURT_M_HARVARD,
             ),
-            ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ),
         )
+        for composite, base, expected in test_cases:
+            with self.subTest(composite=composite, base=base):
+                self.assertEqual(
+                    ClusterSources.merge_sources(composite, base),
+                    expected,
+                )
+                # Order should not matter
+                self.assertEqual(
+                    ClusterSources.merge_sources(base, composite),
+                    expected,
+                )
+
+    def test_cluster_source_validator(self):
+        """Does validate_source reject invalid and misordered sources?"""
+        # Valid sources should not raise
+        valid_sources = ("C", "CR", "ZLCU", "CM", "ZLCRMDQAGUS")
+        for source in valid_sources:
+            with self.subTest(source=source):
+                ClusterSources.validate_source(source)
+
+        # Invalid characters
+        invalid_char_cases = (
+            ("X", "completely unknown character"),
+            ("CX", "unknown character mixed with valid"),
+            ("H", "brad heath archive is audio-only"),
+        )
+        for source, reason in invalid_char_cases:
+            with self.subTest(source=source, reason=reason):
+                with self.assertRaises(ValidationError):
+                    ClusterSources.validate_source(source)
+
+        # Wrong canonical order
+        misordered_cases = (
+            ("RC", "should be CR"),
+            ("CZ", "should be ZC"),
+            ("UCLZ", "should be ZLCU"),
+            ("CC", "duplicates collapse in frozenset"),
+        )
+        for source, reason in misordered_cases:
+            with self.subTest(source=source, reason=reason):
+                with self.assertRaises(ValidationError):
+                    ClusterSources.validate_source(source)
 
     def test_string_merging(self):
         """Can we merge strings while reducing repetition?"""
