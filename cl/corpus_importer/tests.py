@@ -100,7 +100,6 @@ from cl.corpus_importer.tasks import (
     probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
-    ClusterSourceException,
     DocketSourceException,
     compare_documents,
     compute_binary_probe_jitter,
@@ -1821,12 +1820,13 @@ class HarvardMergerTests(TestCase):
         cluster_1.refresh_from_db()
         self.assertEqual(cluster_1.source, ClusterSources.COURT_M_HARVARD)
 
-        with self.assertRaises(ClusterSourceException):
-            cluster_2 = OpinionClusterWithParentsFactory(
-                source=ClusterSources.INTERNET_ARCHIVE
-            )
-            update_cluster_source(cluster_2)
-            cluster_2.refresh_from_db()
+        # Any source can now be merged with Harvard deterministically
+        cluster_2 = OpinionClusterWithParentsFactory(
+            source=ClusterSources.INTERNET_ARCHIVE
+        )
+        update_cluster_source(cluster_2)
+        cluster_2.refresh_from_db()
+        self.assertEqual(cluster_2.source, "AU")
 
     def test_merge_strings(self):
         """Can we choose the best string to fill the field?"""
