@@ -98,7 +98,6 @@ from cl.corpus_importer.tasks import (
     probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
-    ClusterSourceException,
     DocketSourceException,
     compare_documents,
     compute_binary_probe_jitter,
@@ -1819,12 +1818,13 @@ class HarvardMergerTests(TestCase):
         cluster_1.refresh_from_db()
         self.assertEqual(cluster_1.source, ClusterSources.COURT_M_HARVARD)
 
-        with self.assertRaises(ClusterSourceException):
-            cluster_2 = OpinionClusterWithParentsFactory(
-                source=ClusterSources.INTERNET_ARCHIVE
-            )
-            update_cluster_source(cluster_2)
-            cluster_2.refresh_from_db()
+        # Any source can now be merged with Harvard deterministically
+        cluster_2 = OpinionClusterWithParentsFactory(
+            source=ClusterSources.INTERNET_ARCHIVE
+        )
+        update_cluster_source(cluster_2)
+        cluster_2.refresh_from_db()
+        self.assertEqual(cluster_2.source, "AU")
 
     def test_merge_strings(self):
         """Can we choose the best string to fill the field?"""
@@ -3309,6 +3309,37 @@ class TexasMergerTest(TestCase):
 
         transfers = CaseTransfer.objects.all()
         assert transfers.count() == 1
+
+    def test_merge_texas_case_transfers_appellate_with_unknown_workload_transfer_court(
+        self,
+    ):
+        """Do we gracefully skip workload transfers when the origin court is unknown?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        transfer_from = TexasAppellateTransferDictFactory(
+            court_id=CourtID.UNKNOWN.value,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=transfer_from,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+
+        # Only the appeal transfer should be created; the workload transfer
+        # should be skipped because the origin court is unknown.
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+        assert transfer.origin_court == texas_district
 
     def test_merge_texas_docket_appellate_sets_appeal_from(self):
         """Does merge_texas_docket set appeal_from for appellate courts?"""

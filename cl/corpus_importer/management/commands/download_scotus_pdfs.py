@@ -7,14 +7,26 @@ from cl.corpus_importer.tasks import download_scotus_document_pdf
 from cl.corpus_importer.utils import paginate_docs_queryset
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.indexing_utils import (
+    get_last_parent_document_id_processed,
+    log_last_document_indexed,
+)
 from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import SCOTUSDocument
+
+
+def compose_redis_key() -> str:
+    """Compose a Redis key for SCOTUS PDF download log.
+    :return: A Redis key as a string.
+    """
+    return "scotus_pdf_download:log"
 
 
 def download_scotus_pdfs(
     download_queue: str,
     delay: float,
     download_order: str = "asc",
+    auto_resume: bool = False,
 ) -> None:
     """Download PDFs for SCOTUSDocuments missing a local file.
 
@@ -24,12 +36,23 @@ def download_scotus_pdfs(
     :param download_queue: The celery queue for download tasks.
     :param delay: Seconds to sleep between scheduling tasks.
     :param download_order: Sort order for the queryset by pk ("asc" or "desc").
+    :param auto_resume: Resume from last pk stored in Redis.
     :return: None
     """
     desc = download_order == "desc"
     docs = SCOTUSDocument.objects.filter(filepath_local="").values_list(
         "pk", flat=True
     )
+
+    if auto_resume:
+        last_pk = get_last_parent_document_id_processed(compose_redis_key())
+        if last_pk:
+            logger.info("Auto-resuming from pk %s.", last_pk)
+            if desc:
+                docs = docs.filter(pk__lt=last_pk)
+            else:
+                docs = docs.filter(pk__gt=last_pk)
+
     count = docs.count()
     logger.info("Found %s SCOTUSDocuments needing download.", count)
     throttle = CeleryThrottle(queue_name=download_queue)
@@ -47,6 +70,7 @@ def download_scotus_pdfs(
                 count,
                 f"{processed_count / count:.0%}",
             )
+            log_last_document_indexed(pk, compose_redis_key())
         time.sleep(delay)
     logger.info(
         "Scheduled %s/%s",
@@ -169,6 +193,12 @@ class Command(VerboseCommand):
             default="asc",
             help="Sort order for downloading documents by pk (default: asc).",
         )
+        parser.add_argument(
+            "--auto-resume",
+            action="store_true",
+            default=False,
+            help="Resume from last pk stored in Redis.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -190,4 +220,7 @@ class Command(VerboseCommand):
             download_queue = options["download_queue"]
             logger.info("Downloading SCOTUSDocument PDFs.")
             download_order = options["download_order"]
-            download_scotus_pdfs(download_queue, delay, download_order)
+            auto_resume = options["auto_resume"]
+            download_scotus_pdfs(
+                download_queue, delay, download_order, auto_resume
+            )
