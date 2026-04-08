@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('search', '0056_trialcourtdata'),
+        ('search', '0057_update_source_field_noop'),
     ]
 
     operations = [
