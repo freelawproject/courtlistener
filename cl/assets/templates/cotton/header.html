@@ -1,4 +1,5 @@
 {% load static svg_tags component_tags %}
+{# frontend-checks-skip: check_hardcoded_ids #}
 
 <c-vars variant request class=""></c-vars>
 
@@ -60,18 +61,18 @@
       />
       <c-corpus-search.input :request="request" only>
         {#    Advanced Filters Trigger Button    #}
-        <button
-          class="btn-outline max-h-9 bg-white max-lg:px-2 aria-expanded:bg-greyscale-200 aria-expanded:ring-greyscale-300 aria-expanded:ring-2"
+        <c-button
+          variant="outline"
           aria-label="Toggle advanced filters panel open/closed"
-          type="button"
           x-on:click="toggleAdvancedFiltersDesktop"
           x-bind:aria-expanded="advancedFiltersExpandedDesktop"
           aria-haspopup="dialog"
           aria-controls="advanced-filters-panel"
+          class="max-h-9 bg-white max-lg:px-2 aria-expanded:bg-greyscale-200 aria-expanded:ring-greyscale-300 aria-expanded:ring-2"
         >
           {% svg "funnel" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
           <span class="max-lg:hidden">Filters</span>
-        </button>
+        </c-button>
       </c-corpus-search.input>
 
       {#   Search Button   #}
@@ -225,14 +226,15 @@
       {#   Signed-out button   #}
       <div class="flex flex-row flex-nowrap items-center">
         {% if request.path != "/sign-out/" %}
-          <a href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" class="btn-ghost md:h-9">Login</a>
+          <c-button variant="ghost" href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" class="md:h-9">Login</c-button>
         {% else %}
-          <a href="{% url "sign-in" %}" class="btn-ghost md:h-9">Login</a>
+          <c-button variant="ghost" href="{% url "sign-in" %}" class="md:h-9">Login</c-button>
         {% endif %}
-        <a
+        <c-button
+          variant="grey"
           href="{% url "register" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}"
-          class="btn-grey md:h-9 {% if variant == 'homepage' %}bg-white{% endif %} "
-        >Sign&nbsp;Up</a>
+          class="md:h-9 {% if variant == 'homepage' %}bg-white{% endif %}"
+        >Sign&nbsp;Up</c-button>
       </div>
     {% endif %}
   </div>

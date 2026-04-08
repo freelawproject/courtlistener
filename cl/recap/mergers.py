@@ -332,7 +332,10 @@ def add_attorney(atty, p, d):
                 )
             except AttorneyOrganization.DoesNotExist:
                 try:
-                    org = AttorneyOrganization.objects.create(**atty_org_info)
+                    with transaction.atomic():
+                        org = AttorneyOrganization.objects.create(
+                            **atty_org_info
+                        )
                 except IntegrityError:
                     # Race condition. Item was created after get. Try again.
                     org = AttorneyOrganization.objects.get(

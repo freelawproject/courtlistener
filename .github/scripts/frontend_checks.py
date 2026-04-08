@@ -10,6 +10,7 @@ Input file must be in git --name-status format (STATUS\\tPATH per line).
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import re
 import sys
 from dataclasses import dataclass
@@ -20,6 +21,37 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 FAIL = "error"
 WARN = "warning"
+
+# ---------------------------------------------------------------------------
+# Per-file skip directives
+# ---------------------------------------------------------------------------
+
+# Checks that can be skipped via {# frontend-checks-skip: ... #} comments.
+# Only advisory/context-dependent checks belong here — security, a11y, and
+# architecture checks must stay enforced.
+SKIPPABLE_CHECKS = {
+    "check_hardcoded_ids",
+    "check_new_stack_leakage",
+    "check_raw_css",
+    "check_include_in_v2",
+}
+
+_skip_directive_re = re.compile(r"\{#\s*frontend-checks-skip:\s*(.+?)\s*#\}")
+
+
+def _parse_skip_checks(lines: list[str]) -> set[str]:
+    """Parse ``{# frontend-checks-skip: ... #}`` comments.
+
+    Returns the intersection of requested skips with SKIPPABLE_CHECKS,
+    so non-allowlisted checks cannot be bypassed.
+    """
+    skip: set[str] = set()
+    for line in lines:
+        m = _skip_directive_re.search(line)
+        if m:
+            skip.update(name.strip() for name in m.group(1).split(","))
+    return skip & SKIPPABLE_CHECKS
+
 
 # ---------------------------------------------------------------------------
 # File classification helpers
@@ -662,7 +694,10 @@ def _apply_checks(
     findings: list[Finding],
 ) -> None:
     """Run a list of (check_fn, severity) pairs and collect findings."""
+    skip_checks = _parse_skip_checks(lines)
     for fn, severity in checks:
+        if fn.__name__ in skip_checks:
+            continue
         for line_no, msg in fn(lines):
             findings.append(
                 Finding(filepath, line_no, fn.__name__, severity, msg)
@@ -922,6 +957,13 @@ def main() -> int:
         default=None,
         help="Write markdown summary to this file (only if findings exist)",
     )
+    parser.add_argument(
+        "--skip-files",
+        nargs="+",
+        default=[],
+        metavar="GLOB",
+        help="Glob patterns for files to skip (e.g. 'cl/assets/templates/v2_foo/*')",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -948,7 +990,10 @@ def main() -> int:
 
     # Filter to relevant files
     relevant = [
-        f for f in changed_files if f.endswith(".html") or is_input_css(f)
+        f
+        for f in changed_files
+        if (f.endswith(".html") or is_input_css(f))
+        and not any(fnmatch.fnmatch(f, g) for g in args.skip_files)
     ]
 
     if not relevant:

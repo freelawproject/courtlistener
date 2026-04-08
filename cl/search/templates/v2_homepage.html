@@ -40,18 +40,18 @@
           <c-corpus-search.mobile.top-controls :request="request" only />
           <c-corpus-search.mobile.dialog class="w-full mt-2" :request="request" :search_form="search_form" form_prefix="mobile" only>
             <c-slot name="trigger_button">
-              <button
+              <c-button
+                variant="outline"
                 x-on:click="open"
                 x-bind:aria-controls="dialogId"
                 x-bind:aria-expanded="isOpen"
                 x-init="openAdvancedFilters"
                 aria-haspopup="dialog"
-                type="button"
-                class="w-full btn-outline bg-white h-12 justify-center text-md text-greyscale-600 gap-2"
+                class="w-full bg-white h-12 justify-center text-md text-greyscale-600 gap-2"
               >
                 {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
                 Filters
-              </button>
+              </c-button>
             </c-slot>
           </c-corpus-search.mobile.dialog>
           <div class="md:hidden w-full py-4">
@@ -126,6 +126,7 @@
         x-on:focus="scrollIntoView"
         href="https://free.law/about"
         target="_blank"
+        rel="noopener noreferrer"
         aria-label="Learn about Free Law Project (opens in new tab)"
         icon="logos/flp_tiny"
       >
