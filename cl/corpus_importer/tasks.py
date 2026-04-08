@@ -3924,11 +3924,6 @@ def _download_texas_document_pdf(
         return texas_document_pk
 
 
-<<<<<<< morgan/texas-casemail
-@dataclass
-class MergeResult[T = int]:
-    """Stores data about the result of an attempted merge operation.
-=======
 @app.task(
     bind=True,
     ignore_result=True,
@@ -3968,9 +3963,9 @@ def download_texas_document_pdf_unthrottled(
     return _download_texas_document_pdf(self, texas_document_pk)
 
 
-class MergeResult[T = int](NamedTuple):
-    """Stores data about the result of an attempted merge operation."""
->>>>>>> main
+@dataclass
+class MergeResult[T = int]:
+    """Stores data about the result of an attempted merge operation.
 
     :ivar creates: Objects which needed to be created. Key is object name and
         value is a list of PKs to created objects.
@@ -4551,11 +4546,7 @@ def merge_texas_docket_originating_court(
             "Skipping merge of OCI for Texas docket %s due to unknown originating court type.",
             docket.docket_number,
         )
-<<<<<<< morgan/texas-casemail
         return MergeResult.failed("OriginatingCourtInformation")
-=======
-        return MergeResult.unnecessary(None)
->>>>>>> main
 
     created = False
     if not docket.originating_court_information:
@@ -4660,11 +4651,7 @@ def merge_texas_case_transfers(
                     docket.docket_number,
                 )
 
-<<<<<<< morgan/texas-casemail
                 return MergeResult.failed("CaseTransfer")
-=======
-                return MergeResult.unnecessary(None)
->>>>>>> main
 
             logger.warning(
                 "Found Texas SC docket with originating information but no appellate information (docket number %s). Falling back to using trial court to create appeal type transfer.",
