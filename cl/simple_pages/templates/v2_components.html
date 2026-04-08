@@ -200,7 +200,7 @@ Sample code here.
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
       :buttons="[
           {
-            'style': 'btn-primary',
+            'variant': 'primary',
             'name': 'Install now',
             'options': [
               {
@@ -214,7 +214,7 @@ Sample code here.
               }
             ]
           }, {
-              'style': 'btn-outline',
+              'variant': 'outline',
               'name': 'Learn more'
           }
         ]"
@@ -241,7 +241,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>buttons</code></c-slot>
-        <c-slot name="description">List of dicts of button properties</c-slot>
+        <c-slot name="description">List of dicts: <code>variant</code> (primary, outline, etc.), <code>name</code>, <code>href</code> (for links), <code>options</code> (list of <code>{name, href, icon}</code> for dropdowns)</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>image_source</code></c-slot>
@@ -266,7 +266,7 @@ Sample code here.
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
      :buttons="[
           {
-            'style': 'btn-primary',
+            'variant': 'primary',
             'name': 'Install now',
             'options': [
               {
@@ -280,7 +280,7 @@ Sample code here.
               }
             ]
           }, {
-              'style': 'btn-outline',
+              'variant': 'outline',
               'name': 'Learn more'
           }
         ]"
