@@ -93,7 +93,7 @@ When adding `x-data` to a template, there MUST be a corresponding `{% require_sc
 
 Omit the extension only for scripts that have minified versions (the tag resolves `.min.js` in production):
 ```html
-{% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/intersect" defer=True %}
 ```
 
 Plugins MUST be deferred (`defer=True`).

@@ -3,11 +3,11 @@ from django.db import models
 from django.urls import reverse
 from model_utils import FieldTracker
 
+from cl.audio.audio_sources import AudioSources
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.models import AbstractDateTimeModel, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.people_db.models import Person
-from cl.search.cluster_sources import ClusterSources
 from cl.search.models import Docket
 
 
@@ -47,10 +47,10 @@ class Audio(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the audio file, one of: {}".format(
-            ", ".join(f"{t[0]} ({t[1]})" for t in ClusterSources.NAMES)
+            ", ".join(f"{t[0]} ({t[1]})" for t in AudioSources.NAMES)
         ),
         max_length=10,
-        choices=ClusterSources.NAMES,
+        choices=AudioSources.NAMES,
         blank=True,
     )
     case_name_short = models.TextField(
