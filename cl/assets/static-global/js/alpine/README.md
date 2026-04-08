@@ -16,6 +16,7 @@ Current version: **3.15.9**
 | Package | CDN URL |
 |---------|---------|
 | `@alpinejs/csp` | https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.15.9/dist/cdn.js |
+| `@alpinejs/anchor` | https://cdn.jsdelivr.net/npm/@alpinejs/anchor@3.15.9/dist/cdn.js |
 | `@alpinejs/collapse` | https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.15.9/dist/cdn.js |
 | `@alpinejs/focus` | https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.15.9/dist/cdn.js |
 | `@alpinejs/intersect` | https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.15.9/dist/cdn.js |
