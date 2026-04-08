@@ -1276,8 +1276,12 @@ Sample code here.
 
     <c-library.list title="Props">
       <c-library.item optional only>
+        <c-slot name="label"><code>button_variant</code></c-slot>
+        <c-slot name="description">Button variant (primary, outline, ghost, grey, dark). Defaults to <code>primary</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
         <c-slot name="label"><code>button_class</code></c-slot>
-        <c-slot name="description">CSS classes for the trigger button. Defaults to <code>btn-primary</code>.</c-slot>
+        <c-slot name="description">Additional CSS classes for the trigger button.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>menu_class</code></c-slot>

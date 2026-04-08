@@ -17,7 +17,7 @@
       <c-slot name="button_content">
         Support&nbsp;FLP
         <span
-          class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+          class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
           aria-hidden="true"
         >{% svg 'chevron' class="w-full h-full text-white" %}
         </span>
@@ -126,7 +126,8 @@
 
     {% if request.user.is_authenticated %}
       <c-menu-button
-        button_class="bg-white btn-outline hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
+        button_variant="outline"
+        button_class="bg-white hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
         menu_class="z-20 w-[--profile-menu-width] border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
         position="bottom-end"
         widget_aria_label="User account menu"
@@ -137,7 +138,7 @@
           {% svg "avatar" class="border-greyscale-300 border rounded-full" aria_hidden="true" %}
           Profile
           <span
-            class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+            class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
             aria-hidden="true"
           >{% svg "chevron" class="w-full h-full text-greyscale-400" %}
           </span>

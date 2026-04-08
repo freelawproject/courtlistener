@@ -4,7 +4,8 @@
 {% require_script "js/alpine/plugins/anchor" defer=True %}
 
 <c-vars
-  button_class="btn-primary"
+  button_variant="primary"
+  button_class=""
   menu_class="z-20 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
   position="bottom-start"
   widget_aria_label="Dropdown menu with trigger button"
@@ -19,14 +20,14 @@
   aria-label="{{ widget_aria_label }}"
 >
   {# trigger button #}
-  <button
+  <c-button
+    variant="{{ button_variant }}"
     x-menu:button
-    type="button"
     aria-label="{{ trigger_aria_label }}"
-    class="{{ button_class }}"
+    class="group {{ button_class }}"
   >
     {{ button_content }}
-  </button>
+  </c-button>
 
   {# menu #}
   <menu
