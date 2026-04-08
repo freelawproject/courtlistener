@@ -136,7 +136,6 @@
   .screenshot {
     @apply rounded-2xl block max-w-full;
   }
-
   /* ----------- THIRD PARTY OVERRIDES ----------- */
 
   .flatpickr-calendar.animate {

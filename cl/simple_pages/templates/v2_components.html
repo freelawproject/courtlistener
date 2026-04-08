@@ -22,8 +22,10 @@
         {'href': '#nav-layout', 'text': 'Layout with navigation'},
         {'href': '#tabbed-cards', 'text': 'Tabbed cards'},
         {'href': '#data-table', 'text': 'Data table'},
+        {'href': '#flex-table', 'text': 'Flex table'},
         {'href': '#dialog', 'text': 'Dialog'},
         {'href': '#callout', 'text': 'Callout'},
+        {'href': '#button', 'text': 'Button'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#docket-page', 'text': 'Docket page'},
@@ -882,6 +884,138 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
+  {# FLEX TABLE #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="flex-table">
+    <h2 class="mt-6 mb-3">Flex table</h2>
+    <p>A slot-based table component for content that needs full control over row markup, such as links, buttons, or colspan. Use with <code>c-flex-cell</code> for consistent cell styling.</p>
+
+    <h4 class="my-3">Demo</h4>
+    <c-flex-table
+      caption="Usage example of flex table component"
+      align="data-center"
+      :columns="[
+        {'label': 'Service', 'field': 'first'},
+        {'label': 'Speed', 'field': 'second'},
+        {'label': 'Fidelity', 'field': 'third'},
+      ]"
+      :footer="[
+        {
+          'first': 'Total',
+          'second': '3 services',
+          'third': '',
+        },
+      ]"
+    >
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell class="text-center first:text-start">First service</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Fast</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Great</c-flex-cell>
+      </tr>
+      <tr class="border-b-greyscale-200 border-b">
+        <c-flex-cell class="text-center first:text-start">Second service</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Slow</c-flex-cell>
+        <c-flex-cell class="text-center first:text-start">Good</c-flex-cell>
+      </tr>
+      <tr>
+        <c-flex-cell class="text-center first:text-start">Third service</c-flex-cell>
+        <td class="align-top text-sm font-normal p-2 text-start" colspan="2">This cell spans two columns using a raw td with colspan.</td>
+      </tr>
+    </c-flex-table>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-flex-table</code>: <code>columns</code></c-slot>
+        <c-slot name="description">
+          List of headers.<br>Each element in the list is a dictionary with <code>label</code> (shown in the table headers) and <code>field</code> (used to identify the column).
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item only>
+        <c-slot name="label"><code>c-flex-table</code>: <code>caption</code></c-slot>
+        <c-slot name="description">
+          Table caption for accessibility.<br>Not displayed visually, but it's important to provide context for screen readers.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-table</code>: <code>align</code></c-slot>
+        <c-slot name="description">
+          Alignment for table headers. Use <code>center</code> to center all headers. Use <code>data-center</code> to keep the first column left-aligned and center the rest. Defaults to left-aligned.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-table</code>: <code>footer</code></c-slot>
+        <c-slot name="description">
+          List of rows in the <code>&lt;tfoot&gt;</code>.<br>Each element is a dictionary where the keys correspond to the column fields. Content is rendered in bold.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-cell</code>: <code>header</code></c-slot>
+        <c-slot name="description">
+          Boolean. When present, renders a <code>&lt;th scope="row"&gt;</code> instead of <code>&lt;td&gt;</code> for row header cells.
+        </c-slot>
+      </c-library.item>
+
+      <c-library.item optional only>
+        <c-slot name="label"><code>c-flex-cell</code>: <code>class</code></c-slot>
+        <c-slot name="description">
+          Additional CSS classes appended to the cell's defaults (<code>align-middle text-sm font-normal px-2.5 py-4</code>). Use to override alignment (e.g., <code>text-center</code>) or add custom styling. Other HTML attributes are passed through via <code>attrs</code>.
+        </c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label"><code>c-flex-table</code> default</c-slot>
+        <c-slot name="description">
+          Raw <code>&lt;tr&gt;</code> elements for the table body. Use <code>c-flex-cell</code> for consistent cell styling, or raw <code>&lt;td&gt;</code> elements when you need attributes like <code>colspan</code>.
+        </c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>c-flex-cell</code> default</c-slot>
+        <c-slot name="description">Cell content.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-flex-table
+  caption="Usage example of flex table component"
+  align="data-center"
+  :columns="[
+    {'label': 'Service', 'field': 'first'},
+    {'label': 'Speed', 'field': 'second'},
+    {'label': 'Fidelity', 'field': 'third'},
+  ]"
+  :footer="[
+    {
+      'first': 'Total',
+      'second': '3 services',
+      'third': '',
+    },
+  ]"
+&gt;
+  &lt;tr class="border-b-greyscale-200 border-b"&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;First service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Fast&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Great&lt;/c-flex-cell&gt;
+  &lt;/tr&gt;
+  &lt;tr class="border-b-greyscale-200 border-b"&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Second service&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Slow&lt;/c-flex-cell&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Good&lt;/c-flex-cell&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;c-flex-cell class="text-center first:text-start"&gt;Third service&lt;/c-flex-cell&gt;
+    &lt;td class="align-top text-sm font-normal p-2 text-start" colspan="2"&gt;This cell spans two columns using a raw td with colspan.&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/c-flex-table&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
   {# DIALOG #}
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="dialog">
     <h2 class="mt-6 mb-3">Dialog</h2>
@@ -980,6 +1114,140 @@ Sample code here.
       </c-code>
     </c-expansion-panel>
   </section>
+
+
+  {# BUTTON #}
+  <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="button">
+    <h2 class="mt-6 mb-3">Button</h2>
+    <p>A reusable button component with variant styling, element flexibility (<code>&lt;button&gt;</code> or <code>&lt;a&gt;</code>), and optional touch target mode. When <code>variant</code> is omitted, no built-in styling is applied — the caller controls all classes.</p>
+
+    <h3 class="mt-3">Demo</h3>
+
+    <h4 class="mt-3">Variants</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary">Primary</c-button>
+      <c-button variant="outline">Outline</c-button>
+      <c-button variant="dark">Dark</c-button>
+      <c-button variant="ghost">Ghost</c-button>
+      <c-button variant="grey">Grey</c-button>
+      <c-button class="rounded-full px-4 py-2 text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 focus-visible:ring-4 focus-visible:ring-purple-300">Custom</c-button>
+    </div>
+
+    <h4 class="mt-3">Sizes</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary">Default (40px)</c-button>
+      <c-button variant="primary" size="xl">XL (48px)</c-button>
+    </div>
+
+    <h4 class="mt-3">Links</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" href="#">Primary link</c-button>
+      <c-button variant="outline" href="#">Outline link</c-button>
+    </div>
+
+    <h4 class="mt-3">Disabled states</h4>
+    <p class="text-sm mb-2">
+      The native <code>disabled</code> attribute removes a button from the tab order entirely — screen reader users can't reach it and won't know it exists. Use <code>aria-disabled="true"</code> instead when users need to discover the button and understand why it's unavailable (e.g., via a tooltip or adjacent text). The component includes <code>aria-disabled:</code> styling variants for both cases. For links, <code>aria-disabled="true"</code> is the only option since <code>&lt;a&gt;</code> elements don't support <code>disabled</code>. See <a href="https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-disabled" class="underline">MDN: aria-disabled</a>.
+    </p>
+
+    <h5 class="mt-3">Buttons with <code>disabled</code></h5>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" disabled>Primary</c-button>
+      <c-button variant="outline" disabled>Outline</c-button>
+      <c-button variant="dark" disabled>Dark</c-button>
+      <c-button variant="ghost" disabled>Ghost</c-button>
+      <c-button variant="grey" disabled>Grey</c-button>
+    </div>
+
+    <h5 class="mt-3">Links with <code>aria-disabled="true"</code></h5>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-button variant="primary" href="#" aria-disabled="true">Primary link</c-button>
+      <c-button variant="outline" href="#" aria-disabled="true">Outline link</c-button>
+      <c-button variant="dark" href="#" aria-disabled="true">Dark link</c-button>
+      <c-button variant="ghost" href="#" aria-disabled="true">Ghost link</c-button>
+      <c-button variant="grey" href="#" aria-disabled="true">Grey link</c-button>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Visual style. Options: <code>primary</code>, <code>outline</code>, <code>dark</code>, <code>ghost</code>, <code>grey</code>. When omitted, no built-in styling is applied.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>size</code></c-slot>
+        <c-slot name="description">Button size. Default is 40px height. Set to <code>xl</code> for 48px. Only applies when <code>variant</code> is set.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>href</code></c-slot>
+        <c-slot name="description">If provided, renders as <code>&lt;a&gt;</code> instead of <code>&lt;button&gt;</code>.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>type</code></c-slot>
+        <c-slot name="description">Button type attribute. Default: <code>button</code>. Only applies to <code>&lt;button&gt;</code> elements.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>touch_target</code></c-slot>
+        <c-slot name="description">When set, renders a larger outer <code>&lt;button&gt;</code> for touch area with an inner <code>&lt;span&gt;</code> for visual styling. Used by dialog trigger buttons.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>class</code></c-slot>
+        <c-slot name="description">Additional CSS classes. Applied to the visual element (the <code>&lt;span&gt;</code> if <code>touch_target</code>, the element itself otherwise).</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Button content — text, icons, or both.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;h4&gt;Variants&lt;/h4&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary"&gt;Primary&lt;/c-button&gt;
+  &lt;c-button variant="outline"&gt;Outline&lt;/c-button&gt;
+  &lt;c-button variant="dark"&gt;Dark&lt;/c-button&gt;
+  &lt;c-button variant="ghost"&gt;Ghost&lt;/c-button&gt;
+  &lt;c-button variant="grey"&gt;Grey&lt;/c-button&gt;
+  &lt;c-button class="rounded-full px-4 py-2 text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 focus-visible:ring-4 focus-visible:ring-purple-300"&gt;Custom&lt;/c-button&gt;
+&lt;/div&gt;
+
+&lt;h4&gt;Sizes&lt;/h4&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary"&gt;Default (40px)&lt;/c-button&gt;
+  &lt;c-button variant="primary" size="xl"&gt;XL (48px)&lt;/c-button&gt;
+&lt;/div&gt;
+
+&lt;h4&gt;Links&lt;/h4&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary" href="#"&gt;Primary link&lt;/c-button&gt;
+  &lt;c-button variant="outline" href="#"&gt;Outline link&lt;/c-button&gt;
+&lt;/div&gt;
+
+&lt;h4&gt;Disabled states&lt;/h4&gt;
+
+&lt;h5&gt;Buttons with disabled&lt;/h5&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary" disabled&gt;Primary&lt;/c-button&gt;
+  &lt;c-button variant="outline" disabled&gt;Outline&lt;/c-button&gt;
+  &lt;c-button variant="dark" disabled&gt;Dark&lt;/c-button&gt;
+  &lt;c-button variant="ghost" disabled&gt;Ghost&lt;/c-button&gt;
+  &lt;c-button variant="grey" disabled&gt;Grey&lt;/c-button&gt;
+&lt;/div&gt;
+
+&lt;h5&gt;Links with aria-disabled="true"&lt;/h5&gt;
+&lt;div class="flex flex-wrap gap-3 items-center"&gt;
+  &lt;c-button variant="primary" href="#" aria-disabled="true"&gt;Primary link&lt;/c-button&gt;
+  &lt;c-button variant="outline" href="#" aria-disabled="true"&gt;Outline link&lt;/c-button&gt;
+  &lt;c-button variant="dark" href="#" aria-disabled="true"&gt;Dark link&lt;/c-button&gt;
+  &lt;c-button variant="ghost" href="#" aria-disabled="true"&gt;Ghost link&lt;/c-button&gt;
+  &lt;c-button variant="grey" href="#" aria-disabled="true"&gt;Grey link&lt;/c-button&gt;
+&lt;/div&gt;
+      </c-code>
+    </c-expansion-panel>
+  </c-layout-with-navigation.section>
 
 
   {# DOCKET PAGE SHELL #}
