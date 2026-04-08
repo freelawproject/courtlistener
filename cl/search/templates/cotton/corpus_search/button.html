@@ -1,11 +1,5 @@
-{% load svg_tags %}
-
 <c-vars class=""></c-vars>
 
-<button
-  type="submit"
-  class="btn-primary {{ class }}"
-  aria-label="Perform search"
->
+<c-button variant="primary" type="submit" aria-label="Perform search" class="{{ class }}">
   {{ slot }}
-</button>
+</c-button>
