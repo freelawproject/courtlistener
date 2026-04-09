@@ -55,7 +55,7 @@ def require_script(context, script_path, **kwargs):
     Usage:
         {% load component_tags %}
         {% require_script 'js/alpine/components/tabs.js' %}
-        {% require_script 'js/alpine/plugins/intersect@3.14.8' defer=True %}
+        {% require_script 'js/alpine/plugins/intersect' defer=True %}
 
     Notes:
         - Alpine components ('js/alpine/components/') should *NOT* be deferred.
