@@ -3540,9 +3540,11 @@ class TexasMergerTest(TestCase):
         )
 
         result = merge_texas_case_transfers(self.docket_coa1, docket_data)
-
         transfers = CaseTransfer.objects.all()
         self.assertEqual(transfers.count(), 3)
+        source_dns = set(aci["case_number"])
+        db_dns = set(transfer.origin_docket_number for transfer in transfers)
+        self.assertEqual(source_dns, db_dns)
 
     def test_merge_texas_case_transfers_appellate_with_unknown_workload_transfer_court(
         self,
