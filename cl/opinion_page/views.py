@@ -80,6 +80,10 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    build_bankruptcy_metadata,
+    build_docket_metadata,
+    build_docket_tabs,
+    build_originating_court_metadata,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -397,15 +401,35 @@ async def view_docket(
         rd.prayer_count = prayer_counts.get(rd.id, 0)
         rd.prayer_exists = existing_prayers.get(rd.id, False)
 
+    parties = await docket.parties.aexists()
+    has_idb_data = bool(docket.idb_data_id)
+    authority_count = await docket.ahas_authorities()
+
     context.update(
         {
-            "parties": await docket.parties.aexists(),
-            # Needed to show/hide parties tab.
-            "authorities": await docket.ahas_authorities(),
+            "parties": parties,
+            "authorities": authority_count,
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
+            "metadata": await sync_to_async(build_docket_metadata)(
+                docket, context["timezone"]
+            ),
+            "bankruptcy_metadata": await sync_to_async(
+                lambda: build_bankruptcy_metadata(
+                    getattr(docket, "bankruptcy_information", None)
+                )
+            )(),
+            "originating_court_metadata": await sync_to_async(
+                lambda: build_originating_court_metadata(
+                    docket,
+                    getattr(docket, "originating_court_information", None),
+                )
+            )(),
+            "tabs": build_docket_tabs(
+                docket, parties, has_idb_data, authority_count
+            ),
         }
     )
     return TemplateResponse(request, "docket.html", context)
