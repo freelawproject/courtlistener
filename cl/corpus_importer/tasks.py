@@ -3915,7 +3915,7 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
         return None
 
     if texas_document.processing_error == ProcessingError.BAD_URL:
-        logger.error(
+        logger.warning(
             "Texas document download: TexasDocument %s has a bad URL. "
             "Skipping.",
             texas_document_pk,
@@ -3965,7 +3965,7 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
                 full_content = tmp.read()
                 tmp.seek(0)
                 if is_missing_file_page(full_content):
-                    logger.error(
+                    logger.warning(
                         "Texas document download: TexasDocument %s at %s "
                         "returned a missing file page.",
                         texas_document.pk,
