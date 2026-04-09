@@ -582,7 +582,9 @@ async def extract_formatted_text_document_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
-        if strip_html_tags:
+        if strip_html_tags and not str(rd.filepath_local).endswith(
+            ".pdf"
+        ):
             content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
         if ocr_available and ocr_needed:
@@ -609,7 +611,7 @@ async def extract_formatted_text_document_base(
 
         rd.plain_text, _ = anonymize(content)
         # Kludgey fix to handle RECAPDocument's custom save logic.
-        if isinstance(model, RECAPDocument):
+        if isinstance(rd, RECAPDocument):
             await rd.asave(
                 do_extraction=False,
                 update_fields=["ocr_status", "plain_text"],

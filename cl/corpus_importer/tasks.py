@@ -3957,17 +3957,26 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
                 url,
             )
 
-        if extension == ".html" and is_missing_file_page(content):
-            logger.error(
-                "Texas document download: TexasDocument %s at %s "
-                "returned a missing file page.",
-                texas_document.pk,
-                url,
-            )
-            texas_document.processing_error = ProcessingError.BAD_URL
-            texas_document.save()
-            task.request.chain = None
-            return None
+        if extension == ".html":
+            tmp.seek(0, 2)
+            file_size = tmp.tell()
+            tmp.seek(0)
+            if file_size <= 25_000:
+                full_content = tmp.read()
+                tmp.seek(0)
+                if is_missing_file_page(full_content):
+                    logger.error(
+                        "Texas document download: TexasDocument %s at %s "
+                        "returned a missing file page.",
+                        texas_document.pk,
+                        url,
+                    )
+                    texas_document.processing_error = (
+                        ProcessingError.BAD_URL
+                    )
+                    texas_document.save()
+                    task.request.chain = None
+                    return None
 
         filename = (
             f"{texas_document.media_id}"
@@ -4293,6 +4302,7 @@ def merge_texas_document(
             texas_document.filepath_local.delete(save=False)
         texas_document.filepath_local = ""
         texas_document.ocr_status = None
+        texas_document.processing_error = None
         texas_document.save()
         if download_attachments:
             transaction.on_commit(
