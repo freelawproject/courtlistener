@@ -3971,9 +3971,7 @@ def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
                         texas_document.pk,
                         url,
                     )
-                    texas_document.processing_error = (
-                        ProcessingError.BAD_URL
-                    )
+                    texas_document.processing_error = ProcessingError.BAD_URL
                     texas_document.save()
                     task.request.chain = None
                     return None

@@ -582,9 +582,7 @@ async def extract_formatted_text_document_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
-        if strip_html_tags and not str(rd.filepath_local).endswith(
-            ".pdf"
-        ):
+        if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
             content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
         if ocr_available and ocr_needed:
