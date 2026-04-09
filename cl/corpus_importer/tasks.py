@@ -4529,7 +4529,7 @@ def merge_texas_docket_originating_court(
     if texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
-            return MergeResult.failed()
+            return MergeResult.failed("OriginatingCourtInformation")
         oc_dn = sorted(ocd["case_number"])[0]
         oc_reporter = ""
         oc_judge = ocd["justice"]
