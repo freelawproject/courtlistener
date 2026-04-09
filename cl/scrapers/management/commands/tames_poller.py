@@ -195,6 +195,7 @@ def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
                     message,
                 )
                 continue
+            time.sleep(1)
             successful_dates.add(
                 datetime.strptime(case["date_filed"], "%m/%d/%Y").date()
             )
@@ -374,11 +375,7 @@ class Command(BaseCommand):
             # -- Backfill ------------------------------------------------------
             backfill_days = options["case_backfill_days"]
 
-            if backfill_days is not None:
-                backfill_start = today - timedelta(days=backfill_days)
-            else:
-                # Wide range; we'll stop after backfill_count cases
-                backfill_start = scraper.FIRST_RECORD_DATE
+            backfill_start = today - timedelta(days=backfill_days)
 
             # Re-instantiate scraper for the backfill search to get a
             # fresh form state
@@ -448,9 +445,14 @@ class Command(BaseCommand):
                 case_count,
             )
             if not found_stop:
-                logger.error(
-                    "Did not find known case when scraping. Likely gap."
-                )
+                if cached_urls:
+                    logger.error(
+                        "Did not find known case when scraping. Likely gap."
+                    )
+                else:
+                    logger.info(
+                        "No cached_urls found, possible gap if this isn't the first run."
+                    )
 
         subscribe_pending_cases(redis, tames_user)
 
