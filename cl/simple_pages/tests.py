@@ -168,7 +168,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
 
-class PageLoadTestMixin:
+class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
         """Make sure a page has a valid HTML title"""
         html_tree = fromstring(content)
