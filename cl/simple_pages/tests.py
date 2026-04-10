@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
@@ -184,7 +185,7 @@ class PageLoadTestMixin(TestCase):
             msg="The text in this title tag is empty.",
         )
 
-    async def assert_page_loads_ok(self, reverse_param: dict):
+    async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
         :param reverse_param: Params that can be sent to Django's reverse
