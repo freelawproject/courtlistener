@@ -282,9 +282,9 @@ async def associate_related_instances(
     """
 
     if isinstance(pq, EmailProcessingQueue):
-        if not rd_id:
+        if rd_id is None:
             logger.error(
-                "rd_id must be a list when pq is EmailProcessingQueue."
+                "rd_id must not be None when pq is EmailProcessingQueue."
             )
             return
         if isinstance(rd_id, list):
