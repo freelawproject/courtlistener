@@ -1,15 +1,10 @@
 {% load static svg_tags component_tags %}
-{% require_script "js/alpine/components/header.js" %}
-{% require_script "js/alpine/composables/focus.js" %}
-{% require_script "js/alpine/plugins/focus" defer=True %}
-{% require_script "js/alpine/plugins/collapse" defer=True %}
 {# frontend-checks-skip: check_hardcoded_ids #}
 {# This component is a singleton so hardcoded IDs are intentional #}
 
 <c-vars variant request class=""></c-vars>
 
 <header
-  x-data="header"
   class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:max-h-[--desktop-header-height] max-md:h-18 {% endif %} px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
 >
 <div class="capped-width flex justify-between items-center gap-4">
@@ -18,62 +13,34 @@
 
   {# HOMEPAGE VARIANT #}
   {% if variant == "homepage" %}
-      <div class="relative">
-        <button
-          type="button"
-          x-on:click="toggleSupportMenu"
-          class="btn-primary z-10 hover:shadow-md"
-          aria-controls="header-support-menu"
-          aria-haspopup="menu"
-          x-bind:aria-expanded="supportMenuExpanded"
-          aria-label="Toggle menu to support Free Law Project"
+    <c-menu-button>
+      <c-slot name="button_content">
+        Support&nbsp;FLP
+        <span
+          class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+          aria-hidden="true"
+        >{% svg 'chevron' class="w-full h-full text-white" %}
+        </span>
+      </c-slot>
+      <c-slot name="menu_content">
+        <c-menu-button.item
+          href="https://donate.free.law/forms/supportflp"
+          icon="money_hand"
+          item_class="px-4 py-1.5 text-md text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+          li_class="hover:bg-greyscale-50"
         >
-          Support&nbsp;FLP
-          <span
-            x-bind:class="supportCaretClass"
-            class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
-            aria-hidden="true"
-          >{% svg 'chevron' class="w-full h-full text-white" %}
-          </span>
-        </button>
-
-        {#  support menu  #}
-        <menu
-          id="header-support-menu"
-          x-data="focus"
-          x-show="supportMenuExpanded"
-          x-cloak
-          x-on:click.outside="closeSupportMenu"
-          x-on:keyup.esc="closeProfileMenu"
-          x-on:keyup.right="focusNext"
-          x-on:keyup.left="focusPrevious"
-          x-transition:enter="transition ease-out duration-300"
-          x-transition:enter-start="opacity-0"
-          x-transition:enter-end="opacity-100"
-          x-transition:leave="transition ease-in duration-100"
-          x-transition:leave-start="opacity-100"
-          x-transition:leave-end="opacity-0"
-          class="z-20 absolute left-0 top-12 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
-          role="menu"
+          Make a Donation
+        </c-menu-button.item>
+        <c-menu-button.item
+          href="https://free.law/membership/"
+          icon="group"
+          item_class="px-4 py-1.5 text-md text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+          li_class="hover:bg-greyscale-50"
         >
-          <li
-            class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
-          >
-            <a href="https://donate.free.law/forms/supportflp" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 flex justify-start gap-2 w-full">
-              {% svg "money_hand" class="text-greyscale-500" aria_hidden="true" %}
-              Make a Donation
-            </a>
-          </li>
-          <li
-            class="text-md text-greyscale-800 flex hover:bg-greyscale-50"
-          >
-            <a href="https://free.law/membership/" target="_blank" rel="noopener noreferrer" class="px-4 py-1.5 flex justify-start gap-2 w-full">
-              {% svg "group" class="text-greyscale-500" aria_hidden="true" %}
-              Become a Member
-            </a>
-          </li>
-        </menu>
-      </div>
+          Become a Member
+        </c-menu-button.item>
+      </c-slot>
+    </c-menu-button>
 
   {# DEFAULT VARIANT #}
   {% else %}
@@ -158,142 +125,104 @@
     {% endif %}
 
     {% if request.user.is_authenticated %}
-      <div>
-        {#   Signed-in button   #}
-        <c-button
-          variant="outline"
-          id="header-profile-trigger"
-          x-on:click="openProfileMenu"
-          aria-haspopup="menu"
-          aria-controls="header-profile-menu"
-          x-bind:aria-expanded="profileMenuExpanded"
-          class="bg-white text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center hover:shadow-md"
-        >
+      <c-menu-button
+        button_variant="outline"
+        button_class="bg-white hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
+        menu_class="z-20 w-[--profile-menu-width] border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+        position="bottom-end"
+        widget_aria_label="User account menu"
+        trigger_aria_label="Toggle account menu"
+        menu_aria_label="Account navigation"
+      >
+        <c-slot name="button_content">
           {% svg "avatar" class="border-greyscale-300 border rounded-full" aria_hidden="true" %}
           Profile
           <span
-            x-bind:class="profileCaretClass"
-            class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
+            class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
             aria-hidden="true"
           >{% svg "chevron" class="w-full h-full text-greyscale-400" %}
           </span>
-        </c-button>
-
-        {#   Signed-in menu   #}
-        <nav>
-          <ul
-            id="header-profile-menu"
-            x-data="focus"
-            x-show="profileMenuExpanded"
-            x-cloak
-            x-on:click.outside="closeProfileMenu"
-            x-on:keyup.esc="closeProfileMenu"
-            x-on:keyup.right="focusNext"
-            x-on:keyup.left="focusPrevious"
-            x-on:keydown.down.prevent.stop="focusNext"
-            x-on:keydown.up.prevent.stop="focusPrevious"
-            x-on:keydown.tab.prevent.stop="closeProfileMenu"
-            class="absolute right-0 z-10 mt-2 w-[--profile-menu-width] rounded-lg bg-white py-2 shadow-lg border border-greyscale-200 focus-visible:outline-hidden list-none pl-0"
-            tabindex="-1"
-            role="menu"
-            aria-label="Account navigation"
-            x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-100"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
+        </c-slot>
+        <c-slot name="menu_content">
+          <c-menu-button.item
+            href="{% url 'profile_alerts' %}"
+            icon="bell_outline"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
           >
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url "profile_alerts" %}"
-                role="menuitem"
-                aria-label="Go to Alerts page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
+            Alerts
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'profile_notes' %}"
+            icon="bookmark"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Notes
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'tag_list' username=request.user.username %}"
+            icon="tag"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Tags
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'view_api' %}"
+            icon="code"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Developer Tools
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'user_prayers' request.user.username %}"
+            icon="donate"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Prayers
+          </c-menu-button.item>
+          <c-menu-button.divider />
+          <c-menu-button.item
+            href="{% url 'profile_your_support' %}"
+            icon="donate"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Your Support
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'view_settings' %}"
+            icon="avatar_outline"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Account
+          </c-menu-button.item>
+          <li role="none" class="py-[1px] hover:bg-greyscale-100">
+            <form id="logout-form" method="post" action="/sign-out/">
+              {% csrf_token %}
+              <button
+                x-menu:item
+                type="submit"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
               >
-                {% svg "bell_outline" aria_hidden="true" class="text-greyscale-400" %}
-                Alerts
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url "profile_notes" %}"
-                role="menuitem"
-                aria-label="Go to Notes page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "bookmark" aria_hidden="true" class="text-greyscale-400" %}
-                Notes
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url "tag_list" username=request.user.username %}"
-                role="menuitem"
-                aria-label="Go to Tags page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "tag" aria_hidden="true" class="text-greyscale-400" %}
-                Tags
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url "view_api" %}"
-                role="menuitem"
-                aria-label="Go to Developer Tools page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "code" aria_hidden="true" class="text-greyscale-400" %}
-                Developer Tools
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url 'user_prayers' request.user.username %}"
-                role="menuitem"
-                aria-label="Go to Prayers page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "donate" aria_hidden="true" class="text-greyscale-400" %}
-                Prayers
-              </a>
-            </li>
-            <div aria-hidden="true" class="h-1 bg-greyscale-100 my-1 w-full"></div>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url "profile_your_support" %}"
-                role="menuitem"
-                aria-label="Go to Your Support page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "donate" aria_hidden="true" class="text-greyscale-400" %}
-                Your Support
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <a
-                href="{% url "view_settings" %}"
-                role="menuitem"
-                aria-label="Go to Account page"
-                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2"
-              >
-                {% svg "avatar_outline" aria_hidden="true" class="text-greyscale-400" %}
-                Account
-              </a>
-            </li>
-            <li class="relative cursor-default py-[1px] select-none hover:bg-greyscale-100" role="none">
-              <form id="logout-form" method="post" action="/sign-out/">
-                {% csrf_token %}
-                <button type="submit" class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start gap-2 w-full">
-                  {% svg "sign_out" aria_hidden="true" class="text-greyscale-400" %}
-                  Sign out
-                </button>
-              </form>
-            </li>
-          </ul>
-        </nav>
-      </div>
+                {% svg "sign_out" aria_hidden="true" class="text-greyscale-400" %}
+                Sign out
+              </button>
+            </form>
+          </li>
+        </c-slot>
+      </c-menu-button>
     {% else %}
 
       {#   Signed-out button   #}

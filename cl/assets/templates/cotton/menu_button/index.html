@@ -1,0 +1,48 @@
+{% load svg_tags component_tags %}
+{% require_script "js/alpine/components/menu_button" %}
+{% require_script "js/alpine/plugins/ui" defer=True %}
+{% require_script "js/alpine/plugins/anchor" defer=True %}
+
+<c-vars
+  button_variant="primary"
+  button_class=""
+  menu_class="z-20 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+  position="bottom-start"
+  widget_aria_label="Dropdown menu with trigger button"
+  trigger_aria_label="Dropdown menu trigger"
+  menu_aria_label="Dropdown menu panel"
+/>
+
+<article
+  x-data="menuButton"
+  x-menu
+  class="relative"
+  aria-label="{{ widget_aria_label }}"
+>
+  {# trigger button #}
+  <c-button
+    variant="{{ button_variant }}"
+    x-menu:button
+    aria-label="{{ trigger_aria_label }}"
+    class="group {{ button_class }}"
+  >
+    {{ button_content }}
+  </c-button>
+
+  {# menu #}
+  <menu
+    x-menu:items
+    x-anchor.{{ position }}.offset.8="$refs.__button"
+    x-cloak
+    x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-100"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+    class="{{ menu_class }}"
+    aria-label="{{ menu_aria_label }}"
+  >
+    {{ menu_content }}
+  </menu>
+</article>
