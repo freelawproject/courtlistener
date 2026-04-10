@@ -168,10 +168,9 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
 
-class SimplePagesTest(SimpleUserDataMixin, TestCase):
+class PageLoadTestMixin:
     def assert_page_title_in_html(self, content: str) -> None:
         """Make sure a page has a valid HTML title"""
-        print("Checking for HTML title tag....", end="")
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -184,7 +183,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             0,
             msg="The text in this title tag is empty.",
         )
-        print("✓")
 
     async def assert_page_loads_ok(self, reverse_param: dict) -> None:
         """Does a page load properly?
@@ -194,7 +192,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         :return: None
         """
         path = reverse(**reverse_param)
-        print(f"Testing basic load of: {path}...", end="")
         r = await self.async_client.get(path)
         self.assertEqual(
             r.status_code,
@@ -207,11 +204,12 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
                 code=r.status_code,
             ),
         )
-        print("✓")
         is_html = "text/html" in r["content-type"]
         if r["content-type"] and is_html:
             self.assert_page_title_in_html(r.content.decode())
 
+
+class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: list[dict[str, Any]] = [
@@ -302,6 +300,64 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         self.assertIn(
             "with 4 minutes of recordings (and counting).", r.content.decode()
         )
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
+class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
+    """Registry of pages with v2 (redesigned) templates.
+
+    Adding a page here is part of the definition of done for a
+    redesigned template. The homepage is excluded — it has dedicated
+    tests in cl/search/tests/test_v2_pages.py.
+    """
+
+    V2_PAGES: list[dict[str, Any]] = [
+        # Help pages
+        {"viewname": "help_home"},
+        {"viewname": "coverage"},
+        {"viewname": "coverage_fds"},
+        {"viewname": "coverage_oa"},
+        {"viewname": "coverage_opinions"},
+        {"viewname": "coverage_recap"},
+        {"viewname": "alert_help"},
+        {"viewname": "mcp_help"},
+        {"viewname": "tag_notes_help"},
+        {"viewname": "recap_email_help"},
+        {"viewname": "markdown_help"},
+        {"viewname": "cluster_redirections_help"},
+        # Info pages
+        {"viewname": "terms"},
+        {"viewname": "citegeist_help"},
+        {"viewname": "components"},
+        # API documentation pages
+        {"viewname": "api_index"},
+        {"viewname": "bulk_data_index"},
+        {"viewname": "replication_docs"},
+        {"viewname": "migration_guide"},
+        {"viewname": "rest_change_log"},
+        {"viewname": "webhooks_getting_started"},
+        {"viewname": "field_api_help"},
+        {"viewname": "case_law_api_help"},
+        {"viewname": "citation_api_help"},
+        {"viewname": "citation_lookup_api"},
+        {"viewname": "pacer_api_help"},
+        {"viewname": "recap_api_help"},
+        {"viewname": "judge_api_help"},
+        {"viewname": "oral_argument_api_help"},
+        {"viewname": "visualization_api_help"},
+        {"viewname": "alert_api_help"},
+        {"viewname": "financial_disclosures_api_help"},
+        {"viewname": "search_api_help"},
+    ]
+
+    async def test_v2_pages(self) -> None:
+        """Do all registered v2 pages load properly with the redesign flag?"""
+        for reverse_param in self.V2_PAGES:
+            with self.subTest(
+                "Checking v2 page", reverse_params=reverse_param
+            ):
+                await self.assert_page_loads_ok(reverse_param)
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)

@@ -17,7 +17,7 @@
       fill="transparent"
       pointer-events="all"
     />
-    <g clip-path="url(#clip0_9035_58523)">
+    <g>
       <path d="M73.0824 124.526H69.5117V137.34H73.0824V124.526Z" fill="#848582"/>
       <path d="M36.7855 124.526H33.2148V137.34H36.7855V124.526Z" fill="#848582"/>
       <path d="M45.8636 124.526H42.293V137.34H45.8636V124.526Z" fill="#848582"/>
@@ -155,8 +155,7 @@
       fill="transparent"
       pointer-events="all"
     />
-    <g clip-path="url(#clip0_9035_58523)"
-       class="group-hover:text-greyscale-900 text-[#968F7F]"
+    <g class="group-hover:text-greyscale-900 text-[#968F7F]"
     >
       <path d="M73.0824 124.526H69.5117V137.34H73.0824V124.526Z" fill="#848582"/>
       <path d="M36.7855 124.526H33.2148V137.34H36.7855V124.526Z" fill="#848582"/>
@@ -210,14 +209,4 @@
     </g>
   </a>
 
-  <defs>
-    <clipPath id="clip0_9035_58523">
-      <rect
-        width="309.867"
-        height="140"
-        fill="white"
-        transform="translate(0.0664062)"
-      />
-    </clipPath>
-  </defs>
 </svg>
