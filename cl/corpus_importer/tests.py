@@ -2240,19 +2240,19 @@ class TexasMergerTest(TestCase):
 
     @patch(
         "cl.corpus_importer.tasks.merge_texas_parties",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("Party", 1),
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_case_transfers",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("CaseTransfer", 1),
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_trial_court_data",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("TrialCourtData", 1),
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_docket_originating_court",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("OriginatingCourtInformation", 1),
     )
     def test_merge_docket_entries_integration(
         self,
@@ -2352,9 +2352,10 @@ class TexasMergerTest(TestCase):
 
         assert result.create is True
         assert result.success is True
-        assert result.pk is not None
+        assert result.creates.get("TexasDocument")
+        doc_pk = next(iter(result.creates["TexasDocument"]))
         try:
-            created_document = TexasDocument.objects.get(pk=result.pk)
+            created_document = TexasDocument.objects.get(pk=doc_pk)
         except ObjectDoesNotExist:
             created_document = None
         assert created_document is not None
@@ -2388,9 +2389,9 @@ class TexasMergerTest(TestCase):
         result = merge_texas_document(docket_entry, input_document)
 
         assert result.create is False
+        assert result.update is False
         assert result.success is True
-        assert result.pk == current_document.pk
-        result_document = TexasDocument.objects.get(pk=result.pk)
+        result_document = TexasDocument.objects.get(pk=current_document.pk)
         assert result_document is not None
         assert result_document.docket_entry_id == docket_entry.id
         assert result_document.description == input_document["description"]
@@ -2425,8 +2426,8 @@ class TexasMergerTest(TestCase):
         assert result.create is False
         assert result.update is True
         assert result.success is True
-        assert result.pk == current_document.pk
-        result_document = TexasDocument.objects.get(pk=result.pk)
+        assert current_document.pk in result.updates["TexasDocument"]
+        result_document = TexasDocument.objects.get(pk=current_document.pk)
         assert result_document is not None
         assert result_document.docket_entry_id == docket_entry.id
         assert result_document.description == input_document["description"]
@@ -2450,7 +2451,7 @@ class TexasMergerTest(TestCase):
 
         assert result.create is True
         assert result.success is True
-        assert result.pk is not None
+        assert result.creates.get("TexasDocument")
         self.download_task_mock.assert_not_called()
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
@@ -2489,7 +2490,8 @@ class TexasMergerTest(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_document(docket_entry, input_document)
         docket_entry.refresh_from_db()
-        document = TexasDocument.objects.get(pk=result.pk)
+        doc_pk = next(iter(result.creates["TexasDocument"]))
+        document = TexasDocument.objects.get(pk=doc_pk)
 
         self.assertEqual(response.call_count, 1)
         self.assertEqual(document.url, input_document["document_url"])
@@ -2520,8 +2522,9 @@ class TexasMergerTest(TestCase):
         assert output.create is True
         assert output.update is False
         assert output.success is True
-        assert output.pk is not None
-        created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
+        assert "TexasDocketEntry" in output.creates
+        entry_pk = next(iter(output.creates["TexasDocketEntry"]))
+        created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == case_event["type"]
         assert created_docket_entry.disposition == case_event["disposition"]
@@ -2555,8 +2558,8 @@ class TexasMergerTest(TestCase):
             result = merge_texas_docket_entry(
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
-        pk = result.pk
-        documents = TexasDocument.objects.filter(docket_entry_id=pk)
+        entry_pk = next(iter(result.creates["TexasDocketEntry"]))
+        documents = TexasDocument.objects.filter(docket_entry_id=entry_pk)
         for document in documents:
             document.filepath_local = "a"
             document.save()
@@ -2572,9 +2575,8 @@ class TexasMergerTest(TestCase):
         assert output.create is False
         assert output.update is True
         assert output.success is True
-        assert output.pk is not None
-        assert output.pk == pk
-        created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
+        assert entry_pk in output.updates["TexasDocketEntry"]
+        created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == case_event["type"]
         assert created_docket_entry.disposition == case_event["disposition"]
@@ -2609,8 +2611,8 @@ class TexasMergerTest(TestCase):
             result = merge_texas_docket_entry(
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
-        pk = result.pk
-        documents = TexasDocument.objects.filter(docket_entry_id=pk)
+        entry_pk = next(iter(result.creates["TexasDocketEntry"]))
+        documents = TexasDocument.objects.filter(docket_entry_id=entry_pk)
         for document in documents:
             document.filepath_local = "a"
             document.save()
@@ -2626,9 +2628,8 @@ class TexasMergerTest(TestCase):
         assert output.create is True
         assert output.update is True
         assert output.success is True
-        assert output.pk is not None
-        assert output.pk == pk
-        created_docket_entry = TexasDocketEntry.objects.get(pk=output.pk)
+        assert entry_pk in output.updates["TexasDocketEntry"]
+        created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
         assert created_docket_entry.docket_id == self.docket_coa1.id
         assert created_docket_entry.entry_type == case_event["type"]
         assert created_docket_entry.remarks == case_event.get("remarks", "")
@@ -2683,8 +2684,8 @@ class TexasMergerTest(TestCase):
         assert output.create is False
         assert output.update is True
         assert output.success is True
-        assert output.pk == existing_entry_2.pk
-        updated_entry = TexasDocketEntry.objects.get(pk=output.pk)
+        assert existing_entry_2.pk in output.updates["TexasDocketEntry"]
+        updated_entry = TexasDocketEntry.objects.get(pk=existing_entry_2.pk)
         assert updated_entry.disposition == case_event["disposition"]
         assert updated_entry.sequence_number == "2025-01-02.001"
         # Ensure the first entry was not modified
@@ -2723,8 +2724,8 @@ class TexasMergerTest(TestCase):
         assert output.create is False
         assert output.update is True
         assert output.success is True
-        assert output.pk == existing_entry.pk
-        updated_entry = TexasDocketEntry.objects.get(pk=output.pk)
+        assert existing_entry.pk in output.updates["TexasDocketEntry"]
+        updated_entry = TexasDocketEntry.objects.get(pk=existing_entry.pk)
         assert updated_entry.disposition == case_event["disposition"]
         assert updated_entry.sequence_number == "2025-01-04.001"
 
@@ -2767,9 +2768,10 @@ class TexasMergerTest(TestCase):
         assert output.create is True
         assert output.update is False
         assert output.success is True
-        assert output.pk is not None
-        assert output.pk not in (existing_entry_1.pk, existing_entry_2.pk)
-        new_entry = TexasDocketEntry.objects.get(pk=output.pk)
+        assert "TexasDocketEntry" in output.creates
+        entry_pk = next(iter(output.creates["TexasDocketEntry"]))
+        assert entry_pk not in (existing_entry_1.pk, existing_entry_2.pk)
+        new_entry = TexasDocketEntry.objects.get(pk=entry_pk)
         assert new_entry.disposition == case_event["disposition"]
         assert new_entry.sequence_number == "2025-01-03.002"
         # Ensure existing entries were not modified
@@ -3156,7 +3158,9 @@ class TexasMergerTest(TestCase):
         docket_entry = self.docket_coa1_entry
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_document(docket_entry, input_document)
-        document = TexasDocument.objects.get(pk=result.pk)
+        document = TexasDocument.objects.get(
+            pk=list(result.creates["TexasDocument"])[0]
+        )
 
         self.assertEqual(response.call_count, 1)
         self.assertTrue(document.filepath_local)
@@ -3593,7 +3597,7 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket(docket_data)
 
         assert result.success is True
-        assert result.pk == self.docket_coa1.pk
+        assert self.docket_coa1.pk in result.creates["Docket"]
 
         self.docket_coa1.refresh_from_db()
         assert self.docket_coa1.date_filed == docket_data["date_filed"]
@@ -3625,7 +3629,7 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket(docket_data)
 
         assert result.success is True
-        assert result.pk == docket_sc.pk
+        assert docket_sc.pk in result.creates["Docket"]
 
         docket_sc.refresh_from_db()
         assert docket_sc.date_filed == docket_data["date_filed"]
@@ -3645,7 +3649,8 @@ class TexasMergerTest(TestCase):
 
         assert result.success is True
 
-        docket = Docket.objects.get(pk=result.pk)
+        docket_pk = next(iter(result.creates["Docket"]))
+        docket = Docket.objects.get(pk=docket_pk)
 
         assert (
             docket.appeal_from_str == docket_dict["appeals_court"]["district"]
@@ -3654,19 +3659,19 @@ class TexasMergerTest(TestCase):
 
     @patch(
         "cl.corpus_importer.tasks.merge_texas_case_transfers",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("CaseTransfer", 1),
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_docket_entry",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("TexasDocketEntry", 1),
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_parties",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("Party", 1),
     )
     @patch(
         "cl.corpus_importer.tasks.merge_texas_docket_originating_court",
-        return_value=MergeResult.created(1),
+        return_value=MergeResult.created("OriginatingCourtInformation", 1),
     )
     def test_merge_texas_docket_populates_all_fields(
         self, mock_oci, mock_parties, mock_entry, mock_transfers
@@ -3685,9 +3690,10 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket(docket_data)
 
         assert result.success is True
-        assert result.pk is not None
+        assert result.creates.get("Docket")
+        docket_pk = next(iter(result.creates["Docket"]))
 
-        docket = Docket.objects.get(pk=result.pk)
+        docket = Docket.objects.get(pk=docket_pk)
         assert docket.source & Docket.SCRAPER
         assert docket.court_id == "txctapp1"
         assert docket.docket_number == docket_data["docket_number"]
@@ -3719,9 +3725,10 @@ class TexasMergerTest(TestCase):
 
         assert result.create is True
         assert result.success is True
-        assert result.pk is not None
+        assert result.creates.get("TrialCourtData")
+        tcd_pk = next(iter(result.creates["TrialCourtData"]))
 
-        tcd = TrialCourtData.objects.get(pk=result.pk)
+        tcd = TrialCourtData.objects.get(pk=tcd_pk)
         assert tcd.docket_id == docket_sc.pk
         assert tcd.docket_number_raw_trial == originating_court["case"]
         assert tcd.docket_number_trial == originating_court["case"]
@@ -3744,7 +3751,6 @@ class TexasMergerTest(TestCase):
         assert tcd.reporter == originating_court["reporter"]
         assert tcd.punishment == originating_court["punishment"]
         assert tcd.county == originating_court["county"]
-        assert result2.pk == tcd.pk
         assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
 
         # Merging changed data should update
@@ -3762,7 +3768,7 @@ class TexasMergerTest(TestCase):
         assert tcd.reporter == originating_court["reporter"]
         assert tcd.punishment == originating_court["punishment"]
         assert tcd.county == originating_court["county"]
-        assert result3.pk == tcd.pk
+        assert tcd.pk in result3.updates["TrialCourtData"]
         assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
 
 
