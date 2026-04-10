@@ -320,7 +320,6 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "coverage"}, "v2_help/coverage.html"),
         ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
         ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
-        ({"viewname": "coverage_opinions"}, "v2_help/coverage_opinions.html"),
         ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
         ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
         ({"viewname": "mcp_help"}, "v2_help/mcp_help.html"),
