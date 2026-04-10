@@ -3158,7 +3158,9 @@ class TexasMergerTest(TestCase):
         docket_entry = self.docket_coa1_entry
         with self.captureOnCommitCallbacks(execute=True):
             result = merge_texas_document(docket_entry, input_document)
-        document = TexasDocument.objects.get(pk=result.pk)
+        document = TexasDocument.objects.get(
+            pk=list(result.creates["TexasDocument"])[0]
+        )
 
         self.assertEqual(response.call_count, 1)
         self.assertTrue(document.filepath_local)
