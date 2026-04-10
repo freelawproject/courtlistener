@@ -2513,3 +2513,155 @@ class ClusterRedirectionTest(TestCase):
             expected_redirect_url,
             status_code=301,
         )
+
+
+class BuildDocketMetadataTest(TestCase):
+    """Test the build_docket_metadata helper function."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="metd", jurisdiction="FB")
+
+    def test_empty_docket_returns_citation_only(self) -> None:
+        """A minimal docket should still return a citation item."""
+        from cl.opinion_page.utils import build_docket_metadata
+
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            assigned_to=None,
+            referred_to=None,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        labels = [item["label"] for item in items]
+        self.assertIn("Citation", labels)
+
+    def test_metadata_with_judge_link(self) -> None:
+        """A docket with an assigned judge should produce a linked item."""
+        from cl.opinion_page.utils import build_docket_metadata
+        from cl.people_db.factories import PersonFactory
+
+        judge = PersonFactory()
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            assigned_to=judge,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        assigned = next(i for i in items if i["label"] == "Assigned To")
+        self.assertEqual(assigned["value"], judge.name_full)
+        self.assertIn("url", assigned)
+
+    def test_metadata_with_search_link(self) -> None:
+        """Fields like cause should produce a nofollow search link."""
+        from cl.opinion_page.utils import build_docket_metadata
+
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            cause="28:1331",
+            assigned_to=None,
+            referred_to=None,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        cause = next(i for i in items if i["label"] == "Cause")
+        self.assertEqual(cause["value"], "28:1331")
+        self.assertIn("cause", cause["url"])
+        self.assertTrue(cause.get("nofollow"))
+
+
+class BuildDocketTabsTest(SimpleTestCase):
+    """Test the build_docket_tabs helper function."""
+
+    def test_entries_tab_always_present(self) -> None:
+        """The entries tab should always be in the list."""
+        from cl.opinion_page.utils import build_docket_tabs
+
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, False, False, 0)
+        self.assertEqual(len(tabs), 1)
+        self.assertEqual(tabs[0]["key"], "entries")
+
+    def test_all_tabs_present(self) -> None:
+        """All four tabs should appear when all data exists."""
+        from cl.opinion_page.utils import build_docket_tabs
+
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, True, True, 5)
+        keys = [t["key"] for t in tabs]
+        self.assertEqual(keys, ["entries", "parties", "idb", "authorities"])
+
+    def test_conditional_tabs(self) -> None:
+        """Only tabs with data should appear."""
+        from cl.opinion_page.utils import build_docket_tabs
+
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        with self.subTest("parties only"):
+            tabs = build_docket_tabs(docket, True, False, 0)
+            keys = [t["key"] for t in tabs]
+            self.assertEqual(keys, ["entries", "parties"])
+
+        with self.subTest("idb only"):
+            tabs = build_docket_tabs(docket, False, True, 0)
+            keys = [t["key"] for t in tabs]
+            self.assertEqual(keys, ["entries", "idb"])
+
+
+@override_flag("use_new_design", active=True)
+class DocketPageV2TemplateTest(TestCase):
+    """Test that the v2 docket page renders correctly."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        from cl.people_db.factories import PartyFactory, PartyTypeFactory
+
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            cause="28:1331",
+            nature_of_suit="Contract",
+            date_filed=date(2024, 9, 26),
+        )
+        party = PartyFactory.build()
+        party.save()
+        PartyTypeFactory(docket=cls.docket, party=party)
+
+    async def test_v2_docket_page_renders(self) -> None:
+        """The v2 docket page should render without errors."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        content = r.content.decode()
+        self.assertIn("Docket Entries", content)
+        self.assertIn("28:1331", content)
+        self.assertIn("Contract", content)
+
+    async def test_v2_docket_metadata_in_context(self) -> None:
+        """The view should pass metadata and tabs to the template."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertIn("metadata", r.context)
+        self.assertIn("tabs", r.context)
+        self.assertTrue(len(r.context["metadata"]) > 0)
+        self.assertTrue(len(r.context["tabs"]) > 0)

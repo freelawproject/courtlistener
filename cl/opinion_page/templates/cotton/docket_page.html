@@ -1,0 +1,161 @@
+{% load component_tags extras humanize svg_tags text_filters tz %}
+{% require_script "js/alpine/components/docket_page.js" %}
+
+<c-vars
+  docket=""
+  active_tab=""
+  metadata=""
+  bankruptcy_metadata=""
+  originating_court_metadata=""
+  tabs=""
+  has_alert=""
+  note_form=""
+  tab_content_id="tab-content"
+/>
+
+{# Filed date eyebrow #}
+{% if docket.date_filed %}
+  <c-eyebrow class="mb-2">Filed: {{ docket.date_filed }}</c-eyebrow>
+{% endif %}
+
+{# Title and court #}
+<hgroup>
+  <h1 data-type="search.Docket" data-id="{{ docket.pk }}">
+    {{ docket|best_case_name|safe|v_wrapper }}
+    {% if docket.docket_number %}
+      (<span class="whitespace-nowrap">{{ docket.docket_number }}</span>)
+    {% endif %}
+  </h1>
+  {% if docket.court %}
+    <p class="text-display-xs font-semibold text-greyscale-900">{{ docket.court }}</p>
+  {% endif %}
+</hgroup>
+
+{% if perms.search.change_docket and docket.blocked %}
+  <span class="inline-block px-3 py-1 text-sm font-semibold text-red-700 bg-red-100 border border-red-300 rounded-lg">Blocked</span>
+{% endif %}
+
+{# Action buttons — placeholders only. TODO: Refactor with menu button component when available. #}
+<div class="flex flex-wrap gap-2 mt-4">
+  <c-button variant="outline">
+    {% svg "bookmark" class="w-4 h-4" aria_hidden="true" %}
+    Add a Note
+  </c-button>
+  <c-button variant="outline">
+    {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
+    Tags
+  </c-button>
+  <c-button variant="outline">
+    {% svg "bell" class="w-4 h-4" aria_hidden="true" %}
+    Get Alerts
+  </c-button>
+  {% if docket.pacer_docket_url %}
+    <c-button variant="outline">
+      {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+      View on PACER
+    </c-button>
+  {% endif %}
+</div>
+
+{# METADATA #}
+{% if metadata %}
+  <c-description-list class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+    {% for item in metadata %}
+      <c-description-item>
+        <c-description-term>{{ item.label }}</c-description-term>
+        <c-description-details>
+          {% if item.url %}
+            <a class="links" href="{{ item.url }}" {% if item.nofollow %}rel="nofollow"{% endif %}>{{ item.value }}</a>
+          {% elif item.safe %}
+            {{ item.value|safe }}
+          {% else %}
+            {{ item.value }}
+          {% endif %}
+        </c-description-details>
+      </c-description-item>
+    {% endfor %}
+  </c-description-list>
+{% endif %}
+
+{# BANKRUPTCY INFORMATION #}
+{% if bankruptcy_metadata %}
+  <h2 class="mt-6">Bankruptcy Information</h2>
+  <c-description-list>
+    {% for item in bankruptcy_metadata %}
+      <c-description-item>
+        <c-description-term>{{ item.label }}</c-description-term>
+        <c-description-details>{{ item.value }}</c-description-details>
+      </c-description-item>
+    {% endfor %}
+  </c-description-list>
+{% endif %}
+
+{# ORIGINATING COURT INFORMATION #}
+{% if originating_court_metadata %}
+  <h2 class="mt-6">Originating Court Information</h2>
+  <c-description-list>
+    {% for item in originating_court_metadata %}
+      <c-description-item>
+        <c-description-term>{{ item.label }}</c-description-term>
+        <c-description-details>
+          {% if item.url %}
+            <a class="{% if item.is_external %}links-external{% else %}links{% endif %}" href="{{ item.url }}" {% if item.nofollow %}rel="nofollow"{% endif %} {% if item.is_external %}target="_blank" rel="noreferrer"{% endif %}>{{ item.value }}</a>
+          {% elif item.safe %}
+            {{ item.value|safe }}
+          {% else %}
+            {{ item.value }}
+          {% endif %}
+        </c-description-details>
+      </c-description-item>
+    {% endfor %}
+  </c-description-list>
+{% endif %}
+
+{# ORAL ARGUMENT RECORDINGS #}
+{% if docket.audio_files.count %}
+  <h2 class="mt-6">Oral Argument Recordings</h2>
+  <ul>
+    {% for af in docket.audio_files.all %}
+      <li>
+        <a class="links" href="{{ af.get_absolute_url }}{% querystring %}">
+          {{ af|best_case_name|safe|v_wrapper }}
+        </a>
+        <br/>
+        {{ af.docket.date_argued|default_if_none:"" }}
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{# TAB NAVIGATION #}
+{% if tabs|length > 1 %}
+  {# Desktop nav links #}
+  <nav class="hidden md:flex gap-1 mt-8 overflow-x-auto scrollbar-none" aria-label="Docket sections">
+    {% for tab in tabs %}
+      <a href="{{ tab.url }}"
+         {% if active_tab == tab.key %}aria-current="page"{% endif %}
+         class="px-5 py-3 text-sm font-normal rounded-t-2xl whitespace-nowrap focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none {% if active_tab == tab.key %}bg-greyscale-100 text-greyscale-900{% else %}bg-greyscale-50 text-greyscale-600{% endif %}">
+        {{ tab.label }}
+      </a>
+    {% endfor %}
+  </nav>
+
+  {# Mobile select #}
+  <div class="bg-greyscale-100 rounded-t-2xl md:hidden pt-3 px-4 mt-8" x-data="docketPage">
+    <select x-on:change="navigateToSelected" aria-label="Select docket section" class="w-full">
+      {% for tab in tabs %}
+        <option value="{{ tab.url }}" {% if active_tab == tab.key %}selected{% endif %}>{{ tab.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# Tab content #}
+  <div id="{{ tab_content_id }}" class="bg-greyscale-100 rounded-b-2xl md:rounded-tr-2xl p-4">
+    {{ slot }}
+  </div>
+{% else %}
+  {# No tabs needed — just show the content #}
+  <div class="mt-8">
+    {{ slot }}
+  </div>
+{% endif %}

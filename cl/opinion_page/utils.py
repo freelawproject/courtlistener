@@ -16,6 +16,7 @@ from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 from elasticsearch_dsl import Q
 
 from cl.alerts.models import DocketAlert
+from cl.custom_filters.templatetags.extras import citation
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -33,11 +34,414 @@ from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    BankruptcyInformation,
     Docket,
     OpinionCluster,
+    OriginatingCourtInformation,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def build_docket_metadata(
+    docket: Docket, timezone_str: str
+) -> list[dict[str, str | bool]]:
+    """Build metadata items for the docket page description list.
+
+    Each item is a dict with 'label' and 'value', plus optional 'url',
+    'nofollow', and 'is_external' for linked values.
+    """
+    import pytz
+    from django.utils.timezone import localtime
+
+    items: list[dict[str, str | bool]] = []
+
+    if docket.source in docket.RECAP_SOURCES():
+        items.append(
+            {
+                "label": "Last Updated",
+                "value": str(
+                    localtime(
+                        docket.date_modified, pytz.timezone(timezone_str)
+                    )
+                ),
+            }
+        )
+
+    if docket.panel_str:
+        items.append({"label": "Panel", "value": docket.panel_str})
+
+    if docket.assigned_to:
+        items.append(
+            {
+                "label": "Assigned To",
+                "value": docket.assigned_to.name_full,
+                "url": docket.assigned_to.get_absolute_url(),
+            }
+        )
+    elif docket.assigned_to_str:
+        items.append(
+            {
+                "label": "Assigned To",
+                "value": docket.assigned_to_str,
+                "url": f'/?type=r&assigned_to="{docket.assigned_to_str}"',
+                "nofollow": True,
+            }
+        )
+
+    if docket.referred_to:
+        items.append(
+            {
+                "label": "Referred To",
+                "value": docket.referred_to.name_full,
+                "url": docket.referred_to.get_absolute_url(),
+            }
+        )
+    elif docket.referred_to_str:
+        items.append(
+            {
+                "label": "Referred To",
+                "value": docket.referred_to_str,
+                "url": f'/?type=r&referred_to="{docket.referred_to_str}"',
+                "nofollow": True,
+            }
+        )
+
+    if docket.date_cert_granted:
+        items.append(
+            {
+                "label": "Date Certiorari Granted",
+                "value": str(docket.date_cert_granted),
+            }
+        )
+
+    if docket.date_cert_denied:
+        items.append(
+            {
+                "label": "Date Certiorari Denied",
+                "value": str(docket.date_cert_denied),
+            }
+        )
+
+    if docket.date_argued:
+        items.append(
+            {"label": "Date Argued", "value": str(docket.date_argued)}
+        )
+
+    items.append({"label": "Citation", "value": citation(docket)})
+
+    if docket.date_reargued:
+        items.append(
+            {"label": "Date Reargued", "value": str(docket.date_reargued)}
+        )
+
+    if docket.date_reargument_denied:
+        items.append(
+            {
+                "label": "Date Reargument Denied",
+                "value": str(docket.date_reargument_denied),
+            }
+        )
+
+    if docket.date_filed:
+        items.append({"label": "Date Filed", "value": str(docket.date_filed)})
+
+    if docket.date_terminated:
+        items.append(
+            {
+                "label": "Date Terminated",
+                "value": str(docket.date_terminated),
+            }
+        )
+
+    if docket.date_last_filing:
+        items.append(
+            {
+                "label": "Date of Last Known Filing",
+                "value": str(docket.date_last_filing),
+            }
+        )
+
+    if docket.cause:
+        items.append(
+            {
+                "label": "Cause",
+                "value": docket.cause,
+                "url": f'/?type=r&cause="{docket.cause}"',
+                "nofollow": True,
+            }
+        )
+
+    if docket.nature_of_suit:
+        items.append(
+            {
+                "label": "Nature of Suit",
+                "value": docket.nature_of_suit,
+                "url": f'/?type=r&nature_of_suit="{docket.nature_of_suit}"',
+                "nofollow": True,
+            }
+        )
+
+    if docket.jury_demand:
+        items.append(
+            {
+                "label": "Jury Demand",
+                "value": docket.jury_demand,
+                "url": f'/?type=r&q=juryDemand:"{docket.jury_demand}"',
+                "nofollow": True,
+            }
+        )
+
+    if docket.jurisdiction_type:
+        items.append(
+            {"label": "Jurisdiction Type", "value": docket.jurisdiction_type}
+        )
+
+    if docket.mdl_status:
+        items.append({"label": "MDL Status", "value": docket.mdl_status})
+
+    if docket.appellate_fee_status:
+        items.append(
+            {"label": "Fee Status", "value": docket.appellate_fee_status}
+        )
+
+    if docket.appellate_case_type_information:
+        items.append(
+            {
+                "label": "Case Type Information",
+                "value": docket.appellate_case_type_information,
+            }
+        )
+
+    return items
+
+
+def build_bankruptcy_metadata(
+    bankr_info: BankruptcyInformation | None,
+) -> list[dict[str, str]]:
+    """Build metadata items for the bankruptcy information section."""
+    if not bankr_info:
+        return []
+
+    items: list[dict[str, str]] = []
+
+    if bankr_info.date_converted:
+        items.append(
+            {
+                "label": "Date Converted",
+                "value": bankr_info.date_converted.strftime("%b. %d, %Y"),
+            }
+        )
+
+    if bankr_info.date_last_to_file_claims:
+        items.append(
+            {
+                "label": "Last Date to File Claims",
+                "value": bankr_info.date_last_to_file_claims.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.date_last_to_file_govt:
+        items.append(
+            {
+                "label": "Last Date to File Claims (Gov't)",
+                "value": bankr_info.date_last_to_file_govt.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.date_debtor_dismissed:
+        items.append(
+            {
+                "label": "Date Debtor Dismissed",
+                "value": bankr_info.date_debtor_dismissed.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.chapter:
+        items.append({"label": "Chapter", "value": bankr_info.chapter})
+
+    if bankr_info.trustee_str:
+        items.append({"label": "Trustee", "value": bankr_info.trustee_str})
+
+    return items
+
+
+def build_originating_court_metadata(
+    docket: Docket, og_info: OriginatingCourtInformation | None
+) -> list[dict[str, str | bool]]:
+    """Build metadata items for the originating court information section."""
+    if not og_info:
+        return []
+
+    items: list[dict[str, str | bool]] = []
+
+    if docket.appeal_from or docket.appeal_from_str:
+        appeal_value = ""
+        if docket.appeal_from:
+            appeal_value = docket.appeal_from.short_name
+        elif docket.appeal_from_str:
+            appeal_value = docket.appeal_from_str
+
+        if og_info.docket_number:
+            if docket.appeal_from:
+                appeal_value += f' (<a class="links" href="/?type=r&docket_number={og_info.docket_number}&court={docket.appeal_from.pk}" rel="nofollow" title="Search for this docket number in the RECAP Archive.">{og_info.docket_number}</a>)'
+            elif og_info.administrative_link:
+                appeal_value += f' (<a class="links-external" href="{og_info.administrative_link}" target="_blank" rel="noreferrer">{og_info.docket_number}</a>)'
+            else:
+                appeal_value += f" ({og_info.docket_number})"
+
+        items.append(
+            {"label": "Appealed From", "value": appeal_value, "safe": True}
+        )
+
+    if og_info.court_reporter:
+        items.append(
+            {"label": "Court Reporter", "value": og_info.court_reporter}
+        )
+
+    if og_info.assigned_to:
+        items.append(
+            {
+                "label": "Trial Judge",
+                "value": og_info.assigned_to.name_full,
+                "url": og_info.assigned_to.get_absolute_url(),
+            }
+        )
+    elif og_info.assigned_to_str:
+        items.append(
+            {
+                "label": "Trial Judge",
+                "value": og_info.assigned_to_str,
+                "url": f'/?type=r&assigned_to="{og_info.assigned_to_str}"',
+                "nofollow": True,
+            }
+        )
+
+    if og_info.ordering_judge:
+        items.append(
+            {
+                "label": "Ordering Judge",
+                "value": og_info.ordering_judge.name_full,
+                "url": og_info.ordering_judge.get_absolute_url(),
+            }
+        )
+    elif og_info.ordering_judge_str:
+        items.append(
+            {
+                "label": "Ordering Judge",
+                "value": og_info.ordering_judge_str,
+                "url": f'/?type=r&assigned_to="{og_info.ordering_judge_str}"',
+                "nofollow": True,
+            }
+        )
+
+    if og_info.date_filed:
+        items.append({"label": "Date Filed", "value": str(og_info.date_filed)})
+
+    if og_info.date_judgment:
+        items.append(
+            {
+                "label": "Date Order/Judgment",
+                "value": str(og_info.date_judgment),
+            }
+        )
+
+    if og_info.date_judgment_eod:
+        items.append(
+            {
+                "label": "Date Order/Judgment EOD",
+                "value": str(og_info.date_judgment_eod),
+            }
+        )
+
+    if og_info.date_filed_noa:
+        items.append(
+            {"label": "Date NOA Filed", "value": str(og_info.date_filed_noa)}
+        )
+
+    if og_info.date_received_coa:
+        items.append(
+            {
+                "label": "Date Rec'd COA",
+                "value": str(og_info.date_received_coa),
+            }
+        )
+
+    return items
+
+
+def build_docket_tabs(
+    docket: Docket,
+    parties: bool,
+    has_idb_data: bool,
+    authority_count: int,
+) -> list[dict[str, str]]:
+    """Build the tab navigation items for the docket page.
+
+    Each item is a dict with 'label', 'url', and 'key'.
+    """
+    from django.urls import reverse
+
+    tabs = [
+        {
+            "label": "Docket Entries",
+            "url": docket.get_absolute_url(),
+            "key": "entries",
+        }
+    ]
+
+    if parties:
+        tabs.append(
+            {
+                "label": "Parties and Attorneys",
+                "url": reverse(
+                    "docket_parties",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "parties",
+            }
+        )
+
+    if has_idb_data:
+        tabs.append(
+            {
+                "label": "FJC Integrated Database",
+                "url": reverse(
+                    "docket_idb_data",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "idb",
+            }
+        )
+
+    if authority_count:
+        tabs.append(
+            {
+                "label": "Authorities",
+                "url": reverse(
+                    "docket_authorities",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "authorities",
+            }
+        )
+
+    return tabs
 
 
 async def get_case_title(cluster: OpinionCluster) -> str:

@@ -1,0 +1,23 @@
+{% extends "new_base.html" %}
+{% load extras %}
+
+{% block title %}{{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}{{ title }} - CourtListener.com{% endblock %}
+{% block description %}Docket for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}Docket for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block canonical %}{% get_canonical_element %}{% endblock %}
+
+{% block content %}
+<c-docket-page
+  :docket="docket"
+  active_tab="entries"
+  :metadata="metadata"
+  :bankruptcy_metadata="bankruptcy_metadata"
+  :originating_court_metadata="originating_court_metadata"
+  :tabs="tabs"
+  :has_alert="has_alert"
+  :note_form="note_form"
+>
+  {# Docket entries content — placeholder for now, implemented in follow-up PR #}
+</c-docket-page>
+{% endblock %}
