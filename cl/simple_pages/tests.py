@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
@@ -168,10 +169,9 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
 
-class SimplePagesTest(SimpleUserDataMixin, TestCase):
+class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
         """Make sure a page has a valid HTML title"""
-        print("Checking for HTML title tag....", end="")
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -184,17 +184,15 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             0,
             msg="The text in this title tag is empty.",
         )
-        print("✓")
 
-    async def assert_page_loads_ok(self, reverse_param: dict) -> None:
+    async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
         :param reverse_param: Params that can be sent to Django's reverse
         function to get a URL path.
-        :return: None
+        :return: The response object.
         """
         path = reverse(**reverse_param)
-        print(f"Testing basic load of: {path}...", end="")
         r = await self.async_client.get(path)
         self.assertEqual(
             r.status_code,
@@ -207,11 +205,13 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
                 code=r.status_code,
             ),
         )
-        print("✓")
         is_html = "text/html" in r["content-type"]
         if r["content-type"] and is_html:
             self.assert_page_title_in_html(r.content.decode())
+        return r
 
+
+class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: list[dict[str, Any]] = [
@@ -302,6 +302,91 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         self.assertIn(
             "with 4 minutes of recordings (and counting).", r.content.decode()
         )
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
+class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
+    """Registry of pages with v2 (redesigned) templates.
+
+    Adding a page here is part of the definition of done for a
+    redesigned template. The homepage is excluded — it has dedicated
+    tests in cl/search/tests/test_v2_pages.py.
+    """
+
+    V2_PAGES: list[tuple[dict[str, Any], str]] = [
+        # Help pages — (reverse_param, expected v2 template)
+        ({"viewname": "help_home"}, "v2_help/index.html"),
+        ({"viewname": "coverage"}, "v2_help/coverage.html"),
+        ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
+        ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
+        ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
+        ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
+        ({"viewname": "mcp_help"}, "v2_help/mcp_help.html"),
+        ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
+        ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
+        ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
+        (
+            {"viewname": "cluster_redirections_help"},
+            "v2_help/cluster_redirections_help.html",
+        ),
+        # Info pages
+        ({"viewname": "terms"}, "v2_terms/latest.html"),
+        ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
+        ({"viewname": "components"}, "v2_components.html"),
+        # API documentation pages
+        ({"viewname": "api_index"}, "v2_docs.html"),
+        ({"viewname": "bulk_data_index"}, "v2_bulk-data.html"),
+        ({"viewname": "replication_docs"}, "v2_replication.html"),
+        ({"viewname": "migration_guide"}, "v2_migration-guide.html"),
+        ({"viewname": "rest_change_log"}, "v2_rest-change-log.html"),
+        (
+            {"viewname": "webhooks_getting_started"},
+            "v2_webhooks-getting-started.html",
+        ),
+        ({"viewname": "field_api_help"}, "v2_field-help.html"),
+        (
+            {"viewname": "case_law_api_help"},
+            "v2_case-law-api-docs-vlatest.html",
+        ),
+        (
+            {"viewname": "citation_api_help"},
+            "v2_citation-api-docs-vlatest.html",
+        ),
+        (
+            {"viewname": "citation_lookup_api"},
+            "v2_citation-lookup-api-vlatest.html",
+        ),
+        ({"viewname": "pacer_api_help"}, "v2_pacer-api-docs-vlatest.html"),
+        ({"viewname": "recap_api_help"}, "v2_recap-api-docs-vlatest.html"),
+        ({"viewname": "judge_api_help"}, "v2_judge-api-docs-vlatest.html"),
+        (
+            {"viewname": "oral_argument_api_help"},
+            "v2_oral-argument-api-docs-vlatest.html",
+        ),
+        (
+            {"viewname": "visualization_api_help"},
+            "v2_visualizations-api-docs-vlatest.html",
+        ),
+        ({"viewname": "alert_api_help"}, "v2_alert-api-docs-vlatest.html"),
+        (
+            {"viewname": "financial_disclosures_api_help"},
+            "v2_financial-disclosure-api-docs-vlatest.html",
+        ),
+        (
+            {"viewname": "search_api_help"},
+            "v2_search-api-docs-vlatest.html",
+        ),
+    ]
+
+    async def test_v2_pages(self) -> None:
+        """Do all registered v2 pages load properly with the redesign flag?"""
+        for reverse_param, v2_template in self.V2_PAGES:
+            with self.subTest(
+                "Checking v2 page", reverse_params=reverse_param
+            ):
+                r = await self.assert_page_loads_ok(reverse_param)
+                self.assertTemplateUsed(r, v2_template)
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)

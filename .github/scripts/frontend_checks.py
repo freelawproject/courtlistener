@@ -16,6 +16,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+V2_REGISTER_TEST_FILE = "cl/simple_pages/tests.py"
+
 # ---------------------------------------------------------------------------
 # Severity levels
 # ---------------------------------------------------------------------------
@@ -719,6 +721,7 @@ def run_checks(
     components_library_modified = any(
         f.endswith("v2_components.html") for f in changed_files
     )
+    v2_register_test_modified = V2_REGISTER_TEST_FILE in changed_files
 
     for filepath in changed_files:
         abs_path = repo_root / filepath
@@ -735,6 +738,22 @@ def run_checks(
 
         if is_v2_template(filepath):
             _apply_checks(V2_CHECKS, lines, filepath, findings)
+
+            status = file_statuses.get(filepath, "")
+            if (
+                status == "A" or status.startswith("C")
+            ) and not v2_register_test_modified:
+                findings.append(
+                    Finding(
+                        filepath,
+                        1,
+                        "check_v2_register",
+                        WARN,
+                        "New v2 template added but v2 register test "
+                        f"({V2_REGISTER_TEST_FILE}) not modified — add "
+                        "the page's viewname to V2PagesRegisterTest.V2_PAGES",
+                    )
+                )
 
         if is_cotton_component(filepath):
             _apply_checks(COTTON_CHECKS, lines, filepath, findings)

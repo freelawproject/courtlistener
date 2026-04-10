@@ -121,6 +121,7 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         await self.async_client.alogout()
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         self.assertIn(">Login</a>", resp.content.decode())
         self.assertNotIn('id="header-profile-menu"', resp.content.decode())
 
@@ -128,6 +129,7 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         await self.async_client.alogin(username="pandora", password="password")
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         self.assertNotIn(">Login</a>", resp.content.decode())
         self.assertIn('id="header-profile-menu"', resp.content.decode())
 
@@ -150,6 +152,7 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 
     def test_scroll_buttons_have_accessibility_attrs(self):
         resp = self.client.get(reverse("show_results"))
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         html = resp.content.decode()
         self.assertIn('aria-label="Scroll actions left"', html)
         self.assertIn('aria-label="Scroll actions right"', html)
@@ -157,6 +160,7 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 
     def test_stats_section_order_and_labels(self):
         resp = self.client.get(reverse("show_results"))
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         html = resp.content.decode()
         self.assertIn('id="stats-title"', html)
         expected_labels = [
@@ -178,13 +182,15 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
     """Tests for corpus search form rendering and accessibility."""
 
-    @classmethod
-    def setUpTestData(cls):
-        """Fetch the homepage once and share across all tests"""
-        super().setUpTestData()
-        cls.response = cls.client_class().get(reverse("show_results"))
-        cls.html = cls.response.content.decode()
-        cls.tree = lhtml.fromstring(cls.html)
+    def setUp(self):
+        """Fetch the v2 homepage for each test.
+
+        Uses setUp (not setUpTestData) so @override_flag is active.
+        """
+        self.response = self.client.get(reverse("show_results"))
+        self.assertTemplateUsed(self.response, "v2_homepage.html")
+        self.html = self.response.content.decode()
+        self.tree = lhtml.fromstring(self.html)
 
     def test_unique_form_field_ids(self):
         """Test that form fields have unique IDs across desktop and mobile forms"""
@@ -274,11 +280,8 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
 
     def test_date_selector_renders(self):
         """Date selector inputs are present in the rendered search page."""
-        response = self.client.get(reverse("show_results"))
-        tree = lhtml.fromstring(response.content.decode())
-
-        after_inputs = tree.xpath('//input[@name="filed_after"]')
-        before_inputs = tree.xpath('//input[@name="filed_before"]')
+        after_inputs = self.tree.xpath('//input[@name="filed_after"]')
+        before_inputs = self.tree.xpath('//input[@name="filed_before"]')
 
         self.assertGreaterEqual(
             len(after_inputs),
