@@ -8,13 +8,14 @@ import re
 import shutil
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any, NamedTuple
+from typing import IO, Any
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -115,6 +116,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
+from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
     compute_binary_probe_jitter,
@@ -192,7 +194,12 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
-from cl.scrapers.tasks import extract_pdf_document, extract_pdf_document_base
+from cl.scrapers.tasks import (
+    extract_formatted_text_document,
+    extract_pdf_document,
+    extract_pdf_document_base,
+)
+from cl.scrapers.utils import get_extension
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -211,7 +218,11 @@ from cl.search.models import (
     Tag,
     TrialCourtData,
 )
-from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
+from cl.search.state.texas.models import (
+    ProcessingError,
+    TexasDocketEntry,
+    TexasDocument,
+)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3259,19 +3270,22 @@ def is_pdf(response: Response) -> bool:
 
 
 @contextmanager
-def download_pdf_in_stream(
+def download_document_in_stream(
     url: str,
     identifier: str | int,
     temp_prefix: str = "scotus_",
+    require_pdf: bool = True,
 ) -> Iterator[tuple[IO[bytes], str] | None]:
-    """Download a PDF in stream and yield a temporary file to avoid using too
-    much memory
+    """Download a file in stream and yield a temporary file to avoid using
+    too much memory.
 
-    :param url: The URL to download the PDF from
+    :param url: The URL to download from.
     :param identifier: An identifier for logging (docket_id, rd.pk, etc.)
-    :param temp_prefix: Prefix for the temporary file name
-    :yields: A NamedTemporaryFile positioned at the beginning, or None if
-    the response is not a PDF
+    :param temp_prefix: Prefix for the temporary file name.
+    :param require_pdf: If True, abort when Content-Type is not
+        application/pdf. Set to False to accept any file type.
+    :yields: A (NamedTemporaryFile, sha1_hex) tuple, or None if the
+        download failed or the content-type check failed.
     """
 
     @retry(
@@ -3292,7 +3306,7 @@ def download_pdf_in_stream(
             headers={"User-Agent": "Free Law Project"},
         ) as response:
             response.raise_for_status()
-            if not is_pdf(response):
+            if require_pdf and not is_pdf(response):
                 logger.warning(
                     "PDF download: Expected application/pdf for %s from %s; aborting.",
                     identifier,
@@ -3360,7 +3374,9 @@ def download_qp_scotus_pdf(self, docket_id: int) -> None:
         docket_id,
         qp_url,
     )
-    with download_pdf_in_stream(qp_url, docket_id, "scotus_qp_") as result:
+    with download_document_in_stream(
+        qp_url, docket_id, "scotus_qp_", require_pdf=True
+    ) as result:
         if result is None:
             logger.error(
                 "Failed to download QP file for SCOTUS Docket %s from URL %s.",
@@ -3786,7 +3802,9 @@ def download_scotus_document_pdf(self: Task, doc_pk: int) -> int | None:
         doc_pk,
         url,
     )
-    with download_pdf_in_stream(url, doc_pk, "scotus_") as result:
+    with download_document_in_stream(
+        url, doc_pk, "scotus_", require_pdf=True
+    ) as result:
         if result is None:
             logger.error(
                 "Failed to download attachment PDF for SCOTUSDocument %s from URL %s.",
@@ -3869,10 +3887,17 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     process_scotus_docket.delay(docket_data)
 
 
-def _download_texas_document_pdf(
-    task: Task, texas_document_pk: int
-) -> int | None:
-    """Download a Texas document PDF and save it locally.
+KNOWN_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
+EXTRACTABLE_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd"}
+
+
+def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
+    """Download a Texas document and save it locally.
+
+    Accepts any file type. PDF-specific processing (page count) is only
+    performed for PDFs. Non-PDF documents are marked as OCR_UNNECESSARY.
+    For non-extractable types (.mp3, unknown), the extract chain is
+    broken so extract_formatted_text_document is skipped.
 
     :param task: The Celery task instance (used to break the chain on failure).
     :param texas_document_pk: The primary key of the TexasDocument instance to
@@ -3884,31 +3909,77 @@ def _download_texas_document_pdf(
         texas_document = TexasDocument.objects.get(pk=texas_document_pk)
     except TexasDocument.DoesNotExist:
         logger.warning(
-            "Texas document PDF download: TexasDocument %s does not exist; skipping.",
+            "Texas document download: TexasDocument %s does not exist; skipping.",
+            texas_document_pk,
+        )
+        task.request.chain = None
+        return None
+
+    if texas_document.processing_error == ProcessingError.BAD_URL:
+        logger.warning(
+            "Texas document download: TexasDocument %s has a bad URL. "
+            "Skipping.",
             texas_document_pk,
         )
         task.request.chain = None
         return None
 
     url = texas_document.url
+
     logger.info(
-        "Texas PDF download: Fetching PDF for TexasDocument %s from %s",
+        "Texas document download: Fetching document for TexasDocument %s from %s",
         texas_document_pk,
         url,
     )
 
-    with download_pdf_in_stream(url, texas_document.pk, "texas_") as result:
+    with download_document_in_stream(
+        url, texas_document.pk, "texas_", require_pdf=False
+    ) as result:
         if result is None:
             logger.error(
-                "Failed to download attachment PDF for TexasDocument %s from URL %s.",
+                "Failed to download document for TexasDocument %s from URL %s.",
                 texas_document.pk,
                 url,
             )
             task.request.chain = None
             return None
+
         tmp, sha1_hash = result
+        content = tmp.read(8192)
+        tmp.seek(0)
+
+        extension = get_extension(content)
+        if extension not in KNOWN_TEXAS_EXTENSIONS:
+            logger.warning(
+                "Texas document download: Unexpected file extension "
+                "'%s' for TexasDocument %s from %s. Proceeding anyway.",
+                extension,
+                texas_document.pk,
+                url,
+            )
+
+        if extension == ".html":
+            tmp.seek(0, 2)
+            file_size = tmp.tell()
+            tmp.seek(0)
+            if file_size <= 25_000:
+                full_content = tmp.read()
+                tmp.seek(0)
+                if is_missing_file_page(full_content):
+                    logger.warning(
+                        "Texas document download: TexasDocument %s at %s "
+                        "returned a missing file page.",
+                        texas_document.pk,
+                        url,
+                    )
+                    texas_document.processing_error = ProcessingError.BAD_URL
+                    texas_document.save()
+                    task.request.chain = None
+                    return None
+
         filename = (
-            f"{texas_document.media_id}-{texas_document.media_version_id}.pdf"
+            f"{texas_document.media_id}"
+            f"-{texas_document.media_version_id}{extension}"
         )
         downloaded_file = File(tmp)
         texas_document.filepath_local.save(
@@ -3916,40 +3987,49 @@ def _download_texas_document_pdf(
         )
         texas_document.file_size = downloaded_file.size
         texas_document.sha1 = sha1_hash
-        response = async_to_sync(doc_page_count_service)(texas_document)
-        if response.is_success:
-            texas_document.page_count = int(response.text)
+
+        if extension == ".pdf":
+            response = async_to_sync(doc_page_count_service)(texas_document)
+            if response.is_success:
+                texas_document.page_count = int(response.text)
+        elif extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
+            # A slight misnomer, this is a flag for needing the rest of the plain_text extraction pipeline
+            texas_document.ocr_status = TexasDocument.OCR_UNNECESSARY
+
         texas_document.save()
+
+        if extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
+            task.request.chain = None
+            return None
+
         return texas_document_pk
 
 
 @app.task(
     bind=True,
     ignore_result=True,
-    # No retries because download_pdf_in_stream already has retry logic
+    # No retries because download_document_in_stream already has retry logic
 )
 @throttle_task("2/s")
-def download_texas_document_pdf(
-    self: Task, texas_document_pk: int
-) -> int | None:
-    """Throttled version of the Texas document PDF download task.
+def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
+    """Throttled version of the Texas document download task.
 
     :param self: The Celery task instance.
     :param texas_document_pk: The primary key of the TexasDocument instance.
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    return _download_texas_document_pdf(self, texas_document_pk)
+    return _download_texas_document(self, texas_document_pk)
 
 
 @app.task(
     bind=True,
     ignore_result=True,
 )
-def download_texas_document_pdf_unthrottled(
+def download_texas_document_unthrottled(
     self: Task, texas_document_pk: int
 ) -> int | None:
-    """Unthrottled version of the Texas document PDF download task.
+    """Unthrottled version of the Texas document download task.
 
     Use this when the caller already handles throttling (e.g. via
     CeleryThrottle).
@@ -3959,52 +4039,94 @@ def download_texas_document_pdf_unthrottled(
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    return _download_texas_document_pdf(self, texas_document_pk)
+    return _download_texas_document(self, texas_document_pk)
 
 
-class MergeResult[T = int](NamedTuple):
-    """Stores data about the result of an attempted merge operation."""
+TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
 
-    create: bool
-    """Whether a document needed to be created."""
-    update: bool
-    """Whether a document needed to be updated."""
-    success: bool
-    """Whether the operation was successful."""
-    pk: T | None
-    """The primary key of the created or updated object."""
 
-    @staticmethod
-    def created[S](pk: S) -> MergeResult[S]:
-        """Shorthand for the result of a successful creation operation.
+@dataclass
+class MergeResult[T = int]:
+    """Stores data about the result of an attempted merge operation.
 
-        :param pk: The primary key of the created object.
-        :return: The constructed MergeResult object."""
-        return MergeResult(create=True, update=False, success=True, pk=pk)
+    :ivar creates: Objects which needed to be created. Key is object name and
+        value is a list of PKs to created objects.
+    :ivar updates: Objects which needed to be updated.
+    :ivar failures: Objects for which the merge operation failed. Items will be
+        None if an object needed to be created but that operation failed."""
+
+    creates: dict[str, set[T]] = field(default_factory=dict)
+    updates: dict[str, set[T]] = field(default_factory=dict)
+    failures: dict[str, list[T | None]] = field(default_factory=dict)
 
     @staticmethod
-    def updated[S](pk: S) -> MergeResult[S]:
-        """Shorthand for the result of a successful update operation.
-
-        :param pk: The primary key of the updated object.
-        :return: The constructed MergeResult object."""
-        return MergeResult(create=False, update=True, success=True, pk=pk)
-
-    @staticmethod
-    def failed[S]() -> MergeResult[S]:
-        """Shorthand for the result of a failed merge operation.
-
-        :return: The constructed MergeResult object."""
-        return MergeResult[S](
-            create=False, update=False, success=False, pk=None
+    def union[S, U](
+        a: MergeResult[S], b: MergeResult[U]
+    ) -> MergeResult[S | U]:
+        """
+        Creates a new MergeResult object storing the combined results of two
+        objects.
+        """
+        return MergeResult[S | U](
+            creates={
+                k: a.creates.get(k, set()) | b.creates.get(k, set())
+                for k in a.creates.keys() | b.creates.keys()
+            },
+            updates={
+                k: a.updates.get(k, set()) | b.updates.get(k, set())
+                for k in a.updates.keys() | b.updates.keys()
+            },
+            failures={
+                k: [*a.failures.get(k, []), *b.failures.get(k, [])]
+                for k in a.failures.keys() | b.failures.keys()
+            },
         )
 
+    @property
+    def success(self) -> bool:
+        return not self.failures
+
+    @property
+    def update(self) -> bool:
+        return bool(self.updates)
+
+    @property
+    def create(self) -> bool:
+        return bool(self.creates)
+
     @staticmethod
-    def unnecessary[S](pk: S | None) -> MergeResult[S]:
+    def created[S](model: str, pk: S) -> MergeResult[S]:
+        """Shorthand for the result of a successful create operation.
+
+        :param model: The model which was created.
+        :param pk: The primary key of created object.
+        :returns: The constructed MergeResult object."""
+        return MergeResult(creates={model: {pk}})
+
+    @staticmethod
+    def updated[S](model: str, pk: S) -> MergeResult[S]:
+        """Shorthand for the result of a successful update operation.
+
+        :param model: The model which was updated.
+        :param pk: The primary key of the updated object.
+        :return: The constructed MergeResult object."""
+        return MergeResult(updates={model: {pk}})
+
+    @staticmethod
+    def failed[S](model: str, pk: S | None = None) -> MergeResult[S]:
+        """Shorthand for the result of a failed merge operation.
+
+        :param model: The model which failed.
+        :param pk: The (optional) primary key of the failed object.
+        :return: The constructed MergeResult object."""
+        return MergeResult(failures={model: [pk]})
+
+    @staticmethod
+    def unnecessary() -> MergeResult:
         """Shorthand for the result of an unnecessary merge operation.
 
         :return: The constructed MergeResult object."""
-        return MergeResult[S](create=False, update=False, success=True, pk=pk)
+        return MergeResult()
 
 
 def merge_texas_trial_court_data(
@@ -4026,7 +4148,7 @@ def merge_texas_trial_court_data(
             "Originating court for Texas docket %s is appellate. TrialCourtData unnecessary.",
             docket.docket_number,
         )
-        return MergeResult.unnecessary(None)
+        return MergeResult.unnecessary()
     dn_trial = originating_court["case"]
     judge_name = originating_court["judge"]
     reporter = originating_court["reporter"]
@@ -4080,20 +4202,18 @@ def merge_texas_trial_court_data(
         "county": county,
     }
 
-    updated = False
-    if not created:
-        updated = any(
-            getattr(trial_court_data, k) != v for k, v in new_values.items()
-        )
-        if not updated:
-            return MergeResult.unnecessary(trial_court_data.pk)
+    updated = not created and any(
+        getattr(trial_court_data, k) != v for k, v in new_values.items()
+    )
+    if not created and not updated:
+        return MergeResult.unnecessary()
 
     for k, v in new_values.items():
         setattr(trial_court_data, k, v)
     trial_court_data.save()
-    return MergeResult(
-        create=created, update=updated, success=True, pk=trial_court_data.pk
-    )
+    if created:
+        return MergeResult.created("TrialCourtData", trial_court_data.pk)
+    return MergeResult.updated("TrialCourtData", trial_court_data.pk)
 
 
 def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
@@ -4135,7 +4255,7 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
         logger.error(
             "Found multiple matching CaseTransfer objects.",
         )
-        return MergeResult.failed()
+        return MergeResult.failed("CaseTransfer")
     except CaseTransfer.DoesNotExist:
         logger.info(
             "Could not find existing transfer to update. Checking if transfer already exists..."
@@ -4150,17 +4270,17 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
             logger.error(
                 "Found multiple matching CaseTransfer objects.",
             )
-            return MergeResult.failed()
+            return MergeResult.failed("CaseTransfer")
         except CaseTransfer.DoesNotExist:
             logger.info(
                 "Did not find existing CaseTransfer object. Creating..."
             )
             case_transfer.save()
-            return MergeResult.created(case_transfer.pk)
+            return MergeResult.created("CaseTransfer", case_transfer.pk)
         logger.info(
             "Identical CaseTransfer object already exists. Merge is unnecessary."
         )
-        return MergeResult.unnecessary(existing_case_transfer.pk)
+        return MergeResult.unnecessary()
     else:
         logger.info(
             "Updating existing CaseTransfer %s.", existing_case_transfer.pk
@@ -4172,7 +4292,7 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
                 case_transfer.destination_docket
             )
         existing_case_transfer.save()
-        return MergeResult.updated(existing_case_transfer.pk)
+        return MergeResult.updated("CaseTransfer", existing_case_transfer.pk)
 
 
 def merge_texas_document(
@@ -4221,6 +4341,7 @@ def merge_texas_document(
             texas_document.filepath_local.delete(save=False)
         texas_document.filepath_local = ""
         texas_document.ocr_status = None
+        texas_document.processing_error = None
         texas_document.save()
         if download_attachments:
             transaction.on_commit(
@@ -4229,22 +4350,20 @@ def merge_texas_document(
                 # prevent mypy from complaining.
                 (
                     lambda pk: lambda: chain(
-                        download_texas_document_pdf.si(pk),
-                        extract_pdf_document.s(
+                        download_texas_document.si(pk),
+                        extract_formatted_text_document.s(
                             check_if_needed=False,
                             model_name="search.TexasDocument",
+                            strip_html_tags=True,
                         ),
                     ).apply_async()
                 )(texas_document.pk)
             )
-        return MergeResult(
-            create=not existed,
-            update=existed,
-            success=True,
-            pk=texas_document.pk,
-        )
+        if existed:
+            return MergeResult.updated("TexasDocument", texas_document.pk)
+        return MergeResult.created("TexasDocument", texas_document.pk)
 
-    return MergeResult.unnecessary(texas_document.pk)
+    return MergeResult.unnecessary()
 
 
 @transaction.atomic
@@ -4266,12 +4385,7 @@ def merge_texas_docket_entry(
         an appellate brief, None otherwise.
     :param download_attachments: Whether to download docket entry attachments.
 
-    :return: Tuple with the following entries
-    - A flag indicating whether the docket entry or an attached document needed
-    to be created or updated,
-    - A flag which is set to true when the create/update operations are all
-    either successful or unnecessary,
-    - The primary key of the updated TexasDocketEntry object.
+    :return: The result of the merge operation.
     """
     logger.info(
         "Merging TexasDocketEntry with sequence number %s into Docket %s",
@@ -4342,19 +4456,21 @@ def merge_texas_docket_entry(
         docket_entry.pk,
         docket.pk,
     )
-    document_results = [
-        merge_texas_document(
-            docket_entry, document, download_attachments=download_attachments
-        )
-        for document in case_event["attachments"]
-    ]
-
-    return MergeResult(
-        create=created or any(r.create for r in document_results),
-        update=not created or any(r.update for r in document_results),
-        success=all(r.success for r in document_results),
-        pk=docket_entry.pk,
+    result = (
+        MergeResult.created("TexasDocketEntry", docket_entry.pk)
+        if created
+        else MergeResult.updated("TexasDocketEntry", docket_entry.pk)
     )
+    for document in case_event["attachments"]:
+        result = MergeResult.union(
+            result,
+            merge_texas_document(
+                docket_entry,
+                document,
+                download_attachments=download_attachments,
+            ),
+        )
+    return result
 
 
 def merge_texas_docket_entries(
@@ -4373,16 +4489,14 @@ def merge_texas_docket_entries(
     :param appellate_briefs: Scraped appellate briefs.
     :param download_attachments: Whether to download attachments.
 
-    :return: The result of the attempted merge operation.
+    :return: The result of the merge operation.
     """
     brief_iter = iter(appellate_briefs)
     next_brief = next(brief_iter, None)
 
-    create = False
-    update = False
-    success = True
-    for i, (case_event, sequence_number) in enumerate(
-        zip(case_events, create_docket_entry_sequence_numbers(case_events))
+    result = MergeResult()
+    for case_event, sequence_number in zip(
+        case_events, create_docket_entry_sequence_numbers(case_events)
     ):
         appellate_brief = None
         if (
@@ -4393,20 +4507,18 @@ def merge_texas_docket_entries(
         ):
             appellate_brief = next_brief
             next_brief = next(brief_iter, None)
-
-        merge_result = merge_texas_docket_entry(
-            docket,
-            sequence_number,
-            case_event,
-            appellate_brief,
-            download_attachments=download_attachments,
+        result = MergeResult.union(
+            result,
+            merge_texas_docket_entry(
+                docket,
+                sequence_number,
+                case_event,
+                appellate_brief,
+                download_attachments=download_attachments,
+            ),
         )
 
-        create = merge_result.create or create
-        update = merge_result.update or update
-        success = merge_result.success and success
-
-    return MergeResult(create=create, update=update, success=success, pk=None)
+    return result
 
 
 def normalize_texas_parties(
@@ -4483,7 +4595,7 @@ def merge_texas_parties(
         add_parties_and_attorneys does not return this information.
     """
     add_parties_and_attorneys(docket, normalize_texas_parties(parties))
-    return MergeResult(create=False, update=False, success=True, pk=None)
+    return MergeResult.unnecessary()
 
 
 def merge_texas_docket_originating_court(
@@ -4501,7 +4613,7 @@ def merge_texas_docket_originating_court(
     if texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
-            return MergeResult.failed()
+            return MergeResult.failed("OriginatingCourtInformation")
         oc_dn = sorted(ocd["case_number"])[0]
         oc_reporter = ""
         oc_judge = ocd["justice"]
@@ -4520,7 +4632,7 @@ def merge_texas_docket_originating_court(
             "Skipping merge of OCI for Texas docket %s due to unknown originating court type.",
             docket.docket_number,
         )
-        return MergeResult.unnecessary(None)
+        return MergeResult.failed("OriginatingCourtInformation")
 
     created = False
     if not docket.originating_court_information:
@@ -4546,8 +4658,8 @@ def merge_texas_docket_originating_court(
     oci.save()
     if created:
         docket.save()
-
-    return MergeResult(create=created, update=False, success=True, pk=None)
+        return MergeResult.created("OriginatingCourtInformation", oci.pk)
+    return MergeResult.updated("OriginatingCourtInformation", oci.pk)
 
 
 def merge_texas_case_transfers(
@@ -4604,7 +4716,7 @@ def merge_texas_case_transfers(
                     "Unable to determine trial court ID for Texas docket %s to create death penalty appeal CaseTransfer",
                     docket.docket_number,
                 )
-                return MergeResult.failed()
+                return MergeResult.failed("CaseTransfer")
 
             appeal_transfer_origin_dns = [oc_dn]
             appeal_transfer_origin_court_id = trial_court_id
@@ -4625,7 +4737,7 @@ def merge_texas_case_transfers(
                     docket.docket_number,
                 )
 
-                return MergeResult.unnecessary(None)
+                return MergeResult.failed("CaseTransfer")
 
             logger.warning(
                 "Found Texas SC docket with originating information but no appellate information (docket number %s). Falling back to using trial court to create appeal type transfer.",
@@ -4711,7 +4823,7 @@ def merge_texas_case_transfers(
                 docket_data["court_type"],
             )
 
-            return MergeResult.failed()
+            return MergeResult.failed("CaseTransfer")
 
     if appeal_transfer_origin_court_id:
         try:
@@ -4737,14 +4849,10 @@ def merge_texas_case_transfers(
                 for appeal_transfer_origin_dn in appeal_transfer_origin_dns
             )
 
-    results = [merge_case_transfer(transfer) for transfer in transfers]
-
-    return MergeResult(
-        success=all([r.success for r in results]),
-        create=any([r.create for r in results]),
-        update=any([r.update for r in results]),
-        pk=None,
-    )
+    result = MergeResult()
+    for transfer in transfers:
+        result = MergeResult.union(result, merge_case_transfer(transfer))
+    return result
 
 
 def merge_texas_docket(
@@ -4767,7 +4875,7 @@ def merge_texas_docket(
 
     if docket_data["court_type"] == CourtType.UNKNOWN.value:
         logger.error("Texas docket %s has unknown court type", docket_number)
-        return MergeResult.failed()
+        return MergeResult.failed("Docket")
 
     with transaction.atomic():
         docket = None
@@ -4847,7 +4955,7 @@ def merge_texas_docket(
     if docket_data["court_type"] == CourtType.SUPREME.value:
         trial_court_result = merge_texas_trial_court_data(docket, docket_data)
     else:
-        trial_court_result = MergeResult.unnecessary(None)
+        trial_court_result = MergeResult.unnecessary()
 
     party_merge_result = merge_texas_parties(docket, docket_data["parties"])
 
@@ -4862,28 +4970,16 @@ def merge_texas_docket(
         docket, docket_data
     )
 
-    create = (
-        party_merge_result.create
-        or trial_court_result.create
-        or originating_court_merge_result.create
-        or merge_case_transfer_result.create
-        or entry_merge_result.create
+    result = MergeResult.union(
+        originating_court_merge_result, trial_court_result
     )
-    update = (
-        party_merge_result.update
-        or trial_court_result.update
-        or originating_court_merge_result.update
-        or merge_case_transfer_result.update
-        or entry_merge_result.update
-    )
-    success = (
-        party_merge_result.success
-        and trial_court_result.success
-        and originating_court_merge_result.success
-        and merge_case_transfer_result.success
-        and entry_merge_result.success
-    )
-    if not success:
+    result = MergeResult.union(result, party_merge_result)
+    result = MergeResult.union(result, entry_merge_result)
+    result = MergeResult.union(result, merge_case_transfer_result)
+    # Track the docket PK in the result
+    result.creates.setdefault("Docket", set()).add(docket.pk)
+
+    if not result.success:
         logger.error(
             "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Please review logs.",
             docket_number,
@@ -4891,12 +4987,7 @@ def merge_texas_docket(
             court.pk,
         )
 
-    return MergeResult(
-        create=create,
-        update=update,
-        success=success,
-        pk=docket.pk,
-    )
+    return result
 
 
 @app.task(
@@ -4909,6 +5000,7 @@ def texas_ingest_docket_task(
     task: Task,
     i: tuple[bytes, TexasDocketMeta],
     download_attachments: bool = True,
+    subscription_data: str | None = None,
 ) -> MergeResult:
     """
     Task to parse and merge a Texas docket.
@@ -4919,6 +5011,8 @@ def texas_ingest_docket_task(
     - Bytes string to parse.
     - Docket metadata.
     :param download_attachments: Whether to download docket entry attachments.
+    :param subscription_data: Optional JSON string to add to the pending
+        subscriptions Redis SET when a new docket is created.
 
     :return: The result of the merge operation.
     """
@@ -4939,7 +5033,7 @@ def texas_ingest_docket_task(
                     meta.case_number,
                 )
                 task.request.chain = None
-                return MergeResult.failed()
+                return MergeResult.failed("Docket")
 
         parser._parse_text(content.decode("utf-8"))
         docket_data = parser.data
@@ -4950,10 +5044,14 @@ def texas_ingest_docket_task(
             str(e),
         )
         task.request.chain = None
-        return MergeResult.failed()
-    return merge_texas_docket(
+        return MergeResult.failed("Docket")
+    result = merge_texas_docket(
         docket_data, download_attachments=download_attachments
     )
+    if subscription_data and result.create:
+        redis = get_redis_interface("CACHE")
+        redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+    return result
 
 
 @app.task(
