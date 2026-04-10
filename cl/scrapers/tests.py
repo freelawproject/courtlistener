@@ -2499,6 +2499,8 @@ class TexasCaseMailIntegrationTest(TestCase):
         mock_parse_text.assert_called_once_with(fake_docket_html)
 
         self.assertEqual(await Docket.objects.acount(), 1)
+
+
 class AccountSubscriptionIncludeTest(TestCase):
     def setUp(self):
         self.subscription = AccountSubscription.objects.create(
