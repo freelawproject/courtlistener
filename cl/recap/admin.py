@@ -3,14 +3,16 @@ from django.contrib import admin, messages
 from django.contrib.auth.models import User
 from django.utils.translation import ngettext
 
+from cl.lib.model_helpers import is_texas_court
 from cl.recap.models import (
     EmailProcessingQueue,
+    EmailSource,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     PacerHtmlFiles,
     ProcessingQueue,
 )
-from cl.recap.tasks import do_recap_document_fetch
+from cl.recap.tasks import do_recap_document_fetch, process_texas_email
 
 
 @admin.register(ProcessingQueue)
@@ -73,7 +75,11 @@ class PacerHtmlFilesAdmin(CursorPaginatorAdmin):
 def reprocess_failed_epq(modeladmin, request, queryset):
     recap_email_user = User.objects.get(username="recap-email")
     for epq in queryset:
-        do_recap_document_fetch(epq, recap_email_user)
+        if epq.source == EmailSource.STATE:
+            if is_texas_court(epq.court):
+                process_texas_email.delay(epq.pk)
+        else:
+            do_recap_document_fetch(epq, recap_email_user)
 
     modeladmin.message_user(
         request,
