@@ -4041,6 +4041,9 @@ def download_texas_document_unthrottled(
     return _download_texas_document(self, texas_document_pk)
 
 
+TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
+
+
 class MergeResult[T = int](NamedTuple):
     """Stores data about the result of an attempted merge operation."""
 
@@ -4990,6 +4993,7 @@ def texas_ingest_docket_task(
     task: Task,
     i: tuple[bytes, TexasDocketMeta],
     download_attachments: bool = True,
+    subscription_data: str | None = None,
 ) -> MergeResult:
     """
     Task to parse and merge a Texas docket.
@@ -5000,6 +5004,8 @@ def texas_ingest_docket_task(
     - Bytes string to parse.
     - Docket metadata.
     :param download_attachments: Whether to download docket entry attachments.
+    :param subscription_data: Optional JSON string to add to the pending
+        subscriptions Redis SET when a new docket is created.
 
     :return: The result of the merge operation.
     """
@@ -5032,9 +5038,13 @@ def texas_ingest_docket_task(
         )
         task.request.chain = None
         return MergeResult.failed()
-    return merge_texas_docket(
+    result = merge_texas_docket(
         docket_data, download_attachments=download_attachments
     )
+    if subscription_data and result.create and result.pk is not None:
+        redis = get_redis_interface("CACHE")
+        redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+    return result
 
 
 @app.task(
