@@ -1,4 +1,5 @@
 import datetime
+import logging
 from collections import defaultdict
 from http import HTTPStatus
 from typing import Any
@@ -28,6 +29,8 @@ from cl.users.utils import (
     create_stub_account,
     emails,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class NeonMembershipWebhookSerializer(serializers.Serializer):
@@ -366,6 +369,20 @@ class MembershipWebhookViewSet(
         payment_status = self._map_payment_status_value(
             membership_data["paymentStatus"]
         )
+
+        # .edu memberships are free. If Neon didn't send payment info, treat
+        # them as succeeded rather than pending.
+        if membership_level == NeonMembershipLevel.EDU:
+            if not membership_data["paymentStatus"]:
+                payment_status = MembershipPaymentStatus.SUCCEEDED
+            else:
+                logger.error(
+                    "EDU membership %s for account %s has unexpected "
+                    "payment status: %s. Review manually.",
+                    membership_data["membershipId"],
+                    membership_data["accountId"],
+                    membership_data["paymentStatus"],
+                )
 
         try:
             neon_membership = user.membership
