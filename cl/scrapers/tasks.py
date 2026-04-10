@@ -422,7 +422,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     # from the court's server. Since this task is called on a scrape, we assume
     # that is the most recent
     if versions.exists():
-        stats = defaultdict(lambda: 0)
+        stats: defaultdict[str, int] = defaultdict(lambda: 0)
         merge_versions_by_text_similarity(
             recently_scraped_opinion, versions, stats
         )
@@ -691,12 +691,12 @@ def process_audio_file(self, pk) -> None:
     audio_response.raise_for_status()
     cf = ContentFile(audio_response.content)
     file_name = f"{trunc(best_case_name(audio_obj).lower(), 72)}_cl.mp3"
-    audio_obj.file_with_date = audio_obj.docket.date_argued
+    audio_obj.file_with_date = audio_obj.docket.date_argued  # type: ignore[attr-defined]
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
     audio_obj.duration = float(
         async_to_sync(microservice)(
             service="audio-duration",
-            file=audio_response.content,
+            file=audio_response.content,  # type: ignore[arg-type]
             file_type="mp3",
         ).text
     )
