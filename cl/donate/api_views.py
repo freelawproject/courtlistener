@@ -362,10 +362,17 @@ class MembershipWebhookViewSet(
                         email["from_email"],
                         [user.email],
                     )
-
-        payment_status = self._map_payment_status_value(
-            membership_data["paymentStatus"]
-        )
+        # .edu memberships are free. If Neon didn't send payment info,
+        # treat them as succeeded rather than pending.
+        if (
+            membership_level == NeonMembershipLevel.EDU
+            and not membership_data["paymentStatus"]
+        ):
+            payment_status = MembershipPaymentStatus.SUCCEEDED
+        else:
+            payment_status = self._map_payment_status_value(
+                membership_data["paymentStatus"]
+            )
 
         try:
             neon_membership = user.membership
