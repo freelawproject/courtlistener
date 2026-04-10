@@ -6,8 +6,8 @@ from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
 from django import test
+from django.apps import apps
 from django.contrib.staticfiles import testing
-from django.core.management import call_command
 from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
@@ -146,18 +146,49 @@ class ESIndexTestCase(SimpleTestCase):
 
     @classmethod
     def rebuild_index(cls, model):
-        """Create and populate the Elasticsearch index and mapping"""
-        call_command("search_index", "--rebuild", "-f", "--models", model)
+        """Delete, recreate, and populate the Elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        models = model if isinstance(model, list) else [model]
+        model_classes = [apps.get_model(m) for m in models]
+        for index in registry.get_indices(models=model_classes):
+            index.delete(ignore=[404, 400])
+            index.create()
+        for doc in registry.get_documents(models=model_classes):
+            qs = doc().get_indexing_queryset()
+            doc().update(qs)
 
     @classmethod
     def create_index(cls, model):
-        """Create the elasticsearch index."""
-        call_command("search_index", "--create", "-f", "--models", model)
+        """Create the elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        models = model if isinstance(model, list) else [model]
+        model_classes = [apps.get_model(m) for m in models]
+        for index in registry.get_indices(models=model_classes):
+            index.create(ignore=[400])
 
     @classmethod
     def delete_index(cls, model):
-        """Delete the elasticsearch index."""
-        call_command("search_index", "--delete", "-f", "--models", model)
+        """Delete the elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        models = model if isinstance(model, list) else [model]
+        model_classes = [apps.get_model(m) for m in models]
+        for index in registry.get_indices(models=model_classes):
+            index.delete(ignore=[404, 400])
 
     @classmethod
     def restart_celery_throttle_key(cls):
