@@ -34,8 +34,10 @@ from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    BankruptcyInformation,
     Docket,
     OpinionCluster,
+    OriginatingCourtInformation,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 def build_docket_metadata(
     docket: Docket, timezone_str: str
-) -> list[dict[str, str]]:
+) -> list[dict[str, str | bool]]:
     """Build metadata items for the docket page description list.
 
     Each item is a dict with 'label' and 'value', plus optional 'url',
@@ -52,7 +54,7 @@ def build_docket_metadata(
     import pytz
     from django.utils.timezone import localtime
 
-    items: list[dict[str, str]] = []
+    items: list[dict[str, str | bool]] = []
 
     if docket.source in docket.RECAP_SOURCES():
         items.append(
@@ -215,7 +217,7 @@ def build_docket_metadata(
 
 
 def build_bankruptcy_metadata(
-    bankr_info: object,
+    bankr_info: BankruptcyInformation | None,
 ) -> list[dict[str, str]]:
     """Build metadata items for the bankruptcy information section."""
     if not bankr_info:
@@ -271,13 +273,13 @@ def build_bankruptcy_metadata(
 
 
 def build_originating_court_metadata(
-    docket: Docket, og_info: object
-) -> list[dict[str, str]]:
+    docket: Docket, og_info: OriginatingCourtInformation | None
+) -> list[dict[str, str | bool]]:
     """Build metadata items for the originating court information section."""
     if not og_info:
         return []
 
-    items: list[dict[str, str]] = []
+    items: list[dict[str, str | bool]] = []
 
     if docket.appeal_from or docket.appeal_from_str:
         appeal_value = ""
