@@ -250,7 +250,7 @@ def save_docket_response(
     case_meta: dict,
     court_id: str = "unknown_court",
     skip_meta: bool = False,
-) -> None:
+) -> tuple[str, str]:
     """Store docket scraper response content and headers in S3.
 
     Args:
@@ -259,6 +259,10 @@ def save_docket_response(
         court_id: Court identifier extracted from response data
         case_meta: Optional metadata dict from the scraper (e.g., case_number,
             date_filed, etc.) to save alongside the response
+
+    Returns:
+        Tuple of (bucket_name, base_key) for locating stored files. HTML
+        is at ``{base_key}.html``, meta at ``{base_key}_meta.json``.
     """
     storage = S3GlacierInstantRetrievalStorage(
         naming_strategy=clobbering_get_name
@@ -287,6 +291,8 @@ def save_docket_response(
 
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
+
+    return storage.bucket_name, base_name
 
 
 def parse_date_filed(date_str: str | None) -> date | None:

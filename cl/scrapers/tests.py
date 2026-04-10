@@ -56,7 +56,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_download_url,
     passes_length_ratio_check,
 )
-from cl.scrapers.models import UrlHash
+from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
     extract_opinion_content,
     find_and_merge_versions,
@@ -2499,3 +2499,36 @@ class TexasCaseMailIntegrationTest(TestCase):
         mock_parse_text.assert_called_once_with(fake_docket_html)
 
         self.assertEqual(await Docket.objects.acount(), 1)
+class AccountSubscriptionIncludeTest(TestCase):
+    def setUp(self):
+        self.subscription = AccountSubscription.objects.create(
+            scraper=Scraper.TAMES,
+            email="test@example.com",
+            user_name="testuser",
+            first_subscription=date(2025, 3, 1),
+            last_subscription=date(2025, 3, 15),
+        )
+
+    def test_new_dates_widen_window(self):
+        """Dates outside the existing window should expand it."""
+        self.subscription.include_subscriptions(
+            {date(2025, 2, 20), date(2025, 4, 1)}
+        )
+        self.subscription.refresh_from_db()
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 2, 20)
+        )
+        self.assertEqual(self.subscription.last_subscription, date(2025, 4, 1))
+
+    def test_inner_dates_do_not_change_window(self):
+        """Dates within the existing window should leave it unchanged."""
+        self.subscription.include_subscriptions(
+            {date(2025, 3, 5), date(2025, 3, 10)}
+        )
+        self.subscription.refresh_from_db()
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 3, 1)
+        )
+        self.assertEqual(
+            self.subscription.last_subscription, date(2025, 3, 15)
+        )
