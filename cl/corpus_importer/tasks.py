@@ -5045,10 +5045,10 @@ def texas_ingest_docket_task(
         )
         task.request.chain = None
         return MergeResult.failed("Docket")
-    return merge_texas_docket(
+    result = merge_texas_docket(
         docket_data, download_attachments=download_attachments
     )
-    if subscription_data and result.create and result.pk is not None:
+    if subscription_data and result.create:
         redis = get_redis_interface("CACHE")
         redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
     return result
