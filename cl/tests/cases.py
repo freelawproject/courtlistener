@@ -152,11 +152,15 @@ class ESIndexTestCase(SimpleTestCase):
 
     @staticmethod
     def _get_indices(model):
-        return registry.get_indices(models=ESIndexTestCase._get_model_classes(model))
+        return registry.get_indices(
+            models=ESIndexTestCase._get_model_classes(model)
+        )
 
     @staticmethod
     def _get_documents(model):
-        return registry.get_documents(models=ESIndexTestCase._get_model_classes(model))
+        return registry.get_documents(
+            models=ESIndexTestCase._get_model_classes(model)
+        )
 
     @classmethod
     def rebuild_index(cls, model):
