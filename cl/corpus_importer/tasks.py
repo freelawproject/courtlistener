@@ -131,6 +131,7 @@ from cl.corpus_importer.utils import (
     texas_js_court_id_to_court_id,
     texas_originating_court_to_court_id,
 )
+from cl.corpus_importer.scotus_daemon_utils import scotus_raw_s3_key
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.command_utils import logger
@@ -165,7 +166,11 @@ from cl.lib.recap_utils import (
     get_document_filename,
 )
 from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
-from cl.lib.storage import AWSMediaStorage
+from cl.lib.storage import (
+    AWSMediaStorage,
+    S3GlacierInstantRetrievalStorage,
+    clobbering_get_name,
+)
 from cl.lib.types import TaskData
 from cl.people_db.lookup_utils import (
     lookup_judge_by_full_name,
@@ -3885,6 +3890,72 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     :return: None.
     """
     process_scotus_docket.delay(docket_data)
+
+
+SCOTUS_JSON_URL_TEMPLATE = (
+    "https://www.supremecourt.gov/RSS/Cases/JSON/{docket_number}.json"
+)
+
+
+def fetch_scotus_docket_json(
+    docket_number: str,
+) -> tuple[str | None, int]:
+    """Fetch a SCOTUS docket JSON file.
+
+    :param docket_number: A SCOTUS docket number (e.g. ``25-150``).
+    :return: ``(content_text, http_status)``. ``content_text`` is ``None`` for
+        404 responses or for 200 responses that don't contain valid JSON.
+    :raises HTTPError: For non-404 4xx/5xx responses. The caller relies on this
+        to trigger exponential backoff, matching the iquery probe semantics.
+    """
+    url = SCOTUS_JSON_URL_TEMPLATE.format(docket_number=docket_number)
+    resp = requests.get(
+        url,
+        timeout=30,
+        headers={"User-Agent": "CourtListener"},
+    )
+    if resp.status_code == 404:
+        return None, 404
+    resp.raise_for_status()
+    text = resp.text.strip()
+    # SCOTUS sometimes returns an empty body or an HTML error page with HTTP 200.
+    if not text or not text.startswith("{"):
+        return None, resp.status_code
+    return text, resp.status_code
+
+
+def save_scotus_raw_to_s3(docket_number: str, content: str) -> str:
+    """Upload a raw SCOTUS docket JSON blob to S3. Returns the key written.
+
+    Stored in the private bucket under
+    ``responses/dockets/scotus/{docket_number}.json``, matching the
+    convention established by ``save_docket_response`` in
+    ``back_scrape_dockets.py``.
+    """
+    storage = S3GlacierInstantRetrievalStorage(
+        naming_strategy=clobbering_get_name
+    )
+    key = scotus_raw_s3_key(docket_number)
+    storage.save(key, ContentFile(content.encode("utf-8")))
+    return key
+
+
+def process_scotus_hit(docket_number: str, content: str) -> None:
+    """Archive the raw JSON to S3, parse it, and enqueue ingestion.
+
+    Called synchronously from the daemon both for direct probe hits and for
+    serials discovered during backfill. The only part that runs in Celery is
+    ``process_scotus_docket``, which handles the parsed-docket merge.
+    """
+    save_scotus_raw_to_s3(docket_number, content)
+    parser = SCOTUSDocketReport()
+    parser._parse_text(content)
+    if not parser.data.get("docket_number"):
+        logger.error(
+            "SCOTUS parser produced no docket_number for %s", docket_number
+        )
+        return
+    process_scotus_docket.delay(parser.data, download_file=True)
 
 
 KNOWN_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}

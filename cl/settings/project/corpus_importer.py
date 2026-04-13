@@ -33,4 +33,24 @@ IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED = env.bool(
     "IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED", default=False
 )
 IQUERY_COURT_RATE = env("IQUERY_COURT_RATE", default="100/s")
+
+# SCOTUS JSON docket probing daemon
+SCOTUS_PROBE_DAEMON_ENABLED = env.bool(
+    "SCOTUS_PROBE_DAEMON_ENABLED", default=False
+)
+SCOTUS_PROBE_WAIT = env.int("SCOTUS_PROBE_WAIT", default=3600)  # 1 hour
+SCOTUS_PROBE_MAX_OFFSET = env.int("SCOTUS_PROBE_MAX_OFFSET", default=200)
+SCOTUS_COURT_BLOCKED_WAIT = env.int("SCOTUS_COURT_BLOCKED_WAIT", default=600)
+SCOTUS_COURT_BLOCKED_MAX_ATTEMPTS = env.int(
+    "SCOTUS_COURT_BLOCKED_MAX_ATTEMPTS", default=6
+)
+SCOTUS_EMPTY_PROBES_LIMIT_HOURS = env.int(
+    "SCOTUS_EMPTY_PROBES_LIMIT_HOURS", default=72
+)
+# Seconds to sleep between sequential backfill HTTP fetches against
+# supremecourt.gov. Set to 0 to disable the pause.
+SCOTUS_BACKFILL_REQUEST_DELAY = env.float(
+    "SCOTUS_BACKFILL_REQUEST_DELAY", default=1.0
+)
+
 OPENAI_TRANSCRIPTION_KEY = env("OPENAI_TRANSCRIPTION_KEY", default=None)
