@@ -178,9 +178,7 @@ def _probe_scotus_sequence(
 
         if text is None:
             # Real gap: no case exists at this serial. Log and continue.
-            logger.warning(
-                "SCOTUS backfill: no case found for docket %s", dn
-            )
+            logger.warning("SCOTUS backfill: no case found for docket %s", dn)
         else:
             process_scotus_hit(dn, text)
 
@@ -232,18 +230,14 @@ def run_scotus_probe_iteration(r, testing: bool) -> None:
         )
         return
 
-    targets: list[tuple[str, int]] = [
-        (seq, current_term) for seq in SEQUENCES
-    ]
+    targets: list[tuple[str, int]] = [(seq, current_term) for seq in SEQUENCES]
     if next_term_starts_probing(today):
         next_term = (current_term + 1) % 100
         targets.extend((seq, next_term) for seq in SEQUENCES)
 
     total_hits = 0
     for sequence, term_year in targets:
-        hits, blocked = _probe_scotus_sequence(
-            r, sequence, term_year, testing
-        )
+        hits, blocked = _probe_scotus_sequence(r, sequence, term_year, testing)
         total_hits += hits
         if blocked:
             # A court_wait TTL has been set; stop probing everything.
@@ -251,9 +245,7 @@ def run_scotus_probe_iteration(r, testing: bool) -> None:
 
     if total_hits == 0:
         empty_attempts = r.incr(scotus_empty_probe_attempts_key())
-        empty_hours = (
-            empty_attempts * settings.SCOTUS_PROBE_WAIT
-        ) / 3600
+        empty_hours = (empty_attempts * settings.SCOTUS_PROBE_WAIT) / 3600
         logger.info(
             "No SCOTUS cases found this iteration (empty streak: %.1f h).",
             empty_hours,

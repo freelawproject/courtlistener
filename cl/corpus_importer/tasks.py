@@ -116,6 +116,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
+from cl.corpus_importer.scotus_daemon_utils import scotus_raw_s3_key
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
@@ -131,7 +132,6 @@ from cl.corpus_importer.utils import (
     texas_js_court_id_to_court_id,
     texas_originating_court_to_court_id,
 )
-from cl.corpus_importer.scotus_daemon_utils import scotus_raw_s3_key
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.command_utils import logger

@@ -25,7 +25,6 @@ from cl.corpus_importer.scotus_daemon_utils import (
 )
 from cl.lib.redis_utils import get_redis_interface
 
-
 SCOTUS_REDIS_KEYS_TO_CLEAN = (
     HIGHEST_KNOWN_HASH,
     scotus_court_wait_key(),
@@ -126,14 +125,10 @@ class ScotusDaemonTest(SimpleTestCase):
             mock.patch.object(
                 scotus_cmd_module, "fetch_scotus_docket_json"
             ) as mock_fetch,
-            mock.patch.object(
-                scotus_cmd_module.logger, "error"
-            ) as mock_error,
+            mock.patch.object(scotus_cmd_module.logger, "error") as mock_error,
             time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
         ):
-            scotus_cmd_module.run_scotus_probe_iteration(
-                self.r, testing=True
-            )
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
         mock_fetch.assert_not_called()
         self.assertTrue(mock_error.called)
 
@@ -180,14 +175,10 @@ class ScotusDaemonTest(SimpleTestCase):
             # window, so only current-term probing runs.
             time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
         ):
-            scotus_cmd_module.run_scotus_probe_iteration(
-                self.r, testing=True
-            )
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
         # Final low-range watermark should be the last direct hit: 115.
-        self.assertEqual(
-            self.r.hget(HIGHEST_KNOWN_HASH, "low:25"), "115"
-        )
+        self.assertEqual(self.r.hget(HIGHEST_KNOWN_HASH, "low:25"), "115")
         # Every valid low-range serial (100..115 = 16 dockets) must have
         # been archived to S3 and handed to the Celery ingestion task: 5
         # from direct probe hits + 11 from inline backfill.
@@ -214,9 +205,7 @@ class ScotusDaemonTest(SimpleTestCase):
             ),
             time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
         ):
-            scotus_cmd_module.run_scotus_probe_iteration(
-                self.r, testing=True
-            )
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
         self.assertEqual(self.r.get(scotus_blocked_attempts_key()), "1")
         self.assertTrue(self.r.exists(scotus_court_wait_key()))
@@ -228,10 +217,9 @@ class ScotusDaemonTest(SimpleTestCase):
         attempts_needed = max(
             1,
             int(
-                (
-                    settings.SCOTUS_EMPTY_PROBES_LIMIT_HOURS * 3600
-                    / max(1, settings.SCOTUS_PROBE_WAIT)
-                )
+                settings.SCOTUS_EMPTY_PROBES_LIMIT_HOURS
+                * 3600
+                / max(1, settings.SCOTUS_PROBE_WAIT)
             ),
         )
         self.r.set(scotus_empty_probe_attempts_key(), attempts_needed - 1)
@@ -242,14 +230,10 @@ class ScotusDaemonTest(SimpleTestCase):
                 "fetch_scotus_docket_json",
                 return_value=(None, 404),
             ),
-            mock.patch.object(
-                scotus_cmd_module.logger, "error"
-            ) as mock_error,
+            mock.patch.object(scotus_cmd_module.logger, "error") as mock_error,
             time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
         ):
-            scotus_cmd_module.run_scotus_probe_iteration(
-                self.r, testing=True
-            )
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
         self.assertTrue(mock_error.called)
         self.assertEqual(self.r.get(scotus_court_wait_key()), "3600")
@@ -283,9 +267,7 @@ class ScotusDaemonTest(SimpleTestCase):
             mock.patch.object(scotus_cmd_module.time, "sleep"),
             time_machine.travel(datetime(2025, 7, 2, 12), tick=False),
         ):
-            scotus_cmd_module.run_scotus_probe_iteration(
-                self.r, testing=True
-            )
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
         self.assertEqual(self.r.hget(HIGHEST_KNOWN_HASH, "low:26"), "1")
 
@@ -303,9 +285,7 @@ class ScotusDaemonTest(SimpleTestCase):
             ) as mock_run,
             mock.patch.object(scotus_cmd_module.time, "sleep"),
         ):
-            call_command(
-                "probe_scotus_dockets_daemon", testing_iterations=2
-            )
+            call_command("probe_scotus_dockets_daemon", testing_iterations=2)
 
         self.assertEqual(mock_run.call_count, 2)
 
@@ -321,8 +301,6 @@ class ScotusDaemonTest(SimpleTestCase):
             ) as mock_run,
             mock.patch.object(scotus_cmd_module.time, "sleep"),
         ):
-            call_command(
-                "probe_scotus_dockets_daemon", testing_iterations=1
-            )
+            call_command("probe_scotus_dockets_daemon", testing_iterations=1)
 
         mock_run.assert_not_called()
