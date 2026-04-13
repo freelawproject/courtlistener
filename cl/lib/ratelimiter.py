@@ -198,21 +198,23 @@ def is_allowlisted(request: HttpRequest) -> bool:
 
 def parse_rate(rate: str) -> tuple[int, int]:
     """
-
     Given the request rate string, return a two tuple of:
     <allowed number of requests>, <period of time in seconds>
+
+    Supported forms:
+      - "1/s", "60/min", "5000/hour", "100/day" — unit form (uses first letter)
+      - "10/5s", "1/5m"                         — multiplier + single-letter
 
     (Stolen from Django Rest Framework.)
     """
     num, period = rate.split("/")
     num_requests = int(num)
-    if len(period) > 1:
+    if len(period) > 1 and not period.isalpha():
         # It takes the form of a 5d, or 10s, or whatever
         duration_multiplier = int(period[0:-1])
         duration_unit = period[-1]
     else:
         duration_multiplier = 1
-        duration_unit = period[-1]
+        duration_unit = period[0]
     duration_base = {"s": 1, "m": 60, "h": 3600, "d": 86400}[duration_unit]
-    duration = duration_base * duration_multiplier
-    return num_requests, duration
+    return num_requests, duration_base * duration_multiplier
