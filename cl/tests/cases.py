@@ -144,6 +144,20 @@ class ESIndexTestCase(SimpleTestCase):
             index._name = index._name.split("-")[0]
         super().tearDownClass()
 
+    @staticmethod
+    def _get_model_classes(model):
+        models = model if isinstance(model, list) else [model]
+        model_classes = [apps.get_model(m) for m in models]
+        return model_classes
+
+    @staticmethod
+    def _get_indices(model):
+        return registry.get_indices(models=ESIndexTestCase._get_model_classes(model))
+
+    @staticmethod
+    def _get_documents(model):
+        return registry.get_documents(models=ESIndexTestCase._get_model_classes(model))
+
     @classmethod
     def rebuild_index(cls, model):
         """Delete, recreate, and populate the Elasticsearch index.
@@ -153,12 +167,10 @@ class ESIndexTestCase(SimpleTestCase):
         ALL ES indices and fails if any other test's index was already
         deleted.
         """
-        models = model if isinstance(model, list) else [model]
-        model_classes = [apps.get_model(m) for m in models]
-        for index in registry.get_indices(models=model_classes):
+        for index in ESIndexTestCase._get_indices(model):
             index.delete(ignore=[404, 400])
             index.create()
-        for doc in registry.get_documents(models=model_classes):
+        for doc in ESIndexTestCase._get_documents(model):
             qs = doc().get_indexing_queryset()
             doc().update(qs)
 
@@ -171,9 +183,7 @@ class ESIndexTestCase(SimpleTestCase):
         ALL ES indices and fails if any other test's index was already
         deleted.
         """
-        models = model if isinstance(model, list) else [model]
-        model_classes = [apps.get_model(m) for m in models]
-        for index in registry.get_indices(models=model_classes):
+        for index in ESIndexTestCase._get_indices(model):
             index.create(ignore=[400])
 
     @classmethod
@@ -185,9 +195,7 @@ class ESIndexTestCase(SimpleTestCase):
         ALL ES indices and fails if any other test's index was already
         deleted.
         """
-        models = model if isinstance(model, list) else [model]
-        model_classes = [apps.get_model(m) for m in models]
-        for index in registry.get_indices(models=model_classes):
+        for index in ESIndexTestCase._get_indices(model):
             index.delete(ignore=[404, 400])
 
     @classmethod
