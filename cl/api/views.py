@@ -3,7 +3,7 @@ import re
 import time
 from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -442,7 +442,7 @@ class ApiUsageViewSet(ViewSet):
         Results are sorted by utilization descending — the limit
         closest to being hit comes first.
         """
-        default_rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
+        default_rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # type: ignore
         overrides = {
             t.throttle_type: (t.blocked, t.rate)
             for t in APIThrottle.objects.filter(user=user)
@@ -456,7 +456,7 @@ class ApiUsageViewSet(ViewSet):
 
             blocked = False
             rate = default_rate
-
+            throttle_type: ThrottleType | None
             match scope:
                 case "user":
                     throttle_type = ThrottleType.API
@@ -516,24 +516,22 @@ class ApiUsageViewSet(ViewSet):
         start = datetime.today() - timedelta(days=14)
         end = datetime.today()
         data = invert_user_logs(start, end, add_usernames=False)
-        return data.get(user.pk, {"total": 0})
+        return data.get(user.pk, {"total": 0})  # type: ignore[call-overload]
 
     def _get_membership(self, user: User) -> MembershipInfo | None:
         """Return the user's membership level and active status."""
         try:
-            membership = user.membership
+            membership = NeonMembership.objects.get(user=user)
         except NeonMembership.DoesNotExist:
             return None
         level_display = dict(NeonMembershipLevel.TYPES).get(
             membership.level, "Unknown"
         )
-        return {
-            "level": level_display,
-            "is_active": membership.is_active,
-        }
+        return {"level": level_display, "is_active": membership.is_active}
 
     def list(self, request: Request, *args, **kwargs) -> Response:
-        user = request.user
+        # IsAuthenticated permission class rules out AnonymousUser at runtime.
+        user = cast(User, request.user)
         return Response(
             {
                 "current_usage": self._get_current_usage(user),
