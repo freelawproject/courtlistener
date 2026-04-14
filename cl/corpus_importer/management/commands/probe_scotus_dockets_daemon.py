@@ -123,7 +123,9 @@ def _probe_scotus_sequence(
             highest_known, probe_iteration, jitter
         )
         probe_iteration += 1
-        candidate = format_docket_number(term_year_2digit, candidate_serial)
+        candidate = format_docket_number(
+            term_year_2digit, candidate_serial, sequence
+        )
 
         try:
             text, _ = fetch_scotus_docket_json(candidate)
@@ -163,7 +165,7 @@ def _probe_scotus_sequence(
     backfill_serials = [
         serial
         for serial in range(highest_known + 1, latest_match)
-        if format_docket_number(term_year_2digit, serial)
+        if format_docket_number(term_year_2digit, serial, sequence)
         not in probe_hit_serials
     ]
     if backfill_serials:
@@ -177,7 +179,7 @@ def _probe_scotus_sequence(
         )
 
     for serial in backfill_serials:
-        dn = format_docket_number(term_year_2digit, serial)
+        dn = format_docket_number(term_year_2digit, serial, sequence)
         try:
             text, _ = fetch_scotus_docket_json(dn)
         except HTTPError:
@@ -222,9 +224,9 @@ def _probe_scotus_sequence(
 def run_scotus_probe_iteration(r, testing: bool) -> None:
     """Run one full forward-probe iteration across all active SCOTUS targets.
 
-    Targets SCOTUS with two parallel docket-number sequences (low serial
-    range YY-1.., high serial range YY-5001..) and optionally spans a
-    term-year rollover window.
+    Targets SCOTUS with three parallel docket-number sequences (low serial
+    range YY-1.., high serial range YY-5001.., and applications YYA1..)
+    and optionally spans a term-year rollover window.
     """
     today = localtime().date()
     current_term = current_scotus_term_year(today)
@@ -282,13 +284,14 @@ class Command(VerboseCommand):
 The goal of this daemon is to discover and ingest new SCOTUS cases as they
 are docketed at supremecourt.gov.
 
-Each iteration performs a binary (geometric) forward probe over both the
-low-range (YY-1..) and high-range (YY-5001..) docket-number sequences for
-the current SCOTUS term, synchronously fetching JSON files and archiving
-them to S3. Ingestion of each archived file is handed off to Celery via
-``process_scotus_docket``. Gaps jumped over by the geometric probe are
-backfilled inline in the same iteration. Starting on July 1 of each calendar
-year it also probes the upcoming term (YY+1) to catch the rollover moment.
+Each iteration performs a binary (geometric) forward probe over three
+docket-number sequences for the current SCOTUS term: low-range (YY-1..),
+high-range (YY-5001..), and applications (YYA1..). It synchronously fetches
+JSON files and archives them to S3. Ingestion of each archived file is
+handed off to Celery via ``process_scotus_docket``. Gaps jumped over by the
+geometric probe are backfilled inline in the same iteration. Starting on
+July 1 of each calendar year it also probes the upcoming term (YY+1) to
+catch the rollover moment.
 
 """
 

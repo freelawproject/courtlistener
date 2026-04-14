@@ -17,13 +17,18 @@ SCOTUS_JSON_URL_TEMPLATE = (
     "https://www.supremecourt.gov/RSS/Cases/JSON/{docket_number}.json"
 )
 
-# Two parallel docket-number sequences per SCOTUS term year, identified by
-# their serial range:
-#   low:  YY-1    ... YY-~3000
-#   high: YY-5001 ... YY-~12000
+# Three parallel docket-number sequences per SCOTUS term year:
+#   low:          YY-1    ... YY-~3000
+#   high:         YY-5001 ... YY-~12000
+#   applications: YYA1    ... YYA~2000  (e.g. 24A1088)
 LOW_SEQUENCE = "low"
 HIGH_SEQUENCE = "high"
-SEQUENCES: tuple[str, ...] = (LOW_SEQUENCE, HIGH_SEQUENCE)
+APPLICATIONS_SEQUENCE = "applications"
+SEQUENCES: tuple[str, ...] = (
+    LOW_SEQUENCE,
+    HIGH_SEQUENCE,
+    APPLICATIONS_SEQUENCE,
+)
 
 # Serial number one BELOW the first valid docket in each sequence. Used as
 # the probe "watermark" when we haven't seen any case yet in a term: the
@@ -31,6 +36,7 @@ SEQUENCES: tuple[str, ...] = (LOW_SEQUENCE, HIGH_SEQUENCE)
 SEQUENCE_BASE: dict[str, int] = {
     LOW_SEQUENCE: 0,
     HIGH_SEQUENCE: 5000,
+    APPLICATIONS_SEQUENCE: 0,
 }
 
 # Redis hash key that stores the latest probed serial per (sequence, term).
@@ -66,13 +72,22 @@ def next_term_starts_probing(today: date) -> bool:
     return today.month >= 7
 
 
-def format_docket_number(term_year_2digit: int, serial: int) -> str:
-    """Format a docket number back to ``YY-N`` form (no leading zeros on N).
+def format_docket_number(
+    term_year_2digit: int, serial: int, sequence: str = LOW_SEQUENCE
+) -> str:
+    """Format a docket number for the given sequence.
+
+    Low/high sequences use ``YY-N`` form (e.g. ``"25-150"``).
+    Applications use ``YYAN`` form (e.g. ``"24A1088"``).
 
     :param term_year_2digit: The 2-digit SCOTUS term year (e.g. ``25``).
     :param serial: The docket serial number.
-    :return: The formatted docket number (e.g. ``"25-150"``).
+    :param sequence: The docket-number sequence (``"low"``, ``"high"``, or
+        ``"applications"``).
+    :return: The formatted docket number.
     """
+    if sequence == APPLICATIONS_SEQUENCE:
+        return f"{term_year_2digit:02d}A{serial}"
     return f"{term_year_2digit:02d}-{serial}"
 
 

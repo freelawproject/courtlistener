@@ -48,6 +48,12 @@ class ScotusDaemonUtilsTest(SimpleTestCase):
         self.assertEqual(format_docket_number(25, 150), "25-150")
         self.assertEqual(format_docket_number(3, 7), "03-7")
 
+    def test_format_docket_number_applications(self):
+        self.assertEqual(
+            format_docket_number(24, 1088, "applications"), "24A1088"
+        )
+        self.assertEqual(format_docket_number(25, 1, "applications"), "25A1")
+
 
 @mock.patch(
     f"{SCOTUS_DAEMON_MODULE}.HIGHEST_SCOTUS_KNOWN_SERIAL",
@@ -95,9 +101,14 @@ class ScotusDaemonTest(SimpleTestCase):
             self.r.delete(key)
         super().tearDown()
 
-    def _seed_current_term(self, term: int, low: int = 0, high: int = 5000):
+    def _seed_current_term(
+        self, term: int, low: int = 0, high: int = 5000, applications: int = 0
+    ):
         self.r.hset(self.HIGHEST_KNOWN_KEY, f"low:{term:02d}", low)
         self.r.hset(self.HIGHEST_KNOWN_KEY, f"high:{term:02d}", high)
+        self.r.hset(
+            self.HIGHEST_KNOWN_KEY, f"applications:{term:02d}", applications
+        )
 
     # ------------------------------------------------------------------ #
     # run_scotus_probe_iteration
@@ -241,6 +252,38 @@ class ScotusDaemonTest(SimpleTestCase):
 
         self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:26"), "1")
 
+    def test_applications_sequence_uses_a_format(self, *_mocks):
+        """The applications sequence must format docket numbers as YYA{serial}
+        and advance the ``applications:YY`` watermark on hits."""
+        self._seed_current_term(25, low=3000, high=20000, applications=99)
+
+        def fake_fetch(docket_number):
+            if docket_number == "25A100":
+                return '{"docket_number":"25A100"}', HTTPStatus.OK
+            return None, HTTPStatus.NOT_FOUND
+
+        with (
+            mock.patch.object(
+                scotus_cmd_module,
+                "fetch_scotus_docket_json",
+                side_effect=fake_fetch,
+            ),
+            mock.patch.object(scotus_cmd_module, "save_scotus_raw_to_s3"),
+            mock.patch.object(
+                scotus_cmd_module,
+                "SCOTUSDocketReport",
+                new=FakeSCOTUSDocketReport,
+            ),
+            mock.patch.object(scotus_cmd_module, "process_scotus_docket"),
+            mock.patch.object(scotus_cmd_module.time, "sleep"),
+            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+        ):
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+
+        self.assertEqual(
+            self.r.hget(self.HIGHEST_KNOWN_KEY, "applications:25"), "100"
+        )
+
     # ------------------------------------------------------------------ #
     # management command
     # ------------------------------------------------------------------ #
@@ -324,9 +367,14 @@ class ScotusDaemonIntegrationTest(TestCase):
             self.r.delete(key)
         super().tearDown()
 
-    def _seed_current_term(self, term: int, low: int = 0, high: int = 5000):
+    def _seed_current_term(
+        self, term: int, low: int = 0, high: int = 5000, applications: int = 0
+    ):
         self.r.hset(self.HIGHEST_KNOWN_KEY, f"low:{term:02d}", low)
         self.r.hset(self.HIGHEST_KNOWN_KEY, f"high:{term:02d}", high)
+        self.r.hset(
+            self.HIGHEST_KNOWN_KEY, f"applications:{term:02d}", applications
+        )
 
     def test_probe_creates_docket_and_metadata(self, *_mocks):
         """The geometric probe must create Docket + ScotusDocketMetadata
