@@ -272,6 +272,25 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
                 f"Label with for='{label_for}' should have exactly one matching element, found {len(matching_inputs)}",
             )
 
+    def test_date_selector_renders(self):
+        """Date selector inputs are present in the rendered search page."""
+        response = self.client.get(reverse("show_results"))
+        tree = lhtml.fromstring(response.content.decode())
+
+        after_inputs = tree.xpath('//input[@name="filed_after"]')
+        before_inputs = tree.xpath('//input[@name="filed_before"]')
+
+        self.assertGreaterEqual(
+            len(after_inputs),
+            1,
+            "Expected at least one input with name='filed_after'",
+        )
+        self.assertGreaterEqual(
+            len(before_inputs),
+            1,
+            "Expected at least one input with name='filed_before'",
+        )
+
 
 @override_flag("use_new_design", True)
 @patch("cl.search.utils.get_redis_interface")

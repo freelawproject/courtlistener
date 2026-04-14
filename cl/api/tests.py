@@ -58,6 +58,7 @@ from cl.api.utils import (
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
+from cl.audio.audio_sources import AudioSources
 from cl.audio.factories import AudioFactory
 from cl.disclosures.api_views import (
     AgreementViewSet,
@@ -119,7 +120,6 @@ from cl.search.api_views import (
     RECAPDocumentViewSet,
     TagViewSet,
 )
-from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -1936,10 +1936,10 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
         # Multiple choice filter
 
-        sources = [ClusterSources.COURT_WEBSITE]
+        sources = [AudioSources.COURT_WEBSITE]
         self.q = {"source": sources}
         await self.assertCountInResults(2)
-        sources.append(ClusterSources.COURT_M_RESOURCE)
+        sources.append(AudioSources.BRAD_HEATH_ARCHIVE)
         await self.assertCountInResults(3)
 
     async def test_opinion_cited_filters(self) -> None:

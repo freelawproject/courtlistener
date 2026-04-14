@@ -1852,6 +1852,11 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
+class StateCourtsQuerySet(models.QuerySet):
+    def all(self) -> models.QuerySet:
+        return self.filter(jurisdiction__in=Court.STATE_JURISDICTIONS)
+
+
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
@@ -2078,6 +2083,7 @@ class Court(models.Model):
 
     objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
+    state_courts = StateCourtsQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"{self.full_name}"
@@ -2309,7 +2315,7 @@ class OpinionCluster(AbstractDateTimeModel):
             ", ".join(f"{t[0]} ({t[1]})" for t in ClusterSources.NAMES)
         ),
         max_length=10,
-        choices=ClusterSources.NAMES,
+        validators=[ClusterSources.validate_source],
         blank=True,
     )
     procedural_history = models.TextField(

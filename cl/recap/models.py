@@ -1,11 +1,17 @@
+import logging
+
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db.models import QuerySet
 
 from cl.lib.model_helpers import make_path
 from cl.lib.models import AbstractDateTimeModel, AbstractFile
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.recap.constants import DATASET_SOURCES, NOO_CODES, NOS_CODES
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
+
+logger = logging.getLogger(__name__)
 
 
 class UPLOAD_TYPE:
@@ -230,8 +236,50 @@ class ProcessingQueue(AbstractDateTimeModel):
         print(self.file_contents)
 
 
+class EmailSource:
+    """
+    Possible sources for entries in the email processing queue.
+    """
+
+    PACER = 1
+    """
+    Represents email notifications from PACER.
+    """
+    SCOTUS = 2
+    """
+    Represents email notifications from SCOTUS.
+    """
+    STATE = 3
+    """
+    Represents email notifications from any state court system.
+    """
+    NAMES = (
+        (PACER, "PACER email notification."),
+        (SCOTUS, "SCOTUS email notification."),
+        (STATE, "State email notification."),
+    )
+
+
 class EmailProcessingQueue(AbstractDateTimeModel):
-    """Where @recap.email emails go when received by the API"""
+    """
+    Where @recap.email emails go when received by the API
+
+    :ivar uploader: The user that sent in the email for processing.
+    :ivar court: The court where the upload was from.
+    :ivar message_id: The S3 message identifier, used to pull the file in the\
+        processing tasks.
+    :ivar destination_emails: The emails that received the notification.
+    :ivar filepath: The S3 filepath to the email and receipt stored as JSON\
+        text.
+    :ivar status_message: Any errors that occurred while processing an item.
+    :ivar recap_documents: Document(s) created from the PACER email, processed\
+        as a function of this queue. Kept for compatibility; use get_related_objects
+        in the future.
+    :ivar source: The source of this email notification.
+    :ivar related_model: The type of model that was created or updated by this
+        email.
+    :ivar object_ids: The PKs of models created or updated by this email.
+    """
 
     uploader = models.ForeignKey(
         User,
@@ -279,6 +327,26 @@ class EmailProcessingQueue(AbstractDateTimeModel):
         related_name="recap_email_processing_queue",
         help_text="Document(s) created from the PACER email, processed as a function of this queue.",
     )
+    source = models.SmallIntegerField(
+        choices=EmailSource.NAMES,
+        default=EmailSource.PACER,
+        help_text="The source of this email notification.",
+    )
+    related_model = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        null=True,
+    )
+    object_ids = models.JSONField(default=list)
+
+    def get_related_objects(self) -> QuerySet | None:
+        if not self.related_model:
+            logger.warning(
+                "Call to EmailProcessingQueue.get_related_objects() with null related_model."
+            )
+            return None
+        model_class = self.related_model.model_class()
+        return model_class.objects.filter(pk__in=self.object_ids)
 
     def __str__(self) -> str:
         return f"EmailProcessingQueue: {self.pk} in court {self.court_id}"

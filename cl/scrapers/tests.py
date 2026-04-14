@@ -9,13 +9,16 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import responses
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
+from juriscraper.state.texas.common import CourtID
 from responses import matchers
 
 from cl.alerts.factories import AlertFactory
@@ -27,8 +30,15 @@ from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
+from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.factories import PersonFactory
+from cl.recap.models import (
+    PROCESSING_STATUS,
+    EmailProcessingQueue,
+    EmailSource,
+)
+from cl.recap.tasks import process_texas_email
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -46,7 +56,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_download_url,
     passes_length_ratio_check,
 )
-from cl.scrapers.models import UrlHash
+from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
     extract_opinion_content,
     find_and_merge_versions,
@@ -91,6 +101,9 @@ from cl.search.models import (
     OriginatingCourtInformation,
     Parenthetical,
 )
+from cl.search.state.texas.factories import (
+    TexasCourtOfAppealsDocketDictFactory,
+)
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
     ESIndexTestCase,
@@ -98,6 +111,7 @@ from cl.tests.cases import (
     TransactionTestCase,
 )
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
+from cl.tests.utils import AsyncAPIClient
 from cl.users.factories import UserProfileWithParentsFactory
 
 
@@ -1623,8 +1637,8 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         # should ignore due to OpinionCluster.source
         self.assertEqual(should_ignore.main_version, None)
 
-    def test_source_merging(self):
-        """Can we merge both Docket and Cluster sources?"""
+    def test_docket_source_merging(self):
+        """Can we merge Docket sources?"""
         self.assertEqual(
             Docket.merge_sources(Docket.SCRAPER, Docket.SCRAPER_AND_HARVARD),
             Docket.SCRAPER_AND_HARVARD,
@@ -1634,31 +1648,202 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
             Docket.SCRAPER + Docket.DIRECT_INPUT,
         )
 
-        self.assertEqual(
-            ClusterSources.merge_sources(
-                ClusterSources.COURT_WEBSITE, ClusterSources.COURT_WEBSITE
+    def test_cluster_source_merging_base_plus_base(self):
+        """Merging two base ClusterSources produces the explicit
+        combination."""
+        test_cases = (
+            # (source1, source2, expected)
+            # Same source returns itself
+            (
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COURT_WEBSITE,
             ),
-            ClusterSources.COURT_WEBSITE,
+            # Two-char combinations
+            (
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.PUBLIC_RESOURCE,
+                ClusterSources.COURT_M_RESOURCE,
+            ),
+            (
+                ClusterSources.LAWBOX,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.LAWBOX_M_COURT,
+            ),
+            (
+                ClusterSources.LAWBOX,
+                ClusterSources.PUBLIC_RESOURCE,
+                ClusterSources.LAWBOX_M_RESOURCE,
+            ),
+            (
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.LAWBOX,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.LAWBOX_M_HARVARD,
+            ),
+            (
+                ClusterSources.MANUAL_INPUT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.MANUAL_INPUT_M_HARVARD,
+            ),
+            (
+                ClusterSources.PUBLIC_RESOURCE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.PUBLIC_RESOURCE_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_COURT,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
+            ),
         )
-        self.assertEqual(
-            ClusterSources.merge_sources(
+        for source1, source2, expected in test_cases:
+            with self.subTest(source1=source1, source2=source2):
+                self.assertEqual(
+                    ClusterSources.merge_sources(source1, source2),
+                    expected,
+                )
+                # Order should not matter
+                self.assertEqual(
+                    ClusterSources.merge_sources(source2, source1),
+                    expected,
+                )
+
+    def test_cluster_source_merging_composite_plus_base(self):
+        """Merging a composite ClusterSource with a base source produces the
+        explicit combination."""
+        test_cases = (
+            # (composite, base, expected)
+            # Three-char combinations from composite + base
+            (
+                ClusterSources.COURT_M_RESOURCE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COURT_M_RESOURCE_M_HARVARD,
+            ),
+            (
+                ClusterSources.LAWBOX_M_COURT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.LAWBOX_M_COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.LAWBOX_M_RESOURCE,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.LAWBOX_M_RESOURCE_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_LAWBOX_COURT,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_COURT,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX_COURT,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_COURT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+            ),
+            # Four-char combinations from composite + base
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX_COURT,
+                ClusterSources.HARVARD_CASELAW,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ),
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX_M_HARVARD,
                 ClusterSources.COURT_WEBSITE,
                 ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             ),
-            ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
-        )
-        self.assertEqual(
-            ClusterSources.merge_sources(
-                ClusterSources.COURT_WEBSITE, ClusterSources.PUBLIC_RESOURCE
+            (
+                ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+                ClusterSources.LAWBOX,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             ),
-            ClusterSources.COURT_M_RESOURCE,
-        )
-        self.assertEqual(
-            ClusterSources.merge_sources(
-                ClusterSources.HARVARD_CASELAW, ClusterSources.COLUMBIA_M_COURT
+            # Composite already contains the base source
+            (
+                ClusterSources.COURT_M_HARVARD,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COURT_M_HARVARD,
             ),
-            ClusterSources.COLUMBIA_M_COURT_M_HARVARD,
+            (
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+                ClusterSources.COURT_WEBSITE,
+                ClusterSources.COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
+            ),
         )
+        for composite, base, expected in test_cases:
+            with self.subTest(composite=composite, base=base):
+                self.assertEqual(
+                    ClusterSources.merge_sources(composite, base),
+                    expected,
+                )
+                # Order should not matter
+                self.assertEqual(
+                    ClusterSources.merge_sources(base, composite),
+                    expected,
+                )
+
+    def test_cluster_source_validator(self):
+        """Does validate_source reject invalid and misordered sources?"""
+        # Valid sources should not raise
+        valid_sources = ("C", "CR", "ZLCU", "CM", "ZLCRMDQAGUS")
+        for source in valid_sources:
+            with self.subTest(source=source):
+                ClusterSources.validate_source(source)
+
+        # Invalid characters
+        invalid_char_cases = (
+            ("X", "completely unknown character"),
+            ("CX", "unknown character mixed with valid"),
+            ("H", "brad heath archive is audio-only"),
+        )
+        for source, reason in invalid_char_cases:
+            with self.subTest(source=source, reason=reason):
+                with self.assertRaises(ValidationError):
+                    ClusterSources.validate_source(source)
+
+        # Wrong canonical order
+        misordered_cases = (
+            ("RC", "should be CR"),
+            ("CZ", "should be ZC"),
+            ("UCLZ", "should be ZLCU"),
+            ("CC", "duplicates collapse in frozenset"),
+        )
+        for source, reason in misordered_cases:
+            with self.subTest(source=source, reason=reason):
+                with self.assertRaises(ValidationError):
+                    ClusterSources.validate_source(source)
 
     def test_string_merging(self):
         """Can we merge strings while reducing repetition?"""
@@ -2189,3 +2374,163 @@ class SetOrderingKeysTest(SimpleTestCase):
         self.assertEqual(opinions_content[0][0]["ordering_key"], 2)
         self.assertEqual(opinions_content[3][0]["ordering_key"], 3)
         self.assertEqual(opinions_content[2][0]["ordering_key"], 4)
+
+
+@mock.patch("cl.recap.tasks.httpx.get")
+@mock.patch("cl.recap.tasks.TexasEmailSESStorage")
+@mock.patch("cl.recap.tasks.TexasCourtOfAppealsScraper")
+class TexasCaseMailIntegrationTest(TestCase):
+    """Integration test for the Texas CaseMail email processing flow.
+
+    Covers: POST endpoint → EPQ creation → process_texas_email task →
+    email retrieval → parsing → docket scrape → merge → EPQ status update.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        court_id = "txctapp1"
+        test_dir = (
+            Path(settings.INSTALL_ROOT)
+            / "cl"
+            / "scrapers"
+            / "test_assets"
+            / "texas_email"
+        )
+
+        with (
+            open(test_dir / "texas_coa01_notification.txt", "rb") as email_f,
+            open(
+                test_dir / "texas_coa01_post_data.json", encoding="utf-8"
+            ) as post_f,
+        ):
+            texas_email_content = email_f.read()
+            texas_post_data = json.load(post_f)
+        cls.post_data = texas_post_data
+        cls.email_data = texas_email_content
+
+        cls.docket_number_coa1 = "01-24-00089-CV"
+        cls.texas_coa1 = CourtFactory.create(
+            id=court_id, jurisdiction=Court.STATE_APPELLATE
+        )
+        cls.docket_coa1 = DocketFactory.create(
+            court=cls.texas_coa1,
+            docket_number=cls.docket_number_coa1,
+            docket_number_core=make_texas_docket_number_core(
+                cls.docket_number_coa1
+            ),
+        )
+
+        cls.docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=cls.docket_number_coa1,
+        )
+
+    def setUp(self):
+        self.async_client = AsyncAPIClient()
+        self.user = User.objects.get(username="recap-email")
+        token = f"Token {self.user.auth_token.key}"
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = "/api/rest/v4/state/tx/tames/alerts/"
+
+    async def test_full_texas_email_processing_flow(
+        self,
+        mock_coa_scraper,
+        mock_storage_cls,
+        mock_httpx_get,
+    ):
+        """Test the complete flow from endpoint POST through task
+        execution to successful EPQ update."""
+        fake_docket_html = "hi"
+
+        mock_storage = mock_storage_cls.return_value
+        mock_storage.open = mock.mock_open(read_data=self.email_data)
+
+        mock_response = MagicMock()
+        mock_response.text = fake_docket_html
+        mock_httpx_get.return_value = mock_response
+
+        mock_scraper_instance = mock_coa_scraper.return_value
+        mock_parse_text = MagicMock()
+        mock_scraper_instance._parse_text = mock_parse_text
+        mock_scraper_instance.data = self.docket_data
+
+        with patch.object(process_texas_email, "delay") as mock_delay:
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await EmailProcessingQueue.objects.acount(), 1)
+
+        epq = await EmailProcessingQueue.objects.afirst()
+
+        self.assertEqual(epq.message_id, "test-texas-email-id")
+        self.assertEqual(epq.destination_emails, ["tames@recap.email"])
+        self.assertEqual(epq.source, EmailSource.STATE)
+
+        mock_delay.assert_called_once_with(epq.pk)
+        await sync_to_async(process_texas_email)(epq.pk)
+        await epq.arefresh_from_db()
+        self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
+        epq_rm = await EmailProcessingQueue.objects.select_related(
+            "related_model"
+        ).aget(pk=epq.pk)
+        self.assertEqual(epq_rm.related_model.model, "texasdocument")
+        self.assertEqual(
+            len(epq.object_ids),
+            sum(
+                (
+                    len(ce["attachments"])
+                    for ce in self.docket_data["case_events"]
+                ),
+                0,
+            ),
+        )
+
+        mock_storage.open.assert_called_with("test-texas-email-id", "rb")
+
+        mock_httpx_get.assert_called_once_with(
+            "https://search.txcourts.gov/Case.aspx?cn=01-24-00089-CV",
+            headers={"User-Agent": "Free Law Project"},
+            timeout=30.0,
+            follow_redirects=True,
+        )
+
+        mock_parse_text.assert_called_once_with(fake_docket_html)
+
+        self.assertEqual(await Docket.objects.acount(), 1)
+
+
+class AccountSubscriptionIncludeTest(TestCase):
+    def setUp(self):
+        self.subscription = AccountSubscription.objects.create(
+            scraper=Scraper.TAMES,
+            email="test@example.com",
+            user_name="testuser",
+            first_subscription=date(2025, 3, 1),
+            last_subscription=date(2025, 3, 15),
+        )
+
+    def test_new_dates_widen_window(self):
+        """Dates outside the existing window should expand it."""
+        self.subscription.include_subscriptions(
+            {date(2025, 2, 20), date(2025, 4, 1)}
+        )
+        self.subscription.refresh_from_db()
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 2, 20)
+        )
+        self.assertEqual(self.subscription.last_subscription, date(2025, 4, 1))
+
+    def test_inner_dates_do_not_change_window(self):
+        """Dates within the existing window should leave it unchanged."""
+        self.subscription.include_subscriptions(
+            {date(2025, 3, 5), date(2025, 3, 10)}
+        )
+        self.subscription.refresh_from_db()
+        self.assertEqual(
+            self.subscription.first_subscription, date(2025, 3, 1)
+        )
+        self.assertEqual(
+            self.subscription.last_subscription, date(2025, 3, 15)
+        )

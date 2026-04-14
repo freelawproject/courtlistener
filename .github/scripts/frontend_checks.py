@@ -10,6 +10,7 @@ Input file must be in git --name-status format (STATUS\\tPATH per line).
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import re
 import sys
 from dataclasses import dataclass
@@ -956,6 +957,13 @@ def main() -> int:
         default=None,
         help="Write markdown summary to this file (only if findings exist)",
     )
+    parser.add_argument(
+        "--skip-files",
+        nargs="+",
+        default=[],
+        metavar="GLOB",
+        help="Glob patterns for files to skip (e.g. 'cl/assets/templates/v2_foo/*')",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -982,7 +990,10 @@ def main() -> int:
 
     # Filter to relevant files
     relevant = [
-        f for f in changed_files if f.endswith(".html") or is_input_css(f)
+        f
+        for f in changed_files
+        if (f.endswith(".html") or is_input_css(f))
+        and not any(fnmatch.fnmatch(f, g) for g in args.skip_files)
     ]
 
     if not relevant:
