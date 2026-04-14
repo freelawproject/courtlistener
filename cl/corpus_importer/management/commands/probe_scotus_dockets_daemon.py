@@ -289,9 +289,8 @@ docket-number sequences for the current SCOTUS term: low-range (YY-1..),
 high-range (YY-5001..), and applications (YYA1..). It synchronously fetches
 JSON files and archives them to S3. Ingestion of each archived file is
 handed off to Celery via ``process_scotus_docket``. Gaps jumped over by the
-geometric probe are backfilled inline in the same iteration. Starting on
-July 1 of each calendar year it also probes the upcoming term (YY+1) to
-catch the rollover moment.
+geometric probe are backfilled inline in the same iteration. During July
+it also probes the upcoming term to catch the rollover moment.
 
 """
 

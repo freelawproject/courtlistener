@@ -62,14 +62,14 @@ def next_term_starts_probing(today: date) -> bool:
     term year.
 
     SCOTUS cuts the new term on July 1, but the very first docket numbers
-    sometimes trickle in over the following days/weeks. Between July 1 and
-    December 31 we probe both the current term and ``term + 1`` so we don't
-    miss the rollover moment.
+    sometimes trickle in over the following days/weeks. During July we
+    probe both the current term and ``term + 1`` so we don't miss the
+    rollover moment.
 
     :param today: The date to check.
     :return: Whether next-term probing should be active.
     """
-    return today.month >= 7
+    return today.month == 7
 
 
 def format_docket_number(

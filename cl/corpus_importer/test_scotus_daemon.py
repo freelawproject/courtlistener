@@ -42,7 +42,8 @@ class ScotusDaemonUtilsTest(SimpleTestCase):
     def test_next_term_probing_window(self):
         self.assertFalse(next_term_starts_probing(date(2026, 6, 30)))
         self.assertTrue(next_term_starts_probing(date(2026, 7, 1)))
-        self.assertTrue(next_term_starts_probing(date(2026, 12, 31)))
+        self.assertTrue(next_term_starts_probing(date(2026, 7, 31)))
+        self.assertFalse(next_term_starts_probing(date(2026, 8, 1)))
 
     def test_format_docket_number(self):
         self.assertEqual(format_docket_number(25, 150), "25-150")
