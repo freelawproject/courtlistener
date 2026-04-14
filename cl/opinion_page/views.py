@@ -876,7 +876,9 @@ async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
         has_downloads = True
         pdf_path = cluster.filepath_pdf_harvard.url
     else:
-        async for sub_opinion in cluster.sub_opinions.all():
+        async for sub_opinion in cluster.sub_opinions.filter(
+            main_version__isnull=True
+        ):
             if str(sub_opinion.local_path).endswith(".pdf"):
                 has_downloads = True
                 pdf_path = sub_opinion.local_path.url

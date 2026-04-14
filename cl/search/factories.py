@@ -25,6 +25,7 @@ from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Court,
     Docket,
@@ -37,6 +38,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
     SCOTUSDocketEntry,
+    TrialCourtData,
 )
 from cl.tests.providers import LegalProvider
 
@@ -465,3 +467,48 @@ class ScotusDocketDataFactory(DictFactory):
     questions_presented = Faker("url")
     docket_entries = List([SubFactory(SCOTUSDocketEntryDataFactory)])
     parties = List([SubFactory(SCOTUSPartyDataFactory)])
+
+
+class CaseTransferFactory(DjangoModelFactory):
+    origin_court = SubFactory(CourtFactory)
+    origin_docket_number = LazyAttribute(
+        lambda ct: ct.origin_docket.docket_number if ct.origin_docket else None
+    )
+    origin_docket = SubFactory(DocketFactory)
+    destination_court = SubFactory(CourtFactory)
+    destination_docket_number = LazyAttribute(
+        lambda ct: ct.destination_docket.docket_number
+        if ct.destination_docket
+        else None
+    )
+    destination_docket = SubFactory(DocketFactory)
+    transfer_date = Faker("date_object")
+    transfer_type = Faker(
+        "random_element",
+        elements=(
+            CaseTransfer.APPEAL,
+            CaseTransfer.WORKLOAD,
+            CaseTransfer.MERGE,
+            CaseTransfer.JURISDICTION,
+        ),
+    )
+
+    class Meta:
+        model = CaseTransfer
+
+
+class TrialCourtDataFactory(DjangoModelFactory):
+    docket = SubFactory(DocketFactory)
+    docket_number_trial = Faker("federal_district_docket_number")
+    docket_number_raw_trial = SelfAttribute("docket_number_trial")
+    judge_str = Faker("name")
+    judge = SubFactory(PersonFactory)
+    reporter = Faker("name")
+    date_filed = Faker("date_object")
+    court_name = Faker("court_name")
+    court = SubFactory(CourtFactory)
+    punishment = Faker("pystr")
+    county = Faker("pystr")
+
+    class Meta:
+        model = TrialCourtData

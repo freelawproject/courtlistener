@@ -58,6 +58,7 @@ from cl.api.utils import (
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
+from cl.audio.audio_sources import AudioSources
 from cl.audio.factories import AudioFactory
 from cl.disclosures.api_views import (
     AgreementViewSet,
@@ -119,7 +120,6 @@ from cl.search.api_views import (
     RECAPDocumentViewSet,
     TagViewSet,
 )
-from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -241,6 +241,28 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             version_to_compare = version.upper() if version != "v3" else "v3"
             header = f"REST API &ndash; {version_to_compare}"
             self.assertContains(response, header)
+
+    async def test_wiki_data_endpoint(self) -> None:
+        """Does the wiki data endpoint return the expected JSON structure?"""
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/json")
+        data = json.loads(r.content)
+        expected_keys = {
+            "court_count",
+            "citation_count",
+            "citation_lookup",
+            "financial_disclosures",
+        }
+        self.assertEqual(set(data.keys()), expected_keys)
+        self.assertIsInstance(data["court_count"], int)
+        self.assertIsInstance(data["citation_count"], int)
+        citation = data["citation_lookup"]
+        self.assertIn("throttle_count", citation)
+        self.assertIn("throttle_period", citation)
+        self.assertIn("max_per_request", citation)
+        self.assertIn("disclosures", data["financial_disclosures"])
+        self.assertIn("investments", data["financial_disclosures"])
 
 
 class CoverageTests(ESIndexTestCase, TestCase):
@@ -462,7 +484,7 @@ class ApiQueryCountTests(TestCase):
             path = reverse("recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(7):
+        with self.assertNumQueries(8):
             path = reverse("opinioncluster-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -1914,10 +1936,10 @@ class DRFSearchAppAndAudioAppApiFilterTest(
 
         # Multiple choice filter
 
-        sources = [ClusterSources.COURT_WEBSITE]
+        sources = [AudioSources.COURT_WEBSITE]
         self.q = {"source": sources}
         await self.assertCountInResults(2)
-        sources.append(ClusterSources.COURT_M_RESOURCE)
+        sources.append(AudioSources.BRAD_HEATH_ARCHIVE)
         await self.assertCountInResults(3)
 
     async def test_opinion_cited_filters(self) -> None:
@@ -4201,6 +4223,30 @@ class ClusterRedirectionTest(TestCase):
                 )
                 response = await api_client.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_cluster_redirections_nested_field(self):
+        """Test that cluster_redirections appears as a nested field on
+        the OpinionCluster detail endpoint with correct data."""
+        url = reverse(
+            "opinioncluster-detail",
+            kwargs={"version": "v4", "pk": self.redirect_to_cluster.pk},
+        )
+        api_client = await sync_to_async(make_client)(self.user.user.pk)
+        response = await api_client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        data = response.json()
+
+        self.assertIn("cluster_redirections", data)
+        redirections = data["cluster_redirections"]
+        self.assertEqual(len(redirections), 1)
+
+        redirection = redirections[0]
+        expected_fields = {"date_created", "deleted_cluster_id", "reason"}
+        self.assertEqual(set(redirection.keys()), expected_fields)
+        self.assertEqual(
+            redirection["deleted_cluster_id"], self.deleted_cluster_id
+        )
+        self.assertEqual(redirection["reason"], ClusterRedirection.VERSION)
 
 
 class TestOpinionViewsetXMLRendering(TestCase):

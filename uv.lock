@@ -504,7 +504,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.9.0" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=2.6.68" },
+    { name = "juriscraper", specifier = ">=3.0.0" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "markdown2", specifier = ">=2.5.4" },
@@ -648,11 +648,11 @@ wheels = [
 
 [[package]]
 name = "courts-db"
-version = "0.10.26"
+version = "0.10.27"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/de/d5/468434ebbef9e041b8358f1aa702f5538acf258f4ef60c61878edb66d391/courts_db-0.10.26.tar.gz", hash = "sha256:06cbbeabd91786b321d46af0a5c96b27a98a397c0a3f256c5682220a14380ee5", size = 139217, upload-time = "2025-08-27T19:57:25.712Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/b5/67faa4ae8e273708256a08e71e9173f4671dbe274a35256c10ec054e446c/courts_db-0.10.27.tar.gz", hash = "sha256:0562bff60ad2267d5aea7a1acf327af4b00fdd893783612135372101a45e313e", size = 139584, upload-time = "2026-03-25T18:46:00.138Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/19/19dca994d92d961b34db59d9b4c770dbcd1227a8ae7ec697ab0d519e057c/courts_db-0.10.26-py3-none-any.whl", hash = "sha256:aedfab6bf17004a92f0e24ed811df79b4855b477ea8689b99492f55844039117", size = 148320, upload-time = "2025-08-27T19:57:24.023Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/79/c0c10e34711f13258ab0f4299b1cd1eef4253298bb1e9f9131650a08ab87/courts_db-0.10.27-py3-none-any.whl", hash = "sha256:3b47638caeaa30222231e754af3472273dfe8056d0fbd73da7f5d6857b99f27c", size = 148703, upload-time = "2026-03-25T18:45:58.664Z" },
 ]
 
 [[package]]
@@ -1855,7 +1855,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "2.8.4"
+version = "3.0.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1866,6 +1866,7 @@ dependencies = [
     { name = "feedparser" },
     { name = "geonamescache" },
     { name = "html5lib" },
+    { name = "httpx", extra = ["http2"] },
     { name = "lxml" },
     { name = "nh3" },
     { name = "python-dateutil" },
@@ -1873,9 +1874,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d1/40/0d63fde43d58e4968bf180651b72a872e1d1577b06c7d5d846bb38b963f5/juriscraper-2.8.4.tar.gz", hash = "sha256:7d752312fbb115c02a58dd543e31275d24aa5acf01a41a7118e77878cf76fac0", size = 385461, upload-time = "2026-03-17T21:45:30.341Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/9c/dbbe9cc801f7e232b3262ec470636f88f2274d60c00280a4a1ad22678361/juriscraper-3.0.10.tar.gz", hash = "sha256:80f55cd764e421fa00441ee9f44a516776d4c061a2d69f6bc59f9c21def82819", size = 393768, upload-time = "2026-04-14T15:22:39.878Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/f0/1fb2f9f71326c13ec81df9c915d0bd155fc6a172c8766e9c66a354751a55/juriscraper-2.8.4-py3-none-any.whl", hash = "sha256:02a2689949697b87516135d33f3a342151d228baeb6c800dc7c272696aeaf0bf", size = 611354, upload-time = "2026-03-17T21:45:28.398Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/74/8ddd3abda8667c3aec7080d24473bce08d5dfee1219fc2b527480f5b480e/juriscraper-3.0.10-py3-none-any.whl", hash = "sha256:67ff9723038bad63704a1a26d203180dae4b547ec8a4274f986ac520e9f7b7cd", size = 622779, upload-time = "2026-04-14T15:22:37.742Z" },
 ]
 
 [[package]]
@@ -2876,11 +2877,11 @@ wheels = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.63"
+version = "3.2.64"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/53/9b/24b9ff4f33b6ef3b95d8e1c4bcbb3e5ea5427233a1762482c9063968fc0f/reporters_db-3.2.63.tar.gz", hash = "sha256:041592d807191914a46149566e53c3a27f4cf92d23650f48dc0150fc76254588", size = 186320, upload-time = "2025-11-26T17:13:51.798Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/6d/dc133e27a5f55c74d33250da1972d6430200763ae5df41416ef9f25245e6/reporters_db-3.2.64.tar.gz", hash = "sha256:39b50cf3c15bb3f4869cee1226fa06499eec603e14cbd06c66ec2aee2daf9e73", size = 186360, upload-time = "2026-03-25T18:43:28.861Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/27/387a2c9b96bc819d5462a717ca4f6f2e764d9ec3fb9c4d80771d6b43e6fb/reporters_db-3.2.63-py3-none-any.whl", hash = "sha256:ba03e7b4413b5e76d53d36ef46230746fdbaf306ea87182a91497b313d059ac5", size = 186461, upload-time = "2025-11-26T17:13:50.753Z" },
+    { url = "https://files.pythonhosted.org/packages/59/95/8850f2c0929af60705ffc0a42011b91d4ac7141d7bd833f54a43b1582f5a/reporters_db-3.2.64-py3-none-any.whl", hash = "sha256:adcb5d7f984acb85aa861849b7d0a23e102e023762e4f628fb03b60205e69e12", size = 186464, upload-time = "2026-03-25T18:43:27.532Z" },
 ]
 
 [[package]]

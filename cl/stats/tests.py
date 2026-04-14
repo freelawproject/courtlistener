@@ -1,9 +1,12 @@
+import random
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 import pytest
 import time_machine
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -325,10 +328,20 @@ class PrometheusIntegrationAPITests(PrometheusIntegrationTestBase):
         final_count = await self._get_metric_count("keyword", "api")
         self.assertEqual(final_count, initial_count + 1)
 
-    async def test_api_semantic_search_increments_metric(self) -> None:
+    @mock.patch("cl.lib.elasticsearch_utils.microservice")
+    async def test_api_semantic_search_increments_metric(
+        self, mock_microservice
+    ) -> None:
         """Verify semantic API searches increment the Prometheus counter"""
         initial_count = await self._get_metric_count("semantic", "api")
 
+        inception_mock = MagicMock()
+        inception_mock.json.return_value = {
+            "embedding": [
+                random.random() for _ in range(settings.EMBEDDING_DIMENSIONS)
+            ]
+        }
+        mock_microservice.return_value = inception_mock
         search_url = reverse("search-list", kwargs={"version": "v4"})
         await self.async_client.get(
             search_url,
@@ -664,16 +677,8 @@ class TallyStatWithLabelsTests(TestCase):
     def setUp(self):
         self.r = get_redis_interface("STATS")
         self.prefix = get_stat_metrics_prefix()
-        # Clean up date-based keys for metrics this class uses
-        for pattern in [
-            "search.results*",
-            "alerts.sent*",
-            "webhooks.sent*",
-        ]:
-            keys = self.r.keys(pattern)
-            if keys:
-                self.r.delete(*keys)
-        # Clean up prometheus keys
+        # Only clean up prometheus keys (test-specific prefix, safe).
+        # Date-based keys use deltas so no cleanup needed here.
         for key in self.r.scan_iter(f"{self.prefix}*"):
             self.r.delete(key)
 

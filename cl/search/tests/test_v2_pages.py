@@ -122,14 +122,18 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertIn(">Login</a>", resp.content.decode())
-        self.assertNotIn('id="header-profile-menu"', resp.content.decode())
+        self.assertNotIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
     async def test_header_authenticated_user(self):
         await self.async_client.alogin(username="pandora", password="password")
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn(">Login</a>", resp.content.decode())
-        self.assertIn('id="header-profile-menu"', resp.content.decode())
+        self.assertIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
 
 @override_flag("use_new_design", True)
@@ -142,7 +146,8 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
         html = resp.content.decode()
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertIn('x-data="header"', html)
+        self.assertIn("<header", html)
+        self.assertIn("x-menu", html)
         # Ensure no search widget in header (homepage variant)
         self.assertNotIn(
             'x-data="search"', html.split("<header")[1].split("</header")[0]
@@ -271,6 +276,25 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
                 1,
                 f"Label with for='{label_for}' should have exactly one matching element, found {len(matching_inputs)}",
             )
+
+    def test_date_selector_renders(self):
+        """Date selector inputs are present in the rendered search page."""
+        response = self.client.get(reverse("show_results"))
+        tree = lhtml.fromstring(response.content.decode())
+
+        after_inputs = tree.xpath('//input[@name="filed_after"]')
+        before_inputs = tree.xpath('//input[@name="filed_before"]')
+
+        self.assertGreaterEqual(
+            len(after_inputs),
+            1,
+            "Expected at least one input with name='filed_after'",
+        )
+        self.assertGreaterEqual(
+            len(before_inputs),
+            1,
+            "Expected at least one input with name='filed_before'",
+        )
 
 
 @override_flag("use_new_design", True)

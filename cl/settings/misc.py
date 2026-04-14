@@ -35,6 +35,9 @@ IA_OA_COLLECTIONS: list[str] = env(
 LASC_USERNAME = env("LASC_USERNAME", default="")
 LASC_PASSWORD = env("LASC_PASSWORD", default="")
 
+# TAMES (Texas courts CaseMail)
+TAMES_USER = env("TAMES_USER", default="")
+
 # Google auth
 here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {

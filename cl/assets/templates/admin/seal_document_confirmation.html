@@ -1,0 +1,54 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <h2>{{ heading }}</h2>
+
+  {% if documents %}
+    <form method="post">
+      {% csrf_token %}
+
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="select-all" checked></th>
+            <th>ID</th>
+            <th>Doc #</th>
+            <th>Att #</th>
+            <th>Description</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+            <tr{% if doc.is_sealed %} style="opacity: 0.5"{% endif %}>
+              <td>
+                <input type="checkbox" name="doc_ids" value="{{ doc.pk }}"
+                  {% if doc.is_sealed %}disabled{% else %}checked{% endif %}>
+              </td>
+              <td>{{ doc.pk }}</td>
+              <td>{{ doc.document_number|default:"—" }}</td>
+              <td>{{ doc.attachment_number|default:"—" }}</td>
+              <td>{{ doc.description|default:"—"|truncatewords:20 }}</td>
+              <td>{% if doc.is_sealed %}Already sealed{% else %}Unsealed{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <br>
+      <input type="submit" value="Seal Selected Documents" class="default">
+      <a href="{{ cancel_url }}" style="margin-left: 10px;">Cancel</a>
+    </form>
+
+    <script nonce="{{ request.csp_nonce }}">
+      document.getElementById("select-all").addEventListener("change", function() {
+        document.querySelectorAll('input[name="doc_ids"]:not([disabled])').forEach(
+          function(cb) { cb.checked = this.checked; }.bind(this)
+        );
+      });
+    </script>
+  {% else %}
+    <p>No documents found.</p>
+    <a href="{{ cancel_url }}">Go back</a>
+  {% endif %}
+{% endblock %}

@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from typing import cast
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
@@ -47,6 +48,29 @@ class RestartRateLimitMixin:
     def tearDownClass(cls):
         cls.restart_rate_limit()
         super().tearDownClass()
+
+
+class MockTallyStatMixin:
+    """Mock ``tally_stat`` so tests never read/write shared Redis stat keys.
+
+    Tests assert on ``self.mock_tally_stat`` (a standard ``MagicMock``)
+    instead of querying Redis.  All known command-level import sites are
+    patched to the *same* mock, so ``call_count`` and ``call_args_list``
+    reflect every invocation regardless of which command triggered it.
+    """
+
+    tally_stat_module_paths: list[str] = [
+        "cl.alerts.management.commands.cl_send_scheduled_alerts.tally_stat",
+        "cl.alerts.management.commands.cl_send_recap_alerts.tally_stat",
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.mock_tally_stat = mock.MagicMock()
+        for path in self.tally_stat_module_paths:
+            patcher = mock.patch(path, self.mock_tally_stat)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
 
 class RestartSentEmailQuotaMixin:

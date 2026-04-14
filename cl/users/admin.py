@@ -64,7 +64,7 @@ admin.site.unregister(User)
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     form = CustomUserChangeForm  # optimize queryset for user_permissions field
-    change_form_template = "admin/user_change_form.html"
+    change_form_template = "admin/change_form_with_custom_links.html"
     readonly_fields = ("api_calls_count",)
     inlines = (
         UserProfileInline,
