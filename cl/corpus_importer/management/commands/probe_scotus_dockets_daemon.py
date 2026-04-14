@@ -13,7 +13,7 @@ from cl.corpus_importer.scotus_daemon_utils import (
     current_scotus_term_year,
     fetch_scotus_docket_json,
     format_docket_number,
-    next_term_starts_probing,
+    previous_term_still_probing,
     save_scotus_raw_to_s3,
     scotus_blocked_attempts_key,
     scotus_court_wait_key,
@@ -249,9 +249,9 @@ def run_scotus_probe_iteration(r, testing: bool) -> None:
         return
 
     targets: list[tuple[str, int]] = [(seq, current_term) for seq in SEQUENCES]
-    if next_term_starts_probing(today):
-        next_term = (current_term + 1) % 100
-        targets.extend((seq, next_term) for seq in SEQUENCES)
+    if previous_term_still_probing(today):
+        prev_term = (current_term - 1) % 100
+        targets.extend((seq, prev_term) for seq in SEQUENCES)
 
     total_hits = 0
     for sequence, term_year in targets:
@@ -290,7 +290,7 @@ high-range (YY-5001..), and applications (YYA1..). It synchronously fetches
 JSON files and archives them to S3. Ingestion of each archived file is
 handed off to Celery via ``process_scotus_docket``. Gaps jumped over by the
 geometric probe are backfilled inline in the same iteration. During July
-it also probes the upcoming term to catch the rollover moment.
+it also probes the outgoing (previous) term to catch late filings.
 
 """
 

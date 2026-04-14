@@ -57,17 +57,15 @@ def current_scotus_term_year(today: date) -> int:
     return year % 100
 
 
-def next_term_starts_probing(today: date) -> bool:
-    """Return True while we should also probe candidate dockets for the NEXT
-    term year.
+def previous_term_still_probing(today: date) -> bool:
+    """Return True while we should also probe the outgoing (previous) term.
 
-    SCOTUS cuts the new term on July 1, but the very first docket numbers
-    sometimes trickle in over the following days/weeks. During July we
-    probe both the current term and ``term + 1`` so we don't miss the
-    rollover moment.
+    SCOTUS terms switch on July 1. Late filings for the outgoing term may
+    still trickle in after the cutover. During July we probe both the new
+    current term and the previous term so we don't miss stragglers.
 
     :param today: The date to check.
-    :return: Whether next-term probing should be active.
+    :return: Whether previous-term probing should be active.
     """
     return today.month == 7
 

@@ -14,7 +14,7 @@ from cl.corpus_importer.management.commands import (
 from cl.corpus_importer.scotus_daemon_utils import (
     current_scotus_term_year,
     format_docket_number,
-    next_term_starts_probing,
+    previous_term_still_probing,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.factories import CourtFactory
@@ -39,11 +39,11 @@ class ScotusDaemonUtilsTest(SimpleTestCase):
         self.assertEqual(current_scotus_term_year(date(2025, 12, 31)), 25)
         self.assertEqual(current_scotus_term_year(date(2026, 7, 2)), 26)
 
-    def test_next_term_probing_window(self):
-        self.assertFalse(next_term_starts_probing(date(2026, 6, 30)))
-        self.assertTrue(next_term_starts_probing(date(2026, 7, 1)))
-        self.assertTrue(next_term_starts_probing(date(2026, 7, 31)))
-        self.assertFalse(next_term_starts_probing(date(2026, 8, 1)))
+    def test_previous_term_probing_window(self):
+        self.assertFalse(previous_term_still_probing(date(2026, 6, 30)))
+        self.assertTrue(previous_term_still_probing(date(2026, 7, 1)))
+        self.assertTrue(previous_term_still_probing(date(2026, 7, 31)))
+        self.assertFalse(previous_term_still_probing(date(2026, 8, 1)))
 
     def test_format_docket_number(self):
         self.assertEqual(format_docket_number(25, 150), "25-150")
@@ -223,14 +223,19 @@ class ScotusDaemonTest(SimpleTestCase):
         self.assertTrue(mock_error.called)
         self.assertEqual(self.r.get(self.COURT_WAIT_KEY), "3600")
 
-    def test_term_rollover_persists_new_term_watermark(self, *_mocks):
-        """During the July-onward rollover window, a hit in the new term
-        must persist ``low:26``."""
+    def test_term_rollover_probes_outgoing_term(self, *_mocks):
+        """During July the daemon must also probe the outgoing (previous)
+        term. A late filing for term 24 must persist ``low:24``."""
+        # July 2025: current term = 25, previous term = 24.
+        # Seed term 25 (current) and term 24 (outgoing with straggler room).
         self._seed_current_term(25, low=3000, high=20000)
+        self.r.hset(self.HIGHEST_KNOWN_KEY, "low:24", 2999)
+        self.r.hset(self.HIGHEST_KNOWN_KEY, "high:24", 20000)
+        self.r.hset(self.HIGHEST_KNOWN_KEY, "applications:24", 2000)
 
         def fake_fetch(docket_number):
-            if docket_number == "26-1":
-                return '{"docket_number":"26-1"}', HTTPStatus.OK
+            if docket_number == "24-3000":
+                return '{"docket_number":"24-3000"}', HTTPStatus.OK
             return None, HTTPStatus.NOT_FOUND
 
         with (
@@ -251,7 +256,7 @@ class ScotusDaemonTest(SimpleTestCase):
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
-        self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:26"), "1")
+        self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:24"), "3000")
 
     def test_applications_sequence_uses_a_format(self, *_mocks):
         """The applications sequence must format docket numbers as YYA{serial}
