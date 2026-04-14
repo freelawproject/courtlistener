@@ -40,13 +40,9 @@
             type="text"
             placeholder="Search this docket"
           />
-          <a
-            href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-            class="btn-primary rounded-l-none px-3"
-            title="Search"
-          >
+          <c-button variant="primary" href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" class="rounded-l-none px-3" title="Search">
             {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
-          </a>
+          </c-button>
         </div>
       </div>
 
@@ -126,30 +122,30 @@
       {# Prev/Next — submit this form with page param #}
       <div class="flex items-end gap-1 ml-auto">
         {% if page_obj.has_previous %}
-          <button type="submit" name="page" value="{{ page_obj.previous_page_number }}" title="Previous page" class="btn-ghost px-2 py-2">
+          <c-button variant="ghost" type="submit" name="page" value="{{ page_obj.previous_page_number }}" title="Previous page" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
             <span class="ml-1">Prev</span>
-          </button>
+          </c-button>
         {% else %}
-          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+          <c-button variant="ghost" disabled aria-disabled="true" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
             <span class="ml-1">Prev</span>
-          </span>
+          </c-button>
         {% endif %}
         {% if page_obj.has_next %}
-          <button type="submit" name="page" value="{{ page_obj.next_page_number }}" title="Next page" class="btn-ghost px-2 py-2">
+          <c-button variant="ghost" type="submit" name="page" value="{{ page_obj.next_page_number }}" title="Next page" class="px-2 py-2">
             <span class="mr-1">Next</span>
             {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </button>
+          </c-button>
         {% else %}
-          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+          <c-button variant="ghost" disabled aria-disabled="true" class="px-2 py-2">
             <span class="mr-1">Next</span>
             {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </span>
+          </c-button>
         {% endif %}
       </div>
 
-      <button type="submit" class="sr-only">Filter</button>
+      <c-button type="submit" class="sr-only">Filter</c-button>
     </div>
   </form>
 
@@ -167,35 +163,31 @@
             type="text"
             placeholder="Search this docket"
           />
-          <a
-            href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}"
-            class="btn-primary rounded-l-none px-3"
-            title="Search"
-          >
+          <c-button variant="primary" href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" class="rounded-l-none px-3" title="Search">
             {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
-          </a>
+          </c-button>
         </div>
       </div>
 
       {# Prev/Next — standalone links on mobile #}
       <div class="flex items-end gap-1">
         {% if page_obj.has_previous %}
-          <a href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="btn-ghost px-2 py-2">
+          <c-button variant="ghost" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-          </a>
+          </c-button>
         {% else %}
-          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+          <c-button variant="ghost" disabled aria-disabled="true" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-          </span>
+          </c-button>
         {% endif %}
         {% if page_obj.has_next %}
-          <a href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="btn-ghost px-2 py-2">
+          <c-button variant="ghost" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </a>
+          </c-button>
         {% else %}
-          <span class="btn-ghost px-2 py-2 opacity-40 pointer-events-none" aria-disabled="true">
+          <c-button variant="ghost" disabled aria-disabled="true" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </span>
+          </c-button>
         {% endif %}
       </div>
     </div>
@@ -286,9 +278,9 @@
         </div>
 
         <c-slot name="footer">
-          <button type="submit" class="btn-primary w-full justify-center">
+          <c-button variant="primary" type="submit" class="w-full justify-center">
             Apply filters
-          </button>
+          </c-button>
         </c-slot>
       </form>
     </c-filter-drawer>

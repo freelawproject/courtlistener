@@ -11,17 +11,16 @@
 
 <div x-data="filterDrawer" x-id="drawerIdGroup" class="md:hidden {{ class }}">
   {# Trigger button #}
-  <button
+  <c-button
+    variant="outline"
     x-on:click="open"
     x-bind:aria-controls="drawerId"
     x-bind:aria-expanded="isOpen"
     aria-haspopup="dialog"
-    type="button"
-    class="btn-outline"
   >
     {% svg "funnel" class="w-4 h-4" aria_hidden="true" %}
     {{ title }}
-  </button>
+  </c-button>
 
   {# Drawer panel #}
   <div
@@ -50,14 +49,14 @@
       {# Header #}
       <div class="flex items-center justify-between px-4 py-3 border-b border-greyscale-200">
         <h2 class="text-lg font-semibold text-greyscale-900">{{ title }}</h2>
-        <button
+        <c-button
+          variant="ghost"
           x-on:click="close"
-          type="button"
-          class="btn-ghost p-1"
+          class="p-1"
           aria-label="Close filters"
         >
           {% svg "cross" class="w-5 h-5" aria_hidden="true" %}
-        </button>
+        </c-button>
       </div>
 
       {# Content — filter fields projected via slot #}
