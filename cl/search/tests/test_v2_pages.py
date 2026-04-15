@@ -123,7 +123,9 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
         self.assertIn(">Login</a>", resp.content.decode())
-        self.assertNotIn('id="header-profile-menu"', resp.content.decode())
+        self.assertNotIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
     async def test_header_authenticated_user(self):
         await self.async_client.alogin(username="pandora", password="password")
@@ -131,7 +133,9 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
         self.assertNotIn(">Login</a>", resp.content.decode())
-        self.assertIn('id="header-profile-menu"', resp.content.decode())
+        self.assertIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
 
 @override_flag("use_new_design", True)
@@ -144,7 +148,8 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
         html = resp.content.decode()
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertIn('x-data="header"', html)
+        self.assertIn("<header", html)
+        self.assertIn("x-menu", html)
         # Ensure no search widget in header (homepage variant)
         self.assertNotIn(
             'x-data="search"', html.split("<header")[1].split("</header")[0]
