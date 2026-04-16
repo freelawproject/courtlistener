@@ -2622,6 +2622,11 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         self.assertTrue(appealed_from["suffix_nofollow"])
         self.assertNotIn("suffix_is_external", appealed_from)
 
+        # An accessible name describes the link's purpose for assistive tech
+        # (rendered as aria-label, replacing the prior title attribute).
+        self.assertIn("1:23-cv-456", appealed_from["suffix_aria_label"])
+        self.assertIn("RECAP", appealed_from["suffix_aria_label"])
+
     def test_appealed_from_renders_lower_court_docket_number_as_plain_text(
         self,
     ) -> None:

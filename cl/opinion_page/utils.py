@@ -299,8 +299,9 @@ def build_originating_court_metadata(
                     f"&court={docket.appeal_from.pk}"
                 )
                 item["suffix_nofollow"] = True
-                item["suffix_title"] = (
-                    "Search for this docket number in the RECAP Archive."
+                item["suffix_aria_label"] = (
+                    f"Search the RECAP Archive for docket number "
+                    f"{og_info.docket_number}"
                 )
             elif og_info.administrative_link:
                 item["suffix_url"] = og_info.administrative_link
