@@ -2570,6 +2570,86 @@ class BuildDocketMetadataTest(TestCase):
         self.assertTrue(cause.get("nofollow"))
 
 
+class BuildOriginatingCourtMetadataTest(TestCase):
+    """Test the build_originating_court_metadata helper function."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.appellate_court = CourtFactory(id="ca1", jurisdiction="F")
+        cls.lower_court = CourtFactory(id="dmd", jurisdiction="FD")
+
+    def test_returns_empty_when_no_og_info(self) -> None:
+        """No originating court information yields an empty list."""
+        from cl.opinion_page.utils import build_originating_court_metadata
+
+        docket = DocketFactory(court=self.appellate_court, source=Docket.RECAP)
+        items = build_originating_court_metadata(docket, None)
+        self.assertEqual(items, [])
+
+    def test_appealed_from_links_lower_court_docket_number(self) -> None:
+        """When the lower court is known, the lower-court docket number
+        renders as a nofollow RECAP search link via data fields — never as
+        a raw HTML string in the value."""
+        from cl.search.models import OriginatingCourtInformation
+
+        from cl.opinion_page.utils import build_originating_court_metadata
+
+        og_info = OriginatingCourtInformation.objects.create(
+            docket_number="1:23-cv-456"
+        )
+        docket = DocketFactory(
+            court=self.appellate_court,
+            source=Docket.RECAP,
+            appeal_from=self.lower_court,
+            originating_court_information=og_info,
+        )
+        items = build_originating_court_metadata(docket, og_info)
+        appealed_from = next(i for i in items if i["label"] == "Appealed From")
+
+        # The displayed value is the lower court name only — no embedded HTML.
+        self.assertEqual(appealed_from["label"], "Appealed From")
+        self.assertEqual(appealed_from["value"], self.lower_court.short_name)
+        self.assertNotIn("<", str(appealed_from["value"]))
+
+        # The lower-court docket number travels as data, not as HTML.
+        self.assertEqual(appealed_from["suffix_text"], "1:23-cv-456")
+        self.assertIn(
+            "docket_number=1:23-cv-456", appealed_from["suffix_url"]
+        )
+        self.assertIn(
+            f"court={self.lower_court.pk}", appealed_from["suffix_url"]
+        )
+        self.assertTrue(appealed_from["suffix_nofollow"])
+        self.assertNotIn("suffix_is_external", appealed_from)
+
+    def test_appealed_from_renders_lower_court_docket_number_as_plain_text(
+        self,
+    ) -> None:
+        """When only the lower court name is known (no FK, no admin link),
+        the lower-court docket number is plain text with no link fields."""
+        from cl.search.models import OriginatingCourtInformation
+
+        from cl.opinion_page.utils import build_originating_court_metadata
+
+        og_info = OriginatingCourtInformation.objects.create(
+            docket_number="42"
+        )
+        docket = DocketFactory(
+            court=self.appellate_court,
+            source=Docket.RECAP,
+            appeal_from=None,
+            appeal_from_str="Some State Court",
+            originating_court_information=og_info,
+        )
+        items = build_originating_court_metadata(docket, og_info)
+        appealed_from = next(i for i in items if i["label"] == "Appealed From")
+
+        self.assertEqual(appealed_from["label"], "Appealed From")
+        self.assertEqual(appealed_from["value"], "Some State Court")
+        self.assertEqual(appealed_from["suffix_text"], "42")
+        self.assertNotIn("suffix_url", appealed_from)
+
+
 class BuildDocketTabsTest(SimpleTestCase):
     """Test the build_docket_tabs helper function."""
 

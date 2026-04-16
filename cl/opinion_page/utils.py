@@ -282,23 +282,30 @@ def build_originating_court_metadata(
     items: list[dict[str, str | bool]] = []
 
     if docket.appeal_from or docket.appeal_from_str:
-        appeal_value = ""
         if docket.appeal_from:
             appeal_value = docket.appeal_from.short_name
-        elif docket.appeal_from_str:
+        else:
             appeal_value = docket.appeal_from_str
 
+        item: dict[str, str | bool] = {
+            "label": "Appealed From",
+            "value": appeal_value,
+        }
         if og_info.docket_number:
+            item["suffix_text"] = og_info.docket_number
             if docket.appeal_from:
-                appeal_value += f' (<a class="links" href="/?type=r&docket_number={og_info.docket_number}&court={docket.appeal_from.pk}" rel="nofollow" title="Search for this docket number in the RECAP Archive.">{og_info.docket_number}</a>)'
+                item["suffix_url"] = (
+                    f"/?type=r&docket_number={og_info.docket_number}"
+                    f"&court={docket.appeal_from.pk}"
+                )
+                item["suffix_nofollow"] = True
+                item["suffix_title"] = (
+                    "Search for this docket number in the RECAP Archive."
+                )
             elif og_info.administrative_link:
-                appeal_value += f' (<a class="links-external" href="{og_info.administrative_link}" target="_blank" rel="noreferrer">{og_info.docket_number}</a>)'
-            else:
-                appeal_value += f" ({og_info.docket_number})"
-
-        items.append(
-            {"label": "Appealed From", "value": appeal_value, "safe": True}
-        )
+                item["suffix_url"] = og_info.administrative_link
+                item["suffix_is_external"] = True
+        items.append(item)
 
     if og_info.court_reporter:
         items.append(

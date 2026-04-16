@@ -1,0 +1,52 @@
+{# Renders a metadata section: optional <h2> heading + <dl> of label/value items. #}
+{# Each item is a dict with: #}
+{#   - label, value (required) #}
+{#   - url (optional): renders value as a link #}
+{#   - nofollow (optional bool): adds rel="nofollow" to the link #}
+{#   - is_external (optional bool): renders as an external link #}
+{#   - suffix_text (optional): rendered after value in parentheses #}
+{#   - suffix_url (optional): renders suffix_text as a link #}
+{#   - suffix_nofollow / suffix_is_external / suffix_title (optional) #}
+<c-vars
+  items=""
+  title=""
+  list_class=""
+/>
+
+{% if items %}
+  {% if title %}
+    <h2 class="mt-6">{{ title }}</h2>
+  {% endif %}
+  <c-description-list class="{{ list_class }}">
+    {% for item in items %}
+      <c-description-item>
+        <c-description-term>{{ item.label }}</c-description-term>
+        <c-description-details>
+          {% if item.url %}
+            <a
+              class="{% if item.is_external %}links-external{% else %}links{% endif %}"
+              href="{{ item.url }}"
+              {% if item.nofollow %}rel="nofollow"{% endif %}
+              {% if item.is_external %}target="_blank" rel="noreferrer"{% endif %}
+            >{{ item.value }}</a>
+          {% else %}
+            {{ item.value }}
+          {% endif %}
+          {% if item.suffix_text %}
+            {% if item.suffix_url %}
+              (<a
+                class="{% if item.suffix_is_external %}links-external{% else %}links{% endif %}"
+                href="{{ item.suffix_url }}"
+                {% if item.suffix_nofollow %}rel="nofollow"{% endif %}
+                {% if item.suffix_is_external %}target="_blank" rel="noreferrer"{% endif %}
+                {% if item.suffix_title %}title="{{ item.suffix_title }}"{% endif %}
+              >{{ item.suffix_text }}</a>)
+            {% else %}
+              ({{ item.suffix_text }})
+            {% endif %}
+          {% endif %}
+        </c-description-details>
+      </c-description-item>
+    {% endfor %}
+  </c-description-list>
+{% endif %}

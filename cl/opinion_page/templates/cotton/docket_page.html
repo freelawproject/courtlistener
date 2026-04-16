@@ -153,58 +153,22 @@
 </div>
 
 {# METADATA #}
-{% if metadata %}
-  <c-description-list class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-    {% for item in metadata %}
-      <c-description-item>
-        <c-description-term>{{ item.label }}</c-description-term>
-        <c-description-details>
-          {% if item.url %}
-            <a class="links" href="{{ item.url }}" {% if item.nofollow %}rel="nofollow"{% endif %}>{{ item.value }}</a>
-          {% elif item.safe %}
-            {{ item.value|safe }}
-          {% else %}
-            {{ item.value }}
-          {% endif %}
-        </c-description-details>
-      </c-description-item>
-    {% endfor %}
-  </c-description-list>
-{% endif %}
+<c-metadata-section
+  :items="metadata"
+  list_class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4"
+/>
 
 {# BANKRUPTCY INFORMATION #}
-{% if bankruptcy_metadata %}
-  <h2 class="mt-6">Bankruptcy Information</h2>
-  <c-description-list>
-    {% for item in bankruptcy_metadata %}
-      <c-description-item>
-        <c-description-term>{{ item.label }}</c-description-term>
-        <c-description-details>{{ item.value }}</c-description-details>
-      </c-description-item>
-    {% endfor %}
-  </c-description-list>
-{% endif %}
+<c-metadata-section
+  :items="bankruptcy_metadata"
+  title="Bankruptcy Information"
+/>
 
 {# ORIGINATING COURT INFORMATION #}
-{% if originating_court_metadata %}
-  <h2 class="mt-6">Originating Court Information</h2>
-  <c-description-list>
-    {% for item in originating_court_metadata %}
-      <c-description-item>
-        <c-description-term>{{ item.label }}</c-description-term>
-        <c-description-details>
-          {% if item.url %}
-            <a class="{% if item.is_external %}links-external{% else %}links{% endif %}" href="{{ item.url }}" {% if item.nofollow %}rel="nofollow"{% endif %} {% if item.is_external %}target="_blank" rel="noreferrer"{% endif %}>{{ item.value }}</a>
-          {% elif item.safe %}
-            {{ item.value|safe }}
-          {% else %}
-            {{ item.value }}
-          {% endif %}
-        </c-description-details>
-      </c-description-item>
-    {% endfor %}
-  </c-description-list>
-{% endif %}
+<c-metadata-section
+  :items="originating_court_metadata"
+  title="Originating Court Information"
+/>
 
 {# ORAL ARGUMENT RECORDINGS #}
 {% if docket.audio_files.count %}
