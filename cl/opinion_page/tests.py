@@ -2590,9 +2590,8 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         """When the lower court is known, the lower-court docket number
         renders as a nofollow RECAP search link via data fields — never as
         a raw HTML string in the value."""
-        from cl.search.models import OriginatingCourtInformation
-
         from cl.opinion_page.utils import build_originating_court_metadata
+        from cl.search.models import OriginatingCourtInformation
 
         og_info = OriginatingCourtInformation.objects.create(
             docket_number="1:23-cv-456"
@@ -2613,9 +2612,7 @@ class BuildOriginatingCourtMetadataTest(TestCase):
 
         # The lower-court docket number travels as data, not as HTML.
         self.assertEqual(appealed_from["suffix_text"], "1:23-cv-456")
-        self.assertIn(
-            "docket_number=1:23-cv-456", appealed_from["suffix_url"]
-        )
+        self.assertIn("docket_number=1:23-cv-456", appealed_from["suffix_url"])
         self.assertIn(
             f"court={self.lower_court.pk}", appealed_from["suffix_url"]
         )
@@ -2632,9 +2629,8 @@ class BuildOriginatingCourtMetadataTest(TestCase):
     ) -> None:
         """When only the lower court name is known (no FK, no admin link),
         the lower-court docket number is plain text with no link fields."""
-        from cl.search.models import OriginatingCourtInformation
-
         from cl.opinion_page.utils import build_originating_court_metadata
+        from cl.search.models import OriginatingCourtInformation
 
         og_info = OriginatingCourtInformation.objects.create(
             docket_number="42"
