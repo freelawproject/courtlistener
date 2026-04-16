@@ -182,14 +182,17 @@ class DynamicClientRegistrationView(APIView):
         else:
             client_type = Application.CLIENT_CONFIDENTIAL
 
-        app = Application.objects.create(
+        app = Application(
             name=client_name,
             client_type=client_type,
-            authorization_grant_type=(Application.GRANT_AUTHORIZATION_CODE),
+            authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
             redirect_uris=" ".join(redirect_uris),
             algorithm=Application.RS256_ALGORITHM,
             skip_authorization=False,
         )
+        # Capture the plaintext BEFORE save() hashes it in place.
+        client_secret_plaintext = app.client_secret
+        app.save()
 
         response_data: dict[str, Any] = {
             "client_id": app.client_id,
@@ -201,9 +204,7 @@ class DynamicClientRegistrationView(APIView):
             "client_id_issued_at": int(timezone.now().timestamp()),
         }
         if client_type == Application.CLIENT_CONFIDENTIAL:
-            # DOT hashes the secret on save and returns the plaintext
-            # on the instance only for the duration of this request.
-            response_data["client_secret"] = app.client_secret
+            response_data["client_secret"] = client_secret_plaintext
         return Response(response_data, status=status.HTTP_201_CREATED)
 
 

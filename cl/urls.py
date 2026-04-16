@@ -55,10 +55,6 @@ urlpatterns = [
     path("", include("cl.api.urls")),
     path("", include("cl.visualizations.urls")),
     path("", include("cl.stats.urls")),
-    # OAuth 2.1 / MCP. Our DCR + metadata routes must come before
-    # the oauth2_provider include so /o/register/ resolves to our
-    # RFC 7591 endpoint rather than the library's human UI (which
-    # lives at /o/applications/register/).
     path("", include("cl.oauth.urls")),
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     # Sitemaps
