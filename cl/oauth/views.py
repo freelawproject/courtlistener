@@ -101,7 +101,7 @@ def _invalid_metadata(description: str) -> Response:
 
 @method_decorator(
     ratelimit(key="ip", rate="10/h", block=True, method="POST"),
-    name="dispatch",
+    name="post",
 )
 class DynamicClientRegistrationView(APIView):
     """RFC 7591 Dynamic Client Registration endpoint.
