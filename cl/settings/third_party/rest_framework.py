@@ -27,7 +27,13 @@ REST_FRAMEWORK = {
         "citations": "60/min",
     },
     # Auth
+    # Order matters:
+    # - OAuth2 first so Authorization: Bearer <jwt> wins over Basic.
+    # - Session last because its authenticate() is called
+    #   unconditionally to activate replica routing for anonymous
+    #   users.
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        "cl.api.authentication.ReplicaRoutingOAuth2Authentication",
         "cl.api.authentication.ReplicaRoutingBasicAuthentication",
         "cl.api.authentication.ReplicaRoutingTokenAuthentication",
         "cl.api.authentication.ReplicaRoutingSessionAuthentication",

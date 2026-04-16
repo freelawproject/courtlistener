@@ -1,0 +1,204 @@
+from django.test import override_settings
+from django.urls import reverse
+from oauth2_provider.models import get_application_model
+
+from cl.tests.cases import APITestCase
+
+Application = get_application_model()
+
+
+@override_settings(RATELIMIT_ENABLE=False)
+class DynamicClientRegistrationTest(APITestCase):
+    """Tests for the RFC 7591 DCR endpoint at /o/register/.
+
+    Rate limiting is disabled at the class level so that the many
+    POSTs exercising validation branches don't trip the 10/h limiter.
+    ``DynamicClientRegistrationRateLimitTest`` covers the limiter
+    behavior itself.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("oauth2_dcr")
+
+    def test_confidential_client_registration(self):
+        """A confidential client gets a client_id and client_secret."""
+        resp = self.client.post(
+            self.url,
+            {
+                "redirect_uris": ["https://mcp.example.com/callback"],
+                "client_name": "Example MCP Client",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        body = resp.json()
+        self.assertIn("client_id", body)
+        self.assertIn("client_secret", body)
+        self.assertEqual(body["client_name"], "Example MCP Client")
+        self.assertEqual(
+            body["redirect_uris"], ["https://mcp.example.com/callback"]
+        )
+        self.assertEqual(body["grant_types"], ["authorization_code"])
+        self.assertEqual(body["response_types"], ["code"])
+        self.assertEqual(
+            body["token_endpoint_auth_method"], "client_secret_basic"
+        )
+        # The app was persisted with the right type.
+        app = Application.objects.get(client_id=body["client_id"])
+        self.assertEqual(app.client_type, Application.CLIENT_CONFIDENTIAL)
+
+    def test_public_client_registration_has_no_secret(self):
+        """token_endpoint_auth_method=none yields a public client."""
+        resp = self.client.post(
+            self.url,
+            {
+                "redirect_uris": ["https://mcp.example.com/callback"],
+                "token_endpoint_auth_method": "none",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        body = resp.json()
+        self.assertIn("client_id", body)
+        self.assertNotIn("client_secret", body)
+        app = Application.objects.get(client_id=body["client_id"])
+        self.assertEqual(app.client_type, Application.CLIENT_PUBLIC)
+
+    def test_missing_redirect_uris_rejected(self):
+        resp = self.client.post(self.url, {}, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()["error"], "invalid_client_metadata")
+
+    def test_empty_redirect_uris_rejected(self):
+        resp = self.client.post(self.url, {"redirect_uris": []}, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_http_loopback_allowed(self):
+        for uri in (
+            "http://localhost:8080/cb",
+            "http://127.0.0.1:5555/cb",
+            "http://[::1]:9000/cb",
+        ):
+            with self.subTest(uri=uri):
+                resp = self.client.post(
+                    self.url,
+                    {"redirect_uris": [uri]},
+                    format="json",
+                )
+                self.assertEqual(resp.status_code, 201, resp.content)
+
+    def test_http_non_loopback_rejected(self):
+        resp = self.client.post(
+            self.url,
+            {"redirect_uris": ["http://evil.example.com/cb"]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("loopback", resp.json()["error_description"])
+
+    def test_unsupported_scheme_rejected(self):
+        resp = self.client.post(
+            self.url,
+            {"redirect_uris": ["javascript:alert(1)"]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_disallowed_grant_type_rejected(self):
+        resp = self.client.post(
+            self.url,
+            {
+                "redirect_uris": ["https://mcp.example.com/cb"],
+                "grant_types": ["client_credentials"],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_missing_authorization_code_grant_rejected(self):
+        resp = self.client.post(
+            self.url,
+            {
+                "redirect_uris": ["https://mcp.example.com/cb"],
+                "grant_types": ["refresh_token"],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_unsupported_token_auth_method_rejected(self):
+        resp = self.client.post(
+            self.url,
+            {
+                "redirect_uris": ["https://mcp.example.com/cb"],
+                "token_endpoint_auth_method": "private_key_jwt",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_default_client_name_generated(self):
+        resp = self.client.post(
+            self.url,
+            {"redirect_uris": ["https://mcp.example.com/cb"]},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertTrue(resp.json()["client_name"].startswith("MCP Client "))
+
+
+class DynamicClientRegistrationRateLimitTest(APITestCase):
+    """The DCR endpoint is rate-limited per IP."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("oauth2_dcr")
+        self.restart_rate_limit()
+
+    def test_ratelimit_blocks_after_threshold(self):
+        payload = {"redirect_uris": ["https://mcp.example.com/cb"]}
+        # 10/h is the configured rate.
+        for _ in range(10):
+            resp = self.client.post(self.url, payload, format="json")
+            self.assertEqual(resp.status_code, 201, resp.content)
+        resp = self.client.post(self.url, payload, format="json")
+        self.assertEqual(resp.status_code, 429)
+        self.assertEqual(resp.json()["error"], "rate_limited")
+
+
+class OAuthMetadataTest(APITestCase):
+    """Tests for the RFC 8414 metadata endpoint."""
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("oauth2_metadata")
+
+    def test_metadata_shape(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        # Required RFC 8414 fields.
+        for field in (
+            "issuer",
+            "authorization_endpoint",
+            "token_endpoint",
+            "response_types_supported",
+        ):
+            self.assertIn(field, body)
+        # MCP-specific expectations.
+        self.assertIn("registration_endpoint", body)
+        self.assertIn("S256", body["code_challenge_methods_supported"])
+        self.assertIn("authorization_code", body["grant_types_supported"])
+        self.assertEqual(body["response_types_supported"], ["code"])
+        # Endpoints should be absolute URLs that share an origin with
+        # the issuer.
+        self.assertTrue(
+            body["authorization_endpoint"].startswith(body["issuer"])
+        )
+        self.assertTrue(body["token_endpoint"].startswith(body["issuer"]))
+        self.assertTrue(
+            body["registration_endpoint"].startswith(body["issuer"])
+        )
+        # The registration endpoint must point at our DCR view.
+        self.assertTrue(body["registration_endpoint"].endswith("/o/register/"))
