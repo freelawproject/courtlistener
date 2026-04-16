@@ -3,6 +3,8 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
+from typing import NotRequired, TypedDict
+from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -11,6 +13,8 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.urls import reverse
+from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 from elasticsearch_dsl import Q
@@ -29,6 +33,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
+from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
@@ -43,27 +48,61 @@ from cl.search.models import (
 logger = logging.getLogger(__name__)
 
 
+class MetadataItem(TypedDict):
+    """Shape of a single item in a metadata description list (see the
+    c-metadata-section cotton component)."""
+
+    label: str
+    value: str
+    url: NotRequired[str]
+    nofollow: NotRequired[bool]
+    is_external: NotRequired[bool]
+    aria_label: NotRequired[str]
+    suffix_text: NotRequired[str]
+    suffix_url: NotRequired[str]
+    suffix_nofollow: NotRequired[bool]
+    suffix_is_external: NotRequired[bool]
+    suffix_aria_label: NotRequired[str]
+
+
+def _person_item(
+    label: str,
+    person: Person | None,
+    person_str: str,
+    search_param: str = "assigned_to",
+) -> MetadataItem | None:
+    """Build a metadata item for a person field with both a FK and a string
+    fallback. Returns a linked item when the person FK is set, a nofollow
+    search-link item when only the string is set, or None when both are empty.
+    """
+    if person:
+        return {
+            "label": label,
+            "value": person.name_full,
+            "url": person.get_absolute_url(),
+        }
+    if person_str:
+        return {
+            "label": label,
+            "value": person_str,
+            "url": f'/?type=r&{search_param}="{person_str}"',
+            "nofollow": True,
+        }
+    return None
+
+
 def build_docket_metadata(
     docket: Docket, timezone_str: str
-) -> list[dict[str, str | bool]]:
-    """Build metadata items for the docket page description list.
-
-    Each item is a dict with 'label' and 'value', plus optional 'url',
-    'nofollow', and 'is_external' for linked values.
-    """
-    import pytz
-    from django.utils.timezone import localtime
-
-    items: list[dict[str, str | bool]] = []
+) -> list[MetadataItem]:
+    """Build metadata items for the docket page description list."""
+    items: list[MetadataItem] = []
 
     if docket.source in docket.RECAP_SOURCES():
         items.append(
             {
                 "label": "Last Updated",
                 "value": str(
-                    localtime(
-                        docket.date_modified, pytz.timezone(timezone_str)
-                    )
+                    localtime(docket.date_modified, ZoneInfo(timezone_str))
                 ),
             }
         )
@@ -71,41 +110,18 @@ def build_docket_metadata(
     if docket.panel_str:
         items.append({"label": "Panel", "value": docket.panel_str})
 
-    if docket.assigned_to:
-        items.append(
-            {
-                "label": "Assigned To",
-                "value": docket.assigned_to.name_full,
-                "url": docket.assigned_to.get_absolute_url(),
-            }
-        )
-    elif docket.assigned_to_str:
-        items.append(
-            {
-                "label": "Assigned To",
-                "value": docket.assigned_to_str,
-                "url": f'/?type=r&assigned_to="{docket.assigned_to_str}"',
-                "nofollow": True,
-            }
-        )
+    if assigned := _person_item(
+        "Assigned To", docket.assigned_to, docket.assigned_to_str
+    ):
+        items.append(assigned)
 
-    if docket.referred_to:
-        items.append(
-            {
-                "label": "Referred To",
-                "value": docket.referred_to.name_full,
-                "url": docket.referred_to.get_absolute_url(),
-            }
-        )
-    elif docket.referred_to_str:
-        items.append(
-            {
-                "label": "Referred To",
-                "value": docket.referred_to_str,
-                "url": f'/?type=r&referred_to="{docket.referred_to_str}"',
-                "nofollow": True,
-            }
-        )
+    if referred := _person_item(
+        "Referred To",
+        docket.referred_to,
+        docket.referred_to_str,
+        search_param="referred_to",
+    ):
+        items.append(referred)
 
     if docket.date_cert_granted:
         items.append(
@@ -218,12 +234,12 @@ def build_docket_metadata(
 
 def build_bankruptcy_metadata(
     bankr_info: BankruptcyInformation | None,
-) -> list[dict[str, str]]:
+) -> list[MetadataItem]:
     """Build metadata items for the bankruptcy information section."""
     if not bankr_info:
         return []
 
-    items: list[dict[str, str]] = []
+    items: list[MetadataItem] = []
 
     if bankr_info.date_converted:
         items.append(
@@ -274,12 +290,12 @@ def build_bankruptcy_metadata(
 
 def build_originating_court_metadata(
     docket: Docket, og_info: OriginatingCourtInformation | None
-) -> list[dict[str, str | bool]]:
+) -> list[MetadataItem]:
     """Build metadata items for the originating court information section."""
     if not og_info:
         return []
 
-    items: list[dict[str, str | bool]] = []
+    items: list[MetadataItem] = []
 
     if docket.appeal_from or docket.appeal_from_str:
         if docket.appeal_from:
@@ -287,7 +303,7 @@ def build_originating_court_metadata(
         else:
             appeal_value = docket.appeal_from_str
 
-        item: dict[str, str | bool] = {
+        item: MetadataItem = {
             "label": "Appealed From",
             "value": appeal_value,
         }
@@ -313,41 +329,17 @@ def build_originating_court_metadata(
             {"label": "Court Reporter", "value": og_info.court_reporter}
         )
 
-    if og_info.assigned_to:
-        items.append(
-            {
-                "label": "Trial Judge",
-                "value": og_info.assigned_to.name_full,
-                "url": og_info.assigned_to.get_absolute_url(),
-            }
-        )
-    elif og_info.assigned_to_str:
-        items.append(
-            {
-                "label": "Trial Judge",
-                "value": og_info.assigned_to_str,
-                "url": f'/?type=r&assigned_to="{og_info.assigned_to_str}"',
-                "nofollow": True,
-            }
-        )
+    if trial_judge := _person_item(
+        "Trial Judge", og_info.assigned_to, og_info.assigned_to_str
+    ):
+        items.append(trial_judge)
 
-    if og_info.ordering_judge:
-        items.append(
-            {
-                "label": "Ordering Judge",
-                "value": og_info.ordering_judge.name_full,
-                "url": og_info.ordering_judge.get_absolute_url(),
-            }
-        )
-    elif og_info.ordering_judge_str:
-        items.append(
-            {
-                "label": "Ordering Judge",
-                "value": og_info.ordering_judge_str,
-                "url": f'/?type=r&assigned_to="{og_info.ordering_judge_str}"',
-                "nofollow": True,
-            }
-        )
+    if ordering_judge := _person_item(
+        "Ordering Judge",
+        og_info.ordering_judge,
+        og_info.ordering_judge_str,
+    ):
+        items.append(ordering_judge)
 
     if og_info.date_filed:
         items.append({"label": "Date Filed", "value": str(og_info.date_filed)})
@@ -394,8 +386,6 @@ def build_docket_tabs(
 
     Each item is a dict with 'label', 'url', and 'key'.
     """
-    from django.urls import reverse
-
     tabs = [
         {
             "label": "Docket Entries",
