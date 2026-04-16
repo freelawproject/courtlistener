@@ -4613,6 +4613,10 @@ def merge_texas_docket_originating_court(
     if texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
+            logger.warning(
+                "Skipping merge of OCI for Texas docket %s due to missing originating court docket number.",
+                docket.docket_number,
+            )
             return MergeResult.failed("OriginatingCourtInformation")
         oc_dn = sorted(ocd["case_number"])[0]
         oc_reporter = ""
@@ -4981,10 +4985,11 @@ def merge_texas_docket(
 
     if not result.success:
         logger.error(
-            "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Please review logs.",
+            "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Failures: %s",
             docket_number,
             docket.pk,
             court.pk,
+            result.failures,
         )
 
     return result
