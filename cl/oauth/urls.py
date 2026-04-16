@@ -9,8 +9,7 @@ urlpatterns = [
         views.DynamicClientRegistrationView.as_view(),
         name="oauth2_dcr",
     ),
-    # RFC 8414 Authorization Server Metadata. MCP clients look for
-    # this at the root of the issuer, not under /o/.
+    # RFC 8414 Authorization Server Metadata.
     path(
         ".well-known/oauth-authorization-server",
         views.OAuthMetadataView.as_view(),

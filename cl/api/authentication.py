@@ -88,12 +88,7 @@ class ReplicaRoutingTokenAuthentication(TokenAuthentication):
 
 
 class ReplicaRoutingOAuth2Authentication(OAuth2Authentication):
-    """OAuth2Authentication that activates replica routing after auth.
-
-    Mirrors the pattern of the other replica-routing auth classes so
-    that OAuth-authenticated safe-method reads go to the read replica
-    instead of silently hitting primary.
-    """
+    """OAuth2Authentication that activates replica routing after auth."""
 
     def authenticate(self, request: Request):
         result = super().authenticate(request)
