@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.test import override_settings
 from django.urls import reverse
 from oauth2_provider.models import get_application_model
@@ -148,13 +149,37 @@ class DynamicClientRegistrationTest(APITestCase):
         self.assertTrue(resp.json()["client_name"].startswith("MCP Client "))
 
 
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # Unique LOCATION so this cache is its own LocMemCache
+            # instance, not shared with the default unnamed one.
+            "LOCATION": "oauth-dcr-ratelimit-test",
+        },
+        # Preserve db_cache because some unrelated request paths
+        # reference caches["db_cache"]. Not used by /o/register/.
+        "db_cache": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "django_cache",
+        },
+    },
+)
 class DynamicClientRegistrationRateLimitTest(APITestCase):
-    """The DCR endpoint is rate-limited per IP."""
+    """The DCR endpoint is rate-limited per IP.
+
+    Why the cache override: the project test runner defaults to
+    ``--parallel=N`` (cl/tests/runner.py), and every parallel worker
+    shares the same Redis. ``RestartRateLimitMixin.tearDownClass``
+    runs ``DEL :1:rl:*`` which would wipe this test's counter mid-loop
+    if a sibling worker tore down its class at the wrong moment. A
+    process-local LocMemCache isolates us from sibling workers.
+    """
 
     def setUp(self):
         super().setUp()
         self.url = reverse("oauth2_dcr")
-        self.restart_rate_limit()
+        cache.clear()
 
     def test_ratelimit_blocks_after_threshold(self):
         payload = {"redirect_uris": ["https://mcp.example.com/cb"]}
