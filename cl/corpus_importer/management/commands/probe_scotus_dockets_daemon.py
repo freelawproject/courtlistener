@@ -120,7 +120,7 @@ def _probe_scotus_sequence(
     found_match = False
     reports_data: list[tuple[str, str]] = []
 
-    while probe_offset + jitter < settings.SCOTUS_PROBE_MAX_OFFSET:  # type: ignore[misc]
+    while True:
         candidate_serial, probe_offset = compute_next_binary_probe(
             highest_known, probe_iteration, jitter
         )
@@ -150,6 +150,9 @@ def _probe_scotus_sequence(
             r.set(scotus_empty_probe_attempts_key(), 0)
         elif found_match:
             # Boundary found: first blank hit after a valid case.
+            break
+
+        if probe_offset >= settings.SCOTUS_PROBE_MAX_OFFSET:  # type: ignore[misc]
             break
 
     if not reports_data:
