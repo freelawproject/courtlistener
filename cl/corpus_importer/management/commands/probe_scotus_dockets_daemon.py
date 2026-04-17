@@ -187,9 +187,9 @@ def _probe_scotus_sequence(
         except HTTPError:
             court_blocked_attempts = r.incr(scotus_blocked_attempts_key())
             _handle_scotus_http_error(r, court_blocked_attempts)
-            # Persist watermark progress before bailing so the next
-            # iteration doesn't re-probe serials we already ingested.
-            r.hset(HIGHEST_SCOTUS_KNOWN_SERIAL, field, latest_match)
+            # Persist progress up to (but not including) the blocked serial so
+            # the next iteration resumes from here without skipping anything.
+            r.hset(HIGHEST_SCOTUS_KNOWN_SERIAL, field, serial - 1)
             return len(reports_data), True
         except Timeout:
             logger.warning(
