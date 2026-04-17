@@ -1410,6 +1410,22 @@ Sample code here.
     <h2 class="mt-6 mb-3">Filter drawer</h2>
     <p>A mobile slide-in panel for filter controls. Only visible below the <code>md</code> breakpoint. Reuses the dialog composable for open/close, escape key, and auto-close on breakpoint change. Auto-opens when <code>data-has-errors</code> is present.</p>
 
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">Resize your browser below the <code>md</code> breakpoint (768px) to see the trigger button, then click it to open the drawer.</p>
+    <c-filter-drawer title="Example Filters">
+      <div class="flex flex-col gap-4">
+        <div>
+          <label for="demo-filter-field" class="text-sm font-medium text-greyscale-700">Sample field</label>
+          <input type="text" id="demo-filter-field" class="input-text w-full mt-1" placeholder="Type something" />
+        </div>
+      </div>
+      <c-slot name="footer">
+        <c-button variant="primary" type="button" class="w-full justify-center">
+          Apply filters
+        </c-button>
+      </c-slot>
+    </c-filter-drawer>
+
     <c-library.list title="Props" only>
       <c-library.item optional only>
         <c-slot name="label"><code>title</code></c-slot>
