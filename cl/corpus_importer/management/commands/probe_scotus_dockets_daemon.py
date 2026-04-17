@@ -52,7 +52,8 @@ def _handle_scotus_http_error(r, court_blocked_attempts: int) -> None:
     """Apply exponential backoff after HTTPError while probing SCOTUS."""
     if court_blocked_attempts > settings.SCOTUS_COURT_BLOCKED_MAX_ATTEMPTS:  # type: ignore[misc]
         _, total_accumulated_time = compute_blocked_court_wait(
-            court_blocked_attempts - 1
+            court_blocked_attempts - 1,
+            base_wait=settings.SCOTUS_COURT_BLOCKED_WAIT,  # type: ignore[misc]
         )
         logger.error(
             "SCOTUS probing has been blocked for around %s hours.",
@@ -66,7 +67,8 @@ def _handle_scotus_http_error(r, court_blocked_attempts: int) -> None:
         )
     else:
         next_blocked_wait, _ = compute_blocked_court_wait(
-            court_blocked_attempts
+            court_blocked_attempts,
+            base_wait=settings.SCOTUS_COURT_BLOCKED_WAIT,  # type: ignore[misc]
         )
         r.set(
             scotus_court_wait_key(),
