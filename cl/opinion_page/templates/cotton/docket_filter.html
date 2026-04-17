@@ -30,22 +30,25 @@
     {% endif %}
 
     <div class="flex flex-wrap items-end gap-3">
-      {# Search #}
-      <div class="flex-1 max-w-xs">
+      {# Search — own form so Enter submits search, not filters #}
+      <form action="/" method="get" class="flex-1 max-w-xs">
+        <input type="hidden" name="type" value="r" />
         <label for="de-search-desktop" class="sr-only">Search this docket</label>
         <div class="flex">
           <input
             class="input-text rounded-r-none flex-1"
             id="de-search-desktop"
+            name="q"
+            value="docket_id:{{ docket.pk }}"
             autocomplete="off"
             type="text"
             placeholder="Search this docket"
           />
-          <c-button variant="primary" href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" class="rounded-l-none px-3" title="Search">
+          <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search">
             {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
           </c-button>
         </div>
-      </div>
+      </form>
 
       {# Date range #}
       <div class="flex items-end gap-2">
@@ -62,7 +65,7 @@
           />
         </div>
         <div>
-          <label for="filed-before-desktop" class="text-sm font-medium text-greyscale-700">to</label>
+          <label for="filed-before-desktop" class="text-sm font-medium text-greyscale-700">Filed before</label>
           <input
             type="text"
             name="filed_before"
@@ -78,7 +81,7 @@
       {# Document number range #}
       <div class="flex items-end gap-2">
         <div>
-          <label for="entry-gte-desktop" class="text-sm font-medium text-greyscale-700">Doc #</label>
+          <label for="entry-gte-desktop" class="text-sm font-medium text-greyscale-700">Document # from</label>
           <input
             type="number"
             name="entry_gte"
@@ -90,7 +93,7 @@
           />
         </div>
         <div>
-          <label for="entry-lte-desktop" class="text-sm font-medium text-greyscale-700">to</label>
+          <label for="entry-lte-desktop" class="text-sm font-medium text-greyscale-700">Document # to</label>
           <input
             type="number"
             name="entry_lte"
@@ -106,7 +109,7 @@
       {# Sort order #}
       <fieldset class="flex items-end">
         <legend class="sr-only">Sort order</legend>
-        <div class="flex rounded-lg border border-greyscale-300 overflow-hidden" role="radiogroup" aria-label="Sort order">
+        <div class="flex rounded-lg border border-greyscale-300 overflow-hidden">
           <label class="flex items-center gap-1 px-3 py-2 text-sm cursor-pointer {% if sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
             <input type="radio" name="order_by" value="asc" {% if sort_order_asc %}checked{% endif %} class="sr-only" x-on:change="submitForm" />
             {% svg "chevron" class="w-4 h-4 rotate-180" aria_hidden="true" %}
@@ -153,22 +156,25 @@
   {# MOBILE — search + prev/next + filter drawer #}
   <div class="md:hidden">
     <div class="flex items-end gap-3">
-      {# Search #}
-      <div class="flex-1">
+      {# Search — own form so Enter submits search, not filters #}
+      <form action="/" method="get" class="flex-1">
+        <input type="hidden" name="type" value="r" />
         <label for="de-search-mobile" class="sr-only">Search this docket</label>
         <div class="flex">
           <input
             class="input-text rounded-r-none flex-1"
             id="de-search-mobile"
+            name="q"
+            value="docket_id:{{ docket.pk }}"
             autocomplete="off"
             type="text"
             placeholder="Search this docket"
           />
-          <c-button variant="primary" href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" class="rounded-l-none px-3" title="Search">
+          <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search">
             {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
           </c-button>
         </div>
-      </div>
+      </form>
 
       {# Prev/Next — standalone links on mobile #}
       <div class="flex items-end gap-1">
@@ -263,7 +269,7 @@
           {# Sort order #}
           <fieldset>
             <legend class="text-sm font-medium text-greyscale-700 mb-1">Sort order</legend>
-            <div class="flex rounded-lg border border-greyscale-300 overflow-hidden" role="radiogroup">
+            <div class="flex rounded-lg border border-greyscale-300 overflow-hidden">
               <label class="flex-1 flex items-center justify-center gap-1 px-3 py-2 text-sm cursor-pointer {% if sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
                 <input type="radio" name="order_by" value="asc" {% if sort_order_asc %}checked{% endif %} class="sr-only" />
                 {% svg "chevron" class="w-4 h-4 rotate-180" aria_hidden="true" %}

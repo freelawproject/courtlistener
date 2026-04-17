@@ -7,6 +7,7 @@ document.addEventListener("alpine:init", () => {
     },
     close() {
       this.isOpen = false;
+      this.$nextTick(() => this.$refs.trigger?.focus());
     },
     get drawerId() {
       return this.$id("filter-drawer");
@@ -18,7 +19,7 @@ document.addEventListener("alpine:init", () => {
       if (this.$el.dataset.hasErrors !== undefined) this.open();
       this.onBreakpointChange((e) => {
         if (e.matches && this.isOpen) {
-          this.close();
+          this.isOpen = false;
         }
       });
     },
