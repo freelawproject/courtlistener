@@ -11,10 +11,8 @@ discovery, JWKS). They add:
   discover our endpoints.
 """
 
-import ipaddress
 import uuid
 from typing import Any
-from urllib.parse import urlparse
 
 from django.urls import reverse
 from django.utils import timezone
@@ -27,66 +25,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from cl.oauth.api_serializers import (
+    ALLOWED_GRANT_TYPES,
+    ALLOWED_TOKEN_AUTH_METHODS,
+    DynamicClientRegistrationSerializer,
+    first_error_description,
+)
+
 Application = get_application_model()
-
-# Only these grant types may be requested via DCR. Client-credentials,
-# password, and device-code grants are intentionally excluded — MCP
-# clients are confidential or public user-agent apps using the
-# authorization-code + PKCE flow.
-ALLOWED_GRANT_TYPES = {"authorization_code", "refresh_token"}
-ALLOWED_RESPONSE_TYPES = {"code"}
-ALLOWED_TOKEN_AUTH_METHODS = {
-    "client_secret_basic",
-    "client_secret_post",
-    "none",
-}
-
-# Hosts that are allowed as ``http://`` redirect targets. Everything
-# else must use ``https://``. See RFC 8252 section 7.3 ("Loopback
-# Interface Redirection").
-LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
-
-
-def _is_loopback_host(host: str) -> bool:
-    """Return True if ``host`` is a loopback interface per RFC 8252."""
-    host = host.strip("[]").lower()
-    if host in LOOPBACK_HOSTS:
-        return True
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
-
-
-def _validate_redirect_uris(uris: list[str]) -> str | None:
-    """Return an error description, or None if all URIs are acceptable.
-
-    ``https://`` is always allowed. ``http://`` is only allowed when
-    the host is a loopback interface. Anything else (``ftp://``,
-    ``javascript:``, ``http://evil.example.com``, bare strings) is
-    rejected.
-    """
-    if not uris:
-        return "redirect_uris is required and must be a non-empty list"
-    if not isinstance(uris, list):
-        return "redirect_uris must be a list of strings"
-    for raw in uris:
-        if not isinstance(raw, str) or not raw:
-            return "redirect_uris entries must be non-empty strings"
-        parsed = urlparse(raw)
-        if parsed.scheme == "https":
-            if not parsed.netloc:
-                return f"redirect_uri missing host: {raw}"
-            continue
-        if parsed.scheme == "http":
-            if not parsed.hostname or not _is_loopback_host(parsed.hostname):
-                return (
-                    "http:// redirect_uris are only permitted for "
-                    f"loopback addresses (got {raw})"
-                )
-            continue
-        return f"unsupported redirect_uri scheme: {raw}"
-    return None
 
 
 def _invalid_metadata(description: str) -> Response:
@@ -133,60 +79,28 @@ class DynamicClientRegistrationView(APIView):
         return super().handle_exception(exc)
 
     def post(self, request: Request) -> Response:
-        data = request.data if isinstance(request.data, dict) else {}
-
-        redirect_uris = data.get("redirect_uris")
-        if (err := _validate_redirect_uris(redirect_uris)) is not None:
-            return _invalid_metadata(err)
-
-        grant_types = data.get("grant_types") or ["authorization_code"]
-        if not isinstance(grant_types, list) or not set(grant_types).issubset(
-            ALLOWED_GRANT_TYPES
-        ):
+        serializer = DynamicClientRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
             return _invalid_metadata(
-                "grant_types must be a subset of "
-                f"{sorted(ALLOWED_GRANT_TYPES)}"
-            )
-        if "authorization_code" not in grant_types:
-            return _invalid_metadata(
-                "authorization_code grant type is required"
+                first_error_description(serializer.errors)
             )
 
-        response_types = data.get("response_types") or ["code"]
-        if not isinstance(response_types, list) or not set(
-            response_types
-        ).issubset(ALLOWED_RESPONSE_TYPES):
-            return _invalid_metadata(
-                "only the 'code' response_type is supported"
-            )
-
-        token_endpoint_auth_method = data.get(
-            "token_endpoint_auth_method", "client_secret_basic"
+        data = serializer.validated_data
+        token_endpoint_auth_method = data["token_endpoint_auth_method"]
+        client_name = (
+            data.get("client_name") or f"MCP Client {uuid.uuid4().hex[:8]}"
         )
-        if token_endpoint_auth_method not in ALLOWED_TOKEN_AUTH_METHODS:
-            return _invalid_metadata(
-                "token_endpoint_auth_method must be one of "
-                f"{sorted(ALLOWED_TOKEN_AUTH_METHODS)}"
-            )
-
-        client_name = data.get("client_name") or (
-            f"MCP Client {uuid.uuid4().hex[:8]}"
+        client_type = (
+            Application.CLIENT_PUBLIC
+            if token_endpoint_auth_method == "none"
+            else Application.CLIENT_CONFIDENTIAL
         )
-        if not isinstance(client_name, str) or len(client_name) > 255:
-            return _invalid_metadata(
-                "client_name must be a string of at most 255 characters"
-            )
-
-        if token_endpoint_auth_method == "none":
-            client_type = Application.CLIENT_PUBLIC
-        else:
-            client_type = Application.CLIENT_CONFIDENTIAL
 
         app = Application(
             name=client_name,
             client_type=client_type,
             authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
-            redirect_uris=" ".join(redirect_uris),
+            redirect_uris=" ".join(data["redirect_uris"]),
             algorithm=Application.RS256_ALGORITHM,
             skip_authorization=False,
         )
@@ -197,9 +111,9 @@ class DynamicClientRegistrationView(APIView):
         response_data: dict[str, Any] = {
             "client_id": app.client_id,
             "client_name": client_name,
-            "redirect_uris": redirect_uris,
-            "grant_types": grant_types,
-            "response_types": response_types,
+            "redirect_uris": data["redirect_uris"],
+            "grant_types": data["grant_types"],
+            "response_types": data["response_types"],
             "token_endpoint_auth_method": token_endpoint_auth_method,
             "client_id_issued_at": int(timezone.now().timestamp()),
         }
@@ -239,17 +153,10 @@ class OAuthMetadataView(APIView):
                 + reverse("oauth2_provider:introspect"),
                 "jwks_uri": base + reverse("oauth2_provider:jwks-info"),
                 "response_types_supported": ["code"],
-                "grant_types_supported": [
-                    "authorization_code",
-                    "refresh_token",
-                ],
-                "token_endpoint_auth_methods_supported": [
-                    "client_secret_basic",
-                    "client_secret_post",
-                    "none",
-                ],
+                "grant_types_supported": ALLOWED_GRANT_TYPES,
+                "token_endpoint_auth_methods_supported": ALLOWED_TOKEN_AUTH_METHODS,
                 "code_challenge_methods_supported": ["S256"],
                 "scopes_supported": ["api"],
-                "service_documentation": (base + "/help/api/rest/"),
+                "service_documentation": (base + reverse("rest_docs")),
             }
         )
