@@ -7,10 +7,9 @@ document.addEventListener("alpine:init", () => {
           allowInput: true,
           ariaDateFormat: "F j, Y",
         };
-        const afterEl = this.$el.querySelector("[data-flatpickr-after]");
-        const beforeEl = this.$el.querySelector("[data-flatpickr-before]");
-        if (afterEl) flatpickr(afterEl, config);
-        if (beforeEl) flatpickr(beforeEl, config);
+        for (const el of this.$el.querySelectorAll("[data-flatpickr-after], [data-flatpickr-before]")) {
+          flatpickr(el, config);
+        }
       });
     },
     submitForm() {

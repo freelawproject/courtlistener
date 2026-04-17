@@ -223,6 +223,7 @@
               type="text"
               name="filed_after"
               id="filed-after-mobile"
+              data-flatpickr-after
               value="{{ form.filed_after.value|default_if_none:'' }}"
               class="input-text w-full mt-1"
               placeholder="MM/DD/YYYY"
@@ -234,6 +235,7 @@
               type="text"
               name="filed_before"
               id="filed-before-mobile"
+              data-flatpickr-before
               value="{{ form.filed_before.value|default_if_none:'' }}"
               class="input-text w-full mt-1"
               placeholder="MM/DD/YYYY"
