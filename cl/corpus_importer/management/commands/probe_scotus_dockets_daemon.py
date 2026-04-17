@@ -267,20 +267,27 @@ def run_scotus_probe_iteration(r, testing: bool) -> None:
             return
 
     if total_hits == 0:
-        empty_attempts = r.incr(scotus_empty_probe_attempts_key())
-        empty_hours = (empty_attempts * settings.SCOTUS_PROBE_WAIT) / 3600  # type: ignore[misc]
-        logger.info(
-            "No SCOTUS cases found this iteration (empty streak: %.1f h).",
-            empty_hours,
-        )
-        if empty_hours >= settings.SCOTUS_EMPTY_PROBES_LIMIT_HOURS:  # type: ignore[misc]
-            logger.error(
-                "SCOTUS probe has found no new cases for ~%s hours. "
-                "Manual intervention may be required.",
-                settings.SCOTUS_EMPTY_PROBES_LIMIT_HOURS,  # type: ignore[misc]
+        if today.weekday() in [5, 6]:
+            # SCOTUS doesn't publish on weekends; don't count towards the
+            # empty-probe streak to avoid spurious alerts.
+            logger.info(
+                "No SCOTUS cases found this iteration (weekend - not counting towards empty streak)."
             )
-            r.set(scotus_empty_probe_attempts_key(), 0)
-            r.set(scotus_court_wait_key(), 3600, ex=3600)
+        else:
+            empty_attempts = r.incr(scotus_empty_probe_attempts_key())
+            empty_hours = (empty_attempts * settings.SCOTUS_PROBE_WAIT) / 3600  # type: ignore[misc]
+            logger.info(
+                "No SCOTUS cases found this iteration (empty streak: %.1f h).",
+                empty_hours,
+            )
+            if empty_hours >= settings.SCOTUS_EMPTY_PROBES_LIMIT_HOURS:  # type: ignore[misc]
+                logger.error(
+                    "SCOTUS probe has found no new cases for ~%s hours. "
+                    "Manual intervention may be required.",
+                    settings.SCOTUS_EMPTY_PROBES_LIMIT_HOURS,  # type: ignore[misc]
+                )
+                r.set(scotus_empty_probe_attempts_key(), 0)
+                r.set(scotus_court_wait_key(), 3600, ex=3600)
 
 
 class Command(VerboseCommand):
@@ -315,7 +322,7 @@ it also probes the outgoing (previous) term to catch late filings.
         iterations_completed = 0
         r = get_redis_interface("CACHE")
 
-        while True and settings.SCOTUS_PROBE_DAEMON_ENABLED:  # type: ignore[misc]
+        while settings.SCOTUS_PROBE_DAEMON_ENABLED:  # type: ignore[misc]
             wait_key = scotus_court_wait_key()
             if r.exists(wait_key):
                 ttl = r.ttl(wait_key)

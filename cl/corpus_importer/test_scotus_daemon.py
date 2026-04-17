@@ -123,7 +123,7 @@ class ScotusDaemonTest(SimpleTestCase):
                 scotus_cmd_module, "fetch_scotus_docket_json"
             ) as mock_fetch,
             mock.patch.object(scotus_cmd_module.logger, "error") as mock_error,
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
         mock_fetch.assert_not_called()
@@ -163,7 +163,7 @@ class ScotusDaemonTest(SimpleTestCase):
                 scotus_cmd_module, "process_scotus_docket"
             ) as mock_proc,
             mock.patch.object(scotus_cmd_module.time, "sleep"),
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -189,7 +189,7 @@ class ScotusDaemonTest(SimpleTestCase):
                 "fetch_scotus_docket_json",
                 side_effect=raising_fetch,
             ),
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -216,7 +216,7 @@ class ScotusDaemonTest(SimpleTestCase):
                 return_value=(None, HTTPStatus.NOT_FOUND),
             ),
             mock.patch.object(scotus_cmd_module.logger, "error") as mock_error,
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -282,7 +282,7 @@ class ScotusDaemonTest(SimpleTestCase):
             ),
             mock.patch.object(scotus_cmd_module, "process_scotus_docket"),
             mock.patch.object(scotus_cmd_module.time, "sleep"),
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -419,7 +419,7 @@ class ScotusDaemonIntegrationTest(TestCase):
             ),
             mock.patch.object(scotus_cmd_module, "save_scotus_raw_to_s3"),
             mock.patch.object(scotus_cmd_module.time, "sleep"),
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -455,7 +455,7 @@ class ScotusDaemonIntegrationTest(TestCase):
                 side_effect=fake_fetch,
             ),
             mock.patch.object(scotus_cmd_module.time, "sleep"),
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -481,7 +481,7 @@ class ScotusDaemonIntegrationTest(TestCase):
             ),
             mock.patch.object(scotus_cmd_module.logger, "error") as mock_error,
             mock.patch.object(scotus_cmd_module.time, "sleep"),
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -516,7 +516,7 @@ class ScotusDaemonIntegrationTest(TestCase):
             ),
             mock.patch.object(scotus_cmd_module.logger, "error") as mock_error,
             mock.patch.object(scotus_cmd_module.time, "sleep"),
-            time_machine.travel(datetime(2026, 3, 15, 12), tick=False),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
         ):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
@@ -527,3 +527,40 @@ class ScotusDaemonIntegrationTest(TestCase):
         )
         self.assertEqual(self.r.get(self.EMPTY_KEY), "0")
         self.assertTrue(self.r.exists(self.COURT_WAIT_KEY))
+
+    def test_empty_probe_ignored_on_weekends(self, *_mocks):
+        """Empty probes on Saturday or Sunday must not increment the counter.
+        SCOTUS doesn't publish new cases on weekends, so counting them would
+        trigger spurious alerts."""
+        self._seed_current_term(25, low=99, high=20000)
+
+        def fake_fetch(_dn):
+            return None, HTTPStatus.NOT_FOUND
+
+        # 2026-04-18 is a Saturday, 2026-04-19 is a Sunday.
+        for label, travel_date in [
+            ("saturday", datetime(2026, 4, 18, 12)),
+            ("sunday", datetime(2026, 4, 19, 12)),
+        ]:
+            with self.subTest(day=label):
+                self.r.delete(self.EMPTY_KEY)
+                with (
+                    mock.patch.object(
+                        scotus_cmd_module,
+                        "fetch_scotus_docket_json",
+                        side_effect=fake_fetch,
+                    ),
+                    mock.patch.object(
+                        scotus_cmd_module.logger, "info"
+                    ) as mock_info,
+                    mock.patch.object(scotus_cmd_module.time, "sleep"),
+                    time_machine.travel(travel_date, tick=False),
+                ):
+                    scotus_cmd_module.run_scotus_probe_iteration(
+                        self.r, testing=True
+                    )
+
+                self.assertIsNone(self.r.get(self.EMPTY_KEY))
+                mock_info.assert_any_call(
+                    "No SCOTUS cases found this iteration (weekend - not counting towards empty streak)."
+                )
