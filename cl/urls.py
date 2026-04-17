@@ -56,7 +56,6 @@ urlpatterns = [
     path("", include("cl.visualizations.urls")),
     path("", include("cl.stats.urls")),
     path("", include("cl.oauth.urls")),
-    path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     # Sitemaps
     path(
         "sitemap.xml",
