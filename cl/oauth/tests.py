@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from oauth2_provider.models import get_application_model
 
-from cl.tests.cases import APITestCase
+from cl.tests.cases import APITestCase, SimpleTestCase
 
 Application = get_application_model()
 
@@ -276,3 +276,54 @@ class ApplicationRedirectUriPolicyTest(TestCase):
     def test_unsupported_scheme_rejected(self):
         with self.assertRaises(ValidationError):
             self._make_app("javascript:alert(1)").save()
+
+
+class PKCEMethodEnforcementTest(SimpleTestCase):
+    """The RFC 8414 metadata advertises S256-only PKCE, but oauthlib
+    3.3.1 defaults an absent ``code_challenge_method`` to ``"plain"`` and
+    django-oauth-toolkit 3.2 has no setting to restrict which method is
+    accepted. ``cl.oauth.apps.OAuthConfig.ready`` narrows oauthlib's
+    method dict to S256 only; these tests confirm the patch took effect.
+    """
+
+    def _grant(self):
+        from oauthlib.oauth2.rfc6749.grant_types.authorization_code import (
+            AuthorizationCodeGrant,
+        )
+
+        return AuthorizationCodeGrant(request_validator=None)
+
+    def test_only_s256_registered(self):
+        from oauthlib.oauth2.rfc6749.grant_types.authorization_code import (
+            AuthorizationCodeGrant,
+        )
+
+        self.assertEqual(
+            set(AuthorizationCodeGrant._code_challenge_methods),
+            {"S256"},
+        )
+
+    def test_plain_verification_rejected(self):
+        # With plain removed, oauthlib refuses to run the weak transform.
+        # In the actual HTTP flow this manifests as an
+        # UnsupportedCodeChallengeMethodError earlier in
+        # validate_authorization_request; here we drive the leaf
+        # function directly to prove the method isn't registered.
+        with self.assertRaises(NotImplementedError):
+            self._grant().validate_code_challenge("abc", "plain", "abc")
+
+    def test_s256_verification_still_works(self):
+        import base64
+        import hashlib
+
+        verifier = "abc"
+        challenge = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(verifier.encode()).digest()
+            )
+            .decode()
+            .rstrip("=")
+        )
+        self.assertTrue(
+            self._grant().validate_code_challenge(challenge, "S256", verifier)
+        )
