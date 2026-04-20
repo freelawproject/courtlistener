@@ -564,7 +564,7 @@ async def components(request: HttpRequest) -> HttpResponse:
         value = None
 
     class MockDocketFilterForm:
-        errors = {}
+        errors: dict[str, list[str]] = {}
         filed_after = MockFieldValue()
         filed_before = MockFieldValue()
         entry_gte = MockFieldValue()
