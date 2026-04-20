@@ -8,6 +8,7 @@ from requests.exceptions import HTTPError, Timeout
 
 from cl.corpus_importer.scotus_daemon_utils import (
     HIGHEST_SCOTUS_KNOWN_SERIAL,
+    HIGHEST_SCOTUS_OBSERVED_SERIAL,
     SEQUENCE_BASE,
     SEQUENCES,
     current_scotus_term_year,
@@ -81,6 +82,84 @@ def _handle_scotus_http_error(r, court_blocked_attempts: int) -> None:
         )
 
 
+def _ingest_serial_range(
+    r,
+    field: str,
+    sequence: str,
+    term_year_2digit: int,
+    from_serial: int,
+    to_serial: int,
+    probe_cache: dict[str, str] | None = None,
+) -> tuple[int, bool]:
+    """Ingest all serials in the range (from_serial, to_serial] inclusive.
+
+    Serials present in probe_cache are processed without an HTTP request.
+    All others are fetched from supremecourt.gov with a rate-limiting delay
+    between requests. HIGHEST_SCOTUS_KNOWN_SERIAL is advanced after each
+    serial so a crash mid-loop leaves a safe resume point.
+
+    :param r: Redis interface.
+    :param field: Hash field (e.g. ``"low:25"``).
+    :param sequence: Docket-number sequence.
+    :param term_year_2digit: 2-digit SCOTUS term year.
+    :param from_serial: Last serial already ingested (exclusive lower bound).
+    :param to_serial: Highest observed serial (inclusive upper bound).
+    :param probe_cache: Optional mapping of docket-number → JSON content for
+        serials already fetched during the probe phase.
+    :return: ``(hits_count, blocked)``.
+    """
+    if probe_cache is None:
+        probe_cache = {}
+
+    hits = 0
+
+    for serial in range(from_serial + 1, to_serial + 1):
+        dn = format_docket_number(term_year_2digit, serial, sequence)
+
+        if dn in probe_cache:
+            process_scotus_hit(dn, probe_cache[dn])
+            hits += 1
+        else:
+            try:
+                text, _ = fetch_scotus_docket_json(dn)
+            except HTTPError:
+                court_blocked_attempts = r.incr(scotus_blocked_attempts_key())
+                _handle_scotus_http_error(r, court_blocked_attempts)
+                return hits, True
+            except Timeout:
+                logger.warning(
+                    "SCOTUS website timed out during ingestion of %s. Skipping.",
+                    dn,
+                )
+                r.hset(HIGHEST_SCOTUS_KNOWN_SERIAL, field, serial)
+                if settings.SCOTUS_BACKFILL_REQUEST_DELAY:  # type: ignore[misc]
+                    time.sleep(settings.SCOTUS_BACKFILL_REQUEST_DELAY)  # type: ignore[misc]
+                continue
+
+            if text:
+                process_scotus_hit(dn, text)
+                hits += 1
+            else:
+                logger.warning(
+                    "SCOTUS ingestion: no case found for docket %s", dn
+                )
+
+            if settings.SCOTUS_BACKFILL_REQUEST_DELAY:  # type: ignore[misc]
+                time.sleep(settings.SCOTUS_BACKFILL_REQUEST_DELAY)  # type: ignore[misc]
+
+        r.hset(HIGHEST_SCOTUS_KNOWN_SERIAL, field, serial)
+
+    logger.info(
+        "SCOTUS %s %s: advanced watermark %s -> %s (%s hits).",
+        sequence,
+        term_year_2digit,
+        from_serial,
+        to_serial,
+        hits,
+    )
+    return hits, False
+
+
 def _probe_scotus_sequence(
     r,
     sequence: str,
@@ -89,40 +168,71 @@ def _probe_scotus_sequence(
 ) -> tuple[int, bool]:
     """Probe a single (sequence, term-year) pair forward, synchronously.
 
-    For each direct hit the raw JSON is archived to S3 inline and ingestion
-    is enqueued via Celery. After the forward probe locates the latest
-    case, any serials the geometric probe skipped are backfilled inline
-    (fetched + archived + ingestion enqueued) within this same daemon
-    iteration.
+    Maintains two watermarks per (sequence, term):
 
-    :param sequence: The sequence to probe
-    :param term_year_2digit: The term year 2digit
-    :param testing: Enabled if this is running in tests.
+    * ``HIGHEST_SCOTUS_KNOWN_SERIAL`` (highest ingested) — last serial whose
+      S3-upload and Celery-enqueue completed.  Safe crash-recovery point.
+    * ``HIGHEST_SCOTUS_OBSERVED_SERIAL`` (highest observed) — highest serial
+      the probe confirmed exists on supremecourt.gov, written immediately on
+      each hit so a crash between the probe phase and full ingestion can
+      resume without re-probing.
 
+    On entry, if ``observed > ingested`` the previous run was interrupted
+    mid-ingestion; only the ingest step is repeated for the gap.
+
+    :param r: Redis interface.
+    :param sequence: The docket-number sequence.
+    :param term_year_2digit: 2-digit SCOTUS term year.
+    :param testing: When True jitter is disabled.
     :return: ``(hits_count, blocked)``. When ``blocked`` is True the caller
-        must abort the overall iteration (a ``scotus:court_wait`` TTL has
-        been set).
+        must abort the overall iteration.
     """
     field = scotus_highest_known_field(sequence, term_year_2digit)
-    raw_highest = r.hget(HIGHEST_SCOTUS_KNOWN_SERIAL, field)
-    if raw_highest is None:
-        # For the CURRENT term (never-seeded) we fail loudly upstream. For the
-        # next-term rollover window, however, missing state is expected — we
-        # seed it with the sequence base sentinel.
-        highest_known = SEQUENCE_BASE[sequence]
-    else:
-        highest_known = int(raw_highest)
 
+    raw_ingested = r.hget(HIGHEST_SCOTUS_KNOWN_SERIAL, field)
+    if raw_ingested is None:
+        # For the CURRENT term (never-seeded) we fail loudly upstream. For the
+        # previous-term rollover window, however, missing state is expected —
+        # seed it with the sequence base sentinel.
+        highest_ingested = SEQUENCE_BASE[sequence]
+    else:
+        highest_ingested = int(raw_ingested)
+
+    raw_observed = r.hget(HIGHEST_SCOTUS_OBSERVED_SERIAL, field)
+    highest_observed = (
+        int(raw_observed) if raw_observed is not None else highest_ingested
+    )
+
+    # Recovery path: a previous run completed the probe but was interrupted
+    # mid-ingestion.  Resume from where we left off without re-probing.
+    if highest_observed > highest_ingested:
+        logger.info(
+            "SCOTUS %s %s: resuming interrupted ingestion (%s..%s].",
+            sequence,
+            term_year_2digit,
+            highest_ingested,
+            highest_observed,
+        )
+        return _ingest_serial_range(
+            r,
+            field,
+            sequence,
+            term_year_2digit,
+            from_serial=highest_ingested,
+            to_serial=highest_observed,
+        )
+
+    # Normal path: probe forward from the current watermark.
     jitter = compute_binary_probe_jitter(testing)
     probe_iteration = 1
     probe_offset = 0
     latest_match = 0
     found_match = False
-    reports_data: list[tuple[str, str]] = []
+    probe_cache: dict[str, str] = {}
 
     while True:
         candidate_serial, probe_offset = compute_next_binary_probe(
-            highest_known, probe_iteration, jitter
+            highest_ingested, probe_iteration, jitter
         )
         probe_iteration += 1
         candidate = format_docket_number(
@@ -134,7 +244,7 @@ def _probe_scotus_sequence(
         except HTTPError:
             court_blocked_attempts = r.incr(scotus_blocked_attempts_key())
             _handle_scotus_http_error(r, court_blocked_attempts)
-            return len(reports_data), True
+            return 0, True
         except Timeout:
             logger.warning(
                 "SCOTUS website timed out while probing %s. Aborting this sequence.",
@@ -143,9 +253,12 @@ def _probe_scotus_sequence(
             break
 
         if text:
-            reports_data.append((candidate, text))
+            probe_cache[candidate] = text
             latest_match = candidate_serial
             found_match = True
+            # Record the observation immediately so a crash after this point
+            # can resume ingestion without re-probing.
+            r.hset(HIGHEST_SCOTUS_OBSERVED_SERIAL, field, candidate_serial)
             r.set(scotus_blocked_attempts_key(), 0)
             r.set(scotus_empty_probe_attempts_key(), 0)
         elif found_match:
@@ -155,75 +268,18 @@ def _probe_scotus_sequence(
         if probe_offset >= settings.SCOTUS_PROBE_MAX_OFFSET:  # type: ignore[misc]
             break
 
-    if not reports_data:
+    if not probe_cache:
         return 0, False
 
-    # Store in S3 + enqueue ingestion for every serial we hit directly.
-    for docket_number, content in reports_data:
-        process_scotus_hit(docket_number, content)
-
-    # Synchronously backfill serials skipped by the geometric probe. Each
-    # fetch is spaced by ``SCOTUS_BACKFILL_REQUEST_DELAY`` to respect the rate
-    # limit.
-
-    probe_hit_serials = {dn for dn, _ in reports_data}
-    backfill_serials = [
-        serial
-        for serial in range(highest_known + 1, latest_match)
-        if format_docket_number(term_year_2digit, serial, sequence)
-        not in probe_hit_serials
-    ]
-    if backfill_serials:
-        logger.info(
-            "SCOTUS backfill running for %s serials (%s-%s to %s-%s).",
-            len(backfill_serials),
-            term_year_2digit,
-            backfill_serials[0],
-            term_year_2digit,
-            backfill_serials[-1],
-        )
-
-    for serial in backfill_serials:
-        dn = format_docket_number(term_year_2digit, serial, sequence)
-        try:
-            text, _ = fetch_scotus_docket_json(dn)
-        except HTTPError:
-            court_blocked_attempts = r.incr(scotus_blocked_attempts_key())
-            _handle_scotus_http_error(r, court_blocked_attempts)
-            # Persist progress up to (but not including) the blocked serial so
-            # the next iteration resumes from here without skipping anything.
-            r.hset(HIGHEST_SCOTUS_KNOWN_SERIAL, field, serial - 1)
-            return len(reports_data), True
-        except Timeout:
-            logger.warning(
-                "SCOTUS website timed out during backfill of %s. Skipping.",
-                dn,
-            )
-            if settings.SCOTUS_BACKFILL_REQUEST_DELAY:  # type: ignore[misc]
-                time.sleep(settings.SCOTUS_BACKFILL_REQUEST_DELAY)  # type: ignore[misc]
-            continue
-
-        if text is None:
-            # No case exists at this serial. Log and continue.
-            logger.warning("SCOTUS backfill: no case found for docket %s", dn)
-        else:
-            process_scotus_hit(dn, text)
-
-        if settings.SCOTUS_BACKFILL_REQUEST_DELAY:  # type: ignore[misc]
-            # Wait before the next GET request to keep the backfill within
-            # the rate limit.
-            time.sleep(settings.SCOTUS_BACKFILL_REQUEST_DELAY)  # type: ignore[misc]
-
-    r.hset(HIGHEST_SCOTUS_KNOWN_SERIAL, field, latest_match)
-    logger.info(
-        "SCOTUS %s %s: advanced watermark %s -> %s (%s direct hits).",
+    return _ingest_serial_range(
+        r,
+        field,
         sequence,
         term_year_2digit,
-        highest_known,
-        latest_match,
-        len(reports_data),
+        from_serial=highest_ingested,
+        to_serial=latest_match,
+        probe_cache=probe_cache,
     )
-    return len(reports_data), False
 
 
 def run_scotus_probe_iteration(r, testing: bool) -> None:
