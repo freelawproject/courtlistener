@@ -6,7 +6,7 @@ import time_machine
 from django.conf import settings
 from django.core.management import call_command
 from django.test import SimpleTestCase, override_settings
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, Timeout
 
 from cl.corpus_importer.management.commands import (
     probe_scotus_dockets_daemon as scotus_cmd_module,
@@ -340,6 +340,79 @@ class ScotusDaemonTest(SimpleTestCase):
             and int(c.args[0].split("-")[1]) < 200
         ]
         self.assertEqual(fetched_low, ["25-100", "25-101", "25-102", "25-103"])
+
+    def test_ingestion_timeout_leaves_watermark_and_sets_wait(self, *_mocks):
+        """A Timeout mid-ingestion must not advance the watermark past the last
+        successfully processed serial, must set court_wait, and the subsequent
+        iteration's recovery path must retry the interrupted serial."""
+        self._seed_current_term(25, low=99, high=20000)
+        # Probe already completed (observed=103); ingestion interrupted.
+        self.r.hset(self.HIGHEST_OBSERVED_KEY, "low:25", 103)
+
+        def fake_fetch_with_timeout(dn):
+            if dn in {"25-100", "25-101"}:
+                return f'{{"docket_number":"{dn}"}}', HTTPStatus.OK
+            if dn == "25-102":
+                raise Timeout("timed out")
+            return None, HTTPStatus.NOT_FOUND
+
+        with (
+            mock.patch.object(
+                scotus_cmd_module,
+                "fetch_scotus_docket_json",
+                side_effect=fake_fetch_with_timeout,
+            ),
+            mock.patch.object(scotus_cmd_module, "save_scotus_raw_to_s3"),
+            mock.patch.object(
+                scotus_cmd_module,
+                "SCOTUSDocketReport",
+                new=FakeSCOTUSDocketReport,
+            ),
+            mock.patch.object(
+                scotus_cmd_module, "process_scotus_docket"
+            ) as mock_proc,
+            mock.patch.object(scotus_cmd_module.time, "sleep"),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
+        ):
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+
+        # Watermark must stop at the last successful serial (101), not 102.
+        self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "101")
+        self.assertEqual(mock_proc.delay.call_count, 2)
+        # court_wait must be set so the daemon pauses before the next attempt.
+        self.assertTrue(self.r.exists(self.COURT_WAIT_KEY))
+
+        # ---- Second iteration: recovery retries 102 and 103 ----------------
+        self.r.delete(self.COURT_WAIT_KEY)
+        mock_proc.reset_mock()
+
+        def fake_fetch_recovered(dn):
+            if dn in {"25-102", "25-103"}:
+                return f'{{"docket_number":"{dn}"}}', HTTPStatus.OK
+            return None, HTTPStatus.NOT_FOUND
+
+        with (
+            mock.patch.object(
+                scotus_cmd_module,
+                "fetch_scotus_docket_json",
+                side_effect=fake_fetch_recovered,
+            ),
+            mock.patch.object(scotus_cmd_module, "save_scotus_raw_to_s3"),
+            mock.patch.object(
+                scotus_cmd_module,
+                "SCOTUSDocketReport",
+                new=FakeSCOTUSDocketReport,
+            ),
+            mock.patch.object(
+                scotus_cmd_module, "process_scotus_docket"
+            ) as mock_proc_2,
+            mock.patch.object(scotus_cmd_module.time, "sleep"),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
+        ):
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+
+        self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "103")
+        self.assertEqual(mock_proc_2.delay.call_count, 2)
 
     # ------------------------------------------------------------------ #
     # management command
