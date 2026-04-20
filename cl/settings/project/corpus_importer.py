@@ -47,6 +47,8 @@ SCOTUS_COURT_BLOCKED_MAX_ATTEMPTS = env.int(
 SCOTUS_EMPTY_PROBES_LIMIT_HOURS = env.int(
     "SCOTUS_EMPTY_PROBES_LIMIT_HOURS", default=48
 )
+# Seconds the daemon pauses after a fetch timeout before retrying ingestion.
+SCOTUS_TIMEOUT_WAIT = env.int("SCOTUS_TIMEOUT_WAIT", default=300)
 # Seconds to sleep between sequential backfill HTTP fetches.
 SCOTUS_BACKFILL_REQUEST_DELAY = env.float(
     "SCOTUS_BACKFILL_REQUEST_DELAY", default=1.0

@@ -127,14 +127,22 @@ def _ingest_serial_range(
                 _handle_scotus_http_error(r, court_blocked_attempts)
                 return hits, True
             except Timeout:
+                # Don't advance the watermark — leave it at the last
+                # successfully ingested serial so the recovery path retries
+                # this serial on the next probe iteration. A short pause lets
+                # the site recover before we come back.
                 logger.warning(
-                    "SCOTUS website timed out during ingestion of %s. Skipping.",
+                    "SCOTUS website timed out during ingestion of %s. "
+                    "Pausing for %s seconds before retrying.",
                     dn,
+                    settings.SCOTUS_TIMEOUT_WAIT,  # type: ignore[misc]
                 )
-                r.hset(HIGHEST_SCOTUS_KNOWN_SERIAL, field, serial)
-                if settings.SCOTUS_BACKFILL_REQUEST_DELAY:  # type: ignore[misc]
-                    time.sleep(settings.SCOTUS_BACKFILL_REQUEST_DELAY)  # type: ignore[misc]
-                continue
+                r.set(
+                    scotus_court_wait_key(),
+                    settings.SCOTUS_TIMEOUT_WAIT,  # type: ignore[misc]
+                    ex=settings.SCOTUS_TIMEOUT_WAIT,  # type: ignore[misc]
+                )
+                break
 
             if text:
                 process_scotus_hit(dn, text)
@@ -192,8 +200,8 @@ def _probe_scotus_sequence(
     raw_ingested = r.hget(HIGHEST_SCOTUS_KNOWN_SERIAL, field)
     if raw_ingested is None:
         # For the CURRENT term (never-seeded) we fail loudly upstream. For the
-        # previous-term rollover window, however, missing state is expected —
-        # seed it with the sequence base sentinel.
+        # previous-term rollover window, however, missing state is expected seed
+        # it with the sequence base sentinel.
         highest_ingested = SEQUENCE_BASE[sequence]
     else:
         highest_ingested = int(raw_ingested)
