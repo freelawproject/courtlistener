@@ -39,8 +39,12 @@ SEQUENCE_BASE: dict[str, int] = {
     APPLICATIONS_SEQUENCE: 0,
 }
 
-# Redis hash key that stores the latest probed serial per (sequence, term).
+# Highest serial whose S3-upload + Celery-enqueue completed (safe recovery point).
 HIGHEST_SCOTUS_KNOWN_SERIAL = "scotus:highest_known_serial"
+# Highest serial the probe confirmed exists; written immediately on each probe
+# hit so a crash between the probe phase and full ingestion can resume without
+# re-probing.
+HIGHEST_SCOTUS_OBSERVED_SERIAL = "scotus:highest_observed_serial"
 
 
 def current_scotus_term_year(today: date) -> int:
