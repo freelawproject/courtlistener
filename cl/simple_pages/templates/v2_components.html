@@ -1482,6 +1482,14 @@ Sample code here.
     <h2 class="mt-6 mb-3">Docket filter</h2>
     <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button.</p>
 
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
+    <c-docket-filter
+      :docket="demo_docket"
+      :form="demo_filter_form"
+      :page_obj="demo_page_obj"
+    />
+
     <c-library.list title="Props" only>
       <c-library.item only>
         <c-slot name="label"><code>:docket</code></c-slot>

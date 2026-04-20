@@ -560,10 +560,28 @@ async def components(request: HttpRequest) -> HttpResponse:
         def next_page_number(self) -> int:
             return self.number + 1
 
+    class MockFieldValue:
+        value = None
+
+    class MockDocketFilterForm:
+        errors = {}
+        filed_after = MockFieldValue()
+        filed_before = MockFieldValue()
+        entry_gte = MockFieldValue()
+        entry_lte = MockFieldValue()
+
+    class MockDocket:
+        pk = 12345
+
     return TemplateResponse(
         request,
         "components.html",
-        {"private": True, "demo_page_obj": MockPageObj()},
+        {
+            "private": True,
+            "demo_page_obj": MockPageObj(),
+            "demo_docket": MockDocket(),
+            "demo_filter_form": MockDocketFilterForm(),
+        },
     )
 
 
