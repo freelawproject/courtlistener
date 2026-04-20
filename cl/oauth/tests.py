@@ -36,6 +36,7 @@ class DynamicClientRegistrationTest(APITestCase):
         body = resp.json()
         self.assertIn("client_id", body)
         self.assertIn("client_secret", body)
+        self.assertEqual(body["client_secret_expires_at"], 0)
         self.assertEqual(body["client_name"], "Example MCP Client")
         self.assertEqual(
             body["redirect_uris"], ["https://mcp.example.com/callback"]
@@ -63,6 +64,7 @@ class DynamicClientRegistrationTest(APITestCase):
         body = resp.json()
         self.assertIn("client_id", body)
         self.assertNotIn("client_secret", body)
+        self.assertNotIn("client_secret_expires_at", body)
         app = Application.objects.get(client_id=body["client_id"])
         self.assertEqual(app.client_type, Application.CLIENT_PUBLIC)
 

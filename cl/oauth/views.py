@@ -123,6 +123,7 @@ class DynamicClientRegistrationView(APIView):
         }
         if client_type == Application.CLIENT_CONFIDENTIAL:
             response_data["client_secret"] = client_secret_plaintext
+            response_data["client_secret_expires_at"] = 0
         return Response(response_data, status=status.HTTP_201_CREATED)
 
 
