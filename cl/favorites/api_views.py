@@ -93,6 +93,14 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
             user=user, status=Prayer.WAITING
         ).order_by("-date_created")
 
+    def perform_create(self, serializer):
+        """Set source=API for prayers created through the API.
+
+        API prayers are unlimited and excluded from rate limiting,
+        leaderboards, and public statistics.
+        """
+        serializer.save(source=Prayer.API)
+
 
 class EventCounterViewset(CreateModelMixin, GenericViewSet):
     serializer_class = EventCountSerializer
