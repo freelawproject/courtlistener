@@ -7,7 +7,7 @@
 <c-code>
 curl -v \
 -X OPTIONS \
---header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+--header 'Authorization: Token &lt;your-token-here&gt;' \
 "{% get_full_host %}{% url "docket-list" version=version %}"
 
 </c-code>
@@ -15,7 +15,7 @@ curl -v \
 <p>To look up a particular docket, use its ID:</p>
 <c-code>
 curl -v \
---header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+--header 'Authorization: Token &lt;your-token-here&gt;' \
 "{% get_full_host %}{% url "docket-detail" version=version pk="4214664" %}"
 
 </c-code>
