@@ -14,6 +14,7 @@ discovery, JWKS). They add:
 import uuid
 from typing import Any
 
+from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -145,6 +146,9 @@ class OAuthMetadataView(APIView):
 
     def get(self, request: Request) -> Response:
         base = request.build_absolute_uri("/").rstrip("/")
+        scopes_supported = ["api"]
+        if settings.OAUTH2_PROVIDER.get("OIDC_ENABLED"):
+            scopes_supported.append("openid")
         return Response(
             {
                 "issuer": base,
@@ -160,7 +164,7 @@ class OAuthMetadataView(APIView):
                     ALLOWED_TOKEN_AUTH_METHODS
                 ),
                 "code_challenge_methods_supported": ["S256"],
-                "scopes_supported": ["api"],
+                "scopes_supported": scopes_supported,
                 "service_documentation": base + reverse("rest_docs"),
             }
         )
