@@ -61,6 +61,10 @@ class ScotusDaemonUtilsTest(SimpleTestCase):
     "test:daemon:highest_known",
 )
 @mock.patch(
+    f"{SCOTUS_DAEMON_MODULE}.HIGHEST_SCOTUS_OBSERVED_SERIAL",
+    "test:daemon:highest_observed",
+)
+@mock.patch(
     f"{SCOTUS_DAEMON_MODULE}.scotus_empty_probe_attempts_key",
     return_value="test:daemon:empty_probes",
 )
@@ -81,11 +85,13 @@ class ScotusDaemonTest(SimpleTestCase):
     """
 
     HIGHEST_KNOWN_KEY = "test:daemon:highest_known"
+    HIGHEST_OBSERVED_KEY = "test:daemon:highest_observed"
     COURT_WAIT_KEY = "test:daemon:court_wait"
     BLOCKED_KEY = "test:daemon:blocked"
     EMPTY_KEY = "test:daemon:empty_probes"
     REDIS_KEYS = (
         HIGHEST_KNOWN_KEY,
+        HIGHEST_OBSERVED_KEY,
         COURT_WAIT_KEY,
         BLOCKED_KEY,
         EMPTY_KEY,
@@ -290,6 +296,51 @@ class ScotusDaemonTest(SimpleTestCase):
             self.r.hget(self.HIGHEST_KNOWN_KEY, "applications:25"), "100"
         )
 
+    def test_recovery_resumes_interrupted_ingestion(self, *_mocks):
+        """If highest_observed > highest_ingested on entry the probe loop is
+        skipped and ingestion resumes for the gap without re-probing."""
+        self._seed_current_term(25, low=99, high=20000)
+        # Simulate a crash after probing (observed=103) but mid-ingestion.
+        self.r.hset(self.HIGHEST_OBSERVED_KEY, "low:25", 103)
+
+        def fake_fetch(dn):
+            if dn in {"25-100", "25-101", "25-102", "25-103"}:
+                return f'{{"docket_number":"{dn}"}}', HTTPStatus.OK
+            return None, HTTPStatus.NOT_FOUND
+
+        with (
+            mock.patch.object(
+                scotus_cmd_module,
+                "fetch_scotus_docket_json",
+                side_effect=fake_fetch,
+            ) as mock_fetch,
+            mock.patch.object(scotus_cmd_module, "save_scotus_raw_to_s3"),
+            mock.patch.object(
+                scotus_cmd_module,
+                "SCOTUSDocketReport",
+                new=FakeSCOTUSDocketReport,
+            ),
+            mock.patch.object(
+                scotus_cmd_module, "process_scotus_docket"
+            ) as mock_proc,
+            mock.patch.object(scotus_cmd_module.time, "sleep"),
+            time_machine.travel(datetime(2026, 3, 16, 12), tick=False),
+        ):
+            scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
+
+        # Watermark must advance to 103.
+        self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "103")
+        # All 4 serials in the gap were ingested.
+        self.assertEqual(mock_proc.delay.call_count, 4)
+        # Recovery fetched 100-103 sequentially (no geometric probe offsets).
+        fetched_low = [
+            c.args[0]
+            for c in mock_fetch.call_args_list
+            if c.args[0].startswith("25-")
+            and int(c.args[0].split("-")[1]) < 200
+        ]
+        self.assertEqual(fetched_low, ["25-100", "25-101", "25-102", "25-103"])
+
     # ------------------------------------------------------------------ #
     # management command
     # ------------------------------------------------------------------ #
@@ -330,6 +381,10 @@ class ScotusDaemonTest(SimpleTestCase):
     "test:integration:highest_known",
 )
 @mock.patch(
+    f"{SCOTUS_DAEMON_MODULE}.HIGHEST_SCOTUS_OBSERVED_SERIAL",
+    "test:integration:highest_observed",
+)
+@mock.patch(
     f"{SCOTUS_DAEMON_MODULE}.scotus_empty_probe_attempts_key",
     return_value="test:integration:empty_probes",
 )
@@ -351,11 +406,13 @@ class ScotusDaemonIntegrationTest(TestCase):
     """
 
     HIGHEST_KNOWN_KEY = "test:integration:highest_known"
+    HIGHEST_OBSERVED_KEY = "test:integration:highest_observed"
     COURT_WAIT_KEY = "test:integration:court_wait"
     BLOCKED_KEY = "test:integration:blocked"
     EMPTY_KEY = "test:integration:empty_probes"
     REDIS_KEYS = (
         HIGHEST_KNOWN_KEY,
+        HIGHEST_OBSERVED_KEY,
         COURT_WAIT_KEY,
         BLOCKED_KEY,
         EMPTY_KEY,
