@@ -69,7 +69,7 @@ class DynamicClientRegistrationView(APIView):
     authentication_classes: list[Any] = []
     permission_classes: list[Any] = []
 
-    def handle_exception(self, exc):
+    def handle_exception(self, exc: Exception) -> Response:
         if isinstance(exc, Ratelimited):
             return Response(
                 {
