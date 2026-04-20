@@ -2,7 +2,8 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.core.cache import cache
-from django.test import override_settings
+from django.core.exceptions import ValidationError
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from oauth2_provider.models import get_application_model
 
@@ -244,3 +245,34 @@ class OAuthMetadataTest(APITestCase):
         scopes = resp.json()["scopes_supported"]
         self.assertIn("api", scopes)
         self.assertIn("openid", scopes)
+
+
+class ApplicationRedirectUriPolicyTest(TestCase):
+    """Non-DCR code paths (admin, shell, direct ORM) must be held to the
+    same loopback-only policy for http:// redirect URIs that the DCR
+    serializer enforces. This exercises the pre_save signal in
+    ``cl.oauth.signals``.
+    """
+
+    def _make_app(self, redirect_uris: str) -> Application:
+        return Application(
+            name="t",
+            client_type=Application.CLIENT_CONFIDENTIAL,
+            authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
+            redirect_uris=redirect_uris,
+        )
+
+    def test_https_allowed(self):
+        self._make_app("https://mcp.example.com/cb").save()
+
+    def test_http_loopback_allowed(self):
+        self._make_app("http://127.0.0.1:8080/cb").save()
+
+    def test_http_non_loopback_rejected(self):
+        with self.assertRaises(ValidationError) as cm:
+            self._make_app("http://attacker.example.com/cb").save()
+        self.assertIn("loopback", str(cm.exception))
+
+    def test_unsupported_scheme_rejected(self):
+        with self.assertRaises(ValidationError):
+            self._make_app("javascript:alert(1)").save()

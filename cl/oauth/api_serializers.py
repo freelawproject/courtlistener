@@ -42,6 +42,30 @@ def _is_loopback_host(host: str) -> bool:
         return False
 
 
+def check_redirect_uri(uri: str) -> str | None:
+    """Return an error message if ``uri`` is not an acceptable redirect
+    target, else ``None``.
+
+    Acceptable: any ``https://`` URI with a host, or an ``http://`` URI
+    whose host is a loopback address (RFC 8252 §7.3). The DCR serializer
+    and the ``Application`` pre_save signal both call this so admin-created
+    apps can't bypass the loopback restriction.
+    """
+    parsed = urlparse(uri)
+    if parsed.scheme == "https":
+        if not parsed.netloc:
+            return f"redirect_uri missing host: {uri}"
+        return None
+    if parsed.scheme == "http":
+        if not parsed.hostname or not _is_loopback_host(parsed.hostname):
+            return (
+                "http:// redirect_uris are only permitted for "
+                f"loopback addresses (got {uri})"
+            )
+        return None
+    return f"unsupported redirect_uri scheme: {uri}"
+
+
 class DynamicClientRegistrationSerializer(serializers.Serializer):
     """Validates RFC 7591 DCR POST bodies against the MCP-allowed subset.
 
@@ -77,25 +101,9 @@ class DynamicClientRegistrationSerializer(serializers.Serializer):
 
     def validate_redirect_uris(self, value: list[str]) -> list[str]:
         for raw in value:
-            parsed = urlparse(raw)
-            if parsed.scheme == "https":
-                if not parsed.netloc:
-                    raise serializers.ValidationError(
-                        f"redirect_uri missing host: {raw}"
-                    )
-                continue
-            if parsed.scheme == "http":
-                if not parsed.hostname or not _is_loopback_host(
-                    parsed.hostname
-                ):
-                    raise serializers.ValidationError(
-                        "http:// redirect_uris are only permitted for "
-                        f"loopback addresses (got {raw})"
-                    )
-                continue
-            raise serializers.ValidationError(
-                f"unsupported redirect_uri scheme: {raw}"
-            )
+            error = check_redirect_uri(raw)
+            if error:
+                raise serializers.ValidationError(error)
         return value
 
     def validate_grant_types(self, value: list[str]) -> list[str]:
