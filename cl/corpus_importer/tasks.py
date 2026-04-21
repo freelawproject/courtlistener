@@ -5056,7 +5056,12 @@ def texas_ingest_docket_task(
     )
     if subscription_data and result.create:
         redis = get_redis_interface("CACHE")
-        redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+        added = redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+        if not added:
+            logger.info(
+                "TAMES subscription already pending, skipping: %s",
+                subscription_data,
+            )
     return result
 
 
