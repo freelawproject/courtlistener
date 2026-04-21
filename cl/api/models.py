@@ -78,6 +78,75 @@ class APIThrottle(AbstractDateTimeModel):
             )
 
 
+def normalize_time_unit(rate: str) -> str:
+    """Extract the normalized single-char time unit from a rate string.
+
+    >>> normalize_time_unit("50/hour")
+    'h'
+    >>> normalize_time_unit("5/min")
+    'm'
+    """
+    _, period = rate.split("/")
+    return period[0]
+
+
+@pghistory.track()
+class APIThrottleRate(AbstractDateTimeModel):
+    """Individual rate limit within a throttle configuration."""
+
+    throttle: models.ForeignKey[APIThrottle, APIThrottle] = models.ForeignKey(
+        APIThrottle,
+        help_text="The parent throttle configuration.",
+        related_name="rates",
+        on_delete=models.CASCADE,
+    )
+    rate: models.CharField = models.CharField(
+        help_text="The rate limit (e.g., '5/min', '50/hour', '125/day').",
+        max_length=20,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["throttle", "rate"],
+                name="unique_throttle_rate",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.rate
+
+    def clean(self) -> None:
+        super().clean()
+        if not RATE_PATTERN.match(self.rate):
+            raise ValidationError(
+                {
+                    "rate": f"Invalid rate format: {self.rate}. "
+                    "Use format like '100/hour', '1000/day', '60/min'."
+                }
+            )
+
+        # Prevent two rates with the same time unit on one throttle config
+        my_unit = normalize_time_unit(self.rate)
+        conflicting = APIThrottleRate.objects.filter(
+            throttle=self.throttle
+        ).exclude(pk=self.pk)
+        for existing in conflicting:
+            if normalize_time_unit(existing.rate) == my_unit:
+                unit_name = {
+                    "s": "second",
+                    "m": "minute",
+                    "h": "hour",
+                    "d": "day",
+                }[my_unit]
+                raise ValidationError(
+                    {
+                        "rate": f"A per-{unit_name} rate already exists "
+                        f"for this throttle configuration."
+                    }
+                )
+
+
 class WebhookEventType(models.IntegerChoices):
     DOCKET_ALERT = 1, "Docket Alert"
     SEARCH_ALERT = 2, "Search Alert"
