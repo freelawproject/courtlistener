@@ -1,5 +1,6 @@
 import time
 
+from celery import chain
 from django.conf import settings
 from django.utils.timezone import localtime
 from juriscraper.scotus import SCOTUSDocketReport
@@ -29,6 +30,7 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import get_redis_interface
+from cl.scrapers.tasks import subscribe_to_scotus_updates
 
 
 def process_scotus_hit(docket_number: str, content: str) -> None:
@@ -46,7 +48,10 @@ def process_scotus_hit(docket_number: str, content: str) -> None:
             "SCOTUS parser produced no docket_number for %s", docket_number
         )
         return
-    process_scotus_docket.delay(parser.data, download_file=True)
+    chain(
+        process_scotus_docket.s(parser.data, download_file=True),
+        subscribe_to_scotus_updates.s(),
+    ).apply_async()
 
 
 def _handle_scotus_http_error(r, court_blocked_attempts: int) -> None:
