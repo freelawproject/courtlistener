@@ -980,6 +980,14 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
     }
 
 
+class DjangoModelPermissionsWithView(DjangoModelPermissions):
+    perms_map = {
+        **DjangoModelPermissions.perms_map,
+        "GET": ["%(app_label)s.view_%(model_name)s"],
+        "HEAD": ["%(app_label)s.view_%(model_name)s"],
+    }
+
+
 def make_date_str_list(
     start: str | datetime,
     end: str | datetime,
