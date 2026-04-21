@@ -199,6 +199,8 @@ jobs:
             image_label: sweep-indexer
           - name: cl-iquery-probe
             image_label: cl-iquery-probe
+          - name: cl-tames-poller
+            image_label: cl-tames-poller
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
