@@ -3606,8 +3606,7 @@ class TexasMergerTest(TestCase):
         assert self.docket_coa1.appeal_from_str == texas_district.full_name
 
     def test_merge_texas_docket_existing_docket_marked_as_update(self):
-        """Does merge_texas_docket record an existing docket as an update?
-        """
+        """Does merge_texas_docket record an existing docket as an update?"""
         CourtFactory.create(id="texdistct6")
         originating_court = TexasOriginatingDistrictCourtDictFactory(
             district=5,
