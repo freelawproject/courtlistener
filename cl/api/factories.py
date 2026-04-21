@@ -6,6 +6,7 @@ from factory.fuzzy import FuzzyChoice
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
     APIThrottle,
+    APIThrottleRate,
     ThrottleType,
     Webhook,
     WebhookEvent,
@@ -23,6 +24,14 @@ class APIThrottleFactory(DjangoModelFactory):
     blocked = False
     rate = "100/hour"
     notes = Faker("sentence")
+
+
+class APIThrottleRateFactory(DjangoModelFactory):
+    class Meta:
+        model = APIThrottleRate
+
+    throttle = SubFactory(APIThrottleFactory)
+    rate = "100/hour"
 
 
 class WebhookFactory(DjangoModelFactory):
