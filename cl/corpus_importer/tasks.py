@@ -4913,6 +4913,7 @@ def merge_texas_docket(
                 docket_source=Docket.SCRAPER,
                 allow_create=True,
             )
+        docket_created = docket.pk is None
         docket.add_scraper_source()
         docket.docket_number = docket_number
         docket.docket_number_core = make_texas_docket_number_core(
@@ -4980,8 +4981,8 @@ def merge_texas_docket(
     result = MergeResult.union(result, party_merge_result)
     result = MergeResult.union(result, entry_merge_result)
     result = MergeResult.union(result, merge_case_transfer_result)
-    # Track the docket PK in the result
-    result.creates.setdefault("Docket", set()).add(docket.pk)
+    bucket = result.creates if docket_created else result.updates
+    bucket.setdefault("Docket", set()).add(docket.pk)
 
     if not result.success:
         logger.error(
