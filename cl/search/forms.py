@@ -700,10 +700,7 @@ class SearchForm(forms.Form):
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
 
-        should_disable_knn_search = (
-            not settings.KNN_SEARCH_ENABLED or not self.request
-        )
-        if should_disable_knn_search:
+        if not settings.KNN_SEARCH_ENABLED:
             cleaned_data["semantic"] = False
 
         return cleaned_data

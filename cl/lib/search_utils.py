@@ -30,6 +30,7 @@ from cl.lib.elasticsearch_utils import (
     compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
+    get_query_embedding,
     has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
@@ -712,6 +713,13 @@ def do_es_search(
                         remove_missing_citations(missing_citations, cd)
                     )
                     cd["q"] = suggested_query if suggested_query else cd["q"]
+
+            # For semantic searches, generate the embedding once so both
+            # the main query and the facets query reuse it instead of
+            # making duplicate calls to the inception microservice.
+            if has_semantic_params(cd) and not cd.get("embedding"):
+                cd["embedding"] = get_query_embedding(cd["q"])
+
             (
                 s,
                 child_docs_count_query,
