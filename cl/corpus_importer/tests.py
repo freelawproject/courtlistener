@@ -3605,6 +3605,29 @@ class TexasMergerTest(TestCase):
         assert self.docket_coa1.appeal_from_id == "texdistct6"
         assert self.docket_coa1.appeal_from_str == texas_district.full_name
 
+    def test_merge_texas_docket_existing_docket_marked_as_update(self):
+        """Does merge_texas_docket record an existing docket as an update?
+        """
+        CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        # Precondition: the docket we're about to merge already exists.
+        assert Docket.objects.filter(pk=self.docket_coa1.pk).exists()
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert self.docket_coa1.pk not in result.creates.get("Docket", set())
+        assert self.docket_coa1.pk in result.updates.get("Docket", set())
+
     def test_merge_texas_docket_final_court_sets_appeal_from(self):
         """Does merge_texas_docket set appeal_from for final courts?"""
         sc_dn = "25-1066"
