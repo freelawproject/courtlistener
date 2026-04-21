@@ -3597,7 +3597,7 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket(docket_data)
 
         assert result.success is True
-        assert self.docket_coa1.pk in result.creates["Docket"]
+        assert self.docket_coa1.pk in result.updates["Docket"]
 
         self.docket_coa1.refresh_from_db()
         assert self.docket_coa1.date_filed == docket_data["date_filed"]
@@ -3652,7 +3652,7 @@ class TexasMergerTest(TestCase):
         result = merge_texas_docket(docket_data)
 
         assert result.success is True
-        assert docket_sc.pk in result.creates["Docket"]
+        assert docket_sc.pk in result.updates["Docket"]
 
         docket_sc.refresh_from_db()
         assert docket_sc.date_filed == docket_data["date_filed"]
