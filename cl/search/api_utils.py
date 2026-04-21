@@ -1,5 +1,6 @@
 import logging
 import pickle
+import time
 from collections import defaultdict
 
 from django.conf import settings
@@ -18,6 +19,7 @@ from cl.lib.elasticsearch_utils import (
     do_collapse_count_query,
     do_count_query,
     do_es_api_query,
+    has_semantic_params,
     limit_inner_hits,
     merge_semantic_relevant_chunks,
     merge_unavailable_fields_on_parent_document,
@@ -41,6 +43,7 @@ from cl.search.documents import (
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import SEARCH_TYPES, SearchQuery
 from cl.search.types import ESCursor
+from cl.stats.metrics import record_search_duration
 
 logger = logging.getLogger(__name__)
 
@@ -145,8 +148,11 @@ class ESList:
         ]
 
         error_to_raise = None
+        duration = None
         try:
+            start_time = time.perf_counter()
             results = self.main_query.execute()
+            duration = time.perf_counter() - start_time
         except (TransportError, ConnectionError, RequestError) as e:
             error_to_raise = ElasticServerError
         except ApiError as e:
@@ -155,6 +161,12 @@ class ESList:
             else:
                 logger.error("Multi-search API Error: %s", e)
                 error_to_raise = ElasticServerError
+
+        # Record search duration metric (v3 API doesn't support semantic search)
+        if duration is not None:
+            record_search_duration(
+                duration, query_type="keyword", method="api"
+            )
 
         # Store search query.
         store_search_api_query(
@@ -287,6 +299,7 @@ class CursorESList:
             )
 
         error_to_raise = None
+        duration = None
         try:
             multi_search = MultiSearch()
             multi_search = multi_search.add(self.main_query).add(
@@ -300,7 +313,9 @@ class CursorESList:
             ):
                 multi_search = multi_search.add(child_cardinality_query)
 
+            start_time = time.perf_counter()
             responses = multi_search.execute()
+            duration = time.perf_counter() - start_time
             main_results = responses[0]
             cardinality_count_response = responses[1]
             if child_cardinality_query:
@@ -313,6 +328,17 @@ class CursorESList:
             else:
                 logger.error("Multi-search API Error: %s", e)
                 error_to_raise = ElasticServerError
+
+        # Record search duration metric
+        if duration is not None:
+            query_type = (
+                "semantic"
+                if has_semantic_params(self.clean_data)
+                else "keyword"
+            )
+            record_search_duration(
+                duration, query_type=query_type, method="api"
+            )
 
         # Store search query.
         store_search_api_query(

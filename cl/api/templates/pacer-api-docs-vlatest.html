@@ -53,7 +53,7 @@
         <li><a href="#recap-document-endpoint">Documents</a></li>
         <li><a href="#party-endpoint">Parties</a></li>
         <li><a href="#attorney-endpoint">Attorneys</a></li>
-        <li><a href="#og-court-info-endpoint">Originating Court Info</a></li>
+        <li><a href="#orig-court-info-endpoint">Originating Court Info</a></li>
         <li><a href="#bankruptcy-information-endpoint">Bankruptcy Info</a></li>
         <li><a href="#idb-data-endpoint">Integrated Database</a></li>
       </ul>
@@ -336,7 +336,7 @@
   {% endif %}
 
 
-  <h2 id="og-court-info-endpoint">Originating Court Information<small> — <code><nobr>{% url 'originatingcourtinformation-list' version=version %}</nobr></code></small></h2>
+  <h2 id="orig-court-info-endpoint">Originating Court Information<small> — <code><nobr>{% url 'originatingcourtinformation-list' version=version %}</nobr></code></small></h2>
   <p><code>Originating Court Information</code> represents the information gathered at an appellate court about a case when it was in a lower court or administrative body.
   </p>
   <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.

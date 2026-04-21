@@ -1,12 +1,12 @@
 import logging
 import re
 from datetime import datetime
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import nh3
 import pghistory
 import pytz
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
@@ -50,6 +50,7 @@ from cl.lib.model_helpers import (
     make_scotus_docket_number_core,
     make_texas_docket_number_core,
     make_upload_path,
+    normalize_texas_appellate_docket_number,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
@@ -735,6 +736,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
+
+    def add_scraper_source(self) -> None:
+        if self.source in self.NON_SCRAPER_SOURCES():
+            self.source = self.source + self.SCRAPER
 
     def add_recap_source(self):
         if self.source == self.DEFAULT:
@@ -1847,6 +1852,11 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
+class StateCourtsQuerySet(models.QuerySet):
+    def all(self) -> models.QuerySet:
+        return self.filter(jurisdiction__in=Court.STATE_JURISDICTIONS)
+
+
 @pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
@@ -2073,6 +2083,7 @@ class Court(models.Model):
 
     objects = models.Manager()
     federal_courts = FederalCourtsQuerySet.as_manager()
+    state_courts = StateCourtsQuerySet.as_manager()
 
     def __str__(self) -> str:
         return f"{self.full_name}"
@@ -2304,7 +2315,7 @@ class OpinionCluster(AbstractDateTimeModel):
             ", ".join(f"{t[0]} ({t[1]})" for t in ClusterSources.NAMES)
         ),
         max_length=10,
-        choices=ClusterSources.NAMES,
+        validators=[ClusterSources.validate_source],
         blank=True,
     )
     procedural_history = models.TextField(
@@ -4030,6 +4041,91 @@ class CaseTransfer(AbstractDateTimeModel):
         choices=transfer_type_choices.items(),
     )
 
+    # We currently only generate transfers for state courts, and we do not
+    # scrape trial courts so skip trying to populate fields we'll never be able
+    # to populate.
+    TRACKED_JURISDICTIONS = (Court.STATE_APPELLATE, Court.STATE_SUPREME)
+
+    @classmethod
+    def _fill_null_docket_side(
+        cls, side: Literal["origin"] | Literal["destination"]
+    ) -> tuple[int, int]:
+        """Fill null docket FKs for one side (origin or destination).
+
+        :param side: Either "origin" or "destination".
+        :return: Tuple of (updated_count, total_count).
+        """
+        from cl.recap.mergers import find_docket_object
+
+        qs = cls.objects.filter(
+            **{
+                f"{side}_court__jurisdiction__in": cls.TRACKED_JURISDICTIONS,
+                f"{side}_docket__isnull": True,
+            }
+        )
+        total = qs.count()
+        updated_transfers: list[CaseTransfer] = []
+        total_updated = 0
+
+        for transfer in qs.iterator():
+            court = getattr(transfer, f"{side}_court")
+            docket_number = getattr(transfer, f"{side}_docket_number")
+
+            if court.jurisdiction == Court.STATE_APPELLATE:
+                docket_number = normalize_texas_appellate_docket_number(
+                    docket_number
+                )
+
+            docket = async_to_sync(find_docket_object)(
+                court_id=getattr(transfer, f"{side}_court_id"),
+                pacer_case_id=None,
+                docket_number=docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                allow_create=False,
+            )
+            if docket:
+                logger.info(
+                    "Found %s docket %s!",
+                    side,
+                    getattr(transfer, f"{side}_docket_number"),
+                )
+                setattr(transfer, f"{side}_docket", docket)
+                updated_transfers.append(transfer)
+
+            if len(updated_transfers) >= 100:
+                total_updated += cls.objects.bulk_update(
+                    updated_transfers, [f"{side}_docket"]
+                )
+                updated_transfers = []
+
+        if updated_transfers:
+            total_updated += cls.objects.bulk_update(
+                updated_transfers, [f"{side}_docket"]
+            )
+
+        return total_updated, total
+
+    @classmethod
+    def fill_null_dockets(cls) -> None:
+        logger.info(
+            "Attempting to populate missing fields in CaseTransfer table..."
+        )
+
+        updated_origin, total_origin = cls._fill_null_docket_side("origin")
+        updated_destination, total_destination = cls._fill_null_docket_side(
+            "destination"
+        )
+
+        logger.info(
+            "Update complete. Populated %s/%s origin dockets and %s/%s destination dockets.",
+            updated_origin,
+            total_origin,
+            updated_destination,
+            total_destination,
+        )
+
     class Meta:
         constraints = [
             CheckConstraint(
@@ -4134,3 +4230,63 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         from cl.corpus_importer.utils import extract_file_name_from_url
 
         return extract_file_name_from_url(self.url)
+
+
+@pghistory.track()
+@document_model
+class TrialCourtData(AbstractDateTimeModel):
+    """
+    Trial court information for cases which have moved at least twice since
+    originating in a trial court. This is useful because
+    `originating_court_information` only captures info from the court directly
+    below in the appellate chain, and `CaseTransfer` similarly only goes one
+    step at a time. This model lets us store data from the very first time a
+    case appeared.
+
+    :ivar docket: The docket in the higher court that this information is
+        associated with.
+    :ivar docket_number_trial: The docket number of the trial court case with
+        (potentially) some cleanup applied. May be blank if not available for a
+        given state.
+    :ivar docket_number_raw_trial: The raw trial court docket number value as
+        found on the source, with no cleaning or transformations applied. May
+        be blank.
+    :ivar judge_str: The name of the judge who presided over the case. May be
+        blank if this information is not available.
+    :ivar judge: The entry in people_db.Person for the judge who presided over
+        this case if available.
+    :ivar reporter: The court reporter listed for this case. May be blank if
+        this information is not available.
+    :ivar date_filed: The date this case was originally filed. May be blank if
+        this information is not available.
+    :ivar court_name: The name of the court this case was filed in as it
+        appears in the source. May be blank if this information is not
+        available.
+    :ivar court: A foreign key to the Court object corresponding to the court
+        this case was heard in. May be blank if the court is not in the
+        database or is unavailable in the source.
+    :ivar punishment: The punishment assigned in criminal cases if available.
+    :ivar county: The county the trial court is located in if available.
+    """
+
+    docket = models.OneToOneField(
+        Docket,
+        on_delete=models.CASCADE,
+    )
+    docket_number_trial = models.CharField(blank=True, default="")
+    docket_number_raw_trial = models.CharField(
+        blank=True,
+        default="",
+    )
+    judge_str = models.TextField(blank=True)
+    judge = models.ForeignKey(
+        "people_db.Person", blank=True, null=True, on_delete=models.SET_NULL
+    )
+    reporter = models.TextField(blank=True)
+    date_filed = models.DateField(blank=True, null=True)
+    court_name = models.TextField(blank=True)
+    court = models.ForeignKey(
+        Court, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    punishment = models.TextField(blank=True)
+    county = models.TextField(blank=True)

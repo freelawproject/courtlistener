@@ -65,7 +65,6 @@ from cl.donate.models import (
 )
 from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
 from cl.favorites.models import Prayer
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
@@ -90,6 +89,7 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
+    MockTallyStatMixin,
     SearchAlertsAssertions,
     TestCase,
 )
@@ -2814,7 +2814,9 @@ class DocketAlertGetNotesTagsTests(TestCase):
     NO_MATCH_HL_SIZE=100, WAFFLE_CACHE_PREFIX="SearchAlertsOAESTests"
 )
 @override_switch("increment-stats", active=True)
-class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
+class SearchAlertsOAESTests(
+    MockTallyStatMixin, ESIndexTestCase, TestCase, SearchAlertsAssertions
+):
     """Test ES Search Alerts"""
 
     @classmethod
@@ -2906,13 +2908,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         Alert.objects.all().delete()
         Audio.objects.all().delete()
         super().tearDownClass()
-
-    def setUp(self):
-        self.r = get_redis_interface("STATS")
-        # Note: We no longer delete all alerts.sent* keys here because tests
-        # now check stat deltas (before/after) rather than absolute values.
-        # This makes tests parallel-safe.
-        return super().setUp()
 
     def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
@@ -3287,10 +3282,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         alert_count,
         previous_date=None,
     ):
-        # Track initial stat count to check delta (parallel-test safe)
-        key = f"alerts.sent.{mock_date.date().isoformat()}"
-        initial_count = int(self.r.get(key) or 0)
-
+        self.mock_tally_stat.reset_mock()
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -3301,9 +3293,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 # Call dly command
                 call_command("cl_send_scheduled_alerts", rate=rate)
 
-        # Confirm Stat object is properly updated (check delta, not absolute).
-        count = int(self.r.get(key) or 0)
-        self.assertEqual(count - initial_count, stat_count)
+        # Confirm tally_stat was called with the expected increment.
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(
+            self.mock_tally_stat.call_args.kwargs["inc"], stat_count
+        )
 
         # Confirm Alert date_last_hit is updated.
         search_alert.refresh_from_db()
@@ -3504,19 +3498,17 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
         # Send RT alerts
         mock_date = now() - timedelta(days=10)
-        # Track initial stat count to check delta (parallel-test safe)
-        stat_key = f"alerts.sent.{mock_date.date().isoformat()}"
-        initial_stat_count = int(self.r.get(stat_key) or 0)
+        self.mock_tally_stat.reset_mock()
         with time_machine.travel(mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
-        after_rt_stat_count = int(self.r.get(stat_key) or 0)
 
         # 1 email should be sent for the rt_oa_search_alert and rt_oa_search_alert_2
         self.assertEqual(
             len(mail.outbox), 1, msg="Wrong number of emails sent."
         )
         # Confirm stat was incremented by the RT command.
-        self.assertEqual(after_rt_stat_count - initial_stat_count, 1)
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(self.mock_tally_stat.call_args.kwargs["inc"], 1)
 
         # The OA RT alert email should contain 2 alerts, one for rt_oa_search_alert
         # and one for rt_oa_search_alert_2. First alert should contain 2 hits.
@@ -3652,15 +3644,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         rt_oral_argument_2.delete()
         rt_oral_argument_3.delete()
 
-        # Confirm Stat object is properly created and updated (check delta).
-        # RT command should have incremented by 1, daily command by 1.
-        final_stat_count = int(self.r.get(stat_key) or 0)
-        self.assertEqual(
-            final_stat_count - after_rt_stat_count,
-            1,
-            msg="Daily command did not increment stat.",
-        )
-        self.assertEqual(final_stat_count - initial_stat_count, 2)
+        # Confirm tally_stat was called twice total: once by RT, once by
+        # the daily command, each incrementing by 1.
+        self.assertEqual(self.mock_tally_stat.call_count, 2)
+        for call in self.mock_tally_stat.call_args_list:
+            self.assertEqual(call.kwargs["inc"], 1)
 
         # Remove test instances.
         rt_oa_search_alert.delete()
@@ -3737,9 +3725,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
         # Send RT alerts
         mock_date = now() - timedelta(days=2)
-        # Track initial stat count to check delta (parallel-test safe)
-        stat_key = f"alerts.sent.{mock_date.date().isoformat()}"
-        initial_stat_count = int(self.r.get(stat_key) or 0)
+        self.mock_tally_stat.reset_mock()
         with time_machine.travel(mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
@@ -3758,9 +3744,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         content = webhook_events[0].content["payload"]
         self.assertEqual(len(content["results"]), 1)
 
-        # Confirm Stat object is properly created and updated (check delta).
-        final_stat_count = int(self.r.get(stat_key) or 0)
-        self.assertEqual(final_stat_count - initial_stat_count, 11)
+        # Confirm tally_stat was called with inc=11 (one per user email).
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(self.mock_tally_stat.call_args.kwargs["inc"], 11)
 
         # Remove test instances.
         rt_oral_argument.delete()

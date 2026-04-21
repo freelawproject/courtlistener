@@ -96,6 +96,7 @@ from cl.search.exception import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
+from cl.stats.metrics import record_search_duration
 
 logger = logging.getLogger(__name__)
 
@@ -2356,7 +2357,13 @@ def fetch_es_results(
         multi_search = multi_search.add(main_query).add(main_doc_count_query)
         if child_total_query:
             multi_search = multi_search.add(child_total_query)
+        start_time = time.perf_counter()
         responses = multi_search.execute()
+        duration = time.perf_counter() - start_time
+
+        # Record search duration metric
+        query_type = "semantic" if clean_params.get("semantic") else "keyword"
+        record_search_duration(duration, query_type=query_type, method="web")
 
         main_response = responses[0]
         main_doc_count_response = responses[1]

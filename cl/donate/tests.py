@@ -319,6 +319,41 @@ class MembershipWebhookTest(TestCase):
 
         membership = await query.afirst()
         self.assertEqual(membership.level, NeonMembershipLevel.EDU)
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_edu_membership_with_explicit_payment_status(
+        self, mock_store_webhook
+    ) -> None:
+        """EDU webhooks with explicit payment info should respect that value."""
+        self.user_profile.user.email = "test@university.edu"
+        await self.user_profile.user.asave()
+
+        self.user_profile.email_confirmed = True
+        await self.user_profile.asave()
+
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["membershipName"] = "EDU Membership"
+        self.data["data"]["membership"]["payments"] = [
+            {"paymentStatus": "Failed"}
+        ]
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        membership = await NeonMembership.objects.filter(
+            neon_id="12345"
+        ).afirst()
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.FAILED
+        )
 
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None

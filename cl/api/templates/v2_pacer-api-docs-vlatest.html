@@ -15,7 +15,7 @@
     {'href': '#the-apis', 'text': 'The APIs', 'children': [
       {'href': '#dockets', 'text': 'Dockets'},
       {'href': '#courts', 'text': 'Courts'},
-      {'href': '#docker-entries', 'text': 'Docker Entries'},
+      {'href': '#docket-entries', 'text': 'Docket Entries'},
       {'href': '#documents', 'text': 'Documents'},
       {'href': '#parties', 'text': 'Parties'},
       {'href': '#attorneys', 'text': 'Attorneys'},
@@ -29,7 +29,7 @@
   <c-layout-with-navigation.section id="about">
     <h1>PACER Data APIs</h1>
     <p class="lead">Use these APIs to access almost half a billion items we have in our collection of PACER data.</p>
-    <p>To learn more about what's in the collection and how we gather PACER data each day, see <a class="text-primary-600" href="{% url "coverage_recap" %}">our coverage page on the topic.</a></p>
+    <p>To learn more about what's in the collection and how we gather PACER data each day, see <a class="links" href="{% url "coverage_recap" %}">our coverage page on the topic.</a></p>
     <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.</p>
     <p>In any legal proceeding, there are roughly three things: Documents, people, and organizations. Documents are grouped together into docket entries, which are grouped together into dockets. People and organizations are examples of parties. Parties have attorneys who act on their behalf in particular ways, which we call the attorney's role in the case.</p>
     <p>Each of these relationships is interlinked and has metadata that describes it. Use these APIs to explore this data.</p>
@@ -127,7 +127,7 @@ curl -v \
     <p>You can generally cache this API. It does not change often.</p>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="docker-entries">
+  <c-layout-with-navigation.section id="docket-entries">
     <h3>Docket Entries <small> — <code>{% url "docketentry-list" version=version %}</code></small></h3>
     <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.</p>
     <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.</p>
@@ -147,13 +147,13 @@ curl -v \
         {'label': 'Notes', 'field': 'notes'}
       ]"
       :rows="[
-        {'field': '<code>plain_text</code>', 'notes': '<p>This field contains the extracted text of the document.</p><p>We use <a class=underline href=https://free.law/open-source-tools#doctor>Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p><p>To see whether OCR was used, check the <code>ocr_status</code> field.</p><p>If you don’t need this content, omit it via <a class=text-primary-600 href={% url "rest_docs" version=version %}#field-selection>Field Selection</a> to significantly reduce response times and payload size.</p>'},
-        {'field': '<code>filepath_local</code>', 'notes': '<p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a class=text-primary-600 href={% url "field_api_help" %}#downloads>help article on this topic</a>.</p><p>The name of this field dates back to when all our files were locally stored on a single server.</p>'}
+        {'field': '<code>plain_text</code>', 'notes': '<p>This field contains the extracted text of the document.</p><p>We use <a class=links-external href=https://free.law/open-source-tools#doctor>Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.</p><p>To see whether OCR was used, check the <code>ocr_status</code> field.</p><p>If you don’t need this content, omit it via <a class=links href={% url "rest_docs" version=version %}#field-selection>Field Selection</a> to significantly reduce response times and payload size.</p>'},
+        {'field': '<code>filepath_local</code>', 'notes': '<p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a class=links href={% url "field_api_help" %}#downloads>help article on this topic</a>.</p><p>The name of this field dates back to when all our files were locally stored on a single server.</p>'}
       ]"
     ></c-data-table>
 
        {% if not perms.search.has_recap_api_access %}
-      <p>This endpoint is only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access this API.</p>
+      <p>This endpoint is only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access this API.</p>
     {% endif %}
   </c-layout-with-navigation.section>
 
@@ -233,7 +233,7 @@ curl -v \
       </li>
     </ol>
     {% if not perms.people_db.has_recap_api_access %}
-      <p>These endpoints are only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access these endpoints.</p>
+      <p>These endpoints are only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access these endpoints.</p>
     {% endif %}
   </c-layout-with-navigation.section>
 
@@ -278,7 +278,7 @@ curl -v \
 ...</c-code>
     <p>Similar to the party API above, when you filter attorneys to a particular docket, the nested <code>parties_represented</code> field is not filtered and can show other parties the attorney represented in other dockets.</p>
     {% if not perms.people_db.has_recap_api_access %}
-      <p>These endpoints are only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access these endpoints.
+      <p>These endpoints are only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access these endpoints.
       </p>
     {% endif %}
   </c-layout-with-navigation.section>
@@ -298,11 +298,11 @@ curl -v \
 
   <c-layout-with-navigation.section id="integrated-db">
     <h3>Integrated Database <small> — <code class="whitespace-nowrap">{% url 'fjcintegrateddatabase-list' version=version %}</code></small></h3>
-    <p><code>FJC Integrated Database</code> objects represent the information available in the <a class="underline" href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:</p>
+    <p><code>FJC Integrated Database</code> objects represent the information available in the <a class="links-external" href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:</p>
     <ul>
-      <li><a class="underline" href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
-      <li><a class="underline" href="https://free.law/idb-facts/">Our datasheet on the IDB</a></li>
-      <li>The various codebooks for <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Civil%20Codebook%201988%20Forward_0.pdf">civil</a>, <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Criminal%20Code%20Book%201996%20Forward.pdf">criminal</a>, <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Appeals%20Codebook%202008%20Forward.pdf">appellate</a>, and <a class="underline" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Bankruptcy%20Codebook%202008%20Forward%20(Rev%20January%202018).pdf">bankruptcy</a> datasets.</li>
+      <li><a class="links-external" href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
+      <li><a class="links-external" href="https://free.law/idb-facts/">Our datasheet on the IDB</a></li>
+      <li>The various codebooks for <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Civil%20Codebook%201988%20Forward_0.pdf">civil</a>, <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Criminal%20Code%20Book%201996%20Forward.pdf">criminal</a>, <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Appeals%20Codebook%202008%20Forward.pdf">appellate</a>, and <a class="links-external" href="https://www.fjc.gov/sites/default/files/idb/codebooks/Bankruptcy%20Codebook%202008%20Forward%20(Rev%20January%202018).pdf">bankruptcy</a> datasets.</li>
     </ul>
     <p>As always, you can find our interpretations of these fields by performing an <code>OPTIONS</code> request on this endpoint.</p>
     <p><strong>Note:</strong> Pending further support, this endpoint should be considered <em>experimental</em> quality. It is not guaranteed to have all of the available data sets, may not have the latest quarterly data, and indeed may have bugs. If you encounter any bugs, please let us know. If you would like better guarantees about the quality of this endpoint, we are enthusiastic about finding partners to better support it.</p>
@@ -340,7 +340,7 @@ curl -v \
     <p class="alert-warning"><strong>Careful:</strong> When placing queries, the fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero, and you will need to do so in your queries.</p>
     <p>To query whether a case is in our system, use the <code>Docket</code> endpoint described above.</p>
     {% if not perms.search.has_recap_api_access %}
-      <p>This endpoint is only available to select users. Please <a class="text-primary-600" href="{% url "contact" %}">get in touch</a> to access this API.</p>
+      <p>This endpoint is only available to select users. Please <a class="links" href="{% url "contact" %}">get in touch</a> to access this API.</p>
     {% endif %}
   </c-layout-with-navigation.section>
 </c-layout-with-navigation>

@@ -53,6 +53,7 @@ from cl.search.types import (
     SearchAlertHitType,
     SendAlertsResponse,
 )
+from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -360,7 +361,11 @@ def send_alert_and_webhook(
     connection.send_messages(messages)
 
     # Work completed. Tally, log, and clean up
-    tally_stat("alerts.sent", inc=len(messages))
+    tally_stat(
+        StatMetric.ALERTS_SENT,
+        inc=len(messages),
+        labels={"alert_type": StatAlertType.DOCKET},
+    )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook

@@ -54,6 +54,7 @@ from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import (
     Attorney,
+    AttorneyOrganization,
     AttorneyOrganizationAssociation,
     CriminalComplaint,
     CriminalCount,
@@ -94,6 +95,7 @@ from cl.recap.mergers import (
     get_data_from_att_report,
     get_order_of_docket,
     merge_attachment_page_data,
+    normalize_attorney_contact,
     normalize_long_description,
     update_case_names,
     update_docket_appellate_metadata,
@@ -4313,6 +4315,57 @@ class RecapAddAttorneyTest(TestCase):
         roles = a.roles.all()
         self.assertEqual(roles.count(), 2)
         self.assertNotIn(r, roles)
+
+    def test_atty_org_race_condition_in_atomic_block(self) -> None:
+        """Does add_attorney handle AttorneyOrganization IntegrityError
+        within an outer atomic transaction?
+
+        Simulates the race condition where another process creates the
+        AttorneyOrganization between our .get() and .create(). The
+        IntegrityError must be caught and recovered from without
+        aborting the outer transaction.
+        """
+        atty_org_info, _ = normalize_attorney_contact(
+            self.atty["contact"], fallback_name=self.atty["name"]
+        )
+
+        # Pre-create the org to cause IntegrityError on create
+        AttorneyOrganization.objects.create(**atty_org_info)
+
+        # Mock get() to raise DoesNotExist on first call (simulating
+        # the race window), then succeed on the retry after
+        # IntegrityError.
+        get_call_count = [0]
+        original_get = AttorneyOrganization.objects.get
+
+        def get_side_effect(*args, **kwargs):
+            get_call_count[0] += 1
+            if get_call_count[0] == 1:
+                raise AttorneyOrganization.DoesNotExist()
+            return original_get(*args, **kwargs)
+
+        # Wrap in transaction.atomic to simulate the real call path
+        # (add_parties_and_attorneys is @transaction.atomic).
+        # Without the savepoint fix, the IntegrityError from create()
+        # would break the transaction and the recovery get() would
+        # raise TransactionManagementError.
+        with transaction.atomic():
+            with mock.patch.object(
+                AttorneyOrganization.objects,
+                "get",
+                side_effect=get_side_effect,
+            ):
+                a_pk = add_attorney(self.atty, self.p, self.d)
+
+        a = Attorney.objects.get(pk=a_pk)
+        self.assertTrue(
+            AttorneyOrganizationAssociation.objects.filter(
+                attorney=a,
+                attorney_organization__name=self.atty_org_name,
+                docket=self.d,
+            ).exists(),
+            msg="Attorney organization association should exist after race condition recovery.",
+        )
 
 
 class DocketCaseNameUpdateTest(SimpleTestCase):

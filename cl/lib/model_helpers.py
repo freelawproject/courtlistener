@@ -175,6 +175,42 @@ def is_texas_court(court_id: str) -> bool:
     )
 
 
+def normalize_texas_appellate_docket_number(docket_number: str) -> str:
+    """Normalizes a Texas appellate docket number pulled from the Appellate
+    Case Information table. Returns the original docket number with normalized
+    dashes and converted to lowercase if it can't be normalized into an
+    appellate docket number.
+
+    :param docket_number: The docket number to clean.
+    :return: The cleaned docket number."""
+
+    docket_number = normalize_dashes(docket_number.lower().strip())
+    cr_ending = docket_number.endswith("cr")
+    cv_ending = docket_number.endswith("cv")
+    if docket_number.endswith("r") and not cr_ending:
+        docket_number = docket_number[:-1] + "cr"
+        cr_ending = True
+    if docket_number.endswith("v") and not cv_ending:
+        docket_number = docket_number[:-1] + "cv"
+        cv_ending = True
+    if not cr_ending and not cv_ending:
+        return docket_number
+    parts = [part for part in docket_number.split("-") if part]
+    if len(parts) < 2:
+        return docket_number
+    suffix = parts.pop()
+    if not all(part.isdigit() for part in parts):
+        return docket_number
+    # Three numeric parts (e.g. "09-01-404"): zero-pad to NN-NN-NNNNN
+    if len(parts) == 3:
+        return f"{int(parts[0]):0>2}-{int(parts[1]):0>2}-{int(parts[2]):0>5}-{suffix}"
+    # Joined digits total 9 (e.g. "0199-01326"): re-slice to NN-NN-NNNNN
+    joined = "".join(parts)
+    if len(joined) == 9:
+        return f"{joined[:2]}-{joined[2:4]}-{joined[4:]}-{suffix}"
+    return docket_number
+
+
 def clean_texas_docket_number(docket_number: str | None) -> str:
     """Clean a Texas docket number by extracting the valid docket number
     from potentially dirty input using Juriscraper's regex patterns.
@@ -197,16 +233,32 @@ def clean_texas_docket_number(docket_number: str | None) -> str:
         if regex.fullmatch(docket_number):
             return docket_number
 
-    # Try fullmatch on each whitespace-separated token (dirty input
-    # like "Case Number: 04-97-00972-CV"). We use fullmatch rather
-    # than search because these regexes were designed for fullmatch
-    # and can produce false positives with partial matching.
-    for token in docket_number.split():
+    tokens = [
+        # Strip leading and trailing punctuation from tokens since it's likely invalid.
+        re.compile(r"^[^a-z0-9]+|[^a-z0-9]+$", re.IGNORECASE).sub("", token)
+        for token in docket_number.split()
+    ]
+    matching_parts = []
+    for token in tokens:
         for regex in TEXAS_DN_REGEXES:
             if regex.fullmatch(token):
-                return token
+                matching_parts.append(token)
 
-    return ""
+    if len(matching_parts) == 0:
+        logger.warning(
+            "Could not find valid Texas docket number in string %s. Using empty string as clean docket number",
+            docket_number,
+        )
+        return ""
+
+    matching_parts.sort()
+    if len(matching_parts) > 1:
+        logger.warning(
+            "Found multiple docket numbers combined %s. Using %s as clean docket number.",
+            docket_number,
+            matching_parts[0],
+        )
+    return matching_parts[0]
 
 
 def make_texas_docket_number_core(docket_number: str | None) -> str:
@@ -364,9 +416,10 @@ def make_pdf_path(instance, filename, thumbs=False):
         return str(Path("scotus") / "documents" / file_name)
     elif isinstance(instance, TexasDocument):
         slug = slugify(Path(filename).stem)
+        ext = Path(filename).suffix or ".pdf"
         court_id = instance.docket_entry.docket.court_id
         root = Path(f"us/state/tx/{court_id}")
-        file_name = f"gov.tx.{court_id}.{slug}.pdf"
+        file_name = f"gov.tx.{court_id}.{slug}{ext}"
         return str(root / file_name)
     else:
         raise ValueError(
