@@ -12,6 +12,7 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import BigPagination
 from cl.api.utils import (
+    DjangoModelPermissionsWithView,
     EmailProcessingQueueAPIUsers,
     LoggingMixin,
     NoFilterCacheListMixin,
@@ -82,7 +83,9 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (EmailProcessingQueueAPIUsers,)
+    permission_classes = (
+        EmailProcessingQueueAPIUsers | DjangoModelPermissionsWithView,
+    )
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
