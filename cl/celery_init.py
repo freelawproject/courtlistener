@@ -19,6 +19,10 @@ sys.setrecursionlimit(10000)
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
+# Import for side effects: registers task_prerun/task_postrun signal
+# handlers that emit per-task RSS log lines for memory-leak investigation.
+import cl.lib.celery_memory  # noqa: E402, F401
+
 
 @app.task(bind=True)
 @throttle_task("2/4s")
