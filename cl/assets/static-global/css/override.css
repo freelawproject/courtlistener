@@ -2029,3 +2029,51 @@ rect.series-segment {
 .toggle-disable{
   opacity: 0.65;
 }
+
+/* Search mode toggle icon (Keyword/Semantic) */
+.input-group-addon.search-mode-toggle {
+  cursor: pointer;
+  min-width: 40px;
+  text-align: center;
+  vertical-align: middle;
+  transition: background-color 0.15s ease;
+}
+
+.search-mode-toggle .search-mode-icon {
+  font-size: 20px;
+  font-weight: 700;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.input-group-addon.search-mode-toggle:hover {
+  background-color: #ddd;
+}
+
+@media (max-width: 767px) {
+  #main-query-box .input-group {
+    display: flex;
+  }
+
+  #homepage #main-query-box .input-group {
+    margin-left: 15px;
+    margin-right: 15px;
+  }
+
+  #main-query-box #id_q {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  #main-query-box .input-group-btn,
+  #main-query-box .input-group-addon {
+    flex: 0 0 auto;
+  }
+
+  #main-query-box .input-group-addon.search-mode-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

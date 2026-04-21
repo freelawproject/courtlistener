@@ -356,3 +356,50 @@ if (form && button) {
   });
 }
 
+/*
+  Keyword / Semantic search-mode toggle icon.
+  See cl/search/templates/includes/search_mode_icon.html.
+*/
+function handleSearchModeToggle() {
+  const $icon = $(this);
+  const $toggle = $icon.closest('.input-group').find('.search-mode-toggle');
+  const $hidden = $icon.closest('.input-group').find('.search-mode-value');
+  const $iconEl = $toggle.find('.search-mode-icon');
+  const $input = $icon.closest('.input-group').find('input[name="q"]');
+  const isSemantic = !$hidden.val();
+
+  $hidden.val(isSemantic ? 'true' : '').prop('disabled', !isSemantic);
+  $iconEl.text(isSemantic ? '?' : '&');
+  $toggle.toggleClass('semantic-active', isSemantic);
+  $toggle.attr('aria-label', isSemantic
+    ? 'Semantic search active, click for keyword search'
+    : 'Keyword search active, click for semantic search');
+  $toggle.attr('title', isSemantic
+    ? 'Switch to keyword search'
+    : 'Switch to semantic search');
+  $input.attr('placeholder', isSemantic
+    ? 'Search with natural language, use "quotes" for exact terms'
+    : 'Search with keywords and operators');
+  try { localStorage.setItem('searchMode', isSemantic ? 'semantic' : 'keyword'); } catch (e) {}
+}
+
+$(function () {
+  $('.search-mode-toggle').on('click', handleSearchModeToggle);
+  $('.search-mode-toggle').on('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSearchModeToggle.call(this);
+    }
+  });
+
+  // Restore saved preference if the URL doesn't already specify a mode.
+  try {
+    const urlHasSemantic = new URLSearchParams(window.location.search).has('semantic');
+    if (!urlHasSemantic && localStorage.getItem('searchMode') === 'semantic') {
+      $('.search-mode-toggle').each(function () {
+        handleSearchModeToggle.call(this);
+      });
+    }
+  } catch (e) {}
+});
+

@@ -1,0 +1,37 @@
+{% comment %}
+  Semantic search mode toggle icon.
+
+  Renders a clickable icon on the left side of a search input-group that
+  toggles between Keyword (&) and Semantic (?) modes. Also renders a
+  hidden `semantic` input that gets submitted with the form.
+
+  Gated by the `semantic_search` waffle flag so the toggle can be
+  rolled out to select users before a full launch.
+
+  Must be placed as the FIRST child inside a .input-group, before the
+  text input.
+
+  Context variables:
+    - search_form  (required): the SearchForm instance.
+    - id_suffix    (optional): suffix for element IDs to avoid dupes.
+{% endcomment %}
+{% load waffle_tags %}
+{% flag "semantic_search" %}
+{% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}
+  {% with is_semantic=search_form.semantic.value %}
+  <span class="input-group-addon search-mode-toggle{% if is_semantic %} semantic-active{% endif %}"
+        role="button"
+        tabindex="0"
+        id="search-mode-icon{{ id_suffix|default:'' }}"
+        aria-label="{% if is_semantic %}Semantic search active, click for keyword search{% else %}Keyword search active, click for semantic search{% endif %}"
+        title="{% if is_semantic %}Switch to keyword search{% else %}Switch to semantic search{% endif %}">
+    <span class="search-mode-icon">{% if is_semantic %}?{% else %}&amp;{% endif %}</span>
+  </span>
+  <input type="hidden"
+         name="semantic"
+         class="search-mode-value"
+         value="{% if is_semantic %}true{% endif %}"
+         {% if not is_semantic %}disabled{% endif %}>
+  {% endwith %}
+{% endif %}
+{% endflag %}
