@@ -8,9 +8,11 @@ from unittest.mock import MagicMock
 
 from django.conf import settings
 from django.core.management import call_command
+from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Document
+from lxml import html as lhtml
 from waffle.testutils import override_flag
 
 from cl.lib.search_index_utils import index_documents_in_bulk
@@ -22,7 +24,14 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import PRECEDENTIAL_STATUS, Docket, Opinion, SearchQuery
+from cl.search.forms import SearchForm
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    Docket,
+    Opinion,
+    SearchQuery,
+)
 from cl.tests.cases import ESIndexTestCase, TestCase
 
 
@@ -682,3 +691,155 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
 
         # Should also include the keyword-only match (no embeddings)
         self.assertIn(f'"cluster_id":{self.opinion_5.cluster.id}', content)
+
+    def _test_frontend_article_count(
+        self,
+        inception_mock: MagicMock,
+        expected_count: int,
+        field_name: str,
+        extra_params: dict | None = None,
+    ) -> HttpResponse:
+        """Perform a frontend semantic search and assert article count."""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+        params = {
+            "q": self.situational_query,
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": "true",
+        }
+        if extra_params:
+            params.update(extra_params)
+        r = self.client.get(reverse("show_results"), params)
+        tree = lhtml.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg=f"Did not get the right number of search results in "
+            f"frontend semantic search with {field_name} filter applied.\n"
+            f"Expected: {expected_count}\n"
+            f"     Got: {got}\n\n"
+            f"Params were: {params}",
+        )
+        return r
+
+    @override_flag("semantic_search", active=True)
+    def test_frontend_semantic_search_returns_results(
+        self, inception_mock
+    ) -> None:
+        """Frontend semantic search returns matching opinions."""
+        r = self._test_frontend_article_count(
+            inception_mock, 2, "semantic query"
+        )
+        content = r.content.decode()
+        self.assertIn(self.opinion_2.cluster.case_name, content)
+        self.assertIn(self.opinion_3.cluster.case_name, content)
+
+    @override_flag("semantic_search", active=True)
+    def test_frontend_can_apply_court_filter(self, inception_mock) -> None:
+        """Frontend court filter narrows semantic results."""
+        r = self._test_frontend_article_count(
+            inception_mock,
+            1,
+            "court filter",
+            {"court": self.ohio_court.id},
+        )
+        content = r.content.decode()
+        self.assertIn(self.opinion_2.cluster.case_name, content)
+        self.assertNotIn(self.opinion_3.cluster.case_name, content)
+
+    @override_flag("semantic_search", active=True)
+    def test_frontend_can_apply_docket_number_filter(
+        self, inception_mock
+    ) -> None:
+        """Frontend docket number filter narrows semantic results."""
+        r = self._test_frontend_article_count(
+            inception_mock,
+            1,
+            "docket number filter",
+            {"docket_number": "24-AP-118"},
+        )
+        content = r.content.decode()
+        self.assertNotIn(self.opinion_2.cluster.case_name, content)
+        self.assertIn(self.opinion_3.cluster.case_name, content)
+
+    @override_flag("semantic_search", active=True)
+    def test_frontend_can_sort_by_cite_count(self, inception_mock) -> None:
+        """Frontend semantic results can be sorted by citation count."""
+        r = self._test_frontend_article_count(
+            inception_mock,
+            2,
+            "citeCount desc",
+            {"order_by": "citeCount desc"},
+        )
+        content = r.content.decode()
+        pos_2 = content.index(self.opinion_2.cluster.case_name)
+        pos_3 = content.index(self.opinion_3.cluster.case_name)
+        self.assertLess(
+            pos_2,
+            pos_3,
+            msg="Higher cite-count opinion should appear first "
+            "when sorted by citeCount desc.",
+        )
+
+        r = self._test_frontend_article_count(
+            inception_mock,
+            2,
+            "citeCount asc",
+            {"order_by": "citeCount asc"},
+        )
+        content = r.content.decode()
+        pos_2 = content.index(self.opinion_2.cluster.case_name)
+        pos_3 = content.index(self.opinion_3.cluster.case_name)
+        self.assertLess(
+            pos_3,
+            pos_2,
+            msg="Lower cite-count opinion should appear first "
+            "when sorted by citeCount asc.",
+        )
+
+    @override_flag("semantic_search", active=True)
+    def test_frontend_hybrid_search(self, inception_mock) -> None:
+        """Frontend hybrid search returns semantic and keyword matches."""
+        r = self._test_frontend_article_count(
+            inception_mock,
+            3,
+            "hybrid search",
+            {"q": self.hybrid_query},
+        )
+        content = r.content.decode()
+        self.assertIn(self.opinion_2.cluster.case_name, content)
+        self.assertIn(self.opinion_3.cluster.case_name, content)
+        self.assertIn(self.opinion_5.cluster.case_name, content)
+
+
+@override_settings(KNN_SEARCH_ENABLED=True)
+class SemanticFormCleanTest(TestCase):
+    """Tests that SearchForm preserves the semantic field correctly
+    when used from the frontend (without a request object)."""
+
+    def test_semantic_preserved_when_knn_enabled(self) -> None:
+        """semantic=True survives clean() when KNN_SEARCH_ENABLED=True."""
+        form = SearchForm(
+            {
+                "q": "free speech",
+                "type": SEARCH_TYPES.OPINION,
+                "semantic": True,
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertTrue(form.cleaned_data["semantic"])
+
+    @override_settings(KNN_SEARCH_ENABLED=False)
+    def test_semantic_disabled_when_knn_disabled(self) -> None:
+        """semantic is forced to False when KNN_SEARCH_ENABLED=False."""
+        form = SearchForm(
+            {
+                "q": "free speech",
+                "type": SEARCH_TYPES.OPINION,
+                "semantic": True,
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.cleaned_data["semantic"])
