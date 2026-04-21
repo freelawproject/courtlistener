@@ -16,7 +16,7 @@ from django.contrib.sites.models import Site
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.http import HttpRequest, JsonResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
@@ -37,6 +37,7 @@ from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
 from cl.api.factories import (
     APIThrottleFactory,
+    APIThrottleRateFactory,
     WebhookEventFactory,
     WebhookFactory,
 )
@@ -4749,3 +4750,54 @@ class ThrottleOverrideIntegrationTest(TestCase):
         await sync_to_async(client.force_login)(throttle.user)
         response = await client.get(reverse("citation_lookup_api"))
         self.assertEqual(response.status_code, HTTPStatus.OK)
+
+
+class APIThrottleRateModelTest(TestCase):
+    """Tests for the APIThrottleRate model."""
+
+    def test_rate_validation_accepts_valid_formats(self) -> None:
+        valid_rates = ["100/hour", "1000/day", "60/min", "5000/h", "10/s"]
+        throttle = APIThrottleFactory()
+
+        for rate in valid_rates:
+            with self.subTest(rate=rate):
+                rate_obj = APIThrottleRateFactory.build(
+                    throttle=throttle, rate=rate
+                )
+                rate_obj.clean()
+
+    def test_rate_validation_rejects_invalid_formats(self) -> None:
+        invalid_rates = ["invalid", "100", "/hour", "abc/hour", "100/"]
+        throttle = APIThrottleFactory()
+
+        for rate in invalid_rates:
+            with self.subTest(rate=rate):
+                rate_obj = APIThrottleRateFactory.build(
+                    throttle=throttle, rate=rate
+                )
+                with self.assertRaises(ValidationError):
+                    rate_obj.clean()
+
+    def test_duplicate_time_unit_rejected(self) -> None:
+        throttle = APIThrottleFactory()
+        APIThrottleRateFactory(throttle=throttle, rate="5/min")
+
+        dupe = APIThrottleRateFactory.build(throttle=throttle, rate="10/min")
+        with self.assertRaises(ValidationError):
+            dupe.clean()
+
+    def test_different_time_units_allowed(self) -> None:
+        throttle = APIThrottleFactory()
+        APIThrottleRateFactory(throttle=throttle, rate="5/min")
+
+        different = APIThrottleRateFactory.build(
+            throttle=throttle, rate="50/hour"
+        )
+        different.clean()  # Should not raise
+
+    def test_exact_duplicate_rate_prevented_by_constraint(self) -> None:
+        throttle = APIThrottleFactory()
+        APIThrottleRateFactory(throttle=throttle, rate="5/min")
+
+        with self.assertRaises(IntegrityError):
+            APIThrottleRateFactory(throttle=throttle, rate="5/min")
