@@ -16,7 +16,7 @@ from django.contrib.sites.models import Site
 from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.http import HttpRequest, JsonResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
@@ -42,12 +42,14 @@ from cl.api.factories import (
 )
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
+    APIThrottle,
     ThrottleType,
     WebhookEvent,
     WebhookEventType,
 )
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
+    ExceptionalUserRateThrottle,
     LoggingMixin,
     detect_unknown_filter_params,
     get_all_throttle_overrides,
@@ -4652,6 +4654,100 @@ class APIThrottleModelTest(TestCase):
         self.assertIn("rate", ctx.exception.message_dict)
 
 
+class APIThrottleConstraintTest(TestCase):
+    """Tests for uniqueness rules on APIThrottle."""
+
+    def test_multiple_rates_allowed_for_same_user_and_type(self) -> None:
+        """Same user + throttle_type can have multiple distinct-unit rates."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="50/hour",
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="125/day",
+        )
+        self.assertEqual(
+            APIThrottle.objects.filter(
+                user=user, throttle_type=ThrottleType.API
+            ).count(),
+            3,
+        )
+
+    def test_duplicate_rate_raises_integrity_error(self) -> None:
+        """The same (user, throttle_type, rate) tuple cannot be inserted twice."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+        )
+        with self.assertRaises(IntegrityError):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate="5/min",
+            )
+
+    def test_conflicting_time_unit_rejected_by_clean(self) -> None:
+        """Two rates sharing a time unit (e.g. 5/min and 10/min) fail full_clean()."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+        )
+        conflict = APIThrottleFactory.build(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            conflict.full_clean()
+        self.assertIn("rate", ctx.exception.message_dict)
+        self.assertIn("per-minute", ctx.exception.message_dict["rate"][0])
+
+    def test_conflicting_unit_aliases_rejected_by_clean(self) -> None:
+        """'min' and 'minute' normalize to the same unit and should conflict."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+        )
+        conflict = APIThrottleFactory.build(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/minute",
+        )
+        with self.assertRaises(ValidationError):
+            conflict.full_clean()
+
+    def test_different_throttle_types_do_not_conflict(self) -> None:
+        """Same unit is fine if the throttle_type differs."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+        )
+        other = APIThrottleFactory.build(
+            user=user,
+            throttle_type=ThrottleType.CITATION_LOOKUP,
+            rate="10/min",
+        )
+        # Should not raise.
+        other.full_clean()
+
+
 class ThrottleOverrideIntegrationTest(TestCase):
     """Integration tests for throttle overrides using the APIThrottle model."""
 
@@ -4662,7 +4758,7 @@ class ThrottleOverrideIntegrationTest(TestCase):
         clear_tiered_cache()
 
     def test_get_all_throttle_overrides_returns_dict(self) -> None:
-        """Test that get_all_throttle_overrides returns a dict of overrides."""
+        """Test that get_all_throttle_overrides returns a dict of rate lists."""
         throttle = APIThrottleFactory(
             throttle_type=ThrottleType.API,
             blocked=False,
@@ -4672,24 +4768,50 @@ class ThrottleOverrideIntegrationTest(TestCase):
         overrides = get_all_throttle_overrides(ThrottleType.API)
 
         self.assertIn(throttle.user.username, overrides)
-        blocked, rate = overrides[throttle.user.username]
-        self.assertFalse(blocked)
-        self.assertEqual(rate, "10000/hour")
+        self.assertEqual(overrides[throttle.user.username], ["10000/hour"])
 
-    def test_get_all_throttle_overrides_returns_blocked_status(self) -> None:
-        """Test that blocked users are correctly returned."""
+    def test_get_all_throttle_overrides_returns_multiple_rates(self) -> None:
+        """Test that multiple rates for one user are all returned."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="5/min",
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="50/hour",
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            blocked=False,
+            rate="125/day",
+        )
+
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+
+        self.assertIn(user.username, overrides)
+        self.assertEqual(
+            sorted(overrides[user.username]),
+            sorted(["5/min", "50/hour", "125/day"]),
+        )
+
+    def test_get_all_throttle_overrides_includes_zero_rate(self) -> None:
+        """Test that a 0/min rate (blocking) is included in the override list."""
         throttle = APIThrottleFactory(
             throttle_type=ThrottleType.API,
-            blocked=True,
-            rate="",
+            blocked=False,
+            rate="0/min",
         )
 
         overrides = get_all_throttle_overrides(ThrottleType.API)
 
         self.assertIn(throttle.user.username, overrides)
-        blocked, rate = overrides[throttle.user.username]
-        self.assertTrue(blocked)
-        self.assertEqual(rate, "")
+        self.assertEqual(overrides[throttle.user.username], ["0/min"])
 
     def test_throttle_overrides_are_cached(self) -> None:
         """Test that throttle overrides are cached."""
@@ -4749,3 +4871,66 @@ class ThrottleOverrideIntegrationTest(TestCase):
         await sync_to_async(client.force_login)(throttle.user)
         response = await client.get(reverse("citation_lookup_api"))
         self.assertEqual(response.status_code, HTTPStatus.OK)
+
+
+class MultiRateThrottleTest(TestCase):
+    """Tests for multi-rate enforcement via ExceptionalUserRateThrottle."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        for cache in caches.all():
+            cache.clear()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+        for cache in caches.all():
+            cache.clear()
+
+    def test_zero_rate_blocks_first_request(self) -> None:
+        """A 0/min rate must block the very first request."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = ExceptionalUserRateThrottle()
+        self.assertFalse(throttle.allow_request(request, view=None))
+
+    def test_strictest_rate_wins(self) -> None:
+        """With 5/min and 50/hour, the 6th request in a minute is denied."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="50/hour",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        for _ in range(5):
+            throttle = ExceptionalUserRateThrottle()
+            self.assertTrue(throttle.allow_request(request, view=None))
+
+        throttle = ExceptionalUserRateThrottle()
+        self.assertFalse(throttle.allow_request(request, view=None))
+
+    def test_requests_allowed_when_no_override(self) -> None:
+        """Default rates still apply when the user has no override rows."""
+        user = UserFactory()
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = ExceptionalUserRateThrottle()
+        self.assertTrue(throttle.allow_request(request, view=None))
