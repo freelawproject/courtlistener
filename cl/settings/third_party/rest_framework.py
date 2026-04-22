@@ -1,3 +1,5 @@
+import sys
+
 import environ
 
 env = environ.FileAwareEnv()
@@ -23,7 +25,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
-        "user": "5000/hour",
+        "user": ["5/min", "50/hour", "125/day"],
         "citations": "60/min",
     },
     # Auth
@@ -65,5 +67,8 @@ REST_FRAMEWORK = {
 
 if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
+
+if "test" in sys.argv:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["user"] = "5000/day"  # type: ignore
 
 BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)

@@ -721,30 +721,55 @@ class NoFilterCacheListMixin:
 @tiered_cache(timeout=300)  # 5 minute cache
 def get_all_throttle_overrides(
     throttle_type: int,
-) -> dict[str, tuple[bool, str]]:
+) -> dict[str, list[str]]:
     """Get all throttle overrides of a given type, cached for 5 minutes.
 
     Loads all throttle overrides at once to avoid per-user DB hits since most
     users don't have overrides.
 
     :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
-    :return: Dictionary mapping username to (blocked, rate) tuples.
+    :return: Dictionary mapping username to a list of rate strings. A list
+        containing a '0/...' rate blocks the user, because the enforcement
+        loop rejects on `count >= 0`.
     """
-    overrides: dict[str, tuple[bool, str]] = {}
-    for username, blocked, rate in APIThrottle.objects.filter(
+    overrides: dict[str, list[str]] = {}
+    for username, rate in APIThrottle.objects.filter(
         throttle_type=throttle_type
-    ).values_list("user__username", "blocked", "rate"):
-        overrides[username] = (blocked, rate)
+    ).values_list("user__username", "rate"):
+        if not rate:
+            # Legacy row from before the multi-rate refactor: blocked=True
+            # with an empty rate. The backfill script adds a '0/min' sibling
+            # row, so we can safely ignore the empty one here.
+            continue
+        overrides.setdefault(username, []).append(rate)
     return overrides
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
-    def allow_request(self, request, view):
-        """
-        Give special access to a few special accounts.
+    """User rate throttle that supports multiple simultaneous rate limits.
 
-        Mirrors code in super class with minor tweaks.
-        """
+    Reads per-user overrides from the APIThrottle table. Blocking is expressed
+    by a rate of '0/min' (or any '0/...') — the enforcement check
+    `count >= num_requests` with num_requests=0 is always true.
+    """
+
+    def __init__(self):
+        raw = self.THROTTLE_RATES.get(self.scope)
+        if raw is None:
+            self.rate = None
+            self.default_rates: list[str] = []
+        elif isinstance(raw, str):
+            self.rate = raw
+            self.default_rates = [raw]
+        else:
+            self.default_rates = list(raw)
+            # Set self.rate so DRF base-class attrs have valid defaults.
+            self.rate = self.default_rates[0]
+
+        if self.rate is not None:
+            self.num_requests, self.duration = self.parse_rate(self.rate)
+
+    def allow_request(self, request, view):
         if self.rate is None:
             return True
 
@@ -755,24 +780,40 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
 
-        # Check if user has a throttle override in the database
         overrides = get_all_throttle_overrides(ThrottleType.API)
-        override = overrides.get(request.user.username)
-        if override is not None:
-            blocked, rate = override
-            if blocked:
-                # User is blocked - deny immediately
-                return self.throttle_failure()
-            if rate:
-                self.num_requests, self.duration = self.parse_rate(rate)
+        rates = overrides.get(request.user.username) or self.default_rates
+        return self._check_multi_rate(rates)
 
-        # Drop any requests from the history which have now passed the
-        # throttle duration
-        while self.history and self.history[-1] <= self.now - self.duration:
+    def _check_multi_rate(self, rates: list[str]) -> bool:
+        """Enforce multiple rate windows against one shared timestamp history.
+
+        All rates share a single in-cache list of request timestamps. The cache
+        TTL is the longest window so entries relevant to longer-window checks
+        are preserved.
+
+        :param rates: List of rate strings, e.g. ['5/min', '50/hour'].
+        :return: True if allowed, False if throttled.
+        """
+        parsed = [self.parse_rate(r) for r in rates]
+        max_duration = max(d for _, d in parsed)
+
+        # Drop entries older than the longest window.
+        while self.history and self.history[-1] <= self.now - max_duration:
             self.history.pop()
-        if len(self.history) >= self.num_requests:
-            return self.throttle_failure()
-        return self.throttle_success()
+
+        # Check tightest window first for fast rejection.
+        for num_requests, duration in sorted(parsed, key=lambda p: p[1]):
+            cutoff = self.now - duration
+            count = sum(1 for ts in self.history if ts > cutoff)
+            if count >= num_requests:
+                # Set these so DRF's wait() → correct Retry-After.
+                self.num_requests = num_requests
+                self.duration = duration
+                return self.throttle_failure()
+
+        self.history.insert(0, self.now)
+        self.cache.set(self.key, self.history, max_duration)
+        return True
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
@@ -814,95 +855,76 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             "ident": request.user.pk,
         }
 
-    def get_citations_rate(self, request) -> str | None:
+    def get_citations_rate(self, request) -> list[str]:
         """
         Check for a custom citations API rate limit from the database.
 
         If the authenticated user has a custom rate limit set in the database,
-        it returns that value. If blocked, returns None to signal denial.
-        Otherwise, it returns the default rate limit.
+        it returns that value. A rate of '0/min' (or any '0/...') blocks the
+        user. Otherwise, it returns the default rate limit.
 
         :param request: The request object with the user's data.
         :return: Rate string (e.g., '100/hour'), or None if user is blocked.
         """
-        default_rate = self.THROTTLE_RATES["citations"]
+        default = self.THROTTLE_RATES["citations"]
+        default_rates = (
+            [default] if isinstance(default, str) else list(default)
+        )
         overrides = get_all_throttle_overrides(ThrottleType.CITATION_LOOKUP)
-        override = overrides.get(request.user.username)
-        if override is not None:
-            blocked, rate = override
-            if blocked:
-                return None  # Signal that user is blocked
-            if rate:
-                return rate
-        return default_rate
+        return overrides.get(request.user.username) or default_rates
 
     def throttle_request_by_citation_count(self, request, view):
-        rate = self.get_citations_rate(request)
-        if rate is None:
-            # User is blocked - deny request immediately
-            raise Throttled(
-                detail={
-                    "error_message": "Your account has been blocked from the citations API.",
-                    "wait_until": None,
-                }
-            )
-
-        max_num_citations, _ = self.parse_rate(rate)
+        rates = self.get_citations_rate(request)
+        parsed = [self.parse_rate(r) for r in rates]
+        max_duration = max(d for _, d in parsed)
 
         self.key = self.get_cache_key_for_citations(request, view)
         self.history = self.cache.get(self.key, [])
         self.request_timestamp = self.timer()
 
-        # Drop any requests from the history which have now passed the
-        # throttle duration
-        while self.history and self.history[-1][-1] <= self.request_timestamp:
+        # History entries are [count, inserted_timestamp]. Drop entries older
+        # than the longest window, they don't contribute to any check.
+        cutoff_longest = self.request_timestamp - max_duration
+        while self.history and self.history[-1][1] <= cutoff_longest:
             self.history.pop()
 
-        citations_in_history = sum(
-            citation_count for citation_count, timestamps in self.history
-        )
+        # Check each rate window, tightest first for fast rejection.
+        for (num, duration), rate in sorted(
+            zip(parsed, rates, strict=True), key=lambda pair: pair[0][1]
+        ):
+            window_cutoff = self.request_timestamp - duration
+            citations_in_window = sum(
+                count for count, ts in self.history if ts > window_cutoff
+            )
+            if citations_in_window >= num:
+                self.throttle_request(num, duration, rate)
 
-        if citations_in_history >= max_num_citations:
-            self.throttle_request(request)
+        self.save_citation_count(request, view, max_duration)
 
-        self.save_citation_count(request, view)
+    def save_citation_count(self, request, view, max_duration: float):
+        """Insert [count, inserted_timestamp] into cache history.
 
-    def save_citation_count(self, request, view):
-        """
-        Inserts the number of citations and the expiration time along with
-        the key into the cache.
+        History TTL is the longest rate window; entries are filtered per-rate
+        at check time in throttle_request_by_citation_count.
         """
         citation_count = self.get_citation_count_from_request(request, view)
         if not citation_count:
             return
 
-        max_num_citations, duration = self.parse_rate(
-            self.get_citations_rate(request)
-        )
-        expiration = (
-            citation_count * (duration / max_num_citations)
-            if citation_count > max_num_citations
-            else duration
-        )
-        self.history.insert(
-            0,
-            [
-                citation_count,
-                self.request_timestamp + expiration,
-            ],
-        )
-
-        self.cache.set(self.key, self.history, expiration)
+        self.history.insert(0, [citation_count, self.request_timestamp])
+        self.cache.set(self.key, self.history, max_duration)
 
     def allow_request(self, request, view):
         self.throttle_request_by_citation_count(request, view)
         return super().allow_request(request, view)
 
-    def throttle_request(self, request):
-        """
-        This helper iterates through the request history in reverse
-        chronological order to calculate the soonest time a new request can be
-        made and raises the `Throttled` exception with the details.
+    def throttle_request(
+        self, max_num_citations: int, duration: float, rate: str
+    ):
+        """Raise Throttled for a specific rate window that was exceeded.
+
+        Computes wait_until as the timestamp at which the oldest entry
+        contributing to the overrun drops out of the rate's window.
 
         The exception includes details about the throttling:
 
@@ -910,22 +932,20 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         - `wait_until`: An ISO 8601 formatted string representing the soonest
                     time the next request can be made without throttling.
 
-        Args:
-            request: The request object to be throttled.
-
         Raises:
             Throttled: The exception includes details about the throttling.
         """
-        rate = self.get_citations_rate(request)
-        max_num_citations, _ = self.parse_rate(rate)
+        window_cutoff = self.request_timestamp - duration
+        relevant = [
+            (count, ts) for count, ts in self.history if ts > window_cutoff
+        ]
         soonest_time = None
-        for idx in reversed(range(len(self.history))):
-            remaining_citation = sum(
-                citation_count for citation_count, _ in self.history[:idx]
-            )
-            if remaining_citation < max_num_citations or not idx:
+        for idx in reversed(range(len(relevant))):
+            remaining = sum(count for count, _ in relevant[:idx])
+            if remaining < max_num_citations or not idx:
+                # Entry at idx drops out of the window at ts + duration.
                 datetime_obj = datetime.fromtimestamp(
-                    self.history[idx][-1], UTC
+                    relevant[idx][1] + duration, UTC
                 )
                 soonest_time = datetime_obj.isoformat()
                 break
