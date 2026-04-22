@@ -2,11 +2,11 @@ from datetime import date, datetime
 from http import HTTPStatus
 from unittest import mock
 
+import httpx
 import time_machine
 from django.conf import settings
 from django.core.management import call_command
 from django.test import SimpleTestCase, override_settings
-from requests.exceptions import HTTPError, Timeout
 
 from cl.corpus_importer.management.commands import (
     probe_scotus_dockets_daemon as scotus_cmd_module,
@@ -175,10 +175,10 @@ class ScotusDaemonTest(SimpleTestCase):
 
         self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "115")
         self.assertEqual(mock_save.call_count, 16)
-        self.assertEqual(mock_proc.apply_async.call_count, 16)
+        self.assertEqual(mock_proc.s.call_count, 16)
         enqueued_docket_numbers = {
-            call_args.kwargs["args"][0]["docket_number"]
-            for call_args in mock_proc.apply_async.call_args_list
+            call_args.args[0]["docket_number"]
+            for call_args in mock_proc.s.call_args_list
         }
         self.assertEqual(enqueued_docket_numbers, valid_low)
 
@@ -187,7 +187,9 @@ class ScotusDaemonTest(SimpleTestCase):
         self._seed_current_term(25, low=100, high=20000)
 
         def raising_fetch(_):
-            raise HTTPError("403")
+            req = httpx.Request("GET", "https://www.supremecourt.gov/")
+            resp = httpx.Response(403, request=req)
+            raise httpx.HTTPStatusError("403", request=req, response=resp)
 
         with (
             mock.patch.object(
@@ -331,7 +333,7 @@ class ScotusDaemonTest(SimpleTestCase):
         # Watermark must advance to 103.
         self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "103")
         # All 4 serials in the gap were ingested.
-        self.assertEqual(mock_proc.apply_async.call_count, 4)
+        self.assertEqual(mock_proc.s.call_count, 4)
         # Recovery fetched 100-103 sequentially (no geometric probe offsets).
         fetched_low = [
             c.args[0]
@@ -353,7 +355,7 @@ class ScotusDaemonTest(SimpleTestCase):
             if dn in {"25-100", "25-101"}:
                 return f'{{"docket_number":"{dn}"}}', HTTPStatus.OK
             if dn == "25-102":
-                raise Timeout("timed out")
+                raise httpx.TimeoutException("timed out")
             return None, HTTPStatus.NOT_FOUND
 
         with (
@@ -378,7 +380,7 @@ class ScotusDaemonTest(SimpleTestCase):
 
         # Watermark must stop at the last successful serial (101), not 102.
         self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "101")
-        self.assertEqual(mock_proc.apply_async.call_count, 2)
+        self.assertEqual(mock_proc.s.call_count, 2)
         # court_wait must be set so the daemon pauses before the next attempt.
         self.assertTrue(self.r.exists(self.COURT_WAIT_KEY))
 
@@ -412,7 +414,7 @@ class ScotusDaemonTest(SimpleTestCase):
             scotus_cmd_module.run_scotus_probe_iteration(self.r, testing=True)
 
         self.assertEqual(self.r.hget(self.HIGHEST_KNOWN_KEY, "low:25"), "103")
-        self.assertEqual(mock_proc_2.apply_async.call_count, 2)
+        self.assertEqual(mock_proc_2.s.call_count, 2)
 
     # ------------------------------------------------------------------ #
     # management command
@@ -601,7 +603,9 @@ class ScotusDaemonIntegrationTest(TestCase):
         )
 
         def raising_fetch(_dn):
-            raise HTTPError("403")
+            req = httpx.Request("GET", "https://www.supremecourt.gov/")
+            resp = httpx.Response(403, request=req)
+            raise httpx.HTTPStatusError("403", request=req, response=resp)
 
         with (
             mock.patch.object(
