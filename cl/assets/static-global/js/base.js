@@ -378,8 +378,8 @@ function handleSearchModeToggle() {
     ? 'Switch to keyword search'
     : 'Switch to semantic search');
   $input.attr('placeholder', isSemantic
-    ? 'Search with natural language, use "quotes" for exact terms'
-    : 'Search with keywords and operators');
+    ? 'Natural language search, use "quotes" for exact terms'
+    : 'Keyword(s) search with operators');
   try { localStorage.setItem('searchMode', isSemantic ? 'semantic' : 'keyword'); } catch (e) {}
 }
 
@@ -392,14 +392,7 @@ $(function () {
     }
   });
 
-  // Restore saved preference if the URL doesn't already specify a mode.
-  try {
-    const urlHasSemantic = new URLSearchParams(window.location.search).has('semantic');
-    if (!urlHasSemantic && localStorage.getItem('searchMode') === 'semantic') {
-      $('.search-mode-toggle').each(function () {
-        handleSearchModeToggle.call(this);
-      });
-    }
-  } catch (e) {}
+  // localStorage restore is handled by an inline script in
+  // search_mode_icon.html to avoid a visual flash.
 });
 

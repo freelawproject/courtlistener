@@ -221,7 +221,7 @@
                                    id="id_q"
                                    autocomplete="off"
                                    type="text"
-                                   placeholder='{% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}{% if search_form.semantic.value %}Search with natural language, use &quot;quotes&quot; for exact terms{% else %}Search with keywords and operators{% endif %}{% endif %}'>
+                                   placeholder='{% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}{% if search_form.semantic.value %}Natural language search, use &quot;quotes&quot; for exact terms{% else %}Keyword(s) search with operators{% endif %}{% endif %}'>
                             {% alerts_supported search_form.type.value as search_alerts_supported %}
                             {% if search_alerts_supported %}
                               {% if not error and get_string %}
