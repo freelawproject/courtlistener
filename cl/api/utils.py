@@ -937,7 +937,10 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         """Raise Throttled for a specific rate window that was exceeded.
 
         Computes wait_until as the timestamp at which the oldest entry
-        contributing to the overrun drops out of the rate's window.
+        contributing to the overrun drops out of the rate's window. An
+        oversized single request (count > max_num_citations) is treated as
+        occupying proportionally more of the window — e.g., a 60-citation
+        request against a 20/min rate reports a 3-minute wait.
 
         The exception includes details about the throttling:
 
@@ -956,9 +959,12 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         for idx in reversed(range(len(relevant))):
             remaining = sum(count for count, _ in relevant[:idx])
             if remaining < max_num_citations or not idx:
-                # Entry at idx drops out of the window at ts + duration.
+                count, ts = relevant[idx]
+                effective_duration = (
+                    max(count / max_num_citations, 1) * duration
+                )
                 datetime_obj = datetime.fromtimestamp(
-                    relevant[idx][1] + duration, UTC
+                    ts + effective_duration, UTC
                 )
                 soonest_time = datetime_obj.isoformat()
                 break
