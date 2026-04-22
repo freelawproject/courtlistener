@@ -28,6 +28,7 @@ REST_FRAMEWORK = {
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        "cl.api.authentication.ReplicaRoutingOAuth2Authentication",
         "cl.api.authentication.ReplicaRoutingBasicAuthentication",
         "cl.api.authentication.ReplicaRoutingTokenAuthentication",
         "cl.api.authentication.ReplicaRoutingSessionAuthentication",
