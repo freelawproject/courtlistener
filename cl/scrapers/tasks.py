@@ -11,8 +11,10 @@ import openai
 import requests
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
+from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.utils.html import strip_tags
 from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.pacer import CaseQuery
@@ -29,6 +31,7 @@ from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.llm import call_llm_transcription
 from cl.lib.microservice_utils import microservice
+from cl.lib.models import AbstractPDF
 from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
@@ -41,13 +44,14 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
     merge_versions_by_text_similarity,
 )
 from cl.scrapers.utils import citation_is_duplicated, make_citation
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
-    SOURCES,
     Docket,
     Opinion,
     OriginatingCourtInformation,
     RECAPDocument,
 )
+from cl.search.state.texas.models import ProcessingError, TexasDocument
 
 logger = logging.getLogger(__name__)
 
@@ -407,7 +411,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     query = get_query_from_url(recently_scraped_opinion.download_url, "exact")
     versions = (
         Opinion.objects.filter(query)
-        .filter(cluster__source=SOURCES.COURT_WEBSITE)
+        .filter(cluster__source=ClusterSources.COURT_WEBSITE)
         .exclude(id=pk)
         .exclude(main_version__isnull=False)
         .order_by("-date_created")
@@ -418,7 +422,7 @@ def find_and_merge_versions(self, pk: int) -> None:
     # from the court's server. Since this task is called on a scrape, we assume
     # that is the most recent
     if versions.exists():
-        stats = defaultdict(lambda: 0)
+        stats: defaultdict[str, int] = defaultdict(lambda: 0)
         merge_versions_by_text_similarity(
             recently_scraped_opinion, versions, stats
         )
@@ -440,58 +444,129 @@ def extract_recap_pdf(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
-) -> list[int]:
-    """Celery task wrapper for extract_recap_pdf_base
-    Extract the contents from a RECAP PDF if necessary.
+):
+    """
+    Temporary task method to prevent `extract_recap_pdf` tasks currently in the
+    Celery queue from failing. Should be removed once there are no remaining
+    tasks referencing this method.
+    """
+    return async_to_sync(extract_pdf_document_base)(
+        pks, ocr_available, check_if_needed, "search.RECAPDocument"
+    )
 
-    In order to avoid the issue described here:
-    https://github.com/freelawproject/courtlistener/issues/2103#issuecomment-1206700403
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
+    max_retries=3,
+    retry_backoff=10,
+)
+def extract_formatted_text_document(
+    self,
+    pks: int | list[int],
+    ocr_available: bool = True,
+    check_if_needed: bool = True,
+    model_name: str = "search.RECAPDocument",
+    strip_html_tags: bool = False,
+) -> list[int]:
+    """Celery task wrapper for `extract_formatted_text_document_base`.
+
+    Extract the contents from a document if necessary.
+
+    In order to avoid the issue described [here](
+    https://github.com/freelawproject/courtlistener/issues/2103#issuecomment-1206700403)
 
     If a Celery task is called as a synchronous function within another parent
-    task when it fails the parent task will be retried and every retry logged
+    task, when it fails, the parent task will be retried and every retry logged
     to sentry.
 
-    To avoid logging every retry to sentry a new base method was created:
-    extract_recap_pdf_base that method should be used when a synchronous call
-    is needed within a parent task.
+    To avoid logging every retry to sentry, a new base method was created:
+    extract_formatted_text_document_base that method should be used when a
+    synchronous call is needed within a parent task.
 
     And this task wrapper should be used elsewhere for asynchronous calls
     (delay, async).
 
-    :param pks: The RECAPDocument pk or list of pks to work on.
-    :param ocr_available: Whether it's needed to perform OCR extraction.
-    :param check_if_needed: Whether it's needed to check if the RECAPDocument
+    :param pks: The document pk or list of pks to work on.
+    :param ocr_available: Whether it's necessary to perform OCR extraction.
+    :param check_if_needed: Whether it's necessary to check if the document
     needs extraction.
+    :param model_name: The name of the document model (inheriting from
+    `AbstractPDF`) to operate on. This is passed as a string to avoid
+    serialization errors during task initialization (see [this comment](
+    https://github.com/freelawproject/courtlistener/pull/6761/changes/BASE..540fd91fa5e9e43a96926e891cdb2de83d31088b#r2717354169
+    )).
+    :param strip_html_tags: Whether to strip HTML tags from the extracted
+    content. Use for HTML or WPD documents so that plain_text contains
+    plain text rather than markup.
 
-    :return: A list of processed RECAPDocument
+    :return: A list of processed document pks.
     """
 
-    return async_to_sync(extract_recap_pdf_base)(
-        pks, ocr_available, check_if_needed
+    return async_to_sync(extract_formatted_text_document_base)(
+        pks, ocr_available, check_if_needed, model_name, strip_html_tags
     )
 
 
-async def extract_recap_pdf_base(
+@app.task(
+    bind=True,
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
+    max_retries=3,
+    retry_backoff=10,
+)
+def extract_pdf_document(
+    self,
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
+    model_name: str = "search.RECAPDocument",
 ) -> list[int]:
-    """Extract the contents from a RECAP PDF if necessary.
+    """Thin wrapper around extract_formatted_text_document.
 
-    :param pks: The RECAPDocument pk or list of pks to work on.
-    :param ocr_available: Whether it's needed to perform OCR extraction.
-    :param check_if_needed: Whether it's needed to check if the RECAPDocument
-    needs extraction.
-
-    :return: A list of processed RECAPDocument
+    Kept so that existing Celery tasks referencing this name
+    continue to work until they are fully processed.
     """
+    return async_to_sync(extract_pdf_document_base)(
+        pks, ocr_available, check_if_needed, model_name
+    )
 
+
+async def extract_formatted_text_document_base(
+    pks: int | list[int],
+    ocr_available: bool = True,
+    check_if_needed: bool = True,
+    model_name: str = "search.RECAPDocument",
+    strip_html_tags: bool = False,
+) -> list[int]:
+    """Extract the contents from a document if necessary.
+
+    :param pks: The document pk or list of pks to work on.
+    :param ocr_available: Whether it's necessary to perform OCR extraction.
+    :param check_if_needed: Whether it's necessary to check if the document
+    needs extraction.
+    :param model_name: The name of the document model (inheriting from
+    `AbstractPDF`) to operate on.
+    :param strip_html_tags: Whether to strip HTML tags from the extracted
+    content. Use for HTML or WPD documents so that plain_text contains
+    plain text rather than markup.
+
+    :return: A list of processed document pks.
+    """
     if not is_iter(pks):
         pks = [pks]
 
+    model = apps.get_model(model_name)
     processed: list[int] = []
     for pk in pks:
-        rd = await RECAPDocument.objects.aget(pk=pk)
+        rd = await model.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
@@ -507,6 +582,8 @@ async def extract_recap_pdf_base(
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
+        if strip_html_tags and not str(rd.filepath_local).endswith(".pdf"):
+            content = strip_tags(content)
         ocr_needed = needs_ocr(content, page_count=rd.page_count)
         if ocr_available and ocr_needed:
             response = await microservice(
@@ -521,23 +598,49 @@ async def extract_recap_pdf_base(
         has_content = bool(content)
         match has_content, extracted_by_ocr:
             case True, True:
-                rd.ocr_status = RECAPDocument.OCR_COMPLETE
+                rd.ocr_status = AbstractPDF.OCR_COMPLETE
             case True, False:
                 if not ocr_needed:
-                    rd.ocr_status = RECAPDocument.OCR_UNNECESSARY
+                    rd.ocr_status = AbstractPDF.OCR_UNNECESSARY
             case False, True:
-                rd.ocr_status = RECAPDocument.OCR_FAILED
+                rd.ocr_status = AbstractPDF.OCR_FAILED
             case False, False:
-                rd.ocr_status = RECAPDocument.OCR_NEEDED
+                rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
-        await rd.asave(
-            do_extraction=False,
-            update_fields=["ocr_status", "plain_text"],
-        )
+        # Kludgey fix to handle RECAPDocument's custom save logic.
+        if isinstance(rd, RECAPDocument):
+            await rd.asave(
+                do_extraction=False,
+                update_fields=["ocr_status", "plain_text"],
+            )
+        elif isinstance(rd, TexasDocument):
+            update_fields = ["ocr_status", "plain_text"]
+            if not has_content:
+                rd.processing_error = ProcessingError.EXTRACTION_FAILURE
+                update_fields.append("processing_error")
+            await rd.asave(update_fields=update_fields)
+        else:
+            await rd.asave(update_fields=["ocr_status", "plain_text"])
         processed.append(pk)
 
     return processed
+
+
+async def extract_pdf_document_base(
+    pks: int | list[int],
+    ocr_available: bool = True,
+    check_if_needed: bool = True,
+    model_name: str = "search.RECAPDocument",
+) -> list[int]:
+    """Thin wrapper around extract_formatted_text_document_base.
+
+    Kept as an orphan so that existing Celery tasks referencing this name
+    continue to work until they are fully processed.
+    """
+    return await extract_formatted_text_document_base(
+        pks, ocr_available, check_if_needed, model_name
+    )
 
 
 @app.task(
@@ -588,12 +691,12 @@ def process_audio_file(self, pk) -> None:
     audio_response.raise_for_status()
     cf = ContentFile(audio_response.content)
     file_name = f"{trunc(best_case_name(audio_obj).lower(), 72)}_cl.mp3"
-    audio_obj.file_with_date = audio_obj.docket.date_argued
+    audio_obj.file_with_date = audio_obj.docket.date_argued  # type: ignore[attr-defined]
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
     audio_obj.duration = float(
         async_to_sync(microservice)(
             service="audio-duration",
-            file=audio_response.content,
+            file=audio_response.content,  # type: ignore[arg-type]
             file_type="mp3",
         ).text
     )

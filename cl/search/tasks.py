@@ -902,12 +902,12 @@ def update_children_docs_by_query(
     ignore_result=True,
 )
 def index_docket_parties_in_es(
-    self: Task,
-    docket_id: int,
+    self: Task, docket_id: int, percolate_parties: bool = True
 ) -> None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param docket_id: The docket ID to update in ES.
+    :param percolate_parties: Whether percolate parties.
     :return: None
     """
 
@@ -934,17 +934,18 @@ def index_docket_parties_in_es(
         **fields_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-    # Percolate Docket after parties are up-to-date.
-    chain(
-        send_or_schedule_search_alerts.s(
-            SaveESDocumentReturn(
-                document_id=str(docket_id),
-                document_content=docket_document_dict,
-                app_label="search.Docket",
-            )
-        ),
-        percolator_response_processing.s(),
-    ).apply_async()
+    if percolate_parties:
+        # Percolate Docket after parties are up-to-date.
+        chain(
+            send_or_schedule_search_alerts.s(
+                SaveESDocumentReturn(
+                    document_id=str(docket_id),
+                    document_content=docket_document_dict,
+                    app_label="search.Docket",
+                )
+            ),
+            percolator_response_processing.s(),
+        ).apply_async()
 
 
 def bulk_indexing_generator(

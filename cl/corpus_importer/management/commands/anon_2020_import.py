@@ -16,7 +16,8 @@ from reporters_db import REPORTERS
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
-from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Citation, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -92,7 +93,11 @@ def merge_or_add_opinions(
     # Merge docket information
     docket.add_anon_2020_source()
     docket.date_argued = date_argued or docket.date_argued
+
+    # need to populate the docket number for tests to pass until we activate
+    # the docket_number_raw cleaning flag
     docket.docket_number = docket_number or docket.docket_number
+    docket.docket_number_raw = docket_number or docket.docket_number_raw
     docket.case_name_short = (
         case_names["case_name_short"] or docket.case_name_short
     )
@@ -141,7 +146,7 @@ def merge_or_add_opinions(
 
     # Merge with scrape or add opinion to cluster with harvard
     cluster_source = OpinionCluster.objects.get(pk=cluster_id).source
-    if cluster_source == SOURCES.COURT_WEBSITE:
+    if cluster_source == ClusterSources.COURT_WEBSITE:
         opinion = Opinion.objects.get(cluster_id=cluster_id)
         logger.info("Merge with Harvard data")
         opinion.html_anon_2020 = html_str
@@ -185,6 +190,7 @@ def add_new_records(
     docket = Docket.objects.create(
         **case_names,
         docket_number=docket_number,
+        docket_number_raw=docket_number,
         court_id=court_id,
         source=Docket.ANON_2020,
         ia_needs_upload=False,

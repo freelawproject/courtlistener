@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% load extras %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_visualizations-api-docs-vlatest.html                ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}Visualization APIs for Supreme Court Cases – CourtListener.com{% endblock %}
 {% block og_title %}Visualization APIs for Supreme Court Cases – CourtListener.com{% endblock %}
 
@@ -35,6 +48,8 @@
       <li><a href="#about">Overview</a></li>
       <li><a href="#creating">Creating Visualizations</a></li>
       <li><a href="#editing">Editing Visualizations</a></li>
+      <li><a href="#deprecation-notice">Deprecation Notice</a></li>
+      <li><a href="#faq">FAQ</a></li>
     </ul>
   </div>
 </div>
@@ -46,7 +61,7 @@
   {% endif %}
   <h1 id="about">Supreme Court Visualization&nbsp;API</h1>
   <h2><code>{% url "scotusmap-list" version=version %}</code></h2>
-  <p class="lead">Use this API to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener.
+  <p class="lead">Use this API to programmatically create and manage Supreme Court network visualizations in CourtListener.
   </p>
   <p>All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
   </p>
@@ -77,16 +92,46 @@
   </p>
 
   <h2 id="deprecation-notice">Deprecation Notice</h2>
-    <p>Unfortunately, our system for visualizing Supreme Court networks has not gotten much traction among users, and is partially deprecated as of early 2025.</p>
-    <p>If you are interested in creating, deleting, or updating visualizations, you can still do so through our APIs, but it is no longer possible to display visualizations on CourtListener.com itself. Moving forward, to support existing users, the only way to display visualizations is through their embed links.</p>
-    <p>To embed a visualization on a website you control, use code like the following on your site:
-    <pre><code>{% spaceless %}
-    {% filter force_escape %}
-    <iframe height="540" width="560" src="https://www.courtlistener.com/visualizations/scotus-mapper/YOUR_ID_HERE/embed/" frameborder="0" allowfullscreen></iframe>
-    {% endfilter %}
-    {% endspaceless %}</code></pre>
-    <p>Just replace YOUR_ID_HERE with the ID of your visualization and it should work on your website.</p>
-    <p>We apologize for this deprecation and hope you understand that we cannot always maintain all the features and experiments we undertake.</p>
+  <p>Unfortunately, our system for visualizing Supreme Court networks has not gotten much traction among users, and is largely deprecated as of late 2025.</p>
+  <p>If you are interested in creating, deleting, or updating visualizations, you can still do so through our APIs, but it is no longer possible to display visualizations on CourtListener.com itself. Moving forward, to support existing users, the only way to display visualizations is through their embed links.</p>
+  <p>To embed a visualization on a website you control, use code like the following on your site:
+  <pre><code>{% spaceless %}
+  {% filter force_escape %}
+  <iframe height="540" width="560" src="https://www.courtlistener.com/visualizations/scotus-mapper/YOUR_ID_HERE/embed/" frameborder="0" allowfullscreen></iframe>
+  {% endfilter %}
+  {% endspaceless %}</code></pre>
+  <p>Just replace YOUR_ID_HERE with the ID of your visualization, and it should work on your website.</p>
+  <p>The following <code>GET</code> parameters may be used to adjust the display:</p>
+  <ul>
+    <li><strong><code>type</code></strong> — Use this to set the y-axis. <code>spread</code> opens up the visualization with random locations for the nodes so they can all be seen. <code>geneology</code> makes many paths lighter to highlight the most direct paths. <code>spaeth</code> uses the Supreme Court Database's vote count and decision direction fields.</li>
+    <li><strong><code>xaxis</code></strong> — The x-axis may be set to either equal spacing (<code>cat</code>) or accurate chronological spacing (<code>time</code>)</li>
+    <li><strong><code>dos</code></strong> — Use this to set the Degree of Separation, which represents the maximum number of hops between the first and last nodes.</li>
+  </ul>
+  <p>For example, GET parameters like these will provide a clean, equally spaced chart with up to five nodes of separation: <code>?type=geneology&xaxis=cat&dos=5</code>.</p>
+  <p>We apologize for this deprecation and hope you understand that we cannot always maintain all the features and experiments we undertake.</p>
+
+  <h2 id="faq">Frequently Asked Questions</h2>
+
+  <h3 id="circles-change-size">Why do the case circles change size?</h3>
+  <p>Circles change size based on the number of citations to it by other cases in the network. The more cases that cite to <i>Case A</i>, the larger it will be. The only exception to this rule is the rightmost case on network (with the most recent date). For visual clarity, this anchor case is always represented with a large circle.</p>
+
+  <h3 id="what-cases-mean">How can I find out what the cases in my network mean?</h3>
+  <p>This tool will not read the cases for you, but it will make your reading more efficient. You can read opinion text directly by clicking on opinions in the visualization. You can see all the Supreme Court Database information for a case. Information will open in a separate window and includes issue area, legal provision involved, and detailed voting information. By using SCDB information and skimming opinion text, you can figure out what is going on in the case fairly quickly. Some networks also have helpful user descriptions.</p>
+
+  <h3 id="default-two-degree">Why did my network default to 2-degrees?</h3>
+  <p>We do not generate 3-degree networks when it will contain more than 70 cases. We have found networks larger than 70 are too unwieldy and so default those networks to 2-degrees.</p>
+
+  <h3 id="case-missing">Why is a case missing from my network?</h3>
+  <p>When the Supreme Court cites to recently decided cases, the citation form is non-standard such as citing to <i>Slip. Op</i> or <i>555 S.Ct ___</i>. This currently confounds our automatic citation parser. It's a problem we're working on.</p>
+
+  <h3 id="embed-network">How do I embed a network in my blog?</h3>
+  <p>Use the iframe code shown in the deprecation notice above. Replace YOUR_ID_HERE with the ID of your visualization. You can then put this code in your WordPress blog (or LibGuides site, etc.) just as you would embed a video from YouTube.</p>
+
+  <h3 id="dod">What do you mean by "Degree of Dissent"?</h3>
+  <p>We use <em>Degree of Dissent</em> (DoD) in our visualizations of Supreme Court networks to indicate the average level of disagreement in the cases shown. For example, in a network that shows two cases, each with unanimous 9-0 votes, there would be no dissent, and so the score would be 0. By contrast, if a network had only two cases, each with 5-4 decisions, the DoD would be 1.0, indicating a highly dissenting network.</p>
+  <p>Mathematically, the DoD for a given case is calculated by multiplying the number of dissents by 0.25. This means that a 9-0 case will have the same DoD as a 8-0 case (0.0) and a 6-3 will have the same DoD as 5-3 case.</p>
+  <p>In some cases you may see that the DoD is not using all of the cases in a network, stating something like: "Degree of Dissent: 0.73 for 16 cases of 17." This occurs because some cases do not have vote information in the Supreme Court Database (Spaeth).</p>
+
   {% include "includes/donate_footer_plea.html" %}
 </div>
 {% endblock %}

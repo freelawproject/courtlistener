@@ -1,4 +1,4 @@
-{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
+{% load static humanize extras waffle_tags %}
 {% load tailwind_tags %}{% load component_tags %}
 <!DOCTYPE html>
 <html lang="en" class="motion-safe:scroll-smooth">
@@ -93,9 +93,9 @@
   {% render_required_scripts %}
 
   {% if DEBUG %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% else %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
 
   {# Allows your own scripts in the footer. #}

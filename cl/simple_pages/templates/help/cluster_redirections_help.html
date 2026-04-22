@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% comment %}
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                ATTENTION!                                  ║
+║ This template has a new version behind the use_new_design waffle flag.     ║
+║                                                                            ║
+║ When modifying this template, please also update the new version at:       ║
+║ cl/simple_pages/templates/v2_help/cluster_redirections_help.html           ║
+║                                                                            ║
+║ Once the new design is fully implemented, all legacy templates             ║
+║ (including this one) and the waffle flag will be removed.                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
+{% block title %}Opinion Cluster Redirections – CourtListener.com{% endblock %}
+{% block og_title %}Opinion Cluster Redirections – CourtListener.com{% endblock %}
+
+{% block description %}Learn how CourtListener handles opinion cluster redirections when clusters are merged, deduplicated, or sealed.{% endblock %}
+{% block og_description %}Learn how CourtListener handles opinion cluster redirections when clusters are merged, deduplicated, or sealed.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "help_home" %}">Back to Help</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "help_home" %}">Back to Help</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#why">Why Clusters Get Redirected</a></li>
+      <li><a href="#behavior">How Redirections Work</a></li>
+      <li>
+        <a href="#consumers">For Data Consumers</a>
+        <ul>
+          <li><a href="#api-users">API Users</a></li>
+          <li><a href="#replication-users">Replication Users</a></li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Opinion Cluster Redirections</h1>
+  <p class="lead">CourtListener preserves persistent URLs for all opinion clusters. When a cluster becomes obsolete, its original <code>cluster_id</code> is never simply discarded. Instead, a <code>ClusterRedirection</code> record maps the old cluster to the current, active one.</p>
+
+  <h2 id="why">Why Clusters Get Redirected</h2>
+  <p>Clusters may be removed or consolidated for several reasons:</p>
+  <ul>
+    <li>
+      <p><strong>Duplicates:</strong> Two or more clusters representing the same opinion are merged into one.</p>
+    </li>
+    <li>
+      <p><strong>Versioning:</strong> A newer version of an opinion was incorrectly ingested as a separate cluster. When corrected, the opinions are consolidated into a single cluster and the extra clusters are deleted.</p>
+    </li>
+    <li>
+      <p><strong>Consolidation:</strong> Opinions from the same case (lead opinion, dissent, concurrence) were spread across different clusters because a court published them as separate files. When corrected, we keep a single cluster and delete the others.</p>
+    </li>
+    <li>
+      <p><strong>Sealed:</strong> A cluster is removed or sealed by court order.</p>
+    </li>
+  </ul>
+
+  <h2 id="behavior">How Redirections Work</h2>
+  <p>When you request a cluster that has been redirected, the behavior depends on the reason:</p>
+  <ul>
+    <li>
+      <p>For <strong>version</strong>, <strong>duplicate</strong>, or <strong>consolidation</strong> redirections, you will receive an <strong>HTTP 301</strong> response pointing to the surviving cluster.</p>
+    </li>
+    <li>
+      <p>For <strong>sealed</strong> clusters, you will receive an <strong>HTTP 410 Gone</strong> status with no redirection target.</p>
+    </li>
+  </ul>
+  <p>In some cases (e.g., error pages or court listing pages incorrectly ingested as opinions), clusters are simply deleted with no redirection record, and the old <code>cluster_id</code> will no longer exist.</p>
+
+  <h2 id="consumers">For Data Consumers</h2>
+
+  <h3 id="api-users">API Users</h3>
+  <p>The <a href="{% url "case_law_api_help" %}">Clusters API endpoint</a> supports cluster redirections. When requesting a redirected cluster, you will receive the appropriate HTTP status code (301 or 410) as described above.</p>
+  <p>Additionally, each cluster response includes a <code>cluster_redirections</code> field listing any old clusters that were redirected to it, with the original <code>deleted_cluster_id</code> and the redirection <code>reason</code>.</p>
+
+  <h3 id="replication-users">Replication Users</h3>
+  <p>If you use our <a href="{% url "replication_docs" %}">database replication service</a>, the <code>search_clusterredirection</code> table is included in your replica. You can query it directly to find redirections and understand how clusters have been merged or removed.</p>
+  <p>Be aware that an old <code>cluster_id</code> may internally redirect to a different, newer cluster. Your application should handle this gracefully when joining data across tables.</p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

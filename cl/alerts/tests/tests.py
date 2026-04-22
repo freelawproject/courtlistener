@@ -21,6 +21,7 @@ from lxml import html
 from lxml.html import HtmlElement
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
@@ -64,7 +65,6 @@ from cl.donate.models import (
 )
 from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
 from cl.favorites.models import Prayer
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
@@ -89,6 +89,7 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
+    MockTallyStatMixin,
     SearchAlertsAssertions,
     TestCase,
 )
@@ -855,6 +856,7 @@ class DocketAlertTest(TestCase):
             court_id="scotus",
             pacer_case_id="asdf",
             docket_number="12-cv-02354",
+            docket_number_raw="12-cv-02354",
             case_name="Vargas v. Wilkins",
         )
 
@@ -949,7 +951,9 @@ class DisableDocketAlertTest(TestCase):
         )
 
     def test_alert_created_recently_termination_year_ago(self) -> None:
-        self.alert.docket.date_terminated = now() - timedelta(days=365)
+        self.alert.docket.date_terminated = timezone.localdate() - timedelta(
+            days=365
+        )
         self.alert.docket.save()
 
         report = build_user_report(self.alert.user)
@@ -965,7 +969,7 @@ class DisableDocketAlertTest(TestCase):
         """Flag it if alert is old and item was terminated 90-97 days ago"""
         self.backdate_alert()
         for i in range(90, 97):
-            new_date_terminated = now() - timedelta(days=i)
+            new_date_terminated = timezone.localdate() - timedelta(days=i)
             print(f"Trying a date_terminated of {new_date_terminated}")
             self.alert.docket.date_terminated = new_date_terminated
             self.alert.docket.save()
@@ -1677,7 +1681,7 @@ class SearchAlertsWebhooksTest(
         )
         self.assertEqual(r.json()["count"], 0)
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with (
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -2003,6 +2007,7 @@ class PrayAndPayAlertsWebhooksTest(TestCase):
             "type=oa&docket_number=19-1010&order_by=score+desc&stat_Published=": False,
             "q=hello": False,
             "filter=value": False,
+            "&highlight=on&semantic=true": True,
         }
 
         for query_string, expected in test_cases.items():
@@ -2324,10 +2329,13 @@ class OldDocketAlertsReportToggleTest(TestCase):
         report = build_user_report(self.user_profile.user, delete=True)
         self.assertEqual(report.total_count(), 0)
 
+    @time_machine.travel("2024-01-15T12:00:00Z", tick=False)
     def test_old_docket_alert_report_timeline(self):
         """Can we properly warn and disable docket alerts based on their age
         considering their date_modified is updated when the alert_type change?
         """
+
+        base = now()
 
         # Create today a subscription docket alert from a case terminated long
         # time ago.
@@ -2353,7 +2361,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(active_docket_alerts.count(), 1)
 
         # Simulate user disabling docket alert 60 days in the future.
-        plus_sixty_days = now() + timedelta(days=60)
+        plus_sixty_days = base + timedelta(days=60)
         with time_machine.travel(plus_sixty_days, tick=False):
             # User disabled Docket alert manually.
             da.alert_type = DocketAlert.UNSUBSCRIPTION
@@ -2365,7 +2373,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
         self.assertEqual(da.date_modified, plus_sixty_days)
 
         # Simulate user re-enabling docket alert 85 days in the future.
-        plus_eighty_five_days = now() + timedelta(days=85)
+        plus_eighty_five_days = base + timedelta(days=85)
         with time_machine.travel(plus_eighty_five_days, tick=False):
             # User re-enable Docket alert manually.
             da.alert_type = DocketAlert.SUBSCRIPTION
@@ -2378,7 +2386,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 95 days in the future, 10 days since docket alert was
         # re-enabled
-        plus_ninety_five_days = now() + timedelta(days=95)
+        plus_ninety_five_days = base + timedelta(days=95)
         with time_machine.travel(plus_ninety_five_days, tick=False):
             report = build_user_report(self.user_profile.user, delete=True)
 
@@ -2389,7 +2397,7 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 268 days in the future, 183 days since docket alert was
         # re-enabled
-        plus_two_hundred_sixty_eight_days = now() + timedelta(days=268)
+        plus_two_hundred_sixty_eight_days = base + timedelta(days=268)
         with time_machine.travel(
             plus_two_hundred_sixty_eight_days, tick=False
         ):
@@ -2404,15 +2412,14 @@ class OldDocketAlertsReportToggleTest(TestCase):
 
         # Report is run 272 days in the future, 187 days since docket alert was
         # re-enabled
-        plus_two_hundred_sixty_eight_days = now() + timedelta(days=272)
+        plus_two_hundred_seventy_two_days = base + timedelta(days=272)
         with time_machine.travel(
-            plus_two_hundred_sixty_eight_days, tick=False
+            plus_two_hundred_seventy_two_days, tick=False
         ):
             report = build_user_report(self.user_profile.user, delete=True)
 
-        # After run the report 272 days in the future a warning should go out
-        # but no alert should be disabled since the docket alert was re-enabled
-        # 187 days ago.
+        # After run the report 272 days in the future the alert should be
+        # disabled since the docket alert was re-enabled 187 days ago.
         self.assertEqual(report.total_count(), 1)
         self.assertEqual(len(report.disabled_alerts), 1)
         self.assertEqual(active_docket_alerts.count(), 0)
@@ -2803,8 +2810,13 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
-@override_settings(NO_MATCH_HL_SIZE=100)
-class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
+@override_settings(
+    NO_MATCH_HL_SIZE=100, WAFFLE_CACHE_PREFIX="SearchAlertsOAESTests"
+)
+@override_switch("increment-stats", active=True)
+class SearchAlertsOAESTests(
+    MockTallyStatMixin, ESIndexTestCase, TestCase, SearchAlertsAssertions
+):
     """Test ES Search Alerts"""
 
     @classmethod
@@ -2897,13 +2909,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         Audio.objects.all().delete()
         super().tearDownClass()
 
-    def setUp(self):
-        self.r = get_redis_interface("STATS")
-        keys = self.r.keys("alerts.sent*")
-        if keys:
-            self.r.delete(*keys)
-        return super().setUp()
-
     def test_alert_frequency_estimation(self, mock_abort_audio):
         """Test alert frequency ES API endpoint."""
 
@@ -2919,7 +2924,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
         self.assertEqual(r.json()["count"], 0)
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with (
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
@@ -2944,7 +2949,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     def test_send_oa_search_alert_webhooks(self, mock_abort_audio):
         """Can we send RT OA search alerts?"""
 
-        mock_date = now().replace(day=1, hour=5)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -3097,7 +3102,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=1, hour=5)
+            mock_date = timezone.localtime(now()).replace(day=1, hour=5)
             with (
                 time_machine.travel(mock_date, tick=False),
                 self.captureOnCommitCallbacks(execute=True),
@@ -3277,6 +3282,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         alert_count,
         previous_date=None,
     ):
+        self.mock_tally_stat.reset_mock()
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -3287,10 +3293,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 # Call dly command
                 call_command("cl_send_scheduled_alerts", rate=rate)
 
-        # Confirm Stat object is properly updated.
-        key = f"alerts.sent.{mock_date.date().isoformat()}"
-        count = int(self.r.get(key) or 0)
-        self.assertEqual(count, stat_count)
+        # Confirm tally_stat was called with the expected increment.
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(
+            self.mock_tally_stat.call_args.kwargs["inc"], stat_count
+        )
 
         # Confirm Alert date_last_hit is updated.
         search_alert.refresh_from_db()
@@ -3413,7 +3420,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(month=1, day=30, hour=0)
+            mock_date = timezone.localtime(now()).replace(
+                month=1, day=30, hour=0
+            )
             with time_machine.travel(mock_date, tick=False):
                 # Call mly command
                 with self.assertRaises(InvalidDateError):
@@ -3489,6 +3498,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
         # Send RT alerts
         mock_date = now() - timedelta(days=10)
+        self.mock_tally_stat.reset_mock()
         with time_machine.travel(mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
@@ -3496,6 +3506,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         self.assertEqual(
             len(mail.outbox), 1, msg="Wrong number of emails sent."
         )
+        # Confirm stat was incremented by the RT command.
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(self.mock_tally_stat.call_args.kwargs["inc"], 1)
 
         # The OA RT alert email should contain 2 alerts, one for rt_oa_search_alert
         # and one for rt_oa_search_alert_2. First alert should contain 2 hits.
@@ -3631,10 +3644,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         rt_oral_argument_2.delete()
         rt_oral_argument_3.delete()
 
-        # Confirm Stat object is properly created and updated.
-        key = f"alerts.sent.{mock_date.date().isoformat()}"
-        count = int(self.r.get(key) or 0)
-        self.assertEqual(count, 2)
+        # Confirm tally_stat was called twice total: once by RT, once by
+        # the daily command, each incrementing by 1.
+        self.assertEqual(self.mock_tally_stat.call_count, 2)
+        for call in self.mock_tally_stat.call_args_list:
+            self.assertEqual(call.kwargs["inc"], 1)
 
         # Remove test instances.
         rt_oa_search_alert.delete()
@@ -3711,6 +3725,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
 
         # Send RT alerts
         mock_date = now() - timedelta(days=2)
+        self.mock_tally_stat.reset_mock()
         with time_machine.travel(mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
@@ -3729,11 +3744,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         content = webhook_events[0].content["payload"]
         self.assertEqual(len(content["results"]), 1)
 
-        # Confirm Stat object is properly created and updated.
-        count = int(
-            self.r.get(f"alerts.sent.{mock_date.date().isoformat()}") or 0
-        )
-        self.assertEqual(count, 11)
+        # Confirm tally_stat was called with inc=11 (one per user email).
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(self.mock_tally_stat.call_args.kwargs["inc"], 11)
 
         # Remove test instances.
         rt_oral_argument.delete()
@@ -3990,7 +4003,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
         )
 
         # Send dly alerts and check assertions.
-        mock_date = now().replace(day=1, hour=0)
+        mock_date = timezone.localtime(now()).replace(day=1, hour=0)
         with time_machine.travel(mock_date, tick=False):
             # Call dly command
             call_command("cl_send_scheduled_alerts", rate=Alert.DAILY)
@@ -4404,5 +4417,5 @@ class EmailWithSurrogatesTest(TestCase):
         email = EmailSent.objects.first()
         self.assertEqual(
             email.plain_text,
-            "government interest.” Saxe v. State Coll.",
+            "government interest.” Saxe v. State Coll.\n",
         )

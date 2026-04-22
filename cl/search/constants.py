@@ -97,9 +97,6 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "syllabus",
 ]
 SEARCH_MLT_OPINION_QUERY_FIELDS = [
-    "procedural_history.exact",
-    "posture.exact",
-    "syllabus.exact",
     "text.exact",
 ]
 

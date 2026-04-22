@@ -70,7 +70,7 @@ class CreateAlertForm(ModelForm):
         else:
             level_key = "free"
 
-        flp_membership = "https://donate.free.law/forms/membership"
+        flp_membership = "https://free.law/membership/"
         # Only members or user with unlimited alerts can create RT alerts
         if rate == Alert.REAL_TIME and not (
             self.user.profile.is_eligible_for_rt_search_alerts

@@ -248,6 +248,12 @@ class NeonMembershipLevel:
     GROUP_T4_LARGE = 53
     GROUP_T4_UNLIMITED = 54
 
+    # HeyCounsel Memberships
+    HEYCOUNSEL_T1 = 60
+    HEYCOUNSEL_T2 = 61
+    HEYCOUNSEL_T3 = 62
+    HEYCOUNSEL_T4 = 63
+
     TYPES = (
         # Individual
         (BASIC, "CL Membership - Basic"),
@@ -286,6 +292,11 @@ class NeonMembershipLevel:
         (GROUP_T4_MEDIUM, "Group Tier 4 Membership - Medium"),
         (GROUP_T4_LARGE, "Group Tier 4 Membership - Large"),
         (GROUP_T4_UNLIMITED, "Group Tier 4 Membership - Unlimited"),
+        # HeyCounsel
+        (HEYCOUNSEL_T1, "HeyCounsel Tier 1"),
+        (HEYCOUNSEL_T2, "HeyCounsel Tier 2"),
+        (HEYCOUNSEL_T3, "HeyCounsel Tier 3"),
+        (HEYCOUNSEL_T4, "HeyCounsel Tier 4"),
     )
     TYPES_INVERTED = invert_choices_group_lookup(TYPES)
 

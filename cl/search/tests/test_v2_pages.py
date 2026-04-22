@@ -122,14 +122,18 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertIn(">Login</a>", resp.content.decode())
-        self.assertNotIn('id="header-profile-menu"', resp.content.decode())
+        self.assertNotIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
     async def test_header_authenticated_user(self):
         await self.async_client.alogin(username="pandora", password="password")
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn(">Login</a>", resp.content.decode())
-        self.assertIn('id="header-profile-menu"', resp.content.decode())
+        self.assertIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
 
 @override_flag("use_new_design", True)
@@ -142,7 +146,8 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
         html = resp.content.decode()
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertIn('x-data="header"', html)
+        self.assertIn("<header", html)
+        self.assertIn("x-menu", html)
         # Ensure no search widget in header (homepage variant)
         self.assertNotIn(
             'x-data="search"', html.split("<header")[1].split("</header")[0]
@@ -171,6 +176,125 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
         for label in expected_labels:
             with self.subTest(label=label):
                 self.assertIn(label, html, f"Not found in template: {label}")
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_corpus_search_form_waffle")
+class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
+    """Tests for corpus search form rendering and accessibility."""
+
+    @classmethod
+    def setUpTestData(cls):
+        """Fetch the homepage once and share across all tests"""
+        super().setUpTestData()
+        cls.response = cls.client_class().get(reverse("show_results"))
+        cls.html = cls.response.content.decode()
+        cls.tree = lhtml.fromstring(cls.html)
+
+    def test_unique_form_field_ids(self):
+        """Test that form fields have unique IDs across desktop and mobile forms"""
+        tree = self.tree
+
+        # Test common fields that appear in multiple fieldsets
+        common_fields = ["case_name", "docket_number", "judge"]
+        namespaces = ["opinions", "recap", "oral_arguments", "judges"]
+
+        for field in common_fields:
+            for namespace in namespaces:
+                # Check desktop ID exists
+                desktop_id = f"desktop_{namespace}_{field}"
+                desktop_inputs = tree.xpath(f'//input[@id="{desktop_id}"]')
+
+                # Check mobile ID exists
+                mobile_id = f"mobile_{namespace}_{field}"
+                mobile_inputs = tree.xpath(f'//input[@id="{mobile_id}"]')
+
+                # Some fields may not exist in all namespaces
+                # But if they exist, they should be unique
+                if desktop_inputs:
+                    self.assertEqual(
+                        len(desktop_inputs),
+                        1,
+                        f"Desktop ID {desktop_id} should appear exactly once, found {len(desktop_inputs)}",
+                    )
+
+                if mobile_inputs:
+                    self.assertEqual(
+                        len(mobile_inputs),
+                        1,
+                        f"Mobile ID {mobile_id} should appear exactly once, found {len(mobile_inputs)}",
+                    )
+
+    def test_no_duplicate_ids_in_dom(self):
+        """Test no duplicate ID attributes exist anywhere in the DOM
+
+        Comprehensive check that validates HTML uniqueness constraint for ID
+        attributes across the entire rendered page. This catches any duplicate
+        IDs regardless of source (forms, components, static elements).
+
+        This is the primary regression test for the duplicate ID bug.
+        """
+        tree = self.tree
+
+        # Get all elements with id attribute
+        all_ids = tree.xpath("//*[@id]/@id")
+
+        # Find duplicates
+        id_counts = {}
+        for id_value in all_ids:
+            id_counts[id_value] = id_counts.get(id_value, 0) + 1
+
+        duplicates = {
+            id_val: count for id_val, count in id_counts.items() if count > 1
+        }
+
+        self.assertEqual(
+            duplicates,
+            {},
+            f"Found duplicate IDs in the DOM: {duplicates}",
+        )
+
+    def test_label_for_matches_input_id(self):
+        """Test label 'for' attributes correctly reference existing input IDs
+
+        Validates accessibility: every <label for="..."> must have exactly one
+        matching element with that ID. Ensures the unique ID solution didn't
+        break label/input associations.
+        """
+        tree = self.tree
+
+        # Get all labels with 'for' attribute
+        labels = tree.xpath("//label[@for]")
+
+        for label in labels:
+            label_for = label.get("for")
+            # Find the corresponding input/select/textarea
+            matching_inputs = tree.xpath(f'//*[@id="{label_for}"]')
+
+            self.assertEqual(
+                len(matching_inputs),
+                1,
+                f"Label with for='{label_for}' should have exactly one matching element, found {len(matching_inputs)}",
+            )
+
+    def test_date_selector_renders(self):
+        """Date selector inputs are present in the rendered search page."""
+        response = self.client.get(reverse("show_results"))
+        tree = lhtml.fromstring(response.content.decode())
+
+        after_inputs = tree.xpath('//input[@name="filed_after"]')
+        before_inputs = tree.xpath('//input[@name="filed_before"]')
+
+        self.assertGreaterEqual(
+            len(after_inputs),
+            1,
+            "Expected at least one input with name='filed_after'",
+        )
+        self.assertGreaterEqual(
+            len(before_inputs),
+            1,
+            "Expected at least one input with name='filed_before'",
+        )
 
 
 @override_flag("use_new_design", True)

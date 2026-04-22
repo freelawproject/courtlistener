@@ -1,0 +1,12 @@
+{% load extras %}
+
+<c-vars search_form field_name namespace form_prefix/>
+
+{% with field=search_form|get_item:field_name field_id=form_prefix|add:"_"|add:namespace|add:"_"|add:field_name %}
+<div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
+  <label for="{{ field_id }}">{{ field.label }}</label>
+  <div class="focus-container input-text">
+    {% render_field_with_id field field_id %}
+  </div>
+</div>
+{% endwith %}

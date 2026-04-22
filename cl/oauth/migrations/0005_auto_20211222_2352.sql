@@ -1,0 +1,22 @@
+BEGIN;
+--
+-- Alter field user on accesstoken
+--
+-- (no-op)
+--
+-- Alter field user on application
+--
+-- (no-op)
+--
+-- Alter field user on grant
+--
+-- (no-op)
+--
+-- Alter field user on idtoken
+--
+-- (no-op)
+--
+-- Alter field user on refreshtoken
+--
+-- (no-op)
+COMMIT;

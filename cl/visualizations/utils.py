@@ -1,9 +1,5 @@
 import time
 
-from django.conf import settings
-from django.contrib import messages
-
-from cl.lib.types import EmailType
 from cl.visualizations.exceptions import TooManyNodes
 from cl.visualizations.models import JSONVersion
 
@@ -44,51 +40,3 @@ async def build_visualization(viz):
     jv = JSONVersion(map=viz, json_data=j)
     await jv.asave()
     return "success", viz
-
-
-emails: dict[str, EmailType] = {
-    "referer_detected": {
-        "subject": "Somebody seems to have embedded a viz somewhere.",
-        "body": "Hey admins,\n\n"
-        "It looks like somebody embedded a SCOTUSMap on a blog or "
-        "something. Somebody needs to check this out and possibly "
-        "approve it. It appears to be at:\n\n"
-        " - %s\n\n"
-        "With a page title of:\n\n"
-        " - %s\n\n"
-        "And can be reviewed at:\n\n"
-        " - https://www.courtlistener.com%s\n\n"
-        "If nobody approves it, it'll never show up on the site.\n\n"
-        "Godspeed, fair admin.\n"
-        "The CourtListener bots",
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.MANAGERS],
-    }
-}
-
-message_dict = {
-    "too_many_nodes": {
-        "level": messages.WARNING,
-        "message": "<strong>That network has too many cases.</strong> We "
-        "were unable to create your network because the "
-        "finished product would contain too  many cases. "
-        "We've found that in practice, such networks are "
-        "difficult to read and take far too long for our "
-        "servers to create. Try building a smaller network by "
-        "selecting different cases.",
-    },
-    "too_few_nodes": {
-        "level": messages.WARNING,
-        "message": "<strong>That network has no citations between the "
-        "cases.</strong> With no connections between the cases, we "
-        "can't build a network. Try selecting different cases that "
-        "you're sure cite each other.",
-    },
-    "fewer_hops_delivered": {
-        "level": messages.SUCCESS,
-        "message": "We were unable to build your network with three "
-        "degrees of separation because it grew too large. "
-        "The network below was built with two degrees of "
-        "separation.",
-    },
-}

@@ -20,9 +20,9 @@ from cl.scrapers.management.commands.cl_scrape_opinions import (
     save_everything,
 )
 from cl.scrapers.tasks import extract_opinion_content
+from cl.search.cluster_sources import ClusterSources
 from cl.search.fields import CeilingDateField, FloorDateField
 from cl.search.models import (
-    SOURCES,
     Citation,
     Court,
     Docket,
@@ -411,7 +411,9 @@ class BaseCourtUploadForm(forms.Form):
                     "cite_page",
                     ValidationError(
                         format_html(
-                            f'Citation already in database. See: <a href="{cite.get_absolute_url()}">{cite.cluster.case_name}</a>',
+                            'Citation already in database. See: <a href="{}">{}</a>',
+                            cite.get_absolute_url(),
+                            cite.cluster.case_name,
                         )
                     ),
                 )
@@ -431,7 +433,9 @@ class BaseCourtUploadForm(forms.Form):
                 "pdf_upload",
                 ValidationError(
                     format_html(
-                        f'Document already in database. See: <a href="{op.get_absolute_url()}">{op.cluster.case_name}</a>',
+                        'Document already in database. See: <a href="{}">{}</a>',
+                        op.get_absolute_url(),
+                        op.cluster.case_name,
                     )
                 ),
             )
@@ -458,7 +462,7 @@ class BaseCourtUploadForm(forms.Form):
 
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
-            "cluster_source": SOURCES.DIRECT_COURT_INPUT,
+            "cluster_source": ClusterSources.DIRECT_COURT_INPUT,
             "disposition": self.cleaned_data.get("disposition", ""),
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data.get("publication_date"),

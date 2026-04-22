@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_replication.html                                    ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}Database Replication for Organizations and Researchers – CourtListener.com{% endblock %}
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
@@ -36,6 +49,8 @@
       <li><p><a href="{% url "advanced_p" %}">Judge and Appointer data</a></p></li>
     </ul>
     <p>User data will never be shared as part of this service.
+    </p>
+    <p>If you are replicating case law data, note that opinion clusters may be merged, deduplicated, or sealed over time. See the <a href="{% url "cluster_redirections_help" %}">Opinion Cluster Redirections</a> help page for details on how to handle these cases in your replica.
     </p>
     <p>If you are interested in this service, please get in touch to learn more. We will be happy to discuss the technical details.
     </p>

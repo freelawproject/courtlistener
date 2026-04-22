@@ -271,7 +271,9 @@ class DisclosureAPITest(TestCase):
         self.assertEqual(r.json()["count"], 1, msg="Failed Debt filter")
 
 
-class DisclosureReactLoadTest(BaseSeleniumTest):
+class DisclosurePageTest(BaseSeleniumTest):
+    """Tests for static disclosure pages with HTMX typeahead."""
+
     def setUp(self) -> None:
         judge = PersonWithChildrenFactory.create(
             name_first="Judith",
@@ -305,13 +307,13 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
             EC.visibility_of_element_located((By.ID, "main-query-box"))
         )
         self.assertTrue(
-            search_bar.is_displayed(), msg="React-root failed to load"
+            search_bar.is_displayed(), msg="Search bar failed to load"
         )
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_disclosure_search(self) -> None:
-        """Can we search for judges?"""
-        wait = WebDriverWait(self.browser, 3)
+        """Can we search for judges using HTMX typeahead?"""
+        wait = WebDriverWait(self.browser, 5)
         self.browser.get(self.live_server_url)
         self.browser.implicitly_wait(2)
         self.browser.find_element(By.ID, "navbar-fd").click()
@@ -325,13 +327,23 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
             EC.visibility_of_element_located((By.ID, "main-query-box"))
         )
         self.assertTrue(
-            search_bar.is_displayed(), msg="React-root failed to load"
+            search_bar.is_displayed(), msg="Search bar failed to load"
         )
 
+        # Verify no results initially
         with self.assertRaises(NoSuchElementException):
             self.browser.find_element(By.CSS_SELECTOR, ".tr-results")
 
-        search_bar = self.browser.find_element(By.ID, "id_disclosures_search")
-        search_bar.send_keys("Judith")
-        results = self.browser.find_elements(By.CSS_SELECTOR, ".tr-results")
+        # Type in search box and wait for HTMX response
+        search_input = self.browser.find_element(
+            By.ID, "id_disclosures_search"
+        )
+        search_input.send_keys("Judith")
+
+        # Wait for HTMX to load results
+        results = wait.until(
+            EC.presence_of_all_elements_located(
+                (By.CSS_SELECTOR, ".tr-results")
+            )
+        )
         self.assertEqual(len(results), 1, msg="Incorrect results displayed")

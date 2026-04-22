@@ -1,37 +1,17 @@
 {% load svg_tags %}
 
-<c-vars request search_form/>
+<c-vars request search_form form_prefix/>
 
-<fieldset x-bind:id="fieldsetIds.opinions" class="contents" x-show="isActiveScope" data-scope="Case Law">
+<fieldset x-bind:id="fieldsetIds.opinions" class="contents" x-show="isActiveScope" x-cloak data-scope="Case Law">
   <legend class="sr-only">Case law filters</legend>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.case_name.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.case_name }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="case_name" namespace="opinions" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.docket_number.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.docket_number }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="docket_number" namespace="opinions" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.citation.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.citation }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="citation" namespace="opinions" :form_prefix="form_prefix" only/>
 
-  <div class="flex flex-col justify-start gap-1.5 [&_label]:text-sm [&_label]:font-medium [&_label]:text-greyscale-600">
-    {{ search_form.judge.label_tag }}
-    <div class="focus-container input-text">
-      {{ search_form.judge }}
-    </div>
-  </div>
+  <c-corpus-search.filters.input :search_form="search_form" field_name="judge" namespace="opinions" :form_prefix="form_prefix" only/>
 
   <c-corpus-search.date-selector
     label="Filed After"

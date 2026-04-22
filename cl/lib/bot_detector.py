@@ -10,7 +10,7 @@ def base_bot_matcher(
     Matching is done by seeing if any of the items in the list of known_bots
     is in the user agent for the request provided.
     """
-    ua = request.META.get("HTTP_USER_AGENT", "Testing U-A")
+    ua = request.headers.get("user-agent", "Testing U-A")
     for bot in known_bots:
         if bot in ua.lower():
             return True

@@ -1,6 +1,6 @@
 {% load svg_tags %}
 
-<c-vars request class=""></c-vars>
+<c-vars request search_form form_prefix class=""></c-vars>
 
 <div class="md:hidden {{ class }}">
   <c-dialog class="w-full" panel_class="absolute pt-0 flex flex-col max-h-screen overflow-hidden" only>
@@ -16,39 +16,39 @@
           </div>
         </div>
         <div class="pt-1.5">
-          <button
-            type="button"
+          <c-button
+            variant="outline"
             x-on:click.stop="close"
-            class="btn-outline p-2 rounded-[10px]"
+            class="p-2 rounded-[10px]"
             aria-label="Close modal"
           >
             {% svg "cross" class="text-greyscale-400" %}
-          </button>
+          </c-button>
         </div>
       </div>
 
       <div class="flex flex-col max-h-[--mobile-dialog-panel-height]">
         <div class="flex flex-col gap-2 px-4 pt-1">
           <c-corpus-search.mobile.top-controls :request="request" />
-          <button
-            type="button"
+          <c-button
+            variant="outline"
             x-on:click="toggleAdvancedFilters"
-            class="btn-outline w-full justify-center"
+            class="w-full justify-center"
           >
             {% svg "funnel" class="h-5 w-5 text-greyscale-400" %}
             Filters
-          </button>
+          </c-button>
         </div>
         <div
           class="flex-shrink overflow-auto border-b border-greyscale-200 border-t-4 mt-4"
           x-show="advancedFiltersExpanded"
         >
           <div class="p-4 max-w-[100vw]">
-            <c-corpus-search.filters :request="request" :search_form="search_form"/>
+            <c-corpus-search.filters :request="request" :search_form="search_form" :form_prefix="form_prefix"/>
           </div>
         </div>
         <div class="p-4 flex flex-col gap-4">
-          <c-corpus-search.button class="w-full max-md:btn-xl flex items-center justify-center">
+          <c-corpus-search.button class="w-full max-md:py-3 max-md:px-4.5 max-md:text-md flex items-center justify-center">
             {% svg "magnifier" class="text-white w-5 h-5 mr-1.5" aria_hidden="true" %}
             Search
           </c-corpus-search.button>

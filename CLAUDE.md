@@ -14,15 +14,18 @@ Rules and guidance on our wiki is written with flexibility for humans, but MUST 
 
 ```
 cl/                     # Main Django project
-├── assets/            # Static files, templates, React components
-│   ├── templates/     # Django templates (base.html, etc.)
-│   ├── react/         # React/TypeScript components
+├── assets/            # Static files, templates, components
+│   ├── templates/     # Django templates
 │   └── static-global/ # Global CSS/JS
 ├── lib/               # Shared utilities
 ├── tests/             # Test utilities and base classes
 └── [app]/             # Individual Django apps (search, alerts, etc.)
 ```
 
+
+## Frontend
+
+CourtListener has two frontend stacks (legacy Bootstrap/jQuery and new Tailwind/Alpine/Cotton). Before writing any frontend code, MUST determine which stack you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not mix stacks.
 
 ## Coding Rules
 
@@ -45,6 +48,8 @@ cl/                     # Main Django project
 5. **Management Commands**: Do not add `cl_` to the names of management commands. It's an obsolete practice.
 
 6. **Async Patterns**: Many views use async. Use `sync_to_async` and `async_to_sync` from `asgiref.sync` when needed.
+
+7. **Imports**: NEVER do inline imports except to prevent circular dependency problems. ALWAYS put imports at the top.
 
 ### Python Style Rules
 
@@ -129,10 +134,10 @@ When creating code that modify Django models, strictly follow the Database Migra
 
 ### Pull Requests
 
-1. Update branch before committing.
-2. Run `pre-commit` and ensure it passes
-3. Submit as **draft** PR
-4. Use the template from `.github/PULL_REQUEST_TEMPLATE.md`
+1. ALWAYS update branch before committing.
+2. ALWAYS run `pre-commit` and ensure it passes
+3. ALWAYS submit as **draft** PR
+4. ALWAYS use the template from `.github/PULL_REQUEST_TEMPLATE.md`
 
 
 ## Available Tools

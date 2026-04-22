@@ -1,10 +1,10 @@
 from contextlib import ExitStack
-from functools import cached_property
 from typing import Any
 from urllib.parse import quote
 
 from django.conf import settings
 from django.db import connections
+from django.utils.functional import SimpleLazyObject, empty
 
 
 def escape_sql_comment_value(value: Any) -> str | None:
@@ -46,8 +46,8 @@ def add_sql_comment(sql: str, **meta: Any) -> str:
     sql = sql.rstrip()
 
     if sql.endswith(";"):
-        return sql[:-1] + " " + comment + ";"
-    return sql + " " + comment
+        return comment + " " + sql[:-1] + ";"
+    return comment + " " + sql
 
 
 class SqlCommenter:
@@ -74,17 +74,27 @@ class QueryWrapper:
     def __init__(self, request):
         self.request = request
 
-    @cached_property
     def get_context(self) -> dict[str, Any]:
         """
         Extract relevant context information from the request for SQL comments.
         """
-        user = (
-            self.request.user.pk
-            if hasattr(self.request, "user")
-            and self.request.user.is_authenticated
-            else None
-        )
+        user = None
+        if hasattr(self.request, "user"):
+            user_obj = self.request.user
+            # Check if SimpleLazyObject has been evaluated to avoid recursion.
+            # Accessing is_authenticated on an unevaluated lazy user triggers a
+            # database query, which would go through this wrapper again,
+            # creating infinite recursion. See #6773.
+            if isinstance(user_obj, SimpleLazyObject):
+                # Access _wrapped to check if lazy object has been evaluated.
+                # Once evaluated, it proxies to the User model.
+                if (
+                    user_obj._wrapped is not empty  # type: ignore[attr-defined]
+                    and user_obj.is_authenticated  # type: ignore[attr-defined]
+                ):
+                    user = user_obj.pk  # type: ignore[attr-defined]
+            elif user_obj.is_authenticated:
+                user = user_obj.pk
 
         path = None
         resolver_match = self.request.resolver_match
@@ -100,5 +110,5 @@ class QueryWrapper:
         }
 
     def __call__(self, execute, sql, params, many, context):
-        sql_with_comment = add_sql_comment(sql, **self.get_context)
+        sql_with_comment = add_sql_comment(sql, **self.get_context())
         return execute(sql_with_comment, params, many, context)

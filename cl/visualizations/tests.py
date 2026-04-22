@@ -2,36 +2,88 @@
 Unit tests for Visualizations
 """
 
-from collections.abc import Callable
+import datetime
 from http import HTTPStatus
-from typing import Any
+from typing import ClassVar
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Permission, User
-from django.core.handlers.asgi import ASGIRequest
-from django.test import AsyncRequestFactory
+from django.contrib.auth.models import Permission
 from django.urls import reverse
-from httplib2 import Response
+from rest_framework.response import Response
 
-from cl.search.models import OpinionCluster
-from cl.tests.cases import APITestCase, TestCase
-from cl.tests.utils import make_client
-from cl.users.factories import (
-    UserProfileWithParentsFactory,
-    UserWithChildProfileFactory,
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterWithParentsFactory,
+    OpinionFactory,
+    OpinionsCitedWithParentsFactory,
 )
-from cl.visualizations import views
+from cl.search.models import PRECEDENTIAL_STATUS, Opinion, OpinionCluster
+from cl.tests.cases import APITestCase, SimpleTestCase, TestCase
+from cl.tests.utils import make_client
+from cl.users.factories import UserProfileWithParentsFactory
 from cl.visualizations.factories import VisualizationFactory
-from cl.visualizations.forms import VizForm
 from cl.visualizations.models import JSONVersion, SCOTUSMap
 from cl.visualizations.network_utils import reverse_endpoints_if_needed
+
+
+def create_scotus_test_clusters() -> tuple[OpinionCluster, OpinionCluster]:
+    scotus = CourtFactory(
+        id="scotus",
+        full_name="Supreme Court of the United States",
+        short_name="SCOTUS",
+    )
+    marsh_date = datetime.date(1983, 1, 17)
+    town_date = datetime.date(2014, 5, 5)
+    marsh_docket = DocketFactory(
+        court=scotus,
+        case_name="Marsh v. Chambers",
+        case_name_full="Marsh v. Chambers",
+        date_filed=marsh_date,
+    )
+    town_docket = DocketFactory(
+        court=scotus,
+        case_name="Town of Greece v. Galloway",
+        case_name_full="Town of Greece v. Galloway",
+        date_filed=town_date,
+    )
+    marsh_cluster = OpinionClusterWithParentsFactory(
+        docket=marsh_docket,
+        case_name="Marsh v. Chambers",
+        case_name_full="Marsh v. Chambers",
+        date_filed=marsh_date,
+        precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+    )
+    town_cluster = OpinionClusterWithParentsFactory(
+        docket=town_docket,
+        case_name="Town of Greece v. Galloway",
+        case_name_full="Town of Greece v. Galloway",
+        date_filed=town_date,
+        precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+    )
+    marsh_opinion = OpinionFactory(
+        cluster=marsh_cluster,
+        type=Opinion.COMBINED,
+    )
+    town_opinion = OpinionFactory(
+        cluster=town_cluster,
+        type=Opinion.COMBINED,
+    )
+    OpinionsCitedWithParentsFactory(
+        citing_opinion=town_opinion,
+        cited_opinion=marsh_opinion,
+    )
+    return marsh_cluster, town_cluster
 
 
 class TestVizUtils(TestCase):
     """Tests for Visualization app utils"""
 
-    fixtures = ["scotus_map_data.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+        create_scotus_test_clusters()
 
     async def test_reverse_endpoints_does_not_reverse_good_inputs(
         self,
@@ -71,7 +123,10 @@ class TestVizUtils(TestCase):
 class TestVizModels(TestCase):
     """Tests for Visualization models"""
 
-    fixtures = ["scotus_map_data.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+        create_scotus_test_clusters()
 
     async def test_SCOTUSMap_builds_nx_digraph(self) -> None:
         """Tests build_nx_digraph method to see how it works"""
@@ -112,254 +167,52 @@ class TestVizModels(TestCase):
         self.assertIsNone(viz.pk, None)
 
 
-class TestViews(TestCase):
-    """Tests for Visualization views"""
+class TestVisualizationRedirects(SimpleTestCase):
+    """Test that deprecated visualization URLs redirect properly."""
 
-    view = "new_visualization"
-
-    fixtures = ["scotus_map_data.json"]
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.regular_user = UserWithChildProfileFactory.create(
-            first_name="Userio",
-            username="regular_user",
-            password=make_password("password"),
-            profile__email_confirmed=True,
-        )
-        cls.viz = VisualizationFactory.create(
-            user=cls.regular_user,
-            notes="FREE KESHA",
-            published=True,
-            deleted=False,
-        )
-
-        cls.admin_user = UserWithChildProfileFactory.create(
-            username="admin",
-            password=make_password("password"),
-        )
-        cls.admin_user.is_superuser = True
-        cls.admin_user.is_staff = True
-        cls.admin_user.save()
-
-    async def test_new_visualization_view_provides_form(self) -> None:
-        """Test a GET to the Visualization view provides a VizForm"""
-        self.assertTrue(
-            await self.async_client.alogin(
-                username=self.regular_user.username, password="password"
-            )
-        )
-        response = await self.async_client.get(reverse(self.view))
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.context["form"], VizForm)
-
-    async def test_new_visualization_view_creates_map_on_post(self) -> None:
-        """Test a valid POST creates a new ScotusMap object"""
-        count_before = await SCOTUSMap.objects.all().acount()
-
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="regular_user", password="password"
-            )
-        )
-        data = {
-            "cluster_start": 2674862,
-            "cluster_end": 111014,
-            "title": "Test Map Title",
-            "notes": "Just some notes",
-        }
-        response = await self.async_client.post(reverse(self.view), data=data)
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(count_before + 1, await SCOTUSMap.objects.acount())
-
-        # Should not raise DoesNotExist exception.
-        await SCOTUSMap.objects.aget(title="Test Map Title")
-
-    async def test_published_visualizations_show_in_gallery(self) -> None:
-        """Test that a user can see published visualizations from others"""
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="regular_user", password="password"
-            )
-        )
-        response = await self.async_client.get(reverse("viz_gallery"))
-        html = response.content.decode()
-        html = " ".join(html.split())
-        self.assertIn("Shared by Userio", html)
-        self.assertIn("FREE KESHA", html)
-
-    async def test_cannot_view_anothers_private_visualization(self) -> None:
-        """Test unpublished visualizations cannot be seen by others"""
-        viz = await sync_to_async(VisualizationFactory.create)(
-            user=self.regular_user,
-            title="My Private Visualization",
-            published=False,
-            deleted=False,
-        )
-
-        self.assertFalse(viz.published, "Test SCOTUSMap should be unpublished")
-        url = reverse(
-            "view_visualization", kwargs={"pk": viz.pk, "slug": viz.slug}
-        )
-
-        # Created by regular user, so *can* see unpublished viz.
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="regular_user", password="password"
-            )
-        )
-        response = await self.async_client.get(url)
-        self.assertEqual(
-            response.status_code,
-            HTTPStatus.OK,
-            msg=f"Didn't get {HTTPStatus.OK}, got {response.status_code}, with HTML:\n{response.content.decode()}",
-        )
-        self.assertIn("My Private Visualization", response.content.decode())
-
-        # Not created by admin and we don't have special code to allow admins,
-        # so don't show viz.
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="admin", password="password"
-            )
-        )
-        response = await self.async_client.get(url)
-        self.assertNotEqual(response.status_code, HTTPStatus.OK)
-        self.assertNotIn("My Private Visualization", response.content.decode())
-
-
-class TestVizAjaxCrud(TestCase):
-    """
-    Test the CRUD operations for Visualizations that the javascript client
-    code relies on currently.
-    """
-
-    fixtures = ["scotus_map_data.json", "visualizations.json"]
-
-    def setUp(self) -> None:
-        self.live_viz = SCOTUSMap.objects.get(pk=1)
-        self.private_viz = SCOTUSMap.objects.get(pk=2)
-        self.deleted_viz = SCOTUSMap.objects.get(pk=3)
-        self.factory = AsyncRequestFactory()
-
-    def tearDown(self) -> None:
-        SCOTUSMap.objects.all().delete()
-        JSONVersion.objects.all().delete()
-
-    async def _build_post(
-        self,
-        url: str,
-        username: str = None,
-        data: dict[str, Any] = None,
-    ) -> ASGIRequest:
-        """Helper method to build authenticated AJAX POST
-        Args:
-            url: url pattern to request
-            username: username for User to attach
-            **data: dictionary of POST data
-
-        Returns: HttpRequest configured as an AJAX POST
-        """
-        if data is None:
-            data = {}
-        post = self.factory.post(url, data=data)
-        if username:
-            user = await User.objects.aget(username=username)
-            post.auser = sync_to_async(lambda: user)
-        post.META["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest"
-        return post
-
-    async def post_ajax_view(
-        self,
-        view: Callable,
-        pk: int,
-        username: str = "admin",
-    ) -> SCOTUSMap:
-        """
-        Generates a simple POST for the given view with the given
-        private key as the POST data.
-
-        Args:
-            view: reference to Django View
-            pk: private key of target SCOTUSMap
-            username: username of User to POST as
-
-        Returns: new reference to updated SCOTUSMap
-
-        """
-        post = await self._build_post(
-            reverse(view), username=username, data={"pk": pk}
-        )
-        response = await view(post)
-        self.assertEqual(response.status_code, 200)
-        return await SCOTUSMap.objects.aget(pk=pk)
-
-    async def test_deletion_via_ajax_view(self) -> None:
-        """
-        Test deletion of visualization via view only sets deleted flag and
-        doesn't actually delete the object yet
-        """
-        self.assertFalse(self.live_viz.deleted)
-        self.assertIsNone(self.live_viz.date_deleted)
-
-        viz = await self.post_ajax_view(
-            views.delete_visualization, self.live_viz.pk
-        )
-
-        self.assertTrue(viz.deleted)
-        self.assertIsNotNone(viz.date_deleted)
-
-    async def test_restore_via_ajax_view(self) -> None:
-        """
-        Tests restoration of deleted visualization from teh trash via a
-        ajax POST
-        """
-        self.assertTrue(self.deleted_viz.deleted)
-        self.assertIsNotNone(self.deleted_viz.date_deleted)
-
-        viz = await self.post_ajax_view(
-            views.restore_visualization, self.deleted_viz.pk
-        )
-
-        self.assertFalse(viz.deleted)
-        self.assertIsNone(viz.date_deleted)
-
-    async def test_privatizing_via_ajax_view(self) -> None:
-        """
-        Tests setting a public visualization to private via an AJAX POST
-        """
-        self.assertTrue(self.live_viz.published)
-        self.assertIsNotNone(self.live_viz.date_published)
-
-        viz = await self.post_ajax_view(
-            views.privatize_visualization, self.live_viz.pk
-        )
-
-        self.assertFalse(viz.published)
-
-    async def test_sharing_via_ajax_view(self) -> None:
-        """
-        Tests sharing a public visualization via an AJAX POST
-        """
-        self.assertFalse(self.private_viz.published)
-        self.assertIsNone(self.private_viz.date_published)
-
-        viz = await self.post_ajax_view(
-            views.share_visualization, self.private_viz.pk
-        )
-
-        self.assertTrue(viz.published)
-        self.assertIsNotNone(viz.date_published)
+    def test_deprecated_urls_redirect_to_api_docs(self) -> None:
+        """Test all deprecated visualization URLs redirect to API docs."""
+        expected_redirect = reverse("visualization_api_help")
+        # Raw URLs for visualization paths (catch-all handles these)
+        urls = [
+            "/visualizations/scotus-mapper/",
+            "/visualizations/scotus-mapper/new/",
+            "/visualizations/gallery/",
+            "/visualizations/scotus-mapper/1/test/",
+            "/visualizations/scotus-mapper/1/edit/",
+            "/visualizations/anything/else/",
+            # Named URLs still defined in users/urls.py
+            reverse("view_visualizations"),
+            reverse("view_deleted_visualizations"),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(
+                    response.status_code,
+                    HTTPStatus.MOVED_PERMANENTLY,
+                    msg=f"{url} should return 301",
+                )
+                self.assertEqual(
+                    response.url,
+                    f"{expected_redirect}#deprecation-notice",
+                    msg=f"{url} should redirect to API docs",
+                )
 
 
 class APIVisualizationTestCase(APITestCase):
     """Check that visualizations are created properly through the API."""
 
-    fixtures = ["api_scotus_map_data.json"]
+    cluster_start: ClassVar[OpinionCluster]
+    cluster_end: ClassVar[OpinionCluster]
 
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
+        marsh_cluster, town_cluster = create_scotus_test_clusters()
+        cls.cluster_start = town_cluster
+        cls.cluster_end = marsh_cluster
+
         # Add the permissions to the user.
         cls.up = UserProfileWithParentsFactory.create(
             user__username="recap-user",
@@ -374,6 +227,7 @@ class APIVisualizationTestCase(APITestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.path = reverse("scotusmap-list", kwargs={"version": "v3"})
         self.client = make_client(self.up.user.pk)
         self.rando_client = make_client(self.pandora.user.pk)
@@ -381,15 +235,18 @@ class APIVisualizationTestCase(APITestCase):
     def tearDown(self) -> None:
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
+        super().tearDown()
 
-    async def make_good_visualization(self, title: str) -> Response:
+    async def make_good_visualization(self, title: str) -> "Response":
         data = {
             "title": title,
             "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_start.pk},
             ),
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_end.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -399,10 +256,12 @@ class APIVisualizationTestCase(APITestCase):
         data = {
             "title": "",
             "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_start.pk},
             ),
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_end.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -415,7 +274,8 @@ class APIVisualizationTestCase(APITestCase):
             "title": "My Invalid Visualization - No Cluster Start Provided",
             "cluster_start": "",
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_end.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -429,7 +289,8 @@ class APIVisualizationTestCase(APITestCase):
         data = {
             "title": "My Invalid Visualization - No Cluster End Provided",
             "cluster_start": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 1}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_start.pk},
             ),
             "cluster_end": "",
         }
@@ -445,7 +306,8 @@ class APIVisualizationTestCase(APITestCase):
                 "opinioncluster-detail", kwargs={"version": "v3", "pk": 999}
             ),
             "cluster_end": reverse(
-                "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
+                "opinioncluster-detail",
+                kwargs={"version": "v3", "pk": self.cluster_end.pk},
             ),
         }
         response = await self.client.post(self.path, data, format="json")
@@ -470,19 +332,11 @@ class APIVisualizationTestCase(APITestCase):
         # cluster_start and cluster_end are reversed
         self.assertEqual(
             res["cluster_start"],
-            "http://testserver{}".format(
-                reverse(
-                    "opinioncluster-detail", kwargs={"version": "v3", "pk": 2}
-                )
-            ),
+            f"http://testserver{reverse('opinioncluster-detail', kwargs={'version': 'v3', 'pk': self.cluster_end.pk})}",
         )
         self.assertEqual(
             res["cluster_end"],
-            f"http://testserver{
-                reverse(
-                    'opinioncluster-detail', kwargs={'version': 'v3', 'pk': 1}
-                )
-            }",
+            f"http://testserver{reverse('opinioncluster-detail', kwargs={'version': 'v3', 'pk': self.cluster_start.pk})}",
         )
 
     async def test_visualization_permissions(self) -> None:

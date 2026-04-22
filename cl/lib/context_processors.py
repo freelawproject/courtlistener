@@ -12,7 +12,6 @@ def inject_settings(request):
     """Use this function to inject specific settings into every page."""
     return {
         "DEBUG": settings.DEBUG,
-        "EIN_SECRET": settings.EIN_SECRET,
         "MIN_DONATION": settings.MIN_DONATION,
         "MAX_ALERT_RESULTS_PER_DAY": settings.MAX_ALERT_RESULTS_PER_DAY,
         "MAX_FREE_DOCKET_ALERTS": settings.MAX_FREE_DOCKET_ALERTS,

@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 
+{% comment %}
+╔═════════════════════════════════════════════════════════════════════════╗
+║                               ATTENTION!                                ║
+║ This template has a new version behind the use_new_design waffle flag.  ║
+║                                                                         ║
+║ When modifying this template, please also update the new version at:    ║
+║ cl/api/templates/v2_docs.html                                           ║
+║                                                                         ║
+║ Once the new design is fully implemented, all legacy templates          ║
+║ (including this one) and the waffle flag will be removed.               ║
+╚═════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
 {% block title %}APIs and Bulk Data – CourtListener.com{% endblock %}
 {% block description %}Legal APIs and Bulk Data from Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
 {% block og_description %}Legal APIs and Bulk Data from Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
@@ -9,7 +22,7 @@
 <div class="hidden-xs col-sm-2 col-md-3"></div>
 <div class="col-xs-12 col-sm-8 col-md-6">
   <h1 class="text-center v-offset-below-3">CourtListener APIs, Webhooks, and Bulk Legal&nbsp;Data</h1>
-  <p>We currently have five major services available on CourtListener:
+  <p>We currently have six major services available on CourtListener:
   </p>
   <ol>
     <li>
@@ -27,6 +40,10 @@
     </li>
     <li>
       <p>If you want to subscribe to events on CourtListener, we recommend our <a href="{% url "webhooks_docs" %}">webhooks service</a>, which works as a bi-directional API &mdash; It can push data to you.
+      </p>
+    </li>
+    <li>
+      <p><em>Coming soon:</em> If you use AI assistants like Claude or ChatGPT, our <a href="{% url "mcp_help" %}">MCP server</a> will allow them to access CourtListener data directly.
       </p>
     </li>
     <li>
@@ -82,6 +99,16 @@
       <td class="align-middle">Complex</td>
     </tr>
     <tr>
+      <td><a href="{% url "mcp_help" %}"
+             class="btn btn-lg btn-primary btn-block">MCP Server</a>
+        <em class="small text-muted">Coming soon</em></td>
+      <td class="align-middle">Fast</td>
+      <td class="align-middle">Good</td>
+      <td class="align-middle">Natural<br>Language</td>
+      <td class="align-middle">Short</td>
+      <td class="align-middle">Easy</td>
+    </tr>
+    <tr>
       <td><a href="https://free.law/data-consulting/"
              class="btn btn-lg btn-success btn-block">Data Services</a></td>
       <td colspan="5" class="text-left">Engage with Free Law Project, the non-profit behind CourtListener and RECAP, for the most flexibility.
@@ -94,7 +121,7 @@
   <h2 id="pricing" class="v-offset-above-3">Pricing</h2>
   <p>We make these services available according to means-based pricing. This allows a variety of researchers, journalists, and organizations to access this information.
   </p>
-  <p>The goal of these charges is to provide ongoing support for these APIs and for <a href="https://free.law" target="_blank">Free Law Project</a>, the 501(c)(3) non-profit supporting CourtListener and RECAP. We hope you'll agree that that is an important cause.
+  <p>The goal of these charges is to provide ongoing support for these APIs and for <a href="https://free.law" target="_blank" rel="noopener noreferrer">Free Law Project</a>, the 501(c)(3) non-profit supporting CourtListener and RECAP. We hope you'll agree that that is an important cause.
   </p>
   <p>Depending on what makes sense for the organization and the project, support for Free Law Project can take the form of monthly subscriptions, one time fees for service, or revenue share agreements.
   </p>

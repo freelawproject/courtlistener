@@ -69,10 +69,6 @@ class SimpleSitemap(sitemaps.Sitemap):
             make_url_dict("sign-in", priority=0.6, changefreq="never"),
             make_url_dict("register", priority=0.6, changefreq="never"),
             make_url_dict("password_reset", priority=0.4, changefreq="never"),
-            # Visualizations
-            make_url_dict("mapper_homepage", priority=0.7),
-            make_url_dict("new_visualization", priority=0.4),
-            make_url_dict("viz_gallery", priority=0.6, changefreq="hourly"),
         ]
 
     def changefreq(self, obj: dict[str, str | float]) -> str | float:

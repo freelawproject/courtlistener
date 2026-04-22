@@ -16,6 +16,7 @@ from rest_framework.authtoken.models import Token
 from cl.api.models import Webhook
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.storage import S3PrivateUUIDStorage
+from cl.stats.metrics import accounts_created_total
 from cl.users.email_handlers import (
     handle_complaint,
     handle_hard_bounce,
@@ -162,6 +163,7 @@ def complaint_handler(
 def create_auth_token(sender, instance=None, created=False, **kwargs):
     if created:
         Token.objects.create(user=instance)
+        accounts_created_total.inc()
 
 
 @receiver(

@@ -49,6 +49,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.models import SEARCH_TYPES, Docket
+from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -717,7 +718,11 @@ def query_and_send_alerts(
         )
 
     # Log and tally the total alerts sent
-    tally_stat("alerts.sent", inc=total_alerts_sent_count)
+    tally_stat(
+        StatMetric.ALERTS_SENT,
+        inc=total_alerts_sent_count,
+        labels={"alert_type": StatAlertType.RECAP},
+    )
     logger.info(f"Sent {total_alerts_sent_count} {rate} email alerts.")
 
 

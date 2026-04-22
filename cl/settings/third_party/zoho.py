@@ -22,3 +22,21 @@ ZOHO_CONFIG = SDKConfig(
     connect_timeout=env.int("ZOHO_CONNECT_TIMEOUT", default=30),
     read_timeout=env.int("ZOHO_READ_TIMEOUT", default=60),
 )
+
+###################
+#    ZOHO DESK    #
+###################
+ZOHO_DESK_DEPARTMENT_ID = env("ZOHO_DESK_DEPARTMENT_ID", default="")
+ZOHO_DESK_ORG_ID = env("ZOHO_DESK_ORG_ID", default="")
+
+# Auto-assignment: issue_type key → Zoho Desk agent ID (numeric string).
+ZOHO_DESK_AGENT_ASSIGNMENTS: dict[str, str] = {
+    "recap": env("ZOHO_DESK_AGENT_RECAP", default=""),
+    "data_quality": env("ZOHO_DESK_AGENT_DATA_QUALITY", default=""),
+    "memberships": env("ZOHO_DESK_AGENT_MEMBERSHIPS", default=""),
+    "api": env("ZOHO_DESK_AGENT_API", default=""),
+    "removal": env("ZOHO_DESK_AGENT_REMOVAL", default=""),
+    "support": env("ZOHO_DESK_AGENT_SUPPORT", default=""),
+    "volunteering": env("ZOHO_DESK_AGENT_VOLUNTEERING", default=""),
+    "partnerships": env("ZOHO_DESK_AGENT_PARTNERSHIPS", default=""),
+}

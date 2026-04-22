@@ -54,6 +54,7 @@ from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import (
     Attorney,
+    AttorneyOrganization,
     AttorneyOrganizationAssociation,
     CriminalComplaint,
     CriminalCount,
@@ -94,6 +95,7 @@ from cl.recap.mergers import (
     get_data_from_att_report,
     get_order_of_docket,
     merge_attachment_page_data,
+    normalize_attorney_contact,
     normalize_long_description,
     update_case_names,
     update_docket_appellate_metadata,
@@ -109,6 +111,7 @@ from cl.recap.models import (
     ProcessingQueue,
 )
 from cl.recap.tasks import (
+    check_pdf_redactions,
     create_or_merge_from_idb_chunk,
     do_pacer_fetch,
     download_acms_pdf_by_rd,
@@ -126,7 +129,10 @@ from cl.recap.tasks import (
     process_recap_upload,
     process_recap_zip,
 )
-from cl.recap.utils import get_court_id_from_fetch_queue
+from cl.recap.utils import (
+    get_court_id_from_fetch_queue,
+    send_bad_redaction_email,
+)
 from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
@@ -1761,7 +1767,7 @@ class ReplicateRecapUploadsTest(TestCase):
             msg="Didn't get the expected docket ID.",
         )
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_upload(self, mock_extract):
         """Can we duplicate a PDF document upload from a subdocket case to the
         corresponding RD across all related dockets?
@@ -1904,7 +1910,7 @@ class ReplicateRecapUploadsTest(TestCase):
 
                 transaction.set_rollback(True)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_processing_subdocket_case_pdf_attachment_upload(
         self, mock_extract
     ):
@@ -2357,7 +2363,7 @@ class ReplicateRecapUploadsTest(TestCase):
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
     )
-    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
     def test_replicate_subdocket_pdf_from_fq(
         self,
         mock_extract,
@@ -2457,7 +2463,7 @@ class ReplicateRecapUploadsTest(TestCase):
         # Confirm that the 3 PDFs have been extracted.
         self.assertEqual(mock_extract.call_count, 3)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_avoid_replication_on_pdf_available(self, mock_extract):
         """Confirm that replication for RDs where the PDF is already available is omitted"""
         # Add the docket entry to every case.
@@ -2734,7 +2740,7 @@ class RecapDocketFetchApiTest(TestCase):
 
         # Check that the docket fields match the expected fake data.
         self.assertEqual(appellate_docket.court_id, "ca1")
-        self.assertEqual(appellate_docket.docket_number, "10-1081")
+        self.assertEqual(appellate_docket.docket_number_raw, "10-1081")
         self.assertEqual(appellate_docket.case_name, "United States v. Brown")
 
         # Verify that a RECAPDocument was created and linked to the docket.
@@ -2764,7 +2770,7 @@ class RecapDocketFetchApiTest(TestCase):
     ):
         # Ensure the docket does not exist before the fetch.
         self.assertFalse(
-            Docket.objects.filter(docket_number="25-4097").exists()
+            Docket.objects.filter(docket_number_raw="25-4097").exists()
         )
 
         fq = PacerFetchQueue.objects.create(
@@ -2796,12 +2802,14 @@ class RecapDocketFetchApiTest(TestCase):
         mock_appellate_docket_report.assert_not_called()
 
         # Verify that the docket was created.
-        acms_docket = Docket.objects.filter(docket_number="25-4097").first()
+        acms_docket = Docket.objects.filter(
+            docket_number_raw="25-4097"
+        ).first()
         self.assertIsNotNone(acms_docket)
 
         # Check that the docket fields match the expected fake data.
         self.assertEqual(acms_docket.court_id, "ca9")
-        self.assertEqual(acms_docket.docket_number, "25-4097")
+        self.assertEqual(acms_docket.docket_number_raw, "25-4097")
         self.assertEqual(
             acms_docket.case_name, "Wortman, et al. v. All Nippon Airways"
         )
@@ -3302,7 +3310,7 @@ class RecapPdfFetchApiTest(TestCase):
         "cl.corpus_importer.tasks.is_appellate_court",
         wraps=is_appellate_court,
     )
-    @mock.patch("cl.scrapers.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.scrapers.tasks.extract_pdf_document_base")
     def test_fetch_unavailable_pdf_district(
         self,
         mock_extract,
@@ -3913,7 +3921,7 @@ class DebugRecapUploadtest(TestCase):
         DocketEntry.objects.all().delete()
         RECAPDocument.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     @mock.patch(
         "cl.lib.storage.get_name_by_incrementing",
         side_effect=clobbering_get_name,
@@ -4028,7 +4036,7 @@ class RecapPdfTaskTest(TestCase):
     def test_pq_has_default_status(self) -> None:
         self.assertTrue(self.pq.status == PROCESSING_STATUS.ENQUEUED)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    @mock.patch("cl.recap.tasks.extract_pdf_document_base")
     def test_recap_document_already_exists(self, mock_extract):
         """We already have everything"""
         # Update self.rd so it looks like it is already all good.
@@ -4074,7 +4082,7 @@ class RecapPdfTaskTest(TestCase):
         self.assertEqual(self.pq.docket_entry_id, None)
         self.assertEqual(self.pq.recap_document_id, None)
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
+    @mock.patch("cl.recap.tasks.extract_pdf_document.si")
     def test_docket_and_docket_entry_already_exist(self, mock_extract):
         """What happens if we have everything but the PDF?
 
@@ -4177,7 +4185,7 @@ class RecapZipTaskTest(TestCase):
         Docket.objects.all().delete()
         ProcessingQueue.objects.all().delete()
 
-    @mock.patch("cl.recap.tasks.extract_recap_pdf.si")
+    @mock.patch("cl.recap.tasks.extract_pdf_document.si")
     def test_simple_zip_upload(self, mock_extract):
         """Do we unpack the zip and process it's contents properly?"""
         # The original pq should be marked as complete with a good message.
@@ -4307,6 +4315,57 @@ class RecapAddAttorneyTest(TestCase):
         roles = a.roles.all()
         self.assertEqual(roles.count(), 2)
         self.assertNotIn(r, roles)
+
+    def test_atty_org_race_condition_in_atomic_block(self) -> None:
+        """Does add_attorney handle AttorneyOrganization IntegrityError
+        within an outer atomic transaction?
+
+        Simulates the race condition where another process creates the
+        AttorneyOrganization between our .get() and .create(). The
+        IntegrityError must be caught and recovered from without
+        aborting the outer transaction.
+        """
+        atty_org_info, _ = normalize_attorney_contact(
+            self.atty["contact"], fallback_name=self.atty["name"]
+        )
+
+        # Pre-create the org to cause IntegrityError on create
+        AttorneyOrganization.objects.create(**atty_org_info)
+
+        # Mock get() to raise DoesNotExist on first call (simulating
+        # the race window), then succeed on the retry after
+        # IntegrityError.
+        get_call_count = [0]
+        original_get = AttorneyOrganization.objects.get
+
+        def get_side_effect(*args, **kwargs):
+            get_call_count[0] += 1
+            if get_call_count[0] == 1:
+                raise AttorneyOrganization.DoesNotExist()
+            return original_get(*args, **kwargs)
+
+        # Wrap in transaction.atomic to simulate the real call path
+        # (add_parties_and_attorneys is @transaction.atomic).
+        # Without the savepoint fix, the IntegrityError from create()
+        # would break the transaction and the recovery get() would
+        # raise TransactionManagementError.
+        with transaction.atomic():
+            with mock.patch.object(
+                AttorneyOrganization.objects,
+                "get",
+                side_effect=get_side_effect,
+            ):
+                a_pk = add_attorney(self.atty, self.p, self.d)
+
+        a = Attorney.objects.get(pk=a_pk)
+        self.assertTrue(
+            AttorneyOrganizationAssociation.objects.filter(
+                attorney=a,
+                attorney_organization__name=self.atty_org_name,
+                docket=self.d,
+            ).exists(),
+            msg="Attorney organization association should exist after race condition recovery.",
+        )
 
 
 class DocketCaseNameUpdateTest(SimpleTestCase):
@@ -5814,7 +5873,15 @@ class ClaimsRegistryTaskTest(TestCase):
 
 
 class RecapDocketAppellateTaskTest(TestCase):
-    fixtures = ["hawaii_court.json"]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        CourtFactory(
+            id="hid",
+            jurisdiction="SA",
+            short_name="Faked Hawaii Court",
+            full_name="Faked Hawaii Super Court",
+            in_use=False,
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -8688,3 +8755,106 @@ class RemoveDuplicatedMinuteEntries(TestCase):
                 entry_db.recap_documents.all()[0].description,
                 entry["short_description"],
             )
+
+
+class BadRedactionCheckTest(TestCase):
+    """Tests for the X-Ray bad redaction checking feature."""
+
+    SAMPLE_REDACTIONS = {
+        "1": [{"text": "Hidden SSN", "bbox": (10, 20, 100, 30)}],
+        "3": [{"text": "Secret text", "bbox": (50, 60, 150, 70)}],
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="txnd", jurisdiction="FB")
+
+    def setUp(self):
+        self.docket = DocketFactory(
+            court=self.court,
+            case_name="Test Case v. Bad Redactions",
+            pacer_case_id="12345",
+        )
+        self.de = DocketEntryFactory(docket=self.docket, entry_number=1)
+        self.rd = RECAPDocumentFactory(
+            docket_entry=self.de,
+            document_number="1",
+            pacer_doc_id="test-doc-id",
+            is_available=True,
+        )
+
+    def tearDown(self):
+        Docket.objects.all().delete()
+
+    def _mock_redaction_response(self, results=None, error=False):
+        """Create a mock redaction check response."""
+        mock_response = MagicMock()
+        mock_response.is_success = True
+        mock_response.json.return_value = {
+            "error": error,
+            "results": results or {},
+        }
+        return mock_response
+
+    @mock.patch("cl.recap.tasks.send_bad_redaction_email")
+    @mock.patch("cl.recap.tasks.check_redactions_service")
+    def test_redaction_check_sends_email_only_when_results_found(
+        self, mock_check, mock_send_email
+    ):
+        """Email is sent only when bad redactions are found."""
+        test_cases = [
+            ("with_results", self.SAMPLE_REDACTIONS, True),
+            ("empty_results", {}, False),
+            ("error_response", {"1": [{"text": "x"}]}, False),
+        ]
+        for label, results, expect_email in test_cases:
+            with self.subTest(label=label):
+                mock_send_email.reset_mock()
+                error = label == "error_response"
+                mock_check.return_value = self._mock_redaction_response(
+                    results=results, error=error
+                )
+
+                check_pdf_redactions(self.rd.pk)
+
+                if expect_email:
+                    mock_send_email.assert_called_once()
+                else:
+                    mock_send_email.assert_not_called()
+
+    @mock.patch("cl.recap.tasks.check_redactions_service")
+    def test_redaction_check_failure_raises(self, mock_check):
+        """Redaction check failures are raised (for Celery retry)."""
+        mock_check.side_effect = Exception("Doctor service down")
+        with self.assertRaises(Exception):
+            check_pdf_redactions(self.rd.pk)
+
+    def test_send_bad_redaction_email_content(self):
+        """Email contains correct subject, recipients, and redaction text."""
+        send_bad_redaction_email(self.rd, self.SAMPLE_REDACTIONS)
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn("Bad Redactions Detected", email.subject)
+        self.assertEqual(email.to, [settings.BAD_REDACTION_EMAIL])
+        for page_num, items in self.SAMPLE_REDACTIONS.items():
+            self.assertIn(f"Page {page_num}", email.body)
+            for item in items:
+                self.assertIn(item["text"], email.body)
+
+    def test_send_bad_redaction_email_for_attachment(self):
+        """Email URL contains the attachment number for attachment docs."""
+        rd_attachment = RECAPDocument.objects.create(
+            docket_entry=self.de,
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="1",
+            attachment_number=2,
+            pacer_doc_id="test-att-id",
+        )
+
+        send_bad_redaction_email(
+            rd_attachment, {"1": [{"text": "Secret", "bbox": (0, 0, 10, 10)}]}
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("/1/2/", mail.outbox[0].body)

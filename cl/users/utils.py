@@ -266,7 +266,7 @@ emails: dict[str, EmailType] = {
         "accounts are reserved for users with verified affiliations to "
         "accredited educational institutions.\n\n"
         "That said, we’d still love to have you as part of our community. You "
-        "can sign up for a regular membership here: https://donate.free.law/forms/membership.\n\n"
+        "can sign up for a regular membership here: https://free.law/membership/.\n\n"
         "------------------\n\n"
         "If you have any questions or believe this decision was made in error, "
         "please see our contact page, https://www.courtlistener.com/contact/",

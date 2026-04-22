@@ -673,10 +673,13 @@ def handle_docket_number_raw_cleaning(
         # Only perform cleaning if enabled
         return
 
-    # Only clean if the docket was was non-recap source and newly created or docket_number_raw has changed
-    changed = bool(
-        update_fields and not created and "docket_number_raw" in update_fields
-    )
-    non_recap_sources = instance.source != Docket.RECAP
-    if (created or changed) and non_recap_sources:
+    if instance.source == Docket.RECAP:
+        return
+
+    # handle explicit updates. Otherwise, `clean_docket_number_raw_and_update_redis_cache`
+    # below will create infinite recursion
+    if update_fields and "docket_number_raw" not in update_fields:
+        return
+
+    if created or instance.docket_number_raw_tracker.changed():
         clean_docket_number_raw_and_update_redis_cache(instance)
