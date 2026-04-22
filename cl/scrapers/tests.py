@@ -2235,7 +2235,7 @@ class SubscribeToSCOTUSTest(TestCase):
         form_url = (
             f"{scotus_root}/CaseNotification?caseNumber={self.docket_number}"
         )
-        subscription_email = "scotus@recap.email"
+        subscription_email = settings.SCOTUS_RECAP_EMAIL
         captcha_solution = "mo9su"
         captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
         verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"

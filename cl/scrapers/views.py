@@ -13,7 +13,7 @@ from cl.celery_init import app
 from cl.recap.api_serializers import EmailProcessingQueueSerializer
 from cl.recap.filters import EmailProcessingQueueFilter
 from cl.recap.models import EmailProcessingQueue, EmailSource
-from cl.recap.tasks import process_texas_email, process_scotus_email
+from cl.recap.tasks import process_scotus_email, process_texas_email
 from cl.search.models import Court
 
 

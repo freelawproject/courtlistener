@@ -93,7 +93,9 @@ router.register(
 
 # Scrapers
 router.register(
-    r"scrapers/scotus-email", scraper_views.ScraperSCOTUSEmailEndpoint
+    r"scrapers/scotus-email",
+    scraper_views.ScraperSCOTUSEmailEndpoint,
+    basename="scotus-email",
 )
 
 # Tags

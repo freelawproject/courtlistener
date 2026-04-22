@@ -75,6 +75,7 @@ from cl.corpus_importer.tasks import (
     get_document_number_for_appellate,
     is_docket_entry_sealed,
     is_pacer_doc_sealed,
+    merge_scotus_docket,
     merge_texas_docket,
     save_attachment_pq_from_text,
     update_rd_metadata,
@@ -102,7 +103,11 @@ from cl.lib.pacer_session import (
     get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import get_document_filename
-from cl.lib.storage import RecapEmailSESStorage, SCOTUSSESStorage, TexasEmailSESStorage
+from cl.lib.storage import (
+    RecapEmailSESStorage,
+    SCOTUSSESStorage,
+    TexasEmailSESStorage,
+)
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -115,7 +120,6 @@ from cl.recap.mergers import (
     get_data_from_att_report,
     merge_attachment_page_data,
     merge_pacer_docket_into_cl_docket,
-    merge_scotus_docket,
     process_orphan_documents,
     update_docket_appellate_metadata,
     update_docket_metadata,
@@ -3859,7 +3863,7 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
     )
 
     try:
-        body = retrieve_email_from_queue(epq, SCOTUSSESStorage())
+        body = retrieve_email_from_queue(epq.message_id, SCOTUSSESStorage())
     except FileNotFoundError as exc:
         if self.request.retries == self.max_retries:
             async_to_sync(mark_pq_status)(
