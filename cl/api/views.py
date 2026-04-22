@@ -145,20 +145,32 @@ async def citation_lookup_api(
     request: HttpRequest, version=None
 ) -> HttpResponse:
     cite_count = await Citation.objects.acount()
-    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
-    default_throttle_rate = parse_throttle_rate_for_template(rate)
-    custom_throttle_rate = None
+    raw_default = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"][
+        "citations"
+    ]  # type: ignore
+    default_rate_strs = (
+        [raw_default] if isinstance(raw_default, str) else list(raw_default)
+    )
+    default_throttle_rates = [
+        parsed
+        for r in default_rate_strs
+        if (parsed := parse_throttle_rate_for_template(r)) is not None
+    ]
+
+    custom_throttle_rates: list[tuple[int, str]] = []
     if request.user and request.user.is_authenticated:
         overrides = await sync_to_async(get_all_throttle_overrides)(
             ThrottleType.CITATION_LOOKUP
         )
-        override = overrides.get(request.user.username)
-        if override is not None:
-            blocked, custom_rate = override
-            if not blocked and custom_rate:
-                custom_throttle_rate = parse_throttle_rate_for_template(
-                    custom_rate
-                )
+        user_rates = overrides.get(request.user.username) or []
+        # Skip '0/...' rates — those mean blocked; the docs page shouldn't
+        # advertise them as if they were throughput limits.
+        custom_throttle_rates = [
+            parsed
+            for r in user_rates
+            if not r.startswith("0/")
+            and (parsed := parse_throttle_rate_for_template(r)) is not None
+        ]
 
     return TemplateResponse(
         request,
@@ -168,8 +180,8 @@ async def citation_lookup_api(
         ],
         {
             "cite_count": cite_count,
-            "default_throttle_rate": default_throttle_rate,
-            "custom_throttle_rate": custom_throttle_rate,
+            "default_throttle_rates": default_throttle_rates,
+            "custom_throttle_rates": custom_throttle_rates or None,
             "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
             "private": False,
             "version": version if version else "v4",
