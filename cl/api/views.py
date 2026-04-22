@@ -145,9 +145,9 @@ async def citation_lookup_api(
     request: HttpRequest, version=None
 ) -> HttpResponse:
     cite_count = await Citation.objects.acount()
-    raw_default = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"][
+    raw_default = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"][  # type: ignore[misc]
         "citations"
-    ]  # type: ignore
+    ]
     default_rate_strs = (
         [raw_default] if isinstance(raw_default, str) else list(raw_default)
     )

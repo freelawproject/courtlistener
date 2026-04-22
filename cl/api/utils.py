@@ -794,7 +794,12 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         :param rates: List of rate strings, e.g. ['5/min', '50/hour'].
         :return: True if allowed, False if throttled.
         """
-        parsed = [self.parse_rate(r) for r in rates]
+        parsed: list[tuple[int, int]] = [
+            (n, d)
+            for r in rates
+            for n, d in [self.parse_rate(r)]
+            if n is not None and d is not None
+        ]
         max_duration = max(d for _, d in parsed)
 
         # Drop entries older than the longest window.
@@ -867,15 +872,23 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         :return: Rate string (e.g., '100/hour'), or None if user is blocked.
         """
         default = self.THROTTLE_RATES["citations"]
-        default_rates = (
-            [default] if isinstance(default, str) else list(default)
-        )
+        if default is None:
+            default_rates: list[str] = []
+        elif isinstance(default, str):
+            default_rates = [default]
+        else:
+            default_rates = list(default)
         overrides = get_all_throttle_overrides(ThrottleType.CITATION_LOOKUP)
         return overrides.get(request.user.username) or default_rates
 
     def throttle_request_by_citation_count(self, request, view):
         rates = self.get_citations_rate(request)
-        parsed = [self.parse_rate(r) for r in rates]
+        parsed: list[tuple[int, int]] = [
+            (n, d)
+            for r in rates
+            for n, d in [self.parse_rate(r)]
+            if n is not None and d is not None
+        ]
         max_duration = max(d for _, d in parsed)
 
         self.key = self.get_cache_key_for_citations(request, view)
