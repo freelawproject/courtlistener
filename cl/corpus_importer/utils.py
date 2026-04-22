@@ -1234,9 +1234,7 @@ def compute_blocked_court_wait(
         base_wait = settings.IQUERY_COURT_BLOCKED_WAIT  # type: ignore[assignment]
 
     current_wait_time = int(base_wait * 2 ** (court_blocked_attempts - 1))
-    total_accumulated_time = sum(
-        base_wait * 2**i for i in range(court_blocked_attempts)
-    )
+    total_accumulated_time = base_wait * (2**court_blocked_attempts - 1)
     return current_wait_time, total_accumulated_time
 
 

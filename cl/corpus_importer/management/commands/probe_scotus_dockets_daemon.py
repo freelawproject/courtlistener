@@ -3,9 +3,10 @@ import time
 from celery import chain
 from django.conf import settings
 from django.utils.timezone import localtime
+from httpx import HTTPStatusError as HTTPError
+from httpx import TimeoutException as Timeout
 from juriscraper.scotus import SCOTUSDocketReport
 from redis import ConnectionError as RedisConnectionError
-from requests.exceptions import HTTPError, Timeout
 
 from cl.corpus_importer.scotus_daemon_utils import (
     HIGHEST_SCOTUS_KNOWN_SERIAL,
