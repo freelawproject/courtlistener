@@ -360,6 +360,7 @@ dependencies = [
     { name = "django-markdown-deux" },
     { name = "django-mathfilters" },
     { name = "django-model-utils" },
+    { name = "django-oauth-toolkit" },
     { name = "django-override-storage" },
     { name = "django-permissions-policy" },
     { name = "django-pghistory" },
@@ -477,6 +478,7 @@ requires-dist = [
     { name = "django-markdown-deux", specifier = ">=1.0.6" },
     { name = "django-mathfilters" },
     { name = "django-model-utils", specifier = ">=5.0.0" },
+    { name = "django-oauth-toolkit", extras = ["jwcrypto"], specifier = ">=3.2.0" },
     { name = "django-override-storage", specifier = ">=0.3.2" },
     { name = "django-permissions-policy", specifier = ">=4.28.0" },
     { name = "django-pghistory", specifier = ">=3.9.1" },
@@ -1002,6 +1004,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/81/60/5e232c32a2c977cc1af8c70a38ef436598bc649ad89c2c4568454edde2c9/django_model_utils-5.0.0.tar.gz", hash = "sha256:041cdd6230d2fbf6cd943e1969318bce762272077f4ecd333ab2263924b4e5eb", size = 80559, upload-time = "2024-09-04T11:35:22.858Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/13/87a42048700c54bfce35900a34e2031245132775fb24363fc0e33664aa9c/django_model_utils-5.0.0-py3-none-any.whl", hash = "sha256:fec78e6c323d565a221f7c4edc703f4567d7bb1caeafe1acd16a80c5ff82056b", size = 42630, upload-time = "2024-09-04T11:36:23.166Z" },
+]
+
+[[package]]
+name = "django-oauth-toolkit"
+version = "3.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "jwcrypto" },
+    { name = "oauthlib" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/95/efd83b35c34b86eb2249d2b54c5eaf383c48f3f19034aa6f3807e37471b6/django_oauth_toolkit-3.2.0.tar.gz", hash = "sha256:c36761ae6810083d95a652e9c820046cde0d45a2e2a5574bbe7202656ec20bb6", size = 114211, upload-time = "2026-01-08T22:03:13.311Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ae/cc/f27a784c0ecd13335abd9ef85ebb80dbc04945f919da5f496f56e3562751/django_oauth_toolkit-3.2.0-py3-none-any.whl", hash = "sha256:bd2cd2719b010231a2f370f927dbcc740454fb1d0dd7e7f4138f36227363dc26", size = 87077, upload-time = "2026-01-08T22:03:12.123Z" },
 ]
 
 [[package]]
@@ -1855,7 +1872,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "3.0.10"
+version = "3.0.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1874,9 +1891,22 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f3/9c/dbbe9cc801f7e232b3262ec470636f88f2274d60c00280a4a1ad22678361/juriscraper-3.0.10.tar.gz", hash = "sha256:80f55cd764e421fa00441ee9f44a516776d4c061a2d69f6bc59f9c21def82819", size = 393768, upload-time = "2026-04-14T15:22:39.878Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/e9/0106105daeecb8a5796a4716da659bd63090347f0c1aae7d5267af576ad0/juriscraper-3.0.11.tar.gz", hash = "sha256:1e275f92a06aa9a27a877601fcd46f1e1b2c92811d6315665b2c133d6ecaa7b7", size = 393986, upload-time = "2026-04-18T00:39:39.063Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/74/8ddd3abda8667c3aec7080d24473bce08d5dfee1219fc2b527480f5b480e/juriscraper-3.0.10-py3-none-any.whl", hash = "sha256:67ff9723038bad63704a1a26d203180dae4b547ec8a4274f986ac520e9f7b7cd", size = 622779, upload-time = "2026-04-14T15:22:37.742Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/ce/9c9ca9bff933b9240db75c8cf3371f7dc636aa3abdc791f9f387664368ed/juriscraper-3.0.11-py3-none-any.whl", hash = "sha256:fdb7f0cda98718230efa55b3e3899d65131e384d5fb278a92b927d7eb609bb91", size = 622993, upload-time = "2026-04-18T00:39:37.097Z" },
+]
+
+[[package]]
+name = "jwcrypto"
+version = "1.5.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8c/90/f065668004d22715c1940d6e88e4c3afc8ee16d5664e4478d2c8fd23a250/jwcrypto-1.5.7.tar.gz", hash = "sha256:70204d7cca406eda8c82352e3c41ba2d946610dafd19e54403f0a1f4f18633c6", size = 89535, upload-time = "2026-04-07T00:35:36.116Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/72/24/fb7da4d6613de7001feaf540d4b5969c6b5a1c42839043b0196cb13aa057/jwcrypto-1.5.7-py3-none-any.whl", hash = "sha256:729463fefe28b6de5cf1ebfda3e94f1a1b41d2799148ef98a01cb9678ebe2bb0", size = 94799, upload-time = "2026-04-07T00:35:35.085Z" },
 ]
 
 [[package]]
@@ -2241,6 +2271,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ac/52/41f3d71296a3dcaa4f456aaa3c6fc8e745b43d0552b6bde56571bb4b4a0f/numpy-2.4.0-cp313-cp313t-win32.whl", hash = "sha256:20c115517513831860c573996e395707aa9fb691eb179200125c250e895fcd93", size = 6076216, upload-time = "2025-12-20T16:17:11.437Z" },
     { url = "https://files.pythonhosted.org/packages/35/ff/46fbfe60ab0710d2a2b16995f708750307d30eccbb4c38371ea9e986866e/numpy-2.4.0-cp313-cp313t-win_amd64.whl", hash = "sha256:b48e35f4ab6f6a7597c46e301126ceba4c44cd3280e3750f85db48b082624fa4", size = 12444263, upload-time = "2025-12-20T16:17:13.182Z" },
     { url = "https://files.pythonhosted.org/packages/a3/e3/9189ab319c01d2ed556c932ccf55064c5d75bb5850d1df7a482ce0badead/numpy-2.4.0-cp313-cp313t-win_arm64.whl", hash = "sha256:4d1cfce39e511069b11e67cd0bd78ceff31443b7c9e5c04db73c7a19f572967c", size = 10378265, upload-time = "2025-12-20T16:17:15.211Z" },
+]
+
+[[package]]
+name = "oauthlib"
+version = "3.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/5f/19930f824ffeb0ad4372da4812c50edbd1434f678c90c2733e1188edfc63/oauthlib-3.3.1.tar.gz", hash = "sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9", size = 185918, upload-time = "2025-06-19T22:48:08.269Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/be/9c/92789c596b8df838baa98fa71844d84283302f7604ed565dafe5a6b5041a/oauthlib-3.3.1-py3-none-any.whl", hash = "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1", size = 160065, upload-time = "2025-06-19T22:48:06.508Z" },
 ]
 
 [[package]]

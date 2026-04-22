@@ -4613,6 +4613,10 @@ def merge_texas_docket_originating_court(
     if texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
+            logger.warning(
+                "Skipping merge of OCI for Texas docket %s due to missing originating court docket number.",
+                docket.docket_number,
+            )
             return MergeResult.failed("OriginatingCourtInformation")
         oc_dn = sorted(ocd["case_number"])[0]
         oc_reporter = ""
@@ -4909,6 +4913,7 @@ def merge_texas_docket(
                 docket_source=Docket.SCRAPER,
                 allow_create=True,
             )
+        docket_created = docket.pk is None
         docket.add_scraper_source()
         docket.docket_number = docket_number
         docket.docket_number_core = make_texas_docket_number_core(
@@ -4976,15 +4981,16 @@ def merge_texas_docket(
     result = MergeResult.union(result, party_merge_result)
     result = MergeResult.union(result, entry_merge_result)
     result = MergeResult.union(result, merge_case_transfer_result)
-    # Track the docket PK in the result
-    result.creates.setdefault("Docket", set()).add(docket.pk)
+    bucket = result.creates if docket_created else result.updates
+    bucket.setdefault("Docket", set()).add(docket.pk)
 
     if not result.success:
         logger.error(
-            "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Please review logs.",
+            "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Failures: %s",
             docket_number,
             docket.pk,
             court.pk,
+            result.failures,
         )
 
     return result
@@ -5050,7 +5056,12 @@ def texas_ingest_docket_task(
     )
     if subscription_data and result.create:
         redis = get_redis_interface("CACHE")
-        redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+        added = redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+        if not added:
+            logger.info(
+                "TAMES subscription already pending, skipping: %s",
+                subscription_data,
+            )
     return result
 
 
