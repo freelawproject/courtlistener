@@ -1,7 +1,21 @@
-from django.urls import path
-from oauth2_provider import views as oauth2_views
+from django.urls import include, path
+from oauth2_provider.urls import (
+    app_name as oauth2_app_name,
+)
+from oauth2_provider.urls import (
+    base_urlpatterns,
+    oidc_urlpatterns,
+)
 
 from cl.oauth import views
+
+mcp_base_urlpatterns = [
+    p for p in base_urlpatterns if not (p.name or "").startswith("device")
+]
+
+mcp_oidc_urlpatterns = [
+    p for p in oidc_urlpatterns if p.name != "rp-initiated-logout"
+]
 
 urlpatterns = [
     # RFC 7591 Dynamic Client Registration.
@@ -16,30 +30,11 @@ urlpatterns = [
         views.OAuthMetadataView.as_view(),
         name="oauth2_metadata",
     ),
-    # django-oauth-toolkit endpoints.
+    # django-oauth-toolkit's OAuth 2.0 and OIDC routes.
     path(
-        "o/authorize/",
-        oauth2_views.AuthorizationView.as_view(),
-        name="oauth2_authorize",
-    ),
-    path(
-        "o/token/",
-        oauth2_views.TokenView.as_view(),
-        name="oauth2_token",
-    ),
-    path(
-        "o/revoke_token/",
-        oauth2_views.RevokeTokenView.as_view(),
-        name="oauth2_revoke_token",
-    ),
-    path(
-        "o/introspect/",
-        oauth2_views.IntrospectTokenView.as_view(),
-        name="oauth2_introspect",
-    ),
-    path(
-        "o/.well-known/jwks.json",
-        oauth2_views.JwksInfoView.as_view(),
-        name="oauth2_jwks",
+        "o/",
+        include(
+            (mcp_base_urlpatterns + mcp_oidc_urlpatterns, oauth2_app_name)
+        ),
     ),
 ]
