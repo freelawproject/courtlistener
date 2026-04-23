@@ -148,7 +148,9 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
         return epq
 
 
-class SCOTUSEmailProcessingQueueSerializer(StateEmailProcessingQueueSerializer):
+class SCOTUSEmailProcessingQueueSerializer(
+    StateEmailProcessingQueueSerializer
+):
     court: PrimaryKeyRelatedField[Court] = serializers.PrimaryKeyRelatedField(
         queryset=Court.objects.filter(pk="scotus"),
         required=True,
