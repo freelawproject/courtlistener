@@ -820,6 +820,31 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.cache.set(self.key, self.history, max_duration)
         return True
 
+    def wait(self) -> float | None:
+        """Compute Retry-After using only timestamps in the failing window.
+
+        DRF's default wait() uses ``len(self.history)``, but in the multi-rate
+        case ``self.history`` holds entries for the longest window. When a
+        shorter rate fails, ``num_requests - len(history) + 1`` can go
+        non-positive and DRF returns None (no Retry-After header). Filter
+        the history down to the window being enforced before computing.
+        """
+        if self.duration is None or self.num_requests is None:
+            return None
+
+        cutoff = self.now - self.duration
+        relevant = [ts for ts in self.history if ts > cutoff]
+        if relevant:
+            remaining_duration = self.duration - (self.now - relevant[-1])
+        else:
+            remaining_duration = self.duration
+
+        available_requests = self.num_requests - len(relevant) + 1
+        if available_requests <= 0:
+            return None
+
+        return remaining_duration / float(available_requests)
+
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
     """

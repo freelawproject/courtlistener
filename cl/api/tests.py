@@ -7,6 +7,7 @@ from unittest import mock
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
+import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
@@ -4940,3 +4941,47 @@ class MultiRateThrottleTest(TestCase):
 
         throttle = ExceptionalUserRateThrottle()
         self.assertTrue(throttle.allow_request(request, view=None))
+
+    def test_retry_after_set_when_longer_window_has_older_entries(
+        self,
+    ) -> None:
+        """Retry-After is populated when a shorter rate fails with older entries still cached."""
+        # Rates 1/min + 5/hour share a single timestamp history (sized to
+        # the hour window). After the minute window rolls but the hour
+        # window does not, the next 1/min failure must still produce a
+        # positive wait(): entries left in history from outside the
+        # minute window can otherwise make DRF's wait() return None and
+        # drop the Retry-After header.
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="1/min",
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/hour",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        t0 = datetime(2026, 4, 23, 12, 0, 0, tzinfo=UTC)
+
+        with time_machine.travel(t0, tick=False):
+            throttle = ExceptionalUserRateThrottle()
+            self.assertTrue(throttle.allow_request(request, view=None))
+
+        # Minute window has rolled; still under 5/hour.
+        with time_machine.travel(t0 + timedelta(seconds=61), tick=False):
+            throttle = ExceptionalUserRateThrottle()
+            self.assertTrue(throttle.allow_request(request, view=None))
+
+        # Exceeds 1/min. History holds t0 (hour-window only) + t0+61.
+        with time_machine.travel(t0 + timedelta(seconds=62), tick=False):
+            throttle = ExceptionalUserRateThrottle()
+            self.assertFalse(throttle.allow_request(request, view=None))
+            wait = throttle.wait()
+            self.assertIsNotNone(wait)
+            self.assertAlmostEqual(wait, 59.0, places=5)
