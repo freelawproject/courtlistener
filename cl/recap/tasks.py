@@ -3842,7 +3842,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     retry_backoff=2 * 60,
     retry_backoff_max=60 * 60,
 )
-def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
+def process_scotus_email(self: Task, epq_pk: int) -> None:
     """Task to process an email added to the queue from the
     "scrapers/scotus-email" endpoint. If the email is a case notification
     email, fetch the docket page and return the scraped data.
@@ -3852,9 +3852,9 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
     type was unrecognized.
 
     :param self: The Celery task
-    :param epq: The EmailProcessingQueue object representing the email to
-    process
+    :param epq_pk: The PK of the EmailProcessingQueue object to process
     """
+    epq = EmailProcessingQueue.objects.get(pk=epq_pk)
     async_to_sync(mark_pq_status)(
         epq,
         "Processing SCOTUS email",
@@ -3893,7 +3893,7 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
         self.request.chain = None
         return None
 
-    if email_type == SCOTUSEmailType.CONFIRMATION:
+    if email_type == SCOTUSEmailType.CONFIRMATION.value:
         if data == SCOTUSConfirmationResult.Success.value:
             async_to_sync(mark_pq_status)(
                 epq,
@@ -3913,7 +3913,7 @@ def process_scotus_email(self: Task, epq: EmailProcessingQueue) -> None:
         self.request.chain = None
         return None
     try:
-        d = merge_scotus_docket(data)
+        d, _ = merge_scotus_docket(data)
     except Exception as e:
         async_to_sync(mark_pq_status)(
             epq,

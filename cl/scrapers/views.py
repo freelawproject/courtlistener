@@ -10,7 +10,6 @@ from rest_framework.viewsets import ModelViewSet
 
 from cl.api.utils import EmailProcessingQueueAPIUsers, LoggingMixin
 from cl.celery_init import app
-from cl.recap.api_serializers import EmailProcessingQueueSerializer
 from cl.recap.filters import EmailProcessingQueueFilter
 from cl.recap.models import EmailProcessingQueue, EmailSource
 from cl.recap.tasks import process_scotus_email, process_texas_email
@@ -149,10 +148,17 @@ class StateEmailEndpoint(LoggingMixin, ModelViewSet):
         return epq
 
 
+class SCOTUSEmailProcessingQueueSerializer(StateEmailProcessingQueueSerializer):
+    court: PrimaryKeyRelatedField[Court] = serializers.PrimaryKeyRelatedField(
+        queryset=Court.objects.filter(pk="scotus"),
+        required=True,
+    )
+
+
 class ScraperSCOTUSEmailEndpoint(LoggingMixin, ModelViewSet):
     permission_classes = (EmailProcessingQueueAPIUsers,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
-    serializer_class = EmailProcessingQueueSerializer
+    serializer_class = SCOTUSEmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
     ordering_fields = ("id", "date_created", "date_modified")
     ordering = "-id"
