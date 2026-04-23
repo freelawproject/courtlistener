@@ -4873,18 +4873,24 @@ class ThrottleOverrideIntegrationTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "multi-rate-throttle-test",
+        }
+    }
+)
 class MultiRateThrottleTest(TestCase):
     """Tests for multi-rate enforcement via ExceptionalUserRateThrottle."""
 
     def setUp(self) -> None:
         clear_tiered_cache()
-        for cache in caches.all():
-            cache.clear()
+        caches["default"].clear()
 
     def tearDown(self) -> None:
         clear_tiered_cache()
-        for cache in caches.all():
-            cache.clear()
+        caches["default"].clear()
 
     def test_zero_rate_blocks_first_request(self) -> None:
         """A 0/min rate must block the very first request."""
