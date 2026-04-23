@@ -4985,3 +4985,40 @@ class MultiRateThrottleTest(TestCase):
             wait = throttle.wait()
             self.assertIsNotNone(wait)
             self.assertAlmostEqual(wait, 59.0, places=5)
+
+    @mock.patch("cl.api.utils.get_all_throttle_overrides")
+    def test_retry_after_set_when_rate_tightened_after_history_accumulated(
+        self,
+        mock_overrides: mock.MagicMock,
+    ) -> None:
+        """Retry-After is set when a newly added rate's limit is smaller than cached entries in its window."""
+        # User starts with an hour-scope rate and burns several requests
+        # inside a minute. Then a tighter per-minute rate is added. The
+        # next request is throttled by the minute rate while history
+        # still holds more entries than num_requests allows; wait()
+        # must return the time until enough entries age out of the
+        # minute window, not None.
+        user = UserFactory()
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        t0 = datetime(2026, 4, 23, 12, 0, 0, tzinfo=UTC)
+
+        # Phase 1: only 10/hour is configured. Burn the budget.
+        mock_overrides.return_value = {user.username: ["10/hour"]}
+        for i in range(10):
+            with time_machine.travel(t0 + timedelta(seconds=i), tick=False):
+                throttle = ExceptionalUserRateThrottle()
+                self.assertTrue(throttle.allow_request(request, view=None))
+
+        # Phase 2: 5/min is added. All 10 cached entries sit inside the
+        # new minute window; wait() must return the time until the
+        # 6th-oldest entry (t0+5) ages out at t0+65, i.e. 35s.
+        mock_overrides.return_value = {user.username: ["10/hour", "5/min"]}
+        with time_machine.travel(t0 + timedelta(seconds=30), tick=False):
+            throttle = ExceptionalUserRateThrottle()
+            self.assertFalse(throttle.allow_request(request, view=None))
+            wait = throttle.wait()
+            self.assertIsNotNone(wait)
+            self.assertAlmostEqual(wait, 35.0, places=5)

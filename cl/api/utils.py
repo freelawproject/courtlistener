@@ -823,27 +823,37 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
     def wait(self) -> float | None:
         """Compute Retry-After using only timestamps in the failing window.
 
-        DRF's default wait() uses ``len(self.history)``, but in the multi-rate
-        case ``self.history`` holds entries for the longest window. When a
-        shorter rate fails, ``num_requests - len(history) + 1`` can go
-        non-positive and DRF returns None (no Retry-After header). Filter
-        the history down to the window being enforced before computing.
+        DRF's default wait() relies on len(self.history) and a division-based
+        calculation, which breaks in multi-rate scenarios:
+
+        1. Overlapping windows: entries from longer durations inflate history
+        size, causing available_requests <= 0 and returning None incorrectly.
+        2. Dynamic rate changes: if limits are tightened after history has built
+        up, the naive count-based approach underestimates pressure within the
+        active window.
+
+        Instead, we compute how many requests must expire before a new request fits,
+        then return the time until the most recent of those expiring requests leaves
+        the window.
         """
         if self.duration is None or self.num_requests is None:
             return None
 
-        cutoff = self.now - self.duration
-        relevant = [ts for ts in self.history if ts > cutoff]
-        if relevant:
-            remaining_duration = self.duration - (self.now - relevant[-1])
-        else:
-            remaining_duration = self.duration
+        window_start = self.now - self.duration
+        window_requests = [ts for ts in self.history if ts > window_start]
 
-        available_requests = self.num_requests - len(relevant) + 1
-        if available_requests <= 0:
+        # Number of requests that must expire for one new request to be allowed.
+        excess_requests = len(window_requests) - self.num_requests + 1
+        if excess_requests <= 0 or excess_requests > len(window_requests):
+            # <= 0: request is actually within limit (unexpected in throttle_failure context)
             return None
 
-        return remaining_duration / float(available_requests)
+        # history is assumed newest-first
+        # The last element in window_requests is the oldest in the window
+        # The target is the newest request that must expire
+        expiry_time = window_requests[-excess_requests] + self.duration
+
+        return max(expiry_time - self.now, 0.0)
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
