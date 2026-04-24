@@ -41,6 +41,7 @@ def process_scotus_hit(docket_number: str, content: str) -> None:
     :param content: The raw JSON
     :returns: None
     """
+    logger.info("Processing SCOTUS hit for docket %s.", docket_number)
     save_scotus_raw_to_s3(docket_number, content)
     parser = SCOTUSDocketReport()
     parser._parse_text(content)
@@ -252,6 +253,13 @@ def _probe_scotus_sequence(
         candidate = format_docket_number(
             term_year_2digit, candidate_serial, sequence
         )
+        logger.info(
+            "SCOTUS %s %s: probing candidate %s (offset %s).",
+            sequence,
+            term_year_2digit,
+            candidate,
+            probe_offset,
+        )
 
         try:
             text, _ = fetch_scotus_docket_json(candidate)
@@ -267,6 +275,12 @@ def _probe_scotus_sequence(
             break
 
         if text:
+            logger.info(
+                "SCOTUS %s %s: probe matched candidate %s.",
+                sequence,
+                term_year_2digit,
+                candidate,
+            )
             probe_cache[candidate] = text
             latest_match = candidate_serial
             found_match = True
