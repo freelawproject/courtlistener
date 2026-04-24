@@ -3756,7 +3756,7 @@ def process_scotus_docket(
     self,
     report_data: dict[str, Any],
     download_file: bool = True,
-) -> None:
+) -> int:
     """Process and merge a SCOTUS docket report.
 
     This task merges the provided SCOTUS docket report data into the database,
@@ -3766,13 +3766,14 @@ def process_scotus_docket(
     :param self: The Celery task instance.
     :param report_data: Parsed SCOTUS docket report data.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: None
+    :return: The primary key of the merged Docket.
     """
     docket, download_qp = merge_scotus_docket(
         report_data, download_file=download_file
     )
     if download_qp:
         download_qp_scotus_pdf.delay(docket.pk)
+    return docket.pk
 
 
 @app.task(
