@@ -9,7 +9,7 @@ from django.core.files.base import ContentFile
 
 from cl.lib.storage import (
     S3GlacierInstantRetrievalStorage,
-    clobbering_get_name,
+    get_name_by_incrementing,
 )
 
 SCOTUS_COURT_ID = "scotus"
@@ -156,7 +156,7 @@ def save_scotus_raw_to_s3(docket_number: str, content: str) -> None:
     :return: None
     """
     storage = S3GlacierInstantRetrievalStorage(
-        naming_strategy=clobbering_get_name
+        naming_strategy=get_name_by_incrementing
     )
     file_name = f"responses/dockets/scotus/{docket_number}.json"
     storage.save(file_name, ContentFile(content.encode("utf-8")))
