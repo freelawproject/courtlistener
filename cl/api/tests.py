@@ -27,7 +27,7 @@ from django.utils.timezone import now
 from django.utils.xmlutils import UnserializableContentError
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, Throttled
 from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -4894,7 +4894,7 @@ class MultiRateThrottleTest(TestCase):
         caches["default"].clear()
 
     def test_zero_rate_blocks_first_request(self) -> None:
-        """A 0/min rate must block the very first request."""
+        """A 0/min rate raises Throttled with a block-specific message."""
         user = UserFactory()
         APIThrottleFactory(
             user=user,
@@ -4906,10 +4906,17 @@ class MultiRateThrottleTest(TestCase):
         request.user = user
 
         throttle = ExceptionalUserRateThrottle()
-        self.assertFalse(throttle.allow_request(request, view=None))
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        # No meaningful retry time for a blocked user, wait is None,
+        # so DRF omits the Retry-After header.
+        self.assertIsNone(ctx.exception.wait)
+        self.assertIn("blocked", str(ctx.exception.detail).lower())
+        # The raw "0/min" rate should NOT leak into the user-facing message.
+        self.assertNotIn("0/min", str(ctx.exception.detail))
 
     def test_strictest_rate_wins(self) -> None:
-        """With 5/min and 50/hour, the 6th request in a minute is denied."""
+        """With 5/min and 50/hour, the 6th request raises Throttled citing 5/min."""
         user = UserFactory()
         APIThrottleFactory(
             user=user,
@@ -4930,7 +4937,9 @@ class MultiRateThrottleTest(TestCase):
             self.assertTrue(throttle.allow_request(request, view=None))
 
         throttle = ExceptionalUserRateThrottle()
-        self.assertFalse(throttle.allow_request(request, view=None))
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        self.assertIn("5/min", str(ctx.exception.detail))
 
     def test_requests_allowed_when_no_override(self) -> None:
         """Default rates still apply when the user has no override rows."""
@@ -4981,10 +4990,12 @@ class MultiRateThrottleTest(TestCase):
         # Exceeds 1/min. History holds t0 (hour-window only) + t0+61.
         with time_machine.travel(t0 + timedelta(seconds=62), tick=False):
             throttle = ExceptionalUserRateThrottle()
-            self.assertFalse(throttle.allow_request(request, view=None))
-            wait = throttle.wait()
-            self.assertIsNotNone(wait)
-            self.assertAlmostEqual(wait, 59.0, places=5)
+            with self.assertRaises(Throttled) as ctx:
+                throttle.allow_request(request, view=None)
+            # Newest in-window entry is t0+61 → 60 - (62 - 61) = 59s.
+            # DRF ceils wait to an int inside Throttled.__init__.
+            self.assertEqual(ctx.exception.wait, 59)
+            self.assertIn("1/min", str(ctx.exception.detail))
 
     @mock.patch("cl.api.utils.get_all_throttle_overrides")
     def test_retry_after_set_when_rate_tightened_after_history_accumulated(
@@ -5018,7 +5029,7 @@ class MultiRateThrottleTest(TestCase):
         mock_overrides.return_value = {user.username: ["10/hour", "5/min"]}
         with time_machine.travel(t0 + timedelta(seconds=30), tick=False):
             throttle = ExceptionalUserRateThrottle()
-            self.assertFalse(throttle.allow_request(request, view=None))
-            wait = throttle.wait()
-            self.assertIsNotNone(wait)
-            self.assertAlmostEqual(wait, 35.0, places=5)
+            with self.assertRaises(Throttled) as ctx:
+                throttle.allow_request(request, view=None)
+            self.assertEqual(ctx.exception.wait, 35)
+            self.assertIn("5/min", str(ctx.exception.detail))

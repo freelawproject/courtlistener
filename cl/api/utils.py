@@ -794,26 +794,26 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         :param rates: List of rate strings, e.g. ['5/min', '50/hour'].
         :return: True if allowed, False if throttled.
         """
-        parsed: list[tuple[int, int]] = [
-            (n, d)
-            for r in rates
-            for n, d in [self.parse_rate(r)]
-            if n is not None and d is not None
-        ]
-        max_duration = max(d for _, d in parsed)
+        parsed: list[tuple[int, int, str]] = []
+        for r in rates:
+            n, d = self.parse_rate(r)
+            if n is not None and d is not None:
+                parsed.append((n, d, r))
+        max_duration = max(d for _, d, _ in parsed)
 
         # Drop entries older than the longest window.
         while self.history and self.history[-1] <= self.now - max_duration:
             self.history.pop()
 
         # Check tightest window first for fast rejection.
-        for num_requests, duration in sorted(parsed, key=lambda p: p[1]):
+        for num_requests, duration, rate in sorted(parsed, key=lambda p: p[1]):
             cutoff = self.now - duration
             count = sum(1 for ts in self.history if ts > cutoff)
             if count >= num_requests:
                 # Set these so DRF's wait() → correct Retry-After.
                 self.num_requests = num_requests
                 self.duration = duration
+                self.failing_rate = rate
                 return self.throttle_failure()
 
         self.history.insert(0, self.now)
@@ -854,6 +854,23 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         expiry_time = window_requests[-excess_requests] + self.duration
 
         return max(expiry_time - self.now, 0.0)
+
+    def throttle_failure(self) -> bool:
+        """Raise Throttled with a message tailored to the failing rate."""
+        wait = self.wait()
+        if self.num_requests == 0:
+            # A '0/...' rate is used to block a user; surface that
+            # explicitly rather than as a rate-limit message.
+            detail = (
+                "Request was throttled. Your account is currently "
+                "blocked from making API requests."
+            )
+        else:
+            detail = (
+                f"Request was throttled. Rate limit exceeded: "
+                f"{self.failing_rate}."
+            )
+        raise Throttled(wait=wait, detail=detail)
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
