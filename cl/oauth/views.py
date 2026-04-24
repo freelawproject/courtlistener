@@ -152,12 +152,17 @@ class OAuthMetadataView(APIView):
         return Response(
             {
                 "issuer": base,
-                "authorization_endpoint": base + reverse("oauth2_authorize"),
-                "token_endpoint": base + reverse("oauth2_token"),
+                "authorization_endpoint": base
+                + reverse("oauth2_provider:authorize"),
+                "token_endpoint": base + reverse("oauth2_provider:token"),
                 "registration_endpoint": base + reverse("oauth2_dcr"),
-                "revocation_endpoint": base + reverse("oauth2_revoke_token"),
-                "introspection_endpoint": base + reverse("oauth2_introspect"),
-                "jwks_uri": base + reverse("oauth2_jwks"),
+                "revocation_endpoint": base
+                + reverse("oauth2_provider:revoke-token"),
+                "introspection_endpoint": base
+                + reverse("oauth2_provider:introspect"),
+                "userinfo_endpoint": base
+                + reverse("oauth2_provider:user-info"),
+                "jwks_uri": base + reverse("oauth2_provider:jwks-info"),
                 "response_types_supported": sorted(ALLOWED_RESPONSE_TYPES),
                 "grant_types_supported": sorted(ALLOWED_GRANT_TYPES),
                 "token_endpoint_auth_methods_supported": sorted(
