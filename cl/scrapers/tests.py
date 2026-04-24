@@ -32,6 +32,9 @@ from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
+from cl.corpus_importer.tasks import (
+    merge_scotus_docket as real_merge_scotus_docket,
+)
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.model_helpers import make_texas_docket_number_core
@@ -92,6 +95,8 @@ from cl.search.factories import (
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
     ParentheticalFactory,
+    ScotusDocketDataFactory,
+    SCOTUSDocketEntryDataFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -104,6 +109,7 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
+    SCOTUSDocketEntry,
 )
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
@@ -2630,20 +2636,21 @@ class SCOTUSEmailIntegrationTest(TestCase):
     async def test_docket_entry_email(
         self, mock_storage_cls, mock_email_cls, mock_merge
     ):
-        """Docket entry email calls merge_scotus_docket and sets SUCCESSFUL."""
+        """Docket entry email runs merge_scotus_docket and creates docket entries."""
         mock_storage_cls.return_value.open = mock.mock_open(
             read_data=b"fake email body"
         )
-        docket_data = {
-            "docket_number": "24-100",
-            "case_name": "Test v. Case",
-        }
+        docket_data = await sync_to_async(ScotusDocketDataFactory)(
+            docket_entries=[SCOTUSDocketEntryDataFactory()],
+            parties=[],
+        )
         mock_email_cls.return_value.handle_email.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,
         }
-        docket = await sync_to_async(DocketFactory.create)(court=self.scotus)
-        mock_merge.return_value = (docket, False)
+        mock_merge.side_effect = lambda data: real_merge_scotus_docket(
+            data, download_file=False
+        )
 
         with patch.object(process_scotus_email, "delay") as mock_delay:
             response = await self.async_client.post(
@@ -2659,6 +2666,16 @@ class SCOTUSEmailIntegrationTest(TestCase):
 
         self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
         mock_merge.assert_called_once_with(docket_data)
+        self.assertEqual(
+            await SCOTUSDocketEntry.objects.acount(),
+            len(docket_data["docket_entries"]),
+        )
+        entry = await SCOTUSDocketEntry.objects.select_related(
+            "docket"
+        ).afirst()
+        self.assertEqual(
+            entry.docket.docket_number, docket_data["docket_number"]
+        )
 
 
 class AccountSubscriptionIncludeTest(TestCase):
