@@ -95,8 +95,11 @@ from cl.search.factories import (
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
     ParentheticalFactory,
+    SCOTUSAttachmentDataFactory,
     ScotusDocketDataFactory,
     SCOTUSDocketEntryDataFactory,
+    SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -2637,16 +2640,60 @@ class SCOTUSEmailIntegrationTest(TestCase):
     async def test_docket_entry_email(
         self, mock_storage_cls, mock_email_cls, mock_merge
     ):
-        """Docket entry email runs merge_scotus_docket, creates docket entries,
-        and links the resulting SCOTUSDocuments to the EPQ via
-        associate_related_instances."""
+        """Docket entry email links only newly created SCOTUSDocuments.
+
+        The test pre-creates a docket, entry, and one document that will be
+        re-encountered during the merge. The entry data contains two attachments:
+        the first matches the pre-existing document (updated, not linked) and
+        the second is new (created and linked to the EPQ).
+        """
         mock_storage_cls.return_value.open = mock.mock_open(
             read_data=b"fake email body"
         )
-        docket_data = await sync_to_async(ScotusDocketDataFactory)(
-            docket_entries=[SCOTUSDocketEntryDataFactory()],
+
+        # Build entry data with two attachments
+        docket_data = await sync_to_async(
+            ScotusDocketDataFactory
+        )(
+            docket_entries=[
+                SCOTUSDocketEntryDataFactory(
+                    attachments=[
+                        SCOTUSAttachmentDataFactory(),  # will match existing doc
+                        SCOTUSAttachmentDataFactory(),  # will be new
+                    ]
+                )
+            ],
             parties=[],
         )
+        entry_data = docket_data["docket_entries"][0]
+        existing_attachment = entry_data["attachments"][0]
+
+        # Pre-create the docket with the same docket_number the merge will use.
+        # source=SCRAPER avoids RECAP validation that requires pacer_case_id.
+        # pacer_case_id=None is required because make_scotus_docket_number_core
+        # returns "" for the fake federal-district-style docket numbers generated
+        # by ScotusDocketDataFactory, so find_docket_object falls back to
+        # {"pacer_case_id": None, "docket_number_raw": docket_number}.
+        existing_docket = await sync_to_async(DocketFactory.create)(
+            court=self.scotus,
+            docket_number=docket_data["docket_number"],
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+        # Pre-create the matching entry (entry_number = entry's document_number)
+        existing_entry = await sync_to_async(SCOTUSDocketEntryFactory.create)(
+            docket=existing_docket,
+            entry_number=entry_data["document_number"],
+        )
+        # Pre-create the document for the first attachment.
+        # enrich_scotus_attachments assigns attachment_number=1 to index 0,
+        # which is what merge_scotus_document will use in get_or_create.
+        existing_doc = await sync_to_async(SCOTUSDocumentFactory.create)(
+            docket_entry=existing_entry,
+            document_number=existing_attachment["document_number"],
+            attachment_number=1,
+        )
+
         mock_email_cls.return_value.handle_email.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,
@@ -2670,29 +2717,21 @@ class SCOTUSEmailIntegrationTest(TestCase):
         self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
         mock_merge.assert_called_once_with(docket_data)
 
-        # Docket entry and its attachments were created
-        expected_entry_count = len(docket_data["docket_entries"])
-        expected_doc_count = sum(
-            len(e["attachments"]) for e in docket_data["docket_entries"]
-        )
-        self.assertEqual(
-            await SCOTUSDocketEntry.objects.acount(), expected_entry_count
-        )
-        self.assertEqual(
-            await SCOTUSDocument.objects.acount(), expected_doc_count
-        )
+        # One entry merged (not duplicated), two total documents (1 existing + 1 new)
+        self.assertEqual(await SCOTUSDocketEntry.objects.acount(), 1)
+        self.assertEqual(await SCOTUSDocument.objects.acount(), 2)
 
-        # SCOTUSDocuments are linked to the EPQ via associate_related_instances
+        # Only the newly created document is linked in the EPQ — not the
+        # pre-existing one that was merely updated
         epq_rm = await EmailProcessingQueue.objects.select_related(
             "related_model"
         ).aget(pk=epq.pk)
         self.assertEqual(epq_rm.related_model.model, "scotusdocument")
-        doc_pks = sorted(
-            await sync_to_async(list)(
-                SCOTUSDocument.objects.values_list("pk", flat=True)
-            )
-        )
-        self.assertEqual(sorted(epq_rm.object_ids), doc_pks)
+        new_doc = await SCOTUSDocument.objects.exclude(
+            pk=existing_doc.pk
+        ).aget()
+        self.assertEqual(epq_rm.object_ids, [new_doc.pk])
+        self.assertNotIn(existing_doc.pk, epq_rm.object_ids)
 
 
 class AccountSubscriptionIncludeTest(TestCase):

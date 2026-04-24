@@ -3568,14 +3568,15 @@ def merge_scotus_docket_entry(
         de.date_filed = date_filed
         de.save()
 
-        # Merge attachments
+        # Merge attachments; only track newly created document PKs
         doc_pks = []
         attachments = input_docket_entry["attachments"]
         for document in attachments:
-            _, doc_pk = merge_scotus_document(
+            created, doc_pk = merge_scotus_document(
                 de, document, download_file=download_file
             )
-            doc_pks.append(doc_pk)
+            if created:
+                doc_pks.append(doc_pk)
         return de_created, de.pk, doc_pks
 
 
