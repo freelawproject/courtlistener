@@ -42,7 +42,9 @@ def process_scotus_hit(docket_number: str, content: str) -> None:
     :returns: None
     """
     logger.info("Processing SCOTUS hit for docket %s.", docket_number)
-    save_scotus_raw_to_s3(docket_number, content)
+    save_scotus_raw_to_s3(
+        f"responses/dockets/scotus/{docket_number}.json", content
+    )
     parser = SCOTUSDocketReport()
     parser._parse_text(content)
     if not parser.data.get("docket_number"):

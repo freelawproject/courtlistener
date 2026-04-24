@@ -2516,6 +2516,7 @@ class TexasCaseMailIntegrationTest(TestCase):
 
 
 @mock.patch("cl.recap.tasks.merge_scotus_docket")
+@mock.patch("cl.recap.tasks.fetch_and_archive_scotus_docket_followup")
 @mock.patch("cl.recap.tasks.SCOTUSEmail")
 @mock.patch("cl.recap.tasks.SCOTUSSESStorage")
 class SCOTUSEmailIntegrationTest(TestCase):
@@ -2571,12 +2572,13 @@ class SCOTUSEmailIntegrationTest(TestCase):
         self.path = "/api/rest/v4/scrapers/scotus-email/"
 
     async def test_invalid_email_type(
-        self, mock_storage_cls, mock_email_cls, mock_merge
+        self, mock_storage_cls, mock_email_cls, mock_fetch, mock_merge
     ):
         """Invalid email type sets EPQ status to INVALID_CONTENT."""
         mock_storage_cls.return_value.open = mock.mock_open(
             read_data=b"fake email body"
         )
+        mock_email_cls.return_value.email_type = SCOTUSEmailType.INVALID
         mock_email_cls.return_value.handle_email.return_value = {
             "email_type": SCOTUSEmailType.INVALID.value,
             "data": None,
@@ -2599,15 +2601,17 @@ class SCOTUSEmailIntegrationTest(TestCase):
         await epq.arefresh_from_db()
 
         self.assertEqual(epq.status, PROCESSING_STATUS.INVALID_CONTENT)
+        mock_fetch.assert_not_called()
         mock_merge.assert_not_called()
 
     async def test_confirmation_email(
-        self, mock_storage_cls, mock_email_cls, mock_merge
+        self, mock_storage_cls, mock_email_cls, mock_fetch, mock_merge
     ):
         """Successful confirmation sets SUCCESSFUL; any other result sets FAILED."""
         mock_storage_cls.return_value.open = mock.mock_open(
             read_data=b"fake email body"
         )
+        mock_email_cls.return_value.email_type = SCOTUSEmailType.CONFIRMATION
         cases = [
             (
                 SCOTUSConfirmationResult.Success.value,
@@ -2635,10 +2639,11 @@ class SCOTUSEmailIntegrationTest(TestCase):
                 await epq.arefresh_from_db()
 
                 self.assertEqual(epq.status, expected_status)
+                mock_fetch.assert_not_called()
                 mock_merge.assert_not_called()
 
     async def test_docket_entry_email(
-        self, mock_storage_cls, mock_email_cls, mock_merge
+        self, mock_storage_cls, mock_email_cls, mock_fetch, mock_merge
     ):
         """Docket entry email links only newly created SCOTUSDocuments.
 
@@ -2694,7 +2699,8 @@ class SCOTUSEmailIntegrationTest(TestCase):
             attachment_number=1,
         )
 
-        mock_email_cls.return_value.handle_email.return_value = {
+        mock_email_cls.return_value.email_type = SCOTUSEmailType.DOCKET_ENTRY
+        mock_fetch.return_value = {
             "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
             "data": docket_data,
         }

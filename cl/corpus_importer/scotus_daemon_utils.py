@@ -149,14 +149,17 @@ def fetch_scotus_docket_json(
     return text, resp.status_code
 
 
-def save_scotus_raw_to_s3(docket_number: str, content: str) -> None:
-    """Upload a raw SCOTUS docket JSON to S3.
-    :param docket_number: A SCOTUS docket number.
+def save_scotus_raw_to_s3(file_name: str, content: str) -> None:
+    """Upload a raw SCOTUS response to S3.
+
+    :param file_name: The S3 key for the upload, including extension (e.g.
+        ``"responses/dockets/scotus/25-150.json"`` for daemon JSON hits or
+        ``"responses/dockets/scotus/25-150.html"`` for SCOTUS docket pages
+        fetched via the email follow-up flow).
     :param content: Content to be uploaded.
     :return: None
     """
     storage = S3GlacierInstantRetrievalStorage(
         naming_strategy=get_name_by_incrementing
     )
-    file_name = f"responses/dockets/scotus/{docket_number}.json"
     storage.save(file_name, ContentFile(content.encode("utf-8")))

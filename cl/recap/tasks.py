@@ -42,7 +42,7 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
-from juriscraper.scotus import SCOTUSEmail
+from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
 from juriscraper.scotus.scotus_email import (
     SCOTUSConfirmationResult,
     SCOTUSEmailType,
@@ -67,6 +67,7 @@ from cl.alerts.utils import (
 )
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
+from cl.corpus_importer.scotus_daemon_utils import save_scotus_raw_to_s3
 from cl.corpus_importer.tasks import (
     download_acms_pdf_by_rd,
     download_pacer_pdf_by_rd,
@@ -3828,6 +3829,40 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     return None
 
 
+def fetch_and_archive_scotus_docket_followup(
+    scotus_email: SCOTUSEmail,
+    timeout: float = 10.0,
+) -> dict[str, str | dict[str, str]]:
+    """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3,
+    and parse it.
+
+    :param scotus_email: A parsed ``SCOTUSEmail`` whose ``email_type`` is
+        ``DOCKET_ENTRY``.
+    :param timeout: HTTP timeout in seconds.
+    :return: A dict with ``email_type`` and ``data`` keys, matching the shape
+        returned by ``SCOTUSEmail.handle_email``.
+    """
+    parsed_email = scotus_email.data
+    response = requests.get(
+        parsed_email["followup_url"],
+        headers={"User-Agent": "Free Law Project"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+
+    docket_number = parsed_email["data"]["docket_number"]
+    save_scotus_raw_to_s3(
+        f"responses/dockets/scotus-email/{docket_number}.html",
+        response.text,
+    )
+    report = SCOTUSDocketReportHTML(scotus_email.court_id)
+    report._parse_text(response.text)
+    return {
+        "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
+        "data": report.data,
+    }
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -3879,7 +3914,12 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
 
     scotus_email = SCOTUSEmail()
     scotus_email._parse_text(body)
-    handling_result = scotus_email.handle_email()
+    if scotus_email.email_type == SCOTUSEmailType.DOCKET_ENTRY:
+        handling_result = fetch_and_archive_scotus_docket_followup(
+            scotus_email
+        )
+    else:
+        handling_result = scotus_email.handle_email()
     email_type = handling_result["email_type"]
     data = handling_result["data"]
 
