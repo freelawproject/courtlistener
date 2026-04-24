@@ -1,4 +1,5 @@
 import json
+import time
 from collections import OrderedDict, defaultdict
 from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
@@ -72,6 +73,11 @@ from cl.disclosures.api_views import (
 )
 from cl.disclosures.api_views import (
     PositionViewSet as DisclosurePositionViewSet,
+)
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
@@ -4749,3 +4755,161 @@ class ThrottleOverrideIntegrationTest(TestCase):
         await sync_to_async(client.force_login)(throttle.user)
         response = await client.get(reverse("citation_lookup_api"))
         self.assertEqual(response.status_code, HTTPStatus.OK)
+
+
+class TestApiUsageEndpoint(TestCase):
+    """Tests for the GET /api/rest/v4/api-usage/ endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserFactory()
+
+    def setUp(self):
+        self.url = reverse("api-usage-list", kwargs={"version": "v4"})
+        self.client.force_login(self.user)
+
+    def test_unauthenticated_request(self):
+        """Anonymous users get a 401."""
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
+
+    def test_authenticated_returns_correct_shape(self):
+        """Response contains all expected top-level keys."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        data = response.json()
+        self.assertIn("current_usage", data)
+        self.assertIn("historical_usage", data)
+        self.assertIn("membership", data)
+
+    def test_current_usage_reflects_throttle_cache(self):
+        """Seeded throttle cache timestamps appear in current_usage."""
+        default_cache = caches["default"]
+        current_time = time.time()
+        # 10 requests in the last hour (newest-first order)
+        timestamps = [current_time - i * 60 for i in range(10)]
+        cache_key = f"throttle_user_{self.user.pk}"
+        default_cache.set(cache_key, timestamps, timeout=3600)
+
+        response = self.client.get(self.url)
+        data = response.json()
+
+        api_usage = next(
+            u for u in data["current_usage"] if u["scope"] == "user"
+        )
+        # 10 seeded + 1 from this request itself
+        self.assertGreaterEqual(api_usage["requests_made"], 10)
+        self.assertIsNotNone(api_usage["reset_at"])
+        self.assertGreater(api_usage["requests_remaining"], 0)
+
+    def test_current_usage_empty_cache(self):
+        """No prior requests → requests_made near 0, reset_at null."""
+        # Clear any existing throttle state
+        default_cache = caches["default"]
+        default_cache.delete(f"throttle_user_{self.user.pk}")
+        default_cache.delete(f"throttle_citations_{self.user.pk}")
+
+        response = self.client.get(self.url)
+        data = response.json()
+
+        citation_usage = next(
+            u for u in data["current_usage"] if u["scope"] == "citations"
+        )
+        self.assertEqual(citation_usage["requests_made"], 0)
+        self.assertIsNone(citation_usage["reset_at"])
+
+    def test_current_usage_with_custom_override(self):
+        """APIThrottle override is reflected in requests_allowed."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="100/hour",
+        )
+        response = self.client.get(self.url)
+        data = response.json()
+
+        api_usage = next(
+            u for u in data["current_usage"] if u["scope"] == "user"
+        )
+        self.assertEqual(api_usage["rate"], "100/hour")
+        self.assertEqual(api_usage["requests_allowed"], 100)
+
+    def test_current_usage_blocked_user(self):
+        """Blocked APIThrottle shows blocked: true."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            blocked=True,
+            rate="",
+        )
+        response = self.client.get(self.url)
+        data = response.json()
+
+        api_usage = next(
+            u for u in data["current_usage"] if u["scope"] == "user"
+        )
+        self.assertTrue(api_usage["blocked"])
+
+    @patch("cl.api.utils.get_redis_interface")
+    def test_historical_usage_data_returned(self, mock_get_redis):
+        """Historical usage pulls data from Redis via invert_user_logs."""
+        mock_redis = MagicMock()
+        mock_pipeline = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipeline
+        mock_get_redis.return_value = mock_redis
+
+        # invert_user_logs issues two queries (v3 + v4) per date in the range.
+        # _get_historical_usage asks for a 15-day inclusive window
+        # (today - 14 days through today), so the pipeline returns 30 entries.
+        # Seed today's v3/v4 slots; leave the rest empty.
+        num_dates = 15
+        execute_results: list[list[tuple[str, float]]] = [
+            [] for _ in range(num_dates * 2)
+        ]
+        execute_results[-2] = [(str(self.user.pk), 42.0)]  # today, v3
+        execute_results[-1] = [(str(self.user.pk), 18.0)]  # today, v4
+        mock_pipeline.execute.return_value = execute_results
+
+        response = self.client.get(self.url)
+        data = response.json()
+
+        today_iso = date.today().isoformat()
+        self.assertEqual(data["historical_usage"].get(today_iso), 60)
+        self.assertEqual(data["historical_usage"]["total"], 60)
+
+    @patch("cl.api.utils.get_redis_interface")
+    def test_no_historical_usage_data(self, mock_get_redis):
+        """User with no API history gets total: 0."""
+        mock_redis = MagicMock()
+        mock_pipeline = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipeline
+        mock_get_redis.return_value = mock_redis
+
+        # 15-day window × 2 versions = 30 empty result slots, no user data anywhere.
+        mock_pipeline.execute.return_value = [[] for _ in range(15 * 2)]
+
+        response = self.client.get(self.url)
+        data = response.json()
+
+        self.assertEqual(data["historical_usage"].get("total", 0), 0)
+
+    def test_membership_info_present(self):
+        """User with active NeonMembership sees level + is_active."""
+        NeonMembership.objects.create(
+            user=self.user,
+            level=NeonMembershipLevel.TIER_2,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+        )
+        response = self.client.get(self.url)
+        data = response.json()
+
+        self.assertIsNotNone(data["membership"])
+        self.assertEqual(data["membership"]["level"], "CL Membership - Tier 2")
+        self.assertTrue(data["membership"]["is_active"])
+
+    def test_no_membership(self):
+        """User without a membership gets null."""
+        response = self.client.get(self.url)
+        data = response.json()
+        self.assertIsNone(data["membership"])
