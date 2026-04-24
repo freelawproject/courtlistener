@@ -3483,7 +3483,7 @@ def merge_scotus_docket_entry(
     sequence_number: str,
     input_docket_entry: dict[str, Any],
     download_file: bool = True,
-) -> tuple[bool, int | None]:
+) -> tuple[bool, int | None, list[int]]:
     """Merges a SCOTUS docket entry into CL.
 
     :param docket: The docket this entry belongs to.
@@ -3493,6 +3493,7 @@ def merge_scotus_docket_entry(
     :return: Tuple with the following entries:
         - A flag which is set to true when the SCOTUSDocketEntry was created.
         - The pk of the updated SCOTUSDocketEntry object.
+        - A list of PKs of SCOTUSDocument objects that were created or updated.
     """
     with transaction.atomic():
         # Acquire lock on the docket to prevent race conditions
@@ -3518,7 +3519,7 @@ def merge_scotus_docket_entry(
                     entry_number,
                     docket.pk,
                 )
-                return False, None
+                return False, None, []
 
         else:
             normalize_long_description(input_docket_entry)
@@ -3551,7 +3552,7 @@ def merge_scotus_docket_entry(
                         sequence_number,
                         docket.pk,
                     )
-                    return False, None
+                    return False, None, []
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
                     "Multiple matching unnumbered SCOTUSDocketEntries found for description "
@@ -3559,7 +3560,7 @@ def merge_scotus_docket_entry(
                     input_docket_entry["description"],
                     docket.pk,
                 )
-                return False, None
+                return False, None, []
 
         # Update fields
         de.sequence_number = sequence_number
@@ -3568,34 +3569,37 @@ def merge_scotus_docket_entry(
         de.save()
 
         # Merge attachments
+        doc_pks = []
         attachments = input_docket_entry["attachments"]
         for document in attachments:
-            merge_scotus_document(de, document, download_file=download_file)
-        return de_created, de.pk
+            _, doc_pk = merge_scotus_document(
+                de, document, download_file=download_file
+            )
+            doc_pks.append(doc_pk)
+        return de_created, de.pk, doc_pks
 
 
 def add_scotus_docket_entries(
     docket: Docket,
     docket_entries: list[dict[str, Any]],
     download_file: bool = True,
-) -> None:
+) -> list[int]:
     """Add or update SCOTUS docket entries for a docket.
 
     :param docket: The Docket to add entries to.
     :param docket_entries: List of docket entry dicts from the scraper.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: A three-tuple containing:
-        - List of SCOTUSDocketEntry PKs that were created or updated
-        - List of SCOTUSDocument PKs that were created
-        - List of SCOTUSDocument PKs that were updated
+    :return: A list of PKs of SCOTUSDocument objects that were created or
+        updated across all entries.
     """
     sequence_numbers = create_docket_entry_sequence_numbers(
         docket_entries, "date_filed"
     )
+    all_doc_pks: list[int] = []
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
-        de_created, de_pk = merge_scotus_docket_entry(
+        de_created, de_pk, doc_pks = merge_scotus_docket_entry(
             docket,
             sequence_number,
             docket_entry,
@@ -3609,12 +3613,14 @@ def add_scotus_docket_entries(
                 docket.pk,
             )
             continue
+        all_doc_pks.extend(doc_pks)
+    return all_doc_pks
 
 
 def merge_scotus_docket(
     report_data: dict[str, Any],
     download_file: bool = True,
-) -> tuple[Docket, bool]:
+) -> tuple[Docket, bool, list[int]]:
     """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
 
     This will create or update the Docket row for the SCOTUS and
@@ -3622,8 +3628,9 @@ def merge_scotus_docket(
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: A two-tuple: the created or updated Docket instance, whether the
-    QP file should be downloaded.
+    :return: A three-tuple: the created or updated Docket instance, whether
+    the QP file should be downloaded, and a list of PKs of SCOTUSDocument
+    objects that were created or updated.
     """
     with transaction.atomic():
         court = Court.objects.get(pk="scotus")
@@ -3744,11 +3751,11 @@ def merge_scotus_docket(
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    add_scotus_docket_entries(
+    doc_pks = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
 
-    return d, download_qp
+    return d, download_qp, doc_pks
 
 
 @app.task(bind=True)
@@ -3768,7 +3775,7 @@ def process_scotus_docket(
     :param download_file: Whether to trigger PDF download and extraction.
     :return: None
     """
-    docket, download_qp = merge_scotus_docket(
+    docket, download_qp, _ = merge_scotus_docket(
         report_data, download_file=download_file
     )
     if download_qp:

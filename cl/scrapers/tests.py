@@ -110,6 +110,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     Parenthetical,
     SCOTUSDocketEntry,
+    SCOTUSDocument,
 )
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
@@ -2636,7 +2637,9 @@ class SCOTUSEmailIntegrationTest(TestCase):
     async def test_docket_entry_email(
         self, mock_storage_cls, mock_email_cls, mock_merge
     ):
-        """Docket entry email runs merge_scotus_docket and creates docket entries."""
+        """Docket entry email runs merge_scotus_docket, creates docket entries,
+        and links the resulting SCOTUSDocuments to the EPQ via
+        associate_related_instances."""
         mock_storage_cls.return_value.open = mock.mock_open(
             read_data=b"fake email body"
         )
@@ -2666,16 +2669,30 @@ class SCOTUSEmailIntegrationTest(TestCase):
 
         self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
         mock_merge.assert_called_once_with(docket_data)
-        self.assertEqual(
-            await SCOTUSDocketEntry.objects.acount(),
-            len(docket_data["docket_entries"]),
+
+        # Docket entry and its attachments were created
+        expected_entry_count = len(docket_data["docket_entries"])
+        expected_doc_count = sum(
+            len(e["attachments"]) for e in docket_data["docket_entries"]
         )
-        entry = await SCOTUSDocketEntry.objects.select_related(
-            "docket"
-        ).afirst()
         self.assertEqual(
-            entry.docket.docket_number, docket_data["docket_number"]
+            await SCOTUSDocketEntry.objects.acount(), expected_entry_count
         )
+        self.assertEqual(
+            await SCOTUSDocument.objects.acount(), expected_doc_count
+        )
+
+        # SCOTUSDocuments are linked to the EPQ via associate_related_instances
+        epq_rm = await EmailProcessingQueue.objects.select_related(
+            "related_model"
+        ).aget(pk=epq.pk)
+        self.assertEqual(epq_rm.related_model.model, "scotusdocument")
+        doc_pks = sorted(
+            await sync_to_async(list)(
+                SCOTUSDocument.objects.values_list("pk", flat=True)
+            )
+        )
+        self.assertEqual(sorted(epq_rm.object_ids), doc_pks)
 
 
 class AccountSubscriptionIncludeTest(TestCase):

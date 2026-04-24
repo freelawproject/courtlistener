@@ -3913,7 +3913,7 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
         self.request.chain = None
         return None
     try:
-        d, _ = merge_scotus_docket(data)
+        d, _, doc_pks = merge_scotus_docket(data)
     except Exception as e:
         async_to_sync(mark_pq_status)(
             epq,
@@ -3924,9 +3924,8 @@ def process_scotus_email(self: Task, epq_pk: int) -> None:
     else:
         async_to_sync(associate_related_instances)(
             epq,
-            d_id=d.pk,
-            de_id=None,
-            rd_id=None,
+            rd_id=doc_pks,
+            model_name="search.SCOTUSDocument",
         )
         msg = f"SCOTUS docket {data['docket_number']} updated successfully."
         status = PROCESSING_STATUS.SUCCESSFUL
