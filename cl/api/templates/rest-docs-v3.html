@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load extras %}
+{% load waffle_tags %}
 
 {% block title %}[Deprecated] REST API, v3.15 &ndash; CourtListener.com{% endblock %}
 {% block description %}Deprecated — REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
@@ -363,8 +364,13 @@
 
 
     <h3 id="rates">Rate Limits</h3>
-    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation.
-    </p>
+    {% switch "use_new_throttle_defaults" %}
+      <p>Authenticated users may make up to <strong>5 requests per minute</strong>, <strong>50 requests per hour</strong>, and <strong>125 requests per day</strong>. All three limits apply at the same time, so the most restrictive one — given your recent traffic — is what controls whether the next request is accepted. Unauthenticated users are allowed 100 queries per day for experimentation.
+      </p>
+    {% else %}
+      <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation.
+      </p>
+    {% endswitch %}
     <p>To debug throttling issues:</p>
     <ol>
       <li>Try browsing the API while logged into the website. If this works and your code fails, it usually means that your token authentication is not configured properly, and your code is getting throttled as an anonymous user, not according to your token.
