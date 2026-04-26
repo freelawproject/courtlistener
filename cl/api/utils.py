@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
-from django.db.models import F, Model, Prefetch, QuerySet
+from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
@@ -47,6 +47,7 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
+from cl.donate.models import MembershipPaymentStatus, NeonMembership
 from cl.lib.decorators import tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.constants import StatMetric, StatWebhookEventType
@@ -724,22 +725,53 @@ def get_all_throttle_overrides(
 ) -> dict[str, list[str]]:
     """Get all throttle overrides of a given type, cached for 5 minutes.
 
-    Loads all throttle overrides at once to avoid per-user DB hits since most
-    users don't have overrides.
+    Throttle rates are composed from two sources:
+
+    - MANUAL overrides always apply.
+    - MEMBERSHIP overrides apply only if the user's NeonMembership is active
+      (payment_status=SUCCEEDED and termination_date is null or in the future),
+      and no MANUAL overrides exist. If any MANUAL overrides are present, they
+      fully replace the MEMBERSHIP set.
 
     :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
     :return: Dictionary mapping username to a list of rate strings. A list
         containing a '0/...' rate blocks the user, because the enforcement
         loop rejects on `count >= 0`.
     """
+    manual_throttles = APIThrottle.objects.filter(
+        throttle_type=throttle_type,
+        source=APIThrottle.Source.MANUAL,
+    ).values_list("user__username", "rate")
+
+    today = now().date()
+    active_member_ids = (
+        NeonMembership.objects.filter(
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+        )
+        .filter(
+            Q(termination_date__isnull=True)
+            | Q(termination_date__date__gte=today)
+        )
+        .values("user_id")
+    )
+    membership_throttles = APIThrottle.objects.filter(
+        throttle_type=throttle_type,
+        source=APIThrottle.Source.MEMBERSHIP,
+        user_id__in=active_member_ids,
+    ).values_list("user__username", "rate")
+
     overrides: dict[str, list[str]] = {}
-    for username, rate in APIThrottle.objects.filter(
-        throttle_type=throttle_type
-    ).values_list("user__username", "rate"):
+    users_with_manual_throttle: set[str] = set()
+    for username, rate in manual_throttles:
         if not rate:
-            # Legacy row from before the multi-rate refactor: blocked=True
-            # with an empty rate. The backfill script adds a '0/min' sibling
-            # row, so we can safely ignore the empty one here.
+            continue
+        overrides.setdefault(username, []).append(rate)
+        users_with_manual_throttle.add(username)
+    for username, rate in membership_throttles:
+        if not rate:
+            continue
+        if username in users_with_manual_throttle:
+            # Any MANUAL throttle fully replaces the user's MEMBERSHIP set.
             continue
         overrides.setdefault(username, []).append(rate)
     return overrides
