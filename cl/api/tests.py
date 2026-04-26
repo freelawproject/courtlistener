@@ -4705,11 +4705,13 @@ class APIThrottleConstraintTest(TestCase):
             user=user,
             throttle_type=ThrottleType.API,
             rate="5/min",
+            source=APIThrottle.Source.MANUAL,
         )
         conflict = APIThrottleFactory.build(
             user=user,
             throttle_type=ThrottleType.API,
             rate="10/min",
+            source=APIThrottle.Source.MANUAL,
         )
         with self.assertRaises(ValidationError) as ctx:
             conflict.full_clean()
@@ -4723,11 +4725,13 @@ class APIThrottleConstraintTest(TestCase):
             user=user,
             throttle_type=ThrottleType.API,
             rate="5/min",
+            source=APIThrottle.Source.MANUAL,
         )
         conflict = APIThrottleFactory.build(
             user=user,
             throttle_type=ThrottleType.API,
             rate="10/minute",
+            source=APIThrottle.Source.MANUAL,
         )
         with self.assertRaises(ValidationError):
             conflict.full_clean()
@@ -4746,6 +4750,24 @@ class APIThrottleConstraintTest(TestCase):
             rate="10/min",
         )
         # Should not raise.
+        other.full_clean()
+
+    def test_different_sources_do_not_conflict(self) -> None:
+        """A MANUAL and a MEMBERSHIP rate sharing a time unit are allowed."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        other = APIThrottleFactory.build(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        # Should not raise — different source.
         other.full_clean()
 
 
