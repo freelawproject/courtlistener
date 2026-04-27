@@ -5,6 +5,18 @@ Runs checks on changed template and CSS files to enforce frontend
 conventions. Called by the frontend-lint GitHub Actions workflow.
 
 Input file must be in git --name-status format (STATUS\\tPATH per line).
+
+Two directives are recognised in template/CSS files:
+
+* ``{# frontend-checks-skip: <names> #}`` — file-level skip for the
+  listed checks. Restricted to ``SKIPPABLE_CHECKS`` so security and
+  a11y rules cannot be wholesale bypassed.
+* ``{# frontend-checks-ignore-line[: <names>] #}`` — silences findings
+  on the line where it appears. With no names, ignores all checks on
+  that line; otherwise only the named checks. Any check is bypassable
+  here because the scope (one line) makes the suppression reviewable
+  in the diff. Use Django ``{# ... #}`` comments (stripped server-side)
+  rather than HTML comments so the directive never reaches the browser.
 """
 
 from __future__ import annotations
@@ -51,6 +63,27 @@ def _parse_skip_checks(lines: list[str]) -> set[str]:
         if m:
             skip.update(name.strip() for name in m.group(1).split(","))
     return skip & SKIPPABLE_CHECKS
+
+
+_ignore_line_re = re.compile(
+    r"\{#\s*frontend-checks-ignore-line(?::\s*([^#]+?))?\s*#\}"
+)
+
+
+def _line_ignores(line: str) -> set[str] | None:
+    """Parse a ``{# frontend-checks-ignore-line[: ...] #}`` directive.
+
+    Returns the set of ignored check names, ``{"*"}`` when the directive
+    has no argument (ignore all checks on this line), or ``None`` when
+    no directive is present.
+    """
+    m = _ignore_line_re.search(line)
+    if not m:
+        return None
+    spec = m.group(1)
+    if not spec or not spec.strip():
+        return {"*"}
+    return {n.strip() for n in spec.split(",")}
 
 
 # ---------------------------------------------------------------------------
@@ -699,6 +732,11 @@ def _apply_checks(
         if fn.__name__ in skip_checks:
             continue
         for line_no, msg in fn(lines):
+            ignored = _line_ignores(lines[line_no - 1])
+            if ignored is not None and (
+                "*" in ignored or fn.__name__ in ignored
+            ):
+                continue
             findings.append(
                 Finding(filepath, line_no, fn.__name__, severity, msg)
             )
