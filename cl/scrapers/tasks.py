@@ -882,6 +882,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
         transcription = call_llm_transcription(
             ("captcha.wav", audio_file),
             api_key=settings.OPENAI_TRANSCRIPTION_KEY,
+            model="whisper-1",
         )
         solution = process_scotus_captcha_transcription(transcription)
 
