@@ -73,6 +73,7 @@ def call_llm_transcription(
     :param audio: Audio file to transcribe, as a binary IO stream.
     :param api_key: OpenAI transcription API key
     :param model: The OpenAI transcription model to use.
+    :param language: The language of the audio file.
     :return: The transcription text."""
     client = OpenAI(api_key=api_key)
 
