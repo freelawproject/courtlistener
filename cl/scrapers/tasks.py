@@ -784,13 +784,14 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     }
 
     words = [
-        re.sub(r"\W+", "", word) for word in transcription.lower().split(" ")
+        re.sub(r"\W+", "", word)
+        for word in re.split(r"[^a-z0-9]+", transcription.lower())
     ]
 
     if len(words) != 5:
-        raise ValueError(f"Expected 5 words, got {len(words)}")
+        raise ScrapeFailed(f"Expected 5 words, got {len(words)} ({words})")
     if any([len(word) == 0 for word in words]):
-        raise ValueError("Expected all words to be non-empty")
+        raise ScrapeFailed(f"Expected all words to be non-empty (got {words})")
 
     characters = [
         numeric_map[word] if word in numeric_map else word[0] for word in words
