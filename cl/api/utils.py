@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
+from django.db import transaction
 from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
@@ -36,7 +37,9 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
+from waffle import switch_is_active
 
+from cl.api.constants import LEVEL_TO_RATES, SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
     APIThrottle,
@@ -48,7 +51,7 @@ from cl.api.models import (
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.donate.models import MembershipPaymentStatus, NeonMembership
-from cl.lib.decorators import tiered_cache
+from cl.lib.decorators import clear_tiered_cache, tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
@@ -775,6 +778,66 @@ def get_all_throttle_overrides(
             continue
         overrides.setdefault(username, []).append(rate)
     return overrides
+
+
+def apply_membership_throttles(user: User, level: int) -> None:
+    """Replace the user's MEMBERSHIP-source API throttles with the rates
+    for ``level``.
+
+    MANUAL-source rows are left untouched. They take precedence over
+    MEMBERSHIP rows in get_all_throttle_overrides regardless of time
+    unit.
+
+    No-op when:
+
+    - the SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off
+    - the level has no entry in LEVEL_TO_RATES (e.g. Commercial,
+      BASIC, old groups)
+    """
+    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
+        return
+
+    rates = LEVEL_TO_RATES.get(level)
+    if rates is None:
+        logger.info(
+            "No throttle mapping for membership level=%s (user=%s); skipping.",
+            level,
+            user.username,
+        )
+        return
+
+    with transaction.atomic():
+        APIThrottle.objects.filter(
+            user=user,
+            throttle_type=ThrottleType.API,
+            source=APIThrottle.Source.MEMBERSHIP,
+        ).delete()
+        for rate in rates:
+            APIThrottle.objects.create(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+                notes=f"Set by Neon membership level={level}.",
+            )
+    clear_tiered_cache()
+
+
+def clear_membership_throttles(user: User) -> None:
+    """Delete the user's MEMBERSHIP-source API throttle rows.
+
+    MANUAL rows are never touched. No-op when the
+    SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off.
+    """
+    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
+        return
+    deleted, _ = APIThrottle.objects.filter(
+        user=user,
+        throttle_type=ThrottleType.API,
+        source=APIThrottle.Source.MEMBERSHIP,
+    ).delete()
+    if deleted:
+        clear_tiered_cache()
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
