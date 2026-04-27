@@ -810,6 +810,7 @@ class ProfileMembershipTest(TestCase):
             )
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="MembershipWebhookThrottleSyncTest")
 @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class MembershipWebhookThrottleSyncTest(TestCase):
     """End-to-end tests that Neon webhooks sync APIThrottle rows.

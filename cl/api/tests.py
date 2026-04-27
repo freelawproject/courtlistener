@@ -5178,6 +5178,7 @@ class MultiRateThrottleTest(TestCase):
         self.assertIn("blocked", str(ctx.exception.detail).lower())
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="MembershipThrottleSyncTest")
 @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class MembershipThrottleSyncTest(TestCase):
     """Tests for apply_membership_throttles / clear_membership_throttles."""
