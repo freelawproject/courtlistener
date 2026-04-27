@@ -478,7 +478,7 @@ requires-dist = [
     { name = "django-markdown-deux", specifier = ">=1.0.6" },
     { name = "django-mathfilters" },
     { name = "django-model-utils", specifier = ">=5.0.0" },
-    { name = "django-oauth-toolkit", extras = ["jwcrypto"], specifier = ">=3.2.0" },
+    { name = "django-oauth-toolkit", extras = ["jwcrypto"], specifier = "==3.2.0" },
     { name = "django-override-storage", specifier = ">=0.3.2" },
     { name = "django-permissions-policy", specifier = ">=4.28.0" },
     { name = "django-pghistory", specifier = ">=3.9.1" },
@@ -1872,7 +1872,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "3.0.11"
+version = "3.0.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1891,9 +1891,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/38/e9/0106105daeecb8a5796a4716da659bd63090347f0c1aae7d5267af576ad0/juriscraper-3.0.11.tar.gz", hash = "sha256:1e275f92a06aa9a27a877601fcd46f1e1b2c92811d6315665b2c133d6ecaa7b7", size = 393986, upload-time = "2026-04-18T00:39:39.063Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/26/bef5b9edd89a4348976b3d47e580cc973bb44b771ca1ce1604ec3ad0e38e/juriscraper-3.0.12.tar.gz", hash = "sha256:e7a535e0497956283158af18e27c97e789e2b63555abe9e24aa6cb65f928181a", size = 394543, upload-time = "2026-04-27T20:04:19.303Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/ce/9c9ca9bff933b9240db75c8cf3371f7dc636aa3abdc791f9f387664368ed/juriscraper-3.0.11-py3-none-any.whl", hash = "sha256:fdb7f0cda98718230efa55b3e3899d65131e384d5fb278a92b927d7eb609bb91", size = 622993, upload-time = "2026-04-18T00:39:37.097Z" },
+    { url = "https://files.pythonhosted.org/packages/27/9a/e367c6d18a588fd4b27d6a3f3f4fbc9aa235ddfd48b02b5ae38d8f963a0a/juriscraper-3.0.12-py3-none-any.whl", hash = "sha256:ce14d864a85331ef7ab6dae5fc4f68b8b1957b8ca44427f545935cf5ba94156f", size = 623796, upload-time = "2026-04-27T20:04:17.299Z" },
 ]
 
 [[package]]
