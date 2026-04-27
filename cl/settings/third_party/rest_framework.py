@@ -25,7 +25,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
-        "user": "5000/hour",
+        "user": ["5/min", "50/hour", "125/day"],
         "citations": "60/min",
     },
     # Auth
