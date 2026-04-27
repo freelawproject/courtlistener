@@ -15,6 +15,10 @@ from rest_framework import mixins, serializers, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from cl.api.utils import (
+    apply_membership_throttles,
+    clear_membership_throttles,
+)
 from cl.donate.api_permissions import AllowNeonWebhook
 from cl.donate.models import (
     MembershipPaymentStatus,
@@ -321,6 +325,7 @@ class MembershipWebhookViewSet(
         neon_membership.termination_date = membership_data["termEndDate"]
         neon_membership.payment_status = payment_status
         neon_membership.save()
+        apply_membership_throttles(neon_membership.user, membership_level)
 
     def _handle_membership_creation(self, webhook_data) -> None:
         membership_data = self._get_membership_data(webhook_data)
@@ -402,6 +407,7 @@ class MembershipWebhookViewSet(
             neon_membership.termination_date = membership_data["termEndDate"]
             neon_membership.payment_status = payment_status
             neon_membership.save()
+        apply_membership_throttles(user, membership_level)
 
     @staticmethod
     def _handle_membership_deletion(webhook_data) -> None:
@@ -415,4 +421,5 @@ class MembershipWebhookViewSet(
                 "Error processing webhook, Membership not found",
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
+        clear_membership_throttles(neon_membership.user)
         neon_membership.delete()
