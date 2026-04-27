@@ -11,6 +11,7 @@ from cl.donate import api_views as donate_views
 from cl.favorites import api_views as favorite_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
+from cl.scrapers import views as scraper_views
 from cl.search import api_views as search_views
 from cl.visualizations import api_views as viz_views
 
@@ -90,10 +91,24 @@ router.register(
     r"fjc-integrated-database", recap_views.FjcIntegratedDatabaseViewSet
 )
 
+# Scrapers
+router.register(
+    r"scrapers/scotus-email",
+    scraper_views.ScraperSCOTUSEmailEndpoint,
+    basename="scotus-email",
+)
+
 # Tags
 router.register(r"tags", favorite_views.UserTagViewSet, basename="UserTag")
 router.register(
     r"docket-tags", favorite_views.DocketTagViewSet, basename="DocketTag"
+)
+
+# State content
+router.register(
+    r"state/(?P<state>\w{2})/(?P<site>[^/]+)/alerts",
+    scraper_views.StateEmailEndpoint,
+    basename="StateEmail",
 )
 
 # Prayers
@@ -325,6 +340,11 @@ urlpatterns = [
             extra_context={"private": False},
         ),
         name="replication_docs",
+    ),
+    path(
+        "api/rest/v4/wiki-data/",
+        views.wiki_data,
+        name="wiki_data",
     ),
     re_path(
         r"^api/rest/v4/coverage/opinions/",

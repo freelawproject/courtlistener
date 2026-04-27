@@ -7,6 +7,7 @@ from cl.simple_pages.views import (
     alert_help,
     broken_email_help,
     citegeist_help,
+    cluster_redirections_help,
     components,
     contact,
     contact_thanks,
@@ -68,6 +69,11 @@ urlpatterns = [
     path("help/pray-and-pay/", prayer_help, name="pray_and_pay_help"),  # type: ignore[arg-type]
     path("help/relative-dates/", relative_dates, name="relative_dates"),  # type: ignore[arg-type]
     path("help/mcp/", mcp_help, name="mcp_help"),  # type: ignore[arg-type]
+    path(
+        "help/cluster-redirections/",
+        cluster_redirections_help,
+        name="cluster_redirections_help",
+    ),  # type: ignore[arg-type]
     # Added 2018-10-23
     path(
         "search/advanced-techniques/",

@@ -20,14 +20,14 @@
   <c-layout-with-navigation.section id="about">
     <h1>Legal Citation&nbsp;API</h1>
     <p class="lead">Use these APIs to analyze and query the network of citations between legal cases.</p>
-    <p>These APIs are powered by <a class="underline" href="https://free.law/open-source-tools#eyecite">Eyecite</a>, our tool for identifying citations in legal text. Using that tool, we have identified millions of citations between legal decisions, which you can query using these APIs.</p>
+    <p>These APIs are powered by <a class="links-external" href="https://free.law/open-source-tools#eyecite">Eyecite</a>, our tool for identifying citations in legal text. Using that tool, we have identified millions of citations between legal decisions, which you can query using these APIs.</p>
     <p>These citations power our visualizations, tables of authorities, citation search, and more.</p>
-    <p>To look up specific citations, see our <a class="text-primary-600" href="{% url "citation_lookup_api" %}">citation lookup and verification API</a>.</p>
+    <p>To look up specific citations, see our <a class="links" href="{% url "citation_lookup_api" %}">citation lookup and verification API</a>.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="cites-endpoint">
     <h2>Opinions Cited/Citing API — <small><code>{% url "opinionscited-list" version=version %}</code></small></h2>
-    <p>This endpoint provides an interface into the citation graph that CourtListener provides between opinions in <a class="text-primary-600" href="{% url "case_law_api_help" %}">our case law database</a>.</p>
+    <p>This endpoint provides an interface into the citation graph that CourtListener provides between opinions in <a class="links" href="{% url "case_law_api_help" %}">our case law database</a>.</p>
     <p>You can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:</p>
   <c-code>
 curl -v \
@@ -59,7 +59,7 @@ curl -v \
   }
 }
   </c-code>
-  <p>To understand <code>RelatedFilters</code>, see our <a class="text-primary-600" href="{% url "rest_docs" version=version %}#filtering">filtering documentation</a>.</p>
+  <p>To understand <code>RelatedFilters</code>, see our <a class="links" href="{% url "rest_docs" version=version %}#filtering">filtering documentation</a>.</p>
   <p>These filters allow you to filter to the opinions that an opinion cites (its "Authorities" or backward citations) or the later opinions that cite it (forward citations).</p>
   <p>For example, opinion <code>2812209</code> is the decision in <em>Obergefell v. Hodges</em>. To see what it cites:</p>
   <c-code>
@@ -122,7 +122,7 @@ curl -v \
 
   <c-layout-with-navigation.section id="bulk-data">
     <h2>Bulk Data</h2>
-    <p>The citation graph is exported once a month as part of our <a class="text-primary-600" href="{% url "bulk_data_index" %}#citation-data">bulk data system</a>.</p>
+    <p>The citation graph is exported once a month as part of our <a class="links" href="{% url "bulk_data_index" %}#citation-data">bulk data system</a>.</p>
     <p>If you want to analyze the citation network, that is often the best place to begin.</p>
   </c-layout-with-navigation.section>
 

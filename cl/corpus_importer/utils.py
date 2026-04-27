@@ -5,7 +5,7 @@ import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
@@ -40,6 +40,48 @@ from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+PAGINATION_BATCH_SIZE = 2000
+
+
+def paginate_docs_queryset(
+    queryset: QuerySet,
+    batch_size: int = PAGINATION_BATCH_SIZE,
+    desc: bool = False,
+) -> Generator:
+    """Paginate a queryset using pk-based keyset pagination.
+
+    Uses pk-based filtering to avoid server-side cursors that hold
+    open DB connections (which time out during long celery waits).
+
+    :param queryset: A .values_list("pk", flat=True) queryset.
+    :param batch_size: Number of rows to fetch per query.
+    :param desc: If True, iterate in descending pk order.
+    :return: Yields individual pk values.
+    """
+    if desc:
+        # No upper-bound sentinel exists for PKs, so None means
+        # "first page, no filter yet"; subsequent pages use pk__lt.
+        last_pk: int | None = None
+        while True:
+            page = queryset.order_by("-pk")
+            if last_pk is not None:
+                page = page.filter(pk__lt=last_pk)
+            batch = list(page[:batch_size])
+            if not batch:
+                break
+            yield from batch
+            last_pk = batch[-1]
+    else:
+        last_pk_asc = 0
+        while True:
+            batch = list(
+                queryset.filter(pk__gt=last_pk_asc).order_by("pk")[:batch_size]
+            )
+            if not batch:
+                break
+            yield from batch
+            last_pk_asc = batch[-1]
 
 
 def extract_file_name_from_url(url: str) -> str:
@@ -82,13 +124,6 @@ class OpinionTypeException(Exception):
 
 class DocketSourceException(Exception):
     """An exception for wrong docket source"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class ClusterSourceException(Exception):
-    """An exception for wrong cluster source"""
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -1182,22 +1217,24 @@ def compute_next_binary_probe(
     return pacer_case_id_to_lookup, offset + jitter
 
 
-def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
+def compute_blocked_court_wait(
+    court_blocked_attempts: int,
+    base_wait: int | None = None,
+) -> tuple[int, int]:
     """Compute the wait time for the current attempt and the total accumulated
     seconds from previous attempts.
 
     :param court_blocked_attempts: The current number of blocked attempts.
+    :param base_wait: Base wait in seconds for the exponential backoff.
+        Defaults to ``settings.IQUERY_COURT_BLOCKED_WAIT``.
     :return: A tuple containing the wait time for the current attempt and the
     total accumulated seconds.
     """
+    if base_wait is None:
+        base_wait = settings.IQUERY_COURT_BLOCKED_WAIT  # type: ignore[assignment]
 
-    current_wait_time = int(
-        settings.IQUERY_COURT_BLOCKED_WAIT * 2 ** (court_blocked_attempts - 1)
-    )
-    total_accumulated_time = sum(
-        settings.IQUERY_COURT_BLOCKED_WAIT * 2**i
-        for i in range(court_blocked_attempts)
-    )
+    current_wait_time = int(base_wait * 2 ** (court_blocked_attempts - 1))
+    total_accumulated_time = base_wait * (2**court_blocked_attempts - 1)
     return current_wait_time, total_accumulated_time
 
 

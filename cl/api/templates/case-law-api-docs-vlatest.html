@@ -50,6 +50,7 @@
         <li><a href="#docket-endpoint">Dockets</a></li>
         <li><a href="#cluster-endpoint">Clusters</a></li>
         <li><a href="#opinion-endpoint">Opinions</a></li>
+        <li><a href="#cluster-redirections">Cluster Redirections</a></li>
         <li><a href="#court-endpoint">Courts</a></li>
       </ul>
       <li><a href="#examples">API Examples</a></li>
@@ -153,6 +154,9 @@
       <p>There are several fields with judge information, such as <code>judges</code>, <code>panel</code>, <code>non_participating_judges</code>, etc. Some of these fields contain strings and others are linked to records in our <a href="{% url "judge_api_help" %}">judge API</a>. When we are able to normalize a judge's name into a record in the judge database, we do so. If not, we store their name in a string field for later normalization.
       </p>
     </li>
+    <li>
+      <p>The <code>cluster_redirections</code> field lists any old clusters that have been redirected to this one (e.g., due to deduplication, versioning, or consolidation). Each entry includes the <code>deleted_cluster_id</code> and the <code>reason</code> for the redirection. See the <a href="#cluster-redirections">Opinion Cluster Redirections</a> section below for more details.</p>
+    </li>
   </ul>
 
 
@@ -214,6 +218,12 @@
       <p>Whichever field you choose, please use <a href="{% url "rest_docs" version=version %}#field-selection">Field Selection</a> to omit unnecessary fields. This will make your system faster and ease the load on ours.</p>
     </li>
   </ul>
+
+  <section>
+    <h4 id="cluster-redirections">Opinion Cluster Redirections</h4>
+    <p>When clusters are merged, deduplicated, or sealed, CourtListener preserves persistent URLs by creating redirection records. The Clusters API handles these automatically, returning <strong>HTTP 301</strong> or <strong>HTTP 410</strong> responses as appropriate.</p>
+    <p>For full details on why clusters get redirected and how different data consumers should handle them, see the <a href="{% url "cluster_redirections_help" %}">Opinion Cluster Redirections</a> help page.</p>
+  </section>
 
 
   <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>

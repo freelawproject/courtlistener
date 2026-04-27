@@ -53,6 +53,7 @@ from cl.opinion_page.utils import (
 )
 from cl.opinion_page.views import (
     fetch_docket_entries,
+    get_downloads_context,
     get_prev_next_volumes,
     view_recap_document,
 )
@@ -104,6 +105,42 @@ class TitleTest(SimpleTestCase):
         # No docket number
         d = Docket(case_name="foo", docket_number=None)
         self.assertEqual(make_docket_title(d), "foo")
+
+
+class GetDownloadsContextTest(TestCase):
+    """Test get_downloads_context filters out superseded opinion versions.
+
+    See: https://github.com/freelawproject/courtlistener/issues/7179
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            date_filed=datetime.date.today(),
+        )
+        # Old version opinion with a PDF
+        cls.old_opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            local_path="pdf/old_version.pdf",
+        )
+        # New (main) version opinion with a PDF
+        cls.new_opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            local_path="pdf/new_version.pdf",
+        )
+        # Mark old opinion as superseded by pointing to the new one
+        cls.old_opinion.main_version = cls.new_opinion
+        cls.old_opinion.save()
+
+    async def test_pdf_path_uses_main_version(self) -> None:
+        """Does get_downloads_context return the main version PDF?"""
+        context = await get_downloads_context(self.cluster)
+        self.assertTrue(context["has_downloads"])
+        self.assertIn("new_version", context["pdf_path"])
+        self.assertNotIn("old_version", context["pdf_path"])
 
 
 class SimpleLoadTest(TestCase):
