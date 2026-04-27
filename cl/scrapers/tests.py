@@ -35,6 +35,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.corpus_importer.tasks import (
     merge_scotus_docket as real_merge_scotus_docket,
 )
+from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.model_helpers import make_texas_docket_number_core
@@ -2237,6 +2238,51 @@ class SubscribeToSCOTUSTest(TestCase):
         messy = "RoMeo Juleett.; 5 Seven- .Three"
         clean = process_scotus_captcha_transcription(messy)
         self.assertEqual(clean, "rj573")
+
+    def test_transcription_cleaning_non_space_separators(self):
+        # Whisper/gpt-4o-transcribe often return tokens separated by commas,
+        # periods, or newlines instead of single spaces. The split should
+        # treat any run of non-alphanumerics as a separator.
+        for transcription in [
+            "Alpha,Bravo,Charlie,Delta,Echo",
+            "Alpha. Bravo. Charlie. Delta. Echo",
+            "alpha\nbravo\ncharlie\ndelta\necho",
+        ]:
+            with self.subTest(transcription=transcription):
+                self.assertEqual(
+                    process_scotus_captcha_transcription(transcription),
+                    "abcde",
+                )
+
+    def test_transcription_cleaning_trailing_punctuation(self):
+        # Real CAPTCHA transcriptions frequently end with a period. Trailing
+        # non-alphanumerics must not produce a phantom 6th word.
+        self.assertEqual(
+            process_scotus_captcha_transcription(
+                "Eight Victor Lima Hotel four."
+            ),
+            "8vlh4",
+        )
+        self.assertEqual(
+            process_scotus_captcha_transcription(
+                "8. Five. Delta. Papa. Foxtrot."
+            ),
+            "85dpf",
+        )
+
+    def test_transcription_cleaning_raises_scrape_failed_on_short(self):
+        # Under-counted transcriptions (the original #7266 Sentry case) must
+        # raise ScrapeFailed so the celery task autoretries with a fresh
+        # CAPTCHA, rather than ValueError which propagates as a hard error.
+        with self.assertRaises(ScrapeFailed):
+            process_scotus_captcha_transcription("Yankee four Victor.")
+
+    def test_transcription_cleaning_raises_scrape_failed_on_long(self):
+        # Whisper-1 occasionally hallucinates extra tokens (we observed an
+        # 8-token loop and a 10-token counting sequence in our probe).
+        # Over-counts must also trigger a retry, not silently truncate.
+        with self.assertRaises(ScrapeFailed):
+            process_scotus_captcha_transcription("4. 2. 3. 4. 2. 3. 4. 2.")
 
     @responses.activate
     @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")

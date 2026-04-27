@@ -784,8 +784,7 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     }
 
     words = [
-        re.sub(r"\W+", "", word)
-        for word in re.split(r"[^a-z0-9]+", transcription.lower())
+        word for word in re.split(r"[^a-z0-9]+", transcription.lower()) if word
     ]
 
     if len(words) != 5:
