@@ -799,6 +799,75 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     return "".join(characters)
 
 
+def get_scotus_captcha_solution(
+    session: requests.Session,
+    base_url: str,
+    form_url: str,
+    anti_forgery_token: str,
+    n_tries: int = 3,
+) -> tuple[str, str]:
+    """Get the solution to the SCOTUS audio CAPTCHA with retries.
+
+    :param session: The requests session to use.
+    :param base_url: The base URL of the SCOTUS website.
+    :param form_url: The URL for the subscription form.
+    :param anti_forgery_token: The anti-forgery token to pass in requests.
+    :param n_tries: The maximum number of times to try generating CAPTCHAs.
+        Defaults to 3, which given the 4% failure rate observed in whisper-1,
+        should produce an overall failure rate of 0.0064%.
+
+    :return: A tuple containing the solution and the CAPTCHA ID."""
+    captcha_reset_url = f"{base_url}/Captcha/Reset"
+    captcha_payload = {"__RequestVerificationToken": anti_forgery_token}
+
+    for attempt in range(n_tries):
+        reset_response = session.post(
+            captcha_reset_url,
+            data=captcha_payload,
+            headers={
+                "Referer": form_url,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=10,
+        )
+        reset_response.raise_for_status()
+        reset_data = reset_response.json()
+        captcha_id = reset_data.get("captchaId")
+        if not captcha_id:
+            raise ScrapeFailed(
+                f"Failed to get captchaId from /Captcha/Reset. Response: {reset_response.text}"
+            )
+
+        # Fetch the Audio
+        audio_url = f"{base_url}/Captcha/audio?captchaId={captcha_id}"
+        audio_response = session.get(
+            audio_url, headers={"Referer": form_url}, timeout=10
+        )
+        audio_response.raise_for_status()
+
+        # Solve the captcha
+        audio_file = BytesIO(audio_response.content)
+        transcription = call_llm_transcription(
+            ("captcha.wav", audio_file),
+            api_key=settings.OPENAI_TRANSCRIPTION_KEY,
+            model="whisper-1",
+        )
+        try:
+            solution = process_scotus_captcha_transcription(transcription)
+        except ScrapeFailed as _:
+            ...
+        else:
+            if attempt > 0:
+                logger.warning(
+                    "Generated valid CAPTCHA solution in %d attempts",
+                    attempt + 1,
+                )
+            return solution, captcha_id
+    raise ScrapeFailed(
+        f"Failed to generate valid CAPTCHA solution in {n_tries} attempts"
+    )
+
+
 @app.task(bind=True, max_retries=3, autoretry_for=(ScrapeFailed,))
 @throttle_task("30/m")
 def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
@@ -851,40 +920,9 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
         if not anti_forgery_token:
             raise ScrapeFailed("Could not find __RequestVerificationToken.")
 
-        captcha_reset_url = f"{base_url}/Captcha/Reset"
-        captcha_payload = {"__RequestVerificationToken": anti_forgery_token}
-        reset_response = session.post(
-            captcha_reset_url,
-            data=captcha_payload,
-            headers={
-                "Referer": form_url,
-                "X-Requested-With": "XMLHttpRequest",
-            },
-            timeout=10,
+        solution, captcha_id = get_scotus_captcha_solution(
+            session, base_url, form_url, anti_forgery_token
         )
-        reset_response.raise_for_status()
-        reset_data = reset_response.json()
-        captcha_id = reset_data.get("captchaId")
-        if not captcha_id:
-            raise ScrapeFailed(
-                f"Failed to get captchaId from /Captcha/Reset. Response: {reset_response.text}"
-            )
-
-        # Fetch the Audio
-        audio_url = f"{base_url}/Captcha/audio?captchaId={captcha_id}"
-        audio_response = session.get(
-            audio_url, headers={"Referer": form_url}, timeout=10
-        )
-        audio_response.raise_for_status()
-
-        # Solve the captcha
-        audio_file = BytesIO(audio_response.content)
-        transcription = call_llm_transcription(
-            ("captcha.wav", audio_file),
-            api_key=settings.OPENAI_TRANSCRIPTION_KEY,
-            model="whisper-1",
-        )
-        solution = process_scotus_captcha_transcription(transcription)
 
         # Validate Kendo captcha.
         captcha_validate_url = f"{base_url}/Captcha/validate"
