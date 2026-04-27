@@ -96,12 +96,14 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     SEARCH_TYPES,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
     Opinion,
     OpinionCluster,
     OpinionsCitedByRECAPDocument,
+    OriginatingCourtInformation,
     Parenthetical,
     RECAPDocument,
     sort_cites,
@@ -403,12 +405,24 @@ async def view_docket(
 
     parties = await docket.parties.aexists()
     has_idb_data = bool(docket.idb_data_id)
-    authority_count = await docket.ahas_authorities()
+    has_authorities = await docket.ahas_authorities()
+
+    @sync_to_async
+    def _get_related(d: Docket) -> tuple[
+        BankruptcyInformation | None,
+        OriginatingCourtInformation | None,
+    ]:
+        return (
+            getattr(d, "bankruptcy_information", None),
+            getattr(d, "originating_court_information", None),
+        )
+
+    bankr_info, og_info = await _get_related(docket)
 
     context.update(
         {
             "parties": parties,
-            "authorities": authority_count,
+            "authorities": has_authorities,
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
@@ -416,19 +430,12 @@ async def view_docket(
             "metadata": await sync_to_async(build_docket_metadata)(
                 docket, context["timezone"]
             ),
-            "bankruptcy_metadata": await sync_to_async(
-                lambda: build_bankruptcy_metadata(
-                    getattr(docket, "bankruptcy_information", None)
-                )
-            )(),
-            "originating_court_metadata": await sync_to_async(
-                lambda: build_originating_court_metadata(
-                    docket,
-                    getattr(docket, "originating_court_information", None),
-                )
-            )(),
+            "bankruptcy_metadata": build_bankruptcy_metadata(bankr_info),
+            "originating_court_metadata": build_originating_court_metadata(
+                docket, og_info
+            ),
             "tabs": build_docket_tabs(
-                docket, parties, has_idb_data, authority_count
+                docket, parties, has_idb_data, has_authorities
             ),
         }
     )

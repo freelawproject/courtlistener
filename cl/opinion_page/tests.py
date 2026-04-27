@@ -48,6 +48,9 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    build_docket_metadata,
+    build_docket_tabs,
+    build_originating_court_metadata,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
@@ -58,6 +61,8 @@ from cl.opinion_page.views import (
     view_recap_document,
 )
 from cl.people_db.factories import (
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PositionFactory,
@@ -91,6 +96,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
@@ -2524,8 +2530,6 @@ class BuildDocketMetadataTest(TestCase):
 
     def test_empty_docket_returns_citation_only(self) -> None:
         """A minimal docket should still return a citation item."""
-        from cl.opinion_page.utils import build_docket_metadata
-
         docket = DocketFactory(
             court=self.court,
             source=Docket.COLUMBIA,
@@ -2538,9 +2542,6 @@ class BuildDocketMetadataTest(TestCase):
 
     def test_metadata_with_judge_link(self) -> None:
         """A docket with an assigned judge should produce a linked item."""
-        from cl.opinion_page.utils import build_docket_metadata
-        from cl.people_db.factories import PersonFactory
-
         judge = PersonFactory()
         docket = DocketFactory(
             court=self.court,
@@ -2554,8 +2555,6 @@ class BuildDocketMetadataTest(TestCase):
 
     def test_metadata_with_search_link(self) -> None:
         """Fields like cause should produce a nofollow search link."""
-        from cl.opinion_page.utils import build_docket_metadata
-
         docket = DocketFactory(
             court=self.court,
             source=Docket.COLUMBIA,
@@ -2580,8 +2579,6 @@ class BuildOriginatingCourtMetadataTest(TestCase):
 
     def test_returns_empty_when_no_og_info(self) -> None:
         """No originating court information yields an empty list."""
-        from cl.opinion_page.utils import build_originating_court_metadata
-
         docket = DocketFactory(court=self.appellate_court, source=Docket.RECAP)
         items = build_originating_court_metadata(docket, None)
         self.assertEqual(items, [])
@@ -2590,9 +2587,6 @@ class BuildOriginatingCourtMetadataTest(TestCase):
         """When the lower court is known, the lower-court docket number
         renders as a nofollow RECAP search link via data fields — never as
         a raw HTML string in the value."""
-        from cl.opinion_page.utils import build_originating_court_metadata
-        from cl.search.models import OriginatingCourtInformation
-
         og_info = OriginatingCourtInformation.objects.create(
             docket_number="1:23-cv-456"
         )
@@ -2629,9 +2623,6 @@ class BuildOriginatingCourtMetadataTest(TestCase):
     ) -> None:
         """When only the lower court name is known (no FK, no admin link),
         the lower-court docket number is plain text with no link fields."""
-        from cl.opinion_page.utils import build_originating_court_metadata
-        from cl.search.models import OriginatingCourtInformation
-
         og_info = OriginatingCourtInformation.objects.create(
             docket_number="42"
         )
@@ -2656,8 +2647,6 @@ class BuildDocketTabsTest(SimpleTestCase):
 
     def test_entries_tab_always_present(self) -> None:
         """The entries tab should always be in the list."""
-        from cl.opinion_page.utils import build_docket_tabs
-
         docket = MagicMock()
         docket.get_absolute_url.return_value = "/docket/1/test/"
         docket.pk = 1
@@ -2669,8 +2658,6 @@ class BuildDocketTabsTest(SimpleTestCase):
 
     def test_all_tabs_present(self) -> None:
         """All four tabs should appear when all data exists."""
-        from cl.opinion_page.utils import build_docket_tabs
-
         docket = MagicMock()
         docket.get_absolute_url.return_value = "/docket/1/test/"
         docket.pk = 1
@@ -2682,8 +2669,6 @@ class BuildDocketTabsTest(SimpleTestCase):
 
     def test_conditional_tabs(self) -> None:
         """Only tabs with data should appear."""
-        from cl.opinion_page.utils import build_docket_tabs
-
         docket = MagicMock()
         docket.get_absolute_url.return_value = "/docket/1/test/"
         docket.pk = 1
@@ -2706,8 +2691,6 @@ class DocketPageV2TemplateTest(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        from cl.people_db.factories import PartyFactory, PartyTypeFactory
-
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.docket = DocketFactory(
             court=cls.court,

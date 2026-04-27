@@ -14,13 +14,13 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.urls import reverse
+from django.utils.http import urlencode
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 from elasticsearch_dsl import Q
 
 from cl.alerts.models import DocketAlert
-from cl.custom_filters.templatetags.extras import citation
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -41,6 +41,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     BankruptcyInformation,
     Docket,
+    DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
 )
@@ -85,10 +86,37 @@ def _person_item(
         return {
             "label": label,
             "value": person_str,
-            "url": f'/?type=r&{search_param}="{person_str}"',
+            "url": f"/?{urlencode({'type': 'r', search_param: f'\"{person_str}\"'})}",
             "nofollow": True,
         }
     return None
+
+
+def build_citation_string(obj: Docket | DocketEntry) -> str:
+    """Build a Bluebook-style citation string for a docket or docket entry.
+
+    For dockets: name, docket_number, (court)
+    For docket entries: name, docket_number, (court date) ECF No. N
+    """
+    if isinstance(obj, Docket):
+        docket = obj
+        date_of_interest = None
+        ecf = ""
+    elif isinstance(obj, DocketEntry):
+        docket = obj.docket
+        date_of_interest = obj.date_filed
+        ecf = obj.entry_number
+    else:
+        raise NotImplementedError(f"Object not recognized in {__name__}")
+
+    result = f"{docket.case_name}, {docket.docket_number}, ("
+    result = result + docket.court.citation_string
+    if date_of_interest:
+        result = f"{result} {date_of_interest.strftime('%b %d, %Y')}"
+    result = f"{result})"
+    if ecf:
+        result = f"{result} ECF No. {ecf}"
+    return result
 
 
 def build_docket_metadata(
@@ -144,7 +172,7 @@ def build_docket_metadata(
             {"label": "Date Argued", "value": str(docket.date_argued)}
         )
 
-    items.append({"label": "Citation", "value": citation(docket)})
+    items.append({"label": "Citation", "value": build_citation_string(docket)})
 
     if docket.date_reargued:
         items.append(
@@ -183,7 +211,7 @@ def build_docket_metadata(
             {
                 "label": "Cause",
                 "value": docket.cause,
-                "url": f'/?type=r&cause="{docket.cause}"',
+                "url": f"/?{urlencode({'type': 'r', 'cause': f'\"{docket.cause}\"'})}",
                 "nofollow": True,
             }
         )
@@ -193,7 +221,7 @@ def build_docket_metadata(
             {
                 "label": "Nature of Suit",
                 "value": docket.nature_of_suit,
-                "url": f'/?type=r&nature_of_suit="{docket.nature_of_suit}"',
+                "url": f"/?{urlencode({'type': 'r', 'nature_of_suit': f'\"{docket.nature_of_suit}\"'})}",
                 "nofollow": True,
             }
         )
@@ -203,7 +231,7 @@ def build_docket_metadata(
             {
                 "label": "Jury Demand",
                 "value": docket.jury_demand,
-                "url": f'/?type=r&q=juryDemand:"{docket.jury_demand}"',
+                "url": f"/?{urlencode({'type': 'r', 'q': f'juryDemand:\"{docket.jury_demand}\"'})}",
                 "nofollow": True,
             }
         )
@@ -380,7 +408,7 @@ def build_docket_tabs(
     docket: Docket,
     parties: bool,
     has_idb_data: bool,
-    authority_count: int,
+    has_authorities: bool,
 ) -> list[dict[str, str]]:
     """Build the tab navigation items for the docket page.
 
@@ -424,7 +452,7 @@ def build_docket_tabs(
             }
         )
 
-    if authority_count:
+    if has_authorities:
         tabs.append(
             {
                 "label": "Authorities",
