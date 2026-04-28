@@ -985,16 +985,16 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
                 f"Main form submission failed for case {docket_number}."
             )
     except requests.JSONDecodeError as e:
-        logger.error(
+        logger.warning(
             "Failed to decode JSON response during SCOTUS subscription: %s", e
         )
         raise ScrapeFailed(f"Failed to decode JSON response: {e}")
     except openai.APIError as e:
-        logger.error("OpenAI API error during SCOTUS subscription: %s", e)
+        logger.warning("OpenAI API error during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"OpenAI API error: {e}")
     except requests.RequestException as e:
-        logger.error("Network error during SCOTUS subscription: %s", e)
+        logger.warning("Network error during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"Network error: {e}")
     except Exception as e:
-        logger.exception("Unexpected error during SCOTUS subscription")
+        logger.warning("Unexpected error during SCOTUS subscription")
         raise ScrapeFailed(str(e))
