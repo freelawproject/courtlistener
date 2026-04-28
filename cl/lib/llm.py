@@ -62,6 +62,7 @@ def call_llm_transcription(
     audio: tuple[str, IO[bytes]],
     api_key: str,
     model: str = "gpt-4o-transcribe",
+    language: str = "en",
 ) -> str:
     """Call an LLM transcription service with a given base64 encoded audio file.
 
@@ -72,9 +73,10 @@ def call_llm_transcription(
     :param audio: Audio file to transcribe, as a binary IO stream.
     :param api_key: OpenAI transcription API key
     :param model: The OpenAI transcription model to use.
+    :param language: The language of the audio file.
     :return: The transcription text."""
     client = OpenAI(api_key=api_key)
 
     return client.audio.transcriptions.create(
-        model=model, file=audio, response_format="text"
+        model=model, file=audio, response_format="text", language=language
     )
