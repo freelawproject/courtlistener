@@ -16,7 +16,7 @@
     - id_suffix    (optional): suffix for element IDs to avoid dupes.
 {% endcomment %}
 {% load waffle_tags %}
-{% flag "semantic_search" %}
+{% flag "semantic_search_frontend" %}
 {% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}
   {% with is_semantic=search_form.semantic.value %}
   <span class="input-group-addon search-mode-toggle{% if is_semantic %} semantic-active{% endif %}"

@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
+from waffle.models import Flag
 
 from cl.lib.courts import get_active_court_from_cache
 from cl.lib.model_helpers import flatten_choices
@@ -700,7 +701,15 @@ class SearchForm(forms.Form):
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
 
-        if not settings.KNN_SEARCH_ENABLED:
+        # Disable semantic search if KNN is off globally, or if the
+        # request is from the frontend and the waffle flag is not active.
+        # API requests pass self.request and are only gated by KNN_SEARCH_ENABLED.
+        if not settings.KNN_SEARCH_ENABLED or (
+            not self.request
+            and not Flag.objects.filter(
+                name="semantic_search_frontend", everyone=True
+            ).exists()
+        ):
             cleaned_data["semantic"] = False
 
         return cleaned_data
