@@ -608,7 +608,7 @@ async def extract_formatted_text_document_base(
                 rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
-        rd.plain_text = rd.plain_text.replace("\0","")
+        rd.plain_text = rd.plain_text.replace("\0", "")
         # Kludgey fix to handle RECAPDocument's custom save logic.
         if isinstance(rd, RECAPDocument):
             await rd.asave(
