@@ -66,6 +66,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
 )
 from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
+    extract_formatted_text_document_base,
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
@@ -118,6 +119,7 @@ from cl.search.models import (
 )
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
+    TexasDocumentFactory,
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
@@ -550,6 +552,46 @@ class IngestionTest(TestCase):
                 "html/2025/04/25/zelka_h.v.a.c._maintenance_solutions_inc._v._g.m._crisalli__assoc._inc._12.html"
             )
             error_mock.assert_called()
+
+
+class ExtractFormattedTextSanitizationTest(TestCase):
+    """Tests that extract_formatted_text_document_base scrubs content
+    that PostgreSQL won't accept (e.g. NUL bytes) before saving."""
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_nul_bytes_in_extracted_content_are_stripped(
+        self, microservice_mock
+    ):
+        """Does extraction strip NUL bytes so the save does not raise
+        DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?
+        """
+        texas_document = TexasDocumentFactory.create()
+        # Doctor occasionally returns extracted text containing NUL bytes
+        # (e.g. from malformed PDFs). PostgreSQL rejects these in text
+        # columns, so the extractor must strip them before saving.
+        content_with_nuls = (
+            "Hello\0 world\x00. Hello " + chr(0) + "Courtlistener."
+        )
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": content_with_nuls,
+                "extracted_by_ocr": False,
+            },
+        )
+
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+
+        texas_document.refresh_from_db()
+        self.assertNotIn("\x00", texas_document.plain_text)
+        self.assertIn("Hello", texas_document.plain_text)
+        self.assertIn("world", texas_document.plain_text)
+        self.assertIn("Courtlistener", texas_document.plain_text)
 
 
 class ExtensionIdentificationTest(SimpleTestCase):
