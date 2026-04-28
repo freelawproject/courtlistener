@@ -1,6 +1,7 @@
 import logging
 import random
 import re
+import time
 import traceback
 from collections import defaultdict
 from io import BytesIO
@@ -805,6 +806,7 @@ def get_scotus_captcha_solution(
     form_url: str,
     anti_forgery_token: str,
     n_tries: int = 3,
+    wait: float = 1.0,
 ) -> tuple[str, str]:
     """Get the solution to the SCOTUS audio CAPTCHA with retries.
 
@@ -815,6 +817,7 @@ def get_scotus_captcha_solution(
     :param n_tries: The maximum number of times to try generating CAPTCHAs.
         Defaults to 3, which given the 4% failure rate observed in whisper-1,
         should produce an overall failure rate of 0.0064%.
+    :param wait: Time in seconds to wait between consecutive transcription attempts.
 
     :return: A tuple containing the solution and the CAPTCHA ID."""
     captcha_reset_url = f"{base_url}/Captcha/Reset"
@@ -863,7 +866,8 @@ def get_scotus_captcha_solution(
                     attempt + 1,
                 )
             return solution, captcha_id
-    raise ScrapeFailed(
+        time.sleep(wait)
+    raise ValueError(
         f"Failed to generate valid CAPTCHA solution in {n_tries} attempts"
     )
 
