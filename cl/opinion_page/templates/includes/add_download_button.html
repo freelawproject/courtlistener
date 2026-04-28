@@ -7,7 +7,7 @@
     <span class="hidden-xs">
         Download {% if "pdf" in download_file_path %}PDF{% elif "html" in download_file_path %}HTML{% elif "docx" in download_file_path %}DOCX{% elif "rtf" in download_file_path %}RTF{% else %} {% endif %} <span class="caret"></span>
     </span></button>
-    <ul class="dropdown-menu">
+    <ul class="dropdown-menu dropdown-menu-right">
         {% if cluster.filepath_pdf_harvard %}
         <li>
             <a href="{{ cluster.filepath_pdf_harvard.url }}"
