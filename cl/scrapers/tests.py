@@ -18,6 +18,10 @@ from django.test import SimpleTestCase
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
+from juriscraper.scotus.scotus_email import (
+    SCOTUSConfirmationResult,
+    SCOTUSEmailType,
+)
 from juriscraper.state.texas.common import CourtID
 from responses import matchers
 
@@ -28,6 +32,9 @@ from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.citations.models import UnmatchedCitation
+from cl.corpus_importer.tasks import (
+    merge_scotus_docket as real_merge_scotus_docket,
+)
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.model_helpers import make_texas_docket_number_core
@@ -38,7 +45,7 @@ from cl.recap.models import (
     EmailProcessingQueue,
     EmailSource,
 )
-from cl.recap.tasks import process_texas_email
+from cl.recap.tasks import process_scotus_email, process_texas_email
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.exceptions import (
     ConsecutiveDuplicatesError,
@@ -88,6 +95,11 @@ from cl.search.factories import (
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
     ParentheticalFactory,
+    SCOTUSAttachmentDataFactory,
+    ScotusDocketDataFactory,
+    SCOTUSDocketEntryDataFactory,
+    SCOTUSDocketEntryFactory,
+    SCOTUSDocumentFactory,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -100,6 +112,8 @@ from cl.search.models import (
     OpinionsCited,
     OriginatingCourtInformation,
     Parenthetical,
+    SCOTUSDocketEntry,
+    SCOTUSDocument,
 )
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
@@ -2235,7 +2249,7 @@ class SubscribeToSCOTUSTest(TestCase):
         form_url = (
             f"{scotus_root}/CaseNotification?caseNumber={self.docket_number}"
         )
-        subscription_email = "scotus@recap.email"
+        subscription_email = settings.SCOTUS_RECAP_EMAIL
         captcha_solution = "mo9su"
         captcha_id = "3de9089d-108c-4c2f-b235-7979460b1cb2"
         verification_token = "CfDJ8LWjh78o-U5EigyPTWy9BmfxWSmFTEKR1TK7KTiNnwMLP5CZNLNqEUAPQDHopwbVWJWv0IAFiH3Bc3ANa1MqRpCjj5W9VoDr3HDwtFvrKDVr_NhsqCtfn47gr_jp2cYNyuC7V6HvOn4FAxVP98tlC3I"
@@ -2499,6 +2513,231 @@ class TexasCaseMailIntegrationTest(TestCase):
         mock_parse_text.assert_called_once_with(fake_docket_html)
 
         self.assertEqual(await Docket.objects.acount(), 1)
+
+
+@mock.patch("cl.recap.tasks.merge_scotus_docket")
+@mock.patch("cl.recap.tasks.fetch_and_archive_scotus_docket_followup")
+@mock.patch("cl.recap.tasks.SCOTUSEmail")
+@mock.patch("cl.recap.tasks.SCOTUSSESStorage")
+class SCOTUSEmailIntegrationTest(TestCase):
+    """Integration test for the SCOTUS email processing flow.
+
+    Covers: POST endpoint → EPQ creation → process_scotus_email task →
+    email retrieval → parsing → EPQ status update for all email types.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.scotus = CourtFactory.create(id="scotus")
+        cls.post_data = {
+            "mail": {
+                "timestamp": "2024-01-01T00:00:00.000Z",
+                "source": "noreply@supremecourt.gov",
+                "message_id": "test-scotus-email-id",
+                "destination": ["scotus@recap.email"],
+                "headers_truncated": False,
+                "headers": [],
+                "common_headers": {
+                    "return_path": "noreply@supremecourt.gov",
+                    "from": ["noreply@supremecourt.gov"],
+                    "date": "Mon, 1 Jan 2024 00:00:00 +0000",
+                    "to": ["scotus@recap.email"],
+                    "message_id": "test-scotus-email-id",
+                    "subject": "Supreme Court Electronic Filing System",
+                },
+            },
+            "receipt": {
+                "timestamp": "2024-01-01T00:00:00.000Z",
+                "processing_time_millis": 100,
+                "recipients": ["scotus@recap.email"],
+                "spam_verdict": {"status": "PASS"},
+                "virus_verdict": {"status": "PASS"},
+                "spf_verdict": {"status": "PASS"},
+                "dkim_verdict": {"status": "PASS"},
+                "dmarc_verdict": {"status": "PASS"},
+                "action": {
+                    "type": "Lambda",
+                    "function_arn": "arn:aws:lambda:us-east-1:123456789012:function:IncomingEmail",
+                    "invocation_type": "Event",
+                },
+            },
+            "court": "scotus",
+        }
+
+    def setUp(self):
+        self.async_client = AsyncAPIClient()
+        self.user = User.objects.get(username="recap-email")
+        token = f"Token {self.user.auth_token.key}"
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
+        self.path = "/api/rest/v4/scrapers/scotus-email/"
+
+    async def test_invalid_email_type(
+        self, mock_storage_cls, mock_email_cls, mock_fetch, mock_merge
+    ):
+        """Invalid email type sets EPQ status to INVALID_CONTENT."""
+        mock_storage_cls.return_value.open = mock.mock_open(
+            read_data=b"fake email body"
+        )
+        mock_email_cls.return_value.email_type = SCOTUSEmailType.INVALID
+        mock_email_cls.return_value.handle_email.return_value = {
+            "email_type": SCOTUSEmailType.INVALID.value,
+            "data": None,
+        }
+
+        with patch.object(process_scotus_email, "delay") as mock_delay:
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(await EmailProcessingQueue.objects.acount(), 1)
+        epq = await EmailProcessingQueue.objects.afirst()
+        self.assertEqual(epq.message_id, "test-scotus-email-id")
+        self.assertEqual(epq.destination_emails, ["scotus@recap.email"])
+        self.assertEqual(epq.source, EmailSource.SCOTUS)
+        mock_delay.assert_called_once_with(epq.pk)
+
+        await sync_to_async(process_scotus_email)(epq.pk)
+        await epq.arefresh_from_db()
+
+        self.assertEqual(epq.status, PROCESSING_STATUS.INVALID_CONTENT)
+        mock_fetch.assert_not_called()
+        mock_merge.assert_not_called()
+
+    async def test_confirmation_email(
+        self, mock_storage_cls, mock_email_cls, mock_fetch, mock_merge
+    ):
+        """Successful confirmation sets SUCCESSFUL; any other result sets FAILED."""
+        mock_storage_cls.return_value.open = mock.mock_open(
+            read_data=b"fake email body"
+        )
+        mock_email_cls.return_value.email_type = SCOTUSEmailType.CONFIRMATION
+        cases = [
+            (
+                SCOTUSConfirmationResult.Success.value,
+                PROCESSING_STATUS.SUCCESSFUL,
+            ),
+            (SCOTUSConfirmationResult.Failed.value, PROCESSING_STATUS.FAILED),
+        ]
+        for result_value, expected_status in cases:
+            with self.subTest(result=result_value):
+                mock_email_cls.return_value.handle_email.return_value = {
+                    "email_type": SCOTUSEmailType.CONFIRMATION.value,
+                    "data": result_value,
+                }
+                with patch.object(process_scotus_email, "delay") as mock_delay:
+                    response = await self.async_client.post(
+                        self.path, self.post_data, format="json"
+                    )
+                self.assertEqual(response.status_code, HTTPStatus.CREATED)
+                epq = await EmailProcessingQueue.objects.order_by(
+                    "-id"
+                ).afirst()
+                mock_delay.assert_called_once_with(epq.pk)
+
+                await sync_to_async(process_scotus_email)(epq.pk)
+                await epq.arefresh_from_db()
+
+                self.assertEqual(epq.status, expected_status)
+                mock_fetch.assert_not_called()
+                mock_merge.assert_not_called()
+
+    async def test_docket_entry_email(
+        self, mock_storage_cls, mock_email_cls, mock_fetch, mock_merge
+    ):
+        """Docket entry email links only newly created SCOTUSDocuments.
+
+        The test pre-creates a docket, entry, and one document that will be
+        re-encountered during the merge. The entry data contains two attachments:
+        the first matches the pre-existing document (updated, not linked) and
+        the second is new (created and linked to the EPQ).
+        """
+        mock_storage_cls.return_value.open = mock.mock_open(
+            read_data=b"fake email body"
+        )
+
+        # Build entry data with two attachments
+        docket_data = await sync_to_async(
+            ScotusDocketDataFactory
+        )(
+            docket_entries=[
+                SCOTUSDocketEntryDataFactory(
+                    attachments=[
+                        SCOTUSAttachmentDataFactory(),  # will match existing doc
+                        SCOTUSAttachmentDataFactory(),  # will be new
+                    ]
+                )
+            ],
+            parties=[],
+        )
+        entry_data = docket_data["docket_entries"][0]
+        existing_attachment = entry_data["attachments"][0]
+
+        # Pre-create the docket with the same docket_number the merge will use.
+        # source=SCRAPER avoids RECAP validation that requires pacer_case_id.
+        # pacer_case_id=None is required because make_scotus_docket_number_core
+        # returns "" for the fake federal-district-style docket numbers generated
+        # by ScotusDocketDataFactory, so find_docket_object falls back to
+        # {"pacer_case_id": None, "docket_number_raw": docket_number}.
+        existing_docket = await sync_to_async(DocketFactory.create)(
+            court=self.scotus,
+            docket_number=docket_data["docket_number"],
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+        # Pre-create the matching entry (entry_number = entry's document_number)
+        existing_entry = await sync_to_async(SCOTUSDocketEntryFactory.create)(
+            docket=existing_docket,
+            entry_number=entry_data["document_number"],
+        )
+        # Pre-create the document for the first attachment.
+        # enrich_scotus_attachments assigns attachment_number=1 to index 0,
+        # which is what merge_scotus_document will use in get_or_create.
+        existing_doc = await sync_to_async(SCOTUSDocumentFactory.create)(
+            docket_entry=existing_entry,
+            document_number=existing_attachment["document_number"],
+            attachment_number=1,
+        )
+
+        mock_email_cls.return_value.email_type = SCOTUSEmailType.DOCKET_ENTRY
+        mock_fetch.return_value = {
+            "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
+            "data": docket_data,
+        }
+        mock_merge.side_effect = lambda data: real_merge_scotus_docket(
+            data, download_file=False
+        )
+
+        with patch.object(process_scotus_email, "delay") as mock_delay:
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        epq = await EmailProcessingQueue.objects.afirst()
+        mock_delay.assert_called_once_with(epq.pk)
+
+        await sync_to_async(process_scotus_email)(epq.pk)
+        await epq.arefresh_from_db()
+
+        self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
+        mock_merge.assert_called_once_with(docket_data)
+
+        # One entry merged (not duplicated), two total documents (1 existing + 1 new)
+        self.assertEqual(await SCOTUSDocketEntry.objects.acount(), 1)
+        self.assertEqual(await SCOTUSDocument.objects.acount(), 2)
+
+        # Only the newly created document is linked in the EPQ — not the
+        # pre-existing one that was merely updated
+        epq_rm = await EmailProcessingQueue.objects.select_related(
+            "related_model"
+        ).aget(pk=epq.pk)
+        self.assertEqual(epq_rm.related_model.model, "scotusdocument")
+        new_doc = await SCOTUSDocument.objects.exclude(
+            pk=existing_doc.pk
+        ).aget()
+        self.assertEqual(epq_rm.object_ids, [new_doc.pk])
+        self.assertNotIn(existing_doc.pk, epq_rm.object_ids)
 
 
 class AccountSubscriptionIncludeTest(TestCase):

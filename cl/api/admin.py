@@ -9,14 +9,10 @@ class APIThrottleAdmin(admin.ModelAdmin):
     list_display = (
         "user",
         "throttle_type",
-        "blocked",
         "rate",
         "date_created",
     )
-    list_filter = (
-        "throttle_type",
-        "blocked",
-    )
+    list_filter = ("throttle_type",)
     search_fields = (
         "user__username",
         "user__email",
@@ -32,6 +28,7 @@ class APIThrottleInline(admin.TabularInline):
     model = APIThrottle
     extra = 0
     raw_id_fields = ("user",)
+    fields = ("user", "throttle_type", "rate", "notes")
 
 
 @admin.register(Webhook)

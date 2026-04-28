@@ -415,7 +415,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court=self.lower_court.full_name,
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         dockets = Docket.objects.all()
@@ -436,7 +436,7 @@ class ScotusDocketMergeTest(TestCase):
             lower_court_case_numbers=["23-6433"],
             docket_entries=[],
         )
-        updated_docket, _ = merge_scotus_docket(data)
+        updated_docket, _, _ = merge_scotus_docket(data)
         updated_docket.refresh_from_db()
         self.assertEqual(dockets.count(), 1)
         self.assertEqual(scotus_metadata.count(), 1)
@@ -470,7 +470,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="24-200",
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
         self.assertEqual(docket.pk, existing.pk)
         self.assertEqual(
@@ -490,7 +490,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_number="24-400",
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
         self.assertEqual(docket.pk, existing.pk)
         self.assertEqual(
@@ -562,7 +562,7 @@ class ScotusDocketMergeTest(TestCase):
             questions_presented="../qp/14-00556qp.pdf",
             docket_entries=[],
         )
-        docket, _ = merge_scotus_docket(report_data)
+        docket, _, _ = merge_scotus_docket(report_data)
         scotus_meta = ScotusDocketMetadata.objects.get(docket=docket)
         self.assertEqual(
             scotus_meta.questions_presented_url,
@@ -610,7 +610,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entries=[],
         )
 
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -638,7 +638,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entries=[],
         )
 
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])
@@ -667,7 +667,7 @@ class ScotusDocketMergeTest(TestCase):
             docket_entries=[],
         )
 
-        docket, _ = merge_scotus_docket(data)
+        docket, _, _ = merge_scotus_docket(data)
         docket.refresh_from_db()
 
         self.assertEqual(docket.appeal_from_str, data["lower_court"])

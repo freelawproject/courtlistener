@@ -800,7 +800,7 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
 
 
 @app.task(bind=True, max_retries=3, autoretry_for=(ScrapeFailed,))
-@throttle_task("1/m")
+@throttle_task("30/m")
 def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     """Subscribe to SCOTUS email updates for a given opinion.
 
@@ -916,7 +916,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
         # Final Payload Update
         payload.update(
             {
-                "Email": "scotus@recap.email",
+                "Email": settings.SCOTUS_RECAP_EMAIL,
                 "captcha": solution,
                 "SubscribeButton": "Subscribe",
             }
