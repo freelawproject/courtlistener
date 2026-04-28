@@ -46,7 +46,7 @@
         <li><a href="#"><b>Versions</b></a></li>
         {% for sub_opinion in cluster.opinions_versions %}
             {% if sub_opinion.local_path %}
-                <li><a href="{{ sub_opinion.local_path.url }}" rel="nofollow">{{ sub_opinion.date_created }}</a></li>
+                <li><a href="{{ sub_opinion.local_path.url }}" rel="nofollow">{{ sub_opinion.get_type_display }} · {{ sub_opinion.date_created|date:"M j, Y H:i" }}</a></li>
             {% endif %}
         {% endfor %}
     {% endif %}
