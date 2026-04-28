@@ -13,6 +13,20 @@ from cl.lib.models import AbstractDateTimeModel
 # Pattern: digits, slash, then valid time unit (s/m/h/d or full words)
 RATE_PATTERN = re.compile(r"^\d+/(s|m|h|d|sec|min|second|minute|hour|day)$")
 
+# DRF's SimpleRateThrottle.parse_rate() keys off the first char of the period
+# suffix (s/m/h/d), so treat rates that share that char as the same time unit.
+TIME_UNIT_NAMES = {
+    "s": "second",
+    "m": "minute",
+    "h": "hour",
+    "d": "day",
+}
+
+
+def normalize_time_unit(rate: str) -> str:
+    """Return the single-char period ("s"/"m"/"h"/"d") for a valid rate string."""
+    return rate.split("/")[-1][0].lower()
+
 
 class ThrottleType(models.IntegerChoices):
     API = 1, "API"
@@ -52,8 +66,8 @@ class APIThrottle(AbstractDateTimeModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "throttle_type"],
-                name="unique_user_throttle_type",
+                fields=["user", "throttle_type", "rate"],
+                name="unique_user_throttle_type_rate",
             ),
         ]
 
@@ -76,6 +90,22 @@ class APIThrottle(AbstractDateTimeModel):
                     "Use format like '100/hour', '1000/day', '60/min'."
                 }
             )
+        if not self.rate:
+            return
+        unit = normalize_time_unit(self.rate)
+        conflicting = APIThrottle.objects.filter(
+            user_id=self.user_id,
+            throttle_type=self.throttle_type,
+        ).exclude(pk=self.pk)
+        for existing in conflicting:
+            if existing.rate and normalize_time_unit(existing.rate) == unit:
+                unit_name = TIME_UNIT_NAMES[unit]
+                raise ValidationError(
+                    {
+                        "rate": f"A per-{unit_name} rate already exists "
+                        f"for this throttle configuration."
+                    }
+                )
 
 
 class WebhookEventType(models.IntegerChoices):

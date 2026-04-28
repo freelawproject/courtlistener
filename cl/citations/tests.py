@@ -2966,7 +2966,7 @@ class CitationLookUpApiTest(
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
-        return_value="20/m",
+        return_value=["20/m"],
     )
     async def test_can_throttle_user_when_querying_exact_rate_limit(
         self, get_rate_mock, throttle_logic_mock
@@ -3012,7 +3012,7 @@ class CitationLookUpApiTest(
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
-        return_value="20/m",
+        return_value=["20/m"],
     )
     async def test_can_throttle_user_exceeding_citation_limit_by_small_number(
         self, get_rate_mock, throttle_logic_mock
@@ -3100,7 +3100,7 @@ class CitationLookUpApiTest(
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
-        return_value="20/m",
+        return_value=["20/m"],
     )
     async def test_can_throttle_user_exceeding_citation_limit_by_big_margin(
         self, get_rate_mock, throttle_logic_mock
