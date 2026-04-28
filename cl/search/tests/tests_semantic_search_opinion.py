@@ -737,9 +737,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertIn(self.opinion_3.cluster.case_name, content)
 
     @override_flag("semantic_search_frontend", active=False)
-    def test_frontend_flag_off_disables_semantic(
-        self, inception_mock
-    ) -> None:
+    def test_frontend_flag_off_disables_semantic(self, inception_mock) -> None:
         """Semantic search is disabled on the frontend when the waffle
         flag is inactive, even if semantic=true is in the URL."""
         inception_mock.return_value = self._get_mock_for_inception(
