@@ -882,6 +882,7 @@ async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
             if sub_opinion.download_url:
                 has_downloads = True
             if sub_opinion.local_path:
+                has_downloads = True
                 download_file_path = sub_opinion.local_path.url
             if has_downloads and download_file_path:
                 break
