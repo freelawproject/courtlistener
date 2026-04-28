@@ -8,7 +8,6 @@ from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
 from localflavor.us.us_states import STATE_CHOICES
-from waffle.models import Flag
 
 from cl.lib.courts import get_active_court_from_cache
 from cl.lib.model_helpers import flatten_choices
@@ -500,6 +499,9 @@ class SearchForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.courts = kwargs.pop("courts", None)
         self.request = kwargs.pop("request", None)
+        self.is_semantic_frontend_active = kwargs.pop(
+            "is_semantic_frontend_active", False
+        )
         super().__init__(*args, **kwargs)
 
         """
@@ -705,10 +707,7 @@ class SearchForm(forms.Form):
         # request is from the frontend and the waffle flag is not active.
         # API requests pass self.request and are only gated by KNN_SEARCH_ENABLED.
         if not settings.KNN_SEARCH_ENABLED or (
-            not self.request
-            and not Flag.objects.filter(
-                name="semantic_search_frontend", everyone=True
-            ).exists()
+            not self.request and not self.is_semantic_frontend_active
         ):
             cleaned_data["semantic"] = False
 

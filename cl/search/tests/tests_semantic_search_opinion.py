@@ -736,6 +736,23 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertIn(self.opinion_2.cluster.case_name, content)
         self.assertIn(self.opinion_3.cluster.case_name, content)
 
+    @override_flag("semantic_search_frontend", active=False)
+    def test_frontend_flag_off_disables_semantic(
+        self, inception_mock
+    ) -> None:
+        """Semantic search is disabled on the frontend when the waffle
+        flag is inactive, even if semantic=true is in the URL."""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+        params = {
+            "q": self.situational_query,
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": "true",
+        }
+        self.client.get(reverse("show_results"), params)
+        inception_mock.assert_not_called()
+
     @override_flag("semantic_search_frontend", active=True)
     def test_frontend_can_apply_court_filter(self, inception_mock) -> None:
         """Frontend court filter narrows semantic results."""
@@ -819,30 +836,30 @@ class SemanticFormCleanTest(TestCase):
     """Tests that SearchForm preserves the semantic field correctly
     when used from the frontend (without a request object)."""
 
-    @override_flag("semantic_search_frontend", active=True)
     def test_semantic_preserved_when_knn_enabled(self) -> None:
         """semantic=True survives clean() when KNN_SEARCH_ENABLED=True
-        and the waffle flag is active."""
+        and the frontend flag is active."""
         form = SearchForm(
             {
                 "q": "free speech",
                 "type": SEARCH_TYPES.OPINION,
                 "semantic": True,
-            }
+            },
+            is_semantic_frontend_active=True,
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertTrue(form.cleaned_data["semantic"])
 
-    @override_flag("semantic_search_frontend", active=False)
     def test_semantic_disabled_when_flag_inactive(self) -> None:
-        """semantic is forced to False on the frontend when the waffle
-        flag is inactive, even if KNN_SEARCH_ENABLED=True."""
+        """semantic is forced to False on the frontend when the flag
+        is inactive, even if KNN_SEARCH_ENABLED=True."""
         form = SearchForm(
             {
                 "q": "free speech",
                 "type": SEARCH_TYPES.OPINION,
                 "semantic": True,
-            }
+            },
+            is_semantic_frontend_active=False,
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertFalse(form.cleaned_data["semantic"])
