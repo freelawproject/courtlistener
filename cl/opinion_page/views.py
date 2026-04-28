@@ -408,7 +408,9 @@ async def view_docket(
     has_authorities = await docket.ahas_authorities()
 
     @sync_to_async
-    def _get_related(d: Docket) -> tuple[
+    def _get_related(
+        d: Docket,
+    ) -> tuple[
         BankruptcyInformation | None,
         OriginatingCourtInformation | None,
     ]:

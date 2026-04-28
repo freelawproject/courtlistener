@@ -2580,9 +2580,7 @@ class BuildDocketMetadataTest(TestCase):
             cause = next(i for i in items if i["label"] == "Cause")
             self.assertIn("%26", cause["url"])
             parsed = parse_qs(urlparse(cause["url"]).query)
-            self.assertEqual(
-                parsed["cause"][0], '"Civil Rights & Liberties"'
-            )
+            self.assertEqual(parsed["cause"][0], '"Civil Rights & Liberties"')
 
 
 class BuildOriginatingCourtMetadataTest(TestCase):
