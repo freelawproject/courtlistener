@@ -822,6 +822,7 @@ def get_scotus_captcha_solution(
     :return: A tuple containing the solution and the CAPTCHA ID."""
     captcha_reset_url = f"{base_url}/Captcha/Reset"
     captcha_payload = {"__RequestVerificationToken": anti_forgery_token}
+    error_messages = []
 
     for attempt in range(n_tries):
         reset_response = session.post(
@@ -857,18 +858,18 @@ def get_scotus_captcha_solution(
         )
         try:
             solution = process_scotus_captcha_transcription(transcription)
-        except ScrapeFailed as _:
-            ...
+        except ScrapeFailed as e:
+            error_messages.append(str(e))
         else:
             if attempt > 0:
                 logger.warning(
-                    "Generated valid CAPTCHA solution in %d attempts",
+                    f"Generated valid CAPTCHA solution in %d attempts.\nErrors: {error_messages}",
                     attempt + 1,
                 )
             return solution, captcha_id
         time.sleep(wait)
     raise ValueError(
-        f"Failed to generate valid CAPTCHA solution in {n_tries} attempts"
+        f"Failed to generate valid CAPTCHA solution in {n_tries} attempts.\nErrors: {error_messages}"
     )
 
 
