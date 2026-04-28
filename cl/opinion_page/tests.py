@@ -2580,9 +2580,7 @@ class BuildDocketMetadataTest(TestCase):
             cause = next(i for i in items if i["label"] == "Cause")
             self.assertIn("%26", cause["url"])
             parsed = parse_qs(urlparse(cause["url"]).query)
-            self.assertEqual(
-                parsed["cause"][0], '"Civil Rights & Liberties"'
-            )
+            self.assertEqual(parsed["cause"][0], '"Civil Rights & Liberties"')
 
 
 class BuildOriginatingCourtMetadataTest(TestCase):
@@ -2668,7 +2666,7 @@ class BuildDocketTabsTest(SimpleTestCase):
         docket.pk = 1
         docket.slug = "test"
 
-        tabs = build_docket_tabs(docket, False, False, 0)
+        tabs = build_docket_tabs(docket, False, False, False)
         self.assertEqual(len(tabs), 1)
         self.assertEqual(tabs[0]["key"], "entries")
 
@@ -2679,7 +2677,7 @@ class BuildDocketTabsTest(SimpleTestCase):
         docket.pk = 1
         docket.slug = "test"
 
-        tabs = build_docket_tabs(docket, True, True, 5)
+        tabs = build_docket_tabs(docket, True, True, True)
         keys = [t["key"] for t in tabs]
         self.assertEqual(keys, ["entries", "parties", "idb", "authorities"])
 
@@ -2691,12 +2689,12 @@ class BuildDocketTabsTest(SimpleTestCase):
         docket.slug = "test"
 
         with self.subTest("parties only"):
-            tabs = build_docket_tabs(docket, True, False, 0)
+            tabs = build_docket_tabs(docket, True, False, False)
             keys = [t["key"] for t in tabs]
             self.assertEqual(keys, ["entries", "parties"])
 
         with self.subTest("idb only"):
-            tabs = build_docket_tabs(docket, False, True, 0)
+            tabs = build_docket_tabs(docket, False, True, False)
             keys = [t["key"] for t in tabs]
             self.assertEqual(keys, ["entries", "idb"])
 

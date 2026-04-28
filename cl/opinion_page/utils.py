@@ -86,7 +86,7 @@ def _person_item(
         return {
             "label": label,
             "value": person_str,
-            "url": f"/?{urlencode({'type': 'r', search_param: f'\"{person_str}\"'})}",
+            "url": f"/?{urlencode({'type': 'r', search_param: f'"{person_str}"'})}",
             "nofollow": True,
         }
     return None
@@ -211,7 +211,7 @@ def build_docket_metadata(
             {
                 "label": "Cause",
                 "value": docket.cause,
-                "url": f"/?{urlencode({'type': 'r', 'cause': f'\"{docket.cause}\"'})}",
+                "url": f"/?{urlencode({'type': 'r', 'cause': f'"{docket.cause}"'})}",
                 "nofollow": True,
             }
         )
@@ -221,7 +221,7 @@ def build_docket_metadata(
             {
                 "label": "Nature of Suit",
                 "value": docket.nature_of_suit,
-                "url": f"/?{urlencode({'type': 'r', 'nature_of_suit': f'\"{docket.nature_of_suit}\"'})}",
+                "url": f"/?{urlencode({'type': 'r', 'nature_of_suit': f'"{docket.nature_of_suit}"'})}",
                 "nofollow": True,
             }
         )
@@ -231,7 +231,7 @@ def build_docket_metadata(
             {
                 "label": "Jury Demand",
                 "value": docket.jury_demand,
-                "url": f"/?{urlencode({'type': 'r', 'q': f'juryDemand:\"{docket.jury_demand}\"'})}",
+                "url": f"/?{urlencode({'type': 'r', 'q': f'juryDemand:"{docket.jury_demand}"'})}",
                 "nofollow": True,
             }
         )
