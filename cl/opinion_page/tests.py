@@ -7,7 +7,7 @@ from datetime import date
 from http import HTTPStatus
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -2567,6 +2567,22 @@ class BuildDocketMetadataTest(TestCase):
         self.assertEqual(cause["value"], "28:1331")
         self.assertIn("cause", cause["url"])
         self.assertTrue(cause.get("nofollow"))
+
+        with self.subTest("special characters are URL-encoded"):
+            docket_special = DocketFactory(
+                court=self.court,
+                source=Docket.COLUMBIA,
+                cause="Civil Rights & Liberties",
+                assigned_to=None,
+                referred_to=None,
+            )
+            items = build_docket_metadata(docket_special, "US/Eastern")
+            cause = next(i for i in items if i["label"] == "Cause")
+            self.assertIn("%26", cause["url"])
+            parsed = parse_qs(urlparse(cause["url"]).query)
+            self.assertEqual(
+                parsed["cause"][0], '"Civil Rights & Liberties"'
+            )
 
 
 class BuildOriginatingCourtMetadataTest(TestCase):
