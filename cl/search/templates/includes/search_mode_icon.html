@@ -1,0 +1,62 @@
+{% comment %}
+  Semantic search mode toggle icon.
+
+  Renders a clickable icon on the left side of a search input-group that
+  toggles between Keyword (&) and Semantic (?) modes. Also renders a
+  hidden `semantic` input that gets submitted with the form.
+
+  Gated by the `semantic_search` waffle flag so the toggle can be
+  rolled out to select users before a full launch.
+
+  Must be placed as the FIRST child inside a .input-group, before the
+  text input.
+
+  Context variables:
+    - search_form  (required): the SearchForm instance.
+    - id_suffix    (optional): suffix for element IDs to avoid dupes.
+{% endcomment %}
+{% load waffle_tags %}
+{% flag "semantic_search_frontend" %}
+{% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}
+  {% with is_semantic=search_form.semantic.value %}
+  <span class="input-group-addon search-mode-toggle{% if is_semantic %} semantic-active{% endif %}"
+        role="button"
+        tabindex="0"
+        id="search-mode-icon{{ id_suffix|default:'' }}"
+        aria-label="{% if is_semantic %}Semantic search active, click for keyword search{% else %}Keyword search active, click for semantic search{% endif %}"
+        title="{% if is_semantic %}Switch to keyword search{% else %}Switch to semantic search{% endif %}">
+    <span class="search-mode-icon">{% if is_semantic %}?{% else %}&amp;{% endif %}</span>
+  </span>
+  <input type="hidden"
+         name="semantic"
+         class="search-mode-value"
+         value="{% if is_semantic %}true{% endif %}"
+         {% if not is_semantic %}disabled{% endif %}>
+  <script nonce="{{ request.csp_nonce }}">
+  (function() {
+    try {
+      if (new URLSearchParams(window.location.search).has('semantic')) return;
+      if (localStorage.getItem('searchMode') !== 'semantic') return;
+      var toggle = document.currentScript.closest('.input-group').querySelector('.search-mode-toggle');
+      var icon = toggle.querySelector('.search-mode-icon');
+      var hidden = toggle.parentElement.querySelector('.search-mode-value');
+      var group = toggle.closest('.input-group');
+      icon.textContent = '?';
+      toggle.classList.add('semantic-active');
+      toggle.setAttribute('aria-label', 'Semantic search active, click for keyword search');
+      toggle.setAttribute('title', 'Switch to keyword search');
+      hidden.value = 'true'; hidden.disabled = false;
+      // The input and alert bell are defined after this include in the
+      // DOM, so defer until the next frame (before paint, after parsing).
+      requestAnimationFrame(function() {
+        var input = group.querySelector('input[name="q"]');
+        if (input) input.placeholder = 'Natural language search, use "quotes" for exact terms';
+        var alertBell = group.querySelector('.input-group-addon-blended');
+        if (alertBell) alertBell.style.display = 'none';
+      });
+    } catch(e) {}
+  })();
+  </script>
+  {% endwith %}
+{% endif %}
+{% endflag %}
