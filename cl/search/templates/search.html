@@ -225,7 +225,7 @@
                             {% alerts_supported search_form.type.value as search_alerts_supported %}
                             {% if search_alerts_supported %}
                               {% if not error and get_string %}
-                                <span class="input-group-addon input-group-addon-blended">
+                                <span class="input-group-addon input-group-addon-blended"{% if search_form.semantic.value %} style="display:none"{% endif %}>
                                   <i class="fa fa-bell-o fa-lg gray pointer"
                                    data-toggle="modal"
                                    data-target="#modal-save-alert"

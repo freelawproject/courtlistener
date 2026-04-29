@@ -147,12 +147,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         if not alert_form.is_valid():
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(
-                do_es_search(
-                    request.GET.copy(),
-                    is_semantic_frontend_active=is_semantic_active,
-                )
-            )
+            render_dict.update(do_es_search(request.GET.copy()))
             render_dict.update(
                 {"alert_form": alert_form, "alerts_context": alerts_context}
             )

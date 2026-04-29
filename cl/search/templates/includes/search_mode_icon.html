@@ -46,11 +46,13 @@
       toggle.setAttribute('aria-label', 'Semantic search active, click for keyword search');
       toggle.setAttribute('title', 'Switch to keyword search');
       hidden.value = 'true'; hidden.disabled = false;
-      // The input[name="q"] is defined after this include in the DOM,
-      // so defer until the next frame (before paint, after parsing).
+      // The input and alert bell are defined after this include in the
+      // DOM, so defer until the next frame (before paint, after parsing).
       requestAnimationFrame(function() {
         var input = group.querySelector('input[name="q"]');
         if (input) input.placeholder = 'Natural language search, use "quotes" for exact terms';
+        var alertBell = group.querySelector('.input-group-addon-blended');
+        if (alertBell) alertBell.style.display = 'none';
       });
     } catch(e) {}
   })();
