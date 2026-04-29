@@ -34,6 +34,7 @@ from cl.lib.elasticsearch_utils import (
     has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
+    merge_semantic_relevant_chunks,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
     simplify_estimated_count,
@@ -754,6 +755,8 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
+            if has_semantic_params(cd):
+                merge_semantic_relevant_chunks(paged_results)
             cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
