@@ -250,7 +250,8 @@ def _probe_scotus_sequence(
         )
 
     # Normal path: probe forward from the current watermark.
-    jitter = compute_binary_probe_jitter(testing)
+    max_probe = settings.SCOTUS_MAX_PROBE  # type: ignore[misc]
+    jitter = compute_binary_probe_jitter(testing, max_probe=max_probe)
     probe_iteration = 1
     probe_offset = 0
     latest_match = 0
@@ -259,7 +260,7 @@ def _probe_scotus_sequence(
 
     while True:
         candidate_serial, probe_offset = compute_next_binary_probe(
-            highest_ingested, probe_iteration, jitter
+            highest_ingested, probe_iteration, jitter, max_probe=max_probe
         )
         probe_iteration += 1
         candidate = format_docket_number(
