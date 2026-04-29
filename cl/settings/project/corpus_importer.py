@@ -53,5 +53,11 @@ SCOTUS_TIMEOUT_WAIT = env.int("SCOTUS_TIMEOUT_WAIT", default=300)
 SCOTUS_BACKFILL_REQUEST_DELAY = env.float(
     "SCOTUS_BACKFILL_REQUEST_DELAY", default=1.0
 )
+# Cap on serials ingested per daemon iteration when catching up to a known
+# watermark (operator-seeded highest_observed, or any large observed/ingested
+# gap). Bounds the load placed on supremecourt.gov; the daemon trickles
+# through the backlog over many iterations and falls back to probe mode once
+# highest_ingested catches up to highest_observed.
+SCOTUS_FIXED_SWEEP = env.int("SCOTUS_FIXED_SWEEP", default=100)
 
 OPENAI_TRANSCRIPTION_KEY = env("OPENAI_TRANSCRIPTION_KEY", default=None)
