@@ -2059,8 +2059,7 @@ rect.series-segment {
 
 @media (max-width: 767px) {
   #homepage #main-query-box .input-group,
-  #advanced-page #main-query-box .input-group,
-  #search-container .input-group {
+  #advanced-page #main-query-box .input-group {
     display: flex;
   }
 
@@ -2070,8 +2069,7 @@ rect.series-segment {
   }
 
   #homepage #main-query-box #id_q,
-  #advanced-page #main-query-box #id_q,
-  #search-container #id_q {
+  #advanced-page #main-query-box #id_q {
     width: auto;
     flex: 1 1 0;
     min-width: 0;
@@ -2080,9 +2078,7 @@ rect.series-segment {
   #homepage #main-query-box .input-group-btn,
   #homepage #main-query-box .input-group-addon,
   #advanced-page #main-query-box .input-group-btn,
-  #advanced-page #main-query-box .input-group-addon,
-  #search-container .input-group-btn,
-  #search-container .input-group-addon {
+  #advanced-page #main-query-box .input-group-addon {
     flex: 0 0 auto;
   }
 
