@@ -381,8 +381,11 @@ function handleSearchModeToggle() {
     ? 'Natural language search, use "quotes" for exact terms'
     : 'Keyword(s) search with operators');
   // Hide the alert bell in semantic mode (alerts don't support semantic queries).
-  var $alertBell = $icon.closest('.input-group').find('.input-group-addon-blended');
-  if ($alertBell.length) $alertBell.toggle(!isSemantic);
+  // Don't re-show on switch to keyword — it will appear after the next search.
+  if (isSemantic) {
+    var $alertBell = $icon.closest('.input-group').find('.input-group-addon-blended');
+    if ($alertBell.length) $alertBell.hide();
+  }
   try { localStorage.setItem('searchMode', isSemantic ? 'semantic' : 'keyword'); } catch (e) {}
 }
 
