@@ -742,6 +742,10 @@ def do_es_search(
                 page = 1
             cleaned_params = search_form.cleaned_data.copy()
             cleaned_params["page"] = page
+            # Use a smaller page size for semantic results so the longer
+            # chunk previews are less overwhelming to scan.
+            if has_semantic_params(cd):
+                rows = settings.SEMANTIC_SEARCH_PAGE_SIZE
             (
                 paged_results,
                 query_time,
