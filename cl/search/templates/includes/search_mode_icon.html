@@ -16,7 +16,7 @@
     - id_suffix    (optional): suffix for element IDs to avoid dupes.
 {% endcomment %}
 {% load static waffle_tags %}
-{% flag "semantic_search" %}
+{% flag "semantic_search_frontend" %}
 {% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}
   {% with is_semantic=search_form.semantic.value %}
   <span class="input-group-addon search-mode-toggle{% if is_semantic %} semantic-active{% endif %}"
@@ -53,13 +53,20 @@
       var toggle = document.currentScript.closest('.input-group').querySelector('.search-mode-toggle');
       var icon = toggle.querySelector('.search-mode-icon');
       var hidden = toggle.parentElement.querySelector('.search-mode-value');
-      var input = toggle.closest('.input-group').querySelector('input[name="q"]');
+      var group = toggle.closest('.input-group');
       icon.textContent = '?';
       toggle.classList.add('semantic-active');
       toggle.setAttribute('aria-label', 'Semantic search active, click for keyword search');
       toggle.setAttribute('title', 'Switch to keyword search');
       hidden.value = 'true'; hidden.disabled = false;
-      if (input) input.placeholder = 'Natural language search, use "quotes" for exact terms';
+      // The input and alert bell are defined after this include in the
+      // DOM, so defer until the next frame (before paint, after parsing).
+      requestAnimationFrame(function() {
+        var input = group.querySelector('input[name="q"]');
+        if (input) input.placeholder = 'Natural language search, use "quotes" for exact terms';
+        var alertBell = group.querySelector('.input-group-addon-blended');
+        if (alertBell) alertBell.style.display = 'none';
+      });
     } catch(e) {}
   })();
   </script>

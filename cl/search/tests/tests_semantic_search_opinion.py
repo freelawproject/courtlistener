@@ -724,7 +724,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         )
         return r
 
-    @override_flag("semantic_search", active=True)
+    @override_flag("semantic_search_frontend", active=True)
     def test_frontend_semantic_search_returns_results(
         self, inception_mock
     ) -> None:
@@ -736,7 +736,22 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertIn(self.opinion_2.cluster.case_name, content)
         self.assertIn(self.opinion_3.cluster.case_name, content)
 
-    @override_flag("semantic_search", active=True)
+    @override_flag("semantic_search_frontend", active=False)
+    def test_frontend_flag_off_disables_semantic(self, inception_mock) -> None:
+        """Semantic search is disabled on the frontend when the waffle
+        flag is inactive, even if semantic=true is in the URL."""
+        inception_mock.return_value = self._get_mock_for_inception(
+            self.situational_query_vectors
+        )
+        params = {
+            "q": self.situational_query,
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": "true",
+        }
+        self.client.get(reverse("show_results"), params)
+        inception_mock.assert_not_called()
+
+    @override_flag("semantic_search_frontend", active=True)
     def test_frontend_can_apply_court_filter(self, inception_mock) -> None:
         """Frontend court filter narrows semantic results."""
         r = self._test_frontend_article_count(
@@ -749,7 +764,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertIn(self.opinion_2.cluster.case_name, content)
         self.assertNotIn(self.opinion_3.cluster.case_name, content)
 
-    @override_flag("semantic_search", active=True)
+    @override_flag("semantic_search_frontend", active=True)
     def test_frontend_can_apply_docket_number_filter(
         self, inception_mock
     ) -> None:
@@ -764,7 +779,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         self.assertNotIn(self.opinion_2.cluster.case_name, content)
         self.assertIn(self.opinion_3.cluster.case_name, content)
 
-    @override_flag("semantic_search", active=True)
+    @override_flag("semantic_search_frontend", active=True)
     def test_frontend_can_sort_by_cite_count(self, inception_mock) -> None:
         """Frontend semantic results can be sorted by citation count."""
         r = self._test_frontend_article_count(
@@ -799,7 +814,7 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
             "when sorted by citeCount asc.",
         )
 
-    @override_flag("semantic_search", active=True)
+    @override_flag("semantic_search_frontend", active=True)
     def test_frontend_hybrid_search(self, inception_mock) -> None:
         """Frontend hybrid search returns semantic and keyword matches."""
         r = self._test_frontend_article_count(
@@ -820,16 +835,32 @@ class SemanticFormCleanTest(TestCase):
     when used from the frontend (without a request object)."""
 
     def test_semantic_preserved_when_knn_enabled(self) -> None:
-        """semantic=True survives clean() when KNN_SEARCH_ENABLED=True."""
+        """semantic=True survives clean() when KNN_SEARCH_ENABLED=True
+        and the frontend flag is active."""
         form = SearchForm(
             {
                 "q": "free speech",
                 "type": SEARCH_TYPES.OPINION,
                 "semantic": True,
-            }
+            },
+            is_semantic_frontend_active=True,
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertTrue(form.cleaned_data["semantic"])
+
+    def test_semantic_disabled_when_flag_inactive(self) -> None:
+        """semantic is forced to False on the frontend when the flag
+        is inactive, even if KNN_SEARCH_ENABLED=True."""
+        form = SearchForm(
+            {
+                "q": "free speech",
+                "type": SEARCH_TYPES.OPINION,
+                "semantic": True,
+            },
+            is_semantic_frontend_active=False,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.cleaned_data["semantic"])
 
     @override_settings(KNN_SEARCH_ENABLED=False)
     def test_semantic_disabled_when_knn_disabled(self) -> None:

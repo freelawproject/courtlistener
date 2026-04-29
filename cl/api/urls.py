@@ -91,6 +91,13 @@ router.register(
     r"fjc-integrated-database", recap_views.FjcIntegratedDatabaseViewSet
 )
 
+# Scrapers
+router.register(
+    r"scrapers/scotus-email",
+    scraper_views.ScraperSCOTUSEmailEndpoint,
+    basename="scotus-email",
+)
+
 # Tags
 router.register(r"tags", favorite_views.UserTagViewSet, basename="UserTag")
 router.register(

@@ -48,6 +48,9 @@ case "$1" in
 'probe-iquery-pages-daemon')
     exec ./manage.py probe_iquery_pages_daemon
     ;;
+'probe-scotus-dockets-daemon')
+    exec ./manage.py probe_scotus_dockets_daemon
+    ;;
 'tames-scraper-daemon')
     exec ./manage.py tames_poller
     ;;

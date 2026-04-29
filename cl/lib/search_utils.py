@@ -57,6 +57,7 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -645,6 +646,7 @@ def do_es_search(
     cache_key: str | None = None,
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
+    is_semantic_frontend_active: bool = False,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -678,7 +680,11 @@ def do_es_search(
     missing_citations_str: list[str] = []
     error = True
 
-    search_form = SearchForm(get_params, courts=courts)
+    search_form = SearchForm(
+        get_params,
+        courts=courts,
+        is_semantic_frontend_active=is_semantic_frontend_active,
+    )
     match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
@@ -783,6 +789,9 @@ def do_es_search(
         except InvalidRelativeDateSyntax:
             error = True
             error_message = "invalid_relative_date_syntax"
+        except InputTooLongError:
+            error = True
+            error_message = "input_too_long_error"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(
