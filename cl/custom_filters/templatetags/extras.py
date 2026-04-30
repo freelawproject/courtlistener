@@ -245,20 +245,27 @@ def highlight_query(text: str, query: str) -> str:
 
     # Only extract quoted phrases — these are the keyword part of a
     # hybrid search and the only terms we want to visually highlight.
-    phrases = [p for p in re.findall(r'"([^"]*)"', query) if p]
+    phrases = [p.strip() for p in re.findall(r'"([^"]*)"', query) if p.strip()]
     if not phrases:
         return text
 
     # HTML-escape each phrase so it matches against the already-escaped
-    # text (e.g. & → &amp;), then regex-escape for safe pattern use.
-    pattern = "|".join(re.escape(escape(p)) for p in phrases)
+    # text (e.g. & → &amp;), then regex-escape for safe pattern use,
+    # sorted by length to avoid partial matches (e.g. "fair use" before "fair").
+    pattern = "|".join(
+        re.escape(escape(p)) for p in sorted(phrases, key=len, reverse=True)
+    )
 
-    # Split into HTML tags and text runs; only highlight in text runs
+    # Split into HTML tags and text runs; only highlight in text runs.
+    # Word boundaries (\b) prevent partial matches inside longer words.
     parts = _HTML_TAG_RE.split(text)
     for i, part in enumerate(parts):
         if not part.startswith("<"):
             parts[i] = re.sub(
-                f"({pattern})", r"<mark>\1</mark>", part, flags=re.IGNORECASE
+                rf"\b({pattern})\b",
+                r"<mark>\1</mark>",
+                part,
+                flags=re.IGNORECASE,
             )
 
     return mark_safe("".join(parts))

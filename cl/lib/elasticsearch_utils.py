@@ -2860,6 +2860,8 @@ def build_semantic_query(
     :raises InputTooLongError: If the cleaned query string exceeds the maximum allowed length
         for generating embeddings.
     """
+    validate_query_syntax(text_query, QueryType.QUERY_STRING)
+
     semantic_query: list[Query] = []
     # Extract quoted phrases from the input string (for exact keyword matching)
     exact_keywords = re.findall(r'"([^"]*)"', text_query)
@@ -2914,9 +2916,11 @@ def has_semantic_params(get_params: QueryDict | CleanData) -> bool:
     it, and the query has content to generate an embedding or an embedding
     is provided.
     """
+    q = get_params.get("q", "")
+    has_embeddable_text = bool(q.replace('"', "").strip())
     return bool(
         get_params.get("semantic", False)
-        and (get_params.get("q", "") or get_params.get("embedding", None))
+        and (has_embeddable_text or get_params.get("embedding", None))
         and get_params.get("type", SEARCH_TYPES.OPINION)
         in [SEARCH_TYPES.OPINION]
     )

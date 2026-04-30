@@ -474,6 +474,38 @@ class TestHighlightQuery(SimpleTestCase):
         )
         self.assertEqual(str(result).count("<mark>"), 2)
 
+    def test_whitespace_only_phrase_ignored(self) -> None:
+        """Whitespace-only quoted phrases are not highlighted."""
+        result = highlight_query(
+            "The copyright holder filed suit.",
+            'copyright " "',
+        )
+        self.assertNotIn("<mark>", str(result))
+
+    def test_word_boundaries_prevent_partial_match(self) -> None:
+        """Quoted phrases only match at word boundaries."""
+        result = highlight_query(
+            "She has experience in the field.",
+            '"per"',
+        )
+        self.assertNotIn("<mark>", str(result))
+
+    def test_word_boundaries_match_whole_word(self) -> None:
+        """Whole-word matches at word boundaries still work."""
+        result = highlight_query(
+            "The per curiam opinion was brief.",
+            '"per"',
+        )
+        self.assertIn("<mark>per</mark>", result)
+
+    def test_longer_phrases_matched_first(self) -> None:
+        """Longer phrases take priority over shorter sub-phrases."""
+        result = highlight_query(
+            "The married couple filed jointly.",
+            '"married" "married couple"',
+        )
+        self.assertIn("<mark>married couple</mark>", result)
+
 
 class TestSvgTag(SimpleTestCase):
     """Tests for the svg template tag."""
