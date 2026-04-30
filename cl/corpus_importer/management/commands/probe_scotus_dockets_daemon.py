@@ -194,8 +194,11 @@ def _probe_scotus_sequence(
       each hit so a crash between the probe phase and full ingestion can
       resume without re-probing.
 
-    On entry, if ``observed > ingested`` the previous run was interrupted
-    mid-ingestion; only the ingest step is repeated for the gap.
+    On entry, if ``observed > ingested`` (a previous run was interrupted
+    mid-ingestion, or HIGHEST_SCOTUS_OBSERVED_SERIAL was seeded to backfill a
+    known gap), the probe is skipped and the daemon sweeps the gap instead,
+    ingesting at most ``SCOTUS_FIXED_SWEEP`` serials per iteration. Forward
+    probing resumes once ``ingested`` catches up.
 
     :param r: Redis interface.
     :param sequence: The docket-number sequence.
