@@ -10,7 +10,7 @@ from django.template.context import RequestContext
 from django.template.defaultfilters import date as date_filter
 from django.utils.dateparse import parse_datetime
 from django.utils.formats import date_format
-from django.utils.html import format_html
+from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import make_aware
 from elasticsearch_dsl import AttrDict, AttrList
@@ -190,6 +190,60 @@ def render_string_or_list(value: any) -> any:
     if isinstance(value, (list | AttrList)):
         return ", ".join(str(item) for item in value)
     return value
+
+
+# HTML tag pattern for splitting text into tags vs. content.
+_HTML_TAG_RE = re.compile(r"(<[^>]+>)")
+
+
+@register.filter(is_safe=True)
+def highlight_query(text: str, query: str) -> str:
+    """Wrap quoted phrases from *query* in ``<mark>`` tags within
+    already-escaped HTML text.
+
+    Only quoted phrases (e.g. ``"fair use"``) are highlighted — these
+    correspond to the keyword component of a hybrid semantic search.
+
+    Designed to run *after* ``linebreaksbr`` and ``read_more`` so that
+    the ``<mark>`` tags are never broken by word-level truncation.
+    Only highlights inside text content — HTML tags are left untouched.
+
+    :param text: The rendered HTML string (already escaped).
+    :param query: The raw search query typed by the user.
+    :return: HTML-safe string with matching phrases wrapped in
+        ``<mark>``.
+    """
+    if not query or not text:
+        return text
+
+    text = str(text)
+
+    # Only extract quoted phrases — these are the keyword part of a
+    # hybrid search and the only terms we want to visually highlight.
+    phrases = [p.strip() for p in re.findall(r'"([^"]*)"', query) if p.strip()]
+    if not phrases:
+        return text
+
+    # HTML-escape each phrase so it matches against the already-escaped
+    # text (e.g. & → &amp;), then regex-escape for safe pattern use,
+    # sorted by length to avoid partial matches (e.g. "fair use" before "fair").
+    pattern = "|".join(
+        re.escape(escape(p)) for p in sorted(phrases, key=len, reverse=True)
+    )
+
+    # Split into HTML tags and text runs; only highlight in text runs.
+    # Word boundaries (\b) prevent partial matches inside longer words.
+    parts = _HTML_TAG_RE.split(text)
+    for i, part in enumerate(parts):
+        if not part.startswith("<"):
+            parts[i] = re.sub(
+                rf"\b({pattern})\b",
+                r"<mark>\1</mark>",
+                part,
+                flags=re.IGNORECASE,
+            )
+
+    return mark_safe("".join(parts))
 
 
 @register.filter
