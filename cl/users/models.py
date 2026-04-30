@@ -16,6 +16,7 @@ from localflavor.us.models import USStateField
 from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.redis_utils import get_redis_interface
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -215,6 +216,17 @@ class UserProfile(models.Model):
         end = datetime.today()
         data = invert_user_logs(start, end, add_usernames=False)
         return data[self.user.pk]
+
+    @property
+    def total_api_usage(self) -> int:
+        """Lifetime count of API requests for this user across v3 + v4."""
+        r = get_redis_interface("STATS")
+        total = 0
+        for api_prefix in ("v3", "v4"):
+            count = r.zscore(f"api:{api_prefix}.user.counts", self.user_id)
+            if count:
+                total += int(count)
+        return total
 
     def __str__(self) -> str:
         return f"{self.user.username}"
