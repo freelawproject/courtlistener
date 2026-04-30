@@ -2817,6 +2817,27 @@ def apply_custom_score_to_main_query(
     return query
 
 
+def get_query_embedding(text_query: str) -> list[float]:
+    """Generate an embedding vector for a search query via the inception
+    microservice.
+
+    :param text_query: The raw user query string.
+    :return: The embedding vector as a list of floats.
+    :raises InputTooLongError: If the cleaned query exceeds
+        MAX_EMBEDDING_CHAR_LENGTH.
+    """
+    cleaned_text_query = text_query.replace('"', "")
+    if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
+        raise InputTooLongError(QueryType.QUERY_STRING)
+
+    embedding_request = async_to_sync(microservice)(
+        service="inception-query",
+        data=json.dumps({"text": cleaned_text_query}),
+    )
+    embedding_request.raise_for_status()
+    return embedding_request.json()["embedding"]
+
+
 def build_semantic_query(
     text_query: str,
     filters: list[QueryString | Range],
@@ -2845,23 +2866,7 @@ def build_semantic_query(
 
     # Join extracted phrases to form a keyword query string
     keyword_query = " ".join([f'"{s}"' for s in exact_keywords])
-    if not embedding:
-        # Remove quotes from the query to prepare for embedding
-        cleaned_text_query = text_query.replace('"', "")
-
-        # Enforce character limit to avoid exceeding embedding constraints
-        if len(cleaned_text_query) > settings.MAX_EMBEDDING_CHAR_LENGTH:
-            raise InputTooLongError(QueryType.QUERY_STRING)
-
-        # Generate embedding vector using external microservice
-        embedding_request = async_to_sync(microservice)(
-            service="inception-query",
-            data=json.dumps({"text": cleaned_text_query}),
-        )
-        embedding_request.raise_for_status()
-        vectors = embedding_request.json()["embedding"]
-    else:
-        vectors = embedding
+    vectors = embedding if embedding else get_query_embedding(text_query)
 
     # If exact keyword query exists, build and add full-text query to results
     # This enables hybrid search by combining keyword and semantic results

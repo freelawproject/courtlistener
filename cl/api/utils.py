@@ -840,6 +840,10 @@ def clear_membership_throttles(user: User) -> None:
         clear_tiered_cache()
 
 
+USE_NEW_THROTTLE_DEFAULTS_SWITCH = "use_new_throttle_defaults"
+LEGACY_USER_DEFAULT_RATE = "5000/hour"
+
+
 class ExceptionalUserRateThrottle(UserRateThrottle):
     """User rate throttle that supports multiple simultaneous rate limits.
 
@@ -850,6 +854,15 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
 
     def __init__(self):
         raw = self.THROTTLE_RATES.get(self.scope)
+        # Until we're ready to roll out the multi-rate user defaults
+        # configured in settings (issue #7196), keep the historical
+        # 5000/hour fallback for the "user" scope. Other scopes (e.g.
+        # the "citations" rate read separately by CitationCountRateThrottle
+        # in get_citations_rate) read settings as before.
+        if self.scope == "user" and not switch_is_active(
+            USE_NEW_THROTTLE_DEFAULTS_SWITCH
+        ):
+            raw = LEGACY_USER_DEFAULT_RATE
         if raw is None:
             self.rate = None
             self.default_rates: list[str] = []
