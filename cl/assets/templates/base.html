@@ -217,7 +217,7 @@
                   <a href="{% url "coverage_opinions" %}" tabindex="103">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "case_law_api_help" %}" tabindex="104">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/case-law" tabindex="104">API</a>
                 </li>
               </ul>
             </li>
@@ -247,7 +247,7 @@
                   <a href="https://free.law/data-consulting/" tabindex="206">Bulk Data Service</a>
                 </li>
                 <li>
-                  <a href="{% url "pacer_api_help" %}" tabindex="207">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/pacer-data" tabindex="207">API</a>
                 </li>
               </ul>
             </li>
@@ -270,7 +270,7 @@
                   <a href="{% url "coverage_oa" %}" tabindex="304">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "oral_argument_api_help" %}" tabindex="305">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/oral-arguments" tabindex="305">API</a>
                 </li>
               </ul>
             </li>
@@ -287,7 +287,7 @@
                   <a href="https://free.law/datasets#judges-db" tabindex="404">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "judge_api_help" %}" tabindex="405">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/judges" tabindex="405">API</a>
                 </li>
               </ul>
             </li>
@@ -304,7 +304,7 @@
                   <a href="{% url "coverage_fds" %}" tabindex="502">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "financial_disclosures_api_help" %}" tabindex="503">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/financial-disclosures" tabindex="503">API</a>
                 </li>
               </ul>
             </li>
@@ -378,7 +378,7 @@
               <a href="{% url "coverage" %}" tabindex="11003">About Our Data</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "api_index" %}" tabindex="11004">APIs &amp; Bulk Data</a>
+              <a href="{{ WIKI_API_URL }}" tabindex="11004">APIs &amp; Bulk Data</a>
             </div>
             <div class="footer-item">
               <a href="{% url "feeds_info" %}" tabindex="11005">Feeds</a> <span
