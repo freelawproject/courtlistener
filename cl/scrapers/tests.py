@@ -35,6 +35,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.corpus_importer.tasks import (
     merge_scotus_docket as real_merge_scotus_docket,
 )
+from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.model_helpers import make_texas_docket_number_core
@@ -65,6 +66,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
 )
 from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
+    extract_formatted_text_document_base,
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
@@ -117,6 +119,7 @@ from cl.search.models import (
 )
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
+    TexasDocumentFactory,
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
@@ -549,6 +552,46 @@ class IngestionTest(TestCase):
                 "html/2025/04/25/zelka_h.v.a.c._maintenance_solutions_inc._v._g.m._crisalli__assoc._inc._12.html"
             )
             error_mock.assert_called()
+
+
+class ExtractFormattedTextSanitizationTest(TestCase):
+    """Tests that extract_formatted_text_document_base scrubs content
+    that PostgreSQL won't accept (e.g. NUL bytes) before saving."""
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_nul_bytes_in_extracted_content_are_stripped(
+        self, microservice_mock
+    ):
+        """Does extraction strip NUL bytes so the save does not raise
+        DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?
+        """
+        texas_document = TexasDocumentFactory.create()
+        # Doctor occasionally returns extracted text containing NUL bytes
+        # (e.g. from malformed PDFs). PostgreSQL rejects these in text
+        # columns, so the extractor must strip them before saving.
+        content_with_nuls = (
+            "Hello\0 world\x00. Hello " + chr(0) + "Courtlistener."
+        )
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": content_with_nuls,
+                "extracted_by_ocr": False,
+            },
+        )
+
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+
+        texas_document.refresh_from_db()
+        self.assertNotIn("\x00", texas_document.plain_text)
+        self.assertIn("Hello", texas_document.plain_text)
+        self.assertIn("world", texas_document.plain_text)
+        self.assertIn("Courtlistener", texas_document.plain_text)
 
 
 class ExtensionIdentificationTest(SimpleTestCase):
@@ -2237,6 +2280,51 @@ class SubscribeToSCOTUSTest(TestCase):
         messy = "RoMeo Juleett.; 5 Seven- .Three"
         clean = process_scotus_captcha_transcription(messy)
         self.assertEqual(clean, "rj573")
+
+    def test_transcription_cleaning_non_space_separators(self):
+        # Whisper/gpt-4o-transcribe often return tokens separated by commas,
+        # periods, or newlines instead of single spaces. The split should
+        # treat any run of non-alphanumerics as a separator.
+        for transcription in [
+            "Alpha,Bravo,Charlie,Delta,Echo",
+            "Alpha. Bravo. Charlie. Delta. Echo",
+            "alpha\nbravo\ncharlie\ndelta\necho",
+        ]:
+            with self.subTest(transcription=transcription):
+                self.assertEqual(
+                    process_scotus_captcha_transcription(transcription),
+                    "abcde",
+                )
+
+    def test_transcription_cleaning_trailing_punctuation(self):
+        # Real CAPTCHA transcriptions frequently end with a period. Trailing
+        # non-alphanumerics must not produce a phantom 6th word.
+        self.assertEqual(
+            process_scotus_captcha_transcription(
+                "Eight Victor Lima Hotel four."
+            ),
+            "8vlh4",
+        )
+        self.assertEqual(
+            process_scotus_captcha_transcription(
+                "8. Five. Delta. Papa. Foxtrot."
+            ),
+            "85dpf",
+        )
+
+    def test_transcription_cleaning_raises_scrape_failed_on_short(self):
+        # Under-counted transcriptions (the original #7266 Sentry case) must
+        # raise ScrapeFailed so the celery task autoretries with a fresh
+        # CAPTCHA, rather than ValueError which propagates as a hard error.
+        with self.assertRaises(ScrapeFailed):
+            process_scotus_captcha_transcription("Yankee four Victor.")
+
+    def test_transcription_cleaning_raises_scrape_failed_on_long(self):
+        # Whisper-1 occasionally hallucinates extra tokens (we observed an
+        # 8-token loop and a 10-token counting sequence in our probe).
+        # Over-counts must also trigger a retry, not silently truncate.
+        with self.assertRaises(ScrapeFailed):
+            process_scotus_captcha_transcription("4. 2. 3. 4. 2. 3. 4. 2.")
 
     @responses.activate
     @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")
