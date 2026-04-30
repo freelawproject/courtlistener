@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static extras humanize %}
+{% load static extras humanize waffle_tags %}
 
 {% block title %}REST API, v4.3 &ndash; CourtListener.com{% endblock %}
 {% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
@@ -34,6 +34,7 @@
     </p>
     <p><a href="{% url "api-root" version="v4" %}"
           target="_blank"
+          rel="noopener noreferrer"
           class="btn btn-lg btn-primary">Show the APIs</a>
     </p>
     <p>We could have also pulled up that same information using curl, with a command like:</p>
@@ -52,16 +53,18 @@
 
 
     <h2 id="support">Support</h2>
-    <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our GitHub Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>.
+    <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank" rel="noopener noreferrer">to our GitHub Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>.
     </p>
     <p>We prefer that questions be posted in the forum so they can help others. If you are a private organization posting to that forum, we will avoid sharing details about your organization.
     </p>
     <p>
       <a href="https://github.com/freelawproject/courtlistener/discussions"
           target="_blank"
+          rel="noopener noreferrer"
           class="btn btn-default">Ask in GitHub Discussions</a>
       <a href="{% url "contact" %}"
          target="_blank"
+         rel="noopener noreferrer"
          class="btn btn-default">Send us a Private Message</a>
     </p>
 
@@ -69,11 +72,13 @@
     <h2 id="data-modeling">Data Models</h2>
     <p>The two images below show how the APIs work together. The first image shows the models we use for people, and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
       href="{% static "png/complete-model-v3.13.png" %}"
-      target="_blank">Here's a version of this diagram that shows everything all at once</a>.)
+      target="_blank"
+      rel="noopener noreferrer">Here's a version of this diagram that shows everything all at once</a>.)
     </p>
     <p>
       <a href="{% static "png/people-model-v3.13.png" %}"
          target="_blank"
+         rel="noopener noreferrer"
          title="Click to see details.">
         <img src="{% static "png/people-model-v3.13-small.png" %}"
              width="640"
@@ -84,6 +89,7 @@
     <p>
       <a href="{% static "png/search-model-v3.13.png" %}"
          target="_blank"
+         rel="noopener noreferrer"
          title="Click to see details.">
         <img src="{% static "png/search-model-v3.13-small.png" %}"
              width="640"
@@ -94,7 +100,7 @@
 
 
     <h2 id="overview">API Overview</h2>
-    <p>This section explains the general principles of the API. These principals are driven by the features supported by the <a href="https://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>. To go deep on any of these sections, we encourage you to check out the documentation there.
+    <p>This section explains the general principles of the API. These principals are driven by the features supported by the <a href="https://www.django-rest-framework.org/" target="_blank" rel="noopener noreferrer">Django REST Framework</a>. To go deep on any of these sections, we encourage you to check out the documentation there.
     </p>
 
 
@@ -133,7 +139,7 @@
         <a href="https://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">HTTP Token Authentication</a>
       </li>
       <li>
-        <a href="https://docs.djangoproject.com/en/dev/topics/auth/" target="_blank">Cookie/Session Authentication</a>
+        <a href="https://docs.djangoproject.com/en/dev/topics/auth/" target="_blank" rel="noopener noreferrer">Cookie/Session Authentication</a>
       </li>
       <li>
         <a href="https://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
@@ -285,12 +291,12 @@
     <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cluster__docket__court=scotus"</pre>
     <p>This uses the <code>Opinion</code> API to get <code>Opinions</code> that are part of <code>Opinion Clusters</code> that are on <code>Dockets</code> in the <code>Court</code> with the ID of <code>scotus</code>. To understand this data model better, see the <a href="{% url "case_law_api_help" %}">case law API documentation</a>.
     </p>
-    <p>To use date filters, supply dates in <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank">ISO-8601 format</a>.
+    <p>To use date filters, supply dates in <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank" rel="noopener noreferrer">ISO-8601 format</a>.
     </p>
     <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Dockets</code> from non-Federal Appellate jurisdictions:
     </p>
     <pre class=pre-scrollable>curl "{% get_full_host %}{% url "docket-list" version="v4" %}?court__jurisdiction!=F"</pre>
-    <p>You can see more examples of filters in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank">our automated tests</a>.
+    <p>You can see more examples of filters in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank" rel="noopener noreferrer">our automated tests</a>.
     </p>
 
 
@@ -406,8 +412,13 @@
     </ol>
 
     <h3 id="rates">Rate Limits</h3>
-    <p>Our APIs allow 5,000 queries per hour to authenticated users. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.
-    </p>
+    {% switch "use_new_throttle_defaults" %}
+      <p>Authenticated users may make up to <strong>5 requests per minute</strong>, <strong>50 requests per hour</strong>, and <strong>125 requests per day</strong>. All three limits apply at the same time, so the most restrictive one (given your recent traffic) is what controls whether the next request is accepted. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.
+      </p>
+    {% else %}
+      <p>Our APIs allow 5,000 queries per hour to authenticated users. Creating more than one account per project, person, or organization is forbidden. If you are in doubt, please contact us before creating multiple accounts.
+      </p>
+    {% endswitch %}
     <p>To debug throttling issues:</p>
     <ol>
       <li>Try browsing the API while logged into Courtlistener. If this works and your code fails, it usually means that your token authentication is not configured properly, and your code is getting throttled as an anonymous user, not according to your token.

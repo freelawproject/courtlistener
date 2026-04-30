@@ -279,6 +279,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
 @override_settings(KNN_SIMILARITY=0.3)
 @override_settings(KNN_SEARCH_ENABLED=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
 @mock.patch("cl.lib.elasticsearch_utils.microservice")
 class SemanticSearchTests(ESIndexTestCase, TestCase):
     @classmethod
@@ -410,7 +411,6 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         return r
 
     @override_flag("store-search-api-queries", active=True)
-    @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
     def test_can_perform_a_regular_semantic_query(
         self, inception_mock
     ) -> None:
