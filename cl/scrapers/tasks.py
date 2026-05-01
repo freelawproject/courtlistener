@@ -97,6 +97,12 @@ def update_document_from_text(
             opinion.__dict__.update(data)
         elif model_name == "OriginatingCourtInformation":
             docket = opinion.cluster.docket
+            if data.get("docket_number"):
+                data["docket_number_raw"] = data["docket_number"]
+                if settings.DOCKET_NUMBER_CLEANING_ENABLED:
+                    # Behind the flag, leave docket_number for the OCI
+                    # cleaning signal to populate from _raw (#7044).
+                    del data["docket_number"]
             if docket.originating_court_information:
                 docket.originating_court_information.__dict__.update(data)
             else:

@@ -14,7 +14,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
@@ -41,6 +41,7 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.factories import PersonFactory
+from cl.recap.mergers import update_docket_appellate_metadata
 from cl.recap.models import (
     PROCESSING_STATUS,
     EmailProcessingQueue,
@@ -80,6 +81,7 @@ from cl.scrapers.utils import (
     get_existing_docket,
     get_extension,
     update_or_create_docket,
+    update_or_create_originating_court_information,
 )
 from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import (
@@ -228,8 +230,14 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         oci = Docket.objects.get(
             case_name="In Re Motion for Consent to Disclosure of Court Records"
         ).originating_court_information
+        # DOCKET_NUMBER_CLEANING_ENABLED should change this behavior
         self.assertEqual(
             oci.docket_number, "09-2222", "New OCI.docket_number was not saved"
+        )
+        self.assertEqual(
+            oci.docket_number_raw,
+            "09-2222",
+            "New OCI.docket_number was not saved",
         )
         self.assertEqual(
             oci.assigned_to_str,
@@ -239,6 +247,11 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
         self.assertEqual(
             d_1.originating_court_information.docket_number,
+            "09-1111",
+            "Existing OCI.docket_number number changed",
+        )
+        self.assertEqual(
+            d_1.originating_court_information.docket_number_raw,
             "09-1111",
             "Existing OCI.docket_number number changed",
         )
@@ -1241,10 +1254,88 @@ class UpdateFromTextCommandTest(TestCase):
             "Unpublished docket should not be modified",
         )
         self.assertEqual(
+            self.opinion_2020_unpub.cluster.docket.docket_number_raw,
+            "13",
+            "Unpublished docket should not be modified",
+        )
+        # DOCKET_NUMBER_CLEANING_ENABLED should change this behavior
+        self.assertEqual(
             self.opinion_2020.cluster.docket.originating_court_information.docket_number,
             "18-2222",
             "Originating Court Information was not created",
         )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.originating_court_information.docket_number_raw,
+            "18-2222",
+            "Originating Court Information was not created",
+        )
+
+
+@override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
+class OciDocketNumberCleaningFlagOnTest(TestCase):
+    """Pin flag-on behavior across OCI set sites (#7051 / #7052).
+
+    With the cleaning flag on, every set site must:
+    - always populate docket_number_raw from the source value
+    - leave docket_number empty for the future OCI cleaning signal (#7044)
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="ocff", jurisdiction="F")
+
+    def test_uoc_creates_new_oci_with_only_raw(self):
+        """A new OCI from update_or_create_originating_court_information has
+        _raw set; docket_number is left empty."""
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            originating_court_information=None,
+        )
+        oci = update_or_create_originating_court_information(
+            docket, "09-2222", "some judge"
+        )
+        self.assertIsNotNone(oci)
+        self.assertEqual(oci.docket_number_raw, "09-2222")
+        self.assertEqual(oci.docket_number, "")
+
+    def test_uoc_fills_existing_raw_without_touching_docket_number(self):
+        """An existing OCI gets _raw filled if empty; docket_number is left
+        alone."""
+        existing = OriginatingCourtInformation.objects.create(
+            docket_number="EXISTING",
+            docket_number_raw="",
+        )
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.SCRAPER,
+            originating_court_information=existing,
+        )
+        update_or_create_originating_court_information(
+            docket, "09-1111", "another judge"
+        )
+        existing.refresh_from_db()
+        self.assertEqual(existing.docket_number_raw, "09-1111")
+        self.assertEqual(existing.docket_number, "EXISTING")
+
+    def test_appellate_merger_writes_only_raw(self):
+        """update_docket_appellate_metadata writes _raw from PACER's source
+        docket_number, leaving docket_number empty."""
+        d = DocketFactory(
+            court=self.court,
+            source=Docket.RECAP,
+        )
+        docket_data = {
+            "originating_court_information": {
+                "docket_number": "lower-12-345",
+            }
+        }
+        _, og_info = async_to_sync(update_docket_appellate_metadata)(
+            d, docket_data
+        )
+        self.assertIsNotNone(og_info)
+        self.assertEqual(og_info.docket_number_raw, "lower-12-345")
+        self.assertEqual(og_info.docket_number, "")
 
 
 class CommandInputTest(TestCase):

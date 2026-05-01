@@ -5921,6 +5921,7 @@ class RecapDocketAppellateTaskTest(TestCase):
         self.assertTrue(og_info)
         self.assertIn("Gloria", og_info.court_reporter)
         self.assertEqual(og_info.date_judgment, date(2017, 3, 29))
+        # DOCKET_NUMBER_CLEANING_ENABLED (#7044) should change this behavior
         self.assertEqual(og_info.docket_number, "1:17-cv-00050")
 
 

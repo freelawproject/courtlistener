@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from django import forms
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, URLValidator
 from django.db.models import Case, IntegerField, Q, Value, When
@@ -517,11 +518,13 @@ class BaseCourtUploadForm(forms.Form):
             }
         )
 
-        if self.cleaned_data.get("lower_court_docket_number"):
+        if lower_dn := self.cleaned_data.get("lower_court_docket_number"):
+            oci_kwargs: dict[str, str] = {"docket_number_raw": lower_dn}
+            if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
+                # Mirror until the OCI cleaning signal is wired up (#7044).
+                oci_kwargs["docket_number"] = lower_dn
             originating_court = OriginatingCourtInformation.objects.create(
-                docket_number=self.cleaned_data.get(
-                    "lower_court_docket_number"
-                )
+                **oci_kwargs
             )
             docket.originating_court_information = originating_court
             docket.save()
