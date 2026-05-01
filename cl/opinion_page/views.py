@@ -433,9 +433,9 @@ async def view_docket(
                 docket, context["timezone"]
             ),
             "bankruptcy_metadata": build_bankruptcy_metadata(bankr_info),
-            "originating_court_metadata": build_originating_court_metadata(
-                docket, og_info
-            ),
+            "originating_court_metadata": await sync_to_async(
+                build_originating_court_metadata
+            )(docket, og_info),
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),

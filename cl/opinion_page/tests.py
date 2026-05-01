@@ -1119,15 +1119,30 @@ class ViewRecapDocketTest(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
         cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
+        cls.og_info_appellate = OriginatingCourtInformation.objects.create(
+            docket_number="1:23-cv-456"
+        )
         cls.docket_appellate = DocketFactory(
             court=cls.court_appellate,
             source=Docket.RECAP,
+            appeal_from=cls.court,
+            originating_court_information=cls.og_info_appellate,
         )
 
     async def test_regular_docket_url(self) -> None:
         """Can we load a regular docket sheet?"""
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_appellate_docket_with_appeal_from_loads(self) -> None:
+        """Regression for #7306: appellate docket loads in async view."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket_appellate.pk, self.docket_appellate.slug],
+            )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
