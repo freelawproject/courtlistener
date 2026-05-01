@@ -15,8 +15,10 @@ from elasticsearch_dsl import Document
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
+from cl.lib.elasticsearch_utils import has_semantic_params
 from cl.lib.search_index_utils import index_documents_in_bulk
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
+from cl.search.exception import UnbalancedQuotesQuery
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -277,6 +279,7 @@ class OpinionEmbeddingIndexingTests(ESIndexTestCase, TestCase):
 
 @override_settings(KNN_SIMILARITY=0.3)
 @override_settings(KNN_SEARCH_ENABLED=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
 @mock.patch("cl.lib.elasticsearch_utils.microservice")
 class SemanticSearchTests(ESIndexTestCase, TestCase):
     @classmethod
@@ -408,7 +411,6 @@ class SemanticSearchTests(ESIndexTestCase, TestCase):
         return r
 
     @override_flag("store-search-api-queries", active=True)
-    @override_settings(WAFFLE_CACHE_PREFIX="test_semantic_search_opinion")
     def test_can_perform_a_regular_semantic_query(
         self, inception_mock
     ) -> None:
@@ -874,3 +876,65 @@ class SemanticFormCleanTest(TestCase):
         )
         self.assertTrue(form.is_valid(), form.errors)
         self.assertFalse(form.cleaned_data["semantic"])
+
+
+class HasSemanticParamsTest(TestCase):
+    """Tests for the has_semantic_params gate function."""
+
+    def test_empty_quotes_not_semantic(self) -> None:
+        """A query with only empty quotes has no embeddable text."""
+        params = {
+            "q": '""',
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": True,
+        }
+        self.assertFalse(has_semantic_params(params))
+
+    def test_whitespace_quotes_not_semantic(self) -> None:
+        """A query with only whitespace inside quotes has no embeddable
+        text."""
+        params = {
+            "q": '" "',
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": True,
+        }
+        self.assertFalse(has_semantic_params(params))
+
+    def test_quoted_with_unquoted_text_is_semantic(self) -> None:
+        """A query with quoted phrases plus unquoted text is valid."""
+        params = {
+            "q": '"fair use" copyright',
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": True,
+        }
+        self.assertTrue(has_semantic_params(params))
+
+    def test_unquoted_text_only_is_semantic(self) -> None:
+        """A plain query without quotes is valid for semantic search."""
+        params = {
+            "q": "copyright infringement",
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": True,
+        }
+        self.assertTrue(has_semantic_params(params))
+
+    def test_precomputed_embedding_bypasses_text_check(self) -> None:
+        """A precomputed embedding is valid even without query text."""
+        params = {
+            "q": '""',
+            "type": SEARCH_TYPES.OPINION,
+            "semantic": True,
+            "embedding": [0.1, 0.2],
+        }
+        self.assertTrue(has_semantic_params(params))
+
+
+class BuildSemanticQueryValidationTest(TestCase):
+    """Tests for query validation in build_semantic_query."""
+
+    def test_unbalanced_quotes_raises(self) -> None:
+        """Unbalanced quotes raise UnbalancedQuotesQuery."""
+        from cl.lib.elasticsearch_utils import build_semantic_query
+
+        with self.assertRaises(UnbalancedQuotesQuery):
+            build_semantic_query('"foo bar" baz"', [])
