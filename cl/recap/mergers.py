@@ -7,7 +7,6 @@ from datetime import date, timedelta
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, OperationalError, transaction
@@ -534,16 +533,10 @@ async def update_docket_appellate_metadata(d, docket_data):
 
     # Ensure we don't share A-Numbers, which can sometimes be in the docket
     # number field.
-    docket_number = (
-        og_info.get("docket_number", "")
-        or d_og_info.docket_number_raw
-        or d_og_info.docket_number
-    )
+    docket_number = og_info.get("docket_number", "") or d_og_info.docket_number
     docket_number, _ = anonymize(docket_number)
+    d_og_info.docket_number = docket_number
     d_og_info.docket_number_raw = docket_number
-    if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
-        # Mirror until the OCI cleaning signal is wired up (#7044).
-        d_og_info.docket_number = docket_number
     d_og_info.court_reporter = (
         og_info.get("court_reporter", "") or d_og_info.court_reporter
     )

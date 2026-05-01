@@ -6,7 +6,6 @@ from urllib.parse import urljoin
 import httpx
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
@@ -541,15 +540,11 @@ def update_or_create_originating_court_information(
 
     if existing_oci := docket.originating_court_information:
         update = False
+        if not existing_oci.docket_number and lower_court_number:
+            existing_oci.docket_number = lower_court_number
+            update = True
         if not existing_oci.docket_number_raw and lower_court_number:
             existing_oci.docket_number_raw = lower_court_number
-            update = True
-        if (
-            not existing_oci.docket_number
-            and lower_court_number
-            and not settings.DOCKET_NUMBER_CLEANING_ENABLED
-        ):
-            existing_oci.docket_number = lower_court_number
             update = True
         if not existing_oci.assigned_to_str and lower_court_judge:
             existing_oci.assigned_to_str = lower_court_judge
@@ -561,10 +556,8 @@ def update_or_create_originating_court_information(
         # If the docket already had a OriginatingCourtInformation, just return
         return
 
-    oci = OriginatingCourtInformation(
+    return OriginatingCourtInformation(
+        docket_number=lower_court_number or "",
         docket_number_raw=lower_court_number or "",
         assigned_to_str=lower_court_judge or "",
     )
-    if not settings.DOCKET_NUMBER_CLEANING_ENABLED:
-        oci.docket_number = lower_court_number or ""
-    return oci
