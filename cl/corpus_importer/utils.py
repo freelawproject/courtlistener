@@ -1168,38 +1168,47 @@ def make_iquery_probing_key(court_id: str) -> str:
     return f"iquery.probing.enqueued:{court_id}"
 
 
-def compute_binary_probe_jitter(testing: bool) -> int:
+def compute_binary_probe_jitter(
+    testing: bool, max_probe: int | None = None
+) -> int:
     """Compute the jitter for binary probes.
 
     :param testing: A boolean flag indicating whether the function is being
     executed in a testing environment. If True, jitter is disabled and returns 0.
+    :param max_probe: Optional override for the geometric step cap. Defaults to
+    ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range (e.g.
+    the SCOTUS daemon) pass their own cap so the jitter scales accordingly.
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
-    return (
-        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
-        if not testing
-        else 0
-    )
+    if max_probe is None:
+        max_probe = settings.IQUERY_MAX_PROBE
+    # The jitter will be a random value between 1 and half of max_probe.
+    return random.randint(1, round(max_probe * 0.5)) if not testing else 0
 
 
 def compute_next_binary_probe(
-    highest_known_pacer_case_id: int, iteration: int, jitter: int
+    highest_known_pacer_case_id: int,
+    iteration: int,
+    jitter: int,
+    max_probe: int | None = None,
 ) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
     This computes the next probe target using a geometric sequence
     based on the current iteration (2 ** (iteration - 1)), with the increase
-    capped by the IQUERY_MAX_PROBE setting. Once the geometric value reaches
-    this cap, subsequent increments grow linearly by the cap value.
-    In non-testing mode, and except for the first iteration, a jitter is added
-    to the next value to ensure that probing values are not the same as in the
-    previous iteration, increasing the chances of getting a hit.
+    capped by ``max_probe``. Once the geometric value reaches this cap,
+    subsequent increments grow linearly by the cap value. In non-testing mode,
+    and except for the first iteration, a jitter is added to the next value to
+    ensure that probing values are not the same as in the previous iteration,
+    increasing the chances of getting a hit.
 
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
+    :param max_probe: Optional override for the geometric step cap. Defaults
+    to ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range
+    (e.g. the SCOTUS daemon) pass their own cap.
     :return: The updated probe_iteration and the PACER case ID to lookup and
     the probe offset + jitter computed.
     """
@@ -1207,7 +1216,8 @@ def compute_next_binary_probe(
     # Avoid applying jitter on the first iteration to speed up
     # the detection of new cases once courts catch up.
     jitter = 0 if iteration == 1 else jitter
-    max_probe = settings.IQUERY_MAX_PROBE
+    if max_probe is None:
+        max_probe = settings.IQUERY_MAX_PROBE
     cap_iteration = int(math.log2(max_probe)) + 1
     if iteration < cap_iteration:
         offset = 2 ** (iteration - 1)
@@ -1217,22 +1227,24 @@ def compute_next_binary_probe(
     return pacer_case_id_to_lookup, offset + jitter
 
 
-def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
+def compute_blocked_court_wait(
+    court_blocked_attempts: int,
+    base_wait: int | None = None,
+) -> tuple[int, int]:
     """Compute the wait time for the current attempt and the total accumulated
     seconds from previous attempts.
 
     :param court_blocked_attempts: The current number of blocked attempts.
+    :param base_wait: Base wait in seconds for the exponential backoff.
+        Defaults to ``settings.IQUERY_COURT_BLOCKED_WAIT``.
     :return: A tuple containing the wait time for the current attempt and the
     total accumulated seconds.
     """
+    if base_wait is None:
+        base_wait = settings.IQUERY_COURT_BLOCKED_WAIT  # type: ignore[assignment]
 
-    current_wait_time = int(
-        settings.IQUERY_COURT_BLOCKED_WAIT * 2 ** (court_blocked_attempts - 1)
-    )
-    total_accumulated_time = sum(
-        settings.IQUERY_COURT_BLOCKED_WAIT * 2**i
-        for i in range(court_blocked_attempts)
-    )
+    current_wait_time = int(base_wait * 2 ** (court_blocked_attempts - 1))
+    total_accumulated_time = base_wait * (2**court_blocked_attempts - 1)
     return current_wait_time, total_accumulated_time
 
 

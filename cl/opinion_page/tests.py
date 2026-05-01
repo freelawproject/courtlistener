@@ -7,7 +7,7 @@ from datetime import date
 from http import HTTPStatus
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -48,6 +48,9 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    build_docket_metadata,
+    build_docket_tabs,
+    build_originating_court_metadata,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
@@ -58,6 +61,8 @@ from cl.opinion_page.views import (
     view_recap_document,
 )
 from cl.people_db.factories import (
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PositionFactory,
@@ -91,6 +96,7 @@ from cl.search.models import (
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
@@ -2513,3 +2519,227 @@ class ClusterRedirectionTest(TestCase):
             expected_redirect_url,
             status_code=301,
         )
+
+
+class BuildDocketMetadataTest(TestCase):
+    """Test the build_docket_metadata helper function."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="metd", jurisdiction="FB")
+
+    def test_empty_docket_returns_citation_only(self) -> None:
+        """A minimal docket should still return a citation item."""
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            assigned_to=None,
+            referred_to=None,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        labels = [item["label"] for item in items]
+        self.assertIn("Citation", labels)
+
+    def test_metadata_with_judge_link(self) -> None:
+        """A docket with an assigned judge should produce a linked item."""
+        judge = PersonFactory()
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            assigned_to=judge,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        assigned = next(i for i in items if i["label"] == "Assigned To")
+        self.assertEqual(assigned["value"], judge.name_full)
+        self.assertIn("url", assigned)
+
+    def test_metadata_with_search_link(self) -> None:
+        """Fields like cause should produce a nofollow search link."""
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            cause="28:1331",
+            assigned_to=None,
+            referred_to=None,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        cause = next(i for i in items if i["label"] == "Cause")
+        self.assertEqual(cause["value"], "28:1331")
+        self.assertIn("cause", cause["url"])
+        self.assertTrue(cause.get("nofollow"))
+
+        with self.subTest("special characters are URL-encoded"):
+            docket_special = DocketFactory(
+                court=self.court,
+                source=Docket.COLUMBIA,
+                cause="Civil Rights & Liberties",
+                assigned_to=None,
+                referred_to=None,
+            )
+            items = build_docket_metadata(docket_special, "US/Eastern")
+            cause = next(i for i in items if i["label"] == "Cause")
+            self.assertIn("%26", cause["url"])
+            parsed = parse_qs(urlparse(cause["url"]).query)
+            self.assertEqual(parsed["cause"][0], '"Civil Rights & Liberties"')
+
+
+class BuildOriginatingCourtMetadataTest(TestCase):
+    """Test the build_originating_court_metadata helper function."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.appellate_court = CourtFactory(id="ca1", jurisdiction="F")
+        cls.lower_court = CourtFactory(id="dmd", jurisdiction="FD")
+
+    def test_returns_empty_when_no_og_info(self) -> None:
+        """No originating court information yields an empty list."""
+        docket = DocketFactory(court=self.appellate_court, source=Docket.RECAP)
+        items = build_originating_court_metadata(docket, None)
+        self.assertEqual(items, [])
+
+    def test_appealed_from_links_lower_court_docket_number(self) -> None:
+        """When the lower court is known, the lower-court docket number
+        renders as a nofollow RECAP search link via data fields — never as
+        a raw HTML string in the value."""
+        og_info = OriginatingCourtInformation.objects.create(
+            docket_number="1:23-cv-456"
+        )
+        docket = DocketFactory(
+            court=self.appellate_court,
+            source=Docket.RECAP,
+            appeal_from=self.lower_court,
+            originating_court_information=og_info,
+        )
+        items = build_originating_court_metadata(docket, og_info)
+        appealed_from = next(i for i in items if i["label"] == "Appealed From")
+
+        # The displayed value is the lower court name only — no embedded HTML.
+        self.assertEqual(appealed_from["label"], "Appealed From")
+        self.assertEqual(appealed_from["value"], self.lower_court.short_name)
+        self.assertNotIn("<", str(appealed_from["value"]))
+
+        # The lower-court docket number travels as data, not as HTML.
+        self.assertEqual(appealed_from["suffix_text"], "1:23-cv-456")
+        self.assertIn("docket_number=1:23-cv-456", appealed_from["suffix_url"])
+        self.assertIn(
+            f"court={self.lower_court.pk}", appealed_from["suffix_url"]
+        )
+        self.assertTrue(appealed_from["suffix_nofollow"])
+        self.assertNotIn("suffix_is_external", appealed_from)
+
+        # An accessible name describes the link's purpose for assistive tech
+        # (rendered as aria-label, replacing the prior title attribute).
+        self.assertIn("1:23-cv-456", appealed_from["suffix_aria_label"])
+        self.assertIn("RECAP", appealed_from["suffix_aria_label"])
+
+    def test_appealed_from_renders_lower_court_docket_number_as_plain_text(
+        self,
+    ) -> None:
+        """When only the lower court name is known (no FK, no admin link),
+        the lower-court docket number is plain text with no link fields."""
+        og_info = OriginatingCourtInformation.objects.create(
+            docket_number="42"
+        )
+        docket = DocketFactory(
+            court=self.appellate_court,
+            source=Docket.RECAP,
+            appeal_from=None,
+            appeal_from_str="Some State Court",
+            originating_court_information=og_info,
+        )
+        items = build_originating_court_metadata(docket, og_info)
+        appealed_from = next(i for i in items if i["label"] == "Appealed From")
+
+        self.assertEqual(appealed_from["label"], "Appealed From")
+        self.assertEqual(appealed_from["value"], "Some State Court")
+        self.assertEqual(appealed_from["suffix_text"], "42")
+        self.assertNotIn("suffix_url", appealed_from)
+
+
+class BuildDocketTabsTest(SimpleTestCase):
+    """Test the build_docket_tabs helper function."""
+
+    def test_entries_tab_always_present(self) -> None:
+        """The entries tab should always be in the list."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, False, False, False)
+        self.assertEqual(len(tabs), 1)
+        self.assertEqual(tabs[0]["key"], "entries")
+
+    def test_all_tabs_present(self) -> None:
+        """All four tabs should appear when all data exists."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, True, True, True)
+        keys = [t["key"] for t in tabs]
+        self.assertEqual(keys, ["entries", "parties", "idb", "authorities"])
+
+    def test_conditional_tabs(self) -> None:
+        """Only tabs with data should appear."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        with self.subTest("parties only"):
+            tabs = build_docket_tabs(docket, True, False, False)
+            keys = [t["key"] for t in tabs]
+            self.assertEqual(keys, ["entries", "parties"])
+
+        with self.subTest("idb only"):
+            tabs = build_docket_tabs(docket, False, True, False)
+            keys = [t["key"] for t in tabs]
+            self.assertEqual(keys, ["entries", "idb"])
+
+
+@override_flag("use_new_design", active=True)
+class DocketPageV2TemplateTest(TestCase):
+    """Test that the v2 docket page renders correctly."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            cause="28:1331",
+            nature_of_suit="Contract",
+            date_filed=date(2024, 9, 26),
+        )
+        party = PartyFactory.build()
+        party.save()
+        PartyTypeFactory(docket=cls.docket, party=party)
+
+    async def test_v2_docket_page_renders(self) -> None:
+        """The v2 docket page should render without errors."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        content = r.content.decode()
+        self.assertIn("Docket Entries", content)
+        self.assertIn("28:1331", content)
+        self.assertIn("Contract", content)
+
+    async def test_v2_docket_metadata_in_context(self) -> None:
+        """The view should pass metadata and tabs to the template."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertIn("metadata", r.context)
+        self.assertIn("tabs", r.context)
+        self.assertTrue(len(r.context["metadata"]) > 0)
+        self.assertTrue(len(r.context["tabs"]) > 0)

@@ -38,6 +38,7 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
     SCOTUSDocketEntry,
+    SCOTUSDocument,
     TrialCourtData,
 )
 from cl.tests.providers import LegalProvider
@@ -383,6 +384,17 @@ class SCOTUSDocketEntryFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
     date_filed = Faker("date")
     sequence_number = Faker("numerify", text="########")
+
+
+class SCOTUSDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = SCOTUSDocument
+
+    docket_entry = SubFactory(SCOTUSDocketEntryFactory)
+    document_number = Faker("random_int", min=1, max=1000)
+    attachment_number = Faker("random_int", min=1, max=10)
+    url = Faker("url")
+    description = Faker("text", max_nb_chars=20)
 
 
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):

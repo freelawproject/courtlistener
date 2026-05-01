@@ -42,6 +42,11 @@ from juriscraper.pacer import (
     S3NotificationEmail,
 )
 from juriscraper.pacer.email import DocketType
+from juriscraper.scotus import SCOTUSDocketReportHTML, SCOTUSEmail
+from juriscraper.scotus.scotus_email import (
+    SCOTUSConfirmationResult,
+    SCOTUSEmailType,
+)
 from juriscraper.state.texas import (
     TexasCourtOfAppealsScraper,
     TexasCourtOfCriminalAppealsScraper,
@@ -62,6 +67,7 @@ from cl.alerts.utils import (
 )
 from cl.api.webhooks import send_recap_fetch_webhooks
 from cl.celery_init import app
+from cl.corpus_importer.scotus_daemon_utils import save_scotus_raw_to_s3
 from cl.corpus_importer.tasks import (
     download_acms_pdf_by_rd,
     download_pacer_pdf_by_rd,
@@ -70,6 +76,7 @@ from cl.corpus_importer.tasks import (
     get_document_number_for_appellate,
     is_docket_entry_sealed,
     is_pacer_doc_sealed,
+    merge_scotus_docket,
     merge_texas_docket,
     save_attachment_pq_from_text,
     update_rd_metadata,
@@ -97,7 +104,11 @@ from cl.lib.pacer_session import (
     get_pacer_cookie_from_cache,
 )
 from cl.lib.recap_utils import get_document_filename
-from cl.lib.storage import RecapEmailSESStorage, TexasEmailSESStorage
+from cl.lib.storage import (
+    RecapEmailSESStorage,
+    SCOTUSSESStorage,
+    TexasEmailSESStorage,
+)
 from cl.lib.string_diff import find_best_match
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -3814,6 +3825,151 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
             PROCESSING_STATUS.SUCCESSFUL,
             "status_message",
         )
+
+    return None
+
+
+def fetch_and_archive_scotus_docket_followup(
+    scotus_email: SCOTUSEmail,
+    timeout: float = 10.0,
+) -> dict[str, str | dict[str, str]]:
+    """Fetch the SCOTUS docket follow-up URL, archive the raw HTML in S3,
+    and parse it.
+
+    :param scotus_email: A parsed ``SCOTUSEmail`` whose ``email_type`` is
+        ``DOCKET_ENTRY``.
+    :param timeout: HTTP timeout in seconds.
+    :return: A dict with ``email_type`` and ``data`` keys, matching the shape
+        returned by ``SCOTUSEmail.handle_email``.
+    """
+    parsed_email = scotus_email.data
+    response = requests.get(
+        parsed_email["followup_url"],
+        headers={"User-Agent": "Free Law Project"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+
+    docket_number = parsed_email["data"]["docket_number"]
+    save_scotus_raw_to_s3(
+        f"responses/dockets/scotus-email/{docket_number}.html",
+        response.text,
+    )
+    report = SCOTUSDocketReportHTML(scotus_email.court_id)
+    report._parse_text(response.text)
+    return {
+        "email_type": SCOTUSEmailType.DOCKET_ENTRY.value,
+        "data": report.data,
+    }
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore_exception.HTTPClientError,
+        botocore_exception.ConnectionError,
+        requests.ConnectionError,
+        requests.RequestException,
+        requests.ReadTimeout,
+        RedisConnectionError,
+    ),
+    max_retries=10,
+    retry_backoff=2 * 60,
+    retry_backoff_max=60 * 60,
+)
+def process_scotus_email(self: Task, epq_pk: int) -> None:
+    """Task to process an email added to the queue from the
+    "scrapers/scotus-email" endpoint. If the email is a case notification
+    email, fetch the docket page and return the scraped data.
+    If the email is a confirmation email, fetch the confirmation page,
+    throwing an error if it indicates that subscription confirmation failed.
+    Otherwise, set an error in the processing queue indicating the email
+    type was unrecognized.
+
+    :param self: The Celery task
+    :param epq_pk: The PK of the EmailProcessingQueue object to process
+    """
+    epq = EmailProcessingQueue.objects.get(pk=epq_pk)
+    async_to_sync(mark_pq_status)(
+        epq,
+        "Processing SCOTUS email",
+        PROCESSING_STATUS.IN_PROGRESS,
+        "status_message",
+    )
+
+    try:
+        body = retrieve_email_from_queue(epq.message_id, SCOTUSSESStorage())
+    except FileNotFoundError as exc:
+        if self.request.retries == self.max_retries:
+            async_to_sync(mark_pq_status)(
+                epq,
+                "File not found.",
+                PROCESSING_STATUS.FAILED,
+                "status_message",
+            )
+            self.request.chain = None
+            return None
+        else:
+            raise self.retry(exc=exc)
+
+    scotus_email = SCOTUSEmail()
+    scotus_email._parse_text(body)
+    if scotus_email.email_type == SCOTUSEmailType.DOCKET_ENTRY:
+        handling_result = fetch_and_archive_scotus_docket_followup(
+            scotus_email
+        )
+    else:
+        handling_result = scotus_email.handle_email()
+    email_type = handling_result["email_type"]
+    data = handling_result["data"]
+
+    if email_type == SCOTUSEmailType.INVALID.value:
+        async_to_sync(mark_pq_status)(
+            epq,
+            "SCOTUS email format is invalid or not recognized.",
+            PROCESSING_STATUS.INVALID_CONTENT,
+            "status_message",
+        )
+        self.request.chain = None
+        return None
+
+    if email_type == SCOTUSEmailType.CONFIRMATION.value:
+        if data == SCOTUSConfirmationResult.Success.value:
+            async_to_sync(mark_pq_status)(
+                epq,
+                "Successfully confirmed SCOTUS subscription.",
+                PROCESSING_STATUS.SUCCESSFUL,
+                "status_message",
+            )
+            self.request.chain = None
+            return None
+
+        async_to_sync(mark_pq_status)(
+            epq,
+            "Failed to confirm SCOTUS subscription.",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+        self.request.chain = None
+        return None
+    try:
+        d, _, doc_pks = merge_scotus_docket(data)
+    except Exception as e:
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"SCOTUS docket update error: {e}",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+    else:
+        async_to_sync(associate_related_instances)(
+            epq,
+            rd_id=doc_pks,
+            model_name="search.SCOTUSDocument",
+        )
+        msg = f"SCOTUS docket {data['docket_number']} updated successfully."
+        status = PROCESSING_STATUS.SUCCESSFUL
+        async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
 
     return None
 

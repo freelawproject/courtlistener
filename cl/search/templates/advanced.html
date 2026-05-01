@@ -106,19 +106,21 @@
                 <div id="search-container" class="text-center">
                     <label class="sr-only" for="id_q">Search</label>
                     <div class="input-group">
+                        {% include "includes/search_mode_icon.html" %}
                         <input class="form-control input-lg"
                                value="{{ search_form.q.value|default:'' }}"
                                name="q"
                                id="id_q"
                                autocomplete="off"
-                               type="text">
+                               type="text"
+                               placeholder='{% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}{% if search_form.semantic.value %}Natural language search, use &quot;quotes&quot; for exact terms{% else %}Keyword(s) search with operators{% endif %}{% endif %}'>
                         <span class="input-group-btn">
-                        <button type="submit"
-                                class="btn btn-primary btn-lg"
-                                name="search"
-                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
-                        </button>
-                    </span>
+                            <button type="submit"
+                                    class="btn btn-primary btn-lg"
+                                    name="search"
+                                    id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                            </button>
+                        </span>
                     </div>
                 </div>
             </form>
