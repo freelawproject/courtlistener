@@ -45,6 +45,7 @@ urlpatterns = [
                 "extra_context": {"private": False},
             },
         ),
+        name="sign-out",
     ),
     path(
         "reset-password/",
