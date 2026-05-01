@@ -9,6 +9,7 @@ from cl.custom_filters.templatetags.extras import (
     get_full_host,
     get_item,
     granular_date,
+    highlight_query,
     humanize_number,
     render_field_with_id,
 )
@@ -384,6 +385,126 @@ class TestExtras(SimpleTestCase):
         # Test non-existent field
         missing_field = get_item(form, "non_existent_field")
         self.assertEqual(missing_field, "")
+
+
+class TestHighlightQuery(SimpleTestCase):
+    """Tests for the highlight_query template filter."""
+
+    def test_quoted_phrase_highlighted(self) -> None:
+        """Quoted phrases are highlighted as a unit."""
+        result = highlight_query(
+            "The court applied fair use analysis.",
+            '"fair use"',
+        )
+        self.assertIn("<mark>fair use</mark>", result)
+
+    def test_unquoted_words_not_highlighted(self) -> None:
+        """Unquoted words are NOT highlighted (they drive semantic
+        ranking, not keyword matching)."""
+        result = highlight_query(
+            "The copyright holder filed suit.",
+            "copyright holder",
+        )
+        self.assertNotIn("<mark>", str(result))
+
+    def test_case_insensitive(self) -> None:
+        """Matching is case-insensitive."""
+        result = highlight_query(
+            "Fair Use is a defense.",
+            '"fair use"',
+        )
+        self.assertIn("<mark>Fair Use</mark>", result)
+
+    def test_html_tags_not_highlighted(self) -> None:
+        """Phrases inside HTML tag attributes are left alone."""
+        result = highlight_query(
+            'Click <a href="fair use">here</a> for fair use info.',
+            '"fair use"',
+        )
+        # The phrase in the tag attribute should be untouched
+        self.assertIn('<a href="fair use">', result)
+        # The phrase in text content should be highlighted
+        self.assertIn("<mark>fair use</mark> info", result)
+
+    def test_only_quoted_phrases_highlighted_in_mixed_query(self) -> None:
+        """Only quoted phrases are highlighted; unquoted words ignored."""
+        result = highlight_query(
+            "The fair use doctrine protects transformative works.",
+            '"fair use" transformative',
+        )
+        self.assertIn("<mark>fair use</mark>", result)
+        self.assertNotIn("<mark>transformative</mark>", str(result))
+
+    def test_empty_query_returns_unchanged(self) -> None:
+        """Empty query returns text as-is."""
+        text = "Some text here."
+        result = highlight_query(text, "")
+        self.assertEqual(str(result), text)
+
+    def test_no_quotes_returns_safe_unchanged(self) -> None:
+        """Query without quotes returns safe, unhighlighted text."""
+        result = highlight_query("Nothing to see here.", "semantic only query")
+        self.assertNotIn("<mark>", str(result))
+
+    def test_html_entities_in_text(self) -> None:
+        """Ampersands in text (already escaped) are handled properly."""
+        result = highlight_query("AT&amp;T filed the brief.", '"AT&T"')
+        self.assertIn("<mark>AT&amp;T</mark>", result)
+
+    def test_read_more_html_preserved(self) -> None:
+        """HTML from read_more filter is not corrupted."""
+        text = (
+            'word1 word2 <span class="read-more">&hellip;'
+            '<a href="#"><i class="fa fa-plus-square gray"'
+            ' title="Show All"></i></a></span>'
+            '<span class="more hidden">fair use word4</span>'
+        )
+        result = highlight_query(text, '"fair use"')
+        # The read_more structure should be intact
+        self.assertIn('<span class="read-more">', result)
+        self.assertIn('<span class="more hidden">', result)
+        # The phrase inside the hidden span should be highlighted
+        self.assertIn("<mark>fair use</mark>", result)
+
+    def test_multiple_occurrences(self) -> None:
+        """All occurrences of a quoted phrase are highlighted."""
+        result = highlight_query(
+            "Fair use applies. Courts consider fair use broadly.",
+            '"fair use"',
+        )
+        self.assertEqual(str(result).count("<mark>"), 2)
+
+    def test_whitespace_only_phrase_ignored(self) -> None:
+        """Whitespace-only quoted phrases are not highlighted."""
+        result = highlight_query(
+            "The copyright holder filed suit.",
+            'copyright " "',
+        )
+        self.assertNotIn("<mark>", str(result))
+
+    def test_word_boundaries_prevent_partial_match(self) -> None:
+        """Quoted phrases only match at word boundaries."""
+        result = highlight_query(
+            "She has experience in the field.",
+            '"per"',
+        )
+        self.assertNotIn("<mark>", str(result))
+
+    def test_word_boundaries_match_whole_word(self) -> None:
+        """Whole-word matches at word boundaries still work."""
+        result = highlight_query(
+            "The per curiam opinion was brief.",
+            '"per"',
+        )
+        self.assertIn("<mark>per</mark>", result)
+
+    def test_longer_phrases_matched_first(self) -> None:
+        """Longer phrases take priority over shorter sub-phrases."""
+        result = highlight_query(
+            "The married couple filed jointly.",
+            '"married" "married couple"',
+        )
+        self.assertIn("<mark>married couple</mark>", result)
 
 
 class TestSvgTag(SimpleTestCase):
