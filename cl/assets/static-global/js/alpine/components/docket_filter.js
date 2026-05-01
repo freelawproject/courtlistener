@@ -12,8 +12,8 @@ document.addEventListener("alpine:init", () => {
         }
       });
     },
-    submitForm() {
-      const form = this.$el.closest("form") || this.$el.querySelector("form");
+    submitForm(event) {
+      const form = event.target.closest("form");
       if (form) form.requestSubmit();
     },
   }));

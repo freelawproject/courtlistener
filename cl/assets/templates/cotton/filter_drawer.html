@@ -1,21 +1,25 @@
 {% load component_tags svg_tags %}
 {% require_script "js/alpine/composables/utils.js" %}
-{% require_script "js/alpine/components/filter_drawer.js" %}
-{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
-{% require_script "js/alpine/plugins/ui@3.14.8" defer=True %}
+{% require_script "js/alpine/composables/dialog.js" %}
+{% require_script "js/alpine/plugins/focus" defer=True %}
+{% require_script "js/alpine/plugins/ui" defer=True %}
 
 <c-vars
   title="Filters"
   class=""
 />
 
-<div x-data="filterDrawer" x-id="drawerIdGroup" class="md:hidden {{ class }}">
+<div
+  x-data="dialog"
+  x-id="dialogIdGroup"
+  x-init="if ($el.dataset.hasErrors !== undefined) open()"
+  class="md:hidden {{ class }}"
+>
   {# Trigger button #}
   <c-button
     variant="outline"
     x-on:click="open"
-    x-ref="trigger"
-    x-bind:aria-controls="drawerId"
+    x-bind:aria-controls="dialogId"
     x-bind:aria-expanded="isOpen"
     aria-haspopup="dialog"
   >
@@ -25,31 +29,44 @@
 
   {# Drawer panel #}
   <div
-    x-show="isOpen"
-    x-bind:id="drawerId"
+    x-dialog
+    x-bind:open="isOpen"
+    x-bind:id="dialogId"
     role="dialog"
     aria-modal="true"
-    x-bind:aria-label="'{{ title }}'"
     x-on:keyup.esc.stop.prevent="close"
     x-cloak
     class="fixed inset-0 z-40 overflow-hidden"
   >
-    {# Overlay #}
+    {# Overlay — fades in/out #}
     <div
+      x-dialog:overlay
       x-show="isOpen"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"
       x-on:click.stop.prevent="close"
       class="fixed inset-0 bg-greyscale-600/40"
     ></div>
 
-    {# Panel — slides in from right #}
+    {# Panel — slides in/out from right #}
     <div
+      x-dialog:panel
       x-show="isOpen"
-      x-trap.noscroll="isOpen"
+      x-transition:enter="transition ease-out duration-200 transform"
+      x-transition:enter-start="translate-x-full"
+      x-transition:enter-end="translate-x-0"
+      x-transition:leave="transition ease-in duration-150 transform"
+      x-transition:leave-start="translate-x-0"
+      x-transition:leave-end="translate-x-full"
       class="fixed inset-y-0 right-0 z-50 flex flex-col w-80 max-w-full bg-white shadow-lg"
     >
       {# Header #}
       <div class="flex items-center justify-between px-4 py-3 border-b border-greyscale-200">
-        <h2 class="text-lg font-semibold text-greyscale-900">{{ title }}</h2>
+        <h2 x-dialog:title class="text-lg font-semibold text-greyscale-900">{{ title }}</h2>
         <c-button
           variant="ghost"
           x-on:click="close"
