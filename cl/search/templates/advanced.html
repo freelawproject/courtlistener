@@ -777,12 +777,12 @@
             </div>
             <div class="col-md-4">
                 <h3>Studying the Data</h3>
-                <p>Like all of our data, the judicial database is available <a href="{% url "bulk_data_index" %}">in bulk</a> and <a href="{% url "api_index" %}">via our APIs</a>. This means that interested researchers, start-ups, journalists, and the public can download the data or integrate it into their systems.
+                <p>Like all of our data, the judicial database is available <a href="{{ WIKI_API_URL }}/bulk-data/bulk-legal-data">in bulk</a> and <a href="{{ WIKI_API_URL }}">via our APIs</a>. This means that interested researchers, start-ups, journalists, and the public can download the data or integrate it into their systems.
                 </p>
                 <p>We enthusiastically welcome reuse of and contribution to the data.
                 </p>
                 <p>
-                    <a href="{% url "api_index" %}"
+                    <a href="{{ WIKI_API_URL }}"
                        class="btn btn-primary">Learn More</a>
                 </p>
             </div>
