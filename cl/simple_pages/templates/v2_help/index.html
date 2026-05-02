@@ -57,68 +57,9 @@
     <div class="flex flex-col gap-6">
       <div class="flex flex-col gap-2">
         <h2 class="text-display-xs font-semibold text-greyscale-900">Developer Documentation</h2>
-        <p class="text-sm font-normal text-greyscale-600">The following documentation is available for developers:</p>
+        <p class="text-sm font-normal text-greyscale-600">Our developer documentation &mdash; including REST APIs, bulk data, webhooks, MCP, and replication &mdash; has moved to our wiki.</p>
       </div>
-      <div class="pl-4">
-        <ol
-            class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal
-             space-y-4">
-          <li>
-            <p class="mb-2 text-greyscale-800">API Documentation</p>
-            <ul class="list-disc pl-3 space-y-2">
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "rest_docs" %}">REST API Overview</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "citation_lookup_api" %}">Citation Lookup API</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "search_api_help" %}">Search API</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "case_law_api_help" %}">Case Law APIs</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "pacer_api_help" %}">PACER Data APIs</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "recap_api_help" %}">RECAP APIs</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "judge_api_help" %}">Judge APIs</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "financial_disclosures_api_help" %}">Financial Disclosure APIs</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "citation_api_help" %}">Citation APIs</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "alert_api_help" %}">Alert APIs</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "visualization_api_help" %}">Supreme Court Visualization APIs</a>
-              </li>
-            </ul>
-          </li>
-          <li>
-            <p class="mb-2 text-greyscale-800">Webhook Documentation</p>
-            <ul class="list-disc pl-3 space-y-2">
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "webhooks_docs" %}">Webhook Overview</a>
-              </li>
-              <li class="marker:text-greyscale-200">
-                <a class="links" href="{% url "webhooks_getting_started" %}">Getting Started</a>
-              </li>
-            </ul>
-          </li>
-          <li><a class="links" href="{% url "mcp_help" %}">MCP Server for AI Assistants</a> <span class="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full ml-1">Coming Soon</span></li>
-          <li><a class="links" href="{% url "cluster_redirections_help" %}">Opinion Cluster Redirections</a></li>
-          <li><a class="links" href="{% url "bulk_data_index" %}">Bulk Data Documentation</a></li>
-          <li><a class="links" href="{% url "replication_docs" %}">Replication Documentation</a></li>
-          <li><a class="links" href="{% url "api_index" %}">Data Services on CourtListener</a></li>
-        </ol>
-      </div>
+      <a href="{{ WIKI_API_URL }}" class="btn-primary max-md:btn-xl">Developer Documentation on the Wiki</a>
     </div>
 
     <div class="flex flex-col gap-20">

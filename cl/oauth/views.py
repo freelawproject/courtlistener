@@ -170,6 +170,6 @@ class OAuthMetadataView(APIView):
                 ),
                 "code_challenge_methods_supported": ["S256"],
                 "scopes_supported": scopes_supported,
-                "service_documentation": base + reverse("rest_docs"),
+                "service_documentation": f"{settings.WIKI_API_BASE_URL}/rest/v4/overview",
             }
         )
