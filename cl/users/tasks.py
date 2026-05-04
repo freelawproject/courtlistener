@@ -11,6 +11,7 @@ from requests.exceptions import HTTPError, Timeout
 
 from cl.api.models import Webhook, WebhookEvent
 from cl.celery_init import app
+from cl.donate.models import NeonMembershipLevel
 from cl.lib.email_utils import make_multipart_email
 from cl.lib.neon_utils import NeonClient
 from cl.lib.zoho import (
@@ -183,6 +184,62 @@ def create_or_update_zoho_account(
         | milestone_payload
     )
     leads_module.create_record(payload)
+
+
+def _membership_tag_for_level(level: int) -> str:
+    """Return the Zoho tag name for a given NeonMembershipLevel."""
+    if level == NeonMembershipLevel.EDU:
+        return "Student"
+    return "CL Membership"
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(Timeout,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def tag_zoho_record_for_membership(
+    self: Task, user_id: int, level: int
+) -> None:
+    """
+    Add the membership tag to the user's Zoho Lead or Contact record.
+
+    Looks up the user in Zoho by CourtListener ID and email, preferring a
+    Lead match over a Contact match (mirroring `create_or_update_zoho_account`).
+    If no record is found, the task is a no-op — the record will get tagged
+    next time the user shows up in Zoho.
+
+    :param user_id: The primary key of the user whose Zoho record to tag.
+    :param level: The NeonMembershipLevel value used to choose the tag name.
+    """
+    user = User.objects.get(pk=user_id)
+    tag_name = _membership_tag_for_level(level)
+
+    leads_module = LeadsModule()
+    leads_module.initialize()
+    contacts_module = ContactsModule()
+    contacts_module.initialize()
+
+    lead_records = leads_module.get_record_by_cl_id_or_email(
+        emails=[user.email], cl_ids=[user.pk]
+    )
+    if lead_records:
+        leads_module.add_tags(lead_records[0].get_id(), [tag_name])
+        return
+
+    contact_records = contacts_module.get_record_by_cl_id_or_email(
+        emails=[user.email], cl_ids=[user.pk]
+    )
+    if contact_records:
+        contacts_module.add_tags(contact_records[0].get_id(), [tag_name])
+        return
+
+    logger.info(
+        "No Zoho Lead/Contact found for user %s; skipping membership tag.",
+        user_id,
+    )
 
 
 @app.task(ignore_result=True)
