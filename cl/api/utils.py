@@ -7,6 +7,7 @@ from itertools import batched, chain
 from typing import Any, TypedDict
 
 import eyecite
+from celery import chain as celery_chain
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
 from django.conf import settings
@@ -59,6 +60,7 @@ from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
 from cl.users.tasks import (
     create_or_update_zoho_account,
     notify_failing_webhook,
+    tag_zoho_record_for_membership,
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -594,16 +596,35 @@ class LoggingMixin:
             Event.objects.create(
                 description=f"API {api_version} has logged {total_count} total requests."
             )
-        if user.is_authenticated:
-            if user_count in self.milestones:
-                Event.objects.create(
-                    description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
-                    user=user,
-                )
-                if api_version == "v4":
-                    create_or_update_zoho_account.delay(
-                        user.pk, int(user_count)
-                    )
+
+        # Skip user-specific logic if not authenticated
+        if not user.is_authenticated:
+            return
+
+        # User milestones
+        if user_count in self.milestones:
+            Event.objects.create(
+                description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
+                user=user,
+            )
+
+        # Only v4 triggers Zoho updates
+        if api_version != "v4":
+            return
+
+        # Safely fetch membership
+        membership = getattr(user, "membership", None)
+        is_active_member = membership and membership.is_active
+
+        if is_active_member:
+            celery_chain(
+                create_or_update_zoho_account.si(user.pk, int(user_count)),
+                tag_zoho_record_for_membership.si(user.pk, membership.level),
+            ).apply_async()
+        else:
+            create_or_update_zoho_account.si(
+                user.pk, int(user_count)
+            ).apply_async()
 
 
 class CacheListMixin:
