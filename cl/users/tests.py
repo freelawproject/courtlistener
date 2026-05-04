@@ -4048,10 +4048,10 @@ class UserAdminApiCallsCountTest(TestCase):
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should sum scores from both v3 and v4 keys."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
         mock_redis = MagicMock()
-        mock_redis.zscore.side_effect = lambda key, _: (
-            5.0 if "v3" in key else 10.0
-        )
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 15)
@@ -4061,8 +4061,10 @@ class UserAdminApiCallsCountTest(TestCase):
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should return 0 when Redis has no data."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
         mock_redis = MagicMock()
-        mock_redis.zscore.return_value = None
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 0)
@@ -4078,10 +4080,12 @@ class UserProfileTotalApiUsageTest(TestCase):
     @patch("cl.users.models.get_redis_interface")
     def test_sums_v3_and_v4_counts(self, mock_get_redis: MagicMock) -> None:
         """Lifetime total combines v3 and v4 ZSCORE values."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
+
         mock_redis = MagicMock()
-        mock_redis.zscore.side_effect = lambda key, _: (
-            5.0 if "v3" in key else 10.0
-        )
+        mock_redis.pipeline.return_value = mock_pipe
+
         mock_get_redis.return_value = mock_redis
 
         self.assertEqual(self.user.profile.total_api_usage, 15)
@@ -4091,8 +4095,12 @@ class UserProfileTotalApiUsageTest(TestCase):
         self, mock_get_redis: MagicMock
     ) -> None:
         """No Redis entries means a zero total, not a crash."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
+
         mock_redis = MagicMock()
-        mock_redis.zscore.return_value = None
+        mock_redis.pipeline.return_value = mock_pipe
+
         mock_get_redis.return_value = mock_redis
 
         self.assertEqual(self.user.profile.total_api_usage, 0)

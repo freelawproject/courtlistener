@@ -221,12 +221,10 @@ class UserProfile(models.Model):
     def total_api_usage(self) -> int:
         """Lifetime count of API requests for this user across v3 + v4."""
         r = get_redis_interface("STATS")
-        total = 0
+        pipe = r.pipeline()
         for api_prefix in ("v3", "v4"):
-            count = r.zscore(f"api:{api_prefix}.user.counts", self.user_id)
-            if count:
-                total += int(count)
-        return total
+            pipe.zscore(f"api:{api_prefix}.user.counts", self.user_id)
+        return sum(int(count) for count in pipe.execute() if count)
 
     def __str__(self) -> str:
         return f"{self.user.username}"
