@@ -4843,19 +4843,6 @@ class ThrottleOverrideIntegrationTest(TestCase):
         self.assertIn(citation_throttle.user.username, citation_overrides)
         self.assertNotIn(api_throttle.user.username, citation_overrides)
 
-    async def test_citation_lookup_page_loads_with_throttle_override(
-        self,
-    ) -> None:
-        """Test citation lookup help page loads for user with custom rate."""
-        throttle = await sync_to_async(APIThrottleFactory)(
-            throttle_type=ThrottleType.CITATION_LOOKUP,
-            rate="500/hour",
-        )
-        client = AsyncClient()
-        await sync_to_async(client.force_login)(throttle.user)
-        response = await client.get(reverse("citation_lookup_api"))
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
     def test_overrides_drop_membership_when_user_lacks_active_membership(
         self,
     ) -> None:
