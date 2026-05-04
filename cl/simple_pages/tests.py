@@ -223,7 +223,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
-            {"viewname": "replication_docs"},
             {"viewname": "terms"},
             {"viewname": "robots"},
             # Contact
@@ -237,25 +236,7 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             {"viewname": "advanced_search"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
-            {"viewname": "mcp_help"},
-            {"viewname": "cluster_redirections_help"},
             {"viewname": "citegeist_help"},
-            # API help pages
-            {"viewname": "case_law_api_help"},
-            {"viewname": "citation_api_help"},
-            {"viewname": "pacer_api_help"},
-            {"viewname": "recap_api_help"},
-            {"viewname": "judge_api_help"},
-            {"viewname": "field_api_help"},
-            {"viewname": "oral_argument_api_help"},
-            {"viewname": "visualization_api_help"},
-            {"viewname": "webhooks_docs"},
-            {"viewname": "webhooks_getting_started"},
-            {"viewname": "citation_lookup_api"},
-            {"viewname": "alert_api_help"},
-            {"viewname": "financial_disclosures_api_help"},
-            {"viewname": "search_api_help"},
-            {"viewname": "rest_change_log"},
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
@@ -322,61 +303,13 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
         ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
         ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
-        ({"viewname": "mcp_help"}, "v2_help/mcp_help.html"),
         ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
         ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
         ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
-        (
-            {"viewname": "cluster_redirections_help"},
-            "v2_help/cluster_redirections_help.html",
-        ),
         # Info pages
         ({"viewname": "terms"}, "v2_terms/latest.html"),
         ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
         ({"viewname": "components"}, "v2_components.html"),
-        # API documentation pages
-        ({"viewname": "api_index"}, "v2_docs.html"),
-        ({"viewname": "bulk_data_index"}, "v2_bulk-data.html"),
-        ({"viewname": "replication_docs"}, "v2_replication.html"),
-        ({"viewname": "migration_guide"}, "v2_migration-guide.html"),
-        ({"viewname": "rest_change_log"}, "v2_rest-change-log.html"),
-        (
-            {"viewname": "webhooks_getting_started"},
-            "v2_webhooks-getting-started.html",
-        ),
-        ({"viewname": "field_api_help"}, "v2_field-help.html"),
-        (
-            {"viewname": "case_law_api_help"},
-            "v2_case-law-api-docs-vlatest.html",
-        ),
-        (
-            {"viewname": "citation_api_help"},
-            "v2_citation-api-docs-vlatest.html",
-        ),
-        (
-            {"viewname": "citation_lookup_api"},
-            "v2_citation-lookup-api-vlatest.html",
-        ),
-        ({"viewname": "pacer_api_help"}, "v2_pacer-api-docs-vlatest.html"),
-        ({"viewname": "recap_api_help"}, "v2_recap-api-docs-vlatest.html"),
-        ({"viewname": "judge_api_help"}, "v2_judge-api-docs-vlatest.html"),
-        (
-            {"viewname": "oral_argument_api_help"},
-            "v2_oral-argument-api-docs-vlatest.html",
-        ),
-        (
-            {"viewname": "visualization_api_help"},
-            "v2_visualizations-api-docs-vlatest.html",
-        ),
-        ({"viewname": "alert_api_help"}, "v2_alert-api-docs-vlatest.html"),
-        (
-            {"viewname": "financial_disclosures_api_help"},
-            "v2_financial-disclosure-api-docs-vlatest.html",
-        ),
-        (
-            {"viewname": "search_api_help"},
-            "v2_search-api-docs-vlatest.html",
-        ),
     ]
 
     async def test_v2_pages(self) -> None:

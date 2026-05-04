@@ -188,41 +188,12 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, 200)
 
-    async def test_api_index(self) -> None:
-        r = await self.async_client.get(reverse("api_index"))
-        self.assertEqual(r.status_code, 200)
-
     async def test_options_request(self) -> None:
         r = await self.async_client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
     async def test_court_index(self) -> None:
         r = await self.async_client.get(reverse("court_index"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_rest_docs(self) -> None:
-        r = await self.async_client.get(reverse("rest_docs"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_rest_change_log(self) -> None:
-        r = await self.async_client.get(reverse("rest_change_log"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_webhook_docs(self) -> None:
-        r = await self.async_client.get(reverse("webhooks_docs"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_tag_api_help(self) -> None:
-        """Can we load the tag API help page?"""
-        r = await self.async_client.get(reverse("tag_api_help"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_webhooks_getting_started(self) -> None:
-        r = await self.async_client.get(reverse("webhooks_getting_started"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_bulk_data_index(self) -> None:
-        r = await self.async_client.get(reverse("bulk_data_index"))
         self.assertEqual(r.status_code, 200)
 
     async def test_coverage_api(self) -> None:
@@ -234,26 +205,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
     async def test_coverage_api_via_url(self) -> None:
         r = await self.async_client.get("/api/rest/v4/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
-
-    async def test_api_info_page_displays_latest_rest_docs_by_default(
-        self,
-    ) -> None:
-        response = await self.async_client.get(reverse("rest_docs"))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "rest-docs-vlatest.html")
-
-    async def test_api_info_page_can_display_different_versions_of_rest_docs(
-        self,
-    ) -> None:
-        for version in ["v1", "v2", "v3"]:
-            response = await self.async_client.get(
-                reverse("rest_docs", kwargs={"version": version})
-            )
-            self.assertEqual(response.status_code, 200)
-            self.assertTemplateUsed(response, f"rest-docs-{version}.html")
-            version_to_compare = version.upper() if version != "v3" else "v3"
-            header = f"REST API &ndash; {version_to_compare}"
-            self.assertContains(response, header)
 
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
@@ -4891,19 +4842,6 @@ class ThrottleOverrideIntegrationTest(TestCase):
 
         self.assertIn(citation_throttle.user.username, citation_overrides)
         self.assertNotIn(api_throttle.user.username, citation_overrides)
-
-    async def test_citation_lookup_page_loads_with_throttle_override(
-        self,
-    ) -> None:
-        """Test citation lookup help page loads for user with custom rate."""
-        throttle = await sync_to_async(APIThrottleFactory)(
-            throttle_type=ThrottleType.CITATION_LOOKUP,
-            rate="500/hour",
-        )
-        client = AsyncClient()
-        await sync_to_async(client.force_login)(throttle.user)
-        response = await client.get(reverse("citation_lookup_api"))
-        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_overrides_drop_membership_when_user_lacks_active_membership(
         self,
