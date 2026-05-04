@@ -4732,14 +4732,27 @@ class APIThrottleConstraintTest(TestCase):
         other.full_clean()
 
 
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "throttle-override-integration-test",
+        }
+    }
+)
 class ThrottleOverrideIntegrationTest(TestCase):
     """Integration tests for throttle overrides using the APIThrottle model."""
 
     def setUp(self) -> None:
+        # Use a per-process LocMemCache instead of Redis so that
+        # parallel tests don't collide.
+
         clear_tiered_cache()
+        caches["default"].clear()
 
     def tearDown(self) -> None:
         clear_tiered_cache()
+        caches["default"].clear()
 
     def test_get_all_throttle_overrides_returns_dict(self) -> None:
         """Test that get_all_throttle_overrides returns a dict of rate lists."""
@@ -4818,6 +4831,7 @@ class ThrottleOverrideIntegrationTest(TestCase):
 
         # Clear cache and call again
         clear_tiered_cache()
+        caches["default"].clear()
         overrides3 = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(throttle.user.username, overrides3)
 
