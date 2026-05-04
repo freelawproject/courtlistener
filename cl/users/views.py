@@ -44,7 +44,11 @@ from cl.api.models import (
     WebhookEvent,
     WebhookEventType,
 )
-from cl.api.utils import get_all_throttle_overrides
+from cl.api.utils import (
+    LEGACY_USER_DEFAULT_RATE,
+    USE_NEW_THROTTLE_DEFAULTS_SWITCH,
+    get_all_throttle_overrides,
+)
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
@@ -281,14 +285,17 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
         overrides = get_all_throttle_overrides(ThrottleType.API)
         user_rates = overrides.get(request.user.username) or []
         if not user_rates:
-            raw_default = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"][
-                "user"
-            ]
-            user_rates = (
-                [raw_default]
-                if isinstance(raw_default, str)
-                else list(raw_default)
-            )
+            if switch_is_active(USE_NEW_THROTTLE_DEFAULTS_SWITCH):
+                raw_default = settings.REST_FRAMEWORK[
+                    "DEFAULT_THROTTLE_RATES"
+                ]["user"]
+                user_rates = (
+                    [raw_default]
+                    if isinstance(raw_default, str)
+                    else list(raw_default)
+                )
+            else:
+                user_rates = [LEGACY_USER_DEFAULT_RATE]
         # Drop "0/..." rates — those mean blocked, not a throughput limit.
         throttle_rates = [
             parsed
