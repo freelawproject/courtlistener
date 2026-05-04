@@ -37,6 +37,10 @@ class ThrottleType(models.IntegerChoices):
 class APIThrottle(AbstractDateTimeModel):
     """Override rate limits or block specific users for API endpoints."""
 
+    class Source(models.IntegerChoices):
+        MANUAL = 1, "Manual"
+        MEMBERSHIP = 2, "Membership"
+
     user: models.ForeignKey[User, User] = models.ForeignKey(
         User,
         help_text="The user whose throttle rate is being overridden.",
@@ -57,6 +61,17 @@ class APIThrottle(AbstractDateTimeModel):
         "Required if not blocked.",
         max_length=20,
         blank=True,
+    )
+    source: models.SmallIntegerField = models.SmallIntegerField(
+        help_text=(
+            "Where this throttle came from. MANUAL rows are admin "
+            "overrides and are never touched by Neon webhooks. "
+            "MEMBERSHIP rows are written by Neon membership-lifecycle "
+            "handlers and are wiped/replaced when the user's level "
+            "changes."
+        ),
+        choices=Source.choices,
+        default=Source.MANUAL,
     )
     notes: models.TextField = models.TextField(
         help_text="Admin notes about why this override exists.",
@@ -93,9 +108,12 @@ class APIThrottle(AbstractDateTimeModel):
         if not self.rate:
             return
         unit = normalize_time_unit(self.rate)
+        # Only collisions within the same source are rejected. MANUAL
+        # and MEMBERSHIP rows may share a time-unit char by design.
         conflicting = APIThrottle.objects.filter(
             user_id=self.user_id,
             throttle_type=self.throttle_type,
+            source=self.source,
         ).exclude(pk=self.pk)
         for existing in conflicting:
             if existing.rate and normalize_time_unit(existing.rate) == unit:
