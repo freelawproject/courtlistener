@@ -1,5 +1,5 @@
 {% extends "new_base.html" %}
-{% load extras %}
+{% load extras component_tags %}
 
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} - CourtListener.com{% endblock %}
@@ -18,6 +18,21 @@
   :has_alert="has_alert"
   :note_form="note_form"
 >
-  {# Docket entries content — placeholder for now, implemented in follow-up PR #}
+  {# CSV export #}
+  {% if user.is_authenticated %}
+    <div class="flex justify-end py-2">
+      <c-button
+        variant="outline"
+        class="text-sm"
+        hx-get="{% url 'view_download_docket' docket.id %}"
+        hx-swap="none"
+      >
+        Export CSV
+      </c-button>
+    </div>
+  {% endif %}
+
+  {# Docket entry rows #}
+  <c-docket-entry-rows :docket_entries="docket_entries" />
 </c-docket-page>
 {% endblock %}
