@@ -7,6 +7,7 @@ from http import HTTPStatus
 from typing import ClassVar
 
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
 from django.urls import reverse
@@ -170,9 +171,9 @@ class TestVizModels(TestCase):
 class TestVisualizationRedirects(SimpleTestCase):
     """Test that deprecated visualization URLs redirect properly."""
 
-    def test_deprecated_urls_redirect_to_api_docs(self) -> None:
-        """Test all deprecated visualization URLs redirect to API docs."""
-        expected_redirect = reverse("visualization_api_help")
+    def test_deprecated_urls_redirect_to_wiki_docs(self) -> None:
+        """Test all deprecated visualization URLs redirect to wiki docs."""
+        expected_redirect = f"{settings.WIKI_API_BASE_URL}/rest/v4/visualizations#deprecation-notice"
         # Raw URLs for visualization paths (catch-all handles these)
         urls = [
             "/visualizations/scotus-mapper/",
@@ -195,8 +196,8 @@ class TestVisualizationRedirects(SimpleTestCase):
                 )
                 self.assertEqual(
                     response.url,
-                    f"{expected_redirect}#deprecation-notice",
-                    msg=f"{url} should redirect to API docs",
+                    expected_redirect,
+                    msg=f"{url} should redirect to wiki docs",
                 )
 
 

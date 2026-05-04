@@ -92,7 +92,7 @@
     <h4 id="fetch" class="v-offset-above-2">PACER Fetch APIs</h4>
     <p>We host free APIs that many organizations use to gather cases and documents from PACER. Every day, many organizations rely on these automated tools to add data to our system.
     </p>
-    <p><a href="{% url "recap_api_help" %}#pacer-fetch" class="btn btn-default">Learn More</a></p>
+    <p><a href="{{ WIKI_API_URL }}/rest/v4/recap#pacer-fetch" class="btn btn-default">Learn More</a></p>
 
     <h4 id="clients" class="v-offset-above-2">Client Work</h4>
     <p>CourtListener is an initiative of <a href="https://free.law">Free Law Project</a>, a non-profit that consults with organizations to gather PACER data. In these arrangements, we purchase thousands of items from PACER, which we add to the RECAP Archive.
@@ -129,7 +129,7 @@
     <p>We regularly scrape these pages for each court, ensuring that we collect basic metadata for all new District and Bankruptcy cases shortly after they are filed. This data can be used to trigger RECAP Search Alerts.</p>
 
     <h4 id="bots" class="v-offset-above-2">Social Media Bots</h4>
-    <p>We host a fleet of social media bots</a> that download important documents from PACER so they can be shared with the public. The bots use <a href="{% url "api_index" %}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.
+    <p>We host a fleet of social media bots</a> that download important documents from PACER so they can be shared with the public. The bots use <a href="{{ WIKI_API_URL }}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.
     </p>
     <p><a href="https://bots.law" class="btn btn-default">Meet the Bots</a></p>
     {% include "includes/donate_footer_plea.html" %}

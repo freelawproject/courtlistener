@@ -200,18 +200,6 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def mcp_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "help/mcp_help.html", {"private": False})
-
-
-async def cluster_redirections_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "help/cluster_redirections_help.html",
-        {"private": False},
-    )
-
-
 async def build_court_dicts(courts: QuerySet) -> list[dict[str, str]]:
     """Takes the court objects, and manipulates them into a list of more useful
     dictionaries"""
