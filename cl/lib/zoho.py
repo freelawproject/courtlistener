@@ -19,6 +19,11 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
     ResponseWrapper,
     SearchRecordsParam,
 )
+from zohocrmsdk.src.com.zoho.crm.api.tags import (
+    NewTagRequestWrapper,
+    Tag,
+    TagsOperations,
+)
 
 from cl.lib.command_utils import logger
 
@@ -339,6 +344,32 @@ class SearchRecordMixin:
         return ZohoModule.handle_api_response(response)
 
 
+class AddTagsMixin:
+    def add_tags(self: HasModuleName, record_id: int, tag_names: list[str]):
+        """
+        Add one or more tags to a Zoho CRM record.
+
+        :param record_id: The Zoho CRM record ID to tag.
+        :param tag_names: List of tag names to add. Tag matching is exact;
+            tags that don't already exist in Zoho will be auto-created.
+        :return: The Zoho API response data, parsed and validated by
+            `ZohoModule.handle_api_response`.
+        """
+        tags = []
+        for name in tag_names:
+            tag = Tag()
+            tag.set_name(name)
+            tags.append(tag)
+
+        wrapper = NewTagRequestWrapper()
+        wrapper.set_tags(tags)
+
+        response = TagsOperations().add_tags(
+            self.module_name, record_id, wrapper
+        )
+        return ZohoModule.handle_api_response(response)
+
+
 class CreateRecordMixin:
     def create_record(self: HasModuleName, fields: dict[str | Field, Any]):
         """
@@ -387,12 +418,20 @@ class UpdateRecordMixin:
 
 
 class LeadsModule(
-    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+    CreateRecordMixin,
+    UpdateRecordMixin,
+    SearchRecordMixin,
+    AddTagsMixin,
+    ZohoModule,
 ):
     module_name = "Leads"
 
 
 class ContactsModule(
-    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+    CreateRecordMixin,
+    UpdateRecordMixin,
+    SearchRecordMixin,
+    AddTagsMixin,
+    ZohoModule,
 ):
     module_name = "Contacts"
