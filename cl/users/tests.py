@@ -4180,13 +4180,15 @@ class ViewApiUsageTest(TestCase):
     ) -> None:
         """Lifetime total renders with a donate link when count > 0."""
         mock_redis = MagicMock()
-        mock_redis.zscore.side_effect = lambda key, _: (
-            42.0 if "v3" in key else 0.0
-        )
+        mock_pipe = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+        # pipeline.execute() returns results for v3 then v4 zscore calls
+        mock_pipe.execute.return_value = [42.0, 0.0]
         mock_get_redis.return_value = mock_redis
 
         response = self.client.get(self.url)
         self.assertContains(response, "Your Total API Usage")
+        self.assertNotContains(response, "No API usage yet")
         self.assertContains(response, "42")
         self.assertContains(response, "donate.free.law/forms/supportflp")
 
