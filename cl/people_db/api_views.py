@@ -1,12 +1,14 @@
 from rest_framework import viewsets
-from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.permissions import (
+    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import (
     DeferredFieldsMixin,
     LoggingMixin,
     NoFilterCacheListMixin,
-    RECAPUsersReadOnly,
 )
 from cl.people_db.api_serializers import (
     ABARatingSerializer,
@@ -254,7 +256,7 @@ class ABARatingViewSet(
 class PartyViewSet(
     LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
 ):
-    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
+    permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = PartySerializer
     filterset_class = PartyFilter
     ordering_fields = (
@@ -281,7 +283,7 @@ class PartyViewSet(
 class AttorneyViewSet(
     LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
 ):
-    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
+    permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = AttorneySerializer
     filterset_class = AttorneyFilter
     ordering_fields = (
