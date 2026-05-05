@@ -28,6 +28,7 @@ from django.utils.timezone import now
 from django_ses import SESBackend, signals
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -35,13 +36,20 @@ from cl.alerts.factories import (
     DocketAlertWithParentsFactory,
 )
 from cl.alerts.models import DocketAlert, DocketAlertEvent
-from cl.api.factories import WebhookEventFactory, WebhookFactory
+from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
+from cl.api.factories import (
+    APIThrottleFactory,
+    WebhookEventFactory,
+    WebhookFactory,
+)
 from cl.api.models import (
+    ThrottleType,
     Webhook,
     WebhookEvent,
     WebhookEventType,
     WebhookVersions,
 )
+from cl.api.utils import clear_tiered_cache
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -4035,26 +4043,158 @@ class UserAdminApiCallsCountTest(TestCase):
         result = self.user_admin.api_calls_count(unsaved_user)
         self.assertEqual(result, 0)
 
-    @patch("cl.users.admin.get_redis_interface")
+    @patch("cl.users.models.get_redis_interface")
     def test_api_calls_count_sums_v3_and_v4(
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should sum scores from both v3 and v4 keys."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
         mock_redis = MagicMock()
-        mock_redis.zscore.side_effect = lambda key, _: (
-            5.0 if "v3" in key else 10.0
-        )
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 15)
 
-    @patch("cl.users.admin.get_redis_interface")
+    @patch("cl.users.models.get_redis_interface")
     def test_api_calls_count_handles_no_redis_data(
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should return 0 when Redis has no data."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
         mock_redis = MagicMock()
-        mock_redis.zscore.return_value = None
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 0)
+
+
+class UserProfileTotalApiUsageTest(TestCase):
+    """Tests for UserProfile.total_api_usage."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_sums_v3_and_v4_counts(self, mock_get_redis: MagicMock) -> None:
+        """Lifetime total combines v3 and v4 ZSCORE values."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 15)
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_returns_zero_when_no_redis_data(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """No Redis entries means a zero total, not a crash."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 0)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsageTest")
+class ViewApiUsageTest(TestCase):
+    """Tests for /profile/api-usage/."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
+    def test_switch_off_hides_new_sections(self) -> None:
+        """With the switch off, only the recent-usage section renders."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotContains(response, "Your Access Level")
+        self.assertNotContains(response, "Your Total API Usage")
+        self.assertContains(response, "Your API Recent Usage")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_switch_on_shows_default_throttle_rates(self) -> None:
+        """Without overrides, access level falls back to settings defaults."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Your Access Level")
+        # Default rate exposed in DEFAULT_THROTTLE_RATES["user"].
+        self.assertContains(response, "per day")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_switch_on_shows_override_rates(self) -> None:
+        """User APIThrottle overrides replace the defaults in the listing."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+        )
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="500/day",
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "per minute")
+        self.assertContains(response, "per day")
+        # Default "per hour" rate should NOT appear — overrides replace it.
+        self.assertNotContains(response, "per hour")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_blocked_user_filters_zero_rates(self) -> None:
+        """A 0/min row is dropped — we don't advertise blocked as a limit."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+        )
+        response = self.client.get(self.url)
+        # Heading still renders, but no rate rows for the blocked user.
+        self.assertNotContains(response, "per minute")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    @patch("cl.users.models.get_redis_interface")
+    def test_total_section_shows_count_and_donate(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """Lifetime total renders with a donate link when count > 0."""
+        mock_redis = MagicMock()
+        mock_pipe = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+        # pipeline.execute() returns results for v3 then v4 zscore calls
+        mock_pipe.execute.return_value = [42.0, 0.0]
+        mock_get_redis.return_value = mock_redis
+
+        response = self.client.get(self.url)
+        self.assertContains(response, "Your Total API Usage")
+        self.assertNotContains(response, "No API usage yet")
+        self.assertContains(response, "42")
+        self.assertContains(response, "donate.free.law/forms/supportflp")
+
+    def test_unauthenticated_redirected(self) -> None:
+        """The view is login-required."""
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertIn("/sign-in/", response["Location"])
