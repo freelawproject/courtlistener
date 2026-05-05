@@ -207,7 +207,7 @@ Sample code here.
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
       :buttons="[
           {
-            'style': 'btn-primary',
+            'variant': 'primary',
             'name': 'Install now',
             'options': [
               {
@@ -221,7 +221,7 @@ Sample code here.
               }
             ]
           }, {
-              'style': 'btn-outline',
+              'variant': 'outline',
               'name': 'Learn more'
           }
         ]"
@@ -248,7 +248,7 @@ Sample code here.
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>buttons</code></c-slot>
-        <c-slot name="description">List of dicts of button properties</c-slot>
+        <c-slot name="description">List of dicts: <code>variant</code> (primary, outline, etc.), <code>name</code>, <code>href</code> (for links), <code>options</code> (list of <code>{name, href, icon}</code> for dropdowns)</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>image_source</code></c-slot>
@@ -273,7 +273,7 @@ Sample code here.
       paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
      :buttons="[
           {
-            'style': 'btn-primary',
+            'variant': 'primary',
             'name': 'Install now',
             'options': [
               {
@@ -287,7 +287,7 @@ Sample code here.
               }
             ]
           }, {
-              'style': 'btn-outline',
+              'variant': 'outline',
               'name': 'Learn more'
           }
         ]"
@@ -1031,7 +1031,7 @@ Sample code here.
       <c-slot name="panel">
         Place any content you want here.
         <div class="flex flex-row justify-end gap-2">
-          <button x-on:click="close" type="button" class="btn-outline" aria-label="Close modal">Close</button>
+          <c-button variant="outline" x-on:click="close" aria-label="Close modal">Close</c-button>
         </div>
       </c-slot>
     </c-dialog>
@@ -1065,7 +1065,7 @@ Sample code here.
   &lt;c-slot name="panel"&gt;
     Place any content you want here.
     &lt;div class="flex flex-row justify-end gap-2"&gt;
-      &lt;button x-on:click="close" type="button" class="btn-outline" aria-label="Close modal"&gt;Close&lt;/button&gt;
+      &lt;c-button variant="outline" x-on:click="close" aria-label="Close modal"&gt;Close&lt;/c-button&gt;
     &lt;/div&gt;
   &lt;/c-slot&gt;
 &lt;/c-dialog&gt;
@@ -1451,9 +1451,9 @@ Sample code here.
   &lt;form action="" method="get"&gt;
     &lt;!-- Filter fields here --&gt;
     &lt;c-slot name="footer"&gt;
-      &lt;button type="submit" class="btn-primary w-full justify-center"&gt;
+      &lt;c-button variant="primary" type="submit" class="w-full justify-center"&gt;
         Apply filters
-      &lt;/button&gt;
+      &lt;/c-button&gt;
     &lt;/c-slot&gt;
   &lt;/form&gt;
 &lt;/c-filter-drawer&gt;
