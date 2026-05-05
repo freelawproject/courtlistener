@@ -44,9 +44,13 @@ love your support in the form of a donation:
 
 Every bit helps us do more.
 
-You've got my email address now. Let me know if you can't figure something out
-or if you have a suggestion on how things could be better. I hope you enjoy
-using CourtListener, RECAP, and all our services!
+If you can't figure something out or have a suggestion on how things could be
+better, please get in touch via our contact form:
+
+    https://www.courtlistener.com{% url "contact" %}
+
+While I can't respond to every email these days, we do read them all. I hope
+you enjoy using CourtListener, RECAP, and all our services!
 
 
 Mike Lissner
