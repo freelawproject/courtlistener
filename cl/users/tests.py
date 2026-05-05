@@ -42,6 +42,7 @@ from cl.api.models import (
     WebhookEventType,
     WebhookVersions,
 )
+from cl.donate.models import NeonMembershipLevel
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -90,6 +91,7 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
+from cl.users.tasks import tag_zoho_record_for_membership
 
 
 class UserTest(LiveServerTestCase):
@@ -4058,3 +4060,70 @@ class UserAdminApiCallsCountTest(TestCase):
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 0)
+
+
+class TagZohoRecordForMembershipTest(TestCase):
+    """Tests for the tag_zoho_record_for_membership Celery task."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_lead_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead when a Lead match is found by CL ID/email."""
+        mock_lead = MagicMock()
+        mock_lead.get_id.return_value = 42
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = [mock_lead]
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_only_contact_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Falls back to the Contact module when no Lead match is found."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contact = MagicMock()
+        mock_contact.get_id.return_value = 99
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = [
+            mock_contact
+        ]
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.EDU
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_no_record_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when neither a Lead nor Contact match exists."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = []
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()
