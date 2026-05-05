@@ -21,6 +21,7 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
 )
 from zohocrmsdk.src.com.zoho.crm.api.tags import (
     NewTagRequestWrapper,
+    RecordActionWrapper,
     Tag,
     TagsOperations,
 )
@@ -166,7 +167,10 @@ class ZohoModule(ZohoBase):
         if response_object is None:
             raise Exception("Zoho API returned an empty response object.")
 
-        if isinstance(response_object, ResponseWrapper | ActionWrapper):
+        if isinstance(
+            response_object,
+            ResponseWrapper | ActionWrapper | RecordActionWrapper,
+        ):
             return response_object.get_data()
 
         if isinstance(response_object, APIException):
