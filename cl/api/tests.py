@@ -33,9 +33,15 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework_xml.renderers import XMLRenderer
+from waffle.testutils import override_switch
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
+from cl.api.constants import (
+    LEVEL_TO_RATES,
+    SYNC_MEMBERSHIP_THROTTLES_SWITCH,
+    TIER_3_RATES,
+)
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -52,6 +58,8 @@ from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     ExceptionalUserRateThrottle,
     LoggingMixin,
+    apply_membership_throttles,
+    clear_membership_throttles,
     detect_unknown_filter_params,
     get_all_throttle_overrides,
     get_logging_prefix,
@@ -76,6 +84,8 @@ from cl.disclosures.api_views import (
 from cl.disclosures.api_views import (
     PositionViewSet as DisclosurePositionViewSet,
 )
+from cl.donate.factories import NeonMembershipFactory
+from cl.donate.models import MembershipPaymentStatus, NeonMembershipLevel
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
 from cl.lib.decorators import clear_tiered_cache
@@ -4656,11 +4666,13 @@ class APIThrottleConstraintTest(TestCase):
             user=user,
             throttle_type=ThrottleType.API,
             rate="5/min",
+            source=APIThrottle.Source.MANUAL,
         )
         conflict = APIThrottleFactory.build(
             user=user,
             throttle_type=ThrottleType.API,
             rate="10/min",
+            source=APIThrottle.Source.MANUAL,
         )
         with self.assertRaises(ValidationError) as ctx:
             conflict.full_clean()
@@ -4674,11 +4686,13 @@ class APIThrottleConstraintTest(TestCase):
             user=user,
             throttle_type=ThrottleType.API,
             rate="5/min",
+            source=APIThrottle.Source.MANUAL,
         )
         conflict = APIThrottleFactory.build(
             user=user,
             throttle_type=ThrottleType.API,
             rate="10/minute",
+            source=APIThrottle.Source.MANUAL,
         )
         with self.assertRaises(ValidationError):
             conflict.full_clean()
@@ -4697,6 +4711,24 @@ class APIThrottleConstraintTest(TestCase):
             rate="10/min",
         )
         # Should not raise.
+        other.full_clean()
+
+    def test_different_sources_do_not_conflict(self) -> None:
+        """A MANUAL and a MEMBERSHIP rate sharing a time unit are allowed."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        other = APIThrottleFactory.build(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        # Should not raise — different source.
         other.full_clean()
 
 
@@ -4810,6 +4842,90 @@ class ThrottleOverrideIntegrationTest(TestCase):
 
         self.assertIn(citation_throttle.user.username, citation_overrides)
         self.assertNotIn(api_throttle.user.username, citation_overrides)
+
+    def test_overrides_drop_membership_when_user_lacks_active_membership(
+        self,
+    ) -> None:
+        """MEMBERSHIP rows are dropped for users with no NeonMembership."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(throttle.user.username, overrides)
+
+    def test_overrides_drop_membership_when_membership_terminated(
+        self,
+    ) -> None:
+        """MEMBERSHIP throttles are dropped when termination_date is in the past."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        NeonMembershipFactory(
+            user=user,
+            termination_date=now() - timedelta(days=1),
+        )
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(user.username, overrides)
+
+    def test_overrides_drop_membership_when_payment_failed(self) -> None:
+        """MEMBERSHIP throttles are dropped when payment_status != SUCCEEDED."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        NeonMembershipFactory(
+            user=user,
+            payment_status=MembershipPaymentStatus.FAILED,
+        )
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(user.username, overrides)
+
+    def test_overrides_keep_membership_when_active(self) -> None:
+        """MEMBERSHIP throttles for users with an active membership are returned."""
+        user = UserFactory()
+        for rate in ("10/min", "75/hour", "300/day"):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+        NeonMembershipFactory(user=user)
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(user.username, overrides)
+        self.assertEqual(
+            sorted(overrides[user.username]),
+            sorted(["10/min", "75/hour", "300/day"]),
+        )
+
+    def test_overrides_any_manual_drops_all_membership(self) -> None:
+        """A MANUAL override fully replaces the user's MEMBERSHIP set."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="100/day",
+            source=APIThrottle.Source.MANUAL,
+        )
+        for rate in ("10/min", "75/hour"):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+        NeonMembershipFactory(user=user)
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertEqual(overrides[user.username], ["100/day"])
 
 
 @override_settings(
@@ -4971,3 +5087,166 @@ class MultiRateThrottleTest(TestCase):
                 throttle.allow_request(request, view=None)
             self.assertEqual(ctx.exception.wait, 35)
             self.assertIn("5/min", str(ctx.exception.detail))
+
+    def test_manual_zero_min_overrides_active_membership(self) -> None:
+        """A MANUAL 0/min row blocks even when MEMBERSHIP rates would allow."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        for rate in ("10/min", "75/hour"):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+        NeonMembershipFactory(user=user)
+
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = ExceptionalUserRateThrottle()
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        self.assertIn("blocked", str(ctx.exception.detail).lower())
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="MembershipThrottleSyncTest")
+@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+class MembershipThrottleSyncTest(TestCase):
+    """Tests for apply_membership_throttles / clear_membership_throttles."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_each_tier_writes_correct_rates(self) -> None:
+        """Every level in LEVEL_TO_RATES writes MEMBERSHIP rows with matching rates."""
+        for level, rates in LEVEL_TO_RATES.items():
+            with self.subTest(level=level):
+                user = UserFactory()
+                apply_membership_throttles(user, level)
+                got = list(
+                    APIThrottle.objects.filter(
+                        user=user,
+                        throttle_type=ThrottleType.API,
+                        source=APIThrottle.Source.MEMBERSHIP,
+                    ).values_list("rate", flat=True)
+                )
+                self.assertEqual(sorted(got), sorted(rates))
+
+    def test_upgrade_replaces_membership_rows(self) -> None:
+        """A second apply call replaces the previous tier's MEMBERSHIP rows."""
+        user = UserFactory()
+        apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+        apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+
+        rates = sorted(
+            APIThrottle.objects.filter(
+                user=user,
+                throttle_type=ThrottleType.API,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(rates, sorted(TIER_3_RATES))
+
+    def test_apply_writes_membership_alongside_manual(self) -> None:
+        """MANUAL rows coexist in the DB with MEMBERSHIP rows from apply()."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+
+        manual = list(
+            APIThrottle.objects.filter(
+                user=user, source=APIThrottle.Source.MANUAL
+            ).values_list("rate", flat=True)
+        )
+        membership = sorted(
+            APIThrottle.objects.filter(
+                user=user, source=APIThrottle.Source.MEMBERSHIP
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(manual, ["0/min"])
+        self.assertEqual(membership, sorted(["10/min", "75/hour", "300/day"]))
+
+    def test_clear_only_removes_membership_rows(self) -> None:
+        """clear_membership_throttles deletes MEMBERSHIP rows but not MANUAL."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        clear_membership_throttles(user)
+
+        remaining = list(
+            APIThrottle.objects.filter(user=user).values_list("rate", "source")
+        )
+        self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
+
+    def test_unknown_level_is_no_op(self) -> None:
+        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows."""
+        user = UserFactory()
+        apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        self.assertFalse(APIThrottle.objects.filter(user=user).exists())
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
+    def test_switch_off_is_no_op(self) -> None:
+        """With the switch off, neither helper writes nor deletes rows."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+
+        apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+        rates_after_apply = list(
+            APIThrottle.objects.filter(user=user).values_list(
+                "rate", flat=True
+            )
+        )
+        self.assertEqual(rates_after_apply, ["10/min"])  # unchanged
+
+        clear_membership_throttles(user)
+        self.assertTrue(APIThrottle.objects.filter(user=user).exists())
+
+    def test_apply_clears_throttle_cache(self) -> None:
+        """apply_* invalidates the get_all_throttle_overrides cache."""
+        user = UserFactory()
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+        mock_clear.assert_called_once()
+
+    def test_clear_clears_throttle_cache_when_rows_deleted(self) -> None:
+        """clear_* invalidates the cache only when rows actually get deleted."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            clear_membership_throttles(user)
+        mock_clear.assert_called_once()
