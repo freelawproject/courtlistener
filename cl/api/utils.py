@@ -597,22 +597,19 @@ class LoggingMixin:
                 description=f"API {api_version} has logged {total_count} total requests."
             )
 
-        # Skip user-specific logic if not authenticated
-        if not user.is_authenticated:
+        # Skip user-specific logic if not authenticated or not at a milestone.
+        if not user.is_authenticated or user_count not in self.milestones:
             return
 
-        # User milestones
-        if user_count in self.milestones:
-            Event.objects.create(
-                description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
-                user=user,
-            )
+        Event.objects.create(
+            description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
+            user=user,
+        )
 
         # Only v4 triggers Zoho updates
         if api_version != "v4":
             return
 
-        # Safely fetch membership
         membership = getattr(user, "membership", None)
         is_active_member = membership and membership.is_active
 
