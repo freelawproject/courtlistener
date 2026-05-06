@@ -4,6 +4,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import (
+    DjangoModelPermissions,
     DjangoModelPermissionsOrAnonReadOnly,
     IsAuthenticatedOrReadOnly,
 )
@@ -17,7 +18,6 @@ from cl.api.utils import (
     LoggingMixin,
     NoFilterCacheListMixin,
     RECAPUploaders,
-    RECAPUsersReadOnly,
 )
 from cl.recap.api_serializers import (
     EmailProcessingQueueSerializer,
@@ -148,7 +148,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (DjangoModelPermissions,)
     queryset = (
         RECAPDocument.objects.filter(is_available=True)
         .only(

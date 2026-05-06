@@ -440,11 +440,11 @@ class ApiQueryCountTests(TestCase):
             path = reverse("docket-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(8):
+        with self.assertNumQueries(6):
             path = reverse("docketentry-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(4):
             path = reverse("recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -463,12 +463,12 @@ class ApiQueryCountTests(TestCase):
             self.client.get(path)
 
     def test_party_endpoint_query_counts(self, mock_logging_prefix) -> None:
-        with self.assertNumQueries(9):
+        with self.assertNumQueries(7):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
 
     def test_attorney_endpoint_query_counts(self, mock_logging_prefix) -> None:
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(4):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -477,7 +477,7 @@ class ApiQueryCountTests(TestCase):
             path = reverse("processingqueue-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(3):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path, {"pacer_doc_id": "17711118263"})
 
@@ -598,6 +598,7 @@ class ApiEventCreationTestCase(TestCase):
         self.assertEqual(event_descriptions, expected_descriptions)
         mock_zoho_task.delay.assert_not_called()
 
+    @mock.patch("cl.api.utils.tag_zoho_record")
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
@@ -605,7 +606,7 @@ class ApiEventCreationTestCase(TestCase):
     )
     @mock.patch.object(LoggingMixin, "milestones", new=[1])
     async def test_are_v4_events_created_properly(
-        self, mock_logging_prefix, mock_zoho_task
+        self, mock_logging_prefix, mock_zoho_task, mock_tag_task
     ) -> None:
         """Are event objects created as V4 API requests are made?"""
         await self.hit_the_api("v4")
@@ -621,7 +622,41 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v4 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
-        mock_zoho_task.delay.assert_called_once_with(self.user.pk, 1)
+        # Without an active membership, the milestone fires the sync task
+        # alone — no chain, no tag task.
+        mock_zoho_task.si.assert_called_once_with(self.user.pk, 1)
+        mock_zoho_task.si.return_value.apply_async.assert_called_once()
+        mock_tag_task.s.assert_not_called()
+
+    @mock.patch("cl.api.utils.celery_chain")
+    @mock.patch("cl.api.utils.tag_zoho_record")
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    @mock.patch.object(LoggingMixin, "milestones", new=[1])
+    async def test_v4_milestone_chains_tag_task_for_active_member(
+        self,
+        mock_logging_prefix,
+        mock_zoho_task,
+        mock_tag_task,
+        mock_chain,
+    ) -> None:
+        """Active members get the tag task chained after the sync task."""
+        await sync_to_async(NeonMembershipFactory.create)(
+            user=self.user, level=NeonMembershipLevel.TIER_2
+        )
+
+        await self.hit_the_api("v4")
+
+        mock_zoho_task.s.assert_called_once_with(self.user.pk, 1)
+        mock_tag_task.s.assert_called_once_with(NeonMembershipLevel.TIER_2)
+        mock_chain.assert_called_once_with(
+            mock_zoho_task.s.return_value,
+            mock_tag_task.s.return_value,
+        )
+        mock_chain.return_value.apply_async.assert_called_once()
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
@@ -2984,15 +3019,8 @@ class DRFRecapPermissionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         # Add the permissions to the user.
-        up = UserProfileWithParentsFactory.create(
-            user__username="recap-user",
-            user__password=make_password("password"),
-        )
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        up.user.user_permissions.add(*ps)
-
         UserProfileWithParentsFactory.create(
-            user__username="pandora",
+            user__username="recap-user",
             user__password=make_password("password"),
         )
 
@@ -3006,31 +3034,25 @@ class DRFRecapPermissionTest(TestCase):
             ]
         ]
 
-    async def test_has_access(self) -> None:
-        """Does the RECAP user have access to all of the RECAP endpoints?"""
+    async def test_authenticated_user_has_access(self) -> None:
+        """Authenticated users can read all RECAP endpoints."""
         self.assertTrue(
             await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
         for path in self.paths:
-            print(f"Access allowed to recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
             self.assertEqual(r.status_code, HTTPStatus.OK)
-            print("✓")
 
-    async def test_lacks_access(self) -> None:
-        """Does a normal user lack access to the RECPAP endpoints?"""
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
-        )
+    async def test_anonymous_user_lacks_access(self) -> None:
+        """Anonymous users are denied access to RECAP endpoints."""
         for path in self.paths:
-            print(f"Access denied to non-recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
-            self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
-            print("✓")
+            self.assertIn(
+                r.status_code,
+                (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
+            )
 
 
 class WebhooksProxySecurityTest(TestCase):
@@ -4734,6 +4756,19 @@ class APIThrottleConstraintTest(TestCase):
 
 class ThrottleOverrideIntegrationTest(TestCase):
     """Integration tests for throttle overrides using the APIThrottle model."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Start at setUpClass so the patched prefix is active during
+        # setUp/tearDown calls to clear_tiered_cache(). A class decorator
+        # would only wrap test_* methods, leaving setUp unpatched.
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_throttle_override_integration_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
 
     def setUp(self) -> None:
         clear_tiered_cache()

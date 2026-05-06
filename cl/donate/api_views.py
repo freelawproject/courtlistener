@@ -29,6 +29,7 @@ from cl.donate.models import (
 from cl.lib.crypto import sha1_activation_key
 from cl.lib.neon_utils import NeonClient
 from cl.lib.types import EmailType
+from cl.users.tasks import tag_zoho_record_for_membership
 from cl.users.utils import (
     create_stub_account,
     emails,
@@ -408,6 +409,7 @@ class MembershipWebhookViewSet(
             neon_membership.payment_status = payment_status
             neon_membership.save()
         apply_membership_throttles(user, membership_level)
+        tag_zoho_record_for_membership.delay(user.pk, membership_level)
 
     @staticmethod
     def _handle_membership_deletion(webhook_data) -> None:
