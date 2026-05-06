@@ -3,6 +3,7 @@ import concurrent.futures
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
@@ -3776,18 +3777,49 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
                 court_id=email_data["court_id"]
             )
 
-    res = httpx.get(
-        email_data["url"],
-        headers={
-            "User-Agent": "Free Law Project",
-        },
-        timeout=30.0,
-        follow_redirects=True,
-    )
-    res.raise_for_status()
+    MAX_RETRIES = 2
+    docket_data = None
 
-    docket_parser._parse_text(res.text)
-    docket_data = docket_parser.data
+    for retry in range(MAX_RETRIES):
+        response = httpx.get(
+            email_data["url"],
+            headers={"User-Agent": "Free Law Project"},
+            timeout=30.0,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+
+        try:
+            docket_parser._parse_text(response.text)
+            docket_data = docket_parser.data
+        except ValueError as parse_exc:
+            logger.warning(
+                "Texas docket parse failed for EPQ %s: %s | "
+                "sleeping 60s before inline retry",
+                epq.pk,
+                parse_exc,
+            )
+
+            if retry == MAX_RETRIES - 1:
+                redirects = [
+                    (h.status_code, h.headers.get("location", ""))
+                    for h in response.history
+                ]
+                logger.error(
+                    "Texas docket parse failed for EPQ %s after inline retry: %s | "
+                    "url=%s status=%s len=%s redirects=%s preview=%r",
+                    epq.pk,
+                    parse_exc,
+                    response.url,
+                    response.status_code,
+                    len(response.text),
+                    redirects,
+                    response.text[:500],
+                )
+            else:
+                time.sleep(60)
+        else:
+            break
 
     if not docket_data:
         async_to_sync(mark_pq_status)(
@@ -3798,6 +3830,7 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
         )
         self.request.chain = None
         return None
+
     try:
         result = merge_texas_docket(docket_data, download_attachments=True)
     except Exception as e:

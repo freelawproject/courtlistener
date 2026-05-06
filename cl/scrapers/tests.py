@@ -2602,6 +2602,101 @@ class TexasCaseMailIntegrationTest(TestCase):
 
         self.assertEqual(await Docket.objects.acount(), 1)
 
+    @mock.patch("cl.recap.tasks.time.sleep")
+    @mock.patch("cl.recap.tasks.merge_texas_docket")
+    async def test_texas_email_parse_failure_inline_retry_then_fails(
+        self,
+        mock_merge,
+        mock_sleep,
+        mock_coa_scraper,
+        mock_storage_cls,
+        mock_httpx_get,
+    ):
+        """Both initial and inline-retry parse failures should mark FAILED."""
+        mock_storage = mock_storage_cls.return_value
+        mock_storage.open = mock.mock_open(read_data=self.email_data)
+
+        mock_response = MagicMock()
+        mock_response.text = "<html>boom</html>"
+        mock_response.status_code = 200
+        mock_response.url = (
+            "https://search.txcourts.gov/Case.aspx?cn=01-24-00089-CV&coa=coa01"
+        )
+        mock_response.history = []
+        mock_httpx_get.return_value = mock_response
+
+        mock_scraper_instance = mock_coa_scraper.return_value
+        mock_scraper_instance._parse_text = MagicMock(
+            side_effect=ValueError("Case events table not found.")
+        )
+
+        with patch.object(process_texas_email, "delay"):
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        epq = await EmailProcessingQueue.objects.afirst()
+
+        await sync_to_async(process_texas_email)(epq.pk)
+
+        await epq.arefresh_from_db()
+        self.assertEqual(epq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("Failed to parse Texas docket", epq.status_message)
+        self.assertEqual(mock_scraper_instance._parse_text.call_count, 2)
+        self.assertEqual(mock_httpx_get.call_count, 2)
+        mock_sleep.assert_called_once_with(60)
+        mock_merge.assert_not_called()
+
+    @mock.patch("cl.recap.tasks.time.sleep")
+    @mock.patch("cl.recap.tasks.merge_texas_docket")
+    async def test_texas_email_parse_transient_failure_recovers(
+        self,
+        mock_merge,
+        mock_sleep,
+        mock_coa_scraper,
+        mock_storage_cls,
+        mock_httpx_get,
+    ):
+        """A transient parse failure on the first try should recover on retry."""
+        mock_storage = mock_storage_cls.return_value
+        mock_storage.open = mock.mock_open(read_data=self.email_data)
+
+        mock_response = MagicMock()
+        mock_response.text = "<html>case page</html>"
+        mock_response.status_code = 200
+        mock_response.url = (
+            "https://search.txcourts.gov/Case.aspx?cn=01-24-00089-CV&coa=coa01"
+        )
+        mock_response.history = []
+        mock_httpx_get.return_value = mock_response
+
+        mock_scraper_instance = mock_coa_scraper.return_value
+        mock_scraper_instance._parse_text = MagicMock(
+            side_effect=[ValueError("Case events table not found."), None]
+        )
+        mock_scraper_instance.data = self.docket_data
+
+        merge_result = MagicMock()
+        merge_result.creates = {}
+        merge_result.updates = {}
+        mock_merge.return_value = merge_result
+
+        with patch.object(process_texas_email, "delay"):
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        epq = await EmailProcessingQueue.objects.afirst()
+
+        await sync_to_async(process_texas_email)(epq.pk)
+
+        await epq.arefresh_from_db()
+        self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertEqual(mock_scraper_instance._parse_text.call_count, 2)
+        self.assertEqual(mock_httpx_get.call_count, 2)
+        mock_sleep.assert_called_once_with(60)
+        mock_merge.assert_called_once()
+
 
 @mock.patch("cl.recap.tasks.merge_scotus_docket")
 @mock.patch("cl.recap.tasks.fetch_and_archive_scotus_docket_followup")
