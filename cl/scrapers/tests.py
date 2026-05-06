@@ -2602,20 +2602,17 @@ class TexasCaseMailIntegrationTest(TestCase):
 
         self.assertEqual(await Docket.objects.acount(), 1)
 
+    @mock.patch("cl.recap.tasks.time.sleep")
     @mock.patch("cl.recap.tasks.merge_texas_docket")
-    async def test_texas_email_parse_failure_retries_then_fails(
+    async def test_texas_email_parse_failure_inline_retry_then_fails(
         self,
         mock_merge,
+        mock_sleep,
         mock_coa_scraper,
         mock_storage_cls,
         mock_httpx_get,
     ):
-        """Repeated parse failures should retry twice, then mark FAILED.
-
-        In Celery's eager mode, ``self.retry()`` re-runs the task body
-        synchronously, so a single direct invocation walks the full
-        initial-attempt → 2 retries chain.
-        """
+        """Both initial and inline-retry parse failures should mark FAILED."""
         mock_storage = mock_storage_cls.return_value
         mock_storage.open = mock.mock_open(read_data=self.email_data)
 
@@ -2640,18 +2637,22 @@ class TexasCaseMailIntegrationTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         epq = await EmailProcessingQueue.objects.afirst()
 
-        await sync_to_async(process_texas_email.apply)(args=[epq.pk])
+        await sync_to_async(process_texas_email)(epq.pk)
 
         await epq.arefresh_from_db()
         self.assertEqual(epq.status, PROCESSING_STATUS.FAILED)
         self.assertIn("Failed to parse Texas docket", epq.status_message)
-        self.assertEqual(mock_scraper_instance._parse_text.call_count, 3)
+        self.assertEqual(mock_scraper_instance._parse_text.call_count, 2)
+        self.assertEqual(mock_httpx_get.call_count, 2)
+        mock_sleep.assert_called_once_with(60)
         mock_merge.assert_not_called()
 
+    @mock.patch("cl.recap.tasks.time.sleep")
     @mock.patch("cl.recap.tasks.merge_texas_docket")
     async def test_texas_email_parse_transient_failure_recovers(
         self,
         mock_merge,
+        mock_sleep,
         mock_coa_scraper,
         mock_storage_cls,
         mock_httpx_get,
@@ -2687,11 +2688,13 @@ class TexasCaseMailIntegrationTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
         epq = await EmailProcessingQueue.objects.afirst()
 
-        await sync_to_async(process_texas_email.apply)(args=[epq.pk])
+        await sync_to_async(process_texas_email)(epq.pk)
 
         await epq.arefresh_from_db()
         self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
         self.assertEqual(mock_scraper_instance._parse_text.call_count, 2)
+        self.assertEqual(mock_httpx_get.call_count, 2)
+        mock_sleep.assert_called_once_with(60)
         mock_merge.assert_called_once()
 
 
