@@ -3786,8 +3786,46 @@ def process_texas_email(self: Task, epq_pk: int) -> None:
     )
     res.raise_for_status()
 
-    docket_parser._parse_text(res.text)
-    docket_data = docket_parser.data
+    try:
+        docket_parser._parse_text(res.text)
+        docket_data = docket_parser.data
+    except ValueError as parse_exc:
+        redirects = [
+            (h.status_code, h.headers.get("location", "")) for h in res.history
+        ]
+        if self.request.retries < 2:
+            logger.warning(
+                "Texas docket parse failed for EPQ %s (retry %s/2): %s | "
+                "url=%s status=%s len=%s redirects=%s",
+                epq.pk,
+                self.request.retries + 1,
+                parse_exc,
+                res.url,
+                res.status_code,
+                len(res.text),
+                redirects,
+            )
+            raise self.retry(exc=parse_exc, countdown=60, max_retries=2)
+
+        logger.error(
+            "Texas docket parse failed for EPQ %s after retries: %s | "
+            "url=%s status=%s len=%s redirects=%s preview=%r",
+            epq.pk,
+            parse_exc,
+            res.url,
+            res.status_code,
+            len(res.text),
+            redirects,
+            res.text[:500],
+        )
+        async_to_sync(mark_pq_status)(
+            epq,
+            f"Failed to parse Texas docket: {parse_exc}",
+            PROCESSING_STATUS.FAILED,
+            "status_message",
+        )
+        self.request.chain = None
+        return None
 
     if not docket_data:
         async_to_sync(mark_pq_status)(
