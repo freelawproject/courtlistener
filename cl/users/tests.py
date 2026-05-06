@@ -68,6 +68,7 @@ from cl.tests.cases import (
     ESIndexTestCase,
     LiveServerTestCase,
     RestartSentEmailQuotaMixin,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse as MockPostResponse
@@ -99,7 +100,7 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
-from cl.users.tasks import tag_zoho_record_for_membership
+from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 
 
 class UserTest(LiveServerTestCase):
@@ -4264,6 +4265,52 @@ class TagZohoRecordForMembershipTest(TestCase):
         tag_zoho_record_for_membership.delay(
             self.user.pk, NeonMembershipLevel.TIER_1
         )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()
+
+
+class TagZohoRecordTest(SimpleTestCase):
+    """Tests for the tag_zoho_record Celery task (chained, no search)."""
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_record_info_points_to_lead(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Leads", 42), NeonMembershipLevel.TIER_1)
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_record_info_points_to_contact(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Contact directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Contacts", 99), NeonMembershipLevel.EDU)
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_record_info_is_none(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when the upstream task returned no record."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(None, NeonMembershipLevel.TIER_1)
 
         mock_leads.add_tags.assert_not_called()
         mock_contacts.add_tags.assert_not_called()

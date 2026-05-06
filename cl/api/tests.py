@@ -598,7 +598,7 @@ class ApiEventCreationTestCase(TestCase):
         self.assertEqual(event_descriptions, expected_descriptions)
         mock_zoho_task.delay.assert_not_called()
 
-    @mock.patch("cl.api.utils.tag_zoho_record_for_membership")
+    @mock.patch("cl.api.utils.tag_zoho_record")
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
@@ -626,10 +626,10 @@ class ApiEventCreationTestCase(TestCase):
         # alone — no chain, no tag task.
         mock_zoho_task.si.assert_called_once_with(self.user.pk, 1)
         mock_zoho_task.si.return_value.apply_async.assert_called_once()
-        mock_tag_task.si.assert_not_called()
+        mock_tag_task.s.assert_not_called()
 
     @mock.patch("cl.api.utils.celery_chain")
-    @mock.patch("cl.api.utils.tag_zoho_record_for_membership")
+    @mock.patch("cl.api.utils.tag_zoho_record")
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
@@ -650,13 +650,11 @@ class ApiEventCreationTestCase(TestCase):
 
         await self.hit_the_api("v4")
 
-        mock_zoho_task.si.assert_called_once_with(self.user.pk, 1)
-        mock_tag_task.si.assert_called_once_with(
-            self.user.pk, NeonMembershipLevel.TIER_2
-        )
+        mock_zoho_task.s.assert_called_once_with(self.user.pk, 1)
+        mock_tag_task.s.assert_called_once_with(NeonMembershipLevel.TIER_2)
         mock_chain.assert_called_once_with(
-            mock_zoho_task.si.return_value,
-            mock_tag_task.si.return_value,
+            mock_zoho_task.s.return_value,
+            mock_tag_task.s.return_value,
         )
         mock_chain.return_value.apply_async.assert_called_once()
 
