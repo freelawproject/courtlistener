@@ -598,6 +598,7 @@ class ApiEventCreationTestCase(TestCase):
         self.assertEqual(event_descriptions, expected_descriptions)
         mock_zoho_task.delay.assert_not_called()
 
+    @mock.patch("cl.api.utils.tag_zoho_record")
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
@@ -605,7 +606,7 @@ class ApiEventCreationTestCase(TestCase):
     )
     @mock.patch.object(LoggingMixin, "milestones", new=[1])
     async def test_are_v4_events_created_properly(
-        self, mock_logging_prefix, mock_zoho_task
+        self, mock_logging_prefix, mock_zoho_task, mock_tag_task
     ) -> None:
         """Are event objects created as V4 API requests are made?"""
         await self.hit_the_api("v4")
@@ -621,7 +622,41 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v4 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
-        mock_zoho_task.delay.assert_called_once_with(self.user.pk, 1)
+        # Without an active membership, the milestone fires the sync task
+        # alone — no chain, no tag task.
+        mock_zoho_task.si.assert_called_once_with(self.user.pk, 1)
+        mock_zoho_task.si.return_value.apply_async.assert_called_once()
+        mock_tag_task.s.assert_not_called()
+
+    @mock.patch("cl.api.utils.celery_chain")
+    @mock.patch("cl.api.utils.tag_zoho_record")
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    @mock.patch.object(LoggingMixin, "milestones", new=[1])
+    async def test_v4_milestone_chains_tag_task_for_active_member(
+        self,
+        mock_logging_prefix,
+        mock_zoho_task,
+        mock_tag_task,
+        mock_chain,
+    ) -> None:
+        """Active members get the tag task chained after the sync task."""
+        await sync_to_async(NeonMembershipFactory.create)(
+            user=self.user, level=NeonMembershipLevel.TIER_2
+        )
+
+        await self.hit_the_api("v4")
+
+        mock_zoho_task.s.assert_called_once_with(self.user.pk, 1)
+        mock_tag_task.s.assert_called_once_with(NeonMembershipLevel.TIER_2)
+        mock_chain.assert_called_once_with(
+            mock_zoho_task.s.return_value,
+            mock_tag_task.s.return_value,
+        )
+        mock_chain.return_value.apply_async.assert_called_once()
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.

@@ -118,6 +118,28 @@ class MembershipWebhookTest(TestCase):
         self.assertEqual(membership.user_id, self.user_profile.user.pk)
         self.assertEqual(membership.level, NeonMembershipLevel.TIER_1)
 
+    @patch("cl.donate.api_views.tag_zoho_record_for_membership")
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_create_membership_fires_zoho_tag_task(
+        self, mock_store_webhook, mock_tag_task
+    ) -> None:
+        """createMembership webhooks enqueue the Zoho tag task with the
+        new membership's level so the user's Zoho record gets the
+        appropriate tag."""
+        self.data["eventTrigger"] = "createMembership"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+        mock_tag_task.delay.assert_called_once_with(
+            self.user_profile.user.pk, NeonMembershipLevel.TIER_1
+        )
+
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
