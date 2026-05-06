@@ -60,7 +60,7 @@ from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
 from cl.users.tasks import (
     create_or_update_zoho_account,
     notify_failing_webhook,
-    tag_zoho_record_for_membership,
+    tag_zoho_record,
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -615,13 +615,13 @@ class LoggingMixin:
 
         if is_active_member:
             celery_chain(
-                create_or_update_zoho_account.si(user.pk, int(user_count)),
-                tag_zoho_record_for_membership.si(user.pk, membership.level),
+                create_or_update_zoho_account.s(user.pk, int(user_count)),
+                tag_zoho_record.s(membership.level),
             ).apply_async()
         else:
             create_or_update_zoho_account.si(
                 user.pk, int(user_count)
-            ).apply_async()
+            ).apply_async(ignore_result=True)
 
 
 class CacheListMixin:

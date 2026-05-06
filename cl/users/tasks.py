@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from http import HTTPStatus
 
 from celery import Task
@@ -127,11 +128,10 @@ def update_neon_account(self: Task, user_id: int) -> None:
     autoretry_for=(Timeout,),
     max_retries=3,
     interval_start=5,
-    ignore_result=True,
 )
 def create_or_update_zoho_account(
     self: Task, user_id: int, milestone: int
-) -> None:
+) -> tuple[str, int] | None:
     """
     Celery task to create or update a Zoho CRM record for a given user.
 
@@ -142,6 +142,9 @@ def create_or_update_zoho_account(
 
     :param user_id: The primary key of the user to sync with Zoho
     :param milestone: A milestone value to store in the 'API_calls' field
+    :return: A ``(module_name, record_id)`` tuple identifying the record that
+        was created or updated. The chained ``tag_zoho_record`` task uses
+        this to skip a follow-up search.
     """
     user = User.objects.select_related("profile").get(pk=user_id)
     milestone_payload = {"API_calls": milestone}
@@ -159,10 +162,9 @@ def create_or_update_zoho_account(
     # Update the first matching Lead, if found
     if lead_records:
         payload = build_zoho_payload_from_user(user, leads_module.module_name)
-        leads_module.update_record(
-            lead_records[0].get_id(), payload | milestone_payload
-        )
-        return
+        record_id = lead_records[0].get_id()
+        leads_module.update_record(record_id, payload | milestone_payload)
+        return ("Leads", record_id)
 
     # Try to find existing Zoho records
     contact_records = contacts_module.get_record_by_cl_id_or_email(
@@ -173,17 +175,17 @@ def create_or_update_zoho_account(
         payload = build_zoho_payload_from_user(
             user, contacts_module.module_name
         )
-        contacts_module.update_record(
-            contact_records[0].get_id(), payload | milestone_payload
-        )
-        return
+        record_id = contact_records[0].get_id()
+        contacts_module.update_record(record_id, payload | milestone_payload)
+        return ("Contacts", record_id)
 
     # Otherwise, create a new Lead
     payload = (
         build_zoho_payload_from_user(user, leads_module.module_name)
         | milestone_payload
     )
-    leads_module.create_record(payload)
+    created = leads_module.create_record(payload)
+    return ("Leads", int(created[0].get_details()["id"]))
 
 
 def _membership_tag_for_level(level: int) -> str:
@@ -240,6 +242,27 @@ def tag_zoho_record_for_membership(
         "No Zoho Lead/Contact found for user %s; skipping membership tag.",
         user_id,
     )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(Timeout,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def tag_zoho_record(
+    self: Task,
+    record_info: Sequence[str | int] | None,
+    level: int,
+) -> None:
+    """Tag a known Zoho record. Used as the second link in the API-milestone chain."""
+    if not record_info:
+        return  # upstream didn't find/create anything; nothing to tag
+    module_name, record_id = record_info
+    tag_name = _membership_tag_for_level(level)
+    module = LeadsModule() if module_name == "Leads" else ContactsModule()
+    module.add_tags(int(record_id), [tag_name])
 
 
 @app.task(ignore_result=True)
