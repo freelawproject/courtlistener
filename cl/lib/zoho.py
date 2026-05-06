@@ -18,6 +18,7 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
     RecordOperations,
     ResponseWrapper,
     SearchRecordsParam,
+    SuccessResponse,
 )
 from zohocrmsdk.src.com.zoho.crm.api.tags import (
     NewTagRequestWrapper,
@@ -146,6 +147,16 @@ class ZohoModule(ZohoBase):
     """
 
     @staticmethod
+    def _format_api_exception(exc: APIException) -> str:
+        """Format a Zoho APIException into a single-line error message."""
+        status = exc.get_status().get_value()
+        code = exc.get_code().get_value()
+        message = exc.get_message().get_value()
+        details = exc.get_details() or {}
+        detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
+        return f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
+
+    @staticmethod
     def handle_api_response(response):
         """
         Handle a Zoho API response, raising exceptions on errors.
@@ -174,17 +185,25 @@ class ZohoModule(ZohoBase):
             return response_object.get_data()
 
         if isinstance(response_object, APIException):
-            status = response_object.get_status().get_value()
-            code = response_object.get_code().get_value()
-            message = response_object.get_message().get_value()
-            details = response_object.get_details()
-
-            detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
-            raise Exception(
-                f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
-            )
+            raise Exception(ZohoModule._format_api_exception(response_object))
 
         raise Exception("Unexpected response type received from the Zoho API.")
+
+    @staticmethod
+    def get_action_record_id(
+        action_result: SuccessResponse | APIException,
+    ) -> int:
+        """Return the new/updated record id from a single action result.
+
+        Zoho's wrapper responses return a list of items where each item is
+        either a SuccessResponse or an APIException (per-record
+        success/failure). This helper surfaces a per-record APIException with
+        the same formatting `handle_api_response` uses, instead of letting a
+        downstream `KeyError("id")` swallow it.
+        """
+        if isinstance(action_result, APIException):
+            raise Exception(ZohoModule._format_api_exception(action_result))
+        return int(action_result.get_details()["id"])
 
     @staticmethod
     def _build_record(

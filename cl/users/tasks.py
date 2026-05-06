@@ -185,7 +185,7 @@ def create_or_update_zoho_account(
         | milestone_payload
     )
     created = leads_module.create_record(payload)
-    return ("Leads", int(created[0].get_details()["id"]))
+    return ("Leads", LeadsModule.get_action_record_id(created[0]))
 
 
 def _membership_tag_for_level(level: int) -> str:
