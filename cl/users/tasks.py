@@ -220,9 +220,7 @@ def tag_zoho_record_for_membership(
     tag_name = _membership_tag_for_level(level)
 
     leads_module = LeadsModule()
-    leads_module.initialize()
     contacts_module = ContactsModule()
-    contacts_module.initialize()
 
     lead_records = leads_module.get_record_by_cl_id_or_email(
         emails=[user.email], cl_ids=[user.pk]
