@@ -15,7 +15,9 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.paginator import Paginator
 from django.db import connection
+from django.template.loader import render_to_string
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
@@ -26,6 +28,7 @@ from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from factory import RelatedFactory
+from lxml.html import fromstring
 from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
@@ -41,6 +44,7 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.forms import (
+    DocketEntryFilterForm,
     MeCourtUploadForm,
     MissCourtUploadForm,
     MoCourtUploadForm,
@@ -2758,3 +2762,78 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn("tabs", r.context)
         self.assertTrue(len(r.context["metadata"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
+
+
+class DocketFilterDrawerAttrPropagationTest(TestCase):
+    """The mobile filter drawer auto-opens when a filter submission fails
+    validation, so users can see the error messages inside it. That depends
+    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
+    element via Cotton's `{{ attrs }}` passthrough, and the
+    `x-on:open-filter-drawer` listener being wired up on the same element so
+    `docket_filter.js` can dispatch the open event. Lock both in.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
+        cls.empty_page = Paginator([], 200).get_page(1)
+
+    def _render(self, form: DocketEntryFilterForm) -> str:
+        # Render via a wrapper template that invokes <c-docket-filter> as a
+        # child component, instead of rendering cotton/docket_filter.html
+        # directly — the latter declares `form` and `docket` as c-vars, which
+        # would shadow the context values, defeating the whole point.
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        return render_to_string(
+            "tests/docket_filter_attr_propagation.html",
+            {
+                "docket": self.docket,
+                "form": form,
+                "page_obj": self.empty_page,
+                "request": request,
+            },
+        )
+
+    def _find_drawer(self, html: str):
+        """Return the element with `x-on:open-filter-drawer` (the drawer root).
+
+        Done element-wise instead of XPath because `:` in attribute names
+        isn't first-class in XPath.
+        """
+        for el in fromstring(html).iter():
+            if "x-on:open-filter-drawer" in el.attrib:
+                return el
+        return None
+
+    def test_data_has_errors_lands_on_drawer_when_form_invalid(self) -> None:
+        request = RequestFactory().get("/?entry_gte=abc")
+        request.user = AnonymousUser()
+        form = DocketEntryFilterForm(request.GET, request=request)
+        self.assertFalse(form.is_valid())
+
+        drawer = self._find_drawer(self._render(form))
+
+        self.assertIsNotNone(
+            drawer, "drawer root with open listener not found"
+        )
+        self.assertIn(
+            "data-has-errors",
+            drawer.attrib,
+            "data-has-errors must land on the same element that listens "
+            "for open-filter-drawer — otherwise docket_filter.js can't "
+            "find the drawer to dispatch the open event",
+        )
+        self.assertEqual(drawer.attrib["x-on:open-filter-drawer"], "open")
+
+    def test_no_data_has_errors_when_form_is_clean(self) -> None:
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        form = DocketEntryFilterForm(request.GET, request=request)
+        self.assertTrue(form.is_valid())
+
+        drawer = self._find_drawer(self._render(form))
+
+        self.assertIsNotNone(drawer)
+        self.assertNotIn("data-has-errors", drawer.attrib)

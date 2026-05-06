@@ -6,14 +6,17 @@
 
 <c-vars
   title="Filters"
+  has_errors=""
   class=""
 />
 
 <div
   x-data="dialog"
   x-id="dialogIdGroup"
-  x-init="if ($el.dataset.hasErrors !== undefined) open()"
+  x-on:open-filter-drawer="open"
   class="md:hidden {{ class }}"
+  {% if has_errors %}data-has-errors{% endif %}
+  {{ attrs }}
 >
   {# Trigger button #}
   <c-button

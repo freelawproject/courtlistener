@@ -203,7 +203,7 @@
     </div>
 
     {# Filter drawer — contains its own form #}
-    <c-filter-drawer title="Filters" class="mt-3" {% if form.errors %}data-has-errors{% endif %}>
+    <c-filter-drawer title="Filters" class="mt-3" :has_errors="form.errors">
       <form
         id="mobile-filter-form"
         action=""
