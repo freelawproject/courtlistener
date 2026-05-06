@@ -4722,6 +4722,19 @@ class APIThrottleConstraintTest(TestCase):
 class ThrottleOverrideIntegrationTest(TestCase):
     """Integration tests for throttle overrides using the APIThrottle model."""
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Start at setUpClass so the patched prefix is active during
+        # setUp/tearDown calls to clear_tiered_cache(). A class decorator
+        # would only wrap test_* methods, leaving setUp unpatched.
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_throttle_override_integration_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
     def setUp(self) -> None:
         clear_tiered_cache()
 
