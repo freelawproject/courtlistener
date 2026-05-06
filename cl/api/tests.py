@@ -440,11 +440,11 @@ class ApiQueryCountTests(TestCase):
             path = reverse("docket-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(8):
+        with self.assertNumQueries(6):
             path = reverse("docketentry-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(4):
             path = reverse("recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -463,12 +463,12 @@ class ApiQueryCountTests(TestCase):
             self.client.get(path)
 
     def test_party_endpoint_query_counts(self, mock_logging_prefix) -> None:
-        with self.assertNumQueries(9):
+        with self.assertNumQueries(7):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
 
     def test_attorney_endpoint_query_counts(self, mock_logging_prefix) -> None:
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(4):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -477,7 +477,7 @@ class ApiQueryCountTests(TestCase):
             path = reverse("processingqueue-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(3):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path, {"pacer_doc_id": "17711118263"})
 
@@ -3019,15 +3019,8 @@ class DRFRecapPermissionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         # Add the permissions to the user.
-        up = UserProfileWithParentsFactory.create(
-            user__username="recap-user",
-            user__password=make_password("password"),
-        )
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        up.user.user_permissions.add(*ps)
-
         UserProfileWithParentsFactory.create(
-            user__username="pandora",
+            user__username="recap-user",
             user__password=make_password("password"),
         )
 
@@ -3041,31 +3034,25 @@ class DRFRecapPermissionTest(TestCase):
             ]
         ]
 
-    async def test_has_access(self) -> None:
-        """Does the RECAP user have access to all of the RECAP endpoints?"""
+    async def test_authenticated_user_has_access(self) -> None:
+        """Authenticated users can read all RECAP endpoints."""
         self.assertTrue(
             await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
         for path in self.paths:
-            print(f"Access allowed to recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
             self.assertEqual(r.status_code, HTTPStatus.OK)
-            print("✓")
 
-    async def test_lacks_access(self) -> None:
-        """Does a normal user lack access to the RECPAP endpoints?"""
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
-        )
+    async def test_anonymous_user_lacks_access(self) -> None:
+        """Anonymous users are denied access to RECAP endpoints."""
         for path in self.paths:
-            print(f"Access denied to non-recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
-            self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
-            print("✓")
+            self.assertIn(
+                r.status_code,
+                (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
+            )
 
 
 class WebhooksProxySecurityTest(TestCase):

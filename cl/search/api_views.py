@@ -20,7 +20,6 @@ from cl.api.utils import (
     DeferredFieldsMixin,
     LoggingMixin,
     NoFilterCacheListMixin,
-    RECAPUsersReadOnly,
 )
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
@@ -183,7 +182,7 @@ class DocketEntryViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
-    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
+    permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
     ordering_fields = (
@@ -221,7 +220,7 @@ class RECAPDocumentViewSet(
     DeferredFieldsMixin,
     viewsets.ModelViewSet,
 ):
-    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
+    permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = RECAPDocumentSerializer
     filterset_class = RECAPDocumentFilter
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
@@ -395,7 +394,7 @@ class OpinionsCitedViewSet(
 
 
 class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
+    permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = TagSerializer
     # Default cursor ordering key
     ordering = "-id"
