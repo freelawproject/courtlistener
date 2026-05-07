@@ -2719,6 +2719,7 @@ class BuildDocketTabsTest(SimpleTestCase):
 
 
 @override_flag("use_new_design", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 class DocketPageV2TemplateTest(TestCase):
     """Test that the v2 docket page renders correctly."""
 
@@ -2745,8 +2746,8 @@ class DocketPageV2TemplateTest(TestCase):
             )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
         content = r.content.decode()
-        self.assertIn("Docket Entries", content)
         self.assertIn("28:1331", content)
         self.assertIn("Contract", content)
 
@@ -2758,6 +2759,7 @@ class DocketPageV2TemplateTest(TestCase):
                 args=[self.docket.pk, self.docket.slug],
             )
         )
+        self.assertTemplateUsed(r, "v2_docket.html")
         self.assertIn("metadata", r.context)
         self.assertIn("tabs", r.context)
         self.assertTrue(len(r.context["metadata"]) > 0)
@@ -2765,6 +2767,7 @@ class DocketPageV2TemplateTest(TestCase):
 
 
 @override_flag("use_new_design", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
 class DocketEntryRowsV2Test(TestCase):
     """Test that v2 docket entry rows render correctly for all states."""
 
@@ -2825,6 +2828,7 @@ class DocketEntryRowsV2Test(TestCase):
             )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
         return r.content.decode()
 
     async def test_entry_number_and_date_render(self) -> None:
@@ -2877,6 +2881,7 @@ class DocketEntryRowsV2Test(TestCase):
                 args=[empty_docket.pk, empty_docket.slug],
             )
         )
+        self.assertTemplateUsed(r, "v2_docket.html")
         content = r.content.decode()
         self.assertIn("No docket entries", content)
 
