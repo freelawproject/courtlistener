@@ -17,7 +17,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
-from django.template.loader import render_to_string
+from django.template import engines
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
@@ -27,6 +27,7 @@ from django.test import (
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.html import fromstring
 from waffle.testutils import override_flag
@@ -2786,14 +2787,23 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
         # would shadow the context values, defeating the whole point.
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        return render_to_string(
-            "tests/docket_filter_attr_propagation.html",
+        template_path = os.path.join(
+            settings.INSTALL_ROOT,
+            "cl",
+            "opinion_page",
+            "test_assets",
+            "docket_filter_attr_propagation.html",
+        )
+        with open(template_path) as f:
+            compiled = CottonCompiler().process(f.read())
+        template = engines["django"].from_string(compiled)
+        return template.render(
             {
                 "docket": self.docket,
                 "form": form,
                 "page_obj": self.empty_page,
                 "request": request,
-            },
+            }
         )
 
     def _find_drawer(self, html: str):
