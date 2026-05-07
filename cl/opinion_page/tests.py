@@ -2794,7 +2794,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
             "test_assets",
             "docket_filter_attr_propagation.html",
         )
-        with open(template_path) as f:
+        with open(template_path, encoding="utf-8") as f:
             compiled = CottonCompiler().process(f.read())
         template = engines["django"].from_string(compiled)
         return template.render(
