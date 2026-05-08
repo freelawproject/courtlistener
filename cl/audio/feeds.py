@@ -11,6 +11,15 @@ from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Court
 
 
+def _has_processed_mp3(item) -> bool:
+    """Has the audio been processed yet
+
+    :param item: Audio
+    :return: True or False
+    """
+    return bool(getattr(get_item(item), "local_path", None))
+
+
 class JurisdictionPodcast(JurisdictionFeed):
     feed_type = iTunesPodcastsFeedGenerator
     description = (
@@ -45,7 +54,7 @@ class JurisdictionPodcast(JurisdictionFeed):
         }
         search_query = AudioDocument.search()
         items = do_es_feed_query(search_query, cd, rows=20)
-        return items
+        return [i for i in items if _has_processed_mp3(i)]
 
     def feed_extra_kwargs(self, obj):
         extra_args = {
@@ -110,7 +119,7 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
         }
         search_query = AudioDocument.search()
         items = do_es_feed_query(search_query, cd, rows=20)
-        return items
+        return [i for i in items if _has_processed_mp3(i)]
 
 
 class SearchPodcast(JurisdictionPodcast):
@@ -165,18 +174,17 @@ class SearchPodcast(JurisdictionPodcast):
 
     def items(self, obj):
         search_form = SearchForm(obj.GET)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            override_params = {
-                "order_by": "dateArgued desc",
-            }
-            cd.update(override_params)
-            search_query = AudioDocument.search()
-            items = do_es_feed_query(
-                search_query,
-                cd,
-                rows=20,
-            )
-            return items
-        else:
+        if not search_form.is_valid():
             return []
+        cd = search_form.cleaned_data
+        override_params = {
+            "order_by": "dateArgued desc",
+        }
+        cd.update(override_params)
+        search_query = AudioDocument.search()
+        items = do_es_feed_query(
+            search_query,
+            cd,
+            rows=20,
+        )
+        return [i for i in items if _has_processed_mp3(i)]
