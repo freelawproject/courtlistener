@@ -52,6 +52,12 @@ GOOGLE_AUTH = {
 STAT_METRICS_PREFIX = "prometheus:stat:"
 
 
+########
+# Wiki #
+########
+WIKI_API_BASE_URL = "https://wiki.free.law/c/courtlistener/help/api"
+
+
 ##############
 # Super Misc #
 ##############

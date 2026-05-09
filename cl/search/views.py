@@ -91,6 +91,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         "get_string_sans_alert": get_string_sans_alert,
     }
 
+    is_semantic_active = flag_is_active(request, "semantic_search_frontend")
     edit_alert = "edit_alert" in request.GET
     # Build the context for the limitations of RECAP alerts.
     user = request.user
@@ -272,7 +273,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
             request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
         )
     else:
-        search_results = do_es_search(request.GET.copy())
+        search_results = do_es_search(
+            request.GET.copy(),
+            is_semantic_frontend_active=is_semantic_active,
+        )
 
     render_dict.update(search_results)
     store_search_query(request, search_results)

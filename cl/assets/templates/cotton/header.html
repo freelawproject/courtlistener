@@ -2,7 +2,7 @@
 {# frontend-checks-skip: check_hardcoded_ids #}
 {# This component is a singleton so hardcoded IDs are intentional #}
 
-<c-vars variant request class=""></c-vars>
+<c-vars variant request csrf_token class=""></c-vars>
 
 <header
   class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:max-h-[--desktop-header-height] max-md:h-18 {% endif %} px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
@@ -209,7 +209,7 @@
             Account
           </c-menu-button.item>
           <li role="none" class="py-[1px] hover:bg-greyscale-100">
-            <form id="logout-form" method="post" action="/sign-out/">
+            <form id="logout-form" method="post" action="{% url 'sign-out' %}">
               {% csrf_token %}
               <button
                 x-menu:item
