@@ -276,15 +276,15 @@ class PodcastTest(ESIndexTestCase, TestCase):
         self.assertEqual(200, response.status_code)
         xml_tree = etree.fromstring(response.content)
 
-        items = xml_tree.xpath("//channel/item")
+        items = xml_tree.findall(".//channel/item")
         self.assertEqual(
             len(items),
             2,
             msg="Unprocessed audio leaked into the feed.",
         )
 
-        enclosure_urls = xml_tree.xpath("//channel/item/enclosure/@url")
-        for url in enclosure_urls:
+        for enclosure in xml_tree.findall(".//channel/item/enclosure"):
+            url = enclosure.get("url", "")
             self.assertNotIn(
                 "None",
                 url,
