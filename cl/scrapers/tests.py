@@ -234,7 +234,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         self.assertEqual(
             oci.docket_number_raw,
             "09-2222",
-            "New OCI.docket_number was not saved",
+            "New OCI.docket_number_raw was not saved",
         )
         self.assertEqual(
             oci.assigned_to_str,
@@ -250,7 +250,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         self.assertEqual(
             d_1.originating_court_information.docket_number_raw,
             "09-1111",
-            "Existing OCI.docket_number number changed",
+            "Existing OCI.docket_number_raw number changed",
         )
         self.assertEqual(
             d_1.originating_court_information.assigned_to_str,
