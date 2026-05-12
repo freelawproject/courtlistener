@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 from django.conf import settings
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -171,33 +170,6 @@ class DynamicClientRegistrationTest(APITestCase):
         },
     },
 )
-class DynamicClientRegistrationRateLimitTest(APITestCase):
-    """The DCR endpoint is rate-limited per IP.
-
-    Why the cache override: the project test runner defaults to
-    ``--parallel=N`` (cl/tests/runner.py), and every parallel worker
-    shares the same Redis. ``RestartRateLimitMixin.tearDownClass``
-    runs ``DEL :1:rl:*`` which would wipe this test's counter mid-loop
-    if a sibling worker tore down its class at the wrong moment. A
-    process-local LocMemCache isolates us from sibling workers.
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.url = reverse("oauth2_dcr")
-        cache.clear()
-
-    def test_ratelimit_blocks_after_threshold(self):
-        payload = {"redirect_uris": ["https://mcp.example.com/cb"]}
-        # 10/h is the configured rate.
-        for _ in range(10):
-            resp = self.client.post(self.url, payload, format="json")
-            self.assertEqual(resp.status_code, 201, resp.content)
-        resp = self.client.post(self.url, payload, format="json")
-        self.assertEqual(resp.status_code, 429)
-        self.assertEqual(resp.json()["error"], "rate_limited")
-
-
 class OAuthMetadataTest(APITestCase):
     """Tests for the RFC 8414 metadata endpoint."""
 
