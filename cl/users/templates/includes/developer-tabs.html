@@ -17,5 +17,9 @@
       <a href="{% url "view_webhooks" %}">
         <i class="fa fa-plug"></i>&nbsp;Webhooks</a>
     </li>
+    <li class="{% if page == "api_oauth" %} active {% endif %} medium">
+      <a href="{% url "view_oauth_authorizations" %}">
+        <i class="fa fa-shield"></i>&nbsp;Authorized Apps</a>
+    </li>
   </ul>
 </div>
