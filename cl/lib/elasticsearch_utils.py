@@ -2637,6 +2637,8 @@ def build_search_feed_query(
         )
         s = search_query.query(s)
         s = add_highlighting_for_feed_query(s, hl_field)
+    elif exclude_docs_for_empty_field:
+        s = s.filter("exists", field=exclude_docs_for_empty_field)
     return s
 
 
