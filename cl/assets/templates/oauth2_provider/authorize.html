@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Authorize {{ application.name }} – CourtListener.com{% endblock %}
+{% block title %}{% if error %}Authorization error{% else %}Authorize {{ application.name }}{% endif %} – CourtListener.com{% endblock %}
 
 {% block privacy %}
   <meta name="robots" content="noindex, noodp, noarchive, noimageindex"/>
