@@ -517,11 +517,10 @@ class BaseCourtUploadForm(forms.Form):
             }
         )
 
-        if self.cleaned_data.get("lower_court_docket_number"):
+        if lower_dn := self.cleaned_data.get("lower_court_docket_number"):
             originating_court = OriginatingCourtInformation.objects.create(
-                docket_number=self.cleaned_data.get(
-                    "lower_court_docket_number"
-                )
+                docket_number=lower_dn,
+                docket_number_raw=lower_dn,
             )
             docket.originating_court_information = originating_court
             docket.save()
