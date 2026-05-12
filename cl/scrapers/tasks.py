@@ -97,6 +97,8 @@ def update_document_from_text(
             opinion.__dict__.update(data)
         elif model_name == "OriginatingCourtInformation":
             docket = opinion.cluster.docket
+            if data.get("docket_number"):
+                data["docket_number_raw"] = data["docket_number"]
             if docket.originating_court_information:
                 docket.originating_court_information.__dict__.update(data)
             else:

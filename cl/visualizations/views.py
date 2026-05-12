@@ -1,23 +1,27 @@
 from http import HTTPStatus
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
-from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import RedirectView
 
 from cl.visualizations.models import SCOTUSMap
 
+WIKI_VIZ_URL = (
+    f"{settings.WIKI_API_BASE_URL}/rest/v4/visualizations#deprecation-notice"
+)
+
 
 class VisualizationDeprecationRedirectView(RedirectView):
-    """Redirect deprecated visualization pages to API docs."""
+    """Redirect deprecated visualization pages to wiki docs."""
 
     permanent = True
 
     def get_redirect_url(self, *args, **kwargs) -> str:
-        return reverse("visualization_api_help") + "#deprecation-notice"
+        return WIKI_VIZ_URL
 
 
 @xframe_options_exempt
