@@ -48,9 +48,16 @@ def _invalid_metadata(description: str) -> Response:
     )
 
 
+def get_dcr_rate(group: str, request: Request) -> str:
+    return settings.OAUTH2_DCR_RATELIMIT
+
+
 @method_decorator(
     ratelimit(
-        key=get_ip_for_ratelimiter, rate="20000/h", block=True, method="POST"
+        key=get_ip_for_ratelimiter,
+        rate=get_dcr_rate,
+        block=True,
+        method="POST",
     ),
     name="post",
 )
