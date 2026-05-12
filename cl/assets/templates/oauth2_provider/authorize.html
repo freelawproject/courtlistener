@@ -47,7 +47,7 @@
 
       {% if form.errors %}
         {% for error in form.non_field_errors %}
-          <p class="alert alert-danger">{{ error|safe }}</p>
+          <p class="alert alert-danger">{{ error|escape }}</p>
         {% endfor %}
       {% endif %}
 
