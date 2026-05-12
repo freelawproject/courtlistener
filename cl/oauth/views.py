@@ -50,7 +50,7 @@ def _invalid_metadata(description: str) -> Response:
 
 @method_decorator(
     ratelimit(
-        key=get_ip_for_ratelimiter, rate="10/h", block=True, method="POST"
+        key=get_ip_for_ratelimiter, rate="20000/h", block=True, method="POST"
     ),
     name="post",
 )
