@@ -1,0 +1,83 @@
+{% extends "profile/nav.html" %}
+{% load humanize %}
+
+{% block title %}{{ page_title }} &ndash; CourtListener.com{% endblock %}
+
+{% block nav-api %}active{% endblock %}
+
+{% block content %}
+  {# Navigation Tabs #}
+  {% include "includes/developer-tabs.html" %}
+
+  <div class="hidden-xs col-sm-1 col-md-2"></div>
+  <div class="col-xs-12 col-sm-10 col-md-8 text-center">
+    <h1>Authorized Apps</h1>
+    <p class="gray">
+      Apps you have granted access to your CourtListener account.
+    </p>
+
+    {% if messages %}
+      {% for message in messages %}
+        <p class="alert alert-success">{{ message|escape }}</p>
+      {% endfor %}
+    {% endif %}
+
+    {% if authorizations %}
+      <div class="table-responsive v-offset-above-2">
+        <table class="table settings-table">
+          <thead>
+            <tr class="active">
+              <th class="text-left">Application</th>
+              <th class="text-left">Permissions</th>
+              <th class="text-left">First&nbsp;granted</th>
+              <th class="text-left">Last&nbsp;used</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for auth in authorizations %}
+              <tr>
+                <td class="text-left">
+                  <strong>{{ auth.application.name }}</strong>
+                </td>
+                <td class="text-left">
+                  <ul class="list-unstyled bottom">
+                    {% for scope in auth.scopes %}
+                      <li>{{ scope }}</li>
+                    {% endfor %}
+                  </ul>
+                </td>
+                <td class="text-left">
+                  {{ auth.first_granted|naturaltime }}
+                </td>
+                <td class="text-left">
+                  {{ auth.last_used|naturaltime }}
+                </td>
+                <td>
+                  <form method="post" class="bottom">
+                    {% csrf_token %}
+                    <input type="hidden" name="application_id"
+                           value="{{ auth.application.id }}">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                      <i class="fa fa-trash"></i>&nbsp;Revoke
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="v-offset-above-2">
+        You haven&rsquo;t authorized any apps yet.
+      </p>
+      <p class="gray">
+        When you grant a third-party application access to your account
+        through the OAuth flow, it will appear here so you can review
+        or revoke its access at any time.
+      </p>
+    {% endif %}
+  </div>
+  <div class="hidden-xs col-sm-1 col-md-2"></div>
+{% endblock %}
