@@ -33,6 +33,10 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 from django.views.decorators.http import require_http_methods
+from oauth2_provider.models import (
+    get_access_token_model,
+    get_refresh_token_model,
+)
 from rest_framework.renderers import JSONRenderer
 from waffle import switch_is_active
 
@@ -782,6 +786,73 @@ def view_webhooks(request: AuthenticatedHttpRequest) -> HttpResponse:
             "private": True,
             "page": "api_webhooks",
             "sub_page": "webhooks",
+        },
+    )
+
+
+@login_required
+@never_cache
+@require_http_methods(["GET", "POST"])
+def view_oauth_authorizations(
+    request: AuthenticatedHttpRequest,
+) -> HttpResponse:
+    """List the OAuth applications the user has granted access to."""
+    AccessToken = get_access_token_model()
+    RefreshToken = get_refresh_token_model()
+
+    if request.method == "POST":
+        app_id = request.POST.get("application_id")
+        if app_id:
+            AccessToken.objects.filter(
+                user=request.user, application_id=app_id
+            ).delete()
+            RefreshToken.objects.filter(
+                user=request.user, application_id=app_id
+            ).delete()
+            messages.success(request, "Access revoked.")
+        return HttpResponseRedirect(reverse("view_oauth_authorizations"))
+
+    scopes_settings = settings.OAUTH2_PROVIDER.get("SCOPES", {})
+    tokens = (
+        AccessToken.objects.filter(
+            user=request.user, application__isnull=False
+        )
+        .select_related("application")
+        .order_by("-updated")
+    )
+    by_app: dict[int, dict] = {}
+    for tok in tokens:
+        entry = by_app.setdefault(
+            tok.application_id,
+            {
+                "application": tok.application,
+                "first_granted": tok.created,
+                "last_used": tok.updated,
+                "scope_names": set(),
+            },
+        )
+        entry["first_granted"] = min(entry["first_granted"], tok.created)
+        entry["last_used"] = max(entry["last_used"], tok.updated)
+        entry["scope_names"].update(tok.scope.split())
+
+    # One row per Application, aggregated across any access/refresh
+    # tokens the user holds for that application.
+    authorizations = []
+    for entry in by_app.values():
+        entry["scopes"] = [
+            scopes_settings.get(s, s) for s in sorted(entry["scope_names"])
+        ]
+        authorizations.append(entry)
+    authorizations.sort(key=lambda e: e["last_used"], reverse=True)
+
+    return TemplateResponse(
+        request,
+        "profile/oauth_authorizations.html",
+        {
+            "private": True,
+            "page": "api_oauth",
+            "page_title": "Authorized Apps",
+            "authorizations": authorizations,
         },
     )
 
