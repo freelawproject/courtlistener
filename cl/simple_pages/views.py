@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from http import HTTPStatus
 from typing import Any
 
@@ -531,14 +531,15 @@ async def validate_for_wot(request: HttpRequest) -> HttpResponse:
 
 
 async def components(request: HttpRequest) -> HttpResponse:
-    from datetime import date as date_type
-
     # Mock data for docket entry rows demo
     class MockRECAPDoc:
+        PACER_DOCUMENT = RECAPDocument.PACER_DOCUMENT
+        ATTACHMENT = RECAPDocument.ATTACHMENT
+
         def __init__(
             self,
             *,
-            document_type: int = 1,
+            document_type: int = RECAPDocument.PACER_DOCUMENT,
             document_number: str = "1",
             attachment_number: int | None = None,
             description: str = "",
@@ -553,8 +554,6 @@ async def components(request: HttpRequest) -> HttpResponse:
             prayer_exists: bool = False,
             pk: int = 0,
         ):
-            self.PACER_DOCUMENT = 1
-            self.ATTACHMENT = 2
             self.document_type = document_type
             self.document_number = document_number
             self.attachment_number = attachment_number
@@ -598,7 +597,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             self,
             *,
             entry_number: int | None,
-            date_filed: date_type,
+            date_filed: date,
             description: str,
             recap_documents: list[MockRECAPDoc],
             pk: int = 0,
@@ -613,7 +612,7 @@ async def components(request: HttpRequest) -> HttpResponse:
     demo_entries = [
         MockDocketEntry(
             entry_number=1,
-            date_filed=date_type(2024, 4, 21),
+            date_filed=date(2024, 4, 21),
             description=(
                 "COMPLAINT against All Defendants United States of America"
                 " (Filing fee $400 receipt number 0090-4495374)"
@@ -621,7 +620,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             pk=100,
             recap_documents=[
                 MockRECAPDoc(
-                    document_type=1,
+                    document_type=RECAPDocument.PACER_DOCUMENT,
                     document_number="1",
                     description="Complaint",
                     filepath_local="/mock/complaint.pdf",
@@ -632,7 +631,7 @@ async def components(request: HttpRequest) -> HttpResponse:
                     pk=1001,
                 ),
                 MockRECAPDoc(
-                    document_type=2,
+                    document_type=RECAPDocument.ATTACHMENT,
                     document_number="1",
                     attachment_number=1,
                     description="Civil Cover Sheet",
@@ -641,7 +640,7 @@ async def components(request: HttpRequest) -> HttpResponse:
                     pk=1002,
                 ),
                 MockRECAPDoc(
-                    document_type=2,
+                    document_type=RECAPDocument.ATTACHMENT,
                     document_number="1",
                     attachment_number=2,
                     description="Summons to United States Attorney General",
@@ -653,7 +652,7 @@ async def components(request: HttpRequest) -> HttpResponse:
         ),
         MockDocketEntry(
             entry_number=None,
-            date_filed=date_type(2024, 4, 21),
+            date_filed=date(2024, 4, 21),
             description="Case Assigned to Judge Ellen S. Huvelle. (jd)",
             pk=101,
             recap_documents=[],
