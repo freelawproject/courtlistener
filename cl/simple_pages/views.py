@@ -660,12 +660,45 @@ async def components(request: HttpRequest) -> HttpResponse:
         ),
     ]
 
+    # Mock page object for component library demos
+    class MockPaginator:
+        num_pages = 10
+
+    class MockPageObj:
+        number = 3
+        has_previous = True
+        has_next = True
+        has_other_pages = True
+        paginator = MockPaginator()
+
+        def previous_page_number(self) -> int:
+            return self.number - 1
+
+        def next_page_number(self) -> int:
+            return self.number + 1
+
+    class MockFieldValue:
+        value = None
+
+    class MockDocketFilterForm:
+        errors: dict[str, list[str]] = {}
+        filed_after = MockFieldValue()
+        filed_before = MockFieldValue()
+        entry_gte = MockFieldValue()
+        entry_lte = MockFieldValue()
+
+    class MockDocket:
+        pk = 12345
+
     return TemplateResponse(
         request,
         "components.html",
         {
             "private": True,
             "demo_docket_entries": demo_entries,
+            "demo_page_obj": MockPageObj(),
+            "demo_docket": MockDocket(),
+            "demo_filter_form": MockDocketFilterForm(),
         },
     )
 

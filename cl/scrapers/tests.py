@@ -232,6 +232,11 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             oci.docket_number, "09-2222", "New OCI.docket_number was not saved"
         )
         self.assertEqual(
+            oci.docket_number_raw,
+            "09-2222",
+            "New OCI.docket_number_raw was not saved",
+        )
+        self.assertEqual(
             oci.assigned_to_str,
             "another jalal",
             "New OCI.assigned_to_str was not saved",
@@ -241,6 +246,11 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             d_1.originating_court_information.docket_number,
             "09-1111",
             "Existing OCI.docket_number number changed",
+        )
+        self.assertEqual(
+            d_1.originating_court_information.docket_number_raw,
+            "09-1111",
+            "Existing OCI.docket_number_raw number changed",
         )
         self.assertEqual(
             d_1.originating_court_information.assigned_to_str,
@@ -1241,7 +1251,17 @@ class UpdateFromTextCommandTest(TestCase):
             "Unpublished docket should not be modified",
         )
         self.assertEqual(
+            self.opinion_2020_unpub.cluster.docket.docket_number_raw,
+            "13",
+            "Unpublished docket should not be modified",
+        )
+        self.assertEqual(
             self.opinion_2020.cluster.docket.originating_court_information.docket_number,
+            "18-2222",
+            "Originating Court Information was not created",
+        )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.originating_court_information.docket_number_raw,
             "18-2222",
             "Originating Court Information was not created",
         )
