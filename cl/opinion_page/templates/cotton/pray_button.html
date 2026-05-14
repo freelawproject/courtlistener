@@ -25,9 +25,9 @@
       type="submit"
       variant="{% if prayer_exists %}primary{% else %}outline{% endif %}"
       class="text-sm px-2 py-1"
-      aria-label="{% if prayer_exists %}Click to remove your request for this document.{% else %}Click to request this document. {{ count }} requests so far.{% endif %}"
+      aria-label="{% if prayer_exists %}Pray-and-pay: remove your request for this document.{% else %}Pray-and-pay: request this document. {{ count }} requests so far.{% endif %}"
     >
-      <span id="counter_{{ document_id }}">{{ count }}</span> 🙏
+      <span id="counter_{{ document_id }}">{{ count }}</span> <span aria-hidden="true">🙏</span>
     </c-button>
     {% if daily_limit_reached %}
       <span
@@ -44,8 +44,8 @@
     variant="outline"
     href="{% url 'sign-in' %}?next={{ request.path }}"
     class="text-sm px-2 py-1 {{ class }}"
-    aria-label="Sign in to request document. {{ count }} requests so far."
+    aria-label="Pray-and-pay: sign in to request this document. {{ count }} requests so far."
   >
-    {{ count }} 🙏
+    {{ count }} <span aria-hidden="true">🙏</span>
   </c-button>
 {% endif %}
