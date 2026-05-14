@@ -130,7 +130,7 @@
                                 <c-menu-button.item
                                   href="{{ rd.pacer_url }}"
                                   target="_blank"
-                                  rel="nofollow noreferrer"
+                                  rel="nofollow noreferrer noopener"
                                   aria_label="{% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if rd.page_count %} (${{ rd|price }}){% endif %} (opens in new tab)"
                                 >
                                   {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if rd.page_count %} (${{ rd|price }}){% endif %}
@@ -148,7 +148,7 @@
                               variant="ghost"
                               href="{{ rd.pacer_url }}"
                               target="_blank"
-                              rel="nofollow noreferrer"
+                              rel="nofollow noreferrer noopener"
                               class="text-sm px-3 py-1.5"
                               aria-label="Check availability on PACER (opens in new tab)"
                             >
@@ -163,7 +163,7 @@
                             variant="outline"
                             href="{{ rd.pacer_url }}"
                             target="_blank"
-                            rel="nofollow noreferrer"
+                            rel="nofollow noreferrer noopener"
                             class="text-sm px-3 py-1.5"
                             aria-label="Buy on PACER{% if rd.page_count %} (${{ rd|price }}){% endif %} (opens in new tab)"
                           >
