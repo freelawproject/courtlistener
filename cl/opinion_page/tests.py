@@ -2891,3 +2891,13 @@ class DocketEntryRowsV2Test(TestCase):
         await sync_to_async(self.async_client.force_login)(user)
         content = await self._get_docket_page()
         self.assertIn("Export CSV", content)
+
+    async def test_entries_use_option_d_semantic_markup(self) -> None:
+        """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
+        content = await self._get_docket_page()
+        self.assertIn('aria-label="Docket entries"', content)
+        self.assertIn('<li id="entry-1"', content)
+        self.assertIn('<dt class="sr-only">Document Number</dt>', content)
+        self.assertIn('<dt class="sr-only">Date Filed</dt>', content)
+        self.assertIn('<dt class="sr-only">Description</dt>', content)
+        self.assertIn('aria-label="Documents for this entry"', content)
