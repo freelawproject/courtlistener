@@ -18,7 +18,6 @@
     {% endif %}
     hx-swap="none"
     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-    aria-live="polite"
     class="inline-flex items-center gap-1 {{ class }}"
   >
     <c-button
@@ -27,7 +26,7 @@
       class="text-sm px-2 py-1"
       aria-label="{% if prayer_exists %}Pray-and-pay: remove your request for this document.{% else %}Pray-and-pay: request this document. {{ count }} requests so far.{% endif %}"
     >
-      <span id="counter_{{ document_id }}">{{ count }}</span> <span aria-hidden="true">🙏</span>
+      <span id="counter_{{ document_id }}" aria-live="polite">{{ count }}</span> <span aria-hidden="true">🙏</span>
     </c-button>
     {% if daily_limit_reached %}
       <span
