@@ -130,11 +130,13 @@ from cl.recap.tasks import (
     process_recap_zip,
 )
 from cl.recap.utils import (
+    find_available_sibling_rd,
     get_court_id_from_fetch_queue,
     send_bad_redaction_email,
 )
 from cl.recap_rss.tasks import merge_rss_feed_contents
 from cl.scrapers.factories import PACERFreeDocumentRowFactory
+from cl.search.api_serializers import RECAPDocumentSerializer
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -237,6 +239,126 @@ class RecapUtilsTest(TestCase):
             recap_document_id=self.rd.pk,
         )
         self.assertEqual(get_court_id_from_fetch_queue(fq), self.court.pk)
+
+
+class DoppelgangerAvailableViaTest(TestCase):
+    """`find_available_sibling_rd` and `RECAPDocumentSerializer.available_via`.
+
+    These cover the read-time fallback for PACER's master/sub-docket model
+    (issue #2185), where the same `pacer_doc_id` shows up on several
+    `RECAPDocument` rows — one per `pacer_case_id` — and the PDF is only
+    stored under the row that received the upload.
+    """
+
+    def setUp(self) -> None:
+        self.court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
+        # Two dockets in the same court for the same criminal case, with
+        # different pacer_case_ids — the master docket and a sub-docket
+        # for a single defendant. This mirrors the user-reported case in
+        # issue #7345 (txsd 4:23-cr-00523, pacer_case_ids 1940634/1940635).
+        self.master_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            docket_number="4:23-cr-00523",
+            pacer_case_id="1940634",
+        )
+        self.sub_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            docket_number="4:23-cr-00523",
+            pacer_case_id="1940635",
+        )
+        # Same pacer_doc_id on both — the file lives on the sub-docket
+        # but the user lands on the master docket.
+        self.pacer_doc_id = "179050077351"
+        self.stranded_rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=self.master_docket),
+            document_number="20",
+            pacer_doc_id=self.pacer_doc_id,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=False,
+        )
+        self.available_rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=self.sub_docket),
+            document_number="20",
+            pacer_doc_id=self.pacer_doc_id,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+            filepath_local=SimpleUploadedFile("doc.pdf", b"pdf bytes"),
+        )
+
+    def test_returns_available_sibling(self) -> None:
+        sibling = find_available_sibling_rd(self.stranded_rd)
+        self.assertIsNotNone(sibling)
+        self.assertEqual(sibling.pk, self.available_rd.pk)
+
+    def test_returns_none_when_no_sibling_exists(self) -> None:
+        self.available_rd.delete()
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_skips_sealed_siblings(self) -> None:
+        self.available_rd.is_sealed = True
+        self.available_rd.save()
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_skips_siblings_without_file(self) -> None:
+        self.available_rd.filepath_local = ""
+        self.available_rd.save()
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_skips_same_pacer_case_id(self) -> None:
+        """A row with the same `pacer_case_id` is not a sibling — it's us."""
+        self.available_rd.docket_entry.docket = self.master_docket
+        self.available_rd.docket_entry.save()
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_skips_other_courts(self) -> None:
+        other_court = CourtFactory(jurisdiction=Court.FEDERAL_DISTRICT)
+        other_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=other_court,
+            pacer_case_id="1940635",
+        )
+        self.available_rd.docket_entry.docket = other_docket
+        self.available_rd.docket_entry.save()
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_skips_mismatched_attachment_number(self) -> None:
+        self.available_rd.attachment_number = 2
+        self.available_rd.save()
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_returns_none_when_pacer_doc_id_blank(self) -> None:
+        self.stranded_rd.pacer_doc_id = ""
+        self.stranded_rd.save()
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_serializer_exposes_sibling_url(self) -> None:
+        serializer = RECAPDocumentSerializer(
+            self.stranded_rd, context={"request": None}
+        )
+        self.assertEqual(
+            serializer.data["available_via"],
+            self.available_rd.filepath_local.url,
+        )
+
+    def test_serializer_returns_none_when_self_is_available(self) -> None:
+        self.stranded_rd.is_available = True
+        self.stranded_rd.filepath_local = SimpleUploadedFile(
+            "own.pdf", b"own bytes"
+        )
+        self.stranded_rd.save()
+        serializer = RECAPDocumentSerializer(
+            self.stranded_rd, context={"request": None}
+        )
+        self.assertIsNone(serializer.data["available_via"])
+
+    def test_serializer_returns_none_when_no_sibling(self) -> None:
+        self.available_rd.delete()
+        serializer = RECAPDocumentSerializer(
+            self.stranded_rd, context={"request": None}
+        )
+        self.assertIsNone(serializer.data["available_via"])
 
 
 @mock.patch("cl.recap.views.process_recap_upload")

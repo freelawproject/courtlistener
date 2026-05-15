@@ -29,6 +29,7 @@ from cl.lib.document_serializer import (
 )
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
+from cl.recap.utils import find_available_sibling_rd
 from cl.search.constants import o_type_index_map
 from cl.search.documents import (
     AudioDocument,
@@ -177,10 +178,30 @@ class RECAPDocumentSerializer(
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
+    available_via = serializers.SerializerMethodField()
 
     class Meta:
         model = RECAPDocument
         exclude = ("docket_entry",)
+
+    def get_available_via(self, obj: RECAPDocument) -> str | None:
+        """Return a sibling docket's PDF URL when this row is stranded.
+
+        PACER's master/sub-docket model (issue #2185) means the same
+        `pacer_doc_id` can be attached to several `RECAPDocument` rows,
+        each scoped to a different `pacer_case_id`. PDFs are stored
+        under whichever `pacer_case_id` was active at upload time, so
+        sibling rows can show `is_available=False` while the bytes are
+        already in our bucket on another docket. This exposes the URL
+        of an available sibling so API consumers can fetch the file
+        instead of being told to buy it from PACER a second time.
+        """
+        if obj.is_available and obj.filepath_local:
+            return None
+        sibling = find_available_sibling_rd(obj)
+        if sibling is None or not sibling.filepath_local:
+            return None
+        return sibling.filepath_local.url
 
 
 class DocketEntrySerializer(

@@ -108,6 +108,46 @@ def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
     return main_rds_qs
 
 
+def find_available_sibling_rd(rd: RECAPDocument) -> RECAPDocument | None:
+    """Return a sibling RECAPDocument that already holds the PDF for this row.
+
+    PACER assigns separate `pacer_case_id`s to the master docket and each
+    sub-docket of a criminal case (the "doppelganger" problem tracked in
+    issue #2185). PDFs are stored under whichever `pacer_case_id` was
+    active at upload time, so `RECAPDocument` rows on the sibling dockets
+    show `is_available=False` even though the bytes are already in the
+    bucket — until backward replication (#4864) lands and copies the file
+    to each sibling's own path.
+
+    A sibling here is a `RECAPDocument` in the same court with the same
+    `pacer_doc_id` and `attachment_number` but a different `pacer_case_id`
+    on its docket. We exclude sealed siblings to avoid leaking content
+    that the requesting docket has not been authorized to surface.
+
+    :param rd: The RECAPDocument whose own PDF is unavailable.
+    :return: The first available, unsealed sibling, or None if none exists.
+    """
+    if not rd.pacer_doc_id:
+        return None
+
+    sibling = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .filter(
+            pacer_doc_id=rd.pacer_doc_id,
+            attachment_number=rd.attachment_number,
+            docket_entry__docket__court_id=rd.docket_entry.docket.court_id,
+            is_available=True,
+        )
+        .exclude(is_sealed=True)
+        .exclude(filepath_local="")
+        .exclude(
+            docket_entry__docket__pacer_case_id=rd.docket_entry.docket.pacer_case_id
+        )
+        .first()
+    )
+    return sibling
+
+
 def find_subdocket_pdf_rds_from_data(
     user_id: int,
     court_id: str,
