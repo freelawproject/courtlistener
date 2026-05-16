@@ -1994,6 +1994,16 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         search_analyzer="search_analyzer",
     )
     sha1 = fields.TextField(attr="sha1", index=False)
+    description = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
     cites = fields.ListField(
         fields.IntegerField(multi=True),
     )
@@ -2086,6 +2096,22 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
 
     def prepare_joined_by_ids(self, instance):
         return list(instance.joined_by.all().values_list("id", flat=True))
+
+    def prepare_description(self, instance):
+        # For RECAP-sourced opinions, the docket entry description captured
+        # during PACER ingestion (e.g. "ORDER granting Motion for Summary
+        # Judgment") lives on the matching RECAPDocument via sha1.
+        if not instance.sha1:
+            return ""
+        rd = (
+            RECAPDocument.objects.filter(sha1=instance.sha1)
+            .select_related("docket_entry")
+            .only("docket_entry__description")
+            .first()
+        )
+        if rd and rd.docket_entry:
+            return rd.docket_entry.description or ""
+        return ""
 
     def prepare_text(self, instance):
         if instance.html_columbia:

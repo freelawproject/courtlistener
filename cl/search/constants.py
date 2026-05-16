@@ -153,6 +153,7 @@ SEARCH_RECAP_CHILD_HL_FIELDS = {
 }
 SEARCH_OPINION_CHILD_HL_FIELDS = {
     "text": 100,
+    "description": 0,
 }
 SEARCH_RECAP_CHILD_EXCLUDE_FIELDS = {
     "plain_text": 100,
@@ -205,6 +206,7 @@ recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
 opinion_boosts_es = {
     "text": 1.0,
     "type": 1.0,
+    "description": 2.0,
     # Cluster fields
     "caseName.exact": 4.0,
     "docketNumber": 2.0,
@@ -214,6 +216,7 @@ BOOSTS: dict[str, dict[str, dict[str, float]]] = {
         SEARCH_TYPES.OPINION: {
             "text": 1.0,
             "type": 1.0,
+            "description": 2.0,
             # Cluster fields
             "caseName": 4.0,
             "docketNumber": 2.0,
