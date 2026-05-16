@@ -184,24 +184,31 @@ class RECAPDocumentSerializer(
         model = RECAPDocument
         exclude = ("docket_entry",)
 
-    def get_available_via(self, obj: RECAPDocument) -> str | None:
-        """Return a sibling docket's PDF URL when this row is stranded.
+    def get_available_via(self, obj: RECAPDocument) -> dict[str, Any] | None:
+        """Return a sibling docket's file metadata when this row is stranded.
 
         PACER's master/sub-docket model (issue #2185) means the same
         `pacer_doc_id` can be attached to several `RECAPDocument` rows,
         each scoped to a different `pacer_case_id`. PDFs are stored
         under whichever `pacer_case_id` was active at upload time, so
         sibling rows can show `is_available=False` while the bytes are
-        already in our bucket on another docket. This exposes the URL
-        of an available sibling so API consumers can fetch the file
-        instead of being told to buy it from PACER a second time.
+        already in our bucket on another docket. This exposes the
+        complete metadata of an available sibling so API consumers can
+        fetch the file instead of being told to buy it from PACER a
+        second time.
         """
         if obj.is_available and obj.filepath_local:
             return None
         sibling = find_available_sibling_rd(obj)
         if sibling is None or not sibling.filepath_local:
             return None
-        return sibling.filepath_local.url
+        return {
+            "filepath_local": sibling.filepath_local.url,
+            "sha1": sibling.sha1,
+            "file_size": sibling.file_size,
+            "page_count": sibling.page_count,
+            "recap_document_id": sibling.pk,
+        }
 
 
 class DocketEntrySerializer(

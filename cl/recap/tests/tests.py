@@ -333,13 +333,25 @@ class DoppelgangerAvailableViaTest(TestCase):
         self.stranded_rd.save()
         self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
 
-    def test_serializer_exposes_sibling_url(self) -> None:
+    def test_serializer_exposes_sibling_metadata(self) -> None:
         serializer = RECAPDocumentSerializer(
             self.stranded_rd, context={"request": None}
         )
+        available_via = serializer.data["available_via"]
+        self.assertIsNotNone(available_via)
         self.assertEqual(
-            serializer.data["available_via"],
+            available_via["filepath_local"],
             self.available_rd.filepath_local.url,
+        )
+        self.assertEqual(available_via["sha1"], self.available_rd.sha1)
+        self.assertEqual(
+            available_via["file_size"], self.available_rd.file_size
+        )
+        self.assertEqual(
+            available_via["page_count"], self.available_rd.page_count
+        )
+        self.assertEqual(
+            available_via["recap_document_id"], self.available_rd.pk
         )
 
     def test_serializer_returns_none_when_self_is_available(self) -> None:
