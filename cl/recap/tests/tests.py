@@ -131,6 +131,7 @@ from cl.recap.tasks import (
 )
 from cl.recap.utils import (
     find_available_sibling_rd,
+    find_available_sibling_rd_map,
     get_court_id_from_fetch_queue,
     send_bad_redaction_email,
 )
@@ -371,6 +372,124 @@ class DoppelgangerAvailableViaTest(TestCase):
             self.stranded_rd, context={"request": None}
         )
         self.assertIsNone(serializer.data["available_via"])
+
+    def test_picks_lowest_pacer_case_id_when_multiple_siblings(self) -> None:
+        """`.first()` must be deterministic across multiple siblings."""
+        third_docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            docket_number="4:23-cr-00523",
+            pacer_case_id="1940636",
+        )
+        third_rd = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=third_docket),
+            document_number="20",
+            pacer_doc_id=self.pacer_doc_id,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+            filepath_local=SimpleUploadedFile("doc3.pdf", b"pdf3"),
+        )
+        # Existing self.available_rd is on pacer_case_id=1940635 (lower than
+        # the new 1940636), so it should win regardless of insertion order.
+        sibling = find_available_sibling_rd(self.stranded_rd)
+        self.assertEqual(sibling.pk, self.available_rd.pk)
+        self.assertNotEqual(sibling.pk, third_rd.pk)
+
+    def test_skips_main_doc_when_stranded_is_attachment(self) -> None:
+        """Symmetric: attachment_number=2 on stranded must skip None sibling."""
+        self.stranded_rd.attachment_number = 2
+        self.stranded_rd.document_type = RECAPDocument.ATTACHMENT
+        self.stranded_rd.save()
+        # available_rd still has attachment_number=None (main doc).
+        self.assertIsNone(find_available_sibling_rd(self.stranded_rd))
+
+    def test_matches_acms_hyphenated_pacer_doc_id(self) -> None:
+        """ACMS pacer_doc_ids contain hyphens; exact-match still works."""
+        acms_id = "01a-0bcdef-1234567890-abcdef"
+        self.stranded_rd.pacer_doc_id = acms_id
+        self.stranded_rd.save()
+        self.available_rd.pacer_doc_id = acms_id
+        self.available_rd.save()
+        sibling = find_available_sibling_rd(self.stranded_rd)
+        self.assertEqual(sibling.pk, self.available_rd.pk)
+
+    def test_bulk_helper_returns_map_for_multiple_inputs(self) -> None:
+        # Add a second stranded/sibling pair so we exercise grouping.
+        other_master = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            docket_number="4:23-cr-00999",
+            pacer_case_id="2000000",
+        )
+        other_sub = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            docket_number="4:23-cr-00999",
+            pacer_case_id="2000001",
+        )
+        other_pacer_doc_id = "179050099999"
+        other_stranded = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=other_master),
+            document_number="5",
+            pacer_doc_id=other_pacer_doc_id,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=False,
+        )
+        other_available = RECAPDocumentFactory(
+            docket_entry=DocketEntryFactory(docket=other_sub),
+            document_number="5",
+            pacer_doc_id=other_pacer_doc_id,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+            filepath_local=SimpleUploadedFile("other.pdf", b"other"),
+        )
+        rds = [self.stranded_rd, other_stranded, self.available_rd]
+        sibling_map = find_available_sibling_rd_map(rds)
+        self.assertEqual(
+            sibling_map[self.stranded_rd.pk].pk, self.available_rd.pk
+        )
+        self.assertEqual(sibling_map[other_stranded.pk].pk, other_available.pk)
+        # available_rd already has its own file → not in the map.
+        self.assertNotIn(self.available_rd.pk, sibling_map)
+
+    def test_bulk_helper_runs_one_candidate_query(self) -> None:
+        """N+1 guard: one DB hit for the candidate fetch regardless of N."""
+        # Add three more stranded rows, all sharing the same pacer_doc_id —
+        # the candidate query should still be a single SELECT.
+        extra_stranded = [
+            RECAPDocumentFactory(
+                docket_entry=DocketEntryFactory(
+                    docket=DocketFactory(
+                        source=Docket.RECAP,
+                        court=self.court,
+                        pacer_case_id=f"194064{i}",
+                    )
+                ),
+                document_number="20",
+                pacer_doc_id=self.pacer_doc_id,
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+            )
+            for i in range(3)
+        ]
+        rds = [self.stranded_rd, *extra_stranded]
+        with self.assertNumQueries(1):
+            sibling_map = find_available_sibling_rd_map(rds)
+        for rd in rds:
+            self.assertEqual(sibling_map[rd.pk].pk, self.available_rd.pk)
+
+    def test_serializer_uses_context_map_without_extra_query(self) -> None:
+        """When the context map is set, get_available_via must not query."""
+        sibling_map = {self.stranded_rd.pk: self.available_rd}
+        serializer = RECAPDocumentSerializer(
+            self.stranded_rd,
+            context={"request": None, "available_via_map": sibling_map},
+        )
+        # Test the field method in isolation — full ``.data`` would touch
+        # unrelated fields (tags, absolute_url) and skew the query count.
+        with self.assertNumQueries(0):
+            value = serializer.get_available_via(self.stranded_rd)
+        self.assertEqual(value["recap_document_id"], self.available_rd.pk)
 
 
 @mock.patch("cl.recap.views.process_recap_upload")

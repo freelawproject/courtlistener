@@ -1,3 +1,5 @@
+from collections import defaultdict
+from collections.abc import Iterable
 from typing import Any
 
 from django.conf import settings
@@ -121,8 +123,9 @@ def find_available_sibling_rd(rd: RECAPDocument) -> RECAPDocument | None:
 
     A sibling here is a `RECAPDocument` in the same court with the same
     `pacer_doc_id` and `attachment_number` but a different `pacer_case_id`
-    on its docket. We exclude sealed siblings to avoid leaking content
-    that the requesting docket has not been authorized to surface.
+    on its docket. Rows marked `is_sealed=True` are excluded because
+    sealing on PACER signals the file should not be served, regardless of
+    where the bytes happen to sit.
 
     :param rd: The RECAPDocument whose own PDF is unavailable.
     :return: The first available, unsealed sibling, or None if none exists.
@@ -143,9 +146,83 @@ def find_available_sibling_rd(rd: RECAPDocument) -> RECAPDocument | None:
         .exclude(
             docket_entry__docket__pacer_case_id=rd.docket_entry.docket.pacer_case_id
         )
+        .order_by("docket_entry__docket__pacer_case_id", "pk")
         .first()
     )
     return sibling
+
+
+def find_available_sibling_rd_map(
+    rds: Iterable[RECAPDocument],
+) -> dict[int, RECAPDocument]:
+    """Bulk version of :func:`find_available_sibling_rd` for serialization.
+
+    Collapses the per-row sibling lookup into a single query so list/nested
+    API responses don't fan out to one query per stranded RECAPDocument.
+
+    Inputs that already hold their own PDF (or have a blank `pacer_doc_id`)
+    are skipped — they don't need a sibling. The remaining rows are pooled
+    by `pacer_doc_id`, a single query fetches every available, unsealed
+    candidate matching any of those `pacer_doc_id`s, and candidates are
+    matched back to inputs by `(court_id, pacer_doc_id, attachment_number)`
+    with the candidate's `pacer_case_id` required to differ from the input's.
+
+    When multiple siblings qualify for the same input, the one with the
+    lowest `(pacer_case_id, pk)` wins — same ordering as the single-row
+    helper, so the two are consistent.
+
+    Each input must have `docket_entry__docket` accessible without an
+    extra query. The DRF viewsets that use the serializer already
+    `select_related` that path.
+
+    :param rds: The RECAPDocument rows about to be serialized.
+    :return: ``{rd.pk: sibling_rd}`` for inputs where a sibling was found.
+    """
+    rds_needing_sibling: list[RECAPDocument] = []
+    pacer_doc_ids: set[str] = set()
+    for rd in rds:
+        if not rd.pacer_doc_id:
+            continue
+        if rd.is_available and rd.filepath_local:
+            continue
+        rds_needing_sibling.append(rd)
+        pacer_doc_ids.add(rd.pacer_doc_id)
+
+    if not rds_needing_sibling:
+        return {}
+
+    candidates = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .filter(
+            pacer_doc_id__in=pacer_doc_ids,
+            is_available=True,
+        )
+        .exclude(is_sealed=True)
+        .exclude(filepath_local="")
+        .order_by("docket_entry__docket__pacer_case_id", "pk")
+    )
+
+    candidates_by_key: dict[
+        tuple[str, str, int | None], list[RECAPDocument]
+    ] = defaultdict(list)
+    for cand in candidates:
+        key = (
+            cand.docket_entry.docket.court_id,
+            cand.pacer_doc_id,
+            cand.attachment_number,
+        )
+        candidates_by_key[key].append(cand)
+
+    result: dict[int, RECAPDocument] = {}
+    for rd in rds_needing_sibling:
+        docket = rd.docket_entry.docket
+        key = (docket.court_id, rd.pacer_doc_id, rd.attachment_number)
+        for cand in candidates_by_key.get(key, ()):
+            if cand.docket_entry.docket.pacer_case_id != docket.pacer_case_id:
+                result[rd.pk] = cand
+                break
+
+    return result
 
 
 def find_subdocket_pdf_rds_from_data(

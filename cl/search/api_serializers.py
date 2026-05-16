@@ -29,7 +29,10 @@ from cl.lib.document_serializer import (
 )
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
-from cl.recap.utils import find_available_sibling_rd
+from cl.recap.utils import (
+    find_available_sibling_rd,
+    find_available_sibling_rd_map,
+)
 from cl.search.constants import o_type_index_map
 from cl.search.documents import (
     AudioDocument,
@@ -164,6 +167,52 @@ class DocketSerializer(
         )
 
 
+class RECAPDocumentListSerializer(serializers.ListSerializer):
+    """Bulk-populates ``available_via_map`` so child serializers don't N+1.
+
+    DRF instantiates one ListSerializer per ``many=True`` use of
+    :class:`RECAPDocumentSerializer` — both the flat
+    ``RECAPDocumentViewSet`` and the nested
+    ``DocketEntrySerializer.recap_documents`` go through here. We compute
+    siblings for the whole batch in a single query and stash the result
+    in shared context; the child serializer reads it back out per row.
+    """
+
+    def to_representation(self, data: Any) -> list[Any]:
+        items = list(data)
+        sibling_map = find_available_sibling_rd_map(items)
+        existing = self.context.get("available_via_map")
+        if existing is None:
+            self.context["available_via_map"] = sibling_map
+        else:
+            existing.update(sibling_map)
+        return super().to_representation(items)
+
+
+class DocketEntryListSerializer(serializers.ListSerializer):
+    """Pre-aggregate recap_documents across all entries before serialization.
+
+    Without this, each entry's nested ``recap_documents`` ListSerializer
+    runs its own batch, which is still O(entries) queries for a full
+    docket. By gathering every RD across the batch up front and seeding
+    ``available_via_map``, the nested ListSerializer ends up with an
+    already-populated context and skips its own lookup.
+    """
+
+    def to_representation(self, data: Any) -> list[Any]:
+        entries = list(data)
+        all_rds: list[RECAPDocument] = []
+        for entry in entries:
+            all_rds.extend(entry.recap_documents.all())
+        sibling_map = find_available_sibling_rd_map(all_rds)
+        existing = self.context.get("available_via_map")
+        if existing is None:
+            self.context["available_via_map"] = sibling_map
+        else:
+            existing.update(sibling_map)
+        return super().to_representation(entries)
+
+
 class RECAPDocumentSerializer(
     RetrieveFilteredFieldsMixin,
     NestedDynamicFieldsMixin,
@@ -183,6 +232,7 @@ class RECAPDocumentSerializer(
     class Meta:
         model = RECAPDocument
         exclude = ("docket_entry",)
+        list_serializer_class = RECAPDocumentListSerializer
 
     def get_available_via(self, obj: RECAPDocument) -> dict[str, Any] | None:
         """Return a sibling docket's file metadata when this row is stranded.
@@ -196,11 +246,20 @@ class RECAPDocumentSerializer(
         complete metadata of an available sibling so API consumers can
         fetch the file instead of being told to buy it from PACER a
         second time.
+
+        When invoked through a ``many=True`` ListSerializer the sibling
+        is pulled from ``available_via_map`` in context (one bulk query
+        for the whole batch). The per-row fallback only fires for
+        single-object retrievals.
         """
         if obj.is_available and obj.filepath_local:
             return None
-        sibling = find_available_sibling_rd(obj)
-        if sibling is None or not sibling.filepath_local:
+        sibling_map = self.context.get("available_via_map")
+        if sibling_map is not None:
+            sibling = sibling_map.get(obj.pk)
+        else:
+            sibling = find_available_sibling_rd(obj)
+        if sibling is None:
             return None
         return {
             "filepath_local": sibling.filepath_local.url,
@@ -227,6 +286,7 @@ class DocketEntrySerializer(
     class Meta:
         model = DocketEntry
         fields = "__all__"
+        list_serializer_class = DocketEntryListSerializer
 
 
 class FullDocketSerializer(DocketSerializer):
