@@ -13,7 +13,7 @@ from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
 from django.core.validators import validate_email
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.http import (
     HttpRequest,
@@ -33,6 +33,7 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 from django.views.decorators.http import require_http_methods
+from rest_framework.authtoken.models import Token
 from rest_framework.renderers import JSONRenderer
 from waffle import switch_is_active
 
@@ -62,11 +63,11 @@ from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
-    AccountDeleteForm,
     CustomPasswordChangeForm,
     CustomPasswordResetForm,
     EmailConfirmationForm,
     OptInConsentForm,
+    PasswordConfirmForm,
     ProfileForm,
     UserCreationFormExtended,
     UserForm,
@@ -273,6 +274,38 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+@sensitive_variables("password")
+@login_required
+@never_cache
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
+def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        reset_form = PasswordConfirmForm(request, request.POST)
+        if reset_form.is_valid():
+            with transaction.atomic():
+                Token.objects.filter(user=request.user).delete()
+                Token.objects.create(user=request.user)
+            messages.success(
+                request,
+                "Your API token has been reset. Update any scripts or "
+                "services that use the old token.",
+            )
+            return HttpResponseRedirect(reverse("view_api_token"))
+    else:
+        reset_form = PasswordConfirmForm(request=request)
+    return TemplateResponse(
+        request,
+        "profile/api_token_reset.html",
+        {
+            "reset_form": reset_form,
+            "page": "api_token",
+            "page_title": "Reset API Token",
+            "private": True,
+        },
+    )
+
+
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
@@ -409,7 +442,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         deleted=False
     ).count()
     if request.method == "POST":
-        delete_form = AccountDeleteForm(request, request.POST)
+        delete_form = PasswordConfirmForm(request, request.POST)
         if delete_form.is_valid():
             email: EmailType = emails["account_deleted"]
             send_mail(
@@ -426,7 +459,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             return HttpResponseRedirect(reverse("delete_profile_done"))
 
     else:
-        delete_form = AccountDeleteForm(request=request)
+        delete_form = PasswordConfirmForm(request=request)
     return TemplateResponse(
         request,
         "profile/delete.html",
