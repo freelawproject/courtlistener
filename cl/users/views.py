@@ -49,6 +49,7 @@ from cl.api.utils import (
     LEGACY_USER_DEFAULT_RATE,
     USE_NEW_THROTTLE_DEFAULTS_SWITCH,
     get_all_throttle_overrides,
+    get_recent_api_request_count,
 )
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
@@ -299,6 +300,9 @@ def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
         "profile/api_token_reset.html",
         {
             "reset_form": reset_form,
+            "recent_api_count": get_recent_api_request_count(
+                request.user, window_seconds=5 * 60
+            ),
             "page": "api_token",
             "page_title": "Reset API Token",
             "private": True,
