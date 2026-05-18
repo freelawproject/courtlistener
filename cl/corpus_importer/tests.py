@@ -3238,6 +3238,7 @@ class TexasMergerTest(TestCase):
         self.docket_coa1.save()
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             docket_number=self.docket_number_coa1,
+            docket_number_raw=self.docket_number_coa1,
             originating_court=TexasOriginatingDistrictCourtDictFactory(
                 district=5,
             ),
@@ -3258,6 +3259,10 @@ class TexasMergerTest(TestCase):
             == docket_data["originating_court"]["case"]
         )
         assert (
+            originating_info.docket_number_raw
+            == docket_data["originating_court"]["case"]
+        )
+        assert (
             originating_info.court_reporter
             == docket_data["originating_court"]["reporter"]
         )
@@ -3271,6 +3276,7 @@ class TexasMergerTest(TestCase):
         # Create existing originating court information
         self.docket_coa1.originating_court_information = (
             OriginatingCourtInformation.objects.create(
+                docket_number_raw="OLD-123",
                 docket_number="OLD-123",
                 court_reporter="Old Reporter",
                 assigned_to_str="Old Judge",
@@ -3282,6 +3288,7 @@ class TexasMergerTest(TestCase):
         docket_data = TexasCourtOfAppealsDocketDictFactory(
             court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
             docket_number=self.docket_number_coa1,
+            docket_number_raw=self.docket_number_coa1,
             originating_court=originating_court,
         )
 
@@ -3296,6 +3303,7 @@ class TexasMergerTest(TestCase):
         updated_info = self.docket_coa1.originating_court_information
         assert updated_info is not None
         assert updated_info.docket_number == originating_court["case"]
+        assert updated_info.docket_number_raw == originating_court["case"]
         assert updated_info.court_reporter == originating_court["reporter"]
         assert updated_info.assigned_to_str == originating_court["judge"]
 

@@ -58,6 +58,9 @@ if env("DB_READ_REPLICA_HOST", default=""):
     }
 
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
+SLACK_REPLICATION_WEBHOOK_URL = env(
+    "SLACK_REPLICATION_WEBHOOK_URL", default=""
+)
 API_READ_DATABASES: list[str] | None = env.list(
     "API_READ_DATABASES", default=None
 )

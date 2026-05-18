@@ -245,6 +245,55 @@ class PodcastTest(ESIndexTestCase, TestCase):
         )[0].text  # type: ignore
         self.assertIn("magnitsky", subtitle)
 
+    def test_podcast_excludes_audios_without_processed_mp3(self) -> None:
+        """Audios indexed before `process_audio_file` finishes (or whose
+        `local_path` ends up None at index time) must not appear in the feed —
+        otherwise the enclosure URL renders as `.../None`.
+        """
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            unprocessed = AudioWithParentsFactory.create(
+                docket=DocketFactory(
+                    court=self.court_1,
+                    date_argued=datetime.date(2018, 1, 1),
+                ),
+                duration=0,
+            )
+        self.addCleanup(unprocessed.delete)
+        self.assertFalse(
+            bool(unprocessed.local_path_mp3),
+            msg="Test setup should produce an Audio without a processed MP3.",
+        )
+
+        response = self.client.get(
+            reverse(
+                "jurisdiction_podcast",
+                kwargs={"court": self.court_1.id},
+            )
+        )
+        self.assertEqual(200, response.status_code)
+        xml_tree = etree.fromstring(response.content)
+
+        items = xml_tree.findall(".//channel/item")
+        self.assertEqual(
+            len(items),
+            2,
+            msg="Unprocessed audio leaked into the feed.",
+        )
+
+        for enclosure in xml_tree.findall(".//channel/item/enclosure"):
+            url = enclosure.get("url", "")
+            self.assertNotIn(
+                "None",
+                url,
+                msg=f"Feed emitted a broken enclosure URL: {url}",
+            )
+
     def test_catch_es_errors(self) -> None:
         """Can we catch es errors and just render an empy podcast?"""
 
