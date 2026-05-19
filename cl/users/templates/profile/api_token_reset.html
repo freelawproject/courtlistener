@@ -34,7 +34,7 @@
        exposed (for example, committed to a public repository). Otherwise,
        you may want to <a href="{% url "view_api_token" %}">go back</a>.</p>
 
-    <form action="" method="post" class="v-offset-above-3">{% csrf_token %}
+    <form id="reset-token-form" action="" method="post" class="v-offset-above-3">{% csrf_token %}
       <div class="form-group">
         {{ reset_form.password.label_tag }}
         {{ reset_form.password }}
@@ -46,9 +46,17 @@
           </p>
         {% endif %}
       </div>
-      <button type="submit" class="btn btn-danger btn-lg">Reset My API Token</button>
+      <button id="reset-token-btn" type="submit" class="btn btn-danger btn-lg">Reset My API Token</button>
       <a href="{% url "view_api_token" %}" class="btn btn-default btn-lg">Cancel</a>
     </form>
   </div>
   <div class="hidden-xs col-sm-1 col-md-3"></div>
+{% endblock %}
+
+{% block footer-scripts %}
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
+  $("#reset-token-form").on("submit", function () {
+    $("#reset-token-btn").prop("disabled", true).text("Resetting…");
+  });
+</script>
 {% endblock %}
