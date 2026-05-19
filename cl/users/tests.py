@@ -489,7 +489,8 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         r = await self.async_client.get(reverse("reset_api_token"))
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertContains(r, "<strong>3</strong>")
-        self.assertContains(r, "in the last\n      five minutes")
+        self.assertContains(r, "fa-exclamation-triangle")
+        self.assertContains(r, "alert-warning")
 
     async def test_reset_api_token_rotates_with_valid_password(self) -> None:
         """Posting the correct password swaps the token for a new one."""
