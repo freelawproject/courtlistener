@@ -40,6 +40,13 @@ class MergeResult[T = int]:
             },
         )
 
+    def __or__[U](self, other: object) -> MergeResult[T | U]:
+        if not isinstance(other, MergeResult):
+            raise TypeError(
+                f"unsupported operand type(s) for |: 'MergeResult' and '{type(other).__name__}'"
+            )
+        return MergeResult.union(self, other)
+
     @property
     def success(self) -> bool:
         return not self.failures
