@@ -90,6 +90,7 @@ def merge_docket(docket_data: FloridaCase) -> MergeResult:
                 federal_defendant_number=None,
                 federal_dn_judge_initials_assigned=None,
                 federal_dn_judge_initials_referred=None,
+                docket_source=Docket.SCRAPER,
                 allow_create=True,
             )
         case _ if docket_data.court_id in FL_APPELLATE_COURTS:
@@ -99,6 +100,7 @@ def merge_docket(docket_data: FloridaCase) -> MergeResult:
                 court_id=court_id,
                 aggregate_court_id=FL_APPELLATE_COURT_ID,
                 docket_number=docket_data.docket_number,
+                docket_source=Docket.SCRAPER,
             )
             if changed:
                 logger.info(
