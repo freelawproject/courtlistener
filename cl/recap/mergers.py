@@ -287,6 +287,58 @@ async def find_docket_object(
     return d
 
 
+async def find_and_disaggregate_docket_object(
+    court_id: str,
+    aggregate_court_id: str,
+    docket_number: str,
+    docket_source: int = Docket.RECAP,
+) -> tuple[Docket | None, bool]:
+    """Find or create a docket object and if necessary, move it from an aggregate
+    court to a specific court.
+
+    First tries to look up a matching docket using `find_docket_object` in
+    `aggregate_court_id`. If that lookup succeeds, update the court to the
+    disaggregated `court_id` and return. Otherwise, attempt a second lookup in
+    `court_id`, creating a new docket if one doesn't exist and return the result.
+
+    Used to help with matching and disaggregating state dockets in "State Court
+    of Appeals" courts.
+
+    :param court_id: The primary court to look for the docket in.
+    :param aggregate_court_id: The backup court to look in and disaggregate from.
+    :param docket_number: The docket number to lookup.
+    :param docket_source: The source to set when creating a new docket.
+    :return: The docket found or created and a boolean indicating whether the
+        docket's court was changed."""
+    docket = await find_docket_object(
+        court_id=aggregate_court_id,
+        pacer_case_id=None,
+        docket_number=docket_number,
+        federal_defendant_number=None,
+        federal_dn_judge_initials_assigned=None,
+        federal_dn_judge_initials_referred=None,
+        docket_source=docket_source,
+        allow_create=False,
+    )
+    if docket is not None:
+        logger.info(
+            f"Disaggregating docket {docket.pk} from {aggregate_court_id} to {court_id}"
+        )
+        docket.court = await Court.objects.aget(pk=court_id)
+        _ = await docket.asave()
+        return docket, True
+    return await find_docket_object(
+        court_id=court_id,
+        pacer_case_id=None,
+        docket_number=docket_number,
+        federal_defendant_number=None,
+        federal_dn_judge_initials_assigned=None,
+        federal_dn_judge_initials_referred=None,
+        docket_source=docket_source,
+        allow_create=True,
+    ), False
+
+
 def add_attorney(atty, p, d):
     """Add/update an attorney.
 
