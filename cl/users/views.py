@@ -275,7 +275,7 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
-@sensitive_variables("password")
+@sensitive_post_parameters("password")
 @login_required
 @never_cache
 @ratelimiter_unsafe_10_per_m
