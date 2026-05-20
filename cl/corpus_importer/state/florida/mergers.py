@@ -93,6 +93,7 @@ def merge_docket(docket_data: FloridaCase) -> MergeResult:
                 docket_source=Docket.SCRAPER,
                 allow_create=True,
             )
+            changed = False
         case _ if docket_data.court_id in FL_APPELLATE_COURTS:
             docket, changed = async_to_sync(
                 find_and_disaggregate_docket_object
@@ -138,7 +139,7 @@ def merge_docket(docket_data: FloridaCase) -> MergeResult:
         docket_data.docket_number
     )
     docket.docket_number_raw = docket_data.docket_number
-    docket_created = docket.pk is None
+    docket_created = not changed and docket.pk is None
     docket.save()
     docket_result = (
         MergeResult.created("Docket", docket.pk)

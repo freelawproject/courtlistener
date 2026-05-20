@@ -1,7 +1,6 @@
 """Tests for Florida docket and originating-court-information merger."""
 
 from datetime import date, datetime
-from unittest.mock import patch
 
 from juriscraper.state.florida.courts import FloridaCourtID
 
@@ -20,24 +19,6 @@ from cl.tests.cases import TestCase
 
 
 class FloridaMergerTest(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # The appellate flow relies on ``make_florida_docket_number_core`` —
-        # still a stub that raises NotImplementedError — so patch it for the
-        # entire class lifetime, including ``setUpTestData`` and individual
-        # tests.
-        cls._dn_core_patcher = patch(
-            "cl.search.models.make_florida_docket_number_core",
-            side_effect=lambda docket_number, court_id="fl": docket_number,
-        )
-        cls._dn_core_patcher.start()
-        super().setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        cls._dn_core_patcher.stop()
-
     @classmethod
     def setUpTestData(cls):
         cls.flsc = CourtFactory.create(id="fla")
@@ -130,9 +111,9 @@ class FloridaMergerTest(TestCase):
         self.docket_sc.originating_court_information = None
         self.docket_sc.save()
 
-        first = FloridaOriginatingCaseFactory.build(case_number="FIRST-001")
-        second = FloridaOriginatingCaseFactory.build(case_number="SECOND-002")
-        docket_data = FloridaCaseFactory.create(
+        first = FloridaOriginatingCaseFactory(case_number="FIRST-001")
+        second = FloridaOriginatingCaseFactory(case_number="SECOND-002")
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SUPREME_COURT.value,
             originating_cases=[first, second],
         )
@@ -146,7 +127,7 @@ class FloridaMergerTest(TestCase):
 
     def test_merge_docket_unknown_court_fails(self):
         """Does merge_docket fail when the court id is unknown?"""
-        docket_data = FloridaCaseFactory.create(
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
@@ -158,7 +139,7 @@ class FloridaMergerTest(TestCase):
     def test_merge_docket_supreme_court_creates_new(self):
         """Does merge_docket create a new supreme-court docket?"""
         original_pks = set(Docket.objects.values_list("pk", flat=True))
-        docket_data = FloridaCaseFactory.create(
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SUPREME_COURT.value,
             docket_number="SC2025-9999",
             entries=[],
@@ -184,7 +165,7 @@ class FloridaMergerTest(TestCase):
 
     def test_merge_docket_existing_supreme_court_is_update(self):
         """Does merge_docket update an existing supreme-court docket in place?"""
-        docket_data = FloridaCaseFactory.create(
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SUPREME_COURT.value,
             docket_number=self.docket_number_sc,
             entries=[],
@@ -210,10 +191,9 @@ class FloridaMergerTest(TestCase):
             pacer_case_id=None,
             source=Docket.SCRAPER,
         )
-        docket_data = FloridaCaseFactory.create(
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.FIRST_COA.value,
             docket_number=agg_dn,
-            entries=[],
         )
 
         result = merge_docket(docket_data)
@@ -227,7 +207,7 @@ class FloridaMergerTest(TestCase):
         """Does merge_docket create a new docket in the specific appellate
         court when no existing docket matches?"""
         original_pks = set(Docket.objects.values_list("pk", flat=True))
-        docket_data = FloridaCaseFactory.create(
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SECOND_COA.value,
             docket_number="2D2025-BRAND-NEW",
             entries=[],
@@ -247,14 +227,14 @@ class FloridaMergerTest(TestCase):
     def test_merge_docket_uses_latest_entry_for_date_last_filing(self):
         """Does merge_docket pick the latest entry date for date_last_filing?"""
         entries = [
-            FloridaDocketEntryFactory.build(date_filed=d)
+            FloridaDocketEntryFactory(date_filed=d)
             for d in (
                 date(2025, 1, 5),
                 date(2025, 3, 10),
                 date(2025, 2, 12),
             )
         ]
-        docket_data = FloridaCaseFactory.create(
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SUPREME_COURT.value,
             docket_number=self.docket_number_sc,
             entries=entries,
@@ -269,12 +249,11 @@ class FloridaMergerTest(TestCase):
     def test_merge_docket_no_entries_falls_back_to_date_filed(self):
         """When there are no entries, does date_last_filing fall back to
         date_filed?"""
-        filed = date(2024, 6, 15)
-        docket_data = FloridaCaseFactory.create(
+        filed = datetime(2024, 6, 15, 12, 0, 0)
+        docket_data = FloridaCaseFactory(
             court_id=FloridaCourtID.SUPREME_COURT.value,
             docket_number=self.docket_number_sc,
-            datetime_filed=datetime(2024, 6, 15, 12, 0, 0),
-            date_filed=filed,
+            datetime_filed=filed,
             entries=[],
         )
 
@@ -282,5 +261,5 @@ class FloridaMergerTest(TestCase):
 
         assert result.success is True
         self.docket_sc.refresh_from_db()
-        assert self.docket_sc.date_filed == filed
-        assert self.docket_sc.date_last_filing == filed
+        assert self.docket_sc.date_filed == filed.date()
+        assert self.docket_sc.date_last_filing == filed.date()
