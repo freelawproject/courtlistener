@@ -12,7 +12,6 @@
       {'href': '#overview', 'text': 'Overview'},
       {'href': '#sources', 'text': 'Data Sources'},
       {'href': '#courts', 'text': 'Included Courts'},
-      {'href': '#updates', 'text': 'How We Keep It Current'},
       {'href': '#what-we-have', 'text': 'What We Have'},
       {'href': '#roadmap', 'text': 'Availability and Roadmap'},
   ]"
@@ -28,10 +27,12 @@
     <p>Texas publishes docket information through a centralized appellate case management system called <strong>TAMES</strong> (Texas Appeals Management and e-Filing System). We collect data from TAMES in two complementary ways:</p>
     <div class="pl-5">
       <ol>
-        <li><strong>The TAMES website.</strong> Our scraper visits the public TAMES pages for each Texas appellate court and pulls down new and updated cases, entries, and documents.</li>
-        <li><strong>TAMES case-mail emails.</strong> TAMES sends notification emails about case activity. We receive these emails, parse them, and feed the updates back into our database to keep cases current in close to real time.</li>
+        <li><strong>The TAMES website.</strong> Our scraper visits the public TAMES pages for each Texas appellate court <strong>every hour</strong> and pulls down new cases, entries, and documents. In practice, TAMES tends to publish a fresh batch of new content roughly <strong>once a day</strong>.</li>
+        <li><strong>TAMES case-mail emails.</strong> TAMES sends notification emails with updates to existing cases. We receive these emails, parse them, and feed the updates back into our database. These emails also generally arrive in a single batch about once a day, giving us a second channel for picking up activity on cases we already know about.</li>
       </ol>
     </div>
+    <p><strong>Note:</strong> TAMES usually doesn't publish new content over the weekend, so new cases may not appear in CourtListener on Sundays or Mondays.</p>
+    <p>Together, these two systems let CourtListener mirror Texas's appellate dockets as closely as TAMES does.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="courts">
@@ -60,20 +61,14 @@
     </div>
   </c-layout-with-navigation.section>
 
-  <c-layout-with-navigation.section id="updates">
-    <h2>How We Keep It Current</h2>
-    <p>Our Texas scraper runs <strong>every hour</strong>, looking for new cases and new activity on existing cases. In practice, TAMES tends to publish a fresh batch of updates roughly <strong>once a day</strong>, so most new activity shows up in CourtListener within a day of being filed.</p>
-    <p>On top of the scraper, the TAMES notification emails give us a second channel for picking up updates — they also generally arrive about once a day — so cases stay current even when the website changes between scrapes.</p>
-  </c-layout-with-navigation.section>
-
   <c-layout-with-navigation.section id="what-we-have">
     <h2>What We Have</h2>
     <p>Our Texas docket collection covers cases from <strong>1900 to the present</strong>, and currently contains:</p>
     <div class="pl-5">
       <ul>
-        <li>Approximately <strong>750,000 cases</strong> from the Texas Supreme Court and the state's appellate courts</li>
-        <li>Over <strong>13 million docket entries</strong></li>
-        <li>More than <strong>3.7 million documents</strong>, including PDFs, WordPerfect files, HTML records, and MP3 audio recordings</li>
+        <li><strong>Hundreds of thousands of cases</strong> from the Texas Supreme Court and the state's appellate courts</li>
+        <li><strong>Millions of docket entries</strong></li>
+        <li><strong>Millions of documents</strong>, including PDFs, WordPerfect files, HTML records, and MP3 audio recordings</li>
       </ul>
     </div>
   </c-layout-with-navigation.section>

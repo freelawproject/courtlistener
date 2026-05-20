@@ -11,7 +11,6 @@
   :nav_items="[
       {'href': '#overview', 'text': 'Overview'},
       {'href': '#sources', 'text': 'Data Sources'},
-      {'href': '#updates', 'text': 'How We Keep It Current'},
       {'href': '#what-we-have', 'text': 'What We Have'},
       {'href': '#roadmap', 'text': 'Availability and Roadmap'},
   ]"
@@ -19,7 +18,7 @@
   <c-layout-with-navigation.section id="overview">
     <h1 class="text-display-xs">Supreme Court Docket Coverage — What Does CourtListener Have?</h1>
     <p class="lead">CourtListener has a comprehensive collection of docket data from the Supreme Court of the United States.</p>
-    <p>Our SCOTUS collection covers the cases, docket entries, and documents that the Court publishes on its website. We complement that information with case notifications the Court emails to subscribers, so the data in CourtListener stays in step with the Court's own systems.</p>
+    <p>Our SCOTUS collection covers the cases, docket entries, and documents that the Court publishes on its website.</p>
     <p>This is not the same as our <a class="links" href="{% url "coverage_opinions" %}">case law collection</a>, which focuses on the Court's published opinions. The pages described here are the underlying <em>dockets</em> — the running record of activity in each case, including filings, orders, motions, and briefs.</p>
   </c-layout-with-navigation.section>
 
@@ -28,16 +27,11 @@
     <p>We get SCOTUS data from two places, both operated by the Court itself:</p>
     <div class="pl-5">
       <ol>
-        <li><strong>The Supreme Court's docket website.</strong> The Court publishes case dockets and filings on <a class="links-external" href="https://www.supremecourt.gov/" target="_blank" rel="noopener noreferrer">supremecourt.gov</a>. Our scraper visits these pages and pulls down new and updated content.</li>
+        <li><strong>The Supreme Court's docket website.</strong> The Court publishes case dockets and filings on <a class="links-external" href="https://www.supremecourt.gov/" target="_blank" rel="noopener noreferrer">supremecourt.gov</a>. Our scraper visits these pages <strong>every hour</strong> and pulls down new content.</li>
         <li><strong>Case-update emails.</strong> The Court sends notification emails when there is activity on a case. We receive these notifications, parse them, and feed the updates back into our database so cases stay current in close to real time.</li>
       </ol>
     </div>
-  </c-layout-with-navigation.section>
-
-  <c-layout-with-navigation.section id="updates">
-    <h2>How We Keep It Current</h2>
-    <p>Our SCOTUS scraper runs <strong>every hour</strong>, looking for new cases and new activity on existing cases.</p>
-    <p>On top of that hourly cycle, the email notifications give us near real-time updates whenever the Court publishes a new entry. Together, these two systems let CourtListener mirror the Supreme Court's docket as closely as possible.</p>
+    <p>Together, these two systems let CourtListener mirror the Supreme Court's docket as closely as possible.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="what-we-have">
@@ -45,12 +39,11 @@
     <p>Our SCOTUS docket collection covers cases from <strong>2000 to the present</strong>, and currently contains:</p>
     <div class="pl-5">
       <ul>
-        <li>Nearly <strong>200,000 cases</strong></li>
-        <li>Close to <strong>1 million docket entries</strong></li>
-        <li>More than <strong>300,000 documents</strong> downloaded from the Court (PDFs and other filings)</li>
+        <li><strong>Hundreds of thousands of cases</strong></li>
+        <li><strong>Nearly a million docket entries</strong></li>
+        <li><strong>Hundreds of thousands of documents</strong> downloaded from the Court (PDFs)</li>
       </ul>
     </div>
-    <p>A very small number of documents — currently in the low hundreds — were referenced by the Court but were not retrievable when we tried to download them. We re-check these on an ongoing basis.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="roadmap">
