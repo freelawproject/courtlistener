@@ -3,7 +3,6 @@ from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import sync_to_async
-from django.core import mail
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.test import override_settings
@@ -18,6 +17,7 @@ from cl.tests.cases import SimpleTestCase, TestCase
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
+@patch("cl.simple_pages.views.create_zoho_desk_ticket")
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class ContactTest(SimpleUserDataMixin, TestCase):
     test_msg = {
@@ -30,7 +30,9 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         "checked_documentation": True,
     }
 
-    async def test_multiple_requests_request(self, mock: MagicMock) -> None:
+    async def test_multiple_requests_request(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Is state persisted in the contact form?
 
         The contact form is abstracted in a way that it can have peculiar
@@ -51,7 +53,9 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         r = await self.async_client.get(reverse("contact"))
         self.assertNotIn("pandora", r.content.decode())
 
-    async def test_contact_logged_in(self, mock: MagicMock) -> None:
+    async def test_contact_logged_in(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Can we use the contact form to send a message when logged in?"""
         self.assertTrue(
             await self.async_client.alogin(
@@ -62,17 +66,21 @@ class ContactTest(SimpleUserDataMixin, TestCase):
             reverse("contact"), self.test_msg
         )
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        mock_task.delay.assert_called_once()
 
-    async def test_contact_logged_out(self, mock: MagicMock) -> None:
+    async def test_contact_logged_out(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Can we use the contact form to send a message when logged out?"""
         response = await self.async_client.post(
             reverse("contact"), self.test_msg
         )
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        mock_task.delay.assert_called_once()
 
-    async def test_contact_unicode(self, mock: MagicMock) -> None:
+    async def test_contact_unicode(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Can unicode be used when contacting us?"""
         msg = self.test_msg.copy()
         msg["message"] = (
@@ -83,9 +91,11 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         )
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        mock_task.delay.assert_called_once()
 
-    async def test_spam_message_is_rejected(self, mock: MagicMock) -> None:
+    async def test_spam_message_is_rejected(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Do we reject it if people put a phone number in the phone_number
         field?
 
@@ -96,15 +106,17 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         msg["phone_number"] = "909-576-4123"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         # Number in middle of subject is OK!
         msg["phone_number"] = "asdf 909 asdf"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mock_task.delay.call_count, 1)
 
-    async def test_removals_require_http(self, mock: MagicMock) -> None:
+    async def test_removals_require_http(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Do we ensure removals have an HTTP link?"""
         msg = self.test_msg.copy()
 
@@ -113,28 +125,28 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         msg["message"] = "test in message with lots of long words"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         msg["phone_number"] = "Please remove link!"
         msg["message"] = "test in message with lots of long words"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         # Test regex matching on removals fails
         msg["phone_number"] = "take down request"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         # Removal subject with link is OK!
         msg["message"] = "test http in message"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mock_task.delay.call_count, 1)
 
     async def test_documentation_checkbox_required(
-        self, mock: MagicMock
+        self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
         """Is the documentation checkbox required for support-type issues?"""
         for issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
@@ -159,7 +171,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
                 self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
     async def test_documentation_checkbox_not_required_for_other_types(
-        self, mock: MagicMock
+        self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
         """Is the documentation checkbox skipped for non-support issue types?"""
         msg = self.test_msg.copy()
@@ -416,11 +428,9 @@ class SealingOrderDetectionTest(SimpleTestCase):
         self.assertEqual(form.get_zoho_request_type(), "General Support")
 
 
-@override_flag("zoho-desk-tickets", True)
-@override_settings(WAFFLE_CACHE_PREFIX="test_zoho_routing")
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
-    """Test that form submissions route to the correct Zoho service."""
+    """Test that form submissions route to the correct Zoho category."""
 
     @patch("cl.simple_pages.views.create_zoho_desk_ticket")
     async def test_support_request_creates_desk_ticket(

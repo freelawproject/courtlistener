@@ -1,5 +1,5 @@
 import re
-from typing import Any, Literal
+from typing import Any
 
 from django import forms
 from django.conf import settings
@@ -336,42 +336,24 @@ class ContactForm(forms.Form):
             else choices.get(value)
         )
 
-    def email_subject(self) -> str:
-        """Subject line for this submission."""
-        return f"[CourtListener] Contact: {self.cleaned_data['phone_number']}"
-
-    def render_email_body(
-        self,
-        user_agent: str = "Unknown",
-        target: Literal["jira", "zoho_desk"] = "jira",
-    ) -> str:
-        """Build the email body from cleaned_data.
+    def render_email_body(self, user_agent: str = "Unknown") -> str:
+        """Build the HTML body for the Zoho Desk ticket description.
 
         The output includes a common header (subject, name, email, and issue
         type), followed by issue-type-specific fields (such as partnership
         details or technical support context) and the user's free-text message.
 
-        The output format depends on the target parameter:
-
-        - When target is "jira", the output is plain text with newline separators
-        and format email addresses as with angle brackets.
-        - When target is "zoho_desk", the output uses HTML line breaks.
-
         :param user_agent: The submitter's browser User-Agent string.
-        :param target: Output format target, either "jira" or "zoho_desk", which
-            determines line separators and email formatting.
-        :return: The formatted body string.
+        :return: HTML string suitable for the Zoho Desk ``description``
+            field.
         """
         cd = self.cleaned_data
         issue_type_label = self.get_issue_type_display()
 
-        email = cd.get("email", "")
-        email_display = email if target == "zoho_desk" else f"<{email}>"
-
         lines: list[str] = [
             f"Subject: {cd.get('phone_number', '')}",
             f"From: {cd.get('name', '')}",
-            f"User Email: {email_display}",
+            f"User Email: {cd.get('email', '')}",
             f"Issue Type: {issue_type_label}",
             "",
         ]
@@ -414,8 +396,7 @@ class ContactForm(forms.Form):
         lines.append("")
         lines.append(f"Browser: {user_agent}")
 
-        separator = "<br>" if target == "zoho_desk" else "\n"
-        return separator.join(lines)
+        return "<br>".join(lines)
 
     def _is_sealing_order(self) -> bool:
         """Check if this submission should be treated as a sealing order."""
