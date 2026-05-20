@@ -1,4 +1,5 @@
 import logging
+import time
 import warnings
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -13,6 +14,7 @@ from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.core.cache import cache as default_cache
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db import transaction
@@ -860,6 +862,21 @@ def clear_membership_throttles(user: User) -> None:
 
 USE_NEW_THROTTLE_DEFAULTS_SWITCH = "use_new_throttle_defaults"
 LEGACY_USER_DEFAULT_RATE = "5000/hour"
+
+
+def get_recent_api_request_count(user: User, window_seconds: int) -> int:
+    """Count this user's authenticated API requests within the given window.
+
+    Reads the same in-memory timestamp history that ExceptionalUserRateThrottle
+    populates on every authenticated API hit, keyed as
+    ``throttle_user_<user_pk>``. The cache TTL equals the longest configured
+    throttle window (currently a day), so any ``window_seconds`` shorter than
+    that returns an accurate count.
+    """
+    key = UserRateThrottle.cache_format % {"scope": "user", "ident": user.pk}
+    history: list[float] = default_cache.get(key, [])
+    cutoff = time.time() - window_seconds
+    return sum(1 for ts in history if ts > cutoff)
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
