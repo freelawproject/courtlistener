@@ -1,6 +1,7 @@
 import sys
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import QuerySet
@@ -70,7 +71,7 @@ class Command(VerboseCommand):
                 EmailMultiAlternatives(
                     subject="Welcome to CourtListener and Free Law Project",
                     body=email_txt,
-                    from_email="Mike Lissner <mike@courtlistener.com>",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[recipient.email],
                     headers={
                         "X-Entity-Ref-ID": f"welcome.email:{recipient.pk}"

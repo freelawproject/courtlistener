@@ -1,4 +1,5 @@
 import logging
+import time
 import warnings
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -7,14 +8,17 @@ from itertools import batched, chain
 from typing import Any, TypedDict
 
 import eyecite
+from celery import chain as celery_chain
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.core.cache import cache as default_cache
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
-from django.db.models import F, Model, Prefetch, QuerySet
+from django.db import transaction
+from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
@@ -38,6 +42,7 @@ from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
 from waffle import switch_is_active
 
+from cl.api.constants import LEVEL_TO_RATES, SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
     APIThrottle,
@@ -48,7 +53,8 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
-from cl.lib.decorators import tiered_cache
+from cl.donate.models import MembershipPaymentStatus, NeonMembership
+from cl.lib.decorators import clear_tiered_cache, tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
@@ -56,6 +62,7 @@ from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
 from cl.users.tasks import (
     create_or_update_zoho_account,
     notify_failing_webhook,
+    tag_zoho_record,
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -591,16 +598,32 @@ class LoggingMixin:
             Event.objects.create(
                 description=f"API {api_version} has logged {total_count} total requests."
             )
-        if user.is_authenticated:
-            if user_count in self.milestones:
-                Event.objects.create(
-                    description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
-                    user=user,
-                )
-                if api_version == "v4":
-                    create_or_update_zoho_account.delay(
-                        user.pk, int(user_count)
-                    )
+
+        # Skip user-specific logic if not authenticated or not at a milestone.
+        if not user.is_authenticated or user_count not in self.milestones:
+            return
+
+        Event.objects.create(
+            description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
+            user=user,
+        )
+
+        # Only v4 triggers Zoho updates
+        if api_version != "v4":
+            return
+
+        membership = getattr(user, "membership", None)
+        is_active_member = membership and membership.is_active
+
+        if is_active_member:
+            celery_chain(
+                create_or_update_zoho_account.s(user.pk, int(user_count)),
+                tag_zoho_record.s(membership.level),
+            ).apply_async()
+        else:
+            create_or_update_zoho_account.si(
+                user.pk, int(user_count)
+            ).apply_async(ignore_result=True)
 
 
 class CacheListMixin:
@@ -725,29 +748,135 @@ def get_all_throttle_overrides(
 ) -> dict[str, list[str]]:
     """Get all throttle overrides of a given type, cached for 5 minutes.
 
-    Loads all throttle overrides at once to avoid per-user DB hits since most
-    users don't have overrides.
+    Throttle rates are composed from two sources:
+
+    - MANUAL overrides always apply.
+    - MEMBERSHIP overrides apply only if the user's NeonMembership is active
+      (payment_status=SUCCEEDED and termination_date is null or in the future),
+      and no MANUAL overrides exist. If any MANUAL overrides are present, they
+      fully replace the MEMBERSHIP set.
 
     :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
     :return: Dictionary mapping username to a list of rate strings. A list
         containing a '0/...' rate blocks the user, because the enforcement
         loop rejects on `count >= 0`.
     """
+    manual_throttles = APIThrottle.objects.filter(
+        throttle_type=throttle_type,
+        source=APIThrottle.Source.MANUAL,
+    ).values_list("user__username", "rate")
+
+    today = now().date()
+    active_member_ids = (
+        NeonMembership.objects.filter(
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+        )
+        .filter(
+            Q(termination_date__isnull=True)
+            | Q(termination_date__date__gte=today)
+        )
+        .values("user_id")
+    )
+    membership_throttles = APIThrottle.objects.filter(
+        throttle_type=throttle_type,
+        source=APIThrottle.Source.MEMBERSHIP,
+        user_id__in=active_member_ids,
+    ).values_list("user__username", "rate")
+
     overrides: dict[str, list[str]] = {}
-    for username, rate in APIThrottle.objects.filter(
-        throttle_type=throttle_type
-    ).values_list("user__username", "rate"):
+    users_with_manual_throttle: set[str] = set()
+    for username, rate in manual_throttles:
         if not rate:
-            # Legacy row from before the multi-rate refactor: blocked=True
-            # with an empty rate. The backfill script adds a '0/min' sibling
-            # row, so we can safely ignore the empty one here.
+            continue
+        overrides.setdefault(username, []).append(rate)
+        users_with_manual_throttle.add(username)
+    for username, rate in membership_throttles:
+        if not rate:
+            continue
+        if username in users_with_manual_throttle:
+            # Any MANUAL throttle fully replaces the user's MEMBERSHIP set.
             continue
         overrides.setdefault(username, []).append(rate)
     return overrides
 
 
+def apply_membership_throttles(user: User, level: int) -> None:
+    """Replace the user's MEMBERSHIP-source API throttles with the rates
+    for ``level``.
+
+    MANUAL-source rows are left untouched. They take precedence over
+    MEMBERSHIP rows in get_all_throttle_overrides regardless of time
+    unit.
+
+    No-op when:
+
+    - the SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off
+    - the level has no entry in LEVEL_TO_RATES (e.g. Commercial,
+      BASIC, old groups)
+    """
+    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
+        return
+
+    rates = LEVEL_TO_RATES.get(level)
+    if rates is None:
+        logger.info(
+            "No throttle mapping for membership level=%s (user=%s); skipping.",
+            level,
+            user.username,
+        )
+        return
+
+    with transaction.atomic():
+        APIThrottle.objects.filter(
+            user=user,
+            throttle_type=ThrottleType.API,
+            source=APIThrottle.Source.MEMBERSHIP,
+        ).delete()
+        for rate in rates:
+            APIThrottle.objects.create(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+                notes=f"Set by Neon membership level={level}.",
+            )
+    clear_tiered_cache()
+
+
+def clear_membership_throttles(user: User) -> None:
+    """Delete the user's MEMBERSHIP-source API throttle rows.
+
+    MANUAL rows are never touched. No-op when the
+    SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off.
+    """
+    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
+        return
+    deleted, _ = APIThrottle.objects.filter(
+        user=user,
+        throttle_type=ThrottleType.API,
+        source=APIThrottle.Source.MEMBERSHIP,
+    ).delete()
+    if deleted:
+        clear_tiered_cache()
+
+
 USE_NEW_THROTTLE_DEFAULTS_SWITCH = "use_new_throttle_defaults"
 LEGACY_USER_DEFAULT_RATE = "5000/hour"
+
+
+def get_recent_api_request_count(user: User, window_seconds: int) -> int:
+    """Count this user's authenticated API requests within the given window.
+
+    Reads the same in-memory timestamp history that ExceptionalUserRateThrottle
+    populates on every authenticated API hit, keyed as
+    ``throttle_user_<user_pk>``. The cache TTL equals the longest configured
+    throttle window (currently a day), so any ``window_seconds`` shorter than
+    that returns an accurate count.
+    """
+    key = UserRateThrottle.cache_format % {"scope": "user", "ident": user.pk}
+    history: list[float] = default_cache.get(key, [])
+    cutoff = time.time() - window_seconds
+    return sum(1 for ts in history if ts > cutoff)
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):

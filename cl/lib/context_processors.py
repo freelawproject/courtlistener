@@ -17,6 +17,7 @@ def inject_settings(request):
         "MAX_FREE_DOCKET_ALERTS": settings.MAX_FREE_DOCKET_ALERTS,
         "DOCKET_ALERT_RECAP_BONUS": settings.DOCKET_ALERT_RECAP_BONUS,
         "SEARCH_TYPES": SEARCH_TYPES,
+        "WIKI_API_URL": settings.WIKI_API_BASE_URL,
     }
 
 
@@ -67,9 +68,7 @@ info_tips = (
     'A podcast is created for every oral argument query that you make using <a href="{}">the oral Argument search engine</a>.'.format(
         reverse("advanced_oa")
     ),
-    'CourtListener has an <a href="{}">API</a> so anybody can easily use our data.'.format(
-        reverse("api_index")
-    ),
+    f'CourtListener has an <a href="{settings.WIKI_API_BASE_URL}">API</a> so anybody can easily use our data.',
     'Oral argument podcasts <a href="{}">are available wherever you get your podcasts</a>.'.format(
         reverse("podcasts")
     ),
