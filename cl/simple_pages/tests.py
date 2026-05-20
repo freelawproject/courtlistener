@@ -3,6 +3,7 @@ from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import sync_to_async
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.test import override_settings
@@ -56,7 +57,42 @@ class ContactTest(SimpleUserDataMixin, TestCase):
     async def test_contact_logged_in(
         self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
-        """Can we use the contact form to send a message when logged in?"""
+        """Can a logged-in user submit the form (without typing an email)?
+
+        The form must not accept an email from a logged-in user — the
+        account email is used directly. The resulting ticket also
+        surfaces the user's account status so support staff don't need
+        to verify it again.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        msg = self.test_msg.copy()
+        msg.pop("email")
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        kwargs = mock_task.delay.call_args.kwargs
+        pandora_email = await User.objects.values_list(
+            "email", flat=True
+        ).aget(username="pandora")
+        self.assertEqual(kwargs["email"], pandora_email)
+        description = kwargs["description"]
+        self.assertIn("Logged In As: pandora", description)
+        self.assertIn("Email Confirmed: yes", description)
+        self.assertNotIn("User Email:", description)
+
+    async def test_logged_in_user_cannot_submit_email(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Logged-in users posting an email get the form rejected.
+
+        Typing an arbitrary email while logged in is a confusing path
+        that can mislead support on sensitive requests, so it must
+        fail validation rather than be silently dropped.
+        """
         self.assertTrue(
             await self.async_client.alogin(
                 username="pandora", password="password"
@@ -65,18 +101,34 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(
             reverse("contact"), self.test_msg
         )
-        self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        mock_task.delay.assert_called_once()
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        mock_task.delay.assert_not_called()
 
     async def test_contact_logged_out(
         self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
-        """Can we use the contact form to send a message when logged out?"""
+        """Can we use the contact form to send a message when logged out?
+
+        Anonymous submissions must not include any "Logged In As" line.
+        """
         response = await self.async_client.post(
             reverse("contact"), self.test_msg
         )
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         mock_task.delay.assert_called_once()
+        description = mock_task.delay.call_args.kwargs["description"]
+        self.assertNotIn("Logged In As", description)
+        self.assertNotIn("Email Confirmed", description)
+
+    async def test_logged_out_user_must_provide_email(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Anonymous submissions without an email are rejected."""
+        msg = self.test_msg.copy()
+        msg.pop("email")
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        mock_task.delay.assert_not_called()
 
     async def test_contact_unicode(
         self, mock_captcha: MagicMock, mock_task: MagicMock
@@ -92,6 +144,17 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         mock_task.delay.assert_called_once()
+
+    async def test_message_newlines_become_br(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Multi-line user input renders as <br> in the Zoho description."""
+        msg = self.test_msg.copy()
+        msg["message"] = "Line one\nLine two\nLine three"
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        description = mock_task.delay.call_args.kwargs["description"]
+        self.assertIn("Line one<br>Line two<br>Line three", description)
 
     async def test_spam_message_is_rejected(
         self, mock_captcha: MagicMock, mock_task: MagicMock

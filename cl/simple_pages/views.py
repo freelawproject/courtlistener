@@ -420,8 +420,16 @@ async def contact(
     if initial is None:
         initial = {}
 
+    user = await request.auser()  # type: ignore[attr-defined]
+    is_authenticated = isinstance(user, User)
+    account_email = user.email if is_authenticated else ""
+
     if request.method == "POST":
-        form = ContactForm(request.POST)
+        form = ContactForm(
+            request.POST,
+            is_authenticated=is_authenticated,
+            account_email=account_email,
+        )
         if form.is_valid():
             cd = form.cleaned_data
             # Uses phone_number as Subject field to defeat spam. If this field
@@ -430,12 +438,22 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
+            logged_in_info: dict[str, Any] | None = None
+            if is_authenticated:
+                profile = await sync_to_async(lambda: user.profile)()
+                logged_in_info = {
+                    "username": user.username,
+                    "email": account_email,
+                    "email_confirmed": profile.email_confirmed,
+                }
+
             create_zoho_desk_ticket.delay(
                 subject=cd["phone_number"],
                 name=cd["name"],
-                email=cd["email"],
+                email=account_email if is_authenticated else cd["email"],
                 description=form.render_email_body(
                     user_agent=request.headers.get("user-agent", "Unknown"),
+                    logged_in_info=logged_in_info,
                 ),
                 request_type=form.get_zoho_request_type(),
                 assignee_id=form.get_zoho_assignee_id(),
@@ -446,14 +464,14 @@ async def contact(
         issue_type = request.GET.get("issue_type")
         if issue_type and issue_type.lower() in ContactForm.VALID_ISSUE_TYPES:
             initial["issue_type"] = issue_type.lower()
-        user = await request.auser()  # type: ignore[attr-defined]
-        if isinstance(user, User):
-            initial["email"] = user.email
+        if is_authenticated:
+            # Email field is hidden for logged-in users; don't pre-fill it.
             initial["name"] = user.get_full_name()
-            form = ContactForm(initial=initial)
-        else:
-            # for anonymous users, who lack full_names, and emails
-            form = ContactForm(initial=initial)
+        form = ContactForm(
+            initial=initial,
+            is_authenticated=is_authenticated,
+            account_email=account_email,
+        )
 
     template_data.update({"form": form, "private": False})
     return TemplateResponse(request, template_path, template_data)

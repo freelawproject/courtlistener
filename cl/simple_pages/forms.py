@@ -43,8 +43,13 @@ class ContactForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control"})
     )
 
+    # Required for anonymous submitters, forbidden for logged-in submitters
+    # (the form rejects an emailed payload for authenticated users). The
+    # logged-in path uses the account email so support staff don't have a
+    # spoofable address to verify against.
     email = forms.EmailField(
-        widget=forms.TextInput(attrs={"class": "form-control"})
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
     )
 
     # Build actual choices with additional, invalid options
@@ -227,8 +232,16 @@ class ContactForm(forms.Form):
         label="Links to screenshots, error messages, or logs (if any)",
     )
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        is_authenticated: bool = False,
+        account_email: str = "",
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
+        self.is_authenticated = is_authenticated
+        self.account_email = account_email
         # reverse() can't be called at class definition time because
         # Django's URL configuration isn't loaded yet during import.
         help_url = reverse("help_home")
@@ -248,6 +261,18 @@ class ContactForm(forms.Form):
         subject = cleaned_data.get("phone_number", "")
 
         issue = cleaned_data.get("issue_type", "")
+
+        # Email: required for anonymous submitters; forbidden for logged-in
+        # submitters (where we use the account email instead).
+        email = cleaned_data.get("email", "")
+        if self.is_authenticated and email:
+            self.add_error(
+                "email",
+                "Don't provide an email address while logged in — we use "
+                "your account's email automatically.",
+            )
+        elif not self.is_authenticated and not email:
+            self.add_error("email", "Please provide your email address.")
 
         # Require documentation checkbox for support-type issues
         if issue in self.DOCUMENTATION_CHECK_TYPES and not cleaned_data.get(
@@ -336,72 +361,117 @@ class ContactForm(forms.Form):
             else choices.get(value)
         )
 
-    def render_email_body(self, user_agent: str = "Unknown") -> str:
+    def render_email_body(
+        self,
+        user_agent: str = "Unknown",
+        logged_in_info: dict[str, Any] | None = None,
+    ) -> str:
         """Build the HTML body for the Zoho Desk ticket description.
 
-        The output includes a common header (subject, name, email, and issue
-        type), followed by issue-type-specific fields (such as partnership
-        details or technical support context) and the user's free-text message.
+        Each rendered field is separated by a blank line, and multi-line
+        user input (e.g. the Message textarea) has its newlines converted
+        to ``<br>`` so they render in Zoho Desk's HTML description.
 
         :param user_agent: The submitter's browser User-Agent string.
+        :param logged_in_info: If the submitter was authenticated, a dict
+            with their ``username``, ``email``, and ``email_confirmed``
+            status. ``None`` for anonymous submissions.
         :return: HTML string suitable for the Zoho Desk ``description``
             field.
         """
         cd = self.cleaned_data
-        issue_type_label = self.get_issue_type_display()
+
+        def line(label: str, value: Any) -> str:
+            # Convert newlines so multi-line input renders as multiple
+            # lines in Zoho Desk's HTML description.
+            text = "" if value is None else str(value)
+            return f"{label}: {text}".replace("\n", "<br>")
 
         lines: list[str] = [
-            f"Subject: {cd.get('phone_number', '')}",
-            f"From: {cd.get('name', '')}",
-            f"User Email: {cd.get('email', '')}",
-            f"Issue Type: {issue_type_label}",
-            "",
+            line("Subject", cd.get("phone_number", "")),
+            line("From", cd.get("name", "")),
+            line("Issue Type", self.get_issue_type_display()),
         ]
+
+        if logged_in_info is not None:
+            confirmed = "yes" if logged_in_info["email_confirmed"] else "no"
+            lines.append(
+                line(
+                    "Logged In As",
+                    f"{logged_in_info['username']} "
+                    f"({logged_in_info['email']})",
+                )
+            )
+            lines.append(line("Email Confirmed", confirmed))
+        else:
+            lines.append(line("User Email", cd.get("email", "")))
 
         # Partnerships
         if cd.get("issue_type") == self.PARTNERSHIPS:
-            bg_labels = self.label_for("partner_background", separator=", ")
-            lines.append(f"Background: {bg_labels}")
-            lines.append(
-                f"Background (other): {cd.get('partner_background_other', '')}"
+            lines.extend(
+                [
+                    line(
+                        "Background",
+                        self.label_for("partner_background", separator=", "),
+                    ),
+                    line(
+                        "Background (other)",
+                        cd.get("partner_background_other", ""),
+                    ),
+                    line("Current Work", cd.get("partner_current_work")),
+                    line(
+                        "Team Size", self.label_for("partner_team_size") or ""
+                    ),
+                    line("Founded Year", cd.get("partner_founded_year", "")),
+                    line(
+                        "Funding Total",
+                        self.label_for("partner_funding_total") or "",
+                    ),
+                    line(
+                        "Funding Stage",
+                        self.label_for("partner_funding_stage") or "",
+                    ),
+                    line("Prior Outreach", cd.get("partner_prior_outreach")),
+                    line("Ideal Outcome", cd.get("partner_ideal_outcome")),
+                ]
             )
-            lines.append(f"Current Work: {cd.get('partner_current_work')}")
-            team_label = self.label_for("partner_team_size")
-            lines.append(f"Team Size: {team_label if team_label else ''}")
-            lines.append(f"Founded Year: {cd.get('partner_founded_year', '')}")
-            funding_total_label = self.label_for("partner_funding_total")
-            lines.append(
-                f"Funding Total: {funding_total_label if funding_total_label else ''}"
-            )
-            funding_stage_label = self.label_for("partner_funding_stage")
-            lines.append(
-                f"Funding Stage: {funding_stage_label if funding_stage_label else ''}"
-            )
-            lines.append(f"Prior Outreach: {cd.get('partner_prior_outreach')}")
-            lines.append(f"Ideal Outcome: {cd.get('partner_ideal_outcome')}")
-            lines.append("")
 
         # Technical
         elif cd.get("issue_type") in self.TECH_ISSUE_TYPES:
-            lines.append("Technical Description:")
-            lines.append(cd.get("tech_description", "-"))
-            lines.append("")
-            lines.append(f"Started At: {cd.get('tech_started_at', '')}")
-            lines.append(f"Steps Tried: {cd.get('tech_steps_tried', '')}")
-            lines.append(f"Links: {cd.get('tech_links', '')}")
-            lines.append("")
+            tech_description = (cd.get("tech_description") or "-").replace(
+                "\n", "<br>"
+            )
+            lines.extend(
+                [
+                    f"Technical Description:<br>{tech_description}",
+                    line("Started At", cd.get("tech_started_at", "")),
+                    line("Steps Tried", cd.get("tech_steps_tried", "")),
+                    line("Links", cd.get("tech_links", "")),
+                ]
+            )
 
-        lines.append("Message:")
-        lines.append(cd.get("message", ""))
-        lines.append("")
-        lines.append(f"Browser: {user_agent}")
+        message = (cd.get("message") or "").replace("\n", "<br>")
+        lines.append(f"Message:<br>{message}")
+        lines.append(line("Browser", user_agent))
 
-        return "<br>".join(lines)
+        # Join fields with a blank line so each field reads as its own
+        # paragraph in Zoho Desk.
+        return "<br><br>".join(lines)
+
+    def _effective_email(self) -> str:
+        """Return the email used to classify and route this submission.
+
+        Logged-in users have an empty form email by design; we use their
+        account email instead so government-domain detection still works.
+        """
+        if self.is_authenticated:
+            return self.account_email
+        return self.cleaned_data.get("email", "")
 
     def _is_sealing_order(self) -> bool:
         """Check if this submission should be treated as a sealing order."""
         cd = self.cleaned_data
-        email = cd.get("email", "")
+        email = self._effective_email()
         if email.lower().endswith(("@uscourts.gov", "@usdoj.gov")):
             return True
         if cd.get("issue_type") != self.REMOVAL_REQUEST:
