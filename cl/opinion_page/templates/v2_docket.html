@@ -7,32 +7,36 @@
 {% block og_description %}Docket for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
 {% block canonical %}{% get_canonical_element %}{% endblock %}
 
-{% block content %}
-<c-docket-page
-  :docket="docket"
-  active_tab="entries"
-  :metadata="metadata"
-  :bankruptcy_metadata="bankruptcy_metadata"
-  :originating_court_metadata="originating_court_metadata"
-  :tabs="tabs"
-  :has_alert="has_alert"
-  :note_form="note_form"
->
-  {# CSV export #}
-  {% if user.is_authenticated %}
-    <div class="flex justify-end py-2">
-      <c-button
-        variant="outline"
-        class="text-sm"
-        hx-get="{% url 'view_download_docket' docket.id %}"
-        hx-swap="none"
-      >
-        Export CSV
-      </c-button>
-    </div>
-  {% endif %}
+{% block content_wrapper %}
+<div class="bg-greyscale-100">
+  <div class="max-w-content mx-auto pt-4 md:pt-20 pb-35">
+    <c-docket-page
+      :docket="docket"
+      active_tab="entries"
+      :metadata="metadata"
+      :bankruptcy_metadata="bankruptcy_metadata"
+      :originating_court_metadata="originating_court_metadata"
+      :tabs="tabs"
+      :has_alert="has_alert"
+      :note_form="note_form"
+    >
+      {# CSV export #}
+      {% if user.is_authenticated %}
+        <div class="flex justify-end py-2">
+          <c-button
+            variant="outline"
+            class="text-sm"
+            hx-get="{% url 'view_download_docket' docket.id %}"
+            hx-swap="none"
+          >
+            Export CSV
+          </c-button>
+        </div>
+      {% endif %}
 
-  {# Docket entry rows #}
-  <c-docket-entry-rows :docket_entries="docket_entries" />
-</c-docket-page>
+      {# Docket entry rows #}
+      <c-docket-entry-rows :docket_entries="docket_entries" />
+    </c-docket-page>
+  </div>
+</div>
 {% endblock %}

@@ -7,7 +7,7 @@
 
 {% if docket_entries %}
   {# Column headers — desktop only #}
-  <div class="hidden md:flex border-b border-greyscale-200 py-2 text-sm font-medium text-greyscale-700 {{ class }}">
+  <div class="hidden md:flex border-b border-greyscale-200 bg-greyscale-100 rounded-lg px-4 py-2 text-sm font-medium text-greyscale-700 {{ class }}">
     <div class="w-28 shrink-0">Document Number</div>
     <div class="w-32 shrink-0">Date Filed</div>
     <div class="flex-1">Description</div>
@@ -16,7 +16,7 @@
   <ol class="list-none p-0 m-0" aria-label="Docket entries">
     {% for de in docket_entries %}
       <li id="{% if de.entry_number %}entry-{{ de.entry_number }}{% else %}minute-entry-{{ de.pk }}{% endif %}"
-          class="border-b border-greyscale-200 py-4 {{ class }}">
+          class="border-b border-greyscale-200 px-4 py-4 {{ class }}">
         {# Entry header #}
         <div class="flex gap-2">
           <dl class="flex-1 flex flex-wrap items-start md:flex-nowrap text-sm m-0">
@@ -184,7 +184,7 @@
     {% endfor %}
   </ol>
 {% else %}
-  <div class="py-8 text-center text-sm text-greyscale-700">
+  <div class="px-4 py-8 text-center text-sm text-greyscale-700">
     <p>No docket entries match your filters.</p>
   </div>
 {% endif %}
