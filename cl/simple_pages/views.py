@@ -420,9 +420,16 @@ async def contact(
     if initial is None:
         initial = {}
 
-    user = await request.auser()  # type: ignore[attr-defined]
-    is_authenticated = isinstance(user, User)
-    account_email = user.email if is_authenticated else ""
+    auser = await request.auser()  # type: ignore[attr-defined]
+    if isinstance(auser, User):
+        # Logged-in user
+        is_authenticated = True
+        user = auser
+        account_email = user.email
+    else:
+        is_authenticated = False
+        user = None
+        account_email = ""
 
     if request.method == "POST":
         form = ContactForm(
@@ -439,8 +446,8 @@ async def contact(
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
             logged_in_info: dict[str, Any] | None = None
-            if is_authenticated:
-                profile = await sync_to_async(lambda: user.profile)()
+            if user:
+                profile = await sync_to_async(lambda: user.profile)()  # type: ignore[union-attr]
                 logged_in_info = {
                     "username": user.username,
                     "email": account_email,
@@ -464,7 +471,7 @@ async def contact(
         issue_type = request.GET.get("issue_type")
         if issue_type and issue_type.lower() in ContactForm.VALID_ISSUE_TYPES:
             initial["issue_type"] = issue_type.lower()
-        if is_authenticated:
+        if user:
             # Email field is hidden for logged-in users; don't pre-fill it.
             initial["name"] = user.get_full_name()
         form = ContactForm(
