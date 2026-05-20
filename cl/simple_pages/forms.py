@@ -262,12 +262,13 @@ class ContactForm(forms.Form):
 
         issue = cleaned_data.get("issue_type", "")
 
-        # Email: required for anonymous submitters; forbidden for logged-in
-        # submitters (where we use the account email instead).
         email = cleaned_data.get("email", "")
         if self.is_authenticated and email:
+            # The email field is hidden in the template for authenticated
+            # users, so raise this as a form-level error rather than a
+            # field error — otherwise it would have nowhere to render.
             self.add_error(
-                "email",
+                None,
                 "Don't provide an email address while logged in — we use "
                 "your account's email automatically.",
             )
@@ -394,7 +395,7 @@ class ContactForm(forms.Form):
         ]
 
         if logged_in_info is not None:
-            confirmed = "yes" if logged_in_info["email_confirmed"] else "no"
+            confirmed = "Yes" if logged_in_info["email_confirmed"] else "No"
             lines.append(
                 line(
                     "Logged In As",

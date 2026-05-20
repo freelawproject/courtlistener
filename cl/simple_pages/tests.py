@@ -81,7 +81,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(kwargs["email"], pandora_email)
         description = kwargs["description"]
         self.assertIn("Logged In As: pandora", description)
-        self.assertIn("Email Confirmed: yes", description)
+        self.assertIn("Email Confirmed: Yes", description)
         self.assertNotIn("User Email:", description)
 
     async def test_logged_in_user_cannot_submit_email(

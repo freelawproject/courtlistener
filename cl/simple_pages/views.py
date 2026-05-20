@@ -447,7 +447,7 @@ async def contact(
 
             logged_in_info: dict[str, Any] | None = None
             if user:
-                profile = await sync_to_async(lambda: user.profile)()  # type: ignore[union-attr]
+                profile = await sync_to_async(lambda: user.profile)()  # type: ignore[attr-defined]
                 logged_in_info = {
                     "username": user.username,
                     "email": account_email,
@@ -472,7 +472,6 @@ async def contact(
         if issue_type and issue_type.lower() in ContactForm.VALID_ISSUE_TYPES:
             initial["issue_type"] = issue_type.lower()
         if user:
-            # Email field is hidden for logged-in users; don't pre-fill it.
             initial["name"] = user.get_full_name()
         form = ContactForm(
             initial=initial,
