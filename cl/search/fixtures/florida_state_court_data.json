@@ -3722,5 +3722,23 @@
     },
     "model": "search.court",
     "pk": "flamunict2"
+  },
+  {
+    "fields": {
+      "jurisdiction": "SA",
+      "position": 355.015,
+      "short_name": "Florida Sixth District Court of Appeal",
+      "full_name": "Florida Sixth District Court of Appeal",
+      "citation_string": "Fla. Dist. Ct. App. 6th Dist.",
+      "end_date": null,
+      "in_use": true,
+      "url": "https://6dca.flcourts.gov",
+      "has_oral_argument_scraper": false,
+      "has_opinion_scraper": false,
+      "start_date": "2023-01-01",
+      "notes": "Created as part of Florida state court scraping project."
+    },
+    "model": "search.court",
+    "pk": "fladistctapp6"
   }
 ]
