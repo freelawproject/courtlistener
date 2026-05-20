@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from itertools import product
@@ -14,6 +15,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.cache import cache as django_cache
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -26,8 +28,11 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from rest_framework.authtoken.models import Token
+from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -35,13 +40,21 @@ from cl.alerts.factories import (
     DocketAlertWithParentsFactory,
 )
 from cl.alerts.models import DocketAlert, DocketAlertEvent
-from cl.api.factories import WebhookEventFactory, WebhookFactory
+from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
+from cl.api.factories import (
+    APIThrottleFactory,
+    WebhookEventFactory,
+    WebhookFactory,
+)
 from cl.api.models import (
+    ThrottleType,
     Webhook,
     WebhookEvent,
     WebhookEventType,
     WebhookVersions,
 )
+from cl.api.utils import clear_tiered_cache
+from cl.donate.models import NeonMembershipLevel
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -59,6 +72,7 @@ from cl.tests.cases import (
     ESIndexTestCase,
     LiveServerTestCase,
     RestartSentEmailQuotaMixin,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse as MockPostResponse
@@ -90,6 +104,7 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
+from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 
 
 class UserTest(LiveServerTestCase):
@@ -436,6 +451,104 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             response,
             reverse("delete_profile_done"),
         )
+
+    async def test_reset_api_token_get_renders_confirmation(self) -> None:
+        """The reset page renders a password-confirmation form."""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Reset My API Token")
+        self.assertContains(r, "csrfmiddlewaretoken")
+
+    async def test_reset_api_token_shows_recent_usage_count(self) -> None:
+        """The confirmation page surfaces the recent API request count."""
+        # Prime the throttle cache the same way ExceptionalUserRateThrottle
+        # does: a list of unix timestamps keyed by user pk. We seed three
+        # recent timestamps and one outside the 5-minute window.
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        now_ts = time.time()
+        cache_key = UserRateThrottle.cache_format % {
+            "scope": "user",
+            "ident": user.pk,
+        }
+        django_cache.set(
+            cache_key,
+            [now_ts - 1, now_ts - 60, now_ts - 290, now_ts - 600],
+        )
+        self.addCleanup(django_cache.delete, cache_key)
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "<strong>3</strong>")
+        self.assertContains(r, "fa-exclamation-triangle")
+        self.assertContains(r, "alert-warning")
+
+    async def test_reset_api_token_rotates_with_valid_password(self) -> None:
+        """Posting the correct password swaps the token for a new one."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("view_api_token"))
+
+        # Exactly one token still exists for the user, and the key changed.
+        tokens = Token.objects.filter(user=user)
+        self.assertEqual(await tokens.acount(), 1)
+        new_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertNotEqual(new_key, old_key)
+
+    async def test_reset_api_token_rejects_wrong_password(self) -> None:
+        """A wrong password leaves the existing token untouched."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "not-the-password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Your password was invalid")
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
+
+    async def test_reset_api_token_requires_login(self) -> None:
+        """Anonymous POSTs are redirected to login, no token is changed."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r.headers.get("Location", ""))
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
 
     def test_generate_recap_dot_email_addresses(self) -> None:
         # Test simple username
@@ -4035,26 +4148,271 @@ class UserAdminApiCallsCountTest(TestCase):
         result = self.user_admin.api_calls_count(unsaved_user)
         self.assertEqual(result, 0)
 
-    @patch("cl.users.admin.get_redis_interface")
+    @patch("cl.users.models.get_redis_interface")
     def test_api_calls_count_sums_v3_and_v4(
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should sum scores from both v3 and v4 keys."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
         mock_redis = MagicMock()
-        mock_redis.zscore.side_effect = lambda key, _: (
-            5.0 if "v3" in key else 10.0
-        )
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 15)
 
-    @patch("cl.users.admin.get_redis_interface")
+    @patch("cl.users.models.get_redis_interface")
     def test_api_calls_count_handles_no_redis_data(
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should return 0 when Redis has no data."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
         mock_redis = MagicMock()
-        mock_redis.zscore.return_value = None
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 0)
+
+
+class UserProfileTotalApiUsageTest(TestCase):
+    """Tests for UserProfile.total_api_usage."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_sums_v3_and_v4_counts(self, mock_get_redis: MagicMock) -> None:
+        """Lifetime total combines v3 and v4 ZSCORE values."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 15)
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_returns_zero_when_no_redis_data(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """No Redis entries means a zero total, not a crash."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 0)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsageTest")
+class ViewApiUsageTest(TestCase):
+    """Tests for /profile/api-usage/."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
+    def test_switch_off_hides_new_sections(self) -> None:
+        """With the switch off, only the recent-usage section renders."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotContains(response, "Your Access Level")
+        self.assertNotContains(response, "Your Total API Usage")
+        self.assertContains(response, "Your API Recent Usage")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_switch_on_shows_default_throttle_rates(self) -> None:
+        """Without overrides, access level falls back to settings defaults."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Your Access Level")
+        # Default rate exposed in DEFAULT_THROTTLE_RATES["user"].
+        self.assertContains(response, "per day")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_switch_on_shows_override_rates(self) -> None:
+        """User APIThrottle overrides replace the defaults in the listing."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+        )
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="500/day",
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "per minute")
+        self.assertContains(response, "per day")
+        # Default "per hour" rate should NOT appear — overrides replace it.
+        self.assertNotContains(response, "per hour")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_blocked_user_filters_zero_rates(self) -> None:
+        """A 0/min row is dropped — we don't advertise blocked as a limit."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+        )
+        response = self.client.get(self.url)
+        # Heading still renders, but no rate rows for the blocked user.
+        self.assertNotContains(response, "per minute")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    @patch("cl.users.models.get_redis_interface")
+    def test_total_section_shows_count_and_donate(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """Lifetime total renders with a donate link when count > 0."""
+        mock_redis = MagicMock()
+        mock_pipe = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+        # pipeline.execute() returns results for v3 then v4 zscore calls
+        mock_pipe.execute.return_value = [42.0, 0.0]
+        mock_get_redis.return_value = mock_redis
+
+        response = self.client.get(self.url)
+        self.assertContains(response, "Your Total API Usage")
+        self.assertNotContains(response, "No API usage yet")
+        self.assertContains(response, "42")
+        self.assertContains(response, "donate.free.law/forms/supportflp")
+
+    def test_unauthenticated_redirected(self) -> None:
+        """The view is login-required."""
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertIn("/sign-in/", response["Location"])
+
+
+class TagZohoRecordForMembershipTest(TestCase):
+    """Tests for the tag_zoho_record_for_membership Celery task."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_lead_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead when a Lead match is found by CL ID/email."""
+        mock_lead = MagicMock()
+        mock_lead.get_id.return_value = 42
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = [mock_lead]
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_only_contact_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Falls back to the Contact module when no Lead match is found."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contact = MagicMock()
+        mock_contact.get_id.return_value = 99
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = [
+            mock_contact
+        ]
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.EDU
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_no_record_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when neither a Lead nor Contact match exists."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = []
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()
+
+
+class TagZohoRecordTest(SimpleTestCase):
+    """Tests for the tag_zoho_record Celery task (chained, no search)."""
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_record_info_points_to_lead(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Leads", 42), NeonMembershipLevel.TIER_1)
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_record_info_points_to_contact(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Contact directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Contacts", 99), NeonMembershipLevel.EDU)
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_record_info_is_none(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when the upstream task returned no record."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(None, NeonMembershipLevel.TIER_1)
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()

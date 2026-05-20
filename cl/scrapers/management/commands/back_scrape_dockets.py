@@ -148,7 +148,7 @@ class RateLimitedRequestManager:
         url: str,
         **kwargs,
     ) -> requests.Response:
-        """Make a request with exponential backoff retry on 403.
+        """Make a request with exponential backoff retry on 403 or timeout.
 
         Args:
             method: HTTP method (GET, POST, etc.)
@@ -160,6 +160,7 @@ class RateLimitedRequestManager:
 
         Raises:
             requests.HTTPError: If max backoff time exceeded on 403
+            requests.Timeout: If max backoff time exceeded on read/connect timeout
         """
         kwargs.setdefault("timeout", 60)
         backoff = 1
@@ -173,31 +174,50 @@ class RateLimitedRequestManager:
                 raise ValueError(
                     "RequestManager has no session, likely invoked after closed."
                 )
-            response = self.session.request(method, url, **kwargs)
 
-            if response.status_code != 403:
-                response.raise_for_status()
-                return response
-
-            # Handle 403 with exponential backoff
-            if total_wait >= self.max_backoff_seconds:
-                logger.error(
-                    "Max backoff time (%d seconds) exceeded for URL: %s",
-                    self.max_backoff_seconds,
+            try:
+                response = self.session.request(method, url, **kwargs)
+            except requests.Timeout as e:
+                if total_wait >= self.max_backoff_seconds:
+                    logger.error(
+                        "Max backoff time (%d seconds) exceeded on timeout for URL: %s",
+                        self.max_backoff_seconds,
+                        url,
+                    )
+                    raise
+                logger.warning(
+                    "Timeout on %s: %s. Backing off for %d seconds (total: %d/%d).",
                     url,
+                    e,
+                    backoff,
+                    total_wait,
+                    self.max_backoff_seconds,
                 )
-                response.raise_for_status()
+            else:
+                if response.status_code != 403:
+                    response.raise_for_status()
+                    return response
 
-            logger.warning(
-                "Received 403 Forbidden for %s. Backing off for %d seconds (total: %d/%d). "
-                "Response headers: %s Body (first 500 chars): %s",
-                url,
-                backoff,
-                total_wait,
-                self.max_backoff_seconds,
-                dict(response.headers),
-                response.text[:500],
-            )
+                # Handle 403 with exponential backoff
+                if total_wait >= self.max_backoff_seconds:
+                    logger.error(
+                        "Max backoff time (%d seconds) exceeded for URL: %s",
+                        self.max_backoff_seconds,
+                        url,
+                    )
+                    response.raise_for_status()
+
+                logger.warning(
+                    "Received 403 Forbidden for %s. Backing off for %d seconds (total: %d/%d). "
+                    "Response headers: %s Body (first 500 chars): %s",
+                    url,
+                    backoff,
+                    total_wait,
+                    self.max_backoff_seconds,
+                    dict(response.headers),
+                    response.text[:500],
+                )
+
             time.sleep(backoff)
             total_wait += backoff
             backoff = min(backoff * 2, self.max_backoff_seconds - total_wait)
@@ -250,7 +270,7 @@ def save_docket_response(
     case_meta: dict,
     court_id: str = "unknown_court",
     skip_meta: bool = False,
-) -> None:
+) -> tuple[str, str]:
     """Store docket scraper response content and headers in S3.
 
     Args:
@@ -259,6 +279,10 @@ def save_docket_response(
         court_id: Court identifier extracted from response data
         case_meta: Optional metadata dict from the scraper (e.g., case_number,
             date_filed, etc.) to save alongside the response
+
+    Returns:
+        Tuple of (bucket_name, base_key) for locating stored files. HTML
+        is at ``{base_key}.html``, meta at ``{base_key}_meta.json``.
     """
     storage = S3GlacierInstantRetrievalStorage(
         naming_strategy=clobbering_get_name
@@ -287,6 +311,8 @@ def save_docket_response(
 
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
+
+    return storage.bucket_name, base_name
 
 
 def parse_date_filed(date_str: str | None) -> date | None:

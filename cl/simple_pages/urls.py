@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path
 from django.views.generic import RedirectView
 from django.views.generic.base import TemplateView
@@ -21,7 +22,6 @@ from cl.simple_pages.views import (
     help_home,
     latest_terms,
     markdown_help,
-    mcp_help,
     old_terms,
     podcasts,
     prayer_help,
@@ -67,7 +67,22 @@ urlpatterns = [
     path("help/broken-email/", broken_email_help, name="broken_email_help"),  # type: ignore[arg-type]
     path("help/pray-and-pay/", prayer_help, name="pray_and_pay_help"),  # type: ignore[arg-type]
     path("help/relative-dates/", relative_dates, name="relative_dates"),  # type: ignore[arg-type]
-    path("help/mcp/", mcp_help, name="mcp_help"),  # type: ignore[arg-type]
+    path(
+        "help/mcp/",
+        RedirectView.as_view(
+            url=f"{settings.WIKI_API_BASE_URL}/mcp/model-context-protocol-mcp-server-for-agentic-access",
+            permanent=True,
+        ),
+        name="mcp_help",
+    ),
+    path(
+        "help/cluster-redirections/",
+        RedirectView.as_view(
+            url=f"{settings.WIKI_API_BASE_URL}/rest/opinion-cluster-redirections",
+            permanent=True,
+        ),
+        name="cluster_redirections_help",
+    ),
     # Added 2018-10-23
     path(
         "search/advanced-techniques/",

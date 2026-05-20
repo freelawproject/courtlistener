@@ -332,7 +332,10 @@ def add_attorney(atty, p, d):
                 )
             except AttorneyOrganization.DoesNotExist:
                 try:
-                    org = AttorneyOrganization.objects.create(**atty_org_info)
+                    with transaction.atomic():
+                        org = AttorneyOrganization.objects.create(
+                            **atty_org_info
+                        )
                 except IntegrityError:
                     # Race condition. Item was created after get. Try again.
                     org = AttorneyOrganization.objects.get(
@@ -533,6 +536,7 @@ async def update_docket_appellate_metadata(d, docket_data):
     docket_number = og_info.get("docket_number", "") or d_og_info.docket_number
     docket_number, _ = anonymize(docket_number)
     d_og_info.docket_number = docket_number
+    d_og_info.docket_number_raw = docket_number
     d_og_info.court_reporter = (
         og_info.get("court_reporter", "") or d_og_info.court_reporter
     )

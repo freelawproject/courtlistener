@@ -173,8 +173,21 @@ class TexasAppellateCourtInfoDictFactory(DictFactory):
             CourtID.UNKNOWN.value,
         ),
     )
-    case_number = Faker("federal_district_docket_number")
-    case_url = Faker("url")
+    _n_cases = Faker("random_int", min=1, max=3)
+    case_number = LazyAttribute(
+        lambda aci: [
+            Faker("federal_district_docket_number").evaluate(
+                None, None, {"locale": "en_US"}
+            )
+            for _ in range(aci._n_cases)
+        ]
+    )
+    case_url = LazyAttribute(
+        lambda aci: [
+            Faker("url").evaluate(None, None, {"locale": "en_US"})
+            for _ in range(aci._n_cases)
+        ]
+    )
     disposition = Faker("pystr")
     district = Faker("pystr")
     justice = Faker("name")

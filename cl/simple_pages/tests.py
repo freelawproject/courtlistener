@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
@@ -26,6 +27,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         "message": "123456789012345678901",
         "email": "pandora@box.com",
         "hcaptcha": "xxx",
+        "checked_documentation": True,
     }
 
     async def test_multiple_requests_request(self, mock: MagicMock) -> None:
@@ -131,11 +133,45 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
+    async def test_documentation_checkbox_required(
+        self, mock: MagicMock
+    ) -> None:
+        """Is the documentation checkbox required for support-type issues?"""
+        for issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
+            with self.subTest(issue_type=issue_type):
+                msg = self.test_msg.copy()
+                msg["issue_type"] = issue_type
+                if issue_type in ContactForm.TECH_ISSUE_TYPES:
+                    msg["tech_description"] = "Something is broken"
+                del msg["checked_documentation"]
 
-class SimplePagesTest(SimpleUserDataMixin, TestCase):
+                # Without checkbox, form is rejected
+                response = await self.async_client.post(
+                    reverse("contact"), msg
+                )
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+
+                # With checkbox, form is accepted
+                msg["checked_documentation"] = True
+                response = await self.async_client.post(
+                    reverse("contact"), msg
+                )
+                self.assertEqual(response.status_code, HTTPStatus.FOUND)
+
+    async def test_documentation_checkbox_not_required_for_other_types(
+        self, mock: MagicMock
+    ) -> None:
+        """Is the documentation checkbox skipped for non-support issue types?"""
+        msg = self.test_msg.copy()
+        msg["issue_type"] = "data_quality"
+        msg.pop("checked_documentation", None)
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+
+
+class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
         """Make sure a page has a valid HTML title"""
-        print("Checking for HTML title tag....", end="")
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -148,17 +184,15 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             0,
             msg="The text in this title tag is empty.",
         )
-        print("✓")
 
-    async def assert_page_loads_ok(self, reverse_param: dict) -> None:
+    async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
         :param reverse_param: Params that can be sent to Django's reverse
         function to get a URL path.
-        :return: None
+        :return: The response object.
         """
         path = reverse(**reverse_param)
-        print(f"Testing basic load of: {path}...", end="")
         r = await self.async_client.get(path)
         self.assertEqual(
             r.status_code,
@@ -171,11 +205,13 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
                 code=r.status_code,
             ),
         )
-        print("✓")
         is_html = "text/html" in r["content-type"]
         if r["content-type"] and is_html:
             self.assert_page_title_in_html(r.content.decode())
+        return r
 
+
+class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: list[dict[str, Any]] = [
@@ -187,7 +223,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
-            {"viewname": "replication_docs"},
             {"viewname": "terms"},
             {"viewname": "robots"},
             # Contact
@@ -201,24 +236,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "advanced_search"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
-            {"viewname": "mcp_help"},
             {"viewname": "citegeist_help"},
-            # API help pages
-            {"viewname": "case_law_api_help"},
-            {"viewname": "citation_api_help"},
-            {"viewname": "pacer_api_help"},
-            {"viewname": "recap_api_help"},
-            {"viewname": "judge_api_help"},
-            {"viewname": "field_api_help"},
-            {"viewname": "oral_argument_api_help"},
-            {"viewname": "visualization_api_help"},
-            {"viewname": "webhooks_docs"},
-            {"viewname": "webhooks_getting_started"},
-            {"viewname": "citation_lookup_api"},
-            {"viewname": "alert_api_help"},
-            {"viewname": "financial_disclosures_api_help"},
-            {"viewname": "search_api_help"},
-            {"viewname": "rest_change_log"},
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
@@ -267,6 +285,43 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         )
 
 
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
+class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
+    """Registry of pages with v2 (redesigned) templates.
+
+    Adding a page here is part of the definition of done for a
+    redesigned template. The homepage is excluded — it has dedicated
+    tests in cl/search/tests/test_v2_pages.py.
+    """
+
+    V2_PAGES: list[tuple[dict[str, Any], str]] = [
+        # Help pages — (reverse_param, expected v2 template)
+        ({"viewname": "help_home"}, "v2_help/index.html"),
+        ({"viewname": "coverage"}, "v2_help/coverage.html"),
+        ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
+        ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
+        ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
+        ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
+        ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
+        ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
+        ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
+        # Info pages
+        ({"viewname": "terms"}, "v2_terms/latest.html"),
+        ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
+        ({"viewname": "components"}, "v2_components.html"),
+    ]
+
+    async def test_v2_pages(self) -> None:
+        """Do all registered v2 pages load properly with the redesign flag?"""
+        for reverse_param, v2_template in self.V2_PAGES:
+            with self.subTest(
+                "Checking v2 page", reverse_params=reverse_param
+            ):
+                r = await self.assert_page_loads_ok(reverse_param)
+                self.assertTemplateUsed(r, v2_template)
+
+
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class SealingOrderDetectionTest(SimpleTestCase):
     def _make_form(
@@ -276,7 +331,7 @@ class SealingOrderDetectionTest(SimpleTestCase):
         issue_type: str = ContactForm.REMOVAL_REQUEST,
         email: str = "test@example.com",
     ) -> ContactForm:
-        data = {
+        data: dict[str, Any] = {
             "name": "Test User",
             "email": email,
             "phone_number": subject,
@@ -284,6 +339,8 @@ class SealingOrderDetectionTest(SimpleTestCase):
             "message": message,
             "hcaptcha": "xxx",
         }
+        if issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
+            data["checked_documentation"] = True
         form = ContactForm(data)
         form.is_valid()
         return form
@@ -376,6 +433,7 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
             "message": "I need general help please",
             "email": "test@example.com",
             "hcaptcha": "xxx",
+            "checked_documentation": True,
         }
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
@@ -440,6 +498,7 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
             "message": "I have a question about a case",
             "email": "clerk@uscourts.gov",
             "hcaptcha": "xxx",
+            "checked_documentation": True,
         }
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)

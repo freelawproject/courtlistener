@@ -72,7 +72,12 @@ from cl.search.models import Docket, RECAPDocument
 from cl.search.tasks import (
     index_docket_parties_in_es,
 )
-from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    MockTallyStatMixin,
+    SearchAlertsAssertions,
+    TestCase,
+)
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -84,7 +89,11 @@ from cl.users.factories import UserProfileWithParentsFactory
 @override_switch("increment-stats", active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="RECAPAlertsSweepIndexTest")
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
+    MockTallyStatMixin,
+    RECAPSearchTestCase,
+    ESIndexTestCase,
+    TestCase,
+    SearchAlertsAssertions,
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -136,16 +145,12 @@ class RECAPAlertsSweepIndexTest(
             )
 
     def setUp(self):
+        super().setUp()
         self.r = get_redis_interface("CACHE")
-        self.r_stats = get_redis_interface("STATS")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
             self.r.delete(*keys)
-
-        stat_keys = self.r_stats.keys("alerts.sent.*")
-        if stat_keys:
-            self.r_stats.delete(*stat_keys)
 
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
@@ -2158,16 +2163,16 @@ class RECAPAlertsSweepIndexTest(
                 pacer_doc_id="0190645981",
                 plain_text="plain text lorem",
             )
+        self.mock_tally_stat.reset_mock()
         with time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
 
-        # Confirm Stat object is properly created and updated.
-        key = f"alerts.sent.{now().date().isoformat()}"
-        count = int(self.r_stats.get(key) or 0)
-        self.assertEqual(count, 1, "Wrong number of stats alerts sent.")
+        # Confirm tally_stat was called once by the RT command.
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(self.mock_tally_stat.call_args.kwargs["inc"], 1)
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -2318,9 +2323,13 @@ class RECAPAlertsSweepIndexTest(
             1,
         )
 
-        # Confirm Stat object is properly updated.
-        count = int(self.r_stats.get(key) or 0)
-        self.assertEqual(count, 2, "Wrong number of stats objects.")
+        # Confirm total stat increment is 2: 1 from RT + 1 from sweep.
+        # (tally_stat may be called more than twice since the sweep command
+        # calls it separately for RT and DLY rates, some with inc=0.)
+        total_inc = sum(
+            c.kwargs["inc"] for c in self.mock_tally_stat.call_args_list
+        )
+        self.assertEqual(total_inc, 2)
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:

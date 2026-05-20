@@ -4,6 +4,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import (
+    DjangoModelPermissions,
     DjangoModelPermissionsOrAnonReadOnly,
     IsAuthenticatedOrReadOnly,
 )
@@ -12,11 +13,11 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import BigPagination
 from cl.api.utils import (
+    DjangoModelPermissionsWithView,
     EmailProcessingQueueAPIUsers,
     LoggingMixin,
     NoFilterCacheListMixin,
     RECAPUploaders,
-    RECAPUsersReadOnly,
 )
 from cl.recap.api_serializers import (
     EmailProcessingQueueSerializer,
@@ -33,6 +34,7 @@ from cl.recap.filters import (
 )
 from cl.recap.models import (
     EmailProcessingQueue,
+    EmailSource,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     ProcessingQueue,
@@ -81,7 +83,9 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (EmailProcessingQueueAPIUsers,)
+    permission_classes = (
+        EmailProcessingQueueAPIUsers | DjangoModelPermissionsWithView,
+    )
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
@@ -111,6 +115,7 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
             message_id=self.get_message_id_from_request_data(),
             destination_emails=self.get_destination_emails_from_request_data(),
             uploader=recap_email_user,
+            source=EmailSource.PACER,
         )
         do_recap_document_fetch(epq, recap_email_user)
         return epq
@@ -143,7 +148,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (DjangoModelPermissions,)
     queryset = (
         RECAPDocument.objects.filter(is_available=True)
         .only(

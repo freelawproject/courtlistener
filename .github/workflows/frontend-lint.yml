@@ -38,7 +38,8 @@ jobs:
             --repo-root . \
             --format github \
             --changed-files changed_files.txt \
-            --summary-file summary.md
+            --summary-file summary.md \
+            --skip-files 'cl/*/test_assets/*.html'
 
       - name: Minimize previous bot comments
         if: always()
