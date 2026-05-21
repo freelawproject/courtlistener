@@ -113,7 +113,10 @@ from cl.people_db.factories import (
     RoleFactory,
 )
 from cl.people_db.models import Attorney
-from cl.recap.factories import ProcessingQueueFactory
+from cl.recap.factories import (
+    FjcIntegratedDatabaseFactory,
+    ProcessingQueueFactory,
+)
 from cl.recap.views import (
     EmailProcessingQueueViewSet,
     FjcIntegratedDatabaseViewSet,
@@ -4506,6 +4509,23 @@ class UnknownFilterParameterBlockingTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    def test_fjc_class_action_in_lookup_returns_400(self) -> None:
+        """`class_action__in` on the FJC endpoint is no longer a valid filter
+        (it produced a 500 when combined with a BooleanField in
+        django-filter), so it should be rejected as an unknown param."""
+        FjcIntegratedDatabaseFactory(class_action=True)
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("fjcintegrateddatabase-list", kwargs={"version": "v4"}),
+            {"class_action__in": "True"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        data = response.json()
+        self.assertEqual(
+            data["detail"], "Unknown filter parameters are not allowed."
+        )
+        self.assertEqual(data["unknown_params"], ["class_action__in"])
 
 
 class UnknownFilterParameterUtilsTests(SimpleTestCase):

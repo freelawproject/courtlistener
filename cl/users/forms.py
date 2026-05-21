@@ -220,7 +220,13 @@ class OptInConsentForm(forms.Form):
     hcaptcha = hCaptchaField()
 
 
-class AccountDeleteForm(forms.Form):
+class PasswordConfirmForm(forms.Form):
+    """Re-prompts the logged-in user for their password as a guard.
+
+    Used by views that perform irreversible operations on the user's account
+    (deleting it, rotating their API token, etc.).
+    """
+
     password = forms.CharField(
         label="Confirm your password to continue...",
         strip=False,

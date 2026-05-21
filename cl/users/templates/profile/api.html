@@ -22,6 +22,14 @@
       <h3 class="v-offset-above-2">Your API Token</h3>
       <p>To get started, you need an API token. Keep this private. Yours is:</p>
       <h4><code>{{ user.auth_token }}</code></h4>
+      <p class="v-offset-above-2 text-center">
+        If you believe your token has been exposed, you can reset it. Your
+        old token will stop working immediately, and any scripts or
+        services using it will need to be updated with the new value.
+      </p>
+      <a href="{% url "reset_api_token" %}" class="btn btn-danger">
+        <i class="fa fa-refresh"></i>&nbsp;Reset API Token
+      </a>
     {% elif page == "api_usage" %}
       <h3 class="v-offset-above-2" id="usage">Your API Recent Usage</h3>
       {% with counts=user.profile.recent_api_usage %}
