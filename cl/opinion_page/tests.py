@@ -30,6 +30,7 @@ from django.urls import reverse
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.html import fromstring
+from waffle.models import Flag
 from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
@@ -2746,6 +2747,16 @@ class DocketPageV2TemplateTest(TestCase):
             )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
+        # Required: the v2 template was actually used. Strings like
+        # "Docket Entries" / "28:1331" / "Contract" appear in v1 too,
+        # so without this assertion the test passes against either
+        # template — masking a broken `use_new_design` flag override.
+        template_names = [t.name for t in r.templates if t.name]
+        self.assertIn(
+            "v2_docket.html",
+            template_names,
+            f"v2_docket.html not rendered; templates: {template_names}",
+        )
         content = r.content.decode()
         self.assertIn("Docket Entries", content)
         self.assertIn("28:1331", content)
@@ -2758,6 +2769,15 @@ class DocketPageV2TemplateTest(TestCase):
                 "view_docket",
                 args=[self.docket.pk, self.docket.slug],
             )
+        )
+        # `metadata` and `tabs` are set unconditionally in view_docket,
+        # so context-key assertions alone don't prove v2 rendered.
+        # Pin the template too.
+        template_names = [t.name for t in r.templates if t.name]
+        self.assertIn(
+            "v2_docket.html",
+            template_names,
+            f"v2_docket.html not rendered; templates: {template_names}",
         )
         self.assertIn("metadata", r.context)
         self.assertIn("tabs", r.context)
@@ -2932,6 +2952,14 @@ class DocketFilterPaginationWiringTest(TestCase):
                 for n in range(100, 311)
             ]
         )
+        # Diagnostic: confirm @override_flag actually wrote the flag to the DB
+        # in this test's context. If this fails, the override isn't taking
+        # effect and V1 will render instead of v2_docket.html.
+        flag = await sync_to_async(Flag.objects.get)(name="use_new_design")
+        self.assertTrue(
+            flag.everyone,
+            f"use_new_design flag is not everyone=True; got {flag.everyone!r}",
+        )
         r = await self.async_client.get(
             reverse(
                 "view_docket",
@@ -2939,6 +2967,15 @@ class DocketFilterPaginationWiringTest(TestCase):
             )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
+        # Diagnostic: confirm IncrementalNewTemplateMiddleware swapped to v2.
+        # If this fails while the flag check above passes, the override wrote
+        # to the DB but the middleware didn't see it (cache, request context).
+        template_names = [t.name for t in r.templates if t.name]
+        self.assertIn(
+            "v2_docket.html",
+            template_names,
+            f"v2_docket.html not rendered; templates: {template_names}",
+        )
         content = r.content.decode()
         self.assertIn('aria-label="Pagination"', content)
         self.assertIn("page=2", content)
