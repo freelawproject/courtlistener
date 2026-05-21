@@ -2971,9 +2971,10 @@ class DocketFilterPaginationWiringTest(TestCase):
                 for n in range(100, 311)
             ]
         )
-        # Diagnostic: confirm @override_flag actually wrote the flag to the DB
-        # in this test's context. If this fails, the override isn't taking
-        # effect and V1 will render instead of v2_docket.html.
+        # First half of the override-then-render contract: the @override_flag
+        # decorator wrote everyone=True to this test's DB. Paired with the
+        # template-name check after the GET to distinguish "override broke"
+        # from "middleware didn't see it" if v1 ever sneaks back in.
         flag = await sync_to_async(Flag.objects.get)(name="use_new_design")
         self.assertTrue(
             flag.everyone,
@@ -2986,9 +2987,10 @@ class DocketFilterPaginationWiringTest(TestCase):
             )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        # Diagnostic: confirm IncrementalNewTemplateMiddleware swapped to v2.
-        # If this fails while the flag check above passes, the override wrote
-        # to the DB but the middleware didn't see it (cache, request context).
+        # Second half: the middleware actually swapped to v2_docket.html.
+        # The aria-label="Pagination" check below would also fail on v1,
+        # but pinning the template name surfaces the cause directly rather
+        # than as a string-not-found buried in a multi-KB v1 response.
         template_names = [t.name for t in r.templates if t.name]
         self.assertIn(
             "v2_docket.html",
