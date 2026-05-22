@@ -18,6 +18,25 @@
   :has_alert="has_alert"
   :note_form="note_form"
 >
-  {# Docket entries content — placeholder for now, implemented in follow-up PR #}
+  <c-docket-filter
+    :docket="docket"
+    :form="form"
+    :page_obj="docket_entries"
+    :sort_order_asc="sort_order_asc"
+    class="mb-4"
+  />
+
+  <div id="docket-entries">
+    {# Entry rows — placeholder until PR 2 (#7068) lands the <c-docket-entry-rows> component. #}
+  </div>
+
+  <c-pagination
+    :page_obj="docket_entries"
+    show_first="True"
+    show_previous="True"
+    show_page_indicator="True"
+    show_next="True"
+    show_last="True"
+  />
 </c-docket-page>
 {% endblock %}
