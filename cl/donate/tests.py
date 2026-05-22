@@ -973,7 +973,7 @@ class MembershipWebhookThrottleSyncTest(TestCase):
     async def test_create_lso_1_membership_assigns_tier_1_throttles(
         self, mock_store_webhook
     ) -> None:
-        """LSO 1 webhooks install the Tier 1 MEMBERSHIP rates."""
+        """LSO 1 webhooks provision the Tier 1 MEMBERSHIP rates."""
         self.data["eventTrigger"] = "createMembership"
         self.data["data"]["membership"]["membershipName"] = "LSO 1"
 
