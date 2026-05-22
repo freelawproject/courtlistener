@@ -197,6 +197,54 @@ class MembershipWebhookTest(TestCase):
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
+    async def test_create_membership_with_no_payment_data_is_succeeded(
+        self, mock_store_webhook
+    ) -> None:
+        """Memberships without payment data (manual grants, free tiers) land as SUCCEEDED."""
+        self.data["eventTrigger"] = "createMembership"
+        # Default payload has no "payments" key — that's the case under test.
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        membership = await NeonMembership.objects.filter(
+            neon_id="12345"
+        ).afirst()
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_unknown_payment_status_falls_back_to_pending(
+        self, mock_store_webhook
+    ) -> None:
+        """Unrecognized non-empty paymentStatus values still map to PENDING."""
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["payments"] = [
+            {"paymentStatus": "in_review"}
+        ]
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        membership = await NeonMembership.objects.filter(
+            neon_id="12345"
+        ).afirst()
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.PENDING
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
     async def test_edu_unconfirmed_email_sends_confirmation(
         self, mock_store_webhook
     ) -> None:
