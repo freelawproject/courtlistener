@@ -970,6 +970,37 @@ class MembershipWebhookThrottleSyncTest(TestCase):
         "_store_webhook_payload",
         return_value=None,
     )
+    async def test_create_lso_1_membership_assigns_tier_1_throttles(
+        self, mock_store_webhook
+    ) -> None:
+        """LSO 1 webhooks install the Tier 1 MEMBERSHIP rates."""
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["membershipName"] = "LSO 1"
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+        rates = sorted(
+            [
+                rate
+                async for rate in APIThrottle.objects.filter(
+                    user=self.user_profile.user,
+                    throttle_type=ThrottleType.API,
+                    source=APIThrottle.Source.MEMBERSHIP,
+                ).values_list("rate", flat=True)
+            ]
+        )
+        self.assertEqual(rates, sorted(["10/min", "75/hour", "300/day"]))
+
+    @patch.object(
+        MembershipWebhookViewSet,
+        "_store_webhook_payload",
+        return_value=None,
+    )
     async def test_update_membership_webhook_replaces_throttles(
         self, mock_store_webhook
     ) -> None:
