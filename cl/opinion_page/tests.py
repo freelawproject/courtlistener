@@ -108,7 +108,11 @@ from cl.search.models import (
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
-from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+from cl.users.factories import (
+    UserFactory,
+    UserProfileWithParentsFactory,
+    UserWithChildProfileFactory,
+)
 
 
 class TitleTest(SimpleTestCase):
@@ -2722,6 +2726,7 @@ class BuildDocketTabsTest(SimpleTestCase):
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 @override_flag("use_new_design", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 class DocketPageV2TemplateTest(TestCase):
     """Test that the v2 docket page renders correctly.
 
@@ -2768,7 +2773,6 @@ class DocketPageV2TemplateTest(TestCase):
             f"v2_docket.html not rendered; templates: {template_names}",
         )
         content = r.content.decode()
-        self.assertIn("Docket Entries", content)
         self.assertIn("28:1331", content)
         self.assertIn("Contract", content)
 
@@ -2793,6 +2797,143 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn("tabs", r.context)
         self.assertTrue(len(r.context["metadata"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
+
+
+@override_flag("use_new_design", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
+class DocketEntryRowsV2Test(TestCase):
+    """Test that v2 docket entry rows render correctly for all states."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            date_filed=date(2024, 4, 21),
+        )
+
+        # Entry 1: regular entry with multiple RECAP document states
+        cls.entry_with_docs = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=1,
+            date_filed=date(2024, 4, 21),
+            description="COMPLAINT against All Defendants",
+        )
+        # Main doc with PDF available locally
+        cls.rd_has_pdf = RECAPDocumentFactory(
+            docket_entry=cls.entry_with_docs,
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            filepath_local=SimpleUploadedFile("test.pdf", b"pdf content"),
+            is_available=True,
+            pacer_doc_id="12345",
+            page_count=10,
+        )
+        # Attachment with PACER-only (no local PDF)
+        cls.rd_pacer_only = RECAPAttachmentFactory(
+            docket_entry=cls.entry_with_docs,
+            document_number="1",
+            pacer_doc_id="12346",
+            page_count=4,
+        )
+        # Sealed document
+        cls.rd_sealed = RECAPAttachmentFactory(
+            docket_entry=cls.entry_with_docs,
+            document_number="1",
+            is_sealed=True,
+            pacer_doc_id="12347",
+        )
+
+        # Entry 2: minute entry (no entry_number, no documents)
+        cls.minute_entry = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=None,
+            date_filed=date(2024, 4, 21),
+            description="Case Assigned to Judge Smith",
+        )
+
+    async def _get_docket_page(self) -> str:
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        return r.content.decode()
+
+    async def test_entry_number_and_date_render(self) -> None:
+        """Entry number and date should appear in the page."""
+        content = await self._get_docket_page()
+        self.assertIn("Apr 21, 2024", content)
+        self.assertIn('id="entry-1"', content)
+
+    async def test_main_document_label(self) -> None:
+        """Main Document label should appear for PACER_DOCUMENT type."""
+        content = await self._get_docket_page()
+        self.assertIn("Main Document", content)
+
+    async def test_attachment_label(self) -> None:
+        """Attachment N label should appear for ATTACHMENT type."""
+        content = await self._get_docket_page()
+        self.assertIn("Attachment", content)
+
+    async def test_download_pdf_for_available_docs(self) -> None:
+        """Download PDF button should appear for docs with filepath_local."""
+        content = await self._get_docket_page()
+        self.assertIn("Download PDF", content)
+
+    async def test_buy_on_pacer_for_pacer_only_docs(self) -> None:
+        """Buy on PACER with price should appear for PACER-only docs."""
+        content = await self._get_docket_page()
+        self.assertIn("Buy on PACER", content)
+        self.assertIn("$0.40", content)
+
+    async def test_unavailable_for_sealed_docs(self) -> None:
+        """Unavailable button should appear for sealed documents."""
+        content = await self._get_docket_page()
+        self.assertIn("Unavailable", content)
+
+    async def test_minute_entry_renders(self) -> None:
+        """Minute entries without entry_number should render."""
+        content = await self._get_docket_page()
+        self.assertIn("Case Assigned to Judge Smith", content)
+        self.assertIn(f'id="minute-entry-{self.minute_entry.pk}"', content)
+
+    async def test_empty_state(self) -> None:
+        """Empty state message should show when no entries exist."""
+        empty_docket = await sync_to_async(DocketFactory)(
+            court=self.court,
+            source=Docket.RECAP,
+        )
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[empty_docket.pk, empty_docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        content = r.content.decode()
+        self.assertIn("No docket entries", content)
+
+    async def test_csv_export_for_authenticated_user(self) -> None:
+        """CSV export button should render for authenticated users."""
+        user = await sync_to_async(UserWithChildProfileFactory)()
+        await sync_to_async(self.async_client.force_login)(user)
+        content = await self._get_docket_page()
+        self.assertIn("Export CSV", content)
+
+    async def test_entries_use_option_d_semantic_markup(self) -> None:
+        """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
+        content = await self._get_docket_page()
+        self.assertIn('aria-label="Docket entries"', content)
+        self.assertIn('<li id="entry-1"', content)
+        self.assertIn('<dt class="sr-only">Document Number</dt>', content)
+        self.assertIn('<dt class="sr-only">Date Filed</dt>', content)
+        self.assertIn('<dt class="sr-only">Description</dt>', content)
+        self.assertIn('aria-label="Documents for this entry"', content)
 
 
 class DocketFilterDrawerAttrPropagationTest(TestCase):

@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 from http import HTTPStatus
 from typing import Any
 
@@ -531,6 +531,134 @@ async def validate_for_wot(request: HttpRequest) -> HttpResponse:
 
 
 async def components(request: HttpRequest) -> HttpResponse:
+    # Mock data for docket entry rows demo
+    class MockRECAPDoc:
+        PACER_DOCUMENT = RECAPDocument.PACER_DOCUMENT
+        ATTACHMENT = RECAPDocument.ATTACHMENT
+
+        def __init__(
+            self,
+            *,
+            document_type: int = RECAPDocument.PACER_DOCUMENT,
+            document_number: str = "1",
+            attachment_number: int | None = None,
+            description: str = "",
+            filepath_local: str = "",
+            filepath_ia: str = "",
+            is_available: bool = False,
+            is_sealed: bool | None = None,
+            is_free_on_pacer: bool | None = None,
+            page_count: int | None = None,
+            pacer_doc_id: str = "",
+            prayer_count: int = 0,
+            prayer_exists: bool = False,
+            pk: int = 0,
+        ):
+            self.document_type = document_type
+            self.document_number = document_number
+            self.attachment_number = attachment_number
+            self.description = description
+            self.filepath_local = filepath_local
+            self.filepath_ia = filepath_ia
+            self.is_available = is_available
+            self.is_sealed = is_sealed
+            self.is_free_on_pacer = is_free_on_pacer
+            self.page_count = page_count
+            self.pacer_doc_id = pacer_doc_id
+            self.prayer_count = prayer_count
+            self.prayer_exists = prayer_exists
+            self.id = pk
+            self.pk = pk
+            self.date_upload = None
+
+        @property
+        def pacer_url(self) -> str:
+            if self.pacer_doc_id:
+                return (
+                    f"https://ecf.canb.uscourts.gov/doc1/{self.pacer_doc_id}"
+                )
+            return ""
+
+        def get_absolute_url(self) -> str:
+            return f"/docket/{self.pk}/document/"
+
+    class MockRECAPDocManager:
+        def __init__(self, docs: list[MockRECAPDoc]):
+            self._docs = docs
+
+        def all(self) -> list[MockRECAPDoc]:
+            return self._docs
+
+        def count(self) -> int:
+            return len(self._docs)
+
+    class MockDocketEntry:
+        def __init__(
+            self,
+            *,
+            entry_number: int | None,
+            date_filed: date,
+            description: str,
+            recap_documents: list[MockRECAPDoc],
+            pk: int = 0,
+        ):
+            self.entry_number = entry_number
+            self.date_filed = date_filed
+            self.datetime_filed = None
+            self.description = description
+            self.recap_documents = MockRECAPDocManager(recap_documents)
+            self.pk = pk
+
+    demo_entries = [
+        MockDocketEntry(
+            entry_number=1,
+            date_filed=date(2024, 4, 21),
+            description=(
+                "COMPLAINT against All Defendants United States of America"
+                " (Filing fee $400 receipt number 0090-4495374)"
+            ),
+            pk=100,
+            recap_documents=[
+                MockRECAPDoc(
+                    document_type=RECAPDocument.PACER_DOCUMENT,
+                    document_number="1",
+                    description="Complaint",
+                    filepath_local="/mock/complaint.pdf",
+                    filepath_ia="https://archive.org/download/mock/complaint.pdf",
+                    is_available=True,
+                    pacer_doc_id="09876",
+                    page_count=10,
+                    pk=1001,
+                ),
+                MockRECAPDoc(
+                    document_type=RECAPDocument.ATTACHMENT,
+                    document_number="1",
+                    attachment_number=1,
+                    description="Civil Cover Sheet",
+                    filepath_local="/mock/cover_sheet.pdf",
+                    is_available=True,
+                    pk=1002,
+                ),
+                MockRECAPDoc(
+                    document_type=RECAPDocument.ATTACHMENT,
+                    document_number="1",
+                    attachment_number=2,
+                    description="Summons to United States Attorney General",
+                    pacer_doc_id="09877",
+                    page_count=4,
+                    pk=1003,
+                ),
+            ],
+        ),
+        MockDocketEntry(
+            entry_number=None,
+            date_filed=date(2024, 4, 21),
+            description="Case Assigned to Judge Ellen S. Huvelle. (jd)",
+            pk=101,
+            recap_documents=[],
+        ),
+    ]
+
     # Mock page object for component library demos
     class MockPaginator:
         num_pages = 10
@@ -566,6 +694,7 @@ async def components(request: HttpRequest) -> HttpResponse:
         "components.html",
         {
             "private": True,
+            "demo_docket_entries": demo_entries,
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
             "demo_filter_form": MockDocketFilterForm(),
