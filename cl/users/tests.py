@@ -23,6 +23,7 @@ from django.core.mail import (
     send_mail,
 )
 from django.test import AsyncClient
+from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
@@ -47,6 +48,7 @@ from cl.api.factories import (
     WebhookFactory,
 )
 from cl.api.models import (
+    APIThrottle,
     ThrottleType,
     Webhook,
     WebhookEvent,
@@ -54,7 +56,11 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.api.utils import clear_tiered_cache
-from cl.donate.models import NeonMembershipLevel
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -64,7 +70,10 @@ from cl.favorites.models import (
 )
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    SimpleUserDataMixin,
+    UserProfileWithParentsFactory,
+)
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -4416,3 +4425,73 @@ class TagZohoRecordTest(SimpleTestCase):
 
         mock_leads.add_tags.assert_not_called()
         mock_contacts.add_tags.assert_not_called()
+
+
+@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+class RefreshAPIThrottlesAdminTest(TestCase):
+    def setUp(self):
+        self.staff = UserFactory(is_staff=True, is_superuser=True)
+        self.target = UserProfileWithParentsFactory().user
+        self.client = Client()
+        self.client.force_login(self.staff)
+        self.changelist_url = reverse("admin:auth_user_changelist")
+
+    def _run_action(self, *user_pks):
+        return self.client.post(
+            self.changelist_url,
+            {
+                "action": "refresh_api_throttles",
+                "_selected_action": [str(pk) for pk in user_pks],
+            },
+            follow=True,
+        )
+
+    def test_action_refreshes_throttles_for_active_member(self):
+        """The action installs Tier 1 rates for an active Tier 1 member."""
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="t1",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(self.target.pk)
+
+        rates = sorted(
+            APIThrottle.objects.filter(
+                user=self.target,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(rates, sorted(["10/min", "75/hour", "300/day"]))
+
+    def test_action_skips_user_without_active_membership(self):
+        """Users with no active membership are skipped with a warning."""
+        r = self._run_action(self.target.pk)
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no active Neon membership" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+    def test_action_handles_mixed_queryset(self):
+        """Action refreshes active members and skips inactive ones in one run."""
+        active = UserProfileWithParentsFactory().user
+        NeonMembership.objects.create(
+            user=active,
+            neon_id="t2",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(active.pk, self.target.pk)
+
+        # Active user got rates
+        self.assertTrue(
+            APIThrottle.objects.filter(
+                user=active,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).exists()
+        )
+        # Inactive user got nothing
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())

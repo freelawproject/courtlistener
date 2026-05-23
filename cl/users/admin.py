@@ -1,7 +1,7 @@
 from typing import cast
 
 from django.apps import apps
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
 from django.db.models import Model
@@ -9,11 +9,13 @@ from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.api.admin import APIThrottleInline, WebhookInline
+from cl.api.utils import apply_membership_throttles
 from cl.donate.admin import (
     DonationInline,
     MonthlyDonationInline,
     NeonMembershipInline,
 )
+from cl.donate.models import NeonMembership
 from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
 from cl.favorites.models import UserTag
 from cl.lib.admin import (
@@ -99,6 +101,44 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "email",
         "pk",
     )
+    actions = ["refresh_api_throttles"]
+
+    @admin.action(
+        description="Refresh API throttles from active Neon membership"
+    )
+    def refresh_api_throttles(self, request, queryset):
+        """Resync MEMBERSHIP-source API throttles for the selected users
+        from each user's current active Neon membership.
+
+        MANUAL-source throttles are never touched (the helper only
+        manages MEMBERSHIP rows).
+        """
+        refreshed = 0
+        skipped: list[str] = []
+
+        for user in queryset.select_related("membership"):
+            try:
+                membership = user.membership
+            except NeonMembership.DoesNotExist:
+                membership = None
+
+            if not membership or not membership.is_active:
+                skipped.append(user.username)
+                continue
+
+            apply_membership_throttles(user, membership.level)
+            refreshed += 1
+
+        if refreshed:
+            messages.success(
+                request,
+                f"Refreshed API throttles for {refreshed} user(s).",
+            )
+        if skipped:
+            messages.warning(
+                request,
+                f"Skipped (no active Neon membership): {', '.join(skipped)}",
+            )
 
     def api_calls_count(self, obj):
         if obj.id is None:
