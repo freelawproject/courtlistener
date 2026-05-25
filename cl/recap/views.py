@@ -82,9 +82,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (
-        EmailProcessingQueueAPIUsers,
-    )
+    permission_classes = (EmailProcessingQueueAPIUsers,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
