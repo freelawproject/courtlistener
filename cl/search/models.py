@@ -1614,6 +1614,51 @@ class BankruptcyInformation(AbstractDateTimeModel):
 
 
 @pghistory.track()
+class DocketIdentifier(AbstractDateTimeModel):
+    """An external identifier for the subject matter at issue in a case, such
+    as a U.S. patent asserted in a patent-infringement docket.
+
+    The value is stored as found in the source so that non-numeric forms are
+    preserved (e.g. design patents 'Dxxxxxx', reissues 'RExxxxx', and patent
+    application serial numbers 'NN/NNNNNN').
+    """
+
+    PATENT = 1
+    APPLICATION = 2
+    PUBLISHED_APPLICATION = 3
+    FOREIGN_PATENT = 4
+    IDENTIFIER_TYPES = (
+        (PATENT, "U.S. patent"),
+        (APPLICATION, "U.S. patent application"),
+        (PUBLISHED_APPLICATION, "U.S. published patent application"),
+        (FOREIGN_PATENT, "Foreign patent"),
+    )
+    docket = models.ForeignKey(
+        Docket,
+        help_text="The docket in which this identifier is at issue.",
+        related_name="identifiers",
+        on_delete=models.CASCADE,
+    )
+    type = models.SmallIntegerField(
+        help_text="The type of identifier that this is.",
+        choices=IDENTIFIER_TYPES,
+    )
+    value = models.TextField(
+        help_text=(
+            "The identifier exactly as found in the source, e.g. a patent "
+            "number like '7654321', 'RE38123', or 'D456789'."
+        ),
+        db_index=True,
+    )
+
+    class Meta:
+        unique_together = (("docket", "type", "value"),)
+
+    def __str__(self) -> str:
+        return f"{self.pk}: {self.get_type_display()} {self.value}"
+
+
+@pghistory.track()
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
