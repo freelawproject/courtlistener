@@ -1204,13 +1204,6 @@ class RECAPUploaders(DjangoModelPermissions):
     }
 
 
-class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
-    """Grant POST access via the has_recap_email_upload_access permission,
-    and grant GET access via the Permissions model and the admin for debugging
-    purposes.
-    """
-
-
 class EmailProcessingQueueAPIUsersWithView(DjangoModelPermissions):
     perms_map = {
         "POST": ["%(app_label)s.has_recap_email_upload_access"],
