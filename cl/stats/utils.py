@@ -224,7 +224,8 @@ def get_replication_statuses() -> dict[str, list[dict[str, str | int]]]:
             confirmed_flush_lsn,
             pg_current_wal_lsn(),
             (pg_current_wal_lsn() - confirmed_flush_lsn) AS lsn_distance
-        FROM pg_replication_slots;
+        FROM pg_replication_slots
+        WHERE slot_type = 'logical';
     """
     for alias in connections:
         with connections[alias].cursor() as cursor:
