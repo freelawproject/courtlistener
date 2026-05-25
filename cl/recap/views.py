@@ -14,6 +14,7 @@ from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import BigPagination
 from cl.api.utils import (
     EmailProcessingQueueAPIUsers,
+    EmailProcessingQueueAPIUsersWithView,
     LoggingMixin,
     NoFilterCacheListMixin,
     RECAPUploaders,
@@ -82,7 +83,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (EmailProcessingQueueAPIUsers,)
+    permission_classes = (EmailProcessingQueueAPIUsersWithView,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter

@@ -1210,6 +1210,8 @@ class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
     purposes.
     """
 
+
+class EmailProcessingQueueAPIUsersWithView(DjangoModelPermissions):
     perms_map = {
         "POST": ["%(app_label)s.has_recap_email_upload_access"],
         "GET": ["%(app_label)s.view_%(model_name)s"],
