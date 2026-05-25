@@ -2049,12 +2049,15 @@ class V4DRFPaginationTest(TestCase):
             user__username="recap-user",
             user__password=make_password("password"),
         )
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        ps_upload = Permission.objects.filter(
-            codename="has_recap_upload_access"
+        ps = Permission.objects.filter(
+            codename__in=[
+                "has_recap_api_access",
+                "has_recap_upload_access",
+                "view_processingqueue",
+                "view_emailprocessingqueue",
+            ]
         )
         cls.user_1.user.user_permissions.add(*ps)
-        cls.user_1.user.user_permissions.add(*ps_upload)
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         for i in range(10):
             DocketFactory(
