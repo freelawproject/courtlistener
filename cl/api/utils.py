@@ -1197,20 +1197,10 @@ class RECAPUploaders(DjangoModelPermissions):
     """
 
     perms_map = {
-        "GET": ["%(app_label)s.has_recap_upload_access"],
+        "GET": ["%(app_label)s.view_%(model_name)s"],
         "OPTIONS": ["%(app_label)s.has_recap_upload_access"],
         "HEAD": ["%(app_label)s.has_recap_upload_access"],
         "POST": ["%(app_label)s.has_recap_upload_access"],
-        "PUT": ["%(app_label)s.has_recap_upload_access"],
-        "PATCH": ["%(app_label)s.has_recap_upload_access"],
-        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
-    }
-
-
-class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
-    perms_map = {
-        "POST": ["%(app_label)s.has_recap_upload_access"],
-        "GET": ["%(app_label)s.has_recap_upload_access"],
     }
 
 

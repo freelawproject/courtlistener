@@ -8,11 +8,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import ModelSerializer
 from rest_framework.viewsets import ModelViewSet
 
-from cl.api.utils import (
-    EmailProcessingQueueAPIUsers,
-    EmailProcessingQueueAPIUsersWithView,
-    LoggingMixin,
-)
+from cl.api.utils import EmailProcessingQueueAPIUsersWithView, LoggingMixin
 from cl.celery_init import app
 from cl.recap.filters import EmailProcessingQueueFilter
 from cl.recap.models import EmailProcessingQueue, EmailSource
@@ -105,9 +101,7 @@ class StateEmailProcessingQueueSerializer(ModelSerializer):
 
 
 class StateEmailEndpoint(LoggingMixin, ModelViewSet):
-    permission_classes = (
-        EmailProcessingQueueAPIUsers | EmailProcessingQueueAPIUsersWithView,
-    )
+    permission_classes = (EmailProcessingQueueAPIUsersWithView,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = StateEmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
@@ -164,9 +158,7 @@ class SCOTUSEmailProcessingQueueSerializer(
 
 
 class ScraperSCOTUSEmailEndpoint(LoggingMixin, ModelViewSet):
-    permission_classes = (
-        EmailProcessingQueueAPIUsers | EmailProcessingQueueAPIUsersWithView,
-    )
+    permission_classes = (EmailProcessingQueueAPIUsersWithView,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = SCOTUSEmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter

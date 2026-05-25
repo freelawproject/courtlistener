@@ -245,6 +245,9 @@ class RecapUploadsTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        recap_user = User.objects.get(username="recap")
+        view_perm = Permission.objects.get(codename="view_processingqueue")
+        recap_user.user_permissions.add(view_perm)
         CourtFactory(id="canb", jurisdiction="FB")
         cls.court = CourtFactory.create(
             id="nysd", jurisdiction="FD", in_use=True
@@ -3832,6 +3835,12 @@ class RecapAttPageFetchApiTest(TestCase):
 
 
 class ProcessingQueueApiFilterTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        recap_user = User.objects.get(username="recap")
+        view_perm = Permission.objects.get(codename="view_processingqueue")
+        recap_user.user_permissions.add(view_perm)
+
     def setUp(self) -> None:
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap")
