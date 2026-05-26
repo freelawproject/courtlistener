@@ -14,9 +14,9 @@ from lxml import etree
 from cl.audio.factories import AudioFactory, AudioWithParentsFactory
 from cl.audio.management.commands.transcribe import (
     audio_can_be_processed_by_open_ai_api,
-    transcribe_from_open_ai_api,
 )
 from cl.audio.models import Audio, AudioTranscriptionMetadata
+from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.audio.utils import transcription_was_hallucinated
 from cl.lib.test_helpers import SitemapTest
 from cl.search.factories import CourtFactory, DocketFactory

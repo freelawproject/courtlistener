@@ -146,8 +146,10 @@ class Command(cl_scrape_opinions.Command):
             backscrape=backscrape,
         )
         # Kick off the audio standardization stage through the lock-protected
-        # dispatcher. process_audio_file's success path will hand off to
-        # transcription via dispatch_transcribe — no explicit chain needed.
+        # dispatcher. Transcription is not chained from here — once the
+        # standardization task sets duration, reenqueue_pending_audio_tasks_
+        # daemon picks the audio up on a future cycle and paces the OpenAI
+        # call across the cluster.
         await sync_to_async(dispatch_process_audio_file)(audio_file.pk)
 
         logger.info(

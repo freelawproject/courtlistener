@@ -104,57 +104,59 @@ def run_reenqueue_cycle(
         logger.info("[stage 1] skipped (--skip-processing)")
 
     # ---------- Stage 2: transcribe_from_open_ai_api ----------
-    if not skip_transcription:
-        # Exclude audios queued in stage 1: when their process_audio_file
-        # task succeeds, the in-task hand-off re-dispatches transcription
-        # via dispatch_transcribe. Re-queueing them here would just bounce
-        # off the lock — harmless but noisy.
-        stage1_pks = set(process_pks)
-        qs = (
-            Audio.objects.filter(
-                duration__isnull=False,
-                stt_status=Audio.STT_NEEDED,
-                date_created__lte=older,
-                date_created__gte=newer,
-            )
-            .exclude(pk__in=stage1_pks)
-            .order_by("date_created")
-        )
-        if limit:
-            qs = qs[:limit]
-        transcribe_pks = list(qs.values_list("id", flat=True))
-
-        logger.info(
-            "[stage 2] %s audios need transcription "
-            "(after excluding %s from stage 1)",
-            len(transcribe_pks),
-            len(stage1_pks),
-        )
-        dispatched = skipped = 0
-        for pk in transcribe_pks:
-            if dry_run:
-                per_pk_log(
-                    "[stage 2] [dry-run] would dispatch transcribe(audio=%s)",
-                    pk,
-                )
-                continue
-            if dispatch_transcribe(pk):
-                dispatched += 1
-                per_pk_log("[stage 2] dispatched transcribe(audio=%s)", pk)
-            else:
-                skipped += 1
-                per_pk_log(
-                    "[stage 2] skipped transcribe(audio=%s) — lock held",
-                    pk,
-                )
-        logger.info(
-            "[stage 2] dispatched=%s skipped=%s total=%s",
-            dispatched,
-            skipped,
-            len(transcribe_pks),
-        )
-    else:
+    if skip_transcription:
         logger.info("[stage 2] skipped (--skip-transcription)")
+        return
+
+    # Exclude audios queued in stage 1: their process_audio_file task
+    # almost certainly hasn't run yet (so duration is still NULL and
+    # stage 2's query wouldn't match anyway), but guard against the
+    # narrow race where stage 1's task races stage 2's query. The
+    # next daemon cycle picks them up for transcription naturally.
+    stage1_pks = set(process_pks)
+    qs = (
+        Audio.objects.filter(
+            duration__isnull=False,
+            stt_status=Audio.STT_NEEDED,
+            date_created__lte=older,
+            date_created__gte=newer,
+        )
+        .exclude(pk__in=stage1_pks)
+        .order_by("date_created")
+    )
+    if limit:
+        qs = qs[:limit]
+    transcribe_pks = list(qs.values_list("id", flat=True))
+
+    logger.info(
+        "[stage 2] %s audios need transcription "
+        "(after excluding %s from stage 1)",
+        len(transcribe_pks),
+        len(stage1_pks),
+    )
+    dispatched = skipped = 0
+    for pk in transcribe_pks:
+        if dry_run:
+            per_pk_log(
+                "[stage 2] [dry-run] would dispatch transcribe(audio=%s)",
+                pk,
+            )
+            continue
+        if dispatch_transcribe(pk):
+            dispatched += 1
+            per_pk_log("[stage 2] dispatched transcribe(audio=%s)", pk)
+        else:
+            skipped += 1
+            per_pk_log(
+                "[stage 2] skipped transcribe(audio=%s) — lock held",
+                pk,
+            )
+    logger.info(
+        "[stage 2] dispatched=%s skipped=%s total=%s",
+        dispatched,
+        skipped,
+        len(transcribe_pks),
+    )
 
 
 class Command(VerboseCommand):
