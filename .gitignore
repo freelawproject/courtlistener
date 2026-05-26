@@ -47,4 +47,11 @@ cl/settings/google_auth.json
 
 
 .vscode/*
-/.history
+/.history.coverage
+.claude
+.playwright-mcp
+.pyre
+.pyre_configuration.local
+.tours
+pysa-results
+stubs

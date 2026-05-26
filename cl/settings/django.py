@@ -66,6 +66,22 @@ API_READ_DATABASES: list[str] | None = env.list(
 )
 DATABASE_ROUTERS: list[str] = ["cl.api.routers.ReplicaRouter"]
 
+if TESTING:
+    # In-memory sqlite for the merger framework's L4+ tests. The
+    # ``mergers_testmodels`` Django app (added below to INSTALLED_APPS
+    # when TESTING) is routed here. Production code never touches this DB.
+    # TEST.DEPENDENCIES=[] tells Django this DB doesn't depend on
+    # ``default`` (otherwise it inherits the implicit dep and triggers
+    # "Circular dependency in TEST[DEPENDENCIES]" during test setup).
+    DATABASES["mergers_test"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+        "TEST": {"DEPENDENCIES": []},
+    }
+    DATABASE_ROUTERS.append(
+        "cl.scrapers.mergers.tests.testmodels.db_router.MergersTestRouter"
+    )
+
 ####################
 # Cache & Sessions #
 ####################
@@ -232,6 +248,11 @@ if DEVELOPMENT:
     MIDDLEWARE.append(
         "django_browser_reload.middleware.BrowserReloadMiddleware"
     )
+
+if TESTING:
+    # Test-only Django app for the merger framework's L4+ tests. Routed
+    # to the ``mergers_test`` DB (in-memory sqlite) by MergersTestRouter.
+    INSTALLED_APPS.append("cl.scrapers.mergers.tests.testmodels")
 
 # TODO: Shift to a global Tailwind config and pull out of simple_pages app
 TAILWIND_APP_NAME = "cl.simple_pages"

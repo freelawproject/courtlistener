@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import random
 import re
@@ -6,6 +7,7 @@ import traceback
 from collections import defaultdict
 from io import BytesIO
 
+import botocore
 import celery
 import httpx
 import openai
@@ -645,6 +647,156 @@ async def extract_pdf_document_base(
     return await extract_formatted_text_document_base(
         pks, ocr_available, check_if_needed, model_name
     )
+
+
+# Suffixes doctor's document-extract service handles; everything else
+# (images, audio, ZIPs) skips the plain-text step.
+_EXTRACTABLE_EXTENSIONS = frozenset(
+    {".pdf", ".docx", ".doc", ".txt", ".html", ".htm", ".wpd", ".rtf"}
+)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+        botocore.exceptions.ConnectionError,
+        botocore.exceptions.HTTPClientError,
+    ),
+    max_retries=3,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def process_scraper_file(
+    self,
+    *,
+    storage_url: str,
+    model_label: str,
+    pk: int,
+    filepath_field: str = "filepath_local",
+    plain_text_field: str = "plain_text",
+    sha1_field: str = "sha1",
+    page_count_field: str = "page_count",
+    file_size_field: str = "file_size",
+    ocr_status_field: str = "ocr_status",
+) -> None:
+    """File-ingestion follow-up dispatched by :class:`IngestFile`.
+
+    Resolves the target Django row, reads the file from storage,
+    consults doctor's ``buffer-extension`` for the canonical suffix,
+    and (for text-bearing formats) calls ``document-extract`` for the
+    plain text. Discovered metadata (sha1, file_size, page_count,
+    ocr_status, plain_text) is written back to the field names supplied
+    by the IngestFile payload — the field names are arguments so future
+    drivers can target non-AbstractPDF models without code changes.
+
+    Silently no-ops when the model row has gone away or the file isn't
+    in storage; transient transport errors auto-retry.
+    """
+    model = apps.get_model(model_label)
+    try:
+        instance = model.objects.get(pk=pk)
+    except model.DoesNotExist:
+        logger.warning(
+            "process_scraper_file: %s pk=%d does not exist; skipping.",
+            model_label,
+            pk,
+        )
+        return
+
+    # If the model row doesn't yet have a populated FileField, bootstrap
+    # it from the IngestFile's storage_url. The URL is "s3://<bucket>/<key>"
+    # (or a bare key when the bucket is implied by the storage backend).
+    file_field = getattr(instance, filepath_field)
+    if not file_field:
+        if storage_url.startswith("s3://"):
+            # Strip "s3://<bucket>/" prefix; the storage backend supplies
+            # the bucket. If the bucket actually differs, this needs a
+            # per-driver override on the storage class.
+            _, _, key = storage_url[len("s3://") :].partition("/")
+        else:
+            key = storage_url
+        setattr(instance, filepath_field, key)
+        instance.save(update_fields=[filepath_field])
+        file_field = getattr(instance, filepath_field)
+
+    try:
+        with file_field.open(mode="rb") as f:
+            content = f.read()
+    except (FileNotFoundError, botocore.exceptions.ClientError) as exc:
+        logger.warning(
+            "process_scraper_file: file fetch failed for %s pk=%d (%s): %s",
+            model_label,
+            pk,
+            storage_url,
+            exc,
+        )
+        return
+
+    # 1. Canonical extension from doctor.
+    extension_resp = async_to_sync(microservice)(
+        service="buffer-extension",
+        file=content,
+    )
+    extension = (
+        extension_resp.text if extension_resp.is_success else ""
+    )
+
+    update_fields: list[str] = []
+
+    # 2. sha1 + file size — cheap, computed locally from the bytes we
+    # already have on hand.
+    if sha1_field:
+        setattr(instance, sha1_field, hashlib.sha1(content).hexdigest())
+        update_fields.append(sha1_field)
+    if file_size_field:
+        setattr(instance, file_size_field, len(content))
+        update_fields.append(file_size_field)
+
+    # 3. Plain-text extraction via doctor. Only run for formats doctor's
+    # document-extract service handles.
+    if extension in _EXTRACTABLE_EXTENSIONS and plain_text_field:
+        extract_resp = async_to_sync(microservice)(
+            service="document-extract",
+            item=instance,
+        )
+        if extract_resp.is_success:
+            body = extract_resp.json()
+            raw_text = body.get("content", "") or ""
+            extracted_by_ocr = body.get("extracted_by_ocr", False)
+            page_count = body.get("page_count")
+
+            plain_text, _ = anonymize(raw_text)
+            plain_text = plain_text.replace("\0", "")
+            setattr(instance, plain_text_field, plain_text)
+            update_fields.append(plain_text_field)
+
+            if ocr_status_field:
+                ocr_needed = needs_ocr(raw_text, page_count=page_count)
+                match bool(raw_text), extracted_by_ocr:
+                    case True, True:
+                        ocr_status = AbstractPDF.OCR_COMPLETE
+                    case True, False:
+                        ocr_status = (
+                            AbstractPDF.OCR_UNNECESSARY
+                            if not ocr_needed
+                            else AbstractPDF.OCR_NEEDED
+                        )
+                    case False, True:
+                        ocr_status = AbstractPDF.OCR_FAILED
+                    case _:
+                        ocr_status = AbstractPDF.OCR_NEEDED
+                setattr(instance, ocr_status_field, ocr_status)
+                update_fields.append(ocr_status_field)
+
+            if page_count_field and page_count is not None:
+                setattr(instance, page_count_field, page_count)
+                update_fields.append(page_count_field)
+
+    if update_fields:
+        instance.save(update_fields=update_fields)
 
 
 @app.task(

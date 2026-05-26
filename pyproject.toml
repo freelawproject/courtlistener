@@ -139,6 +139,8 @@ dev = [
   "django-debug-toolbar>=6.1.0",
   "django-tailwind[reload]~=3.9.1",
   "responses>=0.25.8",
+  "hypothesis>=6.152.9",
+  "coverage>=7.14.0",
 ]
 
 [tool.ruff]
