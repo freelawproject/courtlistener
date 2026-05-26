@@ -32,6 +32,7 @@ LEVEL_TO_RATES: dict[int, list[str]] = {
     NeonMembershipLevel.TIER_2: TIER_2_RATES,
     NeonMembershipLevel.TIER_3: TIER_3_RATES,
     NeonMembershipLevel.TIER_4: TIER_4_RATES,
+    NeonMembershipLevel.LSO_1: TIER_1_RATES,
     NeonMembershipLevel.EDU: EDU_RATES,
     # Group Tier 1
     NeonMembershipLevel.GROUP_T1_SMALLEST: TIER_1_RATES,

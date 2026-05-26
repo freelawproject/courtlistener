@@ -262,6 +262,11 @@ class MembershipWebhookViewSet(
         Maps a payment status string into its corresponding
         integer value defined in the `MembershipPaymentStatus` class.
 
+        An empty status means Neon attached no payment info to the membership.
+        That happens for free tiers and for memberships granted manually in
+        Neon, treat both as SUCCEEDED so they don't stick in "Awaiting payment
+        processing".
+
         Args:
             status (str): The payment status string (e.g., "succeeded", "failed").
 
@@ -270,7 +275,7 @@ class MembershipWebhookViewSet(
                 Defaults to `PENDING` for unrecognized values.
         """
         match status:
-            case "succeeded":
+            case "succeeded" | "":
                 payment_status = MembershipPaymentStatus.SUCCEEDED
             case "failed":
                 payment_status = MembershipPaymentStatus.FAILED
@@ -375,20 +380,6 @@ class MembershipWebhookViewSet(
         payment_status = self._map_payment_status_value(
             membership_data["paymentStatus"]
         )
-
-        # .edu memberships are free. If Neon didn't send payment info, treat
-        # them as succeeded rather than pending.
-        if membership_level == NeonMembershipLevel.EDU:
-            if not membership_data["paymentStatus"]:
-                payment_status = MembershipPaymentStatus.SUCCEEDED
-            else:
-                logger.error(
-                    "EDU membership %s for account %s has unexpected "
-                    "payment status: %s. Review manually.",
-                    membership_data["membershipId"],
-                    membership_data["accountId"],
-                    membership_data["paymentStatus"],
-                )
 
         try:
             neon_membership = user.membership
