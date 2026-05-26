@@ -57,12 +57,15 @@ def run_reenqueue_cycle(
     # ---------- Stage 1: process_audio_file ----------
     process_pks: list[int] = []
     if not skip_processing:
-        qs = Audio.objects.filter(
-            duration__isnull=True,
-            local_path_original_file__isnull=False,
-            date_created__lte=older,
-            date_created__gte=newer,
-        ).order_by("date_created")
+        qs = (
+            Audio.objects.filter(
+                duration__isnull=True,
+                date_created__lte=older,
+                date_created__gte=newer,
+            )
+            .exclude(local_path_original_file="")
+            .order_by("date_created")
+        )
         if limit:
             qs = qs[:limit]
         process_pks = list(qs.values_list("id", flat=True))

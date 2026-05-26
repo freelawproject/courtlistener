@@ -761,6 +761,43 @@ class ReenqueueDaemonTest(TestCase):
         self.assertNotIn(too_recent.pk, called_pks)
         self.assertNotIn(too_old.pk, called_pks)
 
+    @override_settings(
+        AUDIO_REENQUEUE_DAEMON_ENABLED=True, AUDIO_REENQUEUE_WAIT=0
+    )
+    def test_stage1_skips_audios_with_empty_local_path(self) -> None:
+        # local_path_original_file is NOT NULL at the DB level, so the only
+        # way an audio can lack a file is empty string. process_audio_file
+        # would fail on those, so the cycle must not dispatch them.
+        in_window = timezone.now() - datetime.timedelta(days=1)
+        empty_path_audio = AudioFactory.create(
+            docket=DocketFactory(court=self.court),
+            duration=None,
+            stt_status=Audio.STT_NEEDED,
+        )
+        self._set_date_created(empty_path_audio, in_window)
+        self.assertEqual(empty_path_audio.local_path_original_file, "")
+
+        with (
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_process_audio_file",
+                return_value=True,
+            ) as mock_dispatch_process,
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_transcribe",
+                return_value=True,
+            ),
+        ):
+            call_command(
+                "reenqueue_pending_audio_tasks_daemon",
+                "--testing-iterations=1",
+                "--older-than-hours=1",
+                "--newer-than-days=7",
+            )
+
+        mock_dispatch_process.assert_not_called()
+
     @override_settings(AUDIO_REENQUEUE_DAEMON_ENABLED=False)
     def test_kill_switch_disabled_exits_without_dispatching(self) -> None:
         self._build_window_audios()

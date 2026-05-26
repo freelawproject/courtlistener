@@ -10,8 +10,11 @@ The dispatch helpers in ``cl.audio.dispatch`` enforce per-pk dedup so
 two daemon cycles overlapping (or a manual one-shot run alongside) never
 double-fire for the same audio.
 
-``settings.AUDIO_REENQUEUE_DAEMON_ENABLED`` is a kill switch checked each
-iteration so the daemon can be drained without redeploying.
+``settings.AUDIO_REENQUEUE_DAEMON_ENABLED`` is the boot-time enable flag.
+Django settings are read once at process start, so flipping the env var on
+a running pod takes effect on the next restart — which is also the drain.
+The in-loop ``while`` check exists so tests can use ``override_settings``
+to exit the loop cleanly.
 """
 
 import argparse
@@ -51,8 +54,9 @@ class Command(VerboseCommand):
         "Long-running daemon that periodically dispatches audios needing "
         "standardization or transcription. Acts as the cluster-wide rate "
         "limiter for OpenAI calls. Cadence is settings.AUDIO_REENQUEUE_"
-        "WAIT; throughput cap is settings.AUDIO_REENQUEUE_MAX_PER_SWEEP; "
-        "can be drained via AUDIO_REENQUEUE_DAEMON_ENABLED=False."
+        "WAIT; throughput cap is settings.AUDIO_REENQUEUE_MAX_PER_SWEEP. "
+        "To drain, set AUDIO_REENQUEUE_DAEMON_ENABLED=False and restart "
+        "the pod (the env var is read once at Django startup)."
     )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
