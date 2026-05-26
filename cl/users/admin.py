@@ -21,7 +21,6 @@ from cl.lib.admin import (
     AdminTweaksMixin,
     generate_admin_links,
 )
-from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
@@ -64,7 +63,7 @@ admin.site.unregister(User)
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     form = CustomUserChangeForm  # optimize queryset for user_permissions field
-    change_form_template = "admin/user_change_form.html"
+    change_form_template = "admin/change_form_with_custom_links.html"
     readonly_fields = ("api_calls_count",)
     inlines = (
         UserProfileInline,
@@ -102,17 +101,11 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     )
 
     def api_calls_count(self, obj):
-        r = get_redis_interface("STATS")
-        total = 0
         if obj.id is None:
             # New user, no API usage, bail.
-            return total
+            return 0
 
-        for api_prefix in ["v3", "v4"]:
-            count = r.zscore(f"api:{api_prefix}.user.counts", obj.id)
-            if count:
-                total += int(count)
-        return total
+        return obj.profile.total_api_usage
 
     api_calls_count.short_description = "API Calls Count"
 

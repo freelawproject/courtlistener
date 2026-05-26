@@ -8,7 +8,7 @@ from unittest import mock
 import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
@@ -7366,6 +7366,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         recap_admin.message_user.assert_called_once_with(
             request,
             "Successfully sealed and removed 1 document(s).",
+            messages.SUCCESS,
         )
 
         # Re-index RDs sealed documents.
@@ -8859,6 +8860,7 @@ class RECAPIndexingTest(
         recap_admin.message_user.assert_called_once_with(
             request,
             "Successfully sealed and removed 2 document(s).",
+            messages.SUCCESS,
         )
 
         # Confirm DB update:

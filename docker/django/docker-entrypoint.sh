@@ -48,6 +48,12 @@ case "$1" in
 'probe-iquery-pages-daemon')
     exec ./manage.py probe_iquery_pages_daemon
     ;;
+'probe-scotus-dockets-daemon')
+    exec ./manage.py probe_scotus_dockets_daemon
+    ;;
+'tames-scraper-daemon')
+    exec ./manage.py tames_poller
+    ;;
 'llm-clean-docket-number-daemon')
     exec ./manage.py llm_clean_docket_number_daemon
     ;;

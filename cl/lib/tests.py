@@ -33,6 +33,7 @@ from cl.lib.model_helpers import (
     make_scotus_docket_number_core,
     make_texas_docket_number_core,
     make_upload_path,
+    normalize_texas_appellate_docket_number,
 )
 from cl.lib.pacer import (
     get_blocked_status,
@@ -451,7 +452,10 @@ class TestModelHelpers(TestCase):
     def test_clean_texas_docket_number(self) -> None:
         """Can we extract Texas docket numbers from dirty input?"""
         test_cases = [
+            ("Case Number: AP-77,129; 04-97-00972-CV", "04-97-00972-CV"),
             ("Case Number: 04-97-00972-CV", "04-97-00972-CV"),
+            ("Case Number: 04-97-00972-CV; AP-77,129", "04-97-00972-CV"),
+            ("AP-77,129, 04-97-00972-CV, and WR-70,849-04", "04-97-00972-CV"),
             ("04-97-00972-CV", "04-97-00972-CV"),
             ("AP-77,129", "AP-77,129"),
             ("WR-70,849-04", "WR-70,849-04"),
@@ -460,9 +464,13 @@ class TestModelHelpers(TestCase):
             ("", ""),
             ("garbage text", ""),
         ]
-        for input_dn, expected in test_cases:
+        for i, (input_dn, expected) in enumerate(test_cases):
             with self.subTest(input_dn=input_dn):
-                self.assertEqual(clean_texas_docket_number(input_dn), expected)
+                self.assertEqual(
+                    clean_texas_docket_number(input_dn),
+                    expected,
+                    f"Failed test case {i}",
+                )
 
     def test_texas_docket_number_core(self) -> None:
         """Can we correctly normalize Texas docket numbers?"""
@@ -488,6 +496,27 @@ class TestModelHelpers(TestCase):
         # Invalid input returns empty string
         self.assertEqual(make_texas_docket_number_core("garbage text"), "")
         self.assertEqual(make_texas_docket_number_core(None), "")
+
+    def test_normalize_texas_appellate_docket_number(self) -> None:
+        test_cases = [
+            ("01-00-0387-CV", "01-00-00387-cv"),
+            ("04-97-00972-CV", "04-97-00972-cv"),
+            ("0199-01326-CR", "01-99-01326-cr"),
+            ("09-01-404-CR", "09-01-00404-cr"),
+            ("10-11-196-CR", "10-11-00196-cr"),
+            ("09-11-717-R", "09-11-00717-cr"),
+            ("12-14438", "12-14438"),
+            ("AP-77,129", "ap-77,129"),
+            ("WR-70,849-04", "wr-70,849-04"),
+            ("A-4369-A", "a-4369-a"),
+        ]
+        for i, (input_dn, expected) in enumerate(test_cases):
+            with self.subTest(input_dn=input_dn):
+                self.assertEqual(
+                    normalize_texas_appellate_docket_number(input_dn),
+                    expected,
+                    f"Failed test case {i}",
+                )
 
     def test_avoid_generating_docket_number_core(self) -> None:
         """Can we avoid generating docket_number_core when the docket number

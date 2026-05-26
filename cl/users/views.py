@@ -13,7 +13,7 @@ from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
 from django.core.validators import validate_email
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.http import (
     HttpRequest,
@@ -33,10 +33,25 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 from django.views.decorators.http import require_http_methods
+from rest_framework.authtoken.models import Token
 from rest_framework.renderers import JSONRenderer
+from waffle import switch_is_active
 
 from cl.alerts.models import DocketAlert
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
+from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    ThrottleType,
+    WebhookEvent,
+    WebhookEventType,
+)
+from cl.api.utils import (
+    LEGACY_USER_DEFAULT_RATE,
+    USE_NEW_THROTTLE_DEFAULTS_SWITCH,
+    get_all_throttle_overrides,
+    get_recent_api_request_count,
+)
+from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
 from cl.lib.crypto import sha1_activation_key
@@ -49,11 +64,11 @@ from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
-    AccountDeleteForm,
     CustomPasswordChangeForm,
     CustomPasswordResetForm,
     EmailConfirmationForm,
     OptInConsentForm,
+    PasswordConfirmForm,
     ProfileForm,
     UserCreationFormExtended,
     UserForm,
@@ -260,13 +275,82 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+@sensitive_post_parameters("password")
+@login_required
+@never_cache
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
+def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        reset_form = PasswordConfirmForm(request, request.POST)
+        if reset_form.is_valid():
+            with transaction.atomic():
+                Token.objects.filter(user=request.user).delete()
+                Token.objects.create(user=request.user)
+            messages.success(
+                request,
+                "Your API token has been reset. Update any scripts or "
+                "services that use the old token.",
+            )
+            return HttpResponseRedirect(reverse("view_api_token"))
+    else:
+        reset_form = PasswordConfirmForm(request=request)
+    return TemplateResponse(
+        request,
+        "profile/api_token_reset.html",
+        {
+            "reset_form": reset_form,
+            "recent_api_count": get_recent_api_request_count(
+                request.user, window_seconds=5 * 60
+            ),
+            "page": "api_token",
+            "page_title": "Reset API Token",
+            "private": True,
+        },
+    )
+
+
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
+    show_membership_features = switch_is_active(
+        SYNC_MEMBERSHIP_THROTTLES_SWITCH
+    )
+
+    throttle_rates: list[tuple[int, str]] = []
+    if show_membership_features:
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        user_rates = overrides.get(request.user.username) or []
+        if not user_rates:
+            if switch_is_active(USE_NEW_THROTTLE_DEFAULTS_SWITCH):
+                raw_default = settings.REST_FRAMEWORK[
+                    "DEFAULT_THROTTLE_RATES"
+                ]["user"]
+                user_rates = (
+                    [raw_default]
+                    if isinstance(raw_default, str)
+                    else list(raw_default)
+                )
+            else:
+                user_rates = [LEGACY_USER_DEFAULT_RATE]
+        # Drop "0/..." rates — those mean blocked, not a throughput limit.
+        throttle_rates = [
+            parsed
+            for r in user_rates
+            if not r.startswith("0/")
+            and (parsed := parse_throttle_rate_for_template(r)) is not None
+        ]
+
     return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_usage", "page_title": "API Usage"},
+        {
+            "private": True,
+            "page": "api_usage",
+            "page_title": "API Usage",
+            "show_membership_features": show_membership_features,
+            "throttle_rates": throttle_rates,
+        },
     )
 
 
@@ -362,7 +446,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         deleted=False
     ).count()
     if request.method == "POST":
-        delete_form = AccountDeleteForm(request, request.POST)
+        delete_form = PasswordConfirmForm(request, request.POST)
         if delete_form.is_valid():
             email: EmailType = emails["account_deleted"]
             send_mail(
@@ -379,7 +463,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             return HttpResponseRedirect(reverse("delete_profile_done"))
 
     else:
-        delete_form = AccountDeleteForm(request=request)
+        delete_form = PasswordConfirmForm(request=request)
     return TemplateResponse(
         request,
         "profile/delete.html",

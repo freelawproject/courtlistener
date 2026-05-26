@@ -1,4 +1,4 @@
-import time
+import asyncio
 
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
@@ -45,7 +45,7 @@ class Command(cl_scrape_opinions.Command):
         super().add_arguments(parser)
         add_backscraper_arguments(parser)
 
-    def parse_and_scrape_site(
+    async def parse_and_scrape_site(
         self,
         mod: AbstractSite,
         options: dict,
@@ -68,7 +68,7 @@ class Command(cl_scrape_opinions.Command):
         """
         court_str = mod.__name__.split(".")[-1].split("_")[0]
         logger.info(f'Using court_str: "{court_str}"')
-        for site in site_yielder(
+        async for site in site_yielder(
             mod.Site(
                 backscrape_start=options.get("backscrape_start"),
                 backscrape_end=options.get("backscrape_end"),
@@ -77,15 +77,15 @@ class Command(cl_scrape_opinions.Command):
             mod,
             save_response_fn=save_response,
         ):
-            site.parse()
-            self.scrape_court(site, full_crawl=True)
+            await site.parse()
+            await self.scrape_court(site, full_crawl=True)
 
             if wait := options["backscrape_wait"]:
                 logger.info(
                     "Sleeping for %s seconds before continuing backscrape",
                     wait,
                 )
-                time.sleep(wait)
+                await asyncio.sleep(wait)
 
     def save_everything(self, items, backscrape=True):
         super().save_everything(items, backscrape)

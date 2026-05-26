@@ -30,9 +30,11 @@ from cl.lib.elasticsearch_utils import (
     compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
+    get_query_embedding,
     has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
+    merge_semantic_relevant_chunks,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
     simplify_estimated_count,
@@ -56,6 +58,7 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -644,6 +647,7 @@ def do_es_search(
     cache_key: str | None = None,
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
+    is_semantic_frontend_active: bool = False,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -677,7 +681,11 @@ def do_es_search(
     missing_citations_str: list[str] = []
     error = True
 
-    search_form = SearchForm(get_params, courts=courts)
+    search_form = SearchForm(
+        get_params,
+        courts=courts,
+        is_semantic_frontend_active=is_semantic_frontend_active,
+    )
     match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
@@ -712,6 +720,13 @@ def do_es_search(
                         remove_missing_citations(missing_citations, cd)
                     )
                     cd["q"] = suggested_query if suggested_query else cd["q"]
+
+            # For semantic searches, generate the embedding once so both
+            # the main query and the facets query reuse it instead of
+            # making duplicate calls to the inception microservice.
+            if has_semantic_params(cd) and not cd.get("embedding"):
+                cd["embedding"] = get_query_embedding(cd["q"])
+
             (
                 s,
                 child_docs_count_query,
@@ -727,6 +742,10 @@ def do_es_search(
                 page = 1
             cleaned_params = search_form.cleaned_data.copy()
             cleaned_params["page"] = page
+            # Use a smaller page size for semantic results so the longer
+            # chunk previews are less overwhelming to scan.
+            if has_semantic_params(cd):
+                rows = settings.SEMANTIC_SEARCH_PAGE_SIZE
             (
                 paged_results,
                 query_time,
@@ -740,6 +759,8 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
+            if has_semantic_params(cd):
+                merge_semantic_relevant_chunks(paged_results)
             cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
@@ -775,6 +796,9 @@ def do_es_search(
         except InvalidRelativeDateSyntax:
             error = True
             error_message = "invalid_relative_date_syntax"
+        except InputTooLongError:
+            error = True
+            error_message = "input_too_long_error"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(

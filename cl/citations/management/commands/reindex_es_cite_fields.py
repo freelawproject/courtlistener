@@ -51,7 +51,7 @@ class Command(VerboseCommand):
         start_id = options["start_id"]
         end_id = options["end_id"]
 
-        if not (start_id and end_id):
+        if start_id is None or end_id is None:
             raise ValueError("`start_id` and `end_id` should have values")
 
         if reindex_target == "citeCount":

@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import itertools
 import math
 import random
 import re
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
@@ -21,6 +23,11 @@ from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.state.texas import (
+    TexasOriginatingAppellateCourt,
+    TexasOriginatingDistrictCourt,
+)
+from juriscraper.state.texas.common import CourtID, CourtType
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import logger
@@ -33,6 +40,48 @@ from cl.people_db.models import Person
 from cl.search.models import Citation, Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+PAGINATION_BATCH_SIZE = 2000
+
+
+def paginate_docs_queryset(
+    queryset: QuerySet,
+    batch_size: int = PAGINATION_BATCH_SIZE,
+    desc: bool = False,
+) -> Generator:
+    """Paginate a queryset using pk-based keyset pagination.
+
+    Uses pk-based filtering to avoid server-side cursors that hold
+    open DB connections (which time out during long celery waits).
+
+    :param queryset: A .values_list("pk", flat=True) queryset.
+    :param batch_size: Number of rows to fetch per query.
+    :param desc: If True, iterate in descending pk order.
+    :return: Yields individual pk values.
+    """
+    if desc:
+        # No upper-bound sentinel exists for PKs, so None means
+        # "first page, no filter yet"; subsequent pages use pk__lt.
+        last_pk: int | None = None
+        while True:
+            page = queryset.order_by("-pk")
+            if last_pk is not None:
+                page = page.filter(pk__lt=last_pk)
+            batch = list(page[:batch_size])
+            if not batch:
+                break
+            yield from batch
+            last_pk = batch[-1]
+    else:
+        last_pk_asc = 0
+        while True:
+            batch = list(
+                queryset.filter(pk__gt=last_pk_asc).order_by("pk")[:batch_size]
+            )
+            if not batch:
+                break
+            yield from batch
+            last_pk_asc = batch[-1]
 
 
 def extract_file_name_from_url(url: str) -> str:
@@ -75,13 +124,6 @@ class OpinionTypeException(Exception):
 
 class DocketSourceException(Exception):
     """An exception for wrong docket source"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-class ClusterSourceException(Exception):
-    """An exception for wrong cluster source"""
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -1126,38 +1168,47 @@ def make_iquery_probing_key(court_id: str) -> str:
     return f"iquery.probing.enqueued:{court_id}"
 
 
-def compute_binary_probe_jitter(testing: bool) -> int:
+def compute_binary_probe_jitter(
+    testing: bool, max_probe: int | None = None
+) -> int:
     """Compute the jitter for binary probes.
 
     :param testing: A boolean flag indicating whether the function is being
     executed in a testing environment. If True, jitter is disabled and returns 0.
+    :param max_probe: Optional override for the geometric step cap. Defaults to
+    ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range (e.g.
+    the SCOTUS daemon) pass their own cap so the jitter scales accordingly.
     :return: An integer representing the jitter value for binary probes.
     """
 
-    # The jitter will be a random value between 1 and half of IQUERY_MAX_PROBE.
-    return (
-        random.randint(1, round(settings.IQUERY_MAX_PROBE * 0.5))
-        if not testing
-        else 0
-    )
+    if max_probe is None:
+        max_probe = settings.IQUERY_MAX_PROBE
+    # The jitter will be a random value between 1 and half of max_probe.
+    return random.randint(1, round(max_probe * 0.5)) if not testing else 0
 
 
 def compute_next_binary_probe(
-    highest_known_pacer_case_id: int, iteration: int, jitter: int
+    highest_known_pacer_case_id: int,
+    iteration: int,
+    jitter: int,
+    max_probe: int | None = None,
 ) -> tuple[int, int]:
     """Compute the next binary probe target for a given PACER case ID.
 
     This computes the next probe target using a geometric sequence
     based on the current iteration (2 ** (iteration - 1)), with the increase
-    capped by the IQUERY_MAX_PROBE setting. Once the geometric value reaches
-    this cap, subsequent increments grow linearly by the cap value.
-    In non-testing mode, and except for the first iteration, a jitter is added
-    to the next value to ensure that probing values are not the same as in the
-    previous iteration, increasing the chances of getting a hit.
+    capped by ``max_probe``. Once the geometric value reaches this cap,
+    subsequent increments grow linearly by the cap value. In non-testing mode,
+    and except for the first iteration, a jitter is added to the next value to
+    ensure that probing values are not the same as in the previous iteration,
+    increasing the chances of getting a hit.
 
     :param highest_known_pacer_case_id: The final PACER case ID.
     :param iteration: The current probe iteration number.
     :param jitter: The jitter value to apply.
+    :param max_probe: Optional override for the geometric step cap. Defaults
+    to ``settings.IQUERY_MAX_PROBE``. Callers with a smaller search range
+    (e.g. the SCOTUS daemon) pass their own cap.
     :return: The updated probe_iteration and the PACER case ID to lookup and
     the probe offset + jitter computed.
     """
@@ -1165,7 +1216,8 @@ def compute_next_binary_probe(
     # Avoid applying jitter on the first iteration to speed up
     # the detection of new cases once courts catch up.
     jitter = 0 if iteration == 1 else jitter
-    max_probe = settings.IQUERY_MAX_PROBE
+    if max_probe is None:
+        max_probe = settings.IQUERY_MAX_PROBE
     cap_iteration = int(math.log2(max_probe)) + 1
     if iteration < cap_iteration:
         offset = 2 ** (iteration - 1)
@@ -1175,22 +1227,24 @@ def compute_next_binary_probe(
     return pacer_case_id_to_lookup, offset + jitter
 
 
-def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
+def compute_blocked_court_wait(
+    court_blocked_attempts: int,
+    base_wait: int | None = None,
+) -> tuple[int, int]:
     """Compute the wait time for the current attempt and the total accumulated
     seconds from previous attempts.
 
     :param court_blocked_attempts: The current number of blocked attempts.
+    :param base_wait: Base wait in seconds for the exponential backoff.
+        Defaults to ``settings.IQUERY_COURT_BLOCKED_WAIT``.
     :return: A tuple containing the wait time for the current attempt and the
     total accumulated seconds.
     """
+    if base_wait is None:
+        base_wait = settings.IQUERY_COURT_BLOCKED_WAIT  # type: ignore[assignment]
 
-    current_wait_time = int(
-        settings.IQUERY_COURT_BLOCKED_WAIT * 2 ** (court_blocked_attempts - 1)
-    )
-    total_accumulated_time = sum(
-        settings.IQUERY_COURT_BLOCKED_WAIT * 2**i
-        for i in range(court_blocked_attempts)
-    )
+    current_wait_time = int(base_wait * 2 ** (court_blocked_attempts - 1))
+    total_accumulated_time = base_wait * (2**court_blocked_attempts - 1)
     return current_wait_time, total_accumulated_time
 
 
@@ -1311,3 +1365,49 @@ class DownloadPDFResult:
 
     success: bool
     sha1: str | None = None
+
+
+def texas_js_court_id_to_court_id(js_court_id: str) -> str | None:
+    """Translates a Juriscraper Texas court ID to a CourtListener Court ID.
+
+    :param js_court_id: The court ID extracted from Juriscraper.
+    :return: The corresponding Court ID or None if invalid."""
+    if js_court_id == CourtID.SUPREME_COURT.value:
+        return "tex"
+    if js_court_id == CourtID.COURT_OF_CRIMINAL_APPEALS.value:
+        return "texcrimapp"
+    if js_court_id == CourtID.UNKNOWN.value:
+        logger.error("Unknown court ID: %s", js_court_id)
+        return None
+    # Court of appeals
+    appellate_number = str(int(js_court_id.removeprefix("texas_coa")))
+    return f"txctapp{appellate_number}"
+
+
+def texas_originating_court_to_court_id(
+    court_data: TexasOriginatingAppellateCourt | TexasOriginatingDistrictCourt,
+) -> str | None:
+    """Attempts to translate Juriscraper Texas originating court data to a
+    CourtListener Court ID.
+
+    :param court_data: The originating court data from Juriscraper.
+    :return: The matching Court ID or None if no court could be found."""
+    court_type = court_data["court_type"]
+    match court_type:
+        case CourtType.APPELLATE.value:
+            return texas_js_court_id_to_court_id(court_data["court_id"])
+        case CourtType.DISTRICT.value:
+            district_number = court_data["district"]
+            if district_number:
+                if district_number > 1:
+                    district_number = district_number + 1
+                return f"texdistct{district_number}"
+            return "texdistct"
+        case CourtType.BUSINESS.value:
+            return "texbizct"
+        case CourtType.MUNICIPAL.value:
+            return "texctyct"
+        case CourtType.PROBATE.value:
+            return "texprobct"
+    # County, justice, and unknown court types
+    return None

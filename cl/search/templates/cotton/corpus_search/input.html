@@ -82,8 +82,8 @@
       </div>
       <p class="text-sm">If you would like assistance crafting a query, let us know. We can sometimes help.</p>
       <div class="flex flex-col md:flex-row justify-end gap-2">
-        <button x-on:click="close" type="button" class="btn-outline max-md:w-full justify-center max-md:order-2" aria-label="Close modal">Close</button>
-        <a href="{% url 'advanced_search' %}" class="btn-primary max-md:w-full justify-center max-md:order-1">Learn More</a>
+        <c-button variant="outline" x-on:click="close" class="max-md:w-full justify-center max-md:order-2" aria-label="Close modal">Close</c-button>
+        <c-button variant="primary" href="{% url 'advanced_search' %}" class="max-md:w-full justify-center max-md:order-1">Learn More</c-button>
       </div>
     </c-slot>
   </c-dialog>

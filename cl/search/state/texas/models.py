@@ -10,6 +10,17 @@ from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 __all__ = ["TexasDocketEntry", "TexasDocument"]
 
 
+class ProcessingError:
+    BAD_URL = 1
+    EXTRACTION_FAILURE = 2
+    SEALED = 3
+    CHOICES = (
+        (BAD_URL, "Bad URL"),
+        (EXTRACTION_FAILURE, "Extraction Failure"),
+        (SEALED, "Sealed"),
+    )
+
+
 @pghistory.track()
 @document_model
 class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
@@ -71,6 +82,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     :ivar media_version_id: The MediaVersionID parameter from the download
     URL that TAMES provided. Used to perform document merging.
     :ivar url: The download URL that TAMES provided for this document.
+    :ivar processing_error: The processing error for the document, if any.
     """
 
     docket_entry = models.ForeignKey(
@@ -80,6 +92,13 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
     url = models.URLField(max_length=250)
+    processing_error = models.SmallIntegerField(
+        choices=ProcessingError.CHOICES,
+        null=True,
+        blank=True,
+        help_text="The processing error for the document, if any.",
+        db_comment="The processing error for the document, if any.",
+    )
 
     class Meta:
         app_label = "search"
