@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from itertools import product
@@ -14,6 +15,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.cache import cache as django_cache
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -26,6 +28,8 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from rest_framework.authtoken.models import Token
+from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
@@ -447,6 +451,104 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             response,
             reverse("delete_profile_done"),
         )
+
+    async def test_reset_api_token_get_renders_confirmation(self) -> None:
+        """The reset page renders a password-confirmation form."""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Reset My API Token")
+        self.assertContains(r, "csrfmiddlewaretoken")
+
+    async def test_reset_api_token_shows_recent_usage_count(self) -> None:
+        """The confirmation page surfaces the recent API request count."""
+        # Prime the throttle cache the same way ExceptionalUserRateThrottle
+        # does: a list of unix timestamps keyed by user pk. We seed three
+        # recent timestamps and one outside the 5-minute window.
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        now_ts = time.time()
+        cache_key = UserRateThrottle.cache_format % {
+            "scope": "user",
+            "ident": user.pk,
+        }
+        django_cache.set(
+            cache_key,
+            [now_ts - 1, now_ts - 60, now_ts - 290, now_ts - 600],
+        )
+        self.addCleanup(django_cache.delete, cache_key)
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "<strong>3</strong>")
+        self.assertContains(r, "fa-exclamation-triangle")
+        self.assertContains(r, "alert-warning")
+
+    async def test_reset_api_token_rotates_with_valid_password(self) -> None:
+        """Posting the correct password swaps the token for a new one."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("view_api_token"))
+
+        # Exactly one token still exists for the user, and the key changed.
+        tokens = Token.objects.filter(user=user)
+        self.assertEqual(await tokens.acount(), 1)
+        new_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertNotEqual(new_key, old_key)
+
+    async def test_reset_api_token_rejects_wrong_password(self) -> None:
+        """A wrong password leaves the existing token untouched."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "not-the-password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Your password was invalid")
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
+
+    async def test_reset_api_token_requires_login(self) -> None:
+        """Anonymous POSTs are redirected to login, no token is changed."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r.headers.get("Location", ""))
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
 
     def test_generate_recap_dot_email_addresses(self) -> None:
         # Test simple username
