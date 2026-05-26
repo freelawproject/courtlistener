@@ -57,6 +57,9 @@ case "$1" in
 'llm-clean-docket-number-daemon')
     exec ./manage.py llm_clean_docket_number_daemon
     ;;
+'reenqueue-pending-audio-tasks-daemon')
+    exec ./manage.py reenqueue_pending_audio_tasks_daemon
+    ;;
 'cl-send-rt-percolator-alerts')
     exec ./manage.py cl_send_rt_percolator_alerts
     ;;

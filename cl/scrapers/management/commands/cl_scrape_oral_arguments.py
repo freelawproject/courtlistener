@@ -2,15 +2,14 @@ from datetime import date
 from typing import Any
 
 from asgiref.sync import async_to_sync, sync_to_async
-from celery.canvas import chain
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl import settings
+from cl.audio.dispatch import dispatch_process_audio_file
 from cl.audio.models import Audio
-from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_scotus_judges
@@ -18,7 +17,6 @@ from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
-from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
     check_duplicate_ingestion,
     get_extension,
@@ -147,12 +145,12 @@ class Command(cl_scrape_opinions.Command):
             items={"docket": docket, "audio_file": audio_file},
             backscrape=backscrape,
         )
-        await sync_to_async(
-            chain(
-                process_audio_file.si(audio_file.pk),
-                transcribe_from_open_ai_api.si(audio_file.pk),
-            ).apply_async
-        )()
+        # Kick off the audio standardization stage through the lock-protected
+        # dispatcher. Transcription is not chained from here — once the
+        # standardization task sets duration, reenqueue_pending_audio_tasks_
+        # daemon picks the audio up on a future cycle and paces the OpenAI
+        # call across the cluster.
+        await sync_to_async(dispatch_process_audio_file)(audio_file.pk)
 
         logger.info(
             "Successfully added audio file %s: %s",
