@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from elasticsearch_dsl import Document
+from elasticsearch.dsl import Document
 from lxml import html as lhtml
 from waffle.testutils import override_flag
 
