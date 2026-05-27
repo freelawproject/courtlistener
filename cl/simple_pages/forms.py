@@ -43,10 +43,9 @@ class ContactForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control"})
     )
 
-    # Required for anonymous submitters, forbidden for logged-in submitters
-    # (the form rejects an emailed payload for authenticated users). The
-    # logged-in path uses the account email so support staff don't have a
-    # spoofable address to verify against.
+    # Required for anonymous submitters, ignored for logged-in submitters
+    # This allows support staff to trust the email provided to Zoho Desk be
+    # auth'ed users.
     email = forms.EmailField(
         required=False,
         widget=forms.TextInput(attrs={"class": "form-control"}),
@@ -262,17 +261,10 @@ class ContactForm(forms.Form):
 
         issue = cleaned_data.get("issue_type", "")
 
-        email = cleaned_data.get("email", "")
-        if self.is_authenticated and email:
-            # The email field is hidden in the template for authenticated
-            # users, so raise this as a form-level error rather than a
-            # field error — otherwise it would have nowhere to render.
-            self.add_error(
-                None,
-                "Don't provide an email address while logged in — we use "
-                "your account's email automatically.",
-            )
-        elif not self.is_authenticated and not email:
+        email = self._get_email()
+        if not self.is_authenticated and not email:
+            # Only unauthenticated users have the email field on the front end
+            # and the possibility of it being left blank.
             self.add_error("email", "Please provide your email address.")
 
         # Require documentation checkbox for support-type issues
@@ -459,12 +451,8 @@ class ContactForm(forms.Form):
         # paragraph in Zoho Desk.
         return "<br><br>".join(lines)
 
-    def _effective_email(self) -> str:
-        """Return the email used to classify and route this submission.
-
-        Logged-in users have an empty form email by design; we use their
-        account email instead so government-domain detection still works.
-        """
+    def _get_email(self) -> str:
+        """Return the email for the form"""
         if self.is_authenticated:
             return self.account_email
         return self.cleaned_data.get("email", "")
@@ -472,7 +460,7 @@ class ContactForm(forms.Form):
     def _is_sealing_order(self) -> bool:
         """Check if this submission should be treated as a sealing order."""
         cd = self.cleaned_data
-        email = self._effective_email()
+        email = self._get_email()
         if email.lower().endswith(("@uscourts.gov", "@usdoj.gov")):
             return True
         if cd.get("issue_type") != self.REMOVAL_REQUEST:
