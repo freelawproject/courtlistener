@@ -800,22 +800,29 @@ def get_all_throttle_overrides(
     return overrides
 
 
-def apply_membership_throttles(user: User, level: int) -> None:
-    """Replace the user's MEMBERSHIP-source API throttles with the rates
-    for ``level``.
+def apply_membership_throttles(user: User, level: int) -> bool:
+    """
+    Sync a user's MEMBERSHIP-based API throttles to match the given membership level.
 
-    MANUAL-source rows are left untouched. They take precedence over
-    MEMBERSHIP rows in get_all_throttle_overrides regardless of time
-    unit.
+    This function replaces all existing MEMBERSHIP-source `APIThrottle` records for the user
+    with the rate limits defined for the provided `level`.
 
-    No-op when:
+    Important behavior:
+    - Only throttles with `source=MEMBERSHIP` are modified.
+    - MANUAL-source throttles are never modified and always take precedence over MEMBERSHIP
+      throttles in `get_all_throttle_overrides`.
+    - Existing MEMBERSHIP throttles are fully removed before new ones are created.
 
-    - the SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off
-    - the level has no entry in LEVEL_TO_RATES (e.g. Commercial,
-      BASIC, old groups)
+    This function is a no-op when:
+    - The `SYNC_MEMBERSHIP_THROTTLES_SWITCH` feature flag is disabled
+    - The provided `level` does not exist in `LEVEL_TO_RATES`
+      (e.g., unsupported, legacy, or commercial levels)
+
+    Returns:
+        bool: True if throttles were successfully applied, False if skipped.
     """
     if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
-        return
+        return False
 
     rates = LEVEL_TO_RATES.get(level)
     if rates is None:
@@ -824,7 +831,7 @@ def apply_membership_throttles(user: User, level: int) -> None:
             level,
             user.username,
         )
-        return
+        return False
 
     with transaction.atomic():
         APIThrottle.objects.filter(
@@ -841,6 +848,7 @@ def apply_membership_throttles(user: User, level: int) -> None:
                 notes=f"Set by Neon membership level={level}.",
             )
     clear_tiered_cache()
+    return True
 
 
 def clear_membership_throttles(user: User) -> None:
