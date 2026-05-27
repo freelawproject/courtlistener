@@ -4473,6 +4473,26 @@ class RefreshAPIThrottlesAdminTest(TestCase):
         self.assertTrue(any("no active Neon membership" in m for m in msgs))
         self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
 
+    def test_action_warns_when_level_has_no_mapping(self):
+        """An active membership whose level isn't in LEVEL_TO_RATES is reported."""
+        # BASIC has no entry in LEVEL_TO_RATES, so apply_membership_throttles
+        # returns False even though the membership is active.
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="basic",
+            level=NeonMembershipLevel.BASIC,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        r = self._run_action(self.target.pk)
+
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no matching membership level" in m for m in msgs))
+        # No success message should appear, and no rows should be written.
+        self.assertFalse(any("Refreshed API throttles" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
     def test_action_handles_mixed_queryset(self):
         """Action refreshes active members and skips inactive ones in one run."""
         active = UserProfileWithParentsFactory().user

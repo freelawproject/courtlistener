@@ -115,6 +115,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         """
         refreshed = 0
         skipped: list[str] = []
+        not_updated: list[str] = []
 
         for user in queryset.select_related("membership"):
             try:
@@ -126,18 +127,28 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
                 skipped.append(user.username)
                 continue
 
-            apply_membership_throttles(user, membership.level)
-            refreshed += 1
+            if apply_membership_throttles(user, membership.level):
+                refreshed += 1
+            else:
+                not_updated.append(user.username)
 
         if refreshed:
-            messages.success(
+            self.message_user(
                 request,
                 f"Refreshed API throttles for {refreshed} user(s).",
+                level=messages.SUCCESS,
             )
         if skipped:
-            messages.warning(
+            self.message_user(
                 request,
                 f"Skipped (no active Neon membership): {', '.join(skipped)}",
+                level=messages.ERROR,
+            )
+        if not_updated:
+            self.message_user(
+                request,
+                f"Could not refresh throttles (no matching membership level): {', '.join(not_updated)}",
+                level=messages.ERROR,
             )
 
     def api_calls_count(self, obj):
