@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.mail import EmailMessage
+from django.core.paginator import Page
 from django.db.models import (
     Case,
     Count,
@@ -663,6 +664,9 @@ async def components(request: HttpRequest) -> HttpResponse:
     class MockPaginator:
         num_pages = 10
 
+        def validate_number(self, number: int) -> int:
+            return number
+
     class MockPageObj:
         number = 3
         has_previous = True
@@ -694,7 +698,7 @@ async def components(request: HttpRequest) -> HttpResponse:
         "components.html",
         {
             "private": True,
-            "demo_docket_entries": demo_entries,
+            "demo_docket_entries": Page(demo_entries, 3, MockPaginator()),
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
             "demo_filter_form": MockDocketFilterForm(),

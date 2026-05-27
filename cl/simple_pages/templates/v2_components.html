@@ -33,6 +33,7 @@
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#docket-page', 'text': 'Docket page'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
+        {'href': '#docket-entries-panel', 'text': 'Docket entries panel'},
         {'href': '#docket-filter', 'text': 'Docket filter'},
         {'href': '#metadata-section', 'text': 'Metadata section'},
       ]},
@@ -1556,6 +1557,35 @@ Sample code here.
     <c-expansion-panel title="Code">
       <c-code>
 &lt;c-docket-entry-rows :docket_entries="docket_entries" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET ENTRIES PANEL #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-entries-panel">
+    <h2 class="mt-6 mb-3">Docket entries panel</h2>
+    <p>Wraps the docket entries list with its full pagination controls — a <code>&lt;c-docket-entry-rows&gt;</code> followed by a <code>&lt;c-pagination&gt;</code> strip (first / previous / page indicator / next / last). Both children read from a single <code>:docket_entries</code> page object.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">Two entries (one main with documents, one minute entry) followed by full pagination. The demo page is configured as "page 3 of 10" so prev/next are both enabled.</p>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4">
+      <c-docket-entries-panel :docket_entries="demo_docket_entries" />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_entries</code></c-slot>
+        <c-slot name="description">A page-like object that is both iterable (yields the entries for the current page) AND exposes Django paginator-page attributes (<code>.number</code>, <code>.has_previous</code>, <code>.has_next</code>, <code>.paginator.num_pages</code>, <code>.previous_page_number()</code>, <code>.next_page_number()</code>). In production this is a Django <code>Paginator.page()</code> result. See <code>&lt;c-docket-entry-rows&gt;</code> for the per-entry field requirements.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-entries-panel :docket_entries="docket_entries" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
