@@ -5190,7 +5190,7 @@ class MembershipThrottleSyncTest(TestCase):
         for level, rates in LEVEL_TO_RATES.items():
             with self.subTest(level=level):
                 user = UserFactory()
-                apply_membership_throttles(user, level)
+                self.assertTrue(apply_membership_throttles(user, level))
                 got = list(
                     APIThrottle.objects.filter(
                         user=user,
@@ -5262,9 +5262,11 @@ class MembershipThrottleSyncTest(TestCase):
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
 
     def test_unknown_level_is_no_op(self) -> None:
-        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows."""
+        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows and return False."""
         user = UserFactory()
-        apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        self.assertFalse(
+            apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        )
         self.assertFalse(APIThrottle.objects.filter(user=user).exists())
 
     @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
@@ -5278,7 +5280,9 @@ class MembershipThrottleSyncTest(TestCase):
             source=APIThrottle.Source.MEMBERSHIP,
         )
 
-        apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+        self.assertFalse(
+            apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+        )
         rates_after_apply = list(
             APIThrottle.objects.filter(user=user).values_list(
                 "rate", flat=True
