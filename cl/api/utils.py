@@ -887,6 +887,12 @@ def get_recent_api_request_count(user: User, window_seconds: int) -> int:
     return sum(1 for ts in history if ts > cutoff)
 
 
+class TagRateThrottle(UserRateThrottle):
+    """Higher dedicated rate limit for the tag endpoints."""
+
+    scope = "tags"
+
+
 class ExceptionalUserRateThrottle(UserRateThrottle):
     """User rate throttle that supports multiple simultaneous rate limits.
 
