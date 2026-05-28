@@ -84,25 +84,33 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         self.assertIn("Email Confirmed: Yes", description)
         self.assertNotIn("User Email:", description)
 
-    async def test_logged_in_user_cannot_submit_email(
+    async def test_logged_in_user_email_field_is_ignored(
         self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
-        """Logged-in users posting an email get the form rejected.
+        """An email submitted by a logged-in user must not reach Zoho.
 
-        Typing an arbitrary email while logged in is a confusing path
-        that can mislead support on sensitive requests, so it must
-        fail validation rather than be silently dropped.
+        A malicious or confused logged-in user might POST a fake email
+        (the field exists on the form even though the template hides
+        it). Support staff rely on Zoho's email coming from the
+        authenticated account, so the submitted value must be ignored
+        in favor of the account email.
         """
         self.assertTrue(
             await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
-        response = await self.async_client.post(
-            reverse("contact"), self.test_msg
-        )
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        mock_task.delay.assert_not_called()
+        msg = self.test_msg.copy()
+        msg["email"] = "malevolent@evil.com"
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        kwargs = mock_task.delay.call_args.kwargs
+        pandora_email = await User.objects.values_list(
+            "email", flat=True
+        ).aget(username="pandora")
+        self.assertEqual(kwargs["email"], pandora_email)
+        self.assertNotIn("malevolent@evil.com", kwargs["description"])
 
     async def test_contact_logged_out(
         self, mock_captcha: MagicMock, mock_task: MagicMock
