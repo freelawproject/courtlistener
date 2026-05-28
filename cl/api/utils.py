@@ -824,9 +824,9 @@ def apply_membership_throttles(
         user: The user whose throttles are being synced.
         level: The Neon membership level to map to a set of rates.
         clear_cache: When True, call ``clear_tiered_cache()`` after writing
-            the new throttle rows. Default False so batch callers (e.g. the
-            admin ``refresh_api_throttles`` action) can clear once after the
-            loop instead of on every iteration.
+            the new throttle rows. Defaults to False, allowing batch callers
+            to defer cache clearing until after a loop and avoid repeated
+            invalidations on each iteration.
 
     Returns:
         bool: True if throttles were successfully applied, False if skipped.
