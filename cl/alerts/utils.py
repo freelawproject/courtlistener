@@ -8,9 +8,9 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
-from elasticsearch_dsl import MultiSearch, Q, Search
-from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit
+from elasticsearch.dsl import MultiSearch, Q, Search
+from elasticsearch.dsl.query import Query
+from elasticsearch.dsl.response import Hit
 from redis import Redis
 
 from cl.alerts.models import (

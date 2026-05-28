@@ -35,6 +35,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.corpus_importer.tasks import (
     merge_scotus_docket as real_merge_scotus_docket,
 )
+from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.model_helpers import make_texas_docket_number_core
@@ -65,6 +66,7 @@ from cl.scrapers.management.commands.merge_opinion_versions import (
 )
 from cl.scrapers.models import AccountSubscription, Scraper, UrlHash
 from cl.scrapers.tasks import (
+    extract_formatted_text_document_base,
     extract_opinion_content,
     find_and_merge_versions,
     process_audio_file,
@@ -117,6 +119,7 @@ from cl.search.models import (
 )
 from cl.search.state.texas.factories import (
     TexasCourtOfAppealsDocketDictFactory,
+    TexasDocumentFactory,
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
@@ -229,6 +232,11 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             oci.docket_number, "09-2222", "New OCI.docket_number was not saved"
         )
         self.assertEqual(
+            oci.docket_number_raw,
+            "09-2222",
+            "New OCI.docket_number_raw was not saved",
+        )
+        self.assertEqual(
             oci.assigned_to_str,
             "another jalal",
             "New OCI.assigned_to_str was not saved",
@@ -238,6 +246,11 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             d_1.originating_court_information.docket_number,
             "09-1111",
             "Existing OCI.docket_number number changed",
+        )
+        self.assertEqual(
+            d_1.originating_court_information.docket_number_raw,
+            "09-1111",
+            "Existing OCI.docket_number_raw number changed",
         )
         self.assertEqual(
             d_1.originating_court_information.assigned_to_str,
@@ -549,6 +562,46 @@ class IngestionTest(TestCase):
                 "html/2025/04/25/zelka_h.v.a.c._maintenance_solutions_inc._v._g.m._crisalli__assoc._inc._12.html"
             )
             error_mock.assert_called()
+
+
+class ExtractFormattedTextSanitizationTest(TestCase):
+    """Tests that extract_formatted_text_document_base scrubs content
+    that PostgreSQL won't accept (e.g. NUL bytes) before saving."""
+
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    def test_nul_bytes_in_extracted_content_are_stripped(
+        self, microservice_mock
+    ):
+        """Does extraction strip NUL bytes so the save does not raise
+        DataError ('PostgreSQL text fields cannot contain NUL (0x00) bytes')?
+        """
+        texas_document = TexasDocumentFactory.create()
+        # Doctor occasionally returns extracted text containing NUL bytes
+        # (e.g. from malformed PDFs). PostgreSQL rejects these in text
+        # columns, so the extractor must strip them before saving.
+        content_with_nuls = (
+            "Hello\0 world\x00. Hello " + chr(0) + "Courtlistener."
+        )
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": content_with_nuls,
+                "extracted_by_ocr": False,
+            },
+        )
+
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            ocr_available=False,
+            model_name="search.TexasDocument",
+        )
+
+        texas_document.refresh_from_db()
+        self.assertNotIn("\x00", texas_document.plain_text)
+        self.assertIn("Hello", texas_document.plain_text)
+        self.assertIn("world", texas_document.plain_text)
+        self.assertIn("Courtlistener", texas_document.plain_text)
 
 
 class ExtensionIdentificationTest(SimpleTestCase):
@@ -1198,7 +1251,17 @@ class UpdateFromTextCommandTest(TestCase):
             "Unpublished docket should not be modified",
         )
         self.assertEqual(
+            self.opinion_2020_unpub.cluster.docket.docket_number_raw,
+            "13",
+            "Unpublished docket should not be modified",
+        )
+        self.assertEqual(
             self.opinion_2020.cluster.docket.originating_court_information.docket_number,
+            "18-2222",
+            "Originating Court Information was not created",
+        )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.originating_court_information.docket_number_raw,
             "18-2222",
             "Originating Court Information was not created",
         )
@@ -2238,6 +2301,51 @@ class SubscribeToSCOTUSTest(TestCase):
         clean = process_scotus_captcha_transcription(messy)
         self.assertEqual(clean, "rj573")
 
+    def test_transcription_cleaning_non_space_separators(self):
+        # Whisper/gpt-4o-transcribe often return tokens separated by commas,
+        # periods, or newlines instead of single spaces. The split should
+        # treat any run of non-alphanumerics as a separator.
+        for transcription in [
+            "Alpha,Bravo,Charlie,Delta,Echo",
+            "Alpha. Bravo. Charlie. Delta. Echo",
+            "alpha\nbravo\ncharlie\ndelta\necho",
+        ]:
+            with self.subTest(transcription=transcription):
+                self.assertEqual(
+                    process_scotus_captcha_transcription(transcription),
+                    "abcde",
+                )
+
+    def test_transcription_cleaning_trailing_punctuation(self):
+        # Real CAPTCHA transcriptions frequently end with a period. Trailing
+        # non-alphanumerics must not produce a phantom 6th word.
+        self.assertEqual(
+            process_scotus_captcha_transcription(
+                "Eight Victor Lima Hotel four."
+            ),
+            "8vlh4",
+        )
+        self.assertEqual(
+            process_scotus_captcha_transcription(
+                "8. Five. Delta. Papa. Foxtrot."
+            ),
+            "85dpf",
+        )
+
+    def test_transcription_cleaning_raises_scrape_failed_on_short(self):
+        # Under-counted transcriptions (the original #7266 Sentry case) must
+        # raise ScrapeFailed so the celery task autoretries with a fresh
+        # CAPTCHA, rather than ValueError which propagates as a hard error.
+        with self.assertRaises(ScrapeFailed):
+            process_scotus_captcha_transcription("Yankee four Victor.")
+
+    def test_transcription_cleaning_raises_scrape_failed_on_long(self):
+        # Whisper-1 occasionally hallucinates extra tokens (we observed an
+        # 8-token loop and a 10-token counting sequence in our probe).
+        # Over-counts must also trigger a retry, not silently truncate.
+        with self.assertRaises(ScrapeFailed):
+            process_scotus_captcha_transcription("4. 2. 3. 4. 2. 3. 4. 2.")
+
     @responses.activate
     @mock.patch("django.conf.settings.OPENAI_TRANSCRIPTION_KEY", "123")
     @mock.patch("cl.scrapers.tasks.call_llm_transcription")
@@ -2513,6 +2621,101 @@ class TexasCaseMailIntegrationTest(TestCase):
         mock_parse_text.assert_called_once_with(fake_docket_html)
 
         self.assertEqual(await Docket.objects.acount(), 1)
+
+    @mock.patch("cl.recap.tasks.time.sleep")
+    @mock.patch("cl.recap.tasks.merge_texas_docket")
+    async def test_texas_email_parse_failure_inline_retry_then_fails(
+        self,
+        mock_merge,
+        mock_sleep,
+        mock_coa_scraper,
+        mock_storage_cls,
+        mock_httpx_get,
+    ):
+        """Both initial and inline-retry parse failures should mark FAILED."""
+        mock_storage = mock_storage_cls.return_value
+        mock_storage.open = mock.mock_open(read_data=self.email_data)
+
+        mock_response = MagicMock()
+        mock_response.text = "<html>boom</html>"
+        mock_response.status_code = 200
+        mock_response.url = (
+            "https://search.txcourts.gov/Case.aspx?cn=01-24-00089-CV&coa=coa01"
+        )
+        mock_response.history = []
+        mock_httpx_get.return_value = mock_response
+
+        mock_scraper_instance = mock_coa_scraper.return_value
+        mock_scraper_instance._parse_text = MagicMock(
+            side_effect=ValueError("Case events table not found.")
+        )
+
+        with patch.object(process_texas_email, "delay"):
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        epq = await EmailProcessingQueue.objects.afirst()
+
+        await sync_to_async(process_texas_email)(epq.pk)
+
+        await epq.arefresh_from_db()
+        self.assertEqual(epq.status, PROCESSING_STATUS.FAILED)
+        self.assertIn("Failed to parse Texas docket", epq.status_message)
+        self.assertEqual(mock_scraper_instance._parse_text.call_count, 2)
+        self.assertEqual(mock_httpx_get.call_count, 2)
+        mock_sleep.assert_called_once_with(60)
+        mock_merge.assert_not_called()
+
+    @mock.patch("cl.recap.tasks.time.sleep")
+    @mock.patch("cl.recap.tasks.merge_texas_docket")
+    async def test_texas_email_parse_transient_failure_recovers(
+        self,
+        mock_merge,
+        mock_sleep,
+        mock_coa_scraper,
+        mock_storage_cls,
+        mock_httpx_get,
+    ):
+        """A transient parse failure on the first try should recover on retry."""
+        mock_storage = mock_storage_cls.return_value
+        mock_storage.open = mock.mock_open(read_data=self.email_data)
+
+        mock_response = MagicMock()
+        mock_response.text = "<html>case page</html>"
+        mock_response.status_code = 200
+        mock_response.url = (
+            "https://search.txcourts.gov/Case.aspx?cn=01-24-00089-CV&coa=coa01"
+        )
+        mock_response.history = []
+        mock_httpx_get.return_value = mock_response
+
+        mock_scraper_instance = mock_coa_scraper.return_value
+        mock_scraper_instance._parse_text = MagicMock(
+            side_effect=[ValueError("Case events table not found."), None]
+        )
+        mock_scraper_instance.data = self.docket_data
+
+        merge_result = MagicMock()
+        merge_result.creates = {}
+        merge_result.updates = {}
+        mock_merge.return_value = merge_result
+
+        with patch.object(process_texas_email, "delay"):
+            response = await self.async_client.post(
+                self.path, self.post_data, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        epq = await EmailProcessingQueue.objects.afirst()
+
+        await sync_to_async(process_texas_email)(epq.pk)
+
+        await epq.arefresh_from_db()
+        self.assertEqual(epq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertEqual(mock_scraper_instance._parse_text.call_count, 2)
+        self.assertEqual(mock_httpx_get.call_count, 2)
+        mock_sleep.assert_called_once_with(60)
+        mock_merge.assert_called_once()
 
 
 @mock.patch("cl.recap.tasks.merge_scotus_docket")

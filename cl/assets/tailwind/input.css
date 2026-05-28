@@ -219,4 +219,11 @@
   .capped-width {
     @apply w-full max-w-[--content-max-width] mx-auto;
   }
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    @apply hidden;
+  }
 }

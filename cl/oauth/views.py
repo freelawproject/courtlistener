@@ -48,9 +48,16 @@ def _invalid_metadata(description: str) -> Response:
     )
 
 
+def get_dcr_rate(group: str, request: Request) -> str:
+    return settings.OAUTH2_DCR_RATELIMIT
+
+
 @method_decorator(
     ratelimit(
-        key=get_ip_for_ratelimiter, rate="10/h", block=True, method="POST"
+        key=get_ip_for_ratelimiter,
+        rate=get_dcr_rate,
+        block=True,
+        method="POST",
     ),
     name="post",
 )
@@ -170,6 +177,6 @@ class OAuthMetadataView(APIView):
                 ),
                 "code_challenge_methods_supported": ["S256"],
                 "scopes_supported": scopes_supported,
-                "service_documentation": base + reverse("rest_docs"),
+                "service_documentation": f"{settings.WIKI_API_BASE_URL}/rest/v4/overview",
             }
         )

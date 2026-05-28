@@ -4,16 +4,19 @@ from math import ceil
 from unittest import mock
 
 import openai
+from django.core.management import call_command
+from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from factory.django import FileField
 from lxml import etree
 
 from cl.audio.factories import AudioFactory, AudioWithParentsFactory
 from cl.audio.management.commands.transcribe import (
     audio_can_be_processed_by_open_ai_api,
-    transcribe_from_open_ai_api,
 )
 from cl.audio.models import Audio, AudioTranscriptionMetadata
+from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.audio.utils import transcription_was_hallucinated
 from cl.lib.test_helpers import SitemapTest
 from cl.search.factories import CourtFactory, DocketFactory
@@ -241,6 +244,55 @@ class PodcastTest(ESIndexTestCase, TestCase):
             },
         )[0].text  # type: ignore
         self.assertIn("magnitsky", subtitle)
+
+    def test_podcast_excludes_audios_without_processed_mp3(self) -> None:
+        """Audios indexed before `process_audio_file` finishes (or whose
+        `local_path` ends up None at index time) must not appear in the feed —
+        otherwise the enclosure URL renders as `.../None`.
+        """
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.allow_es_audio_indexing",
+                side_effect=lambda x, y: True,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            unprocessed = AudioWithParentsFactory.create(
+                docket=DocketFactory(
+                    court=self.court_1,
+                    date_argued=datetime.date(2018, 1, 1),
+                ),
+                duration=0,
+            )
+        self.addCleanup(unprocessed.delete)
+        self.assertFalse(
+            bool(unprocessed.local_path_mp3),
+            msg="Test setup should produce an Audio without a processed MP3.",
+        )
+
+        response = self.client.get(
+            reverse(
+                "jurisdiction_podcast",
+                kwargs={"court": self.court_1.id},
+            )
+        )
+        self.assertEqual(200, response.status_code)
+        xml_tree = etree.fromstring(response.content)
+
+        items = xml_tree.findall(".//channel/item")
+        self.assertEqual(
+            len(items),
+            2,
+            msg="Unprocessed audio leaked into the feed.",
+        )
+
+        for enclosure in xml_tree.findall(".//channel/item/enclosure"):
+            url = enclosure.get("url", "")
+            self.assertNotIn(
+                "None",
+                url,
+                msg=f"Feed emitted a broken enclosure URL: {url}",
+            )
 
     def test_catch_es_errors(self) -> None:
         """Can we catch es errors and just render an empy podcast?"""
@@ -601,3 +653,239 @@ class TranscriptionTest(TestCase):
                 self.transcripted_audio_not_hallucinated
             )
         )
+
+
+class ReenqueueDaemonTest(TestCase):
+    """Tests for reenqueue_pending_audio_tasks_daemon.
+
+    The daemon is just a loop wrapper around run_reenqueue_cycle, so the
+    interesting behaviors to verify are: (1) eligible audios reach the
+    dispatch helpers in a single cycle, (2) the kill switch short-circuits
+    the loop without doing work, (3) per-cycle exceptions don't crash the
+    daemon.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="ca9")
+
+    def _set_date_created(self, audio: Audio, when: datetime.datetime) -> None:
+        # date_created has auto_now_add, so bypass via queryset update.
+        Audio.objects.filter(pk=audio.pk).update(date_created=when)
+
+    def _build_window_audios(self) -> tuple[Audio, Audio, Audio, Audio]:
+        """Build one audio per case the cycle needs to handle.
+
+        Returns ``(needs_processing, needs_transcription, too_recent, too_old)``.
+        """
+        in_window = timezone.now() - datetime.timedelta(days=1)
+        too_recent = timezone.now() - datetime.timedelta(minutes=5)
+        too_old = timezone.now() - datetime.timedelta(days=30)
+
+        needs_processing = AudioFactory.create(
+            docket=DocketFactory(court=self.court),
+            local_path_original_file__data=b"\x10" * 10,
+            duration=None,
+            stt_status=Audio.STT_NEEDED,
+        )
+        self._set_date_created(needs_processing, in_window)
+
+        needs_transcription = AudioFactory.create(
+            docket=DocketFactory(court=self.court),
+            local_path_original_file__data=b"\x10" * 10,
+            duration=120,
+            stt_status=Audio.STT_NEEDED,
+        )
+        self._set_date_created(needs_transcription, in_window)
+
+        # Same shape as needs_processing but outside the window — should
+        # not be picked up.
+        too_recent_audio = AudioFactory.create(
+            docket=DocketFactory(court=self.court),
+            local_path_original_file__data=b"\x10" * 10,
+            duration=None,
+            stt_status=Audio.STT_NEEDED,
+        )
+        self._set_date_created(too_recent_audio, too_recent)
+
+        too_old_audio = AudioFactory.create(
+            docket=DocketFactory(court=self.court),
+            local_path_original_file__data=b"\x10" * 10,
+            duration=None,
+            stt_status=Audio.STT_NEEDED,
+        )
+        self._set_date_created(too_old_audio, too_old)
+
+        return (
+            needs_processing,
+            needs_transcription,
+            too_recent_audio,
+            too_old_audio,
+        )
+
+    @override_settings(
+        AUDIO_REENQUEUE_DAEMON_ENABLED=True, AUDIO_REENQUEUE_WAIT=0
+    )
+    def test_one_cycle_dispatches_only_in_window_audios(self) -> None:
+        needs_processing, needs_transcription, too_recent, too_old = (
+            self._build_window_audios()
+        )
+
+        with (
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_process_audio_file",
+                return_value=True,
+            ) as mock_dispatch_process,
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_transcribe",
+                return_value=True,
+            ) as mock_dispatch_transcribe,
+        ):
+            call_command(
+                "reenqueue_pending_audio_tasks_daemon",
+                "--testing-iterations=1",
+                "--older-than-hours=1",
+                "--newer-than-days=7",
+            )
+
+        mock_dispatch_process.assert_called_once_with(needs_processing.pk)
+        mock_dispatch_transcribe.assert_called_once_with(
+            needs_transcription.pk
+        )
+
+        called_pks = {
+            c.args[0] for c in mock_dispatch_process.call_args_list
+        } | {c.args[0] for c in mock_dispatch_transcribe.call_args_list}
+        self.assertNotIn(too_recent.pk, called_pks)
+        self.assertNotIn(too_old.pk, called_pks)
+
+    @override_settings(
+        AUDIO_REENQUEUE_DAEMON_ENABLED=True, AUDIO_REENQUEUE_WAIT=0
+    )
+    def test_stage1_skips_audios_with_empty_local_path(self) -> None:
+        # local_path_original_file is NOT NULL at the DB level, so the only
+        # way an audio can lack a file is empty string. process_audio_file
+        # would fail on those, so the cycle must not dispatch them.
+        in_window = timezone.now() - datetime.timedelta(days=1)
+        empty_path_audio = AudioFactory.create(
+            docket=DocketFactory(court=self.court),
+            duration=None,
+            stt_status=Audio.STT_NEEDED,
+        )
+        self._set_date_created(empty_path_audio, in_window)
+        self.assertEqual(empty_path_audio.local_path_original_file, "")
+
+        with (
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_process_audio_file",
+                return_value=True,
+            ) as mock_dispatch_process,
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_transcribe",
+                return_value=True,
+            ),
+        ):
+            call_command(
+                "reenqueue_pending_audio_tasks_daemon",
+                "--testing-iterations=1",
+                "--older-than-hours=1",
+                "--newer-than-days=7",
+            )
+
+        mock_dispatch_process.assert_not_called()
+
+    @override_settings(AUDIO_REENQUEUE_DAEMON_ENABLED=False)
+    def test_kill_switch_disabled_exits_without_dispatching(self) -> None:
+        self._build_window_audios()
+
+        with (
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_process_audio_file",
+            ) as mock_dispatch_process,
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_transcribe",
+            ) as mock_dispatch_transcribe,
+        ):
+            call_command(
+                "reenqueue_pending_audio_tasks_daemon",
+                "--testing-iterations=1",
+            )
+
+        mock_dispatch_process.assert_not_called()
+        mock_dispatch_transcribe.assert_not_called()
+
+    @override_settings(
+        AUDIO_REENQUEUE_DAEMON_ENABLED=True, AUDIO_REENQUEUE_WAIT=0
+    )
+    def test_cycle_exception_is_swallowed_and_reported(self) -> None:
+        # A transient failure inside the cycle must not crash the daemon —
+        # we want k8s to restart only on hard failures, not on a blip.
+        with (
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks_daemon."
+                "run_reenqueue_cycle",
+                side_effect=RuntimeError("boom"),
+            ) as mock_cycle,
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks_daemon."
+                "capture_exception"
+            ) as mock_capture,
+        ):
+            call_command(
+                "reenqueue_pending_audio_tasks_daemon",
+                "--testing-iterations=2",
+            )
+
+        self.assertEqual(mock_cycle.call_count, 2)
+        self.assertEqual(mock_capture.call_count, 2)
+
+    @override_settings(
+        AUDIO_REENQUEUE_DAEMON_ENABLED=True, AUDIO_REENQUEUE_WAIT=0
+    )
+    def test_max_per_sweep_caps_transcription_dispatches(self) -> None:
+        # Five audios eligible for transcription, daemon capped at 2 per
+        # cycle: only 2 should be dispatched in one cycle. This is the
+        # rate-limiting behavior under Shape A.
+        in_window = timezone.now() - datetime.timedelta(hours=2)
+        eligible: list[Audio] = []
+        for _ in range(5):
+            a = AudioFactory.create(
+                docket=DocketFactory(court=self.court),
+                local_path_original_file__data=b"\x10" * 10,
+                duration=120,
+                stt_status=Audio.STT_NEEDED,
+            )
+            self._set_date_created(a, in_window)
+            eligible.append(a)
+
+        with (
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_process_audio_file",
+                return_value=True,
+            ),
+            mock.patch(
+                "cl.audio.management.commands.reenqueue_pending_audio_tasks."
+                "dispatch_transcribe",
+                return_value=True,
+            ) as mock_dispatch_transcribe,
+        ):
+            call_command(
+                "reenqueue_pending_audio_tasks_daemon",
+                "--testing-iterations=1",
+                "--older-than-hours=1",
+                "--max-per-sweep=2",
+            )
+
+        self.assertEqual(mock_dispatch_transcribe.call_count, 2)
+        called_pks = {
+            c.args[0] for c in mock_dispatch_transcribe.call_args_list
+        }
+        eligible_pks = {a.pk for a in eligible}
+        self.assertTrue(called_pks.issubset(eligible_pks))

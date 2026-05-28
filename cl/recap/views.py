@@ -4,6 +4,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import (
+    DjangoModelPermissions,
     DjangoModelPermissionsOrAnonReadOnly,
     IsAuthenticatedOrReadOnly,
 )
@@ -12,12 +13,10 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import BigPagination
 from cl.api.utils import (
-    DjangoModelPermissionsWithView,
-    EmailProcessingQueueAPIUsers,
+    EmailProcessingQueueAPIUsersWithView,
     LoggingMixin,
     NoFilterCacheListMixin,
     RECAPUploaders,
-    RECAPUsersReadOnly,
 )
 from cl.recap.api_serializers import (
     EmailProcessingQueueSerializer,
@@ -83,9 +82,7 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (
-        EmailProcessingQueueAPIUsers | DjangoModelPermissionsWithView,
-    )
+    permission_classes = (EmailProcessingQueueAPIUsersWithView,)
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
@@ -148,7 +145,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
 
 
 class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (DjangoModelPermissions,)
     queryset = (
         RECAPDocument.objects.filter(is_available=True)
         .only(

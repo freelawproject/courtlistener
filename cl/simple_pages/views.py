@@ -9,7 +9,6 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.core.mail import EmailMessage
 from django.db.models import (
     Case,
     Count,
@@ -24,7 +23,6 @@ from django.template import loader
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
-from waffle import flag_is_active
 
 from cl.audio.models import Audio
 from cl.disclosures.models import (
@@ -197,18 +195,6 @@ async def broken_email_help(request: HttpRequest) -> HttpResponse:
         request,
         "help/broken_email_help.html",
         {"private": True},
-    )
-
-
-async def mcp_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "help/mcp_help.html", {"private": False})
-
-
-async def cluster_redirections_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "help/cluster_redirections_help.html",
-        {"private": False},
     )
 
 
@@ -434,8 +420,23 @@ async def contact(
     if initial is None:
         initial = {}
 
+    auser = await request.auser()  # type: ignore[attr-defined]
+    if isinstance(auser, User):
+        # Logged-in user
+        is_authenticated = True
+        user = auser
+        account_email = user.email
+    else:
+        is_authenticated = False
+        user = None
+        account_email = ""
+
     if request.method == "POST":
-        form = ContactForm(request.POST)
+        form = ContactForm(
+            request.POST,
+            is_authenticated=is_authenticated,
+            account_email=account_email,
+        )
         if form.is_valid():
             cd = form.cleaned_data
             # Uses phone_number as Subject field to defeat spam. If this field
@@ -444,51 +445,39 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
-            use_zoho = await sync_to_async(flag_is_active)(
-                request, "zoho-desk-tickets"
-            )
-            if use_zoho:
-                create_zoho_desk_ticket.delay(
-                    subject=cd["phone_number"],
-                    name=cd["name"],
-                    email=cd["email"],
-                    description=form.render_email_body(
-                        user_agent=request.headers.get(
-                            "user-agent", "Unknown"
-                        ),
-                        target="zoho_desk",
-                    ),
-                    request_type=form.get_zoho_request_type(),
-                    assignee_id=form.get_zoho_assignee_id(),
-                )
-            else:
-                default_from = settings.DEFAULT_FROM_EMAIL
-                subject = form.email_subject()
-                body = form.render_email_body(
-                    user_agent=request.headers.get("user-agent", "Unknown")
-                )
+            logged_in_info: dict[str, Any] | None = None
+            if user:
+                profile = await sync_to_async(lambda: user.profile)()  # type: ignore[attr-defined]
+                logged_in_info = {
+                    "username": user.username,
+                    "email": account_email,
+                    "email_confirmed": profile.email_confirmed,
+                }
 
-                message = EmailMessage(
-                    subject=subject,
-                    body=body,
-                    to=["support@freelawproject.atlassian.net"],
-                    reply_to=[cd.get("email", default_from) or default_from],
-                )
-                await sync_to_async(message.send)()
+            create_zoho_desk_ticket.delay(
+                subject=cd["phone_number"],
+                name=cd["name"],
+                email=account_email if is_authenticated else cd["email"],
+                description=form.render_email_body(
+                    user_agent=request.headers.get("user-agent", "Unknown"),
+                    logged_in_info=logged_in_info,
+                ),
+                request_type=form.get_zoho_request_type(),
+                assignee_id=form.get_zoho_assignee_id(),
+            )
             return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
         issue_type = request.GET.get("issue_type")
         if issue_type and issue_type.lower() in ContactForm.VALID_ISSUE_TYPES:
             initial["issue_type"] = issue_type.lower()
-        user = await request.auser()  # type: ignore[attr-defined]
-        if isinstance(user, User):
-            initial["email"] = user.email
+        if user:
             initial["name"] = user.get_full_name()
-            form = ContactForm(initial=initial)
-        else:
-            # for anonymous users, who lack full_names, and emails
-            form = ContactForm(initial=initial)
+        form = ContactForm(
+            initial=initial,
+            is_authenticated=is_authenticated,
+            account_email=account_email,
+        )
 
     template_data.update({"form": form, "private": False})
     return TemplateResponse(request, template_path, template_data)
@@ -543,7 +532,46 @@ async def validate_for_wot(request: HttpRequest) -> HttpResponse:
 
 
 async def components(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "components.html", {"private": True})
+    # Mock page object for component library demos
+    class MockPaginator:
+        num_pages = 10
+
+    class MockPageObj:
+        number = 3
+        has_previous = True
+        has_next = True
+        has_other_pages = True
+        paginator = MockPaginator()
+
+        def previous_page_number(self) -> int:
+            return self.number - 1
+
+        def next_page_number(self) -> int:
+            return self.number + 1
+
+    class MockFieldValue:
+        value = None
+
+    class MockDocketFilterForm:
+        errors: dict[str, list[str]] = {}
+        filed_after = MockFieldValue()
+        filed_before = MockFieldValue()
+        entry_gte = MockFieldValue()
+        entry_lte = MockFieldValue()
+
+    class MockDocket:
+        pk = 12345
+
+    return TemplateResponse(
+        request,
+        "components.html",
+        {
+            "private": True,
+            "demo_page_obj": MockPageObj(),
+            "demo_docket": MockDocket(),
+            "demo_filter_form": MockDocketFilterForm(),
+        },
+    )
 
 
 async def ratelimited(
