@@ -128,23 +128,23 @@
         {# Prev/Next — submit this form with page param #}
         <div class="flex items-end gap-1 ml-auto">
           {% if page_obj.has_previous %}
-            <c-button variant="ghost" type="submit" name="page" value="{{ page_obj.previous_page_number }}" title="Previous page" class="px-2 py-2">
+            <c-button variant="outline" type="submit" name="page" value="{{ page_obj.previous_page_number }}" title="Previous page" class="px-2 py-2">
               {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
               <span class="ml-1">Prev</span>
             </c-button>
           {% else %}
-            <c-button variant="ghost" disabled aria-disabled="true" title="Previous page" class="px-2 py-2">
+            <c-button variant="outline" disabled aria-disabled="true" title="Previous page" class="px-2 py-2">
               {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
               <span class="ml-1">Prev</span>
             </c-button>
           {% endif %}
           {% if page_obj.has_next %}
-            <c-button variant="ghost" type="submit" name="page" value="{{ page_obj.next_page_number }}" title="Next page" class="px-2 py-2">
+            <c-button variant="outline" type="submit" name="page" value="{{ page_obj.next_page_number }}" title="Next page" class="px-2 py-2">
               <span class="mr-1">Next</span>
               {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
             </c-button>
           {% else %}
-            <c-button variant="ghost" disabled aria-disabled="true" title="Next page" class="px-2 py-2">
+            <c-button variant="outline" disabled aria-disabled="true" title="Next page" class="px-2 py-2">
               <span class="mr-1">Next</span>
               {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
             </c-button>
@@ -182,20 +182,20 @@
       {# Prev/Next — standalone links on mobile #}
       <div class="flex items-end gap-1">
         {% if page_obj.has_previous %}
-          <c-button variant="ghost" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="px-2 py-2">
+          <c-button variant="outline" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
           </c-button>
         {% else %}
-          <c-button variant="ghost" disabled aria-disabled="true" title="Previous page" class="px-2 py-2">
+          <c-button variant="outline" disabled aria-disabled="true" title="Previous page" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
           </c-button>
         {% endif %}
         {% if page_obj.has_next %}
-          <c-button variant="ghost" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="px-2 py-2">
+          <c-button variant="outline" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
           </c-button>
         {% else %}
-          <c-button variant="ghost" disabled aria-disabled="true" title="Next page" class="px-2 py-2">
+          <c-button variant="outline" disabled aria-disabled="true" title="Next page" class="px-2 py-2">
             {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
           </c-button>
         {% endif %}
