@@ -2,7 +2,7 @@ from datetime import UTC
 from typing import Any
 
 from django.conf import settings
-from elasticsearch_dsl.response import Hit
+from elasticsearch.dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 

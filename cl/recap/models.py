@@ -339,6 +339,14 @@ class EmailProcessingQueue(AbstractDateTimeModel):
     )
     object_ids = models.JSONField(default=list)
 
+    class Meta:
+        permissions = (
+            (
+                "has_recap_email_upload_access",
+                "Can upload @recap.email messages.",
+            ),
+        )
+
     def get_related_objects(self) -> QuerySet | None:
         if not self.related_model:
             logger.warning(
