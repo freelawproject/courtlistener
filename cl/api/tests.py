@@ -5293,11 +5293,20 @@ class MembershipThrottleSyncTest(TestCase):
         clear_membership_throttles(user)
         self.assertTrue(APIThrottle.objects.filter(user=user).exists())
 
-    def test_apply_clears_throttle_cache(self) -> None:
-        """apply_* invalidates the get_all_throttle_overrides cache."""
+    def test_apply_skips_cache_clear_by_default(self) -> None:
+        """apply_* does not invalidate the cache unless clear_cache=True."""
         user = UserFactory()
         with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
             apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+        mock_clear.assert_not_called()
+
+    def test_apply_clears_cache_when_requested(self) -> None:
+        """apply_* invalidates the cache when called with clear_cache=True."""
+        user = UserFactory()
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            apply_membership_throttles(
+                user, NeonMembershipLevel.TIER_1, clear_cache=True
+            )
         mock_clear.assert_called_once()
 
     def test_clear_clears_throttle_cache_when_rows_deleted(self) -> None:

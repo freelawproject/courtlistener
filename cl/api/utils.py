@@ -800,7 +800,9 @@ def get_all_throttle_overrides(
     return overrides
 
 
-def apply_membership_throttles(user: User, level: int) -> bool:
+def apply_membership_throttles(
+    user: User, level: int, clear_cache: bool = False
+) -> bool:
     """
     Sync a user's MEMBERSHIP-based API throttles to match the given membership level.
 
@@ -817,6 +819,14 @@ def apply_membership_throttles(user: User, level: int) -> bool:
     - The `SYNC_MEMBERSHIP_THROTTLES_SWITCH` feature flag is disabled
     - The provided `level` does not exist in `LEVEL_TO_RATES`
       (e.g., unsupported, legacy, or commercial levels)
+
+    Args:
+        user: The user whose throttles are being synced.
+        level: The Neon membership level to map to a set of rates.
+        clear_cache: When True, call ``clear_tiered_cache()`` after writing
+            the new throttle rows. Defaults to False, allowing batch callers
+            to defer cache clearing until after a loop and avoid repeated
+            invalidations on each iteration.
 
     Returns:
         bool: True if throttles were successfully applied, False if skipped.
@@ -847,7 +857,9 @@ def apply_membership_throttles(user: User, level: int) -> bool:
                 source=APIThrottle.Source.MEMBERSHIP,
                 notes=f"Set by Neon membership level={level}.",
             )
-    clear_tiered_cache()
+
+    if clear_cache:
+        clear_tiered_cache()
     return True
 
 
