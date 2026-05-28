@@ -1,12 +1,13 @@
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
+import httpx
 import time_machine
 from django.core.cache import cache as django_cache
 from django.core.management import call_command
 from django.utils import timezone
 from django.utils.timezone import now
-from requests import HTTPError
+from httpx import HTTPError
 
 from cl.lib.utils import append_value_in_cache
 from cl.recap.factories import PacerFetchQueueFactory
@@ -23,7 +24,6 @@ from cl.search.management.commands.pacer_bulk_fetch import (
 )
 from cl.search.models import RECAPDocument
 from cl.tests.cases import TestCase
-from cl.tests.utils import MockResponse
 from cl.users.factories import UserFactory
 
 
@@ -781,11 +781,8 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
     @patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, de_seq_num: (
-            MockResponse(
-                200,
-                b"binary content",
-            ),
+        return_value=(
+            httpx.Response(200, content=b"binary content"),
             "OK",
         ),
     )
@@ -919,11 +916,8 @@ class BulkFetchPacerIntegrationTest(TestCase):
 
     @patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b, de_seq_num: (
-            MockResponse(
-                200,
-                None,
-            ),
+        return_value=(
+            httpx.Response(200, content=None),
             "Document is sealed",
         ),
     )

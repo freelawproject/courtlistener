@@ -112,7 +112,7 @@ dependencies = [
   "django-cotton>=2.6.0",
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=9.0",
-  "juriscraper>=3.0.0",
+  "juriscraper @ git+https://github.com/ttys0dev/juriscraper.git@aecd3d3bbe8d03590c63f54a7f5ad8e0a694ae40",
   "instructor>=1.14.1",
   "django-s3-express-cache>=0.1.0",
   "zohocrmsdk8-0==4.0.0",

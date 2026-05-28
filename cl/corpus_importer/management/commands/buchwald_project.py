@@ -1,6 +1,7 @@
 import os
 from argparse import RawTextHelpFormatter
 
+from asgiref.sync import async_to_sync
 from celery import chain
 from django.conf import settings
 
@@ -36,7 +37,7 @@ def add_all_nysd_to_cl(options):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
 
     # IDs obtained by binary search of docket numbers on PACER website.
     earliest_id = 405990
@@ -53,7 +54,7 @@ def add_all_nysd_to_cl(options):
             session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
+            async_to_sync(session.login)()
 
         throttle.maybe_wait()
         logger.info("Doing pacer_case_id: %s", pacer_case_id)
@@ -72,7 +73,7 @@ def get_dockets(options):
     session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
-    session.login()
+    async_to_sync(session.login)()
 
     buchwald_id = 450
     ds = (
@@ -95,7 +96,7 @@ def get_dockets(options):
             session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
-            session.login()
+            async_to_sync(session.login)()
 
         throttle.maybe_wait()
         logger.info("%s: Doing docket with pk: %s", i, d.pk)

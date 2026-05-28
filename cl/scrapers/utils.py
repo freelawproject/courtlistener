@@ -164,12 +164,12 @@ async def test_for_meta_redirections(
     :param r: A response object
     :return:  A boolean and value
     """
-    response = await microservice(
+    mime_response = await microservice(
         service="buffer-extension",
         file=r.content,
         params={"mime": True},
     )
-    extension = response.text
+    extension = mime_response.text
 
     if extension == ".html":
         html_tree = html.fromstring(r.text)

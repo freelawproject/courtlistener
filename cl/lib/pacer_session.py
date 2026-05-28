@@ -1,12 +1,12 @@
 import pickle
 import random
 from dataclasses import dataclass
-from urllib.parse import urlparse
 
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from httpx import URL, Cookies, Request
 from juriscraper.pacer import PacerSession
 from redis import Redis
-from requests.cookies import RequestsCookieJar
 
 from cl.lib.redis_utils import get_redis_interface
 
@@ -26,7 +26,7 @@ class SessionData:
     `ProxyPacerSession` class.
     """
 
-    cookies: RequestsCookieJar
+    cookies: Cookies
     proxy_address: str = ""
 
     def __post_init__(self):
@@ -68,10 +68,10 @@ class ProxyPacerSession(PacerSession):
         }
         self.headers["X-WhSentry-TLS"] = "true"
 
-    def send(self, request, **kwargs):
+    async def send(self, request: Request, **kwargs):
         """Send a given PreparedRequest."""
         request.url = self._change_protocol(request.url)
-        return super().send(request, **kwargs)
+        return await super().send(request, **kwargs)
 
     def _pick_proxy_connection(self) -> str:
         """
@@ -85,7 +85,7 @@ class ProxyPacerSession(PacerSession):
         """
         return random.choice(settings.EGRESS_PROXY_HOSTS)
 
-    def _change_protocol(self, url: str) -> str:
+    def _change_protocol(self, url: URL | str) -> URL:
         """Converts a URL from HTTPS to HTTP protocol.
 
         By default, HTTP clients create a CONNECT tunnel when a proxy is
@@ -100,26 +100,25 @@ class ProxyPacerSession(PacerSession):
         https://github.com/juggernaut/webhook-sentry?tab=readme-ov-file#https-target
 
         Args:
-            url (str): The URL to modify.
+            url (URL): The URL to modify.
 
         Returns:
-            str: The URL with the protocol changed from HTTPS to HTTP.
+            URL: The URL with the protocol changed from HTTPS to HTTP.
         """
-        new_url = urlparse(url)
-        return new_url._replace(scheme="http").geturl()
+        return URL(url, scheme="http")
 
-    def _prepare_login_request(self, url, *args, **kwargs):
-        return super(PacerSession, self).post(
+    async def _prepare_login_request(self, url, *args, **kwargs):
+        return await super(PacerSession, self).post(
             self._change_protocol(url), **kwargs
         )
 
-    def post(self, url, *args, **kwargs):
-        return super().post(self._change_protocol(url), **kwargs)
+    async def post(self, url, *args, **kwargs):
+        return await super().post(self._change_protocol(url), **kwargs)
 
-    def get(self, url, *args, **kwargs):
-        return super().get(self._change_protocol(url), **kwargs)
+    async def get(self, url, *args, **kwargs):
+        return await super().get(self._change_protocol(url), **kwargs)
 
-    def _get_saml_auth_request_parameters(
+    async def _get_saml_auth_request_parameters(
         self, court_id: str
     ) -> dict[str, str]:
         """
@@ -129,14 +128,16 @@ class ProxyPacerSession(PacerSession):
         workflow can be reused in subsequent requests through a proxy connection
         by setting their 'secure' attribute to False.
         """
-        saml_credentials = super()._get_saml_auth_request_parameters(court_id)
+        saml_credentials = await super()._get_saml_auth_request_parameters(
+            court_id
+        )
         # Update cookies so they can be sent over non-HTTPS connections
         for cookie in self.cookies:
             cookie.secure = False
         return saml_credentials
 
 
-def log_into_pacer(
+async def log_into_pacer(
     username: str,
     password: str,
     client_code: str | None = None,
@@ -154,10 +155,11 @@ def log_into_pacer(
         password=password,
         client_code=client_code,
     )
-    s.login()
+    await s.login()
     return SessionData(s.cookies, s.proxy_address)
 
 
+@sync_to_async
 def get_or_cache_pacer_cookies(
     user_pk: str | int,
     username: str,
@@ -184,7 +186,7 @@ def get_or_cache_pacer_cookies(
     :return: A SessionData object containing the session's cookies and proxy.
     """
     r = get_redis_interface("CACHE", decode_responses=False)
-    cookies_data = get_pacer_cookie_from_cache(user_pk, r=r)
+    cookies_data = async_to_sync(get_pacer_cookie_from_cache)(user_pk, r=r)
     ttl_seconds = r.ttl(session_key % user_pk)
     if cookies_data and ttl_seconds >= 300 and not refresh:
         # cookies were found in cache and ttl >= 5 minutes, return them
@@ -192,7 +194,9 @@ def get_or_cache_pacer_cookies(
 
     # Unable to find cookies in cache, are about to expire or refresh needed
     # Login and cache new values.
-    session_data = log_into_pacer(username, password, client_code)
+    session_data = async_to_sync(log_into_pacer)(
+        username, password, client_code
+    )
     cookie_expiration = 60 * 60
     r.set(
         session_key % user_pk,
@@ -202,6 +206,7 @@ def get_or_cache_pacer_cookies(
     return session_data
 
 
+@sync_to_async
 def get_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
@@ -220,6 +225,7 @@ def get_pacer_cookie_from_cache(
         return pickle.loads(pickled_cookie)
 
 
+@sync_to_async
 def delete_pacer_cookie_from_cache(
     user_pk: str | int,
     r: Redis | None = None,
