@@ -23,10 +23,15 @@
       <c-docket-filter
         :docket="docket"
         :form="form"
-        :page_obj="docket_entries"
         :sort_order_asc="sort_order_asc"
         class="mb-4"
-      />
+      >
+        <c-pagination
+          :page_obj="docket_entries"
+          show_previous="True"
+          show_next="True"
+        />
+      </c-docket-filter>
 
       {# CSV export #}
       {% if user.is_authenticated %}

@@ -6,7 +6,6 @@
 <c-vars
   docket=""
   form=""
-  page_obj=""
   sort_order_asc="True"
   htmx_target=""
   class=""
@@ -125,38 +124,14 @@
           </div>
         </fieldset>
 
-        {# Prev/Next — submit this form with page param #}
-        <div class="flex items-end gap-1 ml-auto">
-          {% if page_obj.has_previous %}
-            <c-button variant="outline" type="submit" name="page" value="{{ page_obj.previous_page_number }}" title="Previous page" class="px-2 py-2">
-              {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-              <span class="ml-1">Prev</span>
-            </c-button>
-          {% else %}
-            <c-button variant="outline" disabled aria-disabled="true" title="Previous page" class="px-2 py-2">
-              {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-              <span class="ml-1">Prev</span>
-            </c-button>
-          {% endif %}
-          {% if page_obj.has_next %}
-            <c-button variant="outline" type="submit" name="page" value="{{ page_obj.next_page_number }}" title="Next page" class="px-2 py-2">
-              <span class="mr-1">Next</span>
-              {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-            </c-button>
-          {% else %}
-            <c-button variant="outline" disabled aria-disabled="true" title="Next page" class="px-2 py-2">
-              <span class="mr-1">Next</span>
-              {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-            </c-button>
-          {% endif %}
-        </div>
-
         <c-button type="submit" class="sr-only">Filter</c-button>
       </form>
+
+      <div class="ml-auto">{{ slot }}</div>
     </div>
   </div>
 
-  {# MOBILE — search + prev/next + filter drawer #}
+  {# MOBILE — search + filter drawer #}
   <div class="md:hidden">
     <div class="flex items-end gap-3">
       {# Search — own form so Enter submits search, not filters #}
@@ -178,28 +153,7 @@
           </c-button>
         </div>
       </form>
-
-      {# Prev/Next — standalone links on mobile #}
-      <div class="flex items-end gap-1">
-        {% if page_obj.has_previous %}
-          <c-button variant="outline" href="{% querystring page=page_obj.previous_page_number %}" title="Previous page" class="px-2 py-2">
-            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-          </c-button>
-        {% else %}
-          <c-button variant="outline" disabled aria-disabled="true" title="Previous page" class="px-2 py-2">
-            {% svg "chevron" class="w-4 h-4 rotate-90" aria_hidden="true" %}
-          </c-button>
-        {% endif %}
-        {% if page_obj.has_next %}
-          <c-button variant="outline" href="{% querystring page=page_obj.next_page_number %}" title="Next page" class="px-2 py-2">
-            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </c-button>
-        {% else %}
-          <c-button variant="outline" disabled aria-disabled="true" title="Next page" class="px-2 py-2">
-            {% svg "chevron" class="w-4 h-4 -rotate-90" aria_hidden="true" %}
-          </c-button>
-        {% endif %}
-      </div>
+      {{ slot }}
     </div>
 
     {# Filter drawer — contains its own form #}

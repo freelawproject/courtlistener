@@ -3023,12 +3023,14 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_filter_pagination_waffle")
 @override_flag("use_new_design", active=True)
 class DocketFilterPaginationWiringTest(TestCase):
-    """v2_docket.html wraps the entries placeholder with <c-docket-filter>
-    above and <c-pagination> below. Lock in the four contracts PR 2 will
-    rely on: the filter form's named inputs render, filter querystring
-    params actually narrow the queryset, the bottom pagination nav appears
-    when there are multiple pages, and pagination links carry filter
-    params forward so users don't lose state when paging.
+    """v2_docket.html lays out the docket-entries tab as a filter row
+    (<c-docket-filter> + a compact <c-pagination> as siblings) above the
+    entries panel, which holds the rows and the full <c-pagination> strip
+    inside docket-entries. Test four pieces of that wiring: the filter
+    form's named inputs render, filter querystring params actually narrow
+    the queryset, the bottom pagination nav inside docket-entries appears
+    when there are multiple pages, and pagination links inside that nav
+    carry filter params forward so users don't lose state when paging.
 
     `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
     namespace from parallel test workers. Without it, the shared Redis
@@ -3139,8 +3141,17 @@ class DocketFilterPaginationWiringTest(TestCase):
             f"v2_docket.html not rendered; templates: {template_names}",
         )
         content = r.content.decode()
-        self.assertIn('aria-label="Pagination"', content)
-        self.assertIn("page=2", content)
+        tree = fromstring(content)
+        docket_entries = tree.get_element_by_id("docket-entries")
+        bottom_nav = docket_entries.find('.//nav[@aria-label="Pagination"]')
+        assert bottom_nav is not None, (
+            "bottom pagination nav missing inside docket-entries"
+        )
+        bottom_hrefs = [a.get("href", "") for a in bottom_nav.findall(".//a")]
+        self.assertTrue(
+            any("page=2" in h for h in bottom_hrefs),
+            f"no page=2 link in bottom nav; hrefs={bottom_hrefs}",
+        )
 
     async def test_pagination_links_preserve_filter_params(self) -> None:
         """Paging to page 2 must keep the user's filter params — otherwise
@@ -3167,16 +3178,21 @@ class DocketFilterPaginationWiringTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         content = r.content.decode()
-        # Find every pagination href and check at least one points at
-        # page 2 while also carrying entry_gte=1.
+        # Find every pagination href inside docket-entries (the bottom nav)
+        # and check at least one points at page 2 while also carrying
+        # entry_gte=1.
         tree = fromstring(content)
-        nav = tree.find('.//nav[@aria-label="Pagination"]')
-        assert nav is not None, "pagination nav missing"
+        docket_entries = tree.get_element_by_id("docket-entries")
+        nav = docket_entries.find('.//nav[@aria-label="Pagination"]')
+        assert nav is not None, (
+            "bottom pagination nav missing inside docket-entries"
+        )
         hrefs = [a.get("href", "") for a in nav.findall(".//a")]
         page_two_with_filter = [
             h for h in hrefs if "page=2" in h and "entry_gte=1" in h
         ]
         self.assertTrue(
             page_two_with_filter,
-            f"no pagination link carries entry_gte forward; hrefs={hrefs}",
+            f"no pagination link in bottom nav carries entry_gte forward; "
+            f"hrefs={hrefs}",
         )

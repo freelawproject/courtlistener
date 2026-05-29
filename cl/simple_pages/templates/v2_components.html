@@ -1593,15 +1593,20 @@ Sample code here.
   {# DOCKET FILTER #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-filter">
     <h2 class="mt-6 mb-3">Docket filter</h2>
-    <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, sort toggle, and prev/next navigation. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button.</p>
+    <p>Page-specific filter toolbar for docket entries. Includes search, date range (Flatpickr), document number range, and sort toggle. On mobile, filter fields move into a <code>&lt;c-filter-drawer&gt;</code> with an "Apply" button. Accepts a default slot for trailing controls (typically <code>&lt;c-pagination&gt;</code>) — rendered at the right of the desktop row and next to the search bar on mobile.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
+    <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below with <code>&lt;c-pagination&gt;</code> in the default slot. Resize below <code>md</code> breakpoint (768px) to see the mobile layout.</p>
     <c-docket-filter
       :docket="demo_docket"
       :form="demo_filter_form"
-      :page_obj="demo_page_obj"
-    />
+    >
+      <c-pagination
+        :page_obj="demo_docket_entries"
+        show_previous="True"
+        show_next="True"
+      />
+    </c-docket-filter>
 
     <c-library.list title="Props" only>
       <c-library.item only>
@@ -1611,10 +1616,6 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>:form</code></c-slot>
         <c-slot name="description">DocketEntryFilterForm instance.</c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>:page_obj</code></c-slot>
-        <c-slot name="description">Django paginator page object for prev/next controls.</c-slot>
       </c-library.item>
       <c-library.item optional only>
         <c-slot name="label"><code>:sort_order_asc</code></c-slot>
@@ -1627,7 +1628,10 @@ Sample code here.
     </c-library.list>
 
     <c-library.list title="Slots" only>
-      <p>No slots</p>
+      <c-library.item only>
+        <c-slot name="label"><em>default</em></c-slot>
+        <c-slot name="description">Trailing controls — rendered at the right edge of the desktop row and next to the search bar on mobile. Typically a <code>&lt;c-pagination&gt;</code> with <code>show_previous="True"</code> and <code>show_next="True"</code>.</c-slot>
+      </c-library.item>
     </c-library.list>
 
     <c-expansion-panel title="Code">
@@ -1635,10 +1639,15 @@ Sample code here.
 &lt;c-docket-filter
   :docket="docket"
   :form="form"
-  :page_obj="docket_entries"
   :sort_order_asc="sort_order_asc"
   htmx_target="#docket-entries"
-/&gt;
+&gt;
+  &lt;c-pagination
+    :page_obj="docket_entries"
+    show_previous="True"
+    show_next="True"
+  /&gt;
+&lt;/c-docket-filter&gt;
       </c-code>
     </c-expansion-panel>
   </section>
