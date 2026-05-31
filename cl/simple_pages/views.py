@@ -1,7 +1,6 @@
 import json
 import logging
 import re
-from datetime import timedelta
 from http import HTTPStatus
 from typing import Any
 
@@ -22,7 +21,6 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template import loader
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.timezone import now
 
 from cl.audio.models import Audio
 from cl.disclosures.models import (
@@ -42,14 +40,14 @@ from cl.people_db.models import Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     Court,
-    Docket,
     OpinionCluster,
-    RECAPDocument,
 )
 from cl.search.selectors import get_available_documents_estimate_count
+from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
+from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
 
@@ -122,19 +120,6 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
         .filter(pacer_has_rss_feed=True, pacer_rss_entry_types="all")
         .order_by(jurisdiction_ordering)
     )
-    cache_key = "alert-help-stats"
-    data = await cache.aget(cache_key)
-    if data is None:
-        data = {
-            "d_update_count": await Docket.objects.filter(
-                date_modified__gte=now() - timedelta(days=1)
-            ).acount(),
-            "de_update_count": await RECAPDocument.objects.filter(
-                date_modified__gte=now() - timedelta(days=1)
-            ).acount(),
-        }
-        one_day = 60 * 60 * 24
-        await cache.aset(cache_key, data, one_day)
     context = {
         "no_feeds": no_feeds,
         "partial_feeds": partial_feeds,
@@ -144,8 +129,11 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
             settings.REAL_TIME_ALERTS_SENDING_RATE / 60
         ),
         "MAX_ATTORNEYS_TO_PERCOLATE": settings.MAX_ATTORNEYS_TO_PERCOLATE,
+        # Yesterday's alert total; start=1 skips today's still-filling bucket.
+        "alerts_sent_count": await sync_to_async(get_redis_stat_sum)(
+            f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
+        ),
     }
-    context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)
 
 
