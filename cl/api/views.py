@@ -24,8 +24,10 @@ from cl.search.documents import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
+from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
+from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
 
@@ -269,10 +271,15 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
 
     fd_data = await get_coverage_data_fds()
+    # Yesterday's alert total; start=1 skips today's still-filling bucket.
+    alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
+        f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
+    )
 
     data = {
         "court_count": court_count,
         "citation_count": citation_count,
+        "alerts_sent_count": alerts_sent_count,
         "citation_lookup": {
             "throttle_count": count,
             "throttle_period": period,

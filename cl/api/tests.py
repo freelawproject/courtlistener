@@ -218,12 +218,14 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         expected_keys = {
             "court_count",
             "citation_count",
+            "alerts_sent_count",
             "citation_lookup",
             "financial_disclosures",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
         self.assertIsInstance(data["citation_count"], int)
+        self.assertIsInstance(data["alerts_sent_count"], int)
         citation = data["citation_lookup"]
         self.assertIn("throttle_count", citation)
         self.assertIn("throttle_period", citation)
