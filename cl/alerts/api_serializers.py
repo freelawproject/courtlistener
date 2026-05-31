@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http import QueryDict
 from rest_framework import serializers
@@ -12,12 +13,21 @@ from cl.alerts.models import (
 from cl.alerts.utils import (
     AlertLimitViolation,
     check_alert_limits,
+    get_alert_estimation_count,
     is_match_all_query,
 )
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.search.models import SEARCH_TYPES
 
 FLP_MEMBERSHIP_URL = "https://free.law/membership/"
+
+# The number of days the alert frequency estimation averages over, matching
+# the value used by the alert_frequency endpoint in the frontend.
+ALERT_ESTIMATION_DAY_COUNT = 100
+
+# Key included in the API response with the estimated number of hits the alert
+# query would have produced over the last ALERT_ESTIMATION_DAY_COUNT days.
+ALERT_ESTIMATION_RESPONSE_KEY = "alert_frequency_estimation"
 
 
 class SearchAlertSerializer(
@@ -38,11 +48,15 @@ class SearchAlertSerializer(
 
     def validate(self, attrs):
         """Validate the query type, set a default for alert_type if not
-        provided, and enforce the user's alert creation quotas."""
+        provided, enforce the user's alert creation quotas, and reject alerts
+        whose query is estimated to be too broad."""
 
+        # The query provided in this request, if any. Used to decide when to
+        # re-run the frequency estimation (only when the query is being set).
+        request_query = attrs.get("query")
         # Get the query from the request or fall back to the instance, as done
         # during PATCH requests.
-        query = attrs.get("query") or getattr(self.instance, "query", "")
+        query = request_query or getattr(self.instance, "query", "")
         if query:
             match_all_query = is_match_all_query(query)
             if match_all_query:
@@ -56,6 +70,11 @@ class SearchAlertSerializer(
         # Enforce the membership and per-rate alert quotas, mirroring the
         # checks performed by CreateAlertForm.clean_rate in the frontend.
         self._validate_alert_quota(attrs)
+
+        # Estimate the alert frequency and reject overly broad queries. Only
+        # run when the query is being created or changed.
+        if request_query:
+            self._validate_alert_frequency(request_query)
         return attrs
 
     @staticmethod
@@ -161,6 +180,49 @@ class SearchAlertSerializer(
                     "gain access to real time alerts, please join Free Law "
                     f"Project as a member: {FLP_MEMBERSHIP_URL}"
                 )
+
+    def _validate_alert_frequency(self, query):
+        """Estimate the alert's frequency and reject overly broad queries.
+
+        Mirrors the frontend check in search.html: if the query averages more
+        than ``settings.MAX_ALERT_RESULTS_PER_DAY`` hits per day over the last
+        ``ALERT_ESTIMATION_DAY_COUNT`` days, the alert can't be created. The
+        estimated number of hits is stashed so it can be included in the
+        response on success, and surfaced in the error otherwise.
+
+        :param query: The alert's search query string.
+        :return: None
+        :raises ValidationError: If the query is estimated to be too broad.
+        """
+        qd = QueryDict(query.encode(), mutable=True)
+        estimation = get_alert_estimation_count(qd, ALERT_ESTIMATION_DAY_COUNT)
+        if estimation is None:
+            # The query couldn't be validated for estimation; skip the check.
+            return
+
+        total_hits = estimation[0]
+        hits_per_day = total_hits // ALERT_ESTIMATION_DAY_COUNT
+        if hits_per_day > settings.MAX_ALERT_RESULTS_PER_DAY:
+            raise serializers.ValidationError(
+                {
+                    ALERT_ESTIMATION_RESPONSE_KEY: total_hits,
+                    "query": (
+                        f"This query averages about {hits_per_day} results per "
+                        "day, which is more than our system can support. Please "
+                        "narrow your query to have fewer results per day."
+                    ),
+                }
+            )
+        self._alert_frequency_estimation = total_hits
+
+    def to_representation(self, instance):
+        """Include the alert frequency estimation in the response when it was
+        computed during validation (i.e. on create/update)."""
+        representation = super().to_representation(instance)
+        estimation = getattr(self, "_alert_frequency_estimation", None)
+        if estimation is not None:
+            representation[ALERT_ESTIMATION_RESPONSE_KEY] = estimation
+        return representation
 
     def create(self, validated_data):
         return super().create(validated_data)
