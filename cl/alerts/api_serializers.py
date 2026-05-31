@@ -1,7 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.http import QueryDict
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
+from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.models import (
     Alert,
     DocketAlert,
@@ -11,6 +13,8 @@ from cl.alerts.models import (
 from cl.alerts.utils import is_match_all_query
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.search.models import SEARCH_TYPES
+
+FLP_MEMBERSHIP_URL = "https://free.law/membership/"
 
 
 class SearchAlertSerializer(
@@ -30,23 +34,35 @@ class SearchAlertSerializer(
         )
 
     def validate(self, attrs):
-        """Validate the query type and set default for alert_type if not
-        provided."""
+        """Validate the query type, set a default for alert_type if not
+        provided, and enforce the user's alert creation quotas."""
 
         # Get the query from the request or fall back to the instance, as done
         # during PATCH requests.
         query = attrs.get("query") or getattr(self.instance, "query", "")
-        if not query:
-            return attrs
+        if query:
+            match_all_query = is_match_all_query(query)
+            if match_all_query:
+                raise serializers.ValidationError(
+                    {
+                        "query": "You can't create a match-all alert. Please try narrowing your query."
+                    }
+                )
+            attrs["alert_type"] = self._resolve_alert_type(attrs, query)
 
-        match_all_query = is_match_all_query(query)
-        if match_all_query:
-            raise serializers.ValidationError(
-                {
-                    "query": "You can't create a match-all alert. Please try narrowing your query."
-                }
-            )
+        # Enforce the membership and per-rate alert quotas, mirroring the
+        # checks performed by CreateAlertForm.clean_rate in the frontend.
+        self._validate_alert_quota(attrs)
+        return attrs
 
+    @staticmethod
+    def _resolve_alert_type(attrs, query):
+        """Determine the alert_type from the search query and request body.
+
+        :param attrs: The partially validated request data.
+        :param query: The alert's search query string.
+        :return: The resolved alert_type.
+        """
         qd = QueryDict(query.encode(), mutable=True)
         alert_type_query = qd.get("type")
         alert_type_request = attrs.get("alert_type")
@@ -54,8 +70,7 @@ class SearchAlertSerializer(
         # If no 'type' is provided in the query parameters, default the alert
         # to an OPINION alert.
         if not alert_type_query:
-            attrs["alert_type"] = SEARCH_TYPES.OPINION
-            return attrs
+            return SEARCH_TYPES.OPINION
 
         recap_supported_types = [
             alert_type for alert_type, _ in SEARCH_TYPES.RECAP_ALERT_TYPES
@@ -67,8 +82,7 @@ class SearchAlertSerializer(
                 validate_alert_type(alert_type_query)
             except ValidationError as e:
                 raise serializers.ValidationError({"alert_type": e.messages})
-            attrs["alert_type"] = alert_type_query
-            return attrs
+            return alert_type_query
 
         # If the query specifies a RECAP alert type, make sure an 'alert_type'
         # is also provided in the request body.
@@ -93,8 +107,96 @@ class SearchAlertSerializer(
                 }
             )
         # If the requested RECAP alert type is valid, use it.
-        attrs["alert_type"] = alert_type_request
-        return attrs
+        return alert_type_request
+
+    def _validate_alert_quota(self, attrs):
+        """Enforce the user's alert creation quotas based on their membership
+        status, mirroring CreateAlertForm.clean_rate.
+
+        Free users and members are limited to a set number of RECAP/DOCKETS
+        alerts per rate, and only members (or users with the unlimited alerts
+        flag) can create Real-Time alerts.
+
+        :param attrs: The partially validated request data.
+        :return: None
+        :raises PermissionDenied: If the request would exceed the user's quota
+        or the user isn't eligible to create a Real-Time alert.
+        """
+        # On PATCH requests, fall back to the instance values for fields that
+        # aren't part of the request.
+        user = attrs.get("user") or getattr(self.instance, "user", None)
+        rate = attrs.get("rate") or getattr(self.instance, "rate", None)
+        if user is None or rate is None:
+            return
+        alert_type = attrs.get("alert_type") or getattr(
+            self.instance, "alert_type", None
+        )
+
+        alert_being_edited = bool(self.instance and self.instance.pk)
+        if alert_being_edited and rate == Alert.OFF:
+            # Don't check quotas when the user disables their alert.
+            return
+
+        profile = user.profile
+        is_member = profile.is_member
+        has_unlimited_alerts = profile.unlimited_docket_alerts
+
+        # Only members or users with unlimited alerts can create RT alerts.
+        if (
+            rate == Alert.REAL_TIME
+            and not profile.is_eligible_for_rt_search_alerts
+        ):
+            raise PermissionDenied(
+                "You must be a member to create Real Time alerts. "
+                f"Please join Free Law Project as a member: {FLP_MEMBERSHIP_URL}"
+            )
+
+        # Quotas only apply to RECAP and DOCKETS alerts for users that don't
+        # have the unlimited alerts flag.
+        if has_unlimited_alerts or alert_type not in {
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+        }:
+            return
+
+        quotas_key = (
+            Alert.REAL_TIME if rate == Alert.REAL_TIME else "other_rates"
+        )
+        quotas = RECAP_ALERT_QUOTAS[quotas_key]
+        level_key = user.membership.level if is_member else "free"
+        allowed = quotas.get(level_key, quotas.get("free", 0))
+
+        query_params = {"user": user}
+        if rate == Alert.REAL_TIME:
+            query_params["rate"] = Alert.REAL_TIME
+        else:
+            query_params["rate__in"] = [
+                Alert.DAILY,
+                Alert.WEEKLY,
+                Alert.MONTHLY,
+            ]
+        alerts_count = Alert.objects.filter(
+            **query_params,
+            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+        )
+        if alert_being_edited:
+            # Exclude the alert being edited from the count.
+            alerts_count = alerts_count.exclude(pk=self.instance.pk)
+
+        if alerts_count.count() + 1 > allowed:
+            if is_member:
+                neon_id = user.membership.neon_id
+                upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+                raise PermissionDenied(
+                    "You've used all of the alerts included with your "
+                    "membership. To create this alert, upgrade your membership "
+                    f"at {upgrade_url} or disable a RECAP Alert."
+                )
+            raise PermissionDenied(
+                f"To create more than {quotas.get('free')} alerts and to gain "
+                "access to real time alerts, please join Free Law Project as a "
+                f"member: {FLP_MEMBERSHIP_URL}"
+            )
 
     def create(self, validated_data):
         return super().create(validated_data)

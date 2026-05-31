@@ -1083,13 +1083,38 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.user_1 = UserFactory()
-        cls.user_2 = UserFactory()
+        # Users need a related UserProfile for the alert quota validation.
+        cls.user_1 = UserProfileWithParentsFactory().user
+        cls.user_2 = UserProfileWithParentsFactory().user
+
+        cls.membership_termination_date = now() + timedelta(days=1)
+        # Non-member used to exercise the free-user quota.
+        cls.no_member_profile = UserProfileWithParentsFactory()
+        cls.user_no_member = cls.no_member_profile.user
+        # Legacy member: RT quota 0, other rates quota 5.
+        cls.user_legacy_member = UserProfileWithParentsFactory().user
+        NeonMembership.objects.create(
+            level=NeonMembershipLevel.LEGACY,
+            user=cls.user_legacy_member,
+            termination_date=cls.membership_termination_date,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+        )
+        # Tier 1 member: RT quota 5, other rates quota 10.
+        cls.user_member_tier_1 = UserProfileWithParentsFactory().user
+        NeonMembership.objects.create(
+            level=NeonMembershipLevel.TIER_1,
+            user=cls.user_member_tier_1,
+            termination_date=cls.membership_termination_date,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+        )
 
     def setUp(self) -> None:
         self.alert_path = reverse("alert-list", kwargs={"version": "v4"})
         self.client = make_client(self.user_1.pk)
         self.client_2 = make_client(self.user_2.pk)
+        self.client_no_member = make_client(self.user_no_member.pk)
+        self.client_legacy_member = make_client(self.user_legacy_member.pk)
+        self.client_member_tier_1 = make_client(self.user_member_tier_1.pk)
 
     def tearDown(cls):
         Alert.objects.all().delete()
@@ -1218,10 +1243,13 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
     def test_alert_update(self) -> None:
         """Can we update an alert?"""
 
+        # Use a member client since the alert is updated to a Real-Time rate,
+        # which is only allowed for members.
+        client = self.client_member_tier_1
         with self.captureOnCommitCallbacks(execute=True):
-            # Make one alerts for user_1
+            # Make one alert for the member user
             alert_1 = async_to_sync(self.make_an_alert)(
-                self.client,
+                client,
                 alert_name="alert_1",
                 alert_query=f"q=testing_query&type={SEARCH_TYPES.ORAL_ARGUMENT}",
             )
@@ -1249,7 +1277,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
             "rate": Alert.REAL_TIME,
         }
         with self.captureOnCommitCallbacks(execute=True):
-            response = async_to_sync(self.client.put)(
+            response = async_to_sync(client.put)(
                 alert_1_path_detail, data_updated
             )
 
@@ -1566,6 +1594,174 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
                 self.assertEqual(
                     response.json()["alert_type"], search_type_target
                 )
+
+    async def test_non_member_rt_alert_rejected(self) -> None:
+        """Non-members cannot create Real-Time alerts through the API."""
+        response = await self.make_an_alert(
+            self.client_no_member,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+            alert_rate=Alert.REAL_TIME,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertIn(
+            "You must be a member to create Real Time alerts.",
+            response.json()["detail"],
+        )
+        self.assertEqual(
+            await Alert.objects.filter(user=self.user_no_member).acount(), 0
+        )
+
+    async def test_member_can_create_rt_non_recap_alert(self) -> None:
+        """Members can create Real-Time non-RECAP alerts through the API."""
+        response = await self.make_an_alert(
+            self.client_member_tier_1,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+            alert_rate=Alert.REAL_TIME,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(
+            await Alert.objects.filter(user=self.user_member_tier_1).acount(),
+            1,
+        )
+
+    async def test_unlimited_flag_user_can_create_rt_recap_alert(self) -> None:
+        """A non-member with the unlimited alerts flag bypasses the membership
+        and quota restrictions, including for RECAP Real-Time alerts."""
+        self.no_member_profile.unlimited_docket_alerts = True
+        await self.no_member_profile.asave()
+
+        response = await self.make_an_alert(
+            self.client_no_member,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(response.json()["alert_type"], SEARCH_TYPES.RECAP)
+
+    async def test_free_user_recap_quota_exceeded(self) -> None:
+        """Free users are limited to 5 RECAP/DOCKETS alerts for non-RT rates."""
+        # Fill the quota with 5 DOCKETS DAILY alerts.
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_no_member,
+            rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        # The 6th RECAP/DOCKETS alert is rejected.
+        response = await self.make_an_alert(
+            self.client_no_member,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertIn(
+            "To create more than 5 alerts", response.json()["detail"]
+        )
+        self.assertEqual(
+            await Alert.objects.filter(user=self.user_no_member).acount(), 5
+        )
+
+    async def test_non_recap_alerts_dont_count_toward_quota(self) -> None:
+        """Non-RECAP alerts are not subject to the RECAP quota, so a free user
+        can create more than 5 of them."""
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_no_member,
+            rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.OPINION,
+        )
+        response = await self.make_an_alert(
+            self.client_no_member,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+            alert_rate=Alert.DAILY,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(
+            await Alert.objects.filter(user=self.user_no_member).acount(), 6
+        )
+
+    async def test_legacy_member_recap_rt_rejected(self) -> None:
+        """Legacy members have a RECAP Real-Time quota of 0, so their first
+        RECAP RT alert is rejected with the membership upgrade message."""
+        response = await self.make_an_alert(
+            self.client_legacy_member,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        detail = response.json()["detail"]
+        self.assertIn(
+            "You've used all of the alerts included with your membership.",
+            detail,
+        )
+        neon_id = await sync_to_async(
+            lambda: self.user_legacy_member.membership.neon_id
+        )()
+        self.assertIn(
+            f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}",
+            detail,
+        )
+        self.assertEqual(
+            await Alert.objects.filter(user=self.user_legacy_member).acount(),
+            0,
+        )
+
+    async def test_member_recap_rt_quota_exceeded(self) -> None:
+        """Tier 1 members have a RECAP Real-Time quota of 5; the 6th RECAP RT
+        alert is rejected."""
+        await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_member_tier_1,
+            rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.DOCKETS,
+        )
+        response = await self.make_an_alert(
+            self.client_member_tier_1,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+            alert_rate=Alert.REAL_TIME,
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertIn(
+            "You've used all of the alerts included with your membership.",
+            response.json()["detail"],
+        )
+        self.assertEqual(
+            await Alert.objects.filter(user=self.user_member_tier_1).acount(),
+            5,
+        )
+
+    async def test_editing_alert_at_quota_excludes_itself(self) -> None:
+        """A user at their quota can still edit an existing RECAP alert, since
+        the alert being edited is excluded from the quota count."""
+        # Fill the free user's non-RT quota with 5 DOCKETS DAILY alerts.
+        alerts = await sync_to_async(AlertFactory.create_batch)(
+            5,
+            user=self.user_no_member,
+            rate=Alert.DAILY,
+            alert_type=SEARCH_TYPES.DOCKETS,
+            query="q=testing_query&type=r",
+        )
+        alert_path_detail = reverse(
+            "alert-detail",
+            kwargs={"pk": alerts[0].pk, "version": "v4"},
+        )
+        # Editing an existing alert while at the quota succeeds because the
+        # alert being edited is excluded from the count.
+        data_updated = {
+            "name": "edited_name",
+            "query": "q=testing_query&type=r",
+            "rate": Alert.DAILY,
+            "alert_type": SEARCH_TYPES.DOCKETS,
+        }
+        response = await self.client_no_member.put(
+            alert_path_detail, data_updated, format="json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["name"], "edited_name")
 
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
