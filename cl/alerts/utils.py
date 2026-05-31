@@ -1,11 +1,13 @@
 import copy
 from dataclasses import dataclass
 from datetime import date, datetime
+from enum import Enum, auto
 from typing import Any
 from urllib.parse import parse_qs
 
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from elasticsearch.dsl import MultiSearch, Q, Search
@@ -13,6 +15,7 @@ from elasticsearch.dsl.query import Query
 from elasticsearch.dsl.response import Hit
 from redis import Redis
 
+from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
     Alert,
@@ -864,3 +867,105 @@ def is_match_all_query(qs: str) -> bool:
 
     # If any remaining value is not empty, it is not a match-all query.
     return not any(val.strip() for vals in parsed.values() for val in vals)
+
+
+class AlertLimitViolation(Enum):
+    """The reason a user can't create or edit an alert with a given rate."""
+
+    # The user isn't eligible to create Real-Time alerts.
+    REAL_TIME_NOT_ALLOWED = auto()
+    # A member has used all the RECAP/DOCKETS alerts included with their plan.
+    MEMBER_QUOTA_EXCEEDED = auto()
+    # A free user has reached the free RECAP/DOCKETS alert quota.
+    FREE_QUOTA_EXCEEDED = auto()
+
+
+@dataclass
+class AlertLimitResult:
+    """Outcome of evaluating an alert against the user's membership limits."""
+
+    # The violation found, or None when the alert is within limits.
+    violation: AlertLimitViolation | None
+    # The free-tier quota for the alert's rate, for building the user message.
+    free_quota: int
+
+
+def check_alert_limits(
+    user: User,
+    rate: str,
+    alert_type: str | None,
+    *,
+    exclude_alert_pk: int | None = None,
+) -> AlertLimitResult:
+    """Evaluate whether creating or editing an alert would exceed the user's
+    membership-based alert limits.
+
+    This holds the business logic shared by the alert creation form
+    (``CreateAlertForm.clean_rate``) and the API serializer
+    (``SearchAlertSerializer``). Each caller is responsible for turning the
+    returned violation into an appropriate error message and exception type.
+
+    :param user: The alert owner.
+    :param rate: The alert rate (``Alert.REAL_TIME``, ``Alert.DAILY``, etc.).
+    :param alert_type: The resolved alert_type (e.g. RECAP, DOCKETS, OPINION).
+    :param exclude_alert_pk: When editing an existing alert, its pk, so it's
+    excluded from the quota count. None when creating a new alert.
+    :return: An ``AlertLimitResult`` with the violation found (or None when
+    within limits) and the free-tier quota for the rate.
+    """
+    profile = user.profile  # type: ignore[attr-defined]
+    quotas = RECAP_ALERT_QUOTAS[
+        Alert.REAL_TIME if rate == Alert.REAL_TIME else "other_rates"
+    ]
+    free_quota = quotas.get("free", 0)
+
+    # Don't enforce limits when disabling an existing alert.
+    if exclude_alert_pk is not None and rate == Alert.OFF:
+        return AlertLimitResult(None, free_quota)
+
+    # Only members or users with the unlimited alerts flag can create RT
+    # alerts, regardless of the alert type.
+    if (
+        rate == Alert.REAL_TIME
+        and not profile.is_eligible_for_rt_search_alerts
+    ):
+        return AlertLimitResult(
+            AlertLimitViolation.REAL_TIME_NOT_ALLOWED, free_quota
+        )
+
+    # Quotas only apply to RECAP/DOCKETS alerts for users that don't have the
+    # unlimited alerts flag.
+    if profile.unlimited_docket_alerts or alert_type not in {
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    }:
+        return AlertLimitResult(None, free_quota)
+
+    level_key = (
+        user.membership.level  # type: ignore[attr-defined]
+        if profile.is_member
+        else "free"
+    )
+    allowed = quotas.get(level_key, free_quota)
+
+    query_params: dict[str, Any] = {"user": user}
+    if rate == Alert.REAL_TIME:
+        query_params["rate"] = Alert.REAL_TIME
+    else:
+        query_params["rate__in"] = [Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]
+    alerts = Alert.objects.filter(
+        **query_params,
+        alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+    )
+    if exclude_alert_pk is not None:
+        # Exclude the alert being edited from the count.
+        alerts = alerts.exclude(pk=exclude_alert_pk)
+
+    if alerts.count() + 1 > allowed:
+        violation = (
+            AlertLimitViolation.MEMBER_QUOTA_EXCEEDED
+            if profile.is_member
+            else AlertLimitViolation.FREE_QUOTA_EXCEEDED
+        )
+        return AlertLimitResult(violation, free_quota)
+    return AlertLimitResult(None, free_quota)

@@ -3,14 +3,17 @@ from django.http import QueryDict
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.models import (
     Alert,
     DocketAlert,
     validate_alert_type,
     validate_recap_alert_type,
 )
-from cl.alerts.utils import is_match_all_query
+from cl.alerts.utils import (
+    AlertLimitViolation,
+    check_alert_limits,
+    is_match_all_query,
+)
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.search.models import SEARCH_TYPES
 
@@ -113,9 +116,8 @@ class SearchAlertSerializer(
         """Enforce the user's alert creation quotas based on their membership
         status, mirroring CreateAlertForm.clean_rate.
 
-        Free users and members are limited to a set number of RECAP/DOCKETS
-        alerts per rate, and only members (or users with the unlimited alerts
-        flag) can create Real-Time alerts.
+        The shared business logic lives in cl.alerts.utils.check_alert_limits;
+        here we only translate the result into the appropriate API error.
 
         :param attrs: The partially validated request data.
         :return: None
@@ -131,60 +133,21 @@ class SearchAlertSerializer(
         alert_type = attrs.get("alert_type") or getattr(
             self.instance, "alert_type", None
         )
-
         alert_being_edited = bool(self.instance and self.instance.pk)
-        if alert_being_edited and rate == Alert.OFF:
-            # Don't check quotas when the user disables their alert.
-            return
 
-        profile = user.profile
-        is_member = profile.is_member
-        has_unlimited_alerts = profile.unlimited_docket_alerts
-
-        # Only members or users with unlimited alerts can create RT alerts.
-        if (
-            rate == Alert.REAL_TIME
-            and not profile.is_eligible_for_rt_search_alerts
-        ):
-            raise PermissionDenied(
-                "You must be a member to create Real Time alerts. "
-                f"Please join Free Law Project as a member: {FLP_MEMBERSHIP_URL}"
-            )
-
-        # Quotas only apply to RECAP and DOCKETS alerts for users that don't
-        # have the unlimited alerts flag.
-        if has_unlimited_alerts or alert_type not in {
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.DOCKETS,
-        }:
-            return
-
-        quotas_key = (
-            Alert.REAL_TIME if rate == Alert.REAL_TIME else "other_rates"
+        result = check_alert_limits(
+            user,
+            rate,
+            alert_type,
+            exclude_alert_pk=self.instance.pk if alert_being_edited else None,
         )
-        quotas = RECAP_ALERT_QUOTAS[quotas_key]
-        level_key = user.membership.level if is_member else "free"
-        allowed = quotas.get(level_key, quotas.get("free", 0))
-
-        query_params = {"user": user}
-        if rate == Alert.REAL_TIME:
-            query_params["rate"] = Alert.REAL_TIME
-        else:
-            query_params["rate__in"] = [
-                Alert.DAILY,
-                Alert.WEEKLY,
-                Alert.MONTHLY,
-            ]
-        alerts_count = Alert.objects.filter(
-            **query_params,
-            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
-        )
-        if alert_being_edited:
-            # Exclude the alert being edited from the count.
-            alerts_count = alerts_count.exclude(pk=self.instance.pk)
-
-        if alerts_count.count() + 1 > allowed:
-            if is_member:
+        match result.violation:
+            case AlertLimitViolation.REAL_TIME_NOT_ALLOWED:
+                raise PermissionDenied(
+                    "You must be a member to create Real Time alerts. "
+                    f"Please join Free Law Project as a member: {FLP_MEMBERSHIP_URL}"
+                )
+            case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
                 neon_id = user.membership.neon_id
                 upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
                 raise PermissionDenied(
@@ -192,11 +155,12 @@ class SearchAlertSerializer(
                     "membership. To create this alert, upgrade your membership "
                     f"at {upgrade_url} or disable a RECAP Alert."
                 )
-            raise PermissionDenied(
-                f"To create more than {quotas.get('free')} alerts and to gain "
-                "access to real time alerts, please join Free Law Project as a "
-                f"member: {FLP_MEMBERSHIP_URL}"
-            )
+            case AlertLimitViolation.FREE_QUOTA_EXCEEDED:
+                raise PermissionDenied(
+                    f"To create more than {result.free_quota} alerts and to "
+                    "gain access to real time alerts, please join Free Law "
+                    f"Project as a member: {FLP_MEMBERSHIP_URL}"
+                )
 
     def create(self, validated_data):
         return super().create(validated_data)
