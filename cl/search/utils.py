@@ -17,22 +17,27 @@ from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Opinion
 from cl.search.selectors import get_total_estimate_count
+from cl.stats.constants import StatMetric
 
 
-def get_redis_stat_sum(key_pattern: str, days: int = 10) -> int:
-    """Get sum of a stat from Redis for the last N days.
+def get_redis_stat_sum(
+    key_pattern: str, days: int = 10, start: int = 0
+) -> int:
+    """Get sum of a stat from Redis for a window of days.
 
     Args:
         key_pattern: Redis key pattern with {date} placeholder
                     (e.g., "alerts.sent.{date}", "api:v4.d:{date}.count")
-        days: Number of days to look back (default: 10)
+        days: Number of days in the window (default: 10)
+        start: Days ago the window starts (default: 0, i.e. today). Use
+               start=1 to skip today's still-filling bucket.
 
     Returns:
-        Sum of the stat values across all days
+        Sum of the stat values across all days in the window
     """
     r = get_redis_interface("STATS")
     keys = []
-    for x in range(0, days):
+    for x in range(start, start + days):
         d = (now().date() - timedelta(days=x)).isoformat()
         keys.append(key_pattern.format(date=d))
     return sum(int(result) for result in r.mget(*keys) if result is not None)
@@ -46,7 +51,9 @@ def get_v2_homepage_stats():
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
 
     # Get stats from Redis (new system)
-    alerts_in_last_ten = get_redis_stat_sum("alerts.sent.{date}")
+    alerts_in_last_ten = get_redis_stat_sum(
+        f"{StatMetric.ALERTS_SENT}.{{date}}"
+    )
     queries_in_last_ten = get_redis_stat_sum("search.results.{date}")
     api_in_last_ten = get_redis_stat_sum("api:v4.d:{date}.count")
 
@@ -75,7 +82,9 @@ def get_homepage_stats():
     ten_days_ago = make_aware(datetime.today() - timedelta(days=10), UTC)
 
     # Get stats from Redis
-    alerts_in_last_ten = get_redis_stat_sum("alerts.sent.{date}")
+    alerts_in_last_ten = get_redis_stat_sum(
+        f"{StatMetric.ALERTS_SENT}.{{date}}"
+    )
     queries_in_last_ten = get_redis_stat_sum("search.results.{date}")
     api_in_last_ten = get_redis_stat_sum("api:v4.d:{date}.count")
 
