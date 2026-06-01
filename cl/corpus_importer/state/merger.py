@@ -1,7 +1,8 @@
 import logging
 import types
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 class AttributeSpecification(ABC): ...
 
 
-class MapInput[ScrapedData, Output](AttributeSpecification):
+class InputMap[ScrapedData, Output](AttributeSpecification):
     def __init__(
         self, map: Callable[[ScrapedData], Output] | None = None
     ) -> None:
@@ -35,13 +36,13 @@ class MapInput[ScrapedData, Output](AttributeSpecification):
         return self._map(i)
 
 
-class InputField[ScrapedData, Output](MapInput[ScrapedData, Output]):
-    def __init__(self, path: str, default: Output | None = None) -> None:
-        super().__init__()
-        self.path: list[str] = [p for p in path.split(".") if p]
-        self.default: Output | None = default
-        if not self.path:
+class InputField[ScrapedData, Output](InputMap[ScrapedData, Output]):
+    def __init__(self, *path: str, default: Output | None = None) -> None:
+        if not path:
             raise ValueError("Path must not be empty")
+        super().__init__()
+        self.path: list[str] = list(path)
+        self.default: Output | None = default
 
     @override
     def map(self, i: ScrapedData) -> Output | None:
@@ -57,48 +58,68 @@ class InputField[ScrapedData, Output](MapInput[ScrapedData, Output]):
         return current
 
 
-class NeverMapping[ScrapedData, T](MapInput[ScrapedData, T]):
+class NeverMapping[ScrapedData, T](InputMap[ScrapedData, T]):
     @override
     def map(self, i: ScrapedData) -> None:
         return None
 
 
-class AttributeMerger[ScrapedData, DBModel: Model, T]:
-    def __init__(
-        self, name: str, specifications: list[AttributeSpecification]
-    ) -> None:
-        map = None
-        self.name: str = name
-        for spec in specifications:
-            match spec:
-                case MapInput() as m:
-                    if map is None:
-                        _map = m
-                    else:
-                        raise ValueError(
-                            "Only one mapping is allowed per attribute"
-                        )
-                case _:
-                    raise TypeError(f"Unknown attribute specification {spec}")
-
-        self._map: MapInput[ScrapedData, T] = (
-            map or NeverMapping[ScrapedData, T]()
-        )
-
-    def get_value(self, i: ScrapedData) -> T | None:
-        """Compute the value of an attribute from scraped data."""
-        return self._map.map(i)
-
-    def merge_values(self, scrape: DBModel, db: DBModel) -> T:
-        """Merge the values of two attributes (scrape and DB) and return the merged value."""
+class MergeStrategy[T](ABC):
+    @abstractmethod
+    def merge_values(self, scrape: T, db: T) -> T:
         raise NotImplementedError
 
 
-class RelatedMerger: ...
+class OverwriteExisting[T](MergeStrategy[T]):
+    @override
+    def merge_values(self, scrape: T, db: T) -> T:
+        return scrape
+
+
+@dataclass
+class OverwriteConditionally[T](MergeStrategy[T]):
+    condition: Callable[[T, T], bool]
+
+    @override
+    def merge_values(self, scrape: T, db: T) -> T:
+        if self.condition(scrape, db):
+            return scrape
+        return db
+
+
+class IgnoreScrape[T](MergeStrategy[T]):
+    @override
+    def merge_values(self, scrape: T, db: T) -> T:
+        return db
+
+
+class AttributeMerger[ScrapedData, T]:
+    name: str = ""
+
+    def __init__(
+        self,
+        transform: InputMap[ScrapedData, T],
+        *,
+        strategy: MergeStrategy[T] = IgnoreScrape(),
+    ) -> None:
+        self.transform: InputMap[ScrapedData, T] = transform
+        self.strategy: MergeStrategy[T] = strategy
+
+    def get_value(self, i: ScrapedData) -> T | None:
+        """Compute the value of an attribute from scraped data."""
+        return self.transform.map(i)
+
+    def merge_values(self, scrape: T, db: T) -> T:
+        """Merge the values of two attributes (scrape and DB) and return the merged value."""
+        return self.strategy.merge_values(scrape, db)
+
+
+class RelatedMerger:
+    name: str = ""
 
 
 class Merger[ScrapedData, DBModel: Model](ABC):
-    __attr_mergers__: list[AttributeMerger[ScrapedData, DBModel, Any]]
+    __attr_mergers__: list[AttributeMerger[ScrapedData, Any]]
     __related_mergers__: ClassVar[list[RelatedMerger]]
     __model__: type[Model]
     __default_values__: ClassVar[dict[str, Any]] = {}
@@ -110,23 +131,44 @@ class Merger[ScrapedData, DBModel: Model](ABC):
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
-        annotated: list[tuple[str, list[AttributeSpecification]]] = [
+        annotated: list[
+            tuple[
+                str,
+                list[AttributeMerger[Any, Any]],
+                list[RelatedMerger],
+            ]
+        ] = [
             (
                 name,
                 [
                     a
                     for a in hint.__metadata__
-                    if isinstance(a, AttributeSpecification)
+                    if isinstance(a, AttributeMerger)
                 ],
+                [a for a in hint.__metadata__ if isinstance(a, RelatedMerger)],
             )
             for name, hint in get_type_hints(cls, include_extras=True).items()
             if not name.startswith("_") and get_origin(hint) is Annotated
         ]
 
+        for name, attr_mergers, related_mergers in annotated:
+            if len(attr_mergers) + len(related_mergers) > 1:
+                raise TypeError(
+                    f"Only one attribute merger or related merger is allowed per attribute: {name}"
+                )
+            if attr_mergers and not attr_mergers[0].name:
+                attr_mergers[0].name = name
+            if related_mergers and not related_mergers[0].name:
+                related_mergers[0].name = name
+
         cls.__attr_mergers__ = [
-            AttributeMerger(name, specs) for name, specs in annotated
+            attr_mergers[0] for _, attr_mergers, _ in annotated if attr_mergers
         ]
-        cls.__related_mergers__ = []
+        cls.__related_mergers__ = [
+            related_mergers[0]
+            for _, _, related_mergers in annotated
+            if related_mergers
+        ]
 
         merger_base = next(
             (
@@ -217,6 +259,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
         if result.failed:
             cls.after(i, None, result)
+            return result
         # TODO Merge children and relatives here
         return result
 
@@ -240,30 +283,3 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             db_obj.save()
             return MergeResult.updated(cls.__model__.__name__, db_obj.pk)
         return MergeResult.unnecessary()
-
-
-# class InputField(MergerMapping):
-#     path: list[str]
-#
-#     def __init__(self, path: str) -> None:
-#         self.path = [p for p in path.split(".") if p]
-#
-#     @override
-#     def map[Output](self, i: object, c: Output | None) -> Output:
-#         if not self.path:
-#             return i
-#         current = i
-#         for p in self.path:
-#             if isinstance(current, dict) and p in current:
-#                 current = current[p]
-#             elif hasattr(current, p):
-#                 current = getattr(current, p)
-#             else:
-#                 raise ValueError(f"Could not find {self.path} in {i}")
-#         return current
-
-
-# class TransformField(MergerMapping):
-#     @override
-#     def map(self, i: Any, c: Any) -> Any:
-#         return i
