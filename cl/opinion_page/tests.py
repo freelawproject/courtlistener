@@ -2936,7 +2936,8 @@ class DocketFilterPaginationWiringTest(TestCase):
             'name="entry_lte"',
             'name="order_by"',
         ):
-            self.assertIn(field, content, f"filter field {field} missing")
+            with self.subTest(field=field):
+                self.assertIn(field, content, f"filter field {field} missing")
 
     async def test_filter_params_narrow_queryset(self) -> None:
         """`?entry_gte=3` must drop entries 1 and 2 from the page's
