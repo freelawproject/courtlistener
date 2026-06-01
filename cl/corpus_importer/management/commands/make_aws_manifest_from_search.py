@@ -7,7 +7,7 @@ from typing import Any
 import boto3
 from django.core.management import CommandParser  # type: ignore
 from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 
 from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand

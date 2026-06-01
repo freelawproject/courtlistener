@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date
 from http import HTTPStatus
 from typing import Any
 
@@ -9,7 +9,6 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.core.mail import EmailMessage
 from django.core.paginator import Page
 from django.db.models import (
     Case,
@@ -24,8 +23,6 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template import loader
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.timezone import now
-from waffle import flag_is_active
 
 from cl.audio.models import Audio
 from cl.disclosures.models import (
@@ -45,14 +42,14 @@ from cl.people_db.models import Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     Court,
-    Docket,
     OpinionCluster,
-    RECAPDocument,
 )
 from cl.search.selectors import get_available_documents_estimate_count
+from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
+from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
 
@@ -125,19 +122,6 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
         .filter(pacer_has_rss_feed=True, pacer_rss_entry_types="all")
         .order_by(jurisdiction_ordering)
     )
-    cache_key = "alert-help-stats"
-    data = await cache.aget(cache_key)
-    if data is None:
-        data = {
-            "d_update_count": await Docket.objects.filter(
-                date_modified__gte=now() - timedelta(days=1)
-            ).acount(),
-            "de_update_count": await RECAPDocument.objects.filter(
-                date_modified__gte=now() - timedelta(days=1)
-            ).acount(),
-        }
-        one_day = 60 * 60 * 24
-        await cache.aset(cache_key, data, one_day)
     context = {
         "no_feeds": no_feeds,
         "partial_feeds": partial_feeds,
@@ -147,8 +131,11 @@ async def alert_help(request: HttpRequest) -> HttpResponse:
             settings.REAL_TIME_ALERTS_SENDING_RATE / 60
         ),
         "MAX_ATTORNEYS_TO_PERCOLATE": settings.MAX_ATTORNEYS_TO_PERCOLATE,
+        # Yesterday's alert total; start=1 skips today's still-filling bucket.
+        "alerts_sent_count": await sync_to_async(get_redis_stat_sum)(
+            f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
+        ),
     }
-    context.update(data)
     return TemplateResponse(request, "help/alert_help.html", context)
 
 
@@ -423,8 +410,23 @@ async def contact(
     if initial is None:
         initial = {}
 
+    auser = await request.auser()  # type: ignore[attr-defined]
+    if isinstance(auser, User):
+        # Logged-in user
+        is_authenticated = True
+        user = auser
+        account_email = user.email
+    else:
+        is_authenticated = False
+        user = None
+        account_email = ""
+
     if request.method == "POST":
-        form = ContactForm(request.POST)
+        form = ContactForm(
+            request.POST,
+            is_authenticated=is_authenticated,
+            account_email=account_email,
+        )
         if form.is_valid():
             cd = form.cleaned_data
             # Uses phone_number as Subject field to defeat spam. If this field
@@ -433,51 +435,39 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
-            use_zoho = await sync_to_async(flag_is_active)(
-                request, "zoho-desk-tickets"
-            )
-            if use_zoho:
-                create_zoho_desk_ticket.delay(
-                    subject=cd["phone_number"],
-                    name=cd["name"],
-                    email=cd["email"],
-                    description=form.render_email_body(
-                        user_agent=request.headers.get(
-                            "user-agent", "Unknown"
-                        ),
-                        target="zoho_desk",
-                    ),
-                    request_type=form.get_zoho_request_type(),
-                    assignee_id=form.get_zoho_assignee_id(),
-                )
-            else:
-                default_from = settings.DEFAULT_FROM_EMAIL
-                subject = form.email_subject()
-                body = form.render_email_body(
-                    user_agent=request.headers.get("user-agent", "Unknown")
-                )
+            logged_in_info: dict[str, Any] | None = None
+            if user:
+                profile = await sync_to_async(lambda: user.profile)()  # type: ignore[attr-defined]
+                logged_in_info = {
+                    "username": user.username,
+                    "email": account_email,
+                    "email_confirmed": profile.email_confirmed,
+                }
 
-                message = EmailMessage(
-                    subject=subject,
-                    body=body,
-                    to=["support@freelawproject.atlassian.net"],
-                    reply_to=[cd.get("email", default_from) or default_from],
-                )
-                await sync_to_async(message.send)()
+            create_zoho_desk_ticket.delay(
+                subject=cd["phone_number"],
+                name=cd["name"],
+                email=account_email if is_authenticated else cd["email"],
+                description=form.render_email_body(
+                    user_agent=request.headers.get("user-agent", "Unknown"),
+                    logged_in_info=logged_in_info,
+                ),
+                request_type=form.get_zoho_request_type(),
+                assignee_id=form.get_zoho_assignee_id(),
+            )
             return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
         issue_type = request.GET.get("issue_type")
         if issue_type and issue_type.lower() in ContactForm.VALID_ISSUE_TYPES:
             initial["issue_type"] = issue_type.lower()
-        user = await request.auser()  # type: ignore[attr-defined]
-        if isinstance(user, User):
-            initial["email"] = user.email
+        if user:
             initial["name"] = user.get_full_name()
-            form = ContactForm(initial=initial)
-        else:
-            # for anonymous users, who lack full_names, and emails
-            form = ContactForm(initial=initial)
+        form = ContactForm(
+            initial=initial,
+            is_authenticated=is_authenticated,
+            account_email=account_email,
+        )
 
     template_data.update({"form": form, "private": False})
     return TemplateResponse(request, template_path, template_data)
