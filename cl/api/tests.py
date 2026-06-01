@@ -218,12 +218,14 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         expected_keys = {
             "court_count",
             "citation_count",
+            "alerts_sent_count",
             "citation_lookup",
             "financial_disclosures",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
         self.assertIsInstance(data["citation_count"], int)
+        self.assertIsInstance(data["alerts_sent_count"], int)
         citation = data["citation_lookup"]
         self.assertIn("throttle_count", citation)
         self.assertIn("throttle_period", citation)
@@ -2049,12 +2051,15 @@ class V4DRFPaginationTest(TestCase):
             user__username="recap-user",
             user__password=make_password("password"),
         )
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        ps_upload = Permission.objects.filter(
-            codename="has_recap_upload_access"
+        ps = Permission.objects.filter(
+            codename__in=[
+                "has_recap_api_access",
+                "has_recap_upload_access",
+                "view_processingqueue",
+                "view_emailprocessingqueue",
+            ]
         )
         cls.user_1.user.user_permissions.add(*ps)
-        cls.user_1.user.user_permissions.add(*ps_upload)
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         for i in range(10):
             DocketFactory(
@@ -5187,7 +5192,7 @@ class MembershipThrottleSyncTest(TestCase):
         for level, rates in LEVEL_TO_RATES.items():
             with self.subTest(level=level):
                 user = UserFactory()
-                apply_membership_throttles(user, level)
+                self.assertTrue(apply_membership_throttles(user, level))
                 got = list(
                     APIThrottle.objects.filter(
                         user=user,
@@ -5259,9 +5264,11 @@ class MembershipThrottleSyncTest(TestCase):
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
 
     def test_unknown_level_is_no_op(self) -> None:
-        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows."""
+        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows and return False."""
         user = UserFactory()
-        apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        self.assertFalse(
+            apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        )
         self.assertFalse(APIThrottle.objects.filter(user=user).exists())
 
     @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
@@ -5275,7 +5282,9 @@ class MembershipThrottleSyncTest(TestCase):
             source=APIThrottle.Source.MEMBERSHIP,
         )
 
-        apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+        self.assertFalse(
+            apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+        )
         rates_after_apply = list(
             APIThrottle.objects.filter(user=user).values_list(
                 "rate", flat=True
@@ -5286,11 +5295,20 @@ class MembershipThrottleSyncTest(TestCase):
         clear_membership_throttles(user)
         self.assertTrue(APIThrottle.objects.filter(user=user).exists())
 
-    def test_apply_clears_throttle_cache(self) -> None:
-        """apply_* invalidates the get_all_throttle_overrides cache."""
+    def test_apply_skips_cache_clear_by_default(self) -> None:
+        """apply_* does not invalidate the cache unless clear_cache=True."""
         user = UserFactory()
         with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
             apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+        mock_clear.assert_not_called()
+
+    def test_apply_clears_cache_when_requested(self) -> None:
+        """apply_* invalidates the cache when called with clear_cache=True."""
+        user = UserFactory()
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            apply_membership_throttles(
+                user, NeonMembershipLevel.TIER_1, clear_cache=True
+            )
         mock_clear.assert_called_once()
 
     def test_clear_clears_throttle_cache_when_rows_deleted(self) -> None:
