@@ -611,6 +611,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             continue
 
         alert_user: UserProfile.user = alert_triggered.user
+        # The (document_type, document_id) pairs to record in the alert_hits
+        # Redis sets if this hit ends up being delivered or scheduled.
+        alert_set_writes: list[tuple[str, int]] = []
         # Set highlight if available in response.
         match app_label_model:
             case "search.RECAPDocument":
@@ -626,6 +629,11 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 )
                 object_id = document_content_copy["docket_id"]
                 child_document = True
+                alert_set_writes = [
+                    ("r", document_content_copy["id"]),
+                    # Mark case-only alert as triggered.
+                    ("co", object_id),
+                ]
             case "search.Docket":
                 # Filter out Dockets already seen by this alert.
                 if has_document_alert_hit_been_triggered(
@@ -637,6 +645,11 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                     continue
                 object_id = document_content_copy["docket_id"]
                 child_document = False
+                alert_set_writes = [
+                    ("d", object_id),
+                    # Mark case-only alert as triggered.
+                    ("co", object_id),
+                ]
             case "audio.Audio":
                 object_id = document_content_copy["id"]
                 child_document = False
@@ -651,6 +664,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 )
                 object_id = document_content_copy["cluster_id"]
                 child_document = True
+                alert_set_writes = [("o", document_content_copy["id"])]
             case _:
                 raise NotImplementedError(
                     "Percolator response processing not supported for: %s",
@@ -686,36 +700,13 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         )
         # Only record the hit in the alert_hits Redis sets if the alert was
         # actually delivered (webhook) or will be scheduled (email).
-        # Otherwise the sets grow unbounded for overly broad non-member RT
+        # Otherwise, the sets grow unbounded for overly broad non-member RT
         # alerts that have no active webhooks.
         if webhook_sent or schedule_alert:
-            match app_label_model:
-                case "search.RECAPDocument":
-                    add_document_hit_to_alert_set(
-                        r,
-                        alert_triggered_id,
-                        "r",
-                        document_content_copy["id"],
-                    )
-                    # Mark case-only alert as triggered.
-                    add_document_hit_to_alert_set(
-                        r, alert_triggered_id, "co", object_id
-                    )
-                case "search.Docket":
-                    add_document_hit_to_alert_set(
-                        r, alert_triggered_id, "d", object_id
-                    )
-                    # Mark case-only alert as triggered.
-                    add_document_hit_to_alert_set(
-                        r, alert_triggered_id, "co", object_id
-                    )
-                case "search.Opinion":
-                    add_document_hit_to_alert_set(
-                        r,
-                        alert_triggered_id,
-                        "o",
-                        document_content_copy["id"],
-                    )
+            for document_type, document_id in alert_set_writes:
+                add_document_hit_to_alert_set(
+                    r, alert_triggered_id, document_type, document_id
+                )
         if not schedule_alert:
             # Omit scheduling an RT alert if the user is not a member.
             continue
