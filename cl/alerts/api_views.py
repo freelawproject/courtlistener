@@ -1,4 +1,5 @@
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.viewsets import ModelViewSet
 
 from cl.alerts.api_serializers import (
@@ -9,13 +10,24 @@ from cl.alerts.filters import DocketAlertFilter, SearchAlertFilter
 from cl.alerts.models import Alert, DocketAlert
 from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.pagination import MediumAdjustablePagination
-from cl.api.utils import LoggingMixin
+from cl.api.utils import (
+    AlertThrottle,
+    ExceptionalUserRateThrottle,
+    LoggingMixin,
+)
 
 
 class SearchAlertViewSet(LoggingMixin, ModelViewSet):
     """A ModelViewset to handle CRUD operations for SearchAlerts."""
 
     permission_classes = [IsOwner, IsAuthenticated, V3APIPermission]
+    # Keep the global anon/user throttles and add the per-user AlertThrottle,
+    # which only rate-limits users with a commercial-agreement alert override.
+    throttle_classes = [
+        AnonRateThrottle,
+        ExceptionalUserRateThrottle,
+        AlertThrottle,
+    ]
     serializer_class = SearchAlertSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = SearchAlertFilter
