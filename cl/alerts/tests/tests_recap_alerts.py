@@ -3310,9 +3310,7 @@ class RECAPAlertsPercolatorTest(
         )
         # No webhook should be sent for a non-member user without a webhook.
         self.assertEqual(
-            WebhookEvent.objects.filter(
-                webhook__user=non_member.user
-            ).count(),
+            WebhookEvent.objects.filter(webhook__user=non_member.user).count(),
             0,
             msg="No webhook should be sent for a non-member without a webhook.",
         )
