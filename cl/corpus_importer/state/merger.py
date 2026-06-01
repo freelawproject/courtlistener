@@ -22,10 +22,7 @@ from cl.corpus_importer.state.utils import MergeResult
 logger = logging.getLogger(__name__)
 
 
-class AttributeSpecification(ABC): ...
-
-
-class InputMap[ScrapedData, Output](AttributeSpecification):
+class InputMap[ScrapedData, Output]:
     def __init__(
         self, map: Callable[[ScrapedData], Output] | None = None
     ) -> None:
@@ -64,6 +61,15 @@ class NeverMapping[ScrapedData, T](InputMap[ScrapedData, T]):
         return None
 
 
+class ParameterMapping[T](InputMap[T, T]):
+    @override
+    def map(self, i: T) -> T:
+        return i
+
+
+Parameter = ParameterMapping[Any]()
+
+
 class MergeStrategy[T](ABC):
     @abstractmethod
     def merge_values(self, scrape: T, db: T) -> T:
@@ -87,26 +93,22 @@ class OverwriteConditionally[T](MergeStrategy[T]):
         return db
 
 
-class IgnoreScrape[T](MergeStrategy[T]):
-    @override
-    def merge_values(self, scrape: T, db: T) -> T:
-        return db
-
-
 class AttributeMerger[ScrapedData, T]:
-    name: str = ""
-
     def __init__(
         self,
         transform: InputMap[ScrapedData, T],
         *,
-        strategy: MergeStrategy[T] = IgnoreScrape(),
+        strategy: MergeStrategy[T] = OverwriteExisting(),
     ) -> None:
-        self.transform: InputMap[ScrapedData, T] = transform
+        self.transform = transform
         self.strategy: MergeStrategy[T] = strategy
 
-    def get_value(self, i: ScrapedData) -> T | None:
+    def get_value(
+        self, i: ScrapedData, param_value: T | None = None
+    ) -> T | None:
         """Compute the value of an attribute from scraped data."""
+        if isinstance(self.transform, ParameterMapping):
+            return param_value
         return self.transform.map(i)
 
     def merge_values(self, scrape: T, db: T) -> T:
@@ -114,15 +116,13 @@ class AttributeMerger[ScrapedData, T]:
         return self.strategy.merge_values(scrape, db)
 
 
-class RelatedMerger:
-    name: str = ""
+class RelatedMerger: ...
 
 
 class Merger[ScrapedData, DBModel: Model](ABC):
-    __attr_mergers__: list[AttributeMerger[ScrapedData, Any]]
-    __related_mergers__: ClassVar[list[RelatedMerger]]
+    __attr_mergers__: dict[str, AttributeMerger[ScrapedData, Any]]
+    __related_mergers__: ClassVar[dict[str, RelatedMerger]]
     __model__: type[Model]
-    __default_values__: ClassVar[dict[str, Any]] = {}
     _uses_natural_key: ClassVar[bool] = True
     atomic: ClassVar[bool] = False
     # I'd like to make this a ClassVar for static type checking, but that's not allowed for some reason
@@ -156,19 +156,17 @@ class Merger[ScrapedData, DBModel: Model](ABC):
                 raise TypeError(
                     f"Only one attribute merger or related merger is allowed per attribute: {name}"
                 )
-            if attr_mergers and not attr_mergers[0].name:
-                attr_mergers[0].name = name
-            if related_mergers and not related_mergers[0].name:
-                related_mergers[0].name = name
 
-        cls.__attr_mergers__ = [
-            attr_mergers[0] for _, attr_mergers, _ in annotated if attr_mergers
-        ]
-        cls.__related_mergers__ = [
-            related_mergers[0]
-            for _, _, related_mergers in annotated
+        cls.__attr_mergers__ = {
+            name: attr_mergers[0]
+            for name, attr_mergers, _ in annotated
+            if attr_mergers
+        }
+        cls.__related_mergers__ = {
+            name: related_mergers[0]
+            for name, _, related_mergers in annotated
             if related_mergers
-        ]
+        }
 
         merger_base = next(
             (
@@ -194,11 +192,6 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             )
 
         cls.__model__ = db_model_type
-        cls.__default_values__ = {
-            field.name: getattr(cls, field.name)
-            for field in cls.__model__._meta.fields
-            if hasattr(cls, field.name)
-        }
 
     @staticmethod
     def validate(i: ScrapedData) -> bool:
@@ -233,21 +226,25 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             return None
         except cls.__model__.MultipleObjectsReturned:
             raise ValueError(
-                f"Multiple objects found for natural key {cls.existing} in {i}"
+                f"Merger {cls.__name__} found multiple objects found for natural key {cls.existing}."
             )
 
     @classmethod
-    def merge(cls, i: ScrapedData) -> MergeResult[Any]:
+    def merge(cls, i: ScrapedData, **kwargs: Any) -> MergeResult[Any]:
         if not cls.validate(i):
-            logger.error(f"Merger {cls.__name__} received invalid input: {i}")
+            logger.error(f"Merger {cls.__name__} received invalid input.")
             return MergeResult.failed(cls.__name__)
+        # TODO Cache this
+        defaults = {
+            name: getattr(cls, name, None) for name in cls.__attr_mergers__
+        } | kwargs
         obj = cast(
             DBModel,
             cls.__model__(
-                **(
-                    cls.__default_values__
-                    | {am.name: am.get_value(i) for am in cls.__attr_mergers__}
-                )
+                **{
+                    name: am.get_value(i, defaults[name])
+                    for name, am in cls.__attr_mergers__.items()
+                }
             ),
         )
 
@@ -271,12 +268,12 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             return MergeResult.created(cls.__model__.__name__, scrape_obj.pk)
 
         update = False
-        for am in cls.__attr_mergers__:
-            scrape_value = getattr(scrape_obj, am.name)
-            db_value = getattr(db_obj, am.name)
-            merged_value = am.merge_values(scrape_value, db_value)
+        for name, attr_merger in cls.__attr_mergers__.items():
+            scrape_value = getattr(scrape_obj, name)
+            db_value = getattr(db_obj, name)
+            merged_value = attr_merger.merge_values(scrape_value, db_value)
             if merged_value != db_value:
-                setattr(db_obj, am.name, merged_value)
+                setattr(db_obj, name, merged_value)
                 update = True
 
         if update:
