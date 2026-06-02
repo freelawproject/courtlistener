@@ -74,6 +74,13 @@ from cl.corpus_importer.management.commands.normalize_judges_opinions import (
 from cl.corpus_importer.management.commands.probe_iquery_pages_daemon import (
     get_latest_pacer_case_id_for_courts,
 )
+from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
+    OUTSTANDING_FAILED_LOOKBACK_DAYS,
+    do_everything,
+    get_and_save_free_document_reports,
+    get_outstanding_failed_dates,
+    report_free_document_scrape_stalls,
+)
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
     check_case_names_match,
     parse_citations,
@@ -151,7 +158,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.recap.tests.tests import mock_bucket_open
-from cl.scrapers.models import PACERFreeDocumentRow
+from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
@@ -171,6 +178,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     CaseTransfer,
     Citation,
+    Court,
     Docket,
     Opinion,
     OpinionCluster,
@@ -618,6 +626,239 @@ class PacerDocketParserTest(TestCase):
         self.assertTrue(row[0].pacer_case_id)
         self.assertTrue(row[0].pacer_doc_id)
         self.assertTrue(row[0].pacer_seq_no)
+
+
+class ScrapeFreeOpinionsLoopTest(TestCase):
+    """Tests for the free-opinion catch-up loop and the stall reporter."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="nysd",
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            in_use=True,
+            end_date=None,
+        )
+
+    def _log(self, day: date, status: int) -> PACERFreeDocumentLog:
+        return PACERFreeDocumentLog.objects.create(
+            court_id=self.court.pk,
+            date_queried=day,
+            status=status,
+        )
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_failed_chunk_does_not_abort_remaining_days(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """A single failed day must not bail the rest of the range."""
+        start = date(2025, 11, 1)
+        end = date(2025, 11, 3)
+        # Fail the middle day, succeed the others.
+        mock_fetch.side_effect = lambda court, s, e, day_span=1: s == date(
+            2025, 11, 2
+        )
+
+        get_and_save_free_document_reports(
+            [self.court.pk], start, end, day_span=1
+        )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        self.assertEqual(
+            queried_days,
+            [date(2025, 11, 1), date(2025, 11, 2), date(2025, 11, 3)],
+            "All three days should be attempted despite the middle failure.",
+        )
+
+    def test_get_outstanding_failed_dates(self) -> None:
+        """Only never-succeeded days within the look-back are returned."""
+        before = date(2026, 5, 20)
+        # Failed, never succeeded -> outstanding.
+        self._log(date(2026, 5, 1), PACERFreeDocumentLog.SCRAPE_FAILED)
+        # Failed then succeeded -> not outstanding.
+        self._log(date(2026, 5, 2), PACERFreeDocumentLog.SCRAPE_FAILED)
+        self._log(date(2026, 5, 2), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        # Succeeded only -> not outstanding.
+        self._log(date(2026, 5, 3), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        # Failed but on/after `before` -> covered by the forward range.
+        self._log(date(2026, 5, 20), PACERFreeDocumentLog.SCRAPE_FAILED)
+        # Failed but older than the look-back floor -> dropped.
+        old_day = date(2026, 5, 20) - timedelta(
+            days=OUTSTANDING_FAILED_LOOKBACK_DAYS + 5
+        )
+        self._log(old_day, PACERFreeDocumentLog.SCRAPE_FAILED)
+
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            outstanding = get_outstanding_failed_dates(
+                self.court.pk,
+                before=before,
+                floor=date(2026, 5, 26)
+                - timedelta(days=OUTSTANDING_FAILED_LOOKBACK_DAYS),
+            )
+
+        self.assertEqual(outstanding, [date(2026, 5, 1)])
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_catch_up_retries_outstanding_failed_day(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """The no-date path retries a failed day behind the cursor."""
+        mock_fetch.return_value = False
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            today = date(2026, 5, 26)
+            # Recent success -> cursor becomes today - 5 = 2026-05-21.
+            self._log(
+                today - timedelta(days=3),
+                PACERFreeDocumentLog.SCRAPE_SUCCESSFUL,
+            )
+            # A failed day behind the cursor must be retried.
+            self._log(
+                today - timedelta(days=10), PACERFreeDocumentLog.SCRAPE_FAILED
+            )
+
+            get_and_save_free_document_reports(
+                [self.court.pk], None, None, day_span=1
+            )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        self.assertIn(date(2026, 5, 16), queried_days)
+        # The retried failed day runs before the forward range begins.
+        self.assertEqual(queried_days[0], date(2026, 5, 16))
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_resolved_failed_day_is_kept_but_not_requeried(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """A failed day that later succeeded keeps its history and isn't redone."""
+        mock_fetch.return_value = False
+        gap_day = date(2026, 5, 16)
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            today = date(2026, 5, 26)
+            # Recent success -> cursor becomes today - 5 = 2026-05-21.
+            self._log(
+                today - timedelta(days=3),
+                PACERFreeDocumentLog.SCRAPE_SUCCESSFUL,
+            )
+            # gap_day already failed once and later succeeded.
+            self._log(gap_day, PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(gap_day, PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+
+            get_and_save_free_document_reports(
+                [self.court.pk], None, None, day_span=1
+            )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        # Resolved day must not be re-queried (it has a success row)...
+        self.assertNotIn(gap_day, queried_days)
+        # ...but its failed row is kept as history.
+        self.assertTrue(
+            PACERFreeDocumentLog.objects.filter(
+                court_id=self.court.pk,
+                status=PACERFreeDocumentLog.SCRAPE_FAILED,
+                date_queried=gap_day,
+            ).exists()
+        )
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.logger"
+    )
+    def test_report_stalls_flags_stale_court(self, mock_logger) -> None:
+        """A court whose newest success is too old is reported."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            self._log(date(2026, 4, 1), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+
+        self.assertEqual(stalled, [(self.court.pk, date(2026, 4, 1))])
+        mock_logger.error.assert_called_once()
+        # The Sentry fingerprint groups the alert per court.
+        self.assertEqual(
+            mock_logger.error.call_args.kwargs["extra"]["fingerprint"],
+            ["pacer-free-opinion-stall", self.court.pk],
+        )
+
+    def test_report_stalls_ignores_fresh_court(self) -> None:
+        """A court that advanced recently is not reported."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            self._log(
+                date(2026, 5, 25), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+            )
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+        self.assertEqual(stalled, [])
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.logger"
+    )
+    def test_report_stalls_enumerates_gaps(self, mock_logger) -> None:
+        """Outstanding failed days past the active window are listed."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            # Recent success -> the court itself is not stalled.
+            self._log(
+                date(2026, 5, 25), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+            )
+            # A genuine gap: failed, never succeeded, past the active window.
+            self._log(date(2026, 3, 1), PACERFreeDocumentLog.SCRAPE_FAILED)
+            # Failed then succeeded -> resolved, not a gap.
+            self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+            # Failed inside the active re-query window -> still being retried.
+            self._log(date(2026, 5, 24), PACERFreeDocumentLog.SCRAPE_FAILED)
+
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+
+        self.assertEqual(stalled, [])
+        gap_calls = [
+            c
+            for c in mock_logger.error.call_args_list
+            if c.kwargs.get("extra", {}).get("fingerprint", [None])[0]
+            == "pacer-free-opinion-gaps"
+        ]
+        self.assertEqual(len(gap_calls), 1)
+        # args: (fmt, count, court_id, dates_str, suffix)
+        self.assertEqual(gap_calls[0].args[1], 1)
+        self.assertEqual(gap_calls[0].args[2], self.court.pk)
+        self.assertIn("2026-03-01", gap_calls[0].args[3])
+        self.assertNotIn("2026-03-02", gap_calls[0].args[3])
+        self.assertNotIn("2026-05-24", gap_calls[0].args[3])
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.report_free_document_scrape_stalls"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.ocr_available"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_pdfs"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_and_save_free_document_reports"
+    )
+    def test_do_everything_runs_stall_report(
+        self, mock_reports, mock_pdfs, mock_ocr, mock_stalls
+    ) -> None:
+        """do-everything self-monitors by calling the stall reporter."""
+        do_everything([self.court.pk], None, None, "pacerdoc1", day_span=1)
+        mock_stalls.assert_called_once_with([self.court.pk])
 
 
 class GetQuarterTest(SimpleTestCase):
