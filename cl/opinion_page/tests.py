@@ -17,6 +17,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
+from django.http import HttpResponse
 from django.template import engines
 from django.test import (
     AsyncRequestFactory,
@@ -3060,17 +3061,45 @@ class DocketFilterPaginationWiringTest(TestCase):
             ]
         )
 
-    async def test_filter_form_fields_render(self) -> None:
-        """Every named filter input must be in the rendered page so users
-        and form submissions both find it. PR 2 will depend on these names.
+    async def _get_docket_and_verify_v2(
+        self, data: dict | None = None
+    ) -> HttpResponse:
+        """Fetch the docket page, assert that v2 actually rendered, and
+        return the response.
+
+        v2 rendering depends on two steps: the @override_flag decorator
+        writes everyone=True for use_new_design, and the middleware reads
+        that flag to swap docket.html → v2_docket.html. If either step
+        silently fails, v1 renders, and downstream content assertions
+        fail with a confusing 'string not found' against a multi-KB HTML
+        dump. The two assertions here surface the actual cause directly.
         """
+        flag = await sync_to_async(Flag.objects.get)(name="use_new_design")
+        self.assertTrue(
+            flag.everyone,
+            f"use_new_design flag is not everyone=True; got {flag.everyone!r}",
+        )
         r = await self.async_client.get(
             reverse(
                 "view_docket",
                 args=[self.docket.pk, self.docket.slug],
-            )
+            ),
+            data,
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
+        template_names = [t.name for t in r.templates if t.name]
+        self.assertIn(
+            "v2_docket.html",
+            template_names,
+            f"v2_docket.html not rendered; templates: {template_names}",
+        )
+        return r
+
+    async def test_filter_form_fields_render(self) -> None:
+        """Every named filter input must be in the rendered page so users
+        and form submissions both find it. PR 2 will depend on these names.
+        """
+        r = await self._get_docket_and_verify_v2()
         content = r.content.decode()
         for field in (
             'name="filed_after"',
@@ -3079,20 +3108,14 @@ class DocketFilterPaginationWiringTest(TestCase):
             'name="entry_lte"',
             'name="order_by"',
         ):
-            self.assertIn(field, content, f"filter field {field} missing")
+            with self.subTest(field=field):
+                self.assertIn(field, content, f"filter field {field} missing")
 
     async def test_filter_params_narrow_queryset(self) -> None:
         """`?entry_gte=3` must drop entries 1 and 2 from the page's
         `docket_entries` queryset — proves the filter form is actually
         wired to the view, not just rendered."""
-        r = await self.async_client.get(
-            reverse(
-                "view_docket",
-                args=[self.docket.pk, self.docket.slug],
-            ),
-            {"entry_gte": "3"},
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
+        r = await self._get_docket_and_verify_v2(data={"entry_gte": "3"})
         numbers = sorted(e.entry_number for e in r.context["docket_entries"])
         self.assertEqual(numbers, [3, 4, 5])
 
@@ -3114,32 +3137,7 @@ class DocketFilterPaginationWiringTest(TestCase):
                 for n in range(100, 311)
             ]
         )
-        # First half of the override-then-render contract: the @override_flag
-        # decorator wrote everyone=True to this test's DB. Paired with the
-        # template-name check after the GET to distinguish "override broke"
-        # from "middleware didn't see it" if v1 ever sneaks back in.
-        flag = await sync_to_async(Flag.objects.get)(name="use_new_design")
-        self.assertTrue(
-            flag.everyone,
-            f"use_new_design flag is not everyone=True; got {flag.everyone!r}",
-        )
-        r = await self.async_client.get(
-            reverse(
-                "view_docket",
-                args=[self.docket.pk, self.docket.slug],
-            )
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        # Second half: the middleware actually swapped to v2_docket.html.
-        # The aria-label="Pagination" check below would also fail on v1,
-        # but pinning the template name surfaces the cause directly rather
-        # than as a string-not-found buried in a multi-KB v1 response.
-        template_names = [t.name for t in r.templates if t.name]
-        self.assertIn(
-            "v2_docket.html",
-            template_names,
-            f"v2_docket.html not rendered; templates: {template_names}",
-        )
+        r = await self._get_docket_and_verify_v2()
         content = r.content.decode()
         tree = fromstring(content)
         docket_entries = tree.get_element_by_id("docket-entries")
@@ -3169,14 +3167,7 @@ class DocketFilterPaginationWiringTest(TestCase):
                 for n in range(100, 311)
             ]
         )
-        r = await self.async_client.get(
-            reverse(
-                "view_docket",
-                args=[self.docket.pk, self.docket.slug],
-            ),
-            {"entry_gte": "1"},
-        )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
+        r = await self._get_docket_and_verify_v2(data={"entry_gte": "1"})
         content = r.content.decode()
         # Find every pagination href inside docket-entries (the bottom nav)
         # and check at least one points at page 2 while also carrying

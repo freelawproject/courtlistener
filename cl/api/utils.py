@@ -99,10 +99,7 @@ BASIC_TEXT_LOOKUPS = [
     "iexact",
     "startswith",
     "istartswith",
-    "endswith",
-    "iendswith",
 ]
-ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ["contains", "icontains"]
 
 logger = logging.getLogger(__name__)
 
