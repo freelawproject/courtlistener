@@ -88,9 +88,11 @@
                       {% endif %}
                     </div>
 
-                    {# Desktop: description in its own column #}
+                    {# Desktop: description in its own column (or empty spacer to preserve flex layout) #}
                     {% if rd.description %}
                       <p class="hidden md:block flex-1 text-sm text-greyscale-900 min-w-48">{{ rd.description }}</p>
+                    {% else %}
+                      <div class="hidden md:block flex-1"></div>
                     {% endif %}
 
                     {# Action buttons #}
