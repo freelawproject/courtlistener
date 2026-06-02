@@ -2935,7 +2935,7 @@ class DocketFilterPaginationWiringTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertTemplateUsed(r, "v2_docket.html")
-        return r
+        return r  # type: ignore[return-value]
 
     async def test_filter_form_fields_render(self) -> None:
         """Every named filter input must be in the rendered page so users
