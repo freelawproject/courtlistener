@@ -1,7 +1,7 @@
 import logging
 import types
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass
 from typing import (
     Annotated,
@@ -209,6 +209,14 @@ class RelatedMerger:
                 )
 
 
+def get_ancestor_classes(cls: type) -> Generator[type]:
+    """Get all ancestor classes of a class, including the class itself"""
+    for base in types.get_original_bases(cls):
+        if isinstance(base, type):
+            yield from get_ancestor_classes(base)
+        yield base
+
+
 class Merger[ScrapedData, DBModel: Model](ABC):
     __attr_mergers__: dict[str, AttributeMerger[ScrapedData, Any]]
     __related_mergers__: ClassVar[dict[str, RelatedMerger]]
@@ -259,18 +267,20 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             if related_mergers
         }
 
-        merger_base = next(
-            (
-                base
-                for base in types.get_original_bases(cls)
-                if get_origin(base) is Merger
-            ),
-            None,
-        )
-        if merger_base is None:
+        merger_bases = {
+            base
+            for base in get_ancestor_classes(cls)
+            if get_origin(base) is Merger
+        }
+        if len(merger_bases) > 1:
+            raise TypeError(
+                f"Merger must only be a subclass of one Merger (got {merger_bases})"
+            )
+        if not merger_bases:
             raise TypeError(
                 "Merger must be a subclass of Merger (I don't know how you managed to do this tbh)."
             )
+        merger_base = merger_bases.pop()
         merger_type_args = get_args(merger_base)
         if len(merger_type_args) != 2:
             raise TypeError(

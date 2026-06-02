@@ -285,3 +285,34 @@ class BaseMergerTest(TestCase):
         self.assertEqual(
             set(de.docket.pk for de in des), set(result.creates["Docket"])
         )
+
+    def test_merger_subclassing(self) -> None:
+        class TestMerger(Merger[dict[str, str], Docket]):
+            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
+            source: Annotated[int, AttributeMerger(Parameter)] = (
+                DocketSources.SCRAPER
+            )
+            docket_number: Annotated[str, AttributeMerger(Parameter)]
+
+            @staticmethod
+            def existing(i: Docket) -> Docket | None:
+                return None
+
+        class TestMerger2(TestMerger):
+            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
+            source: Annotated[int, AttributeMerger(Parameter)] = (
+                DocketSources.SCRAPER
+            )
+            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
+                "ABCDEF"
+            )
+            assigned_to_str: Annotated[str, AttributeMerger(Parameter)]
+
+        ats = "test"
+        result = TestMerger2.merge({}, assigned_to_str=ats)
+
+        self.assertIn("Docket", result.creates)
+        self.assertEqual(len(result.creates["Docket"]), 1)
+        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
+        self.assertEqual(docket.docket_number, TestMerger2.docket_number)
+        self.assertEqual(docket.assigned_to_str, ats)
