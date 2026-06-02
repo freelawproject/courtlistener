@@ -1603,8 +1603,8 @@ Sample code here.
     >
       <c-pagination
         :page_obj="demo_docket_entries"
-        show_previous="True"
-        show_next="True"
+        show_previous
+        show_next
       />
     </c-docket-filter>
 
@@ -1630,7 +1630,7 @@ Sample code here.
     <c-library.list title="Slots" only>
       <c-library.item only>
         <c-slot name="label"><em>default</em></c-slot>
-        <c-slot name="description">Trailing controls — rendered at the right edge of the desktop row and next to the search bar on mobile. Typically a <code>&lt;c-pagination&gt;</code> with <code>show_previous="True"</code> and <code>show_next="True"</code>.</c-slot>
+        <c-slot name="description">Trailing controls — rendered at the right edge of the desktop row and next to the search bar on mobile. Typically a <code>&lt;c-pagination&gt;</code> with bare <code>show_previous</code> and <code>show_next</code> attributes.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1644,8 +1644,8 @@ Sample code here.
 &gt;
   &lt;c-pagination
     :page_obj="docket_entries"
-    show_previous="True"
-    show_next="True"
+    show_previous
+    show_next
   /&gt;
 &lt;/c-docket-filter&gt;
       </c-code>
