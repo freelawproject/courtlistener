@@ -3,6 +3,7 @@ import types
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from enum import Enum
 from typing import (
     Annotated,
     Any,
@@ -16,6 +17,7 @@ from typing import (
 
 from django.db import transaction
 from django.db.models import Model
+from openai._utils import is_iterable
 
 from cl.corpus_importer.state.utils import MergeResult
 
@@ -116,7 +118,62 @@ class AttributeMerger[ScrapedData, T]:
         return self.strategy.merge_values(scrape, db)
 
 
-class RelatedMerger: ...
+class Relationship(Enum):
+    OneToOne = "onetoone"
+    Child = "child"
+
+
+class RelatedMerger:
+    def __init__(
+        self,
+        merger: "Merger[Any, Any]",
+        parent_key: str,
+        transform: InputMap[Any, Any],
+        *,
+        relationship: Relationship,
+    ) -> None:
+        self.merger: Merger[Any, Any] = merger
+        self.parent_key: str = parent_key
+        self.transform: InputMap[Any, Any] = transform
+        self.relationship: Relationship = relationship
+
+    def _merge_one_to_one(
+        self, parent: Model, merger_input: Any
+    ) -> MergeResult[Any]:
+        db_obj = getattr(parent, self.parent_key)
+        if db_obj is None:
+            result = self.merger.merge(merger_input)
+            model = self.merger.__model__
+            model_name = model.__name__
+            db_obj_pk = None
+            if model_name in result.creates:
+                db_obj_pk = next(iter(result.creates[model_name]))
+            elif model_name in result.updates:
+                db_obj_pk = next(iter(result.updates[model_name]))
+            if db_obj_pk is not None:
+                setattr(parent, f"{self.parent_key}_pk", db_obj_pk)
+                parent.save()
+            return result
+        return self.merger.merge(merger_input, existing=db_obj)
+
+    def _merge_child(
+        self, parent: Model, merger_input: Any
+    ) -> MergeResult[Any]:
+        if not is_iterable(merger_input):
+            return MergeResult.failed(self.merger.__model__.__name__)
+        result = MergeResult.unnecessary()
+        for child in merger_input:
+            result |= self.merger.merge(self.merger.merge(child))
+        return result
+
+    def merge(self, parent: Model, i: Any) -> MergeResult[Any]:
+        merger_input = self.transform.map(i)
+
+        match self.relationship:
+            case Relationship.OneToOne:
+                return self._merge_one_to_one(parent, merger_input)
+            case Relationship.Child:
+                return self._merge_child(parent, merger_input)
 
 
 class Merger[ScrapedData, DBModel: Model](ABC):
@@ -230,7 +287,9 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             )
 
     @classmethod
-    def merge(cls, i: ScrapedData, **kwargs: Any) -> MergeResult[Any]:
+    def merge(
+        cls, i: ScrapedData, *, existing: DBModel | None = None, **kwargs: Any
+    ) -> MergeResult[Any]:
         if not cls.validate(i):
             logger.error(f"Merger {cls.__name__} received invalid input.")
             return MergeResult.failed(cls.__name__)
@@ -250,22 +309,39 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
         if cls.atomic:
             with transaction.atomic():
-                result = cls._merge_object(obj)
+                result, db_obj = cls._merge_object(obj, existing=existing)
         else:
-            result = cls._merge_object(obj)
+            result, db_obj = cls._merge_object(obj, existing=existing)
 
         if result.failed:
             cls.after(i, None, result)
             return result
-        # TODO Merge children and relatives here
+        for name, rm in cls.__related_mergers__.items():
+            merger_param = kwargs.get(name, None)
+            if isinstance(merger_param, Model):
+                ...
+                continue
+            result |= rm.merge(db_obj, i)
+        cls.after(i, obj, result)
         return result
 
     @classmethod
-    def _merge_object(cls, scrape_obj: DBModel) -> MergeResult[Any]:
-        db_obj = cls.get_existing(scrape_obj)
+    def _merge_object(
+        cls,
+        scrape_obj: DBModel,
+        *,
+        existing: DBModel | None = None,
+    ) -> tuple[MergeResult[Any], DBModel]:
+        if existing is None:
+            db_obj = cls.get_existing(scrape_obj)
+        else:
+            db_obj = existing
+
         if db_obj is None:
             scrape_obj.save()
-            return MergeResult.created(cls.__model__.__name__, scrape_obj.pk)
+            return MergeResult.created(
+                cls.__model__.__name__, scrape_obj.pk
+            ), scrape_obj
 
         update = False
         for name, attr_merger in cls.__attr_mergers__.items():
@@ -278,5 +354,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
         if update:
             db_obj.save()
-            return MergeResult.updated(cls.__model__.__name__, db_obj.pk)
-        return MergeResult.unnecessary()
+            return MergeResult.updated(
+                cls.__model__.__name__, db_obj.pk
+            ), db_obj
+        return MergeResult.unnecessary(), db_obj
