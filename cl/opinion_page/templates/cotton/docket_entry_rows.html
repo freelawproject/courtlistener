@@ -31,9 +31,9 @@
               <dt class="sr-only">Date Filed</dt>
               <dd>
                 {% if de.datetime_filed %}
-                  <span title="{{ de.datetime_filed|timezone:timezone }}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
-                {% else %}
-                  {{ de.date_filed|date:"M j, Y"|default:"" }}
+                  <time datetime="{{ de.datetime_filed|date:'c' }}" aria-label="{{ de.datetime_filed|timezone:timezone }}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</time>
+                {% elif de.date_filed %}
+                  <time datetime="{{ de.date_filed|date:'c' }}">{{ de.date_filed|date:"M j, Y" }}</time>
                 {% endif %}
               </dd>
             </div>

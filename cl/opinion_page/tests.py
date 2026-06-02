@@ -2861,6 +2861,9 @@ class DocketEntryRowsV2Test(TestCase):
         content = await self._get_docket_page()
         self.assertIn("Apr 21, 2024", content)
         self.assertIn('id="entry-1"', content)
+        # Date is wrapped in <time datetime="..."> for semantic markup
+        # and accessible exposure of the full date value. WCAG 1.3.1.
+        self.assertIn('<time datetime="2024-04-21"', content)
 
     async def test_main_document_label(self) -> None:
         """Main Document label should appear for PACER_DOCUMENT type."""
