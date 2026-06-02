@@ -6,6 +6,10 @@ from django.urls import reverse
 from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
+from cl.alerts.constants import (
+    FLP_MEMBERSHIP_URL,
+    MEMBERSHIP_UPGRADE_BASE_URL,
+)
 from cl.alerts.models import Alert
 from cl.alerts.utils import (
     AlertLimitViolation,
@@ -64,18 +68,19 @@ class CreateAlertForm(ModelForm):
             self.current_type,
             exclude_alert_pk=self.instance.pk if alert_being_edited else None,
         )
-        flp_membership = "https://free.law/membership/"
         match result.violation:
             case AlertLimitViolation.REAL_TIME_NOT_ALLOWED:
                 raise ValidationError(
                     format_html(
                         "You must be a <a href='{}' target='_blank'>member</a> to create Real Time alerts.",
-                        flp_membership,
+                        FLP_MEMBERSHIP_URL,
                     )
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
                 neon_id = self.user.membership.neon_id
-                upgrade_flp_membership = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
+                upgrade_flp_membership = (
+                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{neon_id}"
+                )
                 raise ValidationError(
                     format_html(
                         "You've used all of the alerts included with your membership. "
@@ -91,7 +96,7 @@ class CreateAlertForm(ModelForm):
                         "To create more than {} alerts and to gain access to real time alerts, "
                         "please join <a href='{}' target='_blank'>Free Law project</a> as a member.",
                         result.free_quota,
-                        flp_membership,
+                        FLP_MEMBERSHIP_URL,
                     )
                 )
 
