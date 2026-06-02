@@ -41,7 +41,7 @@
 {% else %}
   <c-button
     variant="outline"
-    href="{% url 'sign-in' %}?next={{ request.path }}"
+    href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
     class="text-sm px-2 py-1 {{ class }}"
     aria-label="Pray-and-pay: sign in to request this document. {{ count }} requests so far."
   >
