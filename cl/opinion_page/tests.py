@@ -2824,6 +2824,7 @@ class DocketEntryRowsV2Test(TestCase):
         cls.rd_pacer_only = RECAPAttachmentFactory(
             docket_entry=cls.entry_with_docs,
             document_number="1",
+            attachment_number=1,
             pacer_doc_id="12346",
             page_count=4,
         )
@@ -2831,6 +2832,7 @@ class DocketEntryRowsV2Test(TestCase):
         cls.rd_sealed = RECAPAttachmentFactory(
             docket_entry=cls.entry_with_docs,
             document_number="1",
+            attachment_number=2,
             is_sealed=True,
             pacer_doc_id="12347",
         )
@@ -2868,7 +2870,9 @@ class DocketEntryRowsV2Test(TestCase):
     async def test_attachment_label(self) -> None:
         """Attachment N label should appear for ATTACHMENT type."""
         content = await self._get_docket_page()
-        self.assertIn("Attachment", content)
+        for label in ("Attachment 1", "Attachment 2"):
+            with self.subTest(label=label):
+                self.assertIn(label, content)
 
     async def test_download_pdf_for_available_docs(self) -> None:
         """Download PDF button should appear for docs with filepath_local."""
