@@ -2723,10 +2723,19 @@ class BuildDocketTabsTest(SimpleTestCase):
             self.assertEqual(keys, ["entries", "idb"])
 
 
-@override_flag("use_new_design", active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
+@override_flag("use_new_design", active=True)
 class DocketPageV2TemplateTest(TestCase):
-    """Test that the v2 docket page renders correctly."""
+    """Test that the v2 docket page renders correctly.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
+    namespace from parallel test workers. Without it, the shared Redis
+    cache key gets `CACHE_EMPTY` poisoned by any worker that calls
+    `flag_is_active("use_new_design")` against a DB where this test
+    class didn't enable the flag — flipping our renders to v1.
+    The setting must precede `@override_flag` so the override's own
+    flush/save go through the prefixed key.
+    """
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2771,10 +2780,19 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertTrue(len(r.context["tabs"]) > 0)
 
 
-@override_flag("use_new_design", active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
+@override_flag("use_new_design", active=True)
 class DocketEntryRowsV2Test(TestCase):
-    """Test that v2 docket entry rows render correctly for all states."""
+    """Test that v2 docket entry rows render correctly for all states.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
+    namespace from parallel test workers. Without it, the shared Redis
+    cache key gets `CACHE_EMPTY` poisoned by any worker that calls
+    `flag_is_active("use_new_design")` against a DB where this test
+    class didn't enable the flag — flipping our renders to v1.
+    The setting must precede `@override_flag` so the override's own
+    flush/save go through the prefixed key.
+    """
 
     @classmethod
     def setUpTestData(cls) -> None:
