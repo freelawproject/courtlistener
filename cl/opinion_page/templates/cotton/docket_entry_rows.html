@@ -38,7 +38,7 @@
             </div>
             <div class="basis-full mt-1 md:basis-auto md:mt-0 md:flex-1 text-greyscale-900">
               <dt class="sr-only">Description</dt>
-              <dd>{% if de.description %}<p>{{ de.description|safe }}</p>{% endif %}</dd>
+              <dd>{% if de.description %}<p>{{ de.description }}</p>{% endif %}</dd>
             </div>
           </dl>
 
@@ -83,13 +83,13 @@
                       {% endif %}
                       {# Mobile: description below badge #}
                       {% if rd.description %}
-                        <p class="md:hidden text-sm text-greyscale-900 mt-0.5">{{ rd.description|safe }}</p>
+                        <p class="md:hidden text-sm text-greyscale-900 mt-0.5">{{ rd.description }}</p>
                       {% endif %}
                     </div>
 
                     {# Desktop: description in its own column #}
                     {% if rd.description %}
-                      <p class="hidden md:block flex-1 text-sm text-greyscale-900 min-w-48">{{ rd.description|safe }}</p>
+                      <p class="hidden md:block flex-1 text-sm text-greyscale-900 min-w-48">{{ rd.description }}</p>
                     {% endif %}
 
                     {# Action buttons #}
