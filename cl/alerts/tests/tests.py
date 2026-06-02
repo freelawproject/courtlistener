@@ -1777,7 +1777,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
                 alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
             )
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
-        self.assertEqual(response.json()["alert_frequency_estimation"], 250)
+        self.assertEqual(response.json()["estimated_hits"], 250)
 
     async def test_alert_rejected_when_query_too_broad(self) -> None:
         """An alert whose query averages more than MAX_ALERT_RESULTS_PER_DAY
@@ -1794,10 +1794,8 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
             )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         # DRF wraps validation-error detail values in a list.
-        self.assertEqual(
-            int(response.json()["alert_frequency_estimation"][0]), 3500
-        )
-        self.assertIn("results per day", str(response.json()["query"]))
+        self.assertEqual(int(response.json()["estimated_hits"][0]), 3500)
+        self.assertIn("results per day", str(response.json()["detail"]))
         self.assertEqual(await Alert.objects.all().acount(), 0)
 
     async def test_alert_frequency_not_estimated_on_name_only_patch(
@@ -1826,7 +1824,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
             self.assertEqual(response.status_code, HTTPStatus.OK)
             # The estimation wasn't run again on the name-only update.
             self.assertEqual(mock_estimation.call_count, 1)
-            self.assertNotIn("alert_frequency_estimation", response.json())
+            self.assertNotIn("estimated_hits", response.json())
 
     def test_alert_frequency_estimation_real_query(self) -> None:
         """The estimation is computed from the alert query against ES and
@@ -1849,7 +1847,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
                 alert_query=f"q=Frequency API Test O&type={SEARCH_TYPES.OPINION}",
             )
         self.assertEqual(response.status_code, HTTPStatus.CREATED)
-        self.assertEqual(response.json()["alert_frequency_estimation"], 1)
+        self.assertEqual(response.json()["estimated_hits"], 1)
 
         opinion.cluster.delete()
 

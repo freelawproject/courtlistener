@@ -1,3 +1,5 @@
+import math
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http import QueryDict
@@ -29,7 +31,7 @@ ALERT_ESTIMATION_DAY_COUNT = 100
 
 # Key included in the API response with the estimated number of hits the alert
 # query would have produced over the last ALERT_ESTIMATION_DAY_COUNT days.
-ALERT_ESTIMATION_RESPONSE_KEY = "alert_frequency_estimation"
+ALERT_ESTIMATION_RESPONSE_KEY = "estimated_hits"
 
 
 class SearchAlertSerializer(
@@ -202,13 +204,15 @@ class SearchAlertSerializer(
             # The query couldn't be validated for estimation; skip the check.
             return
 
+        # Use the first value, as it is the broadest value present across all
+        # search types.
         total_hits = estimation[0]
-        hits_per_day = total_hits // ALERT_ESTIMATION_DAY_COUNT
+        hits_per_day = math.floor(total_hits // ALERT_ESTIMATION_DAY_COUNT)
         if hits_per_day > settings.MAX_ALERT_RESULTS_PER_DAY:
             raise serializers.ValidationError(
                 {
                     ALERT_ESTIMATION_RESPONSE_KEY: total_hits,
-                    "query": (
+                    "detail": (
                         f"This query averages about {hits_per_day} results per "
                         "day, which is more than our system can support. Please "
                         "narrow your query to have fewer results per day."
