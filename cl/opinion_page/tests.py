@@ -2928,6 +2928,10 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn('<dt class="sr-only">Date Filed</dt>', content)
         self.assertIn('<dt class="sr-only">Description</dt>', content)
         self.assertIn('aria-label="Documents for this entry"', content)
+        # Both lists carry an explicit role="list" so Safari + VoiceOver
+        # don't strip list semantics when list-style: none is applied.
+        self.assertIn('<ol role="list"', content)
+        self.assertIn('<ul role="list"', content)
 
 
 class DocketFilterDrawerAttrPropagationTest(TestCase):
