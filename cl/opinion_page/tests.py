@@ -2762,12 +2762,7 @@ class DocketPageV2TemplateTest(TestCase):
         # "Docket Entries" / "28:1331" / "Contract" appear in v1 too,
         # so without this assertion the test passes against either
         # template — masking a broken `use_new_design` flag override.
-        template_names = [t.name for t in r.templates if t.name]
-        self.assertIn(
-            "v2_docket.html",
-            template_names,
-            f"v2_docket.html not rendered; templates: {template_names}",
-        )
+        self.assertTemplateUsed(r, "v2_docket.html")
         content = r.content.decode()
         self.assertIn("Docket Entries", content)
         self.assertIn("28:1331", content)
@@ -2784,12 +2779,7 @@ class DocketPageV2TemplateTest(TestCase):
         # `metadata` and `tabs` are set unconditionally in view_docket,
         # so context-key assertions alone don't prove v2 rendered.
         # Pin the template too.
-        template_names = [t.name for t in r.templates if t.name]
-        self.assertIn(
-            "v2_docket.html",
-            template_names,
-            f"v2_docket.html not rendered; templates: {template_names}",
-        )
+        self.assertTemplateUsed(r, "v2_docket.html")
         self.assertIn("metadata", r.context)
         self.assertIn("tabs", r.context)
         self.assertTrue(len(r.context["metadata"]) > 0)
@@ -2944,12 +2934,7 @@ class DocketFilterPaginationWiringTest(TestCase):
             data,
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        template_names = [t.name for t in r.templates if t.name]
-        self.assertIn(
-            "v2_docket.html",
-            template_names,
-            f"v2_docket.html not rendered; templates: {template_names}",
-        )
+        self.assertTemplateUsed(r, "v2_docket.html")
         return r
 
     async def test_filter_form_fields_render(self) -> None:
