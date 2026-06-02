@@ -50,9 +50,6 @@ RECENT_REQUERY_DAYS = 5
 # this many days. Used by the report-stalls action.
 DEFAULT_STALE_DAYS = 14
 
-# Cap on how many gap dates to list in a single report-stalls log line.
-GAP_REPORT_LIMIT = 30
-
 
 def get_last_complete_date(
     court_id: str,
@@ -133,6 +130,28 @@ def get_outstanding_failed_dates(
         .distinct()
         .order_by("date_queried")
     )
+
+
+def collapse_date_ranges(
+    dates: list[datetime.date],
+) -> list[tuple[datetime.date, datetime.date]]:
+    """Collapse a sorted list of dates into consecutive-day ranges.
+
+    Consecutive calendar days are merged into a single (start, end) tuple so
+    they can be scraped in one --date-start/--date-end call.
+
+    :param dates: a sorted list of dates
+    :returns: list of inclusive (start, end) ranges
+    :rtype: list[tuple[datetime.date, datetime.date]]
+    """
+    ranges: list[tuple[datetime.date, datetime.date]] = []
+    one_day = datetime.timedelta(days=1)
+    for day in dates:
+        if ranges and day == ranges[-1][1] + one_day:
+            ranges[-1] = (ranges[-1][0], day)
+        else:
+            ranges.append((day, day))
+    return ranges
 
 
 def mark_court_in_progress(
@@ -552,18 +571,23 @@ def report_free_document_scrape_stalls(
         gaps = get_outstanding_failed_dates(court_id, before=gap_cutoff)
         if not gaps:
             continue
-        shown = gaps[:GAP_REPORT_LIMIT]
-        suffix = (
-            f" (+{len(gaps) - len(shown)} more)"
-            if len(gaps) > len(shown)
-            else ""
+        ranges = collapse_date_ranges(gaps)
+        # One line per range: a single day shows the date, a span shows
+        # "start to end". Each line is usable as --date-start / --date-end.
+        range_lines = "\n".join(
+            start.isoformat()
+            if start == end
+            else f"{start.isoformat()} to {end.isoformat()}"
+            for start, end in ranges
         )
         logger.error(
-            "Free opinion scrape has %s outstanding failed day(s) for %s: %s%s",
+            "Free opinion scrape has %s outstanding failed day(s) in %s "
+            "range(s) for %s (some of these days may simply have no opinions; "
+            "re-running them will mark them complete):\n%s",
             len(gaps),
+            len(ranges),
             court_id,
-            ", ".join(d.isoformat() for d in shown),
-            suffix,
+            range_lines,
             extra={"fingerprint": ["pacer-free-opinion-gaps", court_id]},
         )
 

@@ -808,14 +808,18 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
         "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.logger"
     )
     def test_report_stalls_enumerates_gaps(self, mock_logger) -> None:
-        """Outstanding failed days past the active window are listed."""
+        """Outstanding failed days past the active window are listed as ranges."""
         with time_machine.travel(datetime(2026, 5, 26), tick=False):
             # Recent success -> the court itself is not stalled.
             self._log(
                 date(2026, 5, 25), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
             )
-            # A genuine gap: failed, never succeeded, past the active window.
+            # A genuine single-day gap.
             self._log(date(2026, 3, 1), PACERFreeDocumentLog.SCRAPE_FAILED)
+            # Three consecutive gap days -> collapse into one range.
+            self._log(date(2026, 3, 5), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 6), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 7), PACERFreeDocumentLog.SCRAPE_FAILED)
             # Failed then succeeded -> resolved, not a gap.
             self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_FAILED)
             self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
@@ -834,12 +838,18 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
             == "pacer-free-opinion-gaps"
         ]
         self.assertEqual(len(gap_calls), 1)
-        # args: (fmt, count, court_id, dates_str, suffix)
-        self.assertEqual(gap_calls[0].args[1], 1)
-        self.assertEqual(gap_calls[0].args[2], self.court.pk)
-        self.assertIn("2026-03-01", gap_calls[0].args[3])
-        self.assertNotIn("2026-03-02", gap_calls[0].args[3])
-        self.assertNotIn("2026-05-24", gap_calls[0].args[3])
+        # args: (fmt, gap_count, range_count, court_id, range_lines)
+        self.assertEqual(gap_calls[0].args[1], 4)  # 4 gap days
+        self.assertEqual(gap_calls[0].args[2], 2)  # in 2 ranges
+        self.assertEqual(gap_calls[0].args[3], self.court.pk)
+        range_lines = gap_calls[0].args[4]
+        self.assertIn("2026-03-01", range_lines)
+        # Consecutive days collapse into a single "start to end" line.
+        self.assertIn("2026-03-05 to 2026-03-07", range_lines)
+        # Each range is on its own line.
+        self.assertEqual(len(range_lines.splitlines()), 2)
+        self.assertNotIn("2026-03-02", range_lines)
+        self.assertNotIn("2026-05-24", range_lines)
 
     @patch(
         "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.report_free_document_scrape_stalls"
