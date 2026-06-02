@@ -43,11 +43,11 @@
             </div>
           </dl>
 
-          {# Direct link anchor — desktop only #}
+          {# Direct link anchor #}
           {% if de.entry_number %}
             <a
               href="#entry-{{ de.entry_number }}"
-              class="hidden md:flex items-start text-greyscale-400 hover:text-greyscale-600 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded shrink-0 pt-0.5"
+              class="flex items-start text-greyscale-400 hover:text-greyscale-600 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded shrink-0 pt-0.5"
               aria-label="Direct link to entry {{ de.entry_number }}"
               title="Direct link to this entry"
             >
