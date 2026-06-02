@@ -27,17 +27,25 @@
 #
 # m = TestMerger()
 # m.merge({"testy_pie": "aaaaaa"})
-from typing import Annotated, override
+from typing import Annotated, Any, override
 
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
+    InputField,
     InputMap,
     Merger,
     Parameter,
+    RelatedMerger,
+    Relationship,
 )
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import Court, Docket
+from cl.search.models import (
+    Court,
+    Docket,
+    DocketEntry,
+    OriginatingCourtInformation,
+)
 from cl.tests.cases import TestCase
 
 
@@ -180,4 +188,100 @@ class BaseMergerTest(TestCase):
         docket = Docket.objects.get(pk=r.creates["Docket"].pop())
         self.assertEqual(docket.docket_number, dn)
 
-    def test_related_mergers_called(self) -> None: ...
+    def test_related_mergers_1to1(self) -> None:
+        class TestRelatedMerger(
+            Merger[dict[str, str], OriginatingCourtInformation]
+        ):
+            docket_number: Annotated[str, AttributeMerger(InputField("sr"))]
+
+            @staticmethod
+            def existing(
+                i: OriginatingCourtInformation,
+            ) -> OriginatingCourtInformation | None:
+                return None
+
+        class TestMerger(Merger[dict[str, Any], Docket]):
+            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
+            source: Annotated[int, AttributeMerger(Parameter)] = (
+                DocketSources.SCRAPER
+            )
+            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
+                self.docket.docket_number + "New"
+            )
+            originating_court_information: Annotated[
+                OriginatingCourtInformation,
+                RelatedMerger(
+                    TestRelatedMerger,
+                    InputField("mctest"),
+                    relationship=Relationship.OneToOne,
+                ),
+            ]
+
+            @staticmethod
+            def existing(i: Docket) -> Docket | None:
+                return None
+
+        i = {"mctest": {"sr": "test"}}
+        result = TestMerger.merge(i)
+
+        self.assertIn("OriginatingCourtInformation", result.creates)
+        self.assertEqual(len(result.creates["OriginatingCourtInformation"]), 1)
+        oci_pk = result.creates["OriginatingCourtInformation"].pop()
+        oci = OriginatingCourtInformation.objects.get(pk=oci_pk)
+        self.assertEqual(oci.docket_number, i["mctest"]["sr"])
+        self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
+
+    def test_related_mergers_child(self) -> None:
+        class TestRelatedMerger(Merger[dict[str, str], DocketEntry]):
+            docket: Annotated[Docket, AttributeMerger(Parameter)]
+            description: Annotated[str, AttributeMerger(InputField("df"))]
+
+            @staticmethod
+            def existing(
+                i: DocketEntry,
+            ) -> DocketEntry | None:
+                return None
+
+        class TestMerger(Merger[dict[str, Any], Docket]):
+            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
+            source: Annotated[int, AttributeMerger(Parameter)] = (
+                DocketSources.SCRAPER
+            )
+            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
+                self.docket.docket_number + "New"
+            )
+            originating_court_information: Annotated[
+                OriginatingCourtInformation,
+                RelatedMerger(
+                    TestRelatedMerger,
+                    InputField("mctest"),
+                    relationship=Relationship.Child("docket"),
+                ),
+            ]
+
+            @staticmethod
+            def existing(i: Docket) -> Docket | None:
+                return None
+
+        i = {
+            "mctest": [
+                {"df": "test1"},
+                {"df": "test2"},
+                {"df": "test3"},
+            ]
+        }
+        result = TestMerger.merge(i)
+
+        self.assertIn("DocketEntry", result.creates)
+        self.assertEqual(len(result.creates["DocketEntry"]), 3)
+        des = list(
+            DocketEntry.objects.filter(pk__in=result.creates["DocketEntry"])
+        )
+        self.assertEqual(len(des), 3)
+        self.assertEqual(
+            set(de.description for de in des),
+            set(mctest["df"] for mctest in i["mctest"]),
+        )
+        self.assertEqual(
+            set(de.docket.pk for de in des), set(result.creates["Docket"])
+        )

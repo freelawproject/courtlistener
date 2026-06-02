@@ -3,7 +3,6 @@ import types
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from enum import Enum
 from typing import (
     Annotated,
     Any,
@@ -104,6 +103,15 @@ class AttributeMerger[ScrapedData, T]:
     ) -> None:
         self.transform = transform
         self.strategy: MergeStrategy[T] = strategy
+        self.name: str = ""
+
+    def __attach_to_merger__(
+        self, merger: "type[Merger[Any, Any]]", attr_name: str
+    ) -> None:
+        """Run any special logic needed to attach this to a Merger object. Should be run after all class setup code for
+        the parent merger. For one-to-one relationships, register the name of the attribute this is attached to on the
+        parent."""
+        self.name = attr_name
 
     def get_value(
         self, i: ScrapedData, param_value: T | None = None
@@ -118,52 +126,73 @@ class AttributeMerger[ScrapedData, T]:
         return self.strategy.merge_values(scrape, db)
 
 
-class Relationship(Enum):
-    OneToOne = "onetoone"
-    Child = "child"
+class OneToOneRelationship: ...
+
+
+@dataclass
+class ChildRelationship:
+    parent: str
+
+
+# Pretend Python has sum types
+class Relationship:
+    OneToOne: OneToOneRelationship = OneToOneRelationship()
+    Child: type[ChildRelationship] = ChildRelationship
+
+
+RelationshipType = OneToOneRelationship | ChildRelationship
 
 
 class RelatedMerger:
     def __init__(
         self,
-        merger: "Merger[Any, Any]",
-        parent_key: str,
+        merger: "type[Merger[Any, Any]]",
         transform: InputMap[Any, Any],
         *,
-        relationship: Relationship,
+        relationship: RelationshipType,
     ) -> None:
-        self.merger: Merger[Any, Any] = merger
-        self.parent_key: str = parent_key
+        """
+
+        :param merger:
+        :param transform:
+        :param relationship:
+        """
+        self.merger: type[Merger[Any, Any]] = merger
         self.transform: InputMap[Any, Any] = transform
-        self.relationship: Relationship = relationship
+        self.relationship: RelationshipType = relationship
+        self.name: str = ""
+
+    def __attach_to_merger__(
+        self, merger: "type[Merger[Any, Any]]", attr_name: str
+    ) -> None:
+        """Run any special logic needed to attach this to a Merger object. Should be run after all class setup code for
+        the parent merger. For one-to-one relationships, register the name of the attribute this is attached to on the
+        parent."""
+        self.name = attr_name
 
     def _merge_one_to_one(
         self, parent: Model, merger_input: Any
     ) -> MergeResult[Any]:
-        db_obj = getattr(parent, self.parent_key)
+        db_obj = getattr(parent, self.name)
         if db_obj is None:
             result = self.merger.merge(merger_input)
             model = self.merger.__model__
             model_name = model.__name__
-            db_obj_pk = None
             if model_name in result.creates:
                 db_obj_pk = next(iter(result.creates[model_name]))
-            elif model_name in result.updates:
-                db_obj_pk = next(iter(result.updates[model_name]))
-            if db_obj_pk is not None:
-                setattr(parent, f"{self.parent_key}_pk", db_obj_pk)
+                setattr(parent, f"{self.name}_id", db_obj_pk)
                 parent.save()
             return result
         return self.merger.merge(merger_input, existing=db_obj)
 
     def _merge_child(
-        self, parent: Model, merger_input: Any
+        self, parent: Model, merger_input: Any, parent_key: str
     ) -> MergeResult[Any]:
         if not is_iterable(merger_input):
             return MergeResult.failed(self.merger.__model__.__name__)
         result = MergeResult.unnecessary()
         for child in merger_input:
-            result |= self.merger.merge(self.merger.merge(child))
+            result |= self.merger.merge(child, **{parent_key: parent})
         return result
 
     def merge(self, parent: Model, i: Any) -> MergeResult[Any]:
@@ -172,14 +201,19 @@ class RelatedMerger:
         match self.relationship:
             case Relationship.OneToOne:
                 return self._merge_one_to_one(parent, merger_input)
-            case Relationship.Child:
-                return self._merge_child(parent, merger_input)
+            case Relationship.Child(parent_key):
+                return self._merge_child(parent, merger_input, parent_key)
+            case _:
+                raise TypeError(
+                    f"Invalid relationship type: {self.relationship}"
+                )
 
 
 class Merger[ScrapedData, DBModel: Model](ABC):
     __attr_mergers__: dict[str, AttributeMerger[ScrapedData, Any]]
     __related_mergers__: ClassVar[dict[str, RelatedMerger]]
     __model__: type[Model]
+    __default_attrs__: dict[str, Any]
     _uses_natural_key: ClassVar[bool] = True
     atomic: ClassVar[bool] = False
     # I'd like to make this a ClassVar for static type checking, but that's not allowed for some reason
@@ -250,6 +284,17 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
         cls.__model__ = db_model_type
 
+        cls.__default_attrs__ = {
+            name: getattr(cls, name)
+            for name in cls.__attr_mergers__
+            if hasattr(cls, name)
+        }
+
+        for name, am in cls.__attr_mergers__.items():
+            am.__attach_to_merger__(cls, name)
+        for name, rm in cls.__related_mergers__.items():
+            rm.__attach_to_merger__(cls, name)
+
     @staticmethod
     def validate(i: ScrapedData) -> bool:
         """Validate the input data before attempting a merge operation
@@ -293,15 +338,13 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         if not cls.validate(i):
             logger.error(f"Merger {cls.__name__} received invalid input.")
             return MergeResult.failed(cls.__name__)
-        # TODO Cache this
-        defaults = {
-            name: getattr(cls, name, None) for name in cls.__attr_mergers__
-        } | kwargs
+
+        defaults = cls.__default_attrs__ | kwargs
         obj = cast(
             DBModel,
             cls.__model__(
                 **{
-                    name: am.get_value(i, defaults[name])
+                    name: am.get_value(i, defaults.get(name, None))
                     for name, am in cls.__attr_mergers__.items()
                 }
             ),
@@ -313,15 +356,9 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         else:
             result, db_obj = cls._merge_object(obj, existing=existing)
 
-        if result.failed:
-            cls.after(i, None, result)
-            return result
-        for name, rm in cls.__related_mergers__.items():
-            merger_param = kwargs.get(name, None)
-            if isinstance(merger_param, Model):
-                ...
-                continue
-            result |= rm.merge(db_obj, i)
+        if not result.failures:
+            for _, rm in cls.__related_mergers__.items():
+                result |= rm.merge(db_obj, i)
         cls.after(i, obj, result)
         return result
 
