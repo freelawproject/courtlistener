@@ -1068,6 +1068,12 @@ class AlertThrottle(ExceptionalUserRateThrottle):
     global user throttle. Only users with a commercial agreement, configured
     via an ``APIThrottle`` row of type ALERTS, are throttled here at their
     configured rate, and those same users bypass the membership quota.
+
+    ``SearchAlertViewSet.get_throttles`` wires this throttle in only for
+    commercial users' write requests (POST/PUT/PATCH), as the sole throttle
+    for those requests. That way commercial alert writes run at the configured
+    rate instead of being capped by the global per-user API throttle, while
+    their reads still fall back to that global throttle.
     """
 
     scope = "alerts"

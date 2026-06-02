@@ -1938,6 +1938,146 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
             await Alert.objects.filter(user=commercial_user).acount(), 2
         )
 
+    async def test_commercial_writes_bypass_global_user_throttle(
+        self,
+    ) -> None:
+        """Commercial alert writes run at the AlertThrottle rate, not the
+        global per-user API throttle.
+
+        The user gets a deliberately tight global API throttle (3/min) on top
+        of a generous ALERTS throttle (100/min). Without the per-method
+        routing in ``SearchAlertViewSet.get_throttles``, the 4th write would be
+        rejected by the global 3/min throttle; with it, only the AlertThrottle
+        applies, so all writes succeed.
+        """
+        commercial_user = (
+            await sync_to_async(UserProfileWithParentsFactory)()
+        ).user
+        # A tight global API throttle that would block writes if it applied.
+        await sync_to_async(APIThrottleFactory)(
+            user=commercial_user,
+            throttle_type=ThrottleType.API,
+            rate="3/min",
+        )
+        # A generous commercial alert throttle.
+        await sync_to_async(APIThrottleFactory)(
+            user=commercial_user,
+            throttle_type=ThrottleType.ALERTS,
+            rate="100/min",
+        )
+        await sync_to_async(clear_tiered_cache)()
+        client = await sync_to_async(make_client)(commercial_user.pk)
+
+        with mock.patch(
+            "cl.alerts.api_serializers.get_alert_estimation_count",
+            return_value=(0, 0),
+        ):
+            # Five writes, well past the global 3/min throttle.
+            for i in range(5):
+                response = await self.make_an_alert(
+                    client,
+                    alert_name=f"bypass_alert_{i}",
+                    alert_query="q=testing_query&type=r",
+                    alert_type=SEARCH_TYPES.DOCKETS,
+                )
+                self.assertEqual(
+                    response.status_code,
+                    HTTPStatus.CREATED,
+                    msg=f"Alert {i} should not be blocked by the global "
+                    "user throttle.",
+                )
+        self.assertEqual(
+            await Alert.objects.filter(user=commercial_user).acount(), 5
+        )
+
+    async def test_non_commercial_writes_keep_global_user_throttle(
+        self,
+    ) -> None:
+        """Non-commercial users are still bound by the global per-user API
+        throttle on the alerts endpoint (the endpoint isn't left unthrottled).
+
+        With a tight 3/min global throttle and no ALERTS override, the 4th
+        write is rejected.
+        """
+        regular_user = (
+            await sync_to_async(UserProfileWithParentsFactory)()
+        ).user
+        await sync_to_async(APIThrottleFactory)(
+            user=regular_user,
+            throttle_type=ThrottleType.API,
+            rate="3/min",
+        )
+        await sync_to_async(clear_tiered_cache)()
+        client = await sync_to_async(make_client)(regular_user.pk)
+
+        with mock.patch(
+            "cl.alerts.api_serializers.get_alert_estimation_count",
+            return_value=(0, 0),
+        ):
+            # The first three writes fit within the global 3/min throttle.
+            for i in range(3):
+                response = await self.make_an_alert(
+                    client,
+                    alert_name=f"regular_alert_{i}",
+                    alert_query="q=testing_query&type=r",
+                    alert_type=SEARCH_TYPES.DOCKETS,
+                )
+                self.assertEqual(response.status_code, HTTPStatus.CREATED)
+
+            # The fourth write exceeds the global throttle.
+            response = await self.make_an_alert(
+                client,
+                alert_name="regular_alert_3",
+                alert_query="q=testing_query&type=r",
+                alert_type=SEARCH_TYPES.DOCKETS,
+            )
+            self.assertEqual(
+                response.status_code, HTTPStatus.TOO_MANY_REQUESTS
+            )
+
+    async def test_commercial_reads_do_not_consume_write_budget(
+        self,
+    ) -> None:
+        """A commercial user's reads use the global throttle, not the
+        AlertThrottle, so polling their alert list neither gets rejected by the
+        alert rate nor consumes their alert-write budget.
+        """
+        commercial_user = (
+            await sync_to_async(UserProfileWithParentsFactory)()
+        ).user
+        # A tight alert throttle: if reads counted against it, the GETs below
+        # would 429 and/or starve the writes.
+        await sync_to_async(APIThrottleFactory)(
+            user=commercial_user,
+            throttle_type=ThrottleType.ALERTS,
+            rate="2/min",
+        )
+        await sync_to_async(clear_tiered_cache)()
+        client = await sync_to_async(make_client)(commercial_user.pk)
+
+        # Five list reads, more than the 2/min alert rate; none are throttled
+        # because reads fall back to the generous global user throttle.
+        for _ in range(5):
+            response = await client.get(self.alert_path)
+            self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        with mock.patch(
+            "cl.alerts.api_serializers.get_alert_estimation_count",
+            return_value=(0, 0),
+        ):
+            # The full 2/min write budget is still available after the reads.
+            for i in range(2):
+                response = await self.make_an_alert(
+                    client,
+                    alert_name=f"read_budget_alert_{i}",
+                    alert_query="q=testing_query&type=r",
+                    alert_type=SEARCH_TYPES.DOCKETS,
+                )
+                self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(
+            await Alert.objects.filter(user=commercial_user).acount(), 2
+        )
+
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class SearchAlertsWebhooksTest(
