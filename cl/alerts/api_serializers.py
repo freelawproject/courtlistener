@@ -23,7 +23,6 @@ from cl.alerts.utils import (
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.search.models import SEARCH_TYPES
 
-
 # The number of days the alert frequency estimation averages over, matching
 # the value used by the alert_frequency endpoint in the frontend.
 ALERT_ESTIMATION_DAY_COUNT = 100
