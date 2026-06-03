@@ -1,7 +1,7 @@
 import logging
 import types
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Generator, Iterable, Mapping
 from dataclasses import dataclass
 from typing import (
     Annotated,
@@ -16,9 +16,9 @@ from typing import (
 
 from django.db import transaction
 from django.db.models import Model
-from openai._utils import is_iterable
 
 from cl.corpus_importer.state.utils import MergeResult
+from cl.lib.utils import is_iter
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +32,13 @@ class InputMap[ScrapedData, Output]:
     def __init__(
         self, map: Callable[[ScrapedData], Output] | None = None
     ) -> None:
-        if map is not None:
-            self._map: Callable[[ScrapedData], Output | None] = map
+        self._map: Callable[[ScrapedData], Output | None] | None = map
 
     def map(self, i: ScrapedData) -> Output | None:
+        if self._map is None:
+            raise NotImplementedError(
+                f"{type(self).__name__} was instantiated without a mapping function; pass one to __init__ or override map()."
+            )
         return self._map(i)
 
 
@@ -123,17 +126,34 @@ class OverwriteConditionally[T](MergeStrategy[T]):
         return db
 
 
+class OverwriteIfPresent[T](MergeStrategy[T]):
+    """Merge strategy that overwrites the existing value only when the scraped
+    value is present (i.e. not `None`), otherwise keeping the DB value.
+
+    This is the default strategy so that a partial scrape -- one that is missing
+    a field it didn't manage to extract -- does not clobber good data already in
+    the DB. Note that "present" means `not None`: a scraped empty string or `0`
+    is treated as a real value and will overwrite the DB value. Use
+    `OverwriteExisting` if `None` should be written, or `OverwriteConditionally`
+    for finer-grained control."""
+
+    @override
+    def merge_values(self, scrape: T, db: T) -> T:
+        return db if scrape is None else scrape
+
+
 class AttributeMerger[ScrapedData, T]:
     """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
 
     :param transform: Defines how to get the DB value from the scrape data using a subclass of `InputMap`
-    :param strategy: How to behave when data is present in the scrape and DB. Defaults to overwriting the DB value."""
+    :param strategy: How to behave when data is present in the scrape and DB. Defaults to overwriting the DB value
+        only when the scraped value is present (not `None`), so a partial scrape won't clobber existing data."""
 
     def __init__(
         self,
         transform: InputMap[ScrapedData, T],
         *,
-        strategy: MergeStrategy[T] = OverwriteExisting(),
+        strategy: MergeStrategy[T] = OverwriteIfPresent(),
     ) -> None:
         self.transform: InputMap[ScrapedData, T] = transform
         self.strategy: MergeStrategy[T] = strategy
@@ -223,14 +243,25 @@ class RelatedMerger:
             if model_name in result.creates:
                 db_obj_pk = next(iter(result.creates[model_name]))
                 setattr(parent, f"{self.name}_id", db_obj_pk)
-                parent.save()
+                # The parent was already fully saved by `_merge_object`; only
+                # the freshly-set FK needs to be written back.
+                parent.save(update_fields=[f"{self.name}_id"])
             return result
         return self.merger.merge(merger_input, existing=db_obj)
 
     def _merge_child(
         self, parent: Model, merger_input: Any, parent_key: str
     ) -> MergeResult[Any]:
-        if not is_iterable(merger_input):
+        # An absent optional collection is not an error; there is simply nothing
+        # to merge.
+        if merger_input is None:
+            return MergeResult.unnecessary()
+        # A lone `str`/`bytes`/`Mapping` is iterable but is not a collection of
+        # children -- iterating it would silently feed characters or keys to the
+        # child merger. Reject those (and anything not iterable at all).
+        if isinstance(merger_input, (str, bytes, Mapping)) or not is_iter(
+            merger_input
+        ):
             return MergeResult.failed(self.merger.__model__.__name__)
         result = MergeResult.unnecessary()
         for child in merger_input:
@@ -273,9 +304,10 @@ class Merger[ScrapedData, DBModel: Model](ABC):
     """Base class for a merger which takes in `ScrapedData` and merges it into `DBModel`. Subclasses should generally
     not be instantiated; methods and attributes should be accessed directly from the class.
 
-    :ivar atomic: Whether to wrap the merge operation in a `transaction.atomic()` context manager. Note that this only
-        applies to attributes which do not reference other objects. Related object mergers will be run outside the block
-        and can set their own `atomic` value.
+    :ivar atomic: Whether to wrap the entire merge operation -- the object's own attributes *and* all related/child
+        mergers -- in a single `transaction.atomic()` block, so the whole tree commits together or rolls back together
+        if an exception is raised. Nested mergers that set their own `atomic` value simply create savepoints within
+        this block.
     :ivar existing: A natural key or a function to find DB objects to merge into. Setting this to an iterable value
         and using natural key lookups is recommended, but if more complex logic is necessary, this can be a method
         that takes in a `DBModel` object and returns the matching object from the DB or `None` if none was found."""
@@ -390,6 +422,9 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         """Attempts to find an existing object in the DB to merge into based on either the natural key or a custom
         lookup function.
 
+        Raises `MultipleObjectsReturned` if the natural key matches more than one
+        object; callers are responsible for turning that into a merge failure.
+
         :param i: The object to attempt to find a match for"""
         if callable(cls.existing):
             return cls.existing(i)
@@ -402,10 +437,6 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             )
         except cls.__model__.DoesNotExist:
             return None
-        except cls.__model__.MultipleObjectsReturned:
-            raise ValueError(
-                f"Merger {cls.__name__} found multiple objects found for natural key {cls.existing}."
-            )
 
     @classmethod
     def merge(
@@ -433,14 +464,26 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
         if cls.atomic:
             with transaction.atomic():
-                result, db_obj = cls._merge_object(obj, existing=existing)
+                result = cls._merge_tree(obj, i, existing=existing)
         else:
-            result, db_obj = cls._merge_object(obj, existing=existing)
-
-        if not result.failures:
-            for _, rm in cls.__related_mergers__.items():
-                result |= rm.merge(db_obj, i)
+            result = cls._merge_tree(obj, i, existing=existing)
         cls.after(i, obj, result)
+        return result
+
+    @classmethod
+    def _merge_tree(
+        cls, obj: DBModel, i: ScrapedData, *, existing: DBModel | None
+    ) -> MergeResult[Any]:
+        """Merge the object's own attributes and then all of its related/child
+        mergers, returning the combined result.
+
+        When `atomic` is set the caller runs this inside a single
+        `transaction.atomic()` block, so the object and its whole related tree
+        commit or roll back together."""
+        result, db_obj = cls._merge_object(obj, existing=existing)
+        if not result.failures:
+            for rm in cls.__related_mergers__.values():
+                result |= rm.merge(db_obj, i)
         return result
 
     @classmethod
@@ -451,7 +494,15 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         existing: DBModel | None = None,
     ) -> tuple[MergeResult[Any], DBModel]:
         if existing is None:
-            db_obj = cls.get_existing(scrape_obj)
+            try:
+                db_obj = cls.get_existing(scrape_obj)
+            except cls.__model__.MultipleObjectsReturned:
+                logger.error(
+                    "Merger %s found multiple objects for natural key %s; skipping merge.",
+                    cls.__name__,
+                    cls.existing,
+                )
+                return MergeResult.failed(cls.__model__.__name__), scrape_obj
         else:
             db_obj = existing
 
