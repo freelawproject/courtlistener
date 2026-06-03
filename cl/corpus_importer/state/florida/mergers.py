@@ -63,6 +63,20 @@ def _originating_case_number(docket_data: FloridaCase) -> str:
     return docket_data.originating_cases[0].case_number
 
 
+def _appeal_from_id(docket_data: FloridaCase) -> str | None:
+    if len(docket_data.originating_cases) > 1:
+        return None
+    return FLORIDA_COURT_ID_MAP.get(
+        docket_data.originating_cases[0].court_id.value, None
+    )
+
+
+def _appeal_from_str(docket_data: FloridaCase) -> str | None:
+    if len(docket_data.originating_cases) > 1:
+        return None
+    return docket_data.originating_cases[0].court_name
+
+
 class FloridaOriginatingCourtInformationMerger(
     Merger[FloridaCase, OriginatingCourtInformation]
 ):
@@ -149,6 +163,12 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     docket_number_core: str = AttributeMerger[FloridaCase, str](
         InputField("docket_number", transform=make_docket_number_core),
         strategy=OverwriteExisting(),
+    )
+    appeal_from_id: str | None = AttributeMerger(
+        InputMap(_appeal_from_id), strategy=OverwriteExisting()
+    )
+    appeal_from_str: str | None = AttributeMerger(
+        InputMap(_appeal_from_str), strategy=OverwriteExisting()
     )
     originating_court_information: OriginatingCourtInformation = RelatedMerger[
         FloridaCase, OriginatingCourtInformation
