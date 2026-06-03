@@ -1793,9 +1793,10 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
                 alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
             )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
-        # DRF wraps validation-error detail values in a list.
-        self.assertEqual(int(response.json()["estimated_hits"][0]), 3500)
-        self.assertIn("results per day", str(response.json()["detail"]))
+        # estimated_hits is returned as an integer, matching the success
+        # response, rather than a list of stringified errors.
+        self.assertEqual(response.json()["estimated_hits"], 3500)
+        self.assertIn("results per day", response.json()["detail"])
         self.assertEqual(await Alert.objects.all().acount(), 0)
 
     async def test_alert_rejected_when_query_is_invalid(self) -> None:

@@ -1,8 +1,10 @@
+from http import HTTPStatus
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http import QueryDict
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import APIException, PermissionDenied
 
 from cl.alerts.constants import (
     FLP_MEMBERSHIP_URL,
@@ -30,6 +32,24 @@ ALERT_ESTIMATION_DAY_COUNT = 100
 # Key included in the API response with the estimated number of hits the alert
 # query would have produced over the last ALERT_ESTIMATION_DAY_COUNT days.
 ALERT_ESTIMATION_RESPONSE_KEY = "estimated_hits"
+
+
+class BroadAlertQueryError(APIException):
+    """Raised when an alert query is estimated to exceed the per-day hit limit.
+
+    Unlike serializers.ValidationError, this sets ``detail`` directly so the
+    estimated hits stay an integer in the response (matching the success
+    response) instead of being coerced into a list of stringified errors.
+    """
+
+    status_code = HTTPStatus.BAD_REQUEST
+    default_code = "broad_alert_query"
+
+    def __init__(self, estimated_hits: int, detail: str) -> None:
+        self.detail = {
+            ALERT_ESTIMATION_RESPONSE_KEY: estimated_hits,
+            "detail": detail,
+        }
 
 
 class SearchAlertSerializer(
@@ -213,15 +233,13 @@ class SearchAlertSerializer(
         total_hits = estimation[0]
         hits_per_day = total_hits // ALERT_ESTIMATION_DAY_COUNT
         if hits_per_day > settings.MAX_ALERT_RESULTS_PER_DAY:
-            raise serializers.ValidationError(
-                {
-                    ALERT_ESTIMATION_RESPONSE_KEY: total_hits,
-                    "detail": (
-                        f"This query averages about {hits_per_day} results per "
-                        "day, which is more than our system can support. Please "
-                        "narrow your query to have fewer results per day."
-                    ),
-                }
+            raise BroadAlertQueryError(
+                estimated_hits=total_hits,
+                detail=(
+                    f"This query averages about {hits_per_day} results per "
+                    "day, which is more than our system can support. Please "
+                    "narrow your query to have fewer results per day."
+                ),
             )
         self._alert_frequency_estimation = total_hits
 
