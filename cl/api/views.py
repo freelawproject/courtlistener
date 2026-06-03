@@ -18,6 +18,7 @@ from cl.lib.elasticsearch_utils import (
     get_opinions_coverage_over_time,
 )
 from cl.search.documents import OpinionClusterDocument
+from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
 from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.coverage_utils import build_chart_data
@@ -168,9 +169,20 @@ async def get_result_count(request, version, day_count):
     period.
     """
 
-    estimation = await sync_to_async(get_alert_estimation_count)(
-        request.GET.copy(), int(day_count)
-    )
+    try:
+        estimation = await sync_to_async(get_alert_estimation_count)(
+            request.GET.copy(), int(day_count)
+        )
+    except (ElasticServerError, ElasticBadRequestError):
+        # The query couldn't be run against Elasticsearch.
+        return JsonResponse(
+            {
+                "error": "Internal server error when trying to get the "
+                "estimation count."
+            },
+            safe=True,
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
     if estimation is None:
         return JsonResponse(
             {"error": "Invalid SearchForm"},

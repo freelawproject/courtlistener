@@ -13,6 +13,7 @@ from django.http import QueryDict
 from elasticsearch.dsl import MultiSearch, Q, Search
 from elasticsearch.dsl.query import Query
 from elasticsearch.dsl.response import Hit
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from redis import Redis
 
 from cl.alerts.constants import RECAP_ALERT_QUOTAS
@@ -59,6 +60,7 @@ from cl.search.documents import (
     OpinionPercolator,
     RECAPPercolator,
 )
+from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
@@ -989,6 +991,9 @@ def get_alert_estimation_count(
     :return: A two-tuple ``(total_hits, case_only_hits)`` where
     ``case_only_hits`` is 0 for non-RECAP search types, or None if the query
     can't be validated by SearchForm.
+    :raises ElasticBadRequestError: If Elasticsearch can't parse the query.
+    :raises ElasticServerError: If the Elasticsearch request fails for any
+    other reason (e.g. a transport or connection error).
     """
     search_form = SearchForm(query_data)
     if not search_form.is_valid():
@@ -996,23 +1001,30 @@ def get_alert_estimation_count(
 
     cd = search_form.cleaned_data
     total_case_only_query_results = 0
-    match cd["type"]:
-        case SEARCH_TYPES.ORAL_ARGUMENT:
-            search_query = AudioDocument.search()
-            total_query_results, _ = do_es_alert_estimation_query(
-                search_query, cd, day_count
-            )
-        case SEARCH_TYPES.OPINION:
-            search_query = OpinionClusterDocument.search()
-            total_query_results, _ = do_es_alert_estimation_query(
-                search_query, cd, day_count
-            )
-        case SEARCH_TYPES.RECAP:
-            search_query = DocketDocument.search()
-            (
-                total_query_results,
-                total_case_only_query_results,
-            ) = do_es_alert_estimation_query(search_query, cd, day_count)
-        case _:
-            total_query_results = 0
+    try:
+        match cd["type"]:
+            case SEARCH_TYPES.ORAL_ARGUMENT:
+                search_query = AudioDocument.search()
+                total_query_results, _ = do_es_alert_estimation_query(
+                    search_query, cd, day_count
+                )
+            case SEARCH_TYPES.OPINION:
+                search_query = OpinionClusterDocument.search()
+                total_query_results, _ = do_es_alert_estimation_query(
+                    search_query, cd, day_count
+                )
+            case SEARCH_TYPES.RECAP:
+                search_query = DocketDocument.search()
+                (
+                    total_query_results,
+                    total_case_only_query_results,
+                ) = do_es_alert_estimation_query(search_query, cd, day_count)
+            case _:
+                total_query_results = 0
+    except (TransportError, ConnectionError, RequestError):
+        raise ElasticServerError()
+    except ApiError as e:
+        if "Failed to parse query" in str(e):
+            raise ElasticBadRequestError()
+        raise ElasticServerError()
     return total_query_results, total_case_only_query_results
