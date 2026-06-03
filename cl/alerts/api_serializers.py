@@ -213,7 +213,7 @@ class SearchAlertSerializer(
         # Use the first value, as it is the broadest value present across all
         # search types.
         total_hits = estimation[0]
-        hits_per_day = math.floor(total_hits // ALERT_ESTIMATION_DAY_COUNT)
+        hits_per_day = total_hits // ALERT_ESTIMATION_DAY_COUNT
         if hits_per_day > settings.MAX_ALERT_RESULTS_PER_DAY:
             raise serializers.ValidationError(
                 {
