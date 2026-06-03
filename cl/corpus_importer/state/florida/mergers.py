@@ -1,23 +1,25 @@
 import logging
 from datetime import date
-from typing import Annotated, override
+from typing import override
 
 from asgiref.sync import async_to_sync
 from juriscraper.state.florida import FloridaCase
 from juriscraper.state.florida.courts import FloridaCourtID
 
+from cl.corpus_importer.state.florida.utils import make_docket_number_core
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
+    Constant,
     InputField,
     InputMap,
     Merger,
     MergeStrategy,
     OverwriteExisting,
+    PassAll,
     RelatedMerger,
     Relationship,
 )
 from cl.corpus_importer.state.utils import MergeResult
-from cl.lib.model_helpers import make_docket_number_core
 from cl.recap.mergers import (
     find_and_disaggregate_docket_object,
     find_docket_object,
@@ -50,14 +52,6 @@ class AddScraperSource(MergeStrategy[int]):
         return db
 
 
-def _scraper_source(docket_data: FloridaCase) -> int:
-    return Docket.SCRAPER
-
-
-def _court_id(docket_data: FloridaCase) -> str:
-    return FLORIDA_COURT_ID_MAP[docket_data.court_id]
-
-
 def _date_last_filing(docket_data: FloridaCase) -> date | None:
     filing_dates = sorted(
         e.date_filed for e in docket_data.entries if e.date_filed
@@ -65,37 +59,19 @@ def _date_last_filing(docket_data: FloridaCase) -> date | None:
     return filing_dates[-1] if filing_dates else docket_data.date_filed
 
 
-def _docket_number_core(docket_data: FloridaCase) -> str:
-    return make_docket_number_core(docket_data.docket_number)
-
-
 def _originating_case_number(docket_data: FloridaCase) -> str:
     return docket_data.originating_cases[0].case_number
-
-
-def _supreme_court_originating_case(
-    docket_data: FloridaCase,
-) -> FloridaCase | None:
-    if docket_data.court_id != FloridaCourtID.SUPREME_COURT.value:
-        return None
-    return docket_data
 
 
 class FloridaOriginatingCourtInformationMerger(
     Merger[FloridaCase, OriginatingCourtInformation]
 ):
-    docket_number: Annotated[
-        str,
-        AttributeMerger(
-            InputMap(_originating_case_number), strategy=OverwriteExisting()
-        ),
-    ]
-    docket_number_raw: Annotated[
-        str,
-        AttributeMerger(
-            InputMap(_originating_case_number), strategy=OverwriteExisting()
-        ),
-    ]
+    docket_number: str = AttributeMerger(
+        InputMap(_originating_case_number), strategy=OverwriteExisting()
+    )
+    docket_number_raw: str = AttributeMerger(
+        InputMap(_originating_case_number), strategy=OverwriteExisting()
+    )
 
     @staticmethod
     def validate(docket_data: FloridaCase) -> bool:
@@ -135,68 +111,55 @@ def merge_oci(docket: Docket, docket_data: FloridaCase) -> MergeResult:
 class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     atomic = True
 
-    court_id: Annotated[
-        str,
-        AttributeMerger(InputMap(_court_id), strategy=OverwriteExisting()),
-    ]
-    source: Annotated[
-        int,
-        AttributeMerger(
-            InputMap(_scraper_source), strategy=AddScraperSource()
+    court_id: str = AttributeMerger[FloridaCase, str](
+        InputMap(
+            lambda docket_data: FLORIDA_COURT_ID_MAP[docket_data.court_id]
         ),
-    ]
-    date_filed: Annotated[
-        date | None,
-        AttributeMerger(
-            InputField("date_filed"), strategy=OverwriteExisting()
+        strategy=OverwriteExisting(),
+    )
+    source: int = AttributeMerger(
+        Constant(Docket.SCRAPER),
+        strategy=AddScraperSource(),
+    )
+    date_filed: date | None = AttributeMerger[FloridaCase, date | None](
+        InputField("date_filed"),
+        strategy=OverwriteExisting(),
+    )
+    date_last_filing: date | None = AttributeMerger(
+        InputMap(_date_last_filing),
+        strategy=OverwriteExisting(),
+    )
+    case_name: str = AttributeMerger[FloridaCase, str](
+        InputField("case_name"), strategy=OverwriteExisting()
+    )
+    case_name_full: str = AttributeMerger[FloridaCase, str](
+        InputField("case_name_full"),
+        strategy=OverwriteExisting(),
+    )
+    case_name_short: str = AttributeMerger[FloridaCase, str](
+        InputField("case_name"), strategy=OverwriteExisting()
+    )
+    docket_number: str = AttributeMerger[FloridaCase, str](
+        InputField("docket_number"),
+        strategy=OverwriteExisting(),
+    )
+    docket_number_raw: str = AttributeMerger[FloridaCase, str](
+        InputField("docket_number"), strategy=OverwriteExisting()
+    )
+    docket_number_core: str = AttributeMerger[FloridaCase, str](
+        InputField("docket_number", transform=make_docket_number_core),
+        strategy=OverwriteExisting(),
+    )
+    originating_court_information: OriginatingCourtInformation = RelatedMerger[
+        FloridaCase, OriginatingCourtInformation
+    ](
+        FloridaOriginatingCourtInformationMerger,
+        PassAll(),
+        gate=lambda docket_data: (
+            docket_data.court_id == FloridaCourtID.SUPREME_COURT.value
         ),
-    ]
-    date_last_filing: Annotated[
-        date | None,
-        AttributeMerger(
-            InputMap(_date_last_filing), strategy=OverwriteExisting()
-        ),
-    ]
-    case_name: Annotated[
-        str,
-        AttributeMerger(InputField("case_name"), strategy=OverwriteExisting()),
-    ]
-    case_name_full: Annotated[
-        str,
-        AttributeMerger(
-            InputField("case_name_full"), strategy=OverwriteExisting()
-        ),
-    ]
-    case_name_short: Annotated[
-        str,
-        AttributeMerger(InputField("case_name"), strategy=OverwriteExisting()),
-    ]
-    docket_number: Annotated[
-        str,
-        AttributeMerger(
-            InputField("docket_number"), strategy=OverwriteExisting()
-        ),
-    ]
-    docket_number_core: Annotated[
-        str,
-        AttributeMerger(
-            InputMap(_docket_number_core), strategy=OverwriteExisting()
-        ),
-    ]
-    docket_number_raw: Annotated[
-        str,
-        AttributeMerger(
-            InputField("docket_number"), strategy=OverwriteExisting()
-        ),
-    ]
-    originating_court_information: Annotated[
-        OriginatingCourtInformation,
-        RelatedMerger(
-            FloridaOriginatingCourtInformationMerger,
-            InputMap(_supreme_court_originating_case),
-            relationship=Relationship.OneToOne,
-        ),
-    ]
+        relationship=Relationship.OneToOne,
+    )
 
     @staticmethod
     def existing(docket: Docket) -> Docket | None:
@@ -212,7 +175,7 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
                 federal_dn_judge_initials_assigned=None,
                 federal_dn_judge_initials_referred=None,
                 docket_source=Docket.SCRAPER,
-                allow_create=True,
+                allow_create=False,
             )
         else:
             found, changed = async_to_sync(
@@ -227,8 +190,6 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
                 logger.info(
                     "Disaggregated Florida docket: %s", docket.docket_number
                 )
-        if found is not None and found.pk is None:
-            return None
         return found
 
 

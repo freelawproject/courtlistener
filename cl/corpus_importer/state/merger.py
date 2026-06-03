@@ -21,10 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class InputMap[ScrapedData, Output]:
-    """Apply a transformation to input data before passing it to a merger.
-
-    :ivar map: Function to apply to input data. Should be a lambda in most cases.
-    """
+    """Apply a transformation to input data before passing it to a merger."""
 
     def __init__(
         self, map: Callable[[ScrapedData], Output] | None = None
@@ -39,17 +36,33 @@ class InputMap[ScrapedData, Output]:
         return self._map(i)
 
 
-class InputField[ScrapedData, Output](InputMap[ScrapedData, Output]):
+class PassAll[T](InputMap[T, T]):
+    """Transform that does nothing. Useful for testing or overriding base class mappings."""
+
+    @override
+    def map(self, i: T, *args: Any, **kwargs: Any) -> T:
+        return i
+
+
+class InputField[ScrapedData, Output, S = Output](
+    InputMap[ScrapedData, Output]
+):
     """Utility transformation to return a field from the input data unchanged.
 
     :ivar path: The path to the relevant field. Will handle dictionaries, objects, and combinations thereof."""
 
-    def __init__(self, *path: str, default: Output | None = None) -> None:
+    def __init__(
+        self,
+        *path: str,
+        default: Output | None = None,
+        transform: Callable[[Output], Output] = lambda x: x,
+    ) -> None:
         if not path:
             raise ValueError("Path must not be empty")
         super().__init__()
         self.path: list[str] = list(path)
         self.default: Output | None = default
+        self.transform: Callable[[Output], Output] = transform
 
     @override
     def map(self, i: ScrapedData, *args: Any, **kwargs: Any) -> Output | None:
@@ -62,23 +75,7 @@ class InputField[ScrapedData, Output](InputMap[ScrapedData, Output]):
             else:
                 logger.error(f"Could not find {self.path} in input")
                 return self.default
-        return current
-
-
-class NeverMapping[ScrapedData, T](InputMap[ScrapedData, T]):
-    """Transform that always returns None. Useful for testing or overriding base class mappings."""
-
-    @override
-    def map(self, i: ScrapedData, *args: Any, **kwargs: Any) -> None:
-        return None
-
-
-class NoOpMapping[T](InputMap[T, T]):
-    """Transform that does nothing. Useful for testing or overriding base class mappings."""
-
-    @override
-    def map(self, i: T, *args: Any, **kwargs: Any) -> T:
-        return i
+        return self.transform(current)
 
 
 @dataclass
@@ -87,13 +84,25 @@ class Parameter[T, S = T](InputMap[T, S]):
     information which won't change over the course of many merges (i.e., a parent `Docket` for `DocketEntry`s)."""
 
     default: S | None = None
-    transform: InputMap[T, S] = NoOpMapping()
+    transform: Callable[[T], S] = lambda x: x
 
     @override
     def map(
-        self, i: T, *args: Any, value: S | None = None, **kwargs: Any
+        self, i: T, *args: Any, value: T | None = None, **kwargs: Any
     ) -> S | None:
-        return value or self.default
+        if value:
+            return self.transform(value)
+        return self.default
+
+
+@dataclass
+class Constant[T](InputMap[Any, T]):
+    """Mapping that always returns a constant value."""
+
+    value: T
+
+    def map(self, i: Any, *args: Any, **kwargs: Any) -> T:
+        return self.value
 
 
 class MergeStrategy[T](ABC):
@@ -209,7 +218,7 @@ class Relationship:
 RelationshipType = OneToOneRelationship | ChildRelationship
 
 
-class RelatedMerger(Any):
+class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
     """Class encapsulating logic for merging one or more related objects. Can be used to merge one-to-one relationships
     or parent-child relationships.
 
@@ -219,25 +228,27 @@ class RelatedMerger(Any):
 
     def __init__(
         self,
-        merger: "type[Merger[Any, Any]]",
-        transform: InputMap[Any, Any],
+        merger: "type[Merger[RelatedInput, RelatedModel]]",
+        transform: InputMap[ScrapedData, RelatedInput],
         *,
         relationship: RelationshipType,
+        gate: Callable[[ScrapedData], bool] = lambda _: True,
     ) -> None:
-        self.merger: type[Merger[Any, Any]] = merger
-        self.transform: InputMap[Any, Any] = transform
+        self.merger: type[Merger[RelatedInput, RelatedModel]] = merger
+        self.transform: InputMap[ScrapedData, RelatedInput] = transform
         self.relationship: RelationshipType = relationship
+        self.gate: Callable[[ScrapedData], bool] = gate
         self.name: str = ""
 
     def __attach_to_merger__(
-        self, merger: "type[Merger[Any, Any]]", attr_name: str
+        self, merger: "type[Merger[ScrapedData, Any]]", attr_name: str
     ) -> None:
         """Run any special logic needed to attach this to a Merger object. Should be run after all class setup code for
         the parent merger."""
         self.name = attr_name
 
     def _merge_one_to_one(
-        self, parent: Model, merger_input: Any
+        self, parent: Model, merger_input: RelatedInput
     ) -> MergeResult[Any]:
         if merger_input is None:
             return MergeResult.unnecessary()
@@ -256,7 +267,7 @@ class RelatedMerger(Any):
         return self.merger.merge(merger_input, existing=db_obj)
 
     def _merge_child(
-        self, parent: Model, merger_input: Any, parent_key: str
+        self, parent: Model, merger_input: RelatedInput, parent_key: str
     ) -> MergeResult[Any]:
         # An absent optional collection is not an error; there is simply nothing
         # to merge.
@@ -274,7 +285,7 @@ class RelatedMerger(Any):
             result |= self.merger.merge(child, **{parent_key: parent})
         return result
 
-    def merge(self, parent: Model, i: Any) -> MergeResult[Any]:
+    def merge(self, parent: Model, i: ScrapedData) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship.
 
         For one-to-one relationships, the input is transformed then passed directly to the related merger; a `None`
@@ -284,7 +295,11 @@ class RelatedMerger(Any):
 
         :param parent: The parent of the object being merged. Must already exist in the DB when this method is called.
         :param i: The input data for the object being merged."""
+        if not self.gate(i):
+            return MergeResult.unnecessary()
         merger_input = self.transform.map(i)
+        if merger_input is None:
+            return MergeResult.unnecessary()
 
         match self.relationship:
             case OneToOneRelationship():
