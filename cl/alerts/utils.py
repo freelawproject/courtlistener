@@ -60,7 +60,16 @@ from cl.search.documents import (
     OpinionPercolator,
     RECAPPercolator,
 )
-from cl.search.exception import ElasticBadRequestError, ElasticServerError
+from cl.search.exception import (
+    BadProximityQuery,
+    DisallowedWildcardPattern,
+    ElasticBadRequestError,
+    ElasticServerError,
+    InputTooLongError,
+    InvalidRelativeDateSyntax,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
@@ -991,7 +1000,9 @@ def get_alert_estimation_count(
     :return: A two-tuple ``(total_hits, case_only_hits)`` where
     ``case_only_hits`` is 0 for non-RECAP search types, or None if the query
     can't be validated by SearchForm.
-    :raises ElasticBadRequestError: If Elasticsearch can't parse the query.
+    :raises ElasticBadRequestError: If the query can't be built (e.g.
+    unbalanced parentheses/quotes, disallowed wildcards) or Elasticsearch
+    can't parse it.
     :raises ElasticServerError: If the Elasticsearch request fails for any
     other reason (e.g. a transport or connection error).
     """
@@ -1021,6 +1032,15 @@ def get_alert_estimation_count(
                 ) = do_es_alert_estimation_query(search_query, cd, day_count)
             case _:
                 total_query_results = 0
+    except (
+        UnbalancedParenthesesQuery,
+        UnbalancedQuotesQuery,
+        BadProximityQuery,
+        DisallowedWildcardPattern,
+        InvalidRelativeDateSyntax,
+        InputTooLongError,
+    ) as e:
+        raise ElasticBadRequestError(detail=e.message)
     except (TransportError, ConnectionError, RequestError):
         raise ElasticServerError()
     except ApiError as e:

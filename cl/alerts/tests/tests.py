@@ -1812,6 +1812,18 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         self.assertIn("invalid", str(response.json()["query"]))
         self.assertEqual(await Alert.objects.all().acount(), 0)
 
+    async def test_alert_rejected_when_query_cant_be_built(self) -> None:
+        """An alert whose query passes SearchForm but can't be built into an ES
+        query (e.g. unbalanced parentheses) is rejected with a 400 carrying the
+        specific reason, instead of being silently created."""
+        response = await self.make_an_alert(
+            self.client,
+            alert_query=f"q=(testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("unbalanced parentheses", str(response.json()["detail"]))
+        self.assertEqual(await Alert.objects.all().acount(), 0)
+
     async def test_alert_frequency_not_estimated_on_name_only_patch(
         self,
     ) -> None:
