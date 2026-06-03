@@ -1798,6 +1798,20 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         self.assertIn("results per day", str(response.json()["detail"]))
         self.assertEqual(await Alert.objects.all().acount(), 0)
 
+    async def test_alert_rejected_when_query_is_invalid(self) -> None:
+        """An alert whose query can't be validated by SearchForm (so the
+        estimation can't be computed) is rejected with a 400 instead of being
+        silently created."""
+        # cited_gt expects a whole number; "foo" makes SearchForm invalid, so
+        # get_alert_estimation_count returns None.
+        response = await self.make_an_alert(
+            self.client,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}&cited_gt=foo",
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("invalid", str(response.json()["query"]))
+        self.assertEqual(await Alert.objects.all().acount(), 0)
+
     async def test_alert_frequency_not_estimated_on_name_only_patch(
         self,
     ) -> None:

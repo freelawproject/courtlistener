@@ -196,13 +196,19 @@ class SearchAlertSerializer(
 
         :param query: The alert's search query string.
         :return: None
-        :raises ValidationError: If the query is estimated to be too broad.
+        :raises ValidationError: If the query can't be validated by SearchForm
+        or is estimated to be too broad.
         """
         qd = QueryDict(query.encode(), mutable=True)
         estimation = get_alert_estimation_count(qd, ALERT_ESTIMATION_DAY_COUNT)
         if estimation is None:
-            # The query couldn't be validated for estimation; skip the check.
-            return
+            # The query couldn't be validated by SearchForm, so it can't be
+            # used for an alert.
+            raise serializers.ValidationError(
+                {
+                    "query": "This query is invalid and can't be used for an alert."
+                }
+            )
 
         # Use the first value, as it is the broadest value present across all
         # search types.
