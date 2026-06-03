@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -46,10 +47,14 @@ class BroadAlertQueryError(APIException):
     default_code = "broad_alert_query"
 
     def __init__(self, estimated_hits: int, detail: str) -> None:
-        self.detail = {
+        # Typed as dict[str, Any] because, unlike DRF's ErrorDetail-based
+        # payloads, this intentionally carries a raw integer for the estimated
+        # hits so it isn't coerced into a stringified list.
+        payload: dict[str, Any] = {
             ALERT_ESTIMATION_RESPONSE_KEY: estimated_hits,
             "detail": detail,
         }
+        self.detail = payload
 
 
 class SearchAlertSerializer(
