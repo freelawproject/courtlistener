@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import (
     Any,
     ClassVar,
+    cast,
     get_args,
     get_origin,
     override,
@@ -44,9 +45,7 @@ class PassAll[T](InputMap[T, T]):
         return i
 
 
-class InputField[ScrapedData, Output, S = Output](
-    InputMap[ScrapedData, Output]
-):
+class InputField[ScrapedData, Output](InputMap[ScrapedData, Output]):
     """Utility transformation to return a field from the input data unchanged.
 
     :ivar path: The path to the relevant field. Will handle dictionaries, objects, and combinations thereof."""
@@ -79,17 +78,17 @@ class InputField[ScrapedData, Output, S = Output](
 
 
 @dataclass
-class Parameter[T, S = T](InputMap[T, S]):
+class Parameter[T](InputMap[Any, T]):
     """Mapping indicating that a value should always be passed as a parameter to the merge method. Useful for passing
     information which won't change over the course of many merges (i.e., a parent `Docket` for `DocketEntry`s)."""
 
-    default: S | None = None
-    transform: Callable[[T], S] = lambda x: x
+    default: T | None = None
+    transform: Callable[[T], T] = lambda x: x
 
     @override
     def map(
-        self, i: T, *args: Any, value: T | None = None, **kwargs: Any
-    ) -> S | None:
+        self, i: Any, *args: Any, value: T | None = None, **kwargs: Any
+    ) -> T | None:
         if value:
             return self.transform(value)
         return self.default
@@ -281,8 +280,9 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         ):
             return MergeResult.failed(self.merger.__model__.__name__)
         result = MergeResult.unnecessary()
-        for child in merger_input:
-            result |= self.merger.merge(child, **{parent_key: parent})
+        parent_kwargs: dict[str, Any] = {parent_key: parent}
+        for child in cast(Iterable[Any], merger_input):
+            result |= self.merger.merge(child, **parent_kwargs)
         return result
 
     def merge(self, parent: Model, i: ScrapedData) -> MergeResult[Any]:
