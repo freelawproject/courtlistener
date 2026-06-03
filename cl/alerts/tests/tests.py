@@ -49,7 +49,6 @@ from cl.alerts.utils import (
     has_document_alert_hit_been_triggered,
     is_match_all_query,
     percolate_es_document,
-    remove_alert_hits_set,
 )
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
