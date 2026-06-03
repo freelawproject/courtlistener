@@ -50,20 +50,26 @@ RECENT_REQUERY_DAYS = 5
 # this many days. Used by the report-stalls action.
 DEFAULT_STALE_DAYS = 14
 
+# Courts that don't provide a usable written opinions report, so we never scrape
+# or report on them.
+EXCLUDED_COURT_IDS = ["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"]
+
 
 def get_last_complete_date(
     court_id: str,
 ) -> datetime.date | None:
-    """Get the next start query date for a court.
+    """Get the date a court's next forward scrape should start from.
 
-    Check the DB for the last date for a court that was completed. Return the
-    day after that date + span days into the future as the range to query for
-    the requested court.
+    Look up the court's most recent non-failed log row. Return its
+    ``date_queried``, but never more recent than ``RECENT_REQUERY_DAYS`` ago,
+    so the last few days are always re-queried to catch late-posted opinions.
 
-    If the court is still in progress, return (None, None).
+    If the most recent row is still in progress, return ``None``.
 
     :param court_id: A PACER Court ID
-    :return: last date queried for the specified court or None if it is in progress
+    :return: the date to resume querying from, or None if the court's latest
+    scrape is still in progress
+    :rtype: datetime.date | None
     """
     court_id = map_pacer_to_cl_id(court_id)
     try:
@@ -216,7 +222,10 @@ def fetch_doc_report(
         if isinstance(exc, (RequestException | ReadTimeoutError)):
             reason = "network error."
         elif isinstance(exc, IndexError):
-            reason = "PACER 6.3 bug."
+            reason = (
+                "PACER 6.3 bug or incomplete/truncated response "
+                "(likely proxy timeout)."
+            )
         elif isinstance(exc, (TypeError | ValueError)):
             reason = "failing PACER website."
         elif isinstance(exc, PacerLoginException):
@@ -260,19 +269,18 @@ def get_and_save_free_document_reports(
     documents. Do not download those items, as that step is done later. For now
     just get the list.
 
-    Note that this uses synchronous celery chains. A previous version was more
-    complex and did not use synchronous chains. Unfortunately in Celery 4.2.0,
-    or more accurately in redis-py 3.x.x, doing it that way failed nearly every
-    time.
-
-    This is a simpler version, though a slower one, but it should get the job
-    done.
+    Note that the ``get_and_save_free_document_report`` Celery task is invoked
+    synchronously (in-process) here, one court and date at a time, rather than
+    being enqueued. A previous version dispatched the work asynchronously, but
+    in Celery 4.2.0 (more accurately in redis-py 3.x.x) that failed nearly every
+    time. This is simpler and slower, but reliable.
 
     :param courts: optionally a list of courts to scrape
     :param date_start: optionally a start date to query all the specified courts or all
     courts
     :param date_end: optionally an end date to query all the specified courts or all
     courts
+    :param day_span: how many days each PACER sub-query should cover
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
     three_hrs_ago = now() - datetime.timedelta(hours=3)
@@ -281,9 +289,7 @@ def get_and_save_free_document_reports(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
     ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED)
 
-    excluded_court_ids = ["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"]
-
-    base_filter = Q(in_use=True, end_date=None) & ~Q(pk__in=excluded_court_ids)
+    base_filter = Q(in_use=True, end_date=None) & ~Q(pk__in=EXCLUDED_COURT_IDS)
     if courts:
         base_filter &= Q(pk__in=courts)
 
@@ -527,8 +533,7 @@ def report_free_document_scrape_stalls(
     :returns: list of (court_id, latest_success_date) for stalled courts
     :rtype: list[tuple[str, datetime.date | None]]
     """
-    excluded_court_ids = ["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"]
-    base_filter = Q(in_use=True, end_date=None) & ~Q(pk__in=excluded_court_ids)
+    base_filter = Q(in_use=True, end_date=None) & ~Q(pk__in=EXCLUDED_COURT_IDS)
     if courts:
         base_filter &= Q(pk__in=courts)
 
