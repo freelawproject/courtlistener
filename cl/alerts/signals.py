@@ -7,6 +7,8 @@ from django.dispatch import receiver
 
 from cl.alerts.models import Alert
 from cl.alerts.tasks import es_save_alert_document
+from cl.alerts.utils import remove_alert_hits_set
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.documents import (
     AudioPercolator,
     OpinionPercolator,
@@ -68,8 +70,14 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
 )
 def remove_alert_from_es_index(sender, instance=None, **kwargs):
     """Receiver function that gets called after an Alert instance is deleted.
-    This function removes Alert from the Percolator index.
+    This function removes Alert from the Percolator index and cleans up the
+    Redis sets that store its document hits.
     """
+    # Clean up the Redis sets tracking document hits for this alert. These are
+    # independent from Elasticsearch, so this runs even when ES is disabled.
+    r = get_redis_interface("CACHE")
+    remove_alert_hits_set(r, instance.pk)
+
     if settings.ELASTICSEARCH_DISABLED:
         return
 
