@@ -1,33 +1,4 @@
-# from typing import Annotated, override
-#
-# from cl.corpus_importer.state.merger import InputField, Merger
-# from cl.corpus_importer.state.utils import MergeResult
-# from cl.search.docket_sources import DocketSources
-# from cl.search.models import Docket
-#
-#
-# class TestMerger(Merger[dict[str, str], Docket]):
-#     source = DocketSources.SCRAPER
-#     docket_number: Annotated[str, InputField("testy_pie")]
-#
-#     @override
-#     def validate_input(self, i: dict[str, str]) -> bool:
-#         return True
-#
-#     @override
-#     def after_merge(
-#         self, i: dict[str, str], m: Docket, r: MergeResult[int]
-#     ) -> None:
-#         print(m.docket_number)
-#
-#     @override
-#     def find_existing(self, i: dict[str, str]) -> Docket | None:
-#         return None
-#
-#
-# m = TestMerger()
-# m.merge({"testy_pie": "aaaaaa"})
-from typing import Annotated, Any, override
+from typing import Any, override
 
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
@@ -60,13 +31,11 @@ class BaseMergerTest(TestCase):
         start_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
-            source: Annotated[int, AttributeMerger(Parameter)] = (
-                DocketSources.SCRAPER
+            court: Court = AttributeMerger(Parameter(default=self.court))
+            source: int = AttributeMerger(
+                Parameter(default=DocketSources.SCRAPER)
             )
-            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
-                "ABCDEFG"
-            )
+            docket_number: str = AttributeMerger(Parameter(default="ABCDEFG"))
 
             @staticmethod
             def existing(i: Docket) -> Docket | None:
@@ -95,24 +64,22 @@ class BaseMergerTest(TestCase):
             "Exactly one Docket should be created.",
         )
         created_docket = Docket.objects.get(pk=r.creates["Docket"].pop())
-        self.assertEqual(
-            created_docket.docket_number, TestMerger.docket_number
-        )
+        self.assertEqual(created_docket.docket_number, "ABCDEFG")
         self.assertEqual(created_docket.court_id, self.court.id)
-        self.assertEqual(created_docket.source, TestMerger.source)
+        self.assertEqual(created_docket.source, DocketSources.SCRAPER)
 
     def test_merger_updates_docket(self) -> None:
         tc = self
+        dn = self.docket.docket_number
+        new_dn = dn + "New"
         start_docket_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
-            source: Annotated[int, AttributeMerger(Parameter)] = (
-                DocketSources.SCRAPER
+            court: Court = AttributeMerger(Parameter(default=self.court))
+            source: int = AttributeMerger(
+                Parameter(default=DocketSources.SCRAPER)
             )
-            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
-                self.docket.docket_number + "New"
-            )
+            docket_number: str = AttributeMerger(Parameter(default=new_dn))
 
             @staticmethod
             def existing(i: Docket) -> Docket | None:
@@ -147,12 +114,12 @@ class BaseMergerTest(TestCase):
         self.docket.refresh_from_db()
         self.assertEqual(
             self.docket.docket_number,
-            TestMerger.docket_number,
+            new_dn,
             "The correct Docket should be updated.",
         )
         self.assertEqual(
             self.docket.source,
-            TestMerger.source,
+            DocketSources.SCRAPER,
         )
         self.assertEqual(
             self.docket.court_id,
@@ -165,19 +132,17 @@ class BaseMergerTest(TestCase):
 
         class TestMapping(InputMap[dict[str, str], str]):
             @override
-            def map(self, i: dict[str, str]) -> str:
+            def map(self, i: dict[str, str], *args: Any, **kwargs: Any) -> str:
                 nonlocal map_calls
                 map_calls += 1
                 return dn
 
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
-            source: Annotated[int, AttributeMerger(Parameter)] = (
-                DocketSources.SCRAPER
+            court: Court = AttributeMerger(Parameter(default=self.court))
+            source: int = AttributeMerger(
+                Parameter(default=DocketSources.SCRAPER)
             )
-            docket_number: Annotated[str, AttributeMerger(TestMapping())] = (
-                "ABCDEFG"
-            )
+            docket_number: str = AttributeMerger(TestMapping())
 
             @staticmethod
             def existing(i: Docket) -> Docket | None:
@@ -192,7 +157,7 @@ class BaseMergerTest(TestCase):
         class TestRelatedMerger(
             Merger[dict[str, str], OriginatingCourtInformation]
         ):
-            docket_number: Annotated[str, AttributeMerger(InputField("sr"))]
+            docket_number: str = AttributeMerger(InputField("sr"))
 
             @staticmethod
             def existing(
@@ -201,21 +166,20 @@ class BaseMergerTest(TestCase):
                 return None
 
         class TestMerger(Merger[dict[str, Any], Docket]):
-            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
-            source: Annotated[int, AttributeMerger(Parameter)] = (
-                DocketSources.SCRAPER
+            court: Court = AttributeMerger(Parameter(default=self.court))
+            source: int = AttributeMerger(
+                Parameter(default=DocketSources.SCRAPER)
             )
-            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
-                self.docket.docket_number + "New"
+            docket_number: str = AttributeMerger(
+                Parameter(default=self.docket.docket_number + "New")
             )
-            originating_court_information: Annotated[
-                OriginatingCourtInformation,
+            originating_court_information: OriginatingCourtInformation = (
                 RelatedMerger(
                     TestRelatedMerger,
                     InputField("mctest"),
                     relationship=Relationship.OneToOne,
-                ),
-            ]
+                )
+            )
 
             @staticmethod
             def existing(i: Docket) -> Docket | None:
@@ -233,8 +197,8 @@ class BaseMergerTest(TestCase):
 
     def test_related_mergers_child(self) -> None:
         class TestRelatedMerger(Merger[dict[str, str], DocketEntry]):
-            docket: Annotated[Docket, AttributeMerger(Parameter)]
-            description: Annotated[str, AttributeMerger(InputField("df"))]
+            docket: Docket = AttributeMerger(Parameter())
+            description: str = AttributeMerger(InputField("df"))
 
             @staticmethod
             def existing(
@@ -243,21 +207,20 @@ class BaseMergerTest(TestCase):
                 return None
 
         class TestMerger(Merger[dict[str, Any], Docket]):
-            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
-            source: Annotated[int, AttributeMerger(Parameter)] = (
-                DocketSources.SCRAPER
+            court: Court = AttributeMerger(Parameter(default=self.court))
+            source: int = AttributeMerger(
+                Parameter(default=DocketSources.SCRAPER)
             )
-            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
-                self.docket.docket_number + "New"
+            docket_number: str = AttributeMerger(
+                Parameter(default=self.docket.docket_number + "New")
             )
-            originating_court_information: Annotated[
-                OriginatingCourtInformation,
+            originating_court_information: OriginatingCourtInformation = (
                 RelatedMerger(
                     TestRelatedMerger,
                     InputField("mctest"),
                     relationship=Relationship.Child("docket"),
-                ),
-            ]
+                )
+            )
 
             @staticmethod
             def existing(i: Docket) -> Docket | None:
@@ -288,25 +251,20 @@ class BaseMergerTest(TestCase):
 
     def test_merger_subclassing(self) -> None:
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
-            source: Annotated[int, AttributeMerger(Parameter)] = (
-                DocketSources.SCRAPER
+            court: Court = AttributeMerger(Parameter(default=self.court))
+            source: int = AttributeMerger(
+                Parameter(default=DocketSources.SCRAPER)
             )
-            docket_number: Annotated[str, AttributeMerger(Parameter)]
+            docket_number: str = AttributeMerger(Parameter(default="ABCDEFG"))
 
             @staticmethod
             def existing(i: Docket) -> Docket | None:
                 return None
 
         class TestMerger2(TestMerger):
-            court: Annotated[Court, AttributeMerger(Parameter)] = self.court
-            source: Annotated[int, AttributeMerger(Parameter)] = (
-                DocketSources.SCRAPER
-            )
-            docket_number: Annotated[str, AttributeMerger(Parameter)] = (
-                "ABCDEF"
-            )
-            assigned_to_str: Annotated[str, AttributeMerger(Parameter)]
+            court: Court = AttributeMerger(Parameter(default=self.court))
+            docket_number: str = AttributeMerger(Parameter(default="ABCDEFGH"))
+            assigned_to_str: str = AttributeMerger(Parameter())
 
         ats = "test"
         result = TestMerger2.merge({}, assigned_to_str=ats)
@@ -314,5 +272,6 @@ class BaseMergerTest(TestCase):
         self.assertIn("Docket", result.creates)
         self.assertEqual(len(result.creates["Docket"]), 1)
         docket = Docket.objects.get(pk=result.creates["Docket"].pop())
-        self.assertEqual(docket.docket_number, TestMerger2.docket_number)
+        self.assertEqual(docket.docket_number, "ABCDEFGH")
+        self.assertEqual(docket.source, DocketSources.SCRAPER)
         self.assertEqual(docket.assigned_to_str, ats)

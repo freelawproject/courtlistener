@@ -4,12 +4,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator, Iterable, Mapping
 from dataclasses import dataclass
 from typing import (
-    Annotated,
     Any,
     ClassVar,
     get_args,
     get_origin,
-    get_type_hints,
     override,
 )
 
@@ -33,7 +31,7 @@ class InputMap[ScrapedData, Output]:
     ) -> None:
         self._map: Callable[[ScrapedData], Output | None] | None = map
 
-    def map(self, i: ScrapedData) -> Output | None:
+    def map(self, i: ScrapedData, *args: Any, **kwargs: Any) -> Output | None:
         if self._map is None:
             raise NotImplementedError(
                 f"{type(self).__name__} was instantiated without a mapping function; pass one to __init__ or override map()."
@@ -54,7 +52,7 @@ class InputField[ScrapedData, Output](InputMap[ScrapedData, Output]):
         self.default: Output | None = default
 
     @override
-    def map(self, i: ScrapedData) -> Output | None:
+    def map(self, i: ScrapedData, *args: Any, **kwargs: Any) -> Output | None:
         current: Any = i
         for p in self.path:
             if isinstance(current, dict) and p in current:
@@ -71,21 +69,31 @@ class NeverMapping[ScrapedData, T](InputMap[ScrapedData, T]):
     """Transform that always returns None. Useful for testing or overriding base class mappings."""
 
     @override
-    def map(self, i: ScrapedData) -> None:
+    def map(self, i: ScrapedData, *args: Any, **kwargs: Any) -> None:
         return None
 
 
-class ParameterMapping[T](InputMap[T, T]):
-    """Mapping indicating that a value should always be passed as a parameter to the merge method. Useful for passing
-    information which won't change over the course of many merges (i.e., a parent `Docket` for `DocketEntry`s)."""
+class NoOpMapping[T](InputMap[T, T]):
+    """Transform that does nothing. Useful for testing or overriding base class mappings."""
 
     @override
-    def map(self, i: T) -> T:
+    def map(self, i: T, *args: Any, **kwargs: Any) -> T:
         return i
 
 
-Parameter = ParameterMapping[Any]()
-"""Shorthand for an attribute which must be passed as a parameter to the merge method."""
+@dataclass
+class Parameter[T, S = T](InputMap[T, S]):
+    """Mapping indicating that a value should always be passed as a parameter to the merge method. Useful for passing
+    information which won't change over the course of many merges (i.e., a parent `Docket` for `DocketEntry`s)."""
+
+    default: S | None = None
+    transform: InputMap[T, S] = NoOpMapping()
+
+    @override
+    def map(
+        self, i: T, *args: Any, value: S | None = None, **kwargs: Any
+    ) -> S | None:
+        return value or self.default
 
 
 class MergeStrategy[T](ABC):
@@ -141,7 +149,7 @@ class OverwriteIfPresent[T](MergeStrategy[T]):
         return db if scrape is None else scrape
 
 
-class AttributeMerger[ScrapedData, T]:
+class AttributeMerger[ScrapedData, T](Any):
     """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
 
     :param transform: Defines how to get the DB value from the scrape data using a subclass of `InputMap`
@@ -153,9 +161,11 @@ class AttributeMerger[ScrapedData, T]:
         transform: InputMap[ScrapedData, T],
         *,
         strategy: MergeStrategy[T] = OverwriteIfPresent(),
+        default: T | None = None,
     ) -> None:
         self.transform: InputMap[ScrapedData, T] = transform
         self.strategy: MergeStrategy[T] = strategy
+        self.default: T | None = default
         self.name: str = ""
 
     def __attach_to_merger__(
@@ -164,16 +174,11 @@ class AttributeMerger[ScrapedData, T]:
         """Run any special logic needed to attach this to a Merger object."""
         self.name = attr_name
 
-    def get_value(
-        self, i: ScrapedData, param_value: T | None = None
-    ) -> T | None:
+    def get_value(self, i: ScrapedData, *args: Any, **kwargs: Any) -> T | None:
         """Compute the value of an attribute from scraped data.
 
-        :param i: The full scrape data for the object being merged
-        :param param_value: Value passed as a kwarg to the merge method. Only used if `transform` is `Parameter`."""
-        if isinstance(self.transform, ParameterMapping):
-            return param_value
-        return self.transform.map(i)
+        :param i: The full scrape data for the object being merged"""
+        return self.transform.map(i, *args, **kwargs)
 
     def merge_values(self, scrape: T, db: T) -> T:
         """Merge the values of two attributes (scrape and DB) and return the merged value.
@@ -204,7 +209,7 @@ class Relationship:
 RelationshipType = OneToOneRelationship | ChildRelationship
 
 
-class RelatedMerger:
+class RelatedMerger(Any):
     """Class encapsulating logic for merging one or more related objects. Can be used to merge one-to-one relationships
     or parent-child relationships.
 
@@ -313,7 +318,6 @@ class Merger[ScrapedData, DBModel: Model](ABC):
     __attr_mergers__: dict[str, AttributeMerger[ScrapedData, Any]]
     __related_mergers__: ClassVar[dict[str, RelatedMerger]]
     __model__: type[DBModel]
-    __default_attrs__: dict[str, Any]
     _uses_natural_key: ClassVar[bool] = True
     atomic: ClassVar[bool] = False
     # I'd like to make this a ClassVar for static type checking, but that's not allowed for some reason
@@ -322,41 +326,21 @@ class Merger[ScrapedData, DBModel: Model](ABC):
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
-        annotated: list[
-            tuple[
-                str,
-                list[AttributeMerger[Any, Any]],
-                list[RelatedMerger],
-            ]
-        ] = [
-            (
-                name,
-                [
-                    a
-                    for a in hint.__metadata__
-                    if isinstance(a, AttributeMerger)
-                ],
-                [a for a in hint.__metadata__ if isinstance(a, RelatedMerger)],
-            )
-            for name, hint in get_type_hints(cls, include_extras=True).items()
-            if not name.startswith("_") and get_origin(hint) is Annotated
+        cls_attrs = [
+            (name, getattr(cls, name))
+            for name in dir(cls)
+            if not name.startswith("_")
         ]
 
-        for name, attr_mergers, related_mergers in annotated:
-            if len(attr_mergers) + len(related_mergers) > 1:
-                raise TypeError(
-                    f"Only one attribute merger or related merger is allowed per attribute: {name}"
-                )
-
         cls.__attr_mergers__ = {
-            name: attr_mergers[0]
-            for name, attr_mergers, _ in annotated
-            if attr_mergers
+            name: value
+            for name, value in cls_attrs
+            if isinstance(value, AttributeMerger)
         }
         cls.__related_mergers__ = {
-            name: related_mergers[0]
-            for name, _, related_mergers in annotated
-            if related_mergers
+            name: value
+            for name, value in cls_attrs
+            if isinstance(value, RelatedMerger)
         }
 
         merger_bases = {
@@ -385,12 +369,6 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             )
 
         cls.__model__ = db_model_type
-
-        cls.__default_attrs__ = {
-            name: getattr(cls, name)
-            for name in cls.__attr_mergers__
-            if hasattr(cls, name)
-        }
 
         for name, am in cls.__attr_mergers__.items():
             am.__attach_to_merger__(cls, name)
@@ -446,10 +424,9 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             logger.error(f"Merger {cls.__name__} received invalid input.")
             return MergeResult.failed(cls.__name__)
 
-        defaults = cls.__default_attrs__ | kwargs
         obj = cls.__model__(
             **{
-                name: am.get_value(i, defaults.get(name, None))
+                name: am.get_value(i, value=kwargs.get(name, None))
                 for name, am in cls.__attr_mergers__.items()
             }
         )
