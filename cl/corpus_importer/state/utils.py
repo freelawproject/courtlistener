@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import cast
 
 
 @dataclass
@@ -40,12 +41,10 @@ class MergeResult[T = int]:
             },
         )
 
-    def __or__[U](self, other: object) -> MergeResult[T | U]:
-        if not isinstance(other, MergeResult):
-            raise TypeError(
-                f"unsupported operand type(s) for |: 'MergeResult' and '{type(other).__name__}'"
-            )
-        return MergeResult.union(self, other)
+    def __or__[U](self, other: MergeResult[U]) -> MergeResult[T | U]:
+        return MergeResult.union(
+            cast(MergeResult[T | U], self), cast(MergeResult[T | U], other)
+        )
 
     @property
     def success(self) -> bool:
