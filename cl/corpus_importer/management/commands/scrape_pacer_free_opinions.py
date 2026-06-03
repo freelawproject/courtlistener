@@ -593,7 +593,10 @@ def report_free_document_scrape_stalls(
             len(ranges),
             court_id,
             range_lines,
-            extra={"fingerprint": ["pacer-free-opinion-gaps", court_id]},
+            # Constant fingerprint (no court_id) so every court's gap report
+            # groups into a single Sentry issue; each court arrives as its own
+            # event under it.
+            extra={"fingerprint": ["pacer-free-opinion-gaps"]},
         )
 
     if not stalled:
