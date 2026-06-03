@@ -234,6 +234,8 @@ class RelatedMerger:
     def _merge_one_to_one(
         self, parent: Model, merger_input: Any
     ) -> MergeResult[Any]:
+        if merger_input is None:
+            return MergeResult.unnecessary()
         db_obj = getattr(parent, self.name)
         if db_obj is None:
             result = self.merger.merge(merger_input)
@@ -270,9 +272,10 @@ class RelatedMerger:
     def merge(self, parent: Model, i: Any) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship.
 
-        For one-to-one relationships, the input is transformed then passed directly to the related merger. For
-        parent-child relationships, we first check if the input is iterable and then run the related merger for each
-        item, passing the parent object as a parameter.
+        For one-to-one relationships, the input is transformed then passed directly to the related merger; a `None`
+        transform result means there is no relative to merge and is skipped. For parent-child relationships, we first
+        check if the input is iterable and then run the related merger for each item, passing the parent object as a
+        parameter.
 
         :param parent: The parent of the object being merged. Must already exist in the DB when this method is called.
         :param i: The input data for the object being merged."""
