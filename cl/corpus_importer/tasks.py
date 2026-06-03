@@ -4917,7 +4917,7 @@ def merge_texas_docket(
             "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Failures: %s",
             docket_number,
             docket.pk,
-            court.pk,
+            court_pk,
             result.failures,
         )
 
