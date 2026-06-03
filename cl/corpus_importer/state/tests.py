@@ -22,10 +22,9 @@ from cl.tests.cases import TestCase
 
 class BaseMergerTest(TestCase):
     @classmethod
-    @override
     def setUpTestData(cls) -> None:
-        cls.court: Court = CourtFactory.create()
-        cls.docket: Docket = DocketFactory.create()
+        cls.court = CourtFactory.create()
+        cls.docket = DocketFactory.create()
 
     def test_merger_creates_object(self) -> None:
         start_count = Docket.objects.count()
