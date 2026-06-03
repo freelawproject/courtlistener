@@ -7,7 +7,6 @@ from typing import (
     Annotated,
     Any,
     ClassVar,
-    cast,
     get_args,
     get_origin,
     get_type_hints,
@@ -56,7 +55,7 @@ class InputField[ScrapedData, Output](InputMap[ScrapedData, Output]):
 
     @override
     def map(self, i: ScrapedData) -> Output | None:
-        current = i
+        current: Any = i
         for p in self.path:
             if isinstance(current, dict) and p in current:
                 current = current[p]
@@ -280,14 +279,10 @@ class RelatedMerger:
         merger_input = self.transform.map(i)
 
         match self.relationship:
-            case Relationship.OneToOne:
+            case OneToOneRelationship():
                 return self._merge_one_to_one(parent, merger_input)
-            case Relationship.Child(parent_key):
+            case ChildRelationship(parent=parent_key):
                 return self._merge_child(parent, merger_input, parent_key)
-            case _:
-                raise TypeError(
-                    f"Invalid relationship type: {self.relationship}"
-                )
 
 
 def get_ancestor_classes(cls: type) -> Generator[type]:
@@ -314,7 +309,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
     __attr_mergers__: dict[str, AttributeMerger[ScrapedData, Any]]
     __related_mergers__: ClassVar[dict[str, RelatedMerger]]
-    __model__: type[Model]
+    __model__: type[DBModel]
     __default_attrs__: dict[str, Any]
     _uses_natural_key: ClassVar[bool] = True
     atomic: ClassVar[bool] = False
@@ -429,11 +424,8 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         if callable(cls.existing):
             return cls.existing(i)
         try:
-            return cast(
-                DBModel,
-                cls.__model__.objects.get(
-                    **{k: getattr(i, k) for k in cls.existing}
-                ),
+            return cls.__model__._default_manager.get(
+                **{k: getattr(i, k) for k in cls.existing}
             )
         except cls.__model__.DoesNotExist:
             return None
@@ -452,14 +444,11 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             return MergeResult.failed(cls.__name__)
 
         defaults = cls.__default_attrs__ | kwargs
-        obj = cast(
-            DBModel,
-            cls.__model__(
-                **{
-                    name: am.get_value(i, defaults.get(name, None))
-                    for name, am in cls.__attr_mergers__.items()
-                }
-            ),
+        obj = cls.__model__(
+            **{
+                name: am.get_value(i, defaults.get(name, None))
+                for name, am in cls.__attr_mergers__.items()
+            }
         )
 
         if cls.atomic:
