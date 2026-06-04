@@ -624,7 +624,8 @@ def handle_recap_doc_change(
 def update_unmatched_citation(
     sender, instance: Citation, created: bool, **kwargs
 ):
-    """Updates UnmatchedCitation.status status to MATCHED, if found"""
+    """Updates the status of matching UnmatchedCitation and
+    UnmatchedCitationFromRECAPDocument rows to FOUND"""
     if not created:
         return
     query = {

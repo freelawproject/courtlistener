@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 
 from eyecite.models import CitationBase, FullCaseCitation
 
@@ -53,17 +54,16 @@ def unmatched_citation_is_valid(
 
 def update_unmatched_citations_status(
     resolved_citations: set[str],
-    existing_unmatched_citations: list[UnmatchedCitation]
-    | list[UnmatchedCitationFromRECAPDocument],
+    existing_unmatched_citations: Sequence[BaseUnmatchedCitation],
 ) -> None:
     """Check if previously unmatched citations have been resolved and
-    updates UnmatchedCitation.status accordingly
+    updates their status accordingly
 
-    We assume no new UnmatchedCitations will be created after the first run
+    We assume no new unmatched citations will be created after the first run
 
-    :param citation_resolutions: strings of resolved citations
+    :param resolved_citations: strings of resolved citations
     :param existing_unmatched_citations: list of existing UnmatchedCitation
-        objects
+        or UnmatchedCitationFromRECAPDocument objects
     :return None:
     """
     # try to update the status of FOUND and FAILED_* UnmatchedCitations
@@ -94,13 +94,14 @@ def store_unmatched_citations(
     unmatched_citations: list[CitationBase],
     citing_object: Opinion | RECAPDocument,
 ) -> None:
-    """Bulk create UnmatchedCitation instances cited by an opinion
+    """Bulk create UnmatchedCitation or UnmatchedCitationFromRECAPDocument
+    instances cited by an opinion or RECAPDocument
 
     Only FullCaseCitations provide useful information for resolution
     updates. Other types are discarded
 
     :param unmatched_citations: citations with 0 matches or more than 1 match
-    :param citing_object: the citing opinion or citing RECAPdocument
+    :param citing_object: the citing Opinion or citing RECAPDocument
     :return None:
     """
     unmatched_citations_to_store = []
@@ -129,7 +130,7 @@ def store_unmatched_citations(
         unmatched_citations_to_store.append(citation_object)
 
     if unmatched_citations_to_store:
-        UnmatchedCitation.objects.bulk_create(
+        unmatched_citation_model.objects.bulk_create(
             unmatched_citations_to_store, ignore_conflicts=True
         )
 
@@ -141,9 +142,10 @@ def handle_unmatched_citations(
         MatchedResourceType, list[SupportedCitationType]
     ],
 ) -> None:
-    """Store or update the status of valid UnmatchedCitations or UnmatchedCitationFromRECAPDocument
+    """Store or update the status of valid UnmatchedCitations or
+    UnmatchedCitationFromRECAPDocument objects
 
-    :param citing_opinion: the citing opinion or RECAPDocument
+    :param citing_object: the citing Opinion or RECAPDocument
     :param unmatched_citations: citations with 0 resolution matches or more
         than 1 match
     :param citation_resolutions: mapper with valid resolutions
@@ -157,13 +159,13 @@ def handle_unmatched_citations(
         existing_unmatched_citations_qs = (
             UnmatchedCitationFromRECAPDocument.objects.filter(
                 citing_recapdocument=citing_object
-            ).all()
+            )
         )
-        self_citations = []
+        self_citations: list[str] = []
     else:
         existing_unmatched_citations_qs = UnmatchedCitation.objects.filter(
             citing_opinion=citing_object
-        ).all()
+        )
         self_citations = [
             str(c) for c in citing_object.cluster.citations.all()
         ]

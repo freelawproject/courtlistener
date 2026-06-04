@@ -729,11 +729,11 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
         )
 
         # Test status update when the Citation is found
-        citation2 = CitationWithParentsFactory.create(
+        CitationWithParentsFactory.create(
             volume="1",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=self.court_ca2),
                 case_name="Something",
                 date_filed=date(2025, 1, 1),
