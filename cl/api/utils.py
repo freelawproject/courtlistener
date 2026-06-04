@@ -99,10 +99,7 @@ BASIC_TEXT_LOOKUPS = [
     "iexact",
     "startswith",
     "istartswith",
-    "endswith",
-    "iendswith",
 ]
-ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ["contains", "icontains"]
 
 logger = logging.getLogger(__name__)
 
@@ -800,22 +797,39 @@ def get_all_throttle_overrides(
     return overrides
 
 
-def apply_membership_throttles(user: User, level: int) -> None:
-    """Replace the user's MEMBERSHIP-source API throttles with the rates
-    for ``level``.
+def apply_membership_throttles(
+    user: User, level: int, clear_cache: bool = False
+) -> bool:
+    """
+    Sync a user's MEMBERSHIP-based API throttles to match the given membership level.
 
-    MANUAL-source rows are left untouched. They take precedence over
-    MEMBERSHIP rows in get_all_throttle_overrides regardless of time
-    unit.
+    This function replaces all existing MEMBERSHIP-source `APIThrottle` records for the user
+    with the rate limits defined for the provided `level`.
 
-    No-op when:
+    Important behavior:
+    - Only throttles with `source=MEMBERSHIP` are modified.
+    - MANUAL-source throttles are never modified and always take precedence over MEMBERSHIP
+      throttles in `get_all_throttle_overrides`.
+    - Existing MEMBERSHIP throttles are fully removed before new ones are created.
 
-    - the SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off
-    - the level has no entry in LEVEL_TO_RATES (e.g. Commercial,
-      BASIC, old groups)
+    This function is a no-op when:
+    - The `SYNC_MEMBERSHIP_THROTTLES_SWITCH` feature flag is disabled
+    - The provided `level` does not exist in `LEVEL_TO_RATES`
+      (e.g., unsupported, legacy, or commercial levels)
+
+    Args:
+        user: The user whose throttles are being synced.
+        level: The Neon membership level to map to a set of rates.
+        clear_cache: When True, call ``clear_tiered_cache()`` after writing
+            the new throttle rows. Defaults to False, allowing batch callers
+            to defer cache clearing until after a loop and avoid repeated
+            invalidations on each iteration.
+
+    Returns:
+        bool: True if throttles were successfully applied, False if skipped.
     """
     if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
-        return
+        return False
 
     rates = LEVEL_TO_RATES.get(level)
     if rates is None:
@@ -824,7 +838,7 @@ def apply_membership_throttles(user: User, level: int) -> None:
             level,
             user.username,
         )
-        return
+        return False
 
     with transaction.atomic():
         APIThrottle.objects.filter(
@@ -840,7 +854,10 @@ def apply_membership_throttles(user: User, level: int) -> None:
                 source=APIThrottle.Source.MEMBERSHIP,
                 notes=f"Set by Neon membership level={level}.",
             )
-    clear_tiered_cache()
+
+    if clear_cache:
+        clear_tiered_cache()
+    return True
 
 
 def clear_membership_throttles(user: User) -> None:
@@ -877,6 +894,12 @@ def get_recent_api_request_count(user: User, window_seconds: int) -> int:
     history: list[float] = default_cache.get(key, [])
     cutoff = time.time() - window_seconds
     return sum(1 for ts in history if ts > cutoff)
+
+
+class TagRateThrottle(UserRateThrottle):
+    """Higher dedicated rate limit for the tag endpoints."""
+
+    scope = "tags"
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
@@ -1197,28 +1220,19 @@ class RECAPUploaders(DjangoModelPermissions):
     """
 
     perms_map = {
-        "GET": ["%(app_label)s.has_recap_upload_access"],
+        "GET": ["%(app_label)s.view_%(model_name)s"],
         "OPTIONS": ["%(app_label)s.has_recap_upload_access"],
         "HEAD": ["%(app_label)s.has_recap_upload_access"],
         "POST": ["%(app_label)s.has_recap_upload_access"],
-        "PUT": ["%(app_label)s.has_recap_upload_access"],
-        "PATCH": ["%(app_label)s.has_recap_upload_access"],
-        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
 
 
-class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
+class EmailProcessingQueueAPIUsersWithView(DjangoModelPermissions):
     perms_map = {
-        "POST": ["%(app_label)s.has_recap_upload_access"],
-        "GET": ["%(app_label)s.has_recap_upload_access"],
-    }
-
-
-class DjangoModelPermissionsWithView(DjangoModelPermissions):
-    perms_map = {
-        **DjangoModelPermissions.perms_map,
+        "POST": ["%(app_label)s.has_recap_email_upload_access"],
         "GET": ["%(app_label)s.view_%(model_name)s"],
         "HEAD": ["%(app_label)s.view_%(model_name)s"],
+        "OPTIONS": ["%(app_label)s.view_%(model_name)s"],
     }
 
 
