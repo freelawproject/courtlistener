@@ -902,6 +902,20 @@ class TagRateThrottle(UserRateThrottle):
     scope = "tags"
 
 
+def has_throttle_override(user: User, throttle_type: int) -> bool:
+    """Whether the user has an active throttle override of the given type.
+
+    Uses the same source of truth as the throttles themselves
+    (``get_all_throttle_overrides``), so MANUAL/MEMBERSHIP precedence and
+    membership expiry are honored.
+
+    :param user: The user to check.
+    :param throttle_type: The ThrottleType integer value.
+    :return: True if the user has an active override of that type.
+    """
+    return user.username in get_all_throttle_overrides(throttle_type)
+
+
 class ExceptionalUserRateThrottle(UserRateThrottle):
     """User rate throttle that supports multiple simultaneous rate limits.
 
@@ -909,6 +923,9 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
     by a rate of '0/min' (or any '0/...') — the enforcement check
     `count >= num_requests` with num_requests=0 is always true.
     """
+
+    # The APIThrottle type whose per-user overrides this throttle reads.
+    throttle_type = ThrottleType.API
 
     def __init__(self):
         raw = self.THROTTLE_RATES.get(self.scope)
@@ -946,7 +963,7 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
 
-        overrides = get_all_throttle_overrides(ThrottleType.API)
+        overrides = get_all_throttle_overrides(self.throttle_type)
         rates = overrides.get(request.user.username) or self.default_rates
         return self._check_multi_rate(rates)
 
@@ -1037,6 +1054,46 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
                 f"{self.failing_rate}."
             )
         raise Throttled(wait=wait, detail=detail)
+
+
+class AlertThrottle(ExceptionalUserRateThrottle):
+    """Per-user throttle for the search alerts endpoint (scope 'alerts').
+
+    Unlike the global user throttle, this scope has no default rate, so it
+    never throttles regular users: members and non-members create alerts
+    bounded by their membership quota (see ``check_alert_limits``) and the
+    global user throttle. Only users with a commercial agreement, configured
+    via an ``APIThrottle`` row of type ALERTS, are throttled here at their
+    configured rate, and those same users bypass the membership quota.
+
+    ``SearchAlertViewSet.get_throttles`` wires this throttle in only for
+    commercial users' write requests (POST/PUT/PATCH), as the sole throttle
+    for those requests. That way commercial alert writes run at the configured
+    rate instead of being capped by the global per-user API throttle, while
+    their reads still fall back to that global throttle.
+    """
+
+    scope = "alerts"
+    throttle_type = ThrottleType.ALERTS
+
+    def allow_request(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return True
+
+        self.key = self.get_cache_key(request, view)
+        if self.key is None:
+            return True
+
+        overrides = get_all_throttle_overrides(self.throttle_type)
+        rates = overrides.get(request.user.username) or self.default_rates
+        if not rates:
+            # No commercial alert throttle configured for this user; their
+            # alert creation isn't rate-limited beyond the global throttle.
+            return True
+
+        self.history = self.cache.get(self.key, [])
+        self.now = self.timer()
+        return self._check_multi_rate(rates)
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):

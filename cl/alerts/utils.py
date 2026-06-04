@@ -23,6 +23,8 @@ from cl.alerts.models import (
     DocketAlert,
     ScheduledAlertHit,
 )
+from cl.api.models import ThrottleType
+from cl.api.utils import has_throttle_override
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import (
     add_es_highlighting,
@@ -932,6 +934,12 @@ def check_alert_limits(
         Alert.REAL_TIME if rate == Alert.REAL_TIME else "other_rates"
     ]
     free_quota = quotas.get("free", 0)
+
+    # Users with a commercial agreement (an APIThrottle of type ALERTS) bypass
+    # the membership/non-member alert limits entirely. Their alert creation is
+    # governed by the AlertThrottle rate instead.
+    if has_throttle_override(user, ThrottleType.ALERTS):
+        return AlertLimitResult(None, free_quota)
 
     # Don't enforce limits when disabling an existing alert.
     if exclude_alert_pk is not None and rate == Alert.OFF:
