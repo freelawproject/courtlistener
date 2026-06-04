@@ -13,6 +13,7 @@ from django.http import QueryDict
 from elasticsearch.dsl import MultiSearch, Q, Search
 from elasticsearch.dsl.query import Query
 from elasticsearch.dsl.response import Hit
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from redis import Redis
 
 from cl.alerts.constants import RECAP_ALERT_QUOTAS
@@ -30,6 +31,7 @@ from cl.lib.elasticsearch_utils import (
     build_has_child_filters,
     build_highlights_dict,
     build_join_es_filters,
+    do_es_alert_estimation_query,
     merge_highlights_into_result,
 )
 from cl.lib.string_utils import trunc
@@ -54,9 +56,21 @@ from cl.search.documents import (
     ESOpinionDocumentPlain,
     ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
+    OpinionClusterDocument,
     OpinionPercolator,
     RECAPPercolator,
 )
+from cl.search.exception import (
+    BadProximityQuery,
+    DisallowedWildcardPattern,
+    ElasticBadRequestError,
+    ElasticServerError,
+    InputTooLongError,
+    InvalidRelativeDateSyntax,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
+from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
     ESDictDocument,
@@ -969,3 +983,68 @@ def check_alert_limits(
         )
         return AlertLimitResult(violation, free_quota)
     return AlertLimitResult(None, free_quota)
+
+
+def get_alert_estimation_count(
+    query_data: QueryDict, day_count: int
+) -> tuple[int, int] | None:
+    """Estimate the number of alert hits a query would have produced over the
+    last ``day_count`` days.
+
+    This is the request-independent core of ``cl.api.views.get_result_count``,
+    so it can be reused to estimate an alert's frequency from a stored alert
+    query instead of an HTTP request.
+
+    :param query_data: A QueryDict holding the alert's search query parameters.
+    :param day_count: The number of days to average the estimation across.
+    :return: A two-tuple ``(total_hits, case_only_hits)`` where
+    ``case_only_hits`` is 0 for non-RECAP search types, or None if the query
+    can't be validated by SearchForm.
+    :raises ElasticBadRequestError: If the query can't be built (e.g.
+    unbalanced parentheses/quotes, disallowed wildcards) or Elasticsearch
+    can't parse it.
+    :raises ElasticServerError: If the Elasticsearch request fails for any
+    other reason (e.g. a transport or connection error).
+    """
+    search_form = SearchForm(query_data)
+    if not search_form.is_valid():
+        return None
+
+    cd = search_form.cleaned_data
+    total_case_only_query_results = 0
+    try:
+        match cd["type"]:
+            case SEARCH_TYPES.ORAL_ARGUMENT:
+                search_query = AudioDocument.search()
+                total_query_results, _ = do_es_alert_estimation_query(
+                    search_query, cd, day_count
+                )
+            case SEARCH_TYPES.OPINION:
+                search_query = OpinionClusterDocument.search()
+                total_query_results, _ = do_es_alert_estimation_query(
+                    search_query, cd, day_count
+                )
+            case SEARCH_TYPES.RECAP:
+                search_query = DocketDocument.search()
+                (
+                    total_query_results,
+                    total_case_only_query_results,
+                ) = do_es_alert_estimation_query(search_query, cd, day_count)
+            case _:
+                total_query_results = 0
+    except (
+        UnbalancedParenthesesQuery,
+        UnbalancedQuotesQuery,
+        BadProximityQuery,
+        DisallowedWildcardPattern,
+        InvalidRelativeDateSyntax,
+        InputTooLongError,
+    ) as e:
+        raise ElasticBadRequestError(detail=e.message)
+    except (TransportError, ConnectionError, RequestError):
+        raise ElasticServerError()
+    except ApiError as e:
+        if "Failed to parse query" in str(e):
+            raise ElasticBadRequestError()
+        raise ElasticServerError()
+    return total_query_results, total_case_only_query_results

@@ -1763,6 +1763,121 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["name"], "edited_name")
 
+    async def test_alert_frequency_estimation_included_on_success(
+        self,
+    ) -> None:
+        """A successful alert creation includes the alert frequency estimation
+        for the last 100 days in the response."""
+        with mock.patch(
+            "cl.alerts.api_serializers.get_alert_estimation_count",
+            return_value=(250, 0),
+        ):
+            response = await self.make_an_alert(
+                self.client,
+                alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+            )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(response.json()["estimated_hits"], 250)
+
+    async def test_alert_rejected_when_query_too_broad(self) -> None:
+        """An alert whose query averages more than MAX_ALERT_RESULTS_PER_DAY
+        hits per day is rejected, and the estimation is surfaced under the same
+        response key."""
+        # 3500 hits / 100 days = 35 hits per day, above the limit of 30.
+        with mock.patch(
+            "cl.alerts.api_serializers.get_alert_estimation_count",
+            return_value=(3500, 0),
+        ):
+            response = await self.make_an_alert(
+                self.client,
+                alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+            )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        # estimated_hits is returned as an integer, matching the success
+        # response, rather than a list of stringified errors.
+        self.assertEqual(response.json()["estimated_hits"], 3500)
+        self.assertIn("results per day", response.json()["detail"])
+        self.assertEqual(await Alert.objects.all().acount(), 0)
+
+    async def test_alert_rejected_when_query_is_invalid(self) -> None:
+        """An alert whose query can't be validated by SearchForm (so the
+        estimation can't be computed) is rejected with a 400 instead of being
+        silently created."""
+        # cited_gt expects a whole number; "foo" makes SearchForm invalid, so
+        # get_alert_estimation_count returns None.
+        response = await self.make_an_alert(
+            self.client,
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}&cited_gt=foo",
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("invalid", str(response.json()["query"]))
+        self.assertEqual(await Alert.objects.all().acount(), 0)
+
+    async def test_alert_rejected_when_query_cant_be_built(self) -> None:
+        """An alert whose query passes SearchForm but can't be built into an ES
+        query (e.g. unbalanced parentheses) is rejected with a 400 carrying the
+        specific reason, instead of being silently created."""
+        response = await self.make_an_alert(
+            self.client,
+            alert_query=f"q=(testing_query&type={SEARCH_TYPES.OPINION}",
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn("unbalanced parentheses", str(response.json()["detail"]))
+        self.assertEqual(await Alert.objects.all().acount(), 0)
+
+    async def test_alert_frequency_not_estimated_on_name_only_patch(
+        self,
+    ) -> None:
+        """The estimation only runs when the query is being set; a name-only
+        update doesn't re-run it."""
+        with mock.patch(
+            "cl.alerts.api_serializers.get_alert_estimation_count",
+            return_value=(100, 0),
+        ) as mock_estimation:
+            alert = await self.make_an_alert(
+                self.client,
+                alert_query=f"q=testing_query&type={SEARCH_TYPES.OPINION}",
+            )
+            self.assertEqual(alert.status_code, HTTPStatus.CREATED)
+            self.assertEqual(mock_estimation.call_count, 1)
+
+            alert_path_detail = reverse(
+                "alert-detail",
+                kwargs={"pk": alert.json()["id"], "version": "v4"},
+            )
+            response = await self.client.patch(
+                alert_path_detail, {"name": "edited_name"}
+            )
+            self.assertEqual(response.status_code, HTTPStatus.OK)
+            # The estimation wasn't run again on the name-only update.
+            self.assertEqual(mock_estimation.call_count, 1)
+            self.assertNotIn("estimated_hits", response.json())
+
+    def test_alert_frequency_estimation_real_query(self) -> None:
+        """The estimation is computed from the alert query against ES and
+        returned in the response."""
+        mock_date = timezone.localtime(now()).replace(day=1, hour=5)
+        with (
+            time_machine.travel(mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            opinion = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__case_name="Frequency API Test O",
+                cluster__date_filed=now().date(),
+                plain_text="Lorem dolor",
+            )
+
+        with time_machine.travel(mock_date, tick=False):
+            response = async_to_sync(self.make_an_alert)(
+                self.client,
+                alert_query=f"q=Frequency API Test O&type={SEARCH_TYPES.OPINION}",
+            )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
+        self.assertEqual(response.json()["estimated_hits"], 1)
+
+        opinion.cluster.delete()
+
 
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class SearchAlertsWebhooksTest(
