@@ -4,17 +4,17 @@ from datetime import datetime
 from importlib import import_module
 from urllib.parse import urlencode
 
-from asgiref.sync import async_to_sync
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
+from waffle import switch_is_active
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
@@ -38,6 +38,7 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.redis_utils import (
     create_redis_semaphore,
     delete_redis_semaphore,
@@ -52,6 +53,7 @@ from cl.search.types import (
     SearchAlertHitType,
     SendAlertsResponse,
 )
+from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -225,6 +227,7 @@ def make_alert_messages(
         "docket": d,
         "docket_alert_secret_key": None,
         "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
+        "recap_alerts_banner": switch_is_active("recap-alerts-email-banner"),
     }
     messages = []
     for recipient in da_recipients:
@@ -358,7 +361,11 @@ def send_alert_and_webhook(
     connection.send_messages(messages)
 
     # Work completed. Tally, log, and clean up
-    async_to_sync(tally_stat)("alerts.docket.alerts.sent", inc=len(messages))
+    tally_stat(
+        StatMetric.ALERTS_SENT,
+        inc=len(messages),
+        labels={"alert_type": StatAlertType.DOCKET},
+    )
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook
@@ -449,7 +456,6 @@ def send_webhook_alert_hits(
     alert_user: UserProfile.user, hits: list[SearchAlertHitType]
 ) -> None:
     """Send webhook alerts for search hits.
-
     :param alert_user: The user profile object associated with the webhooks.
     :param hits: A list of tuples, each containing information about an alert,
     its associated search type, documents found, and the number of documents.
@@ -498,6 +504,9 @@ def send_search_alert_emails(
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
             "scheduled_alert": scheduled_alert,
+            "recap_alerts_banner": switch_is_active(
+                "recap-alerts-email-banner"
+            ),
         }
         headers = {}
         query_string = ""
@@ -531,6 +540,21 @@ def send_search_alert_emails(
     connection.send_messages(messages)
 
 
+@retry(IntegrityError, tries=3, delay=0.5, backoff=1)
+def create_schedule_alerts_hits_in_bulk(
+    scheduled_hits: list[ScheduledAlertHit],
+) -> None:
+    """Create ScheduledAlertHit records in bulk.
+
+    Uses bulk_create to persist a list of ScheduledAlertHit instances in a
+    single database operation. Do retries upon IntegrityError.
+
+    :param scheduled_hits: A list of ScheduledAlertHit instances to be created.
+    :return: None
+    """
+    ScheduledAlertHit.objects.bulk_create(scheduled_hits)
+
+
 @app.task(ignore_result=True)
 def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
@@ -558,6 +582,7 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
     docket_hits = [hit.id for hit in d_alerts_triggered]
+    alerts_triggered_ids = []
     for hit in main_alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
         # independent highlighting for each alert triggered.
@@ -631,6 +656,21 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
             case "audio.Audio":
                 object_id = document_content_copy["id"]
                 child_document = False
+            case "search.Opinion":
+                # Filter out Opinions and set the document id to the
+                # Redis Opinion alert hits set.
+                if has_document_alert_hit_been_triggered(
+                    r, alert_triggered_id, "o", document_content_copy["id"]
+                ):
+                    continue
+                transform_percolator_child_document(
+                    document_content_copy, hit.meta
+                )
+                add_document_hit_to_alert_set(
+                    r, alert_triggered_id, "o", document_content_copy["id"]
+                )
+                object_id = document_content_copy["cluster_id"]
+                child_document = True
             case _:
                 raise NotImplementedError(
                     "Percolator response processing not supported for: %s",
@@ -660,10 +700,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
         send_webhook_alert_hits(alert_user, hits)
-
         if (
             alert_triggered.rate == Alert.REAL_TIME
-            and not alert_user.profile.is_member
+            and not alert_user.profile.is_eligible_for_rt_search_alerts
         ):
             # Omit scheduling an RT alert if the user is not a member.
             continue
@@ -688,10 +727,22 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 object_id=object_id,
             )
         )
+        alerts_triggered_ids.append(alert_triggered_id)
 
+    # Filter out scheduled_hits_to_create by alerts that still exist in the
+    # database to prevent an IntegrityError caused by a race condition when
+    # an alert is deleted.
+    existing_ids = set(
+        Alert.objects.filter(pk__in=alerts_triggered_ids).values_list(
+            "pk", flat=True
+        )
+    )
+    scheduled_hits_to_create_filtered = [
+        hit for hit in scheduled_hits_to_create if hit.alert_id in existing_ids
+    ]
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
-    if scheduled_hits_to_create:
-        ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
+    if scheduled_hits_to_create_filtered:
+        create_schedule_alerts_hits_in_bulk(scheduled_hits_to_create_filtered)
 
 
 @app.task(
@@ -731,9 +782,13 @@ def send_or_schedule_search_alerts(
     if (
         not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
         and response.app_label in ["search.RECAPDocument", "search.Docket"]
+    ) or (
+        not settings.PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        and response.app_label in ["search.Opinion"]
     ):
-        # Disable percolation for RECAP search alerts until
-        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED is set to True.
+        # Disable percolation for RECAP Or Opinions search alerts until
+        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED or PERCOLATOR_OPINIONS_SEARCH_ALERTS_ENABLED
+        # is set to True. Useful to prevent conflicts in tests.
         self.request.chain = None
         return None
 
@@ -751,8 +806,16 @@ def send_or_schedule_search_alerts(
             self.request.retries
             >= settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES
         ):
-            raise exc
-        raise self.retry(exc=exc, countdown=0.5)
+            logger.warning(
+                "RECAPDocument %s missing during alert trigger.", document_id
+            )
+            self.request.chain = None
+            return None
+        raise self.retry(
+            exc=exc,
+            countdown=0.5,
+            max_retries=settings.PERCOLATOR_MISSING_DOCUMENT_MAX_RETRIES,
+        )
 
     if documents_to_percolate:
         # If documents_to_percolate is returned by prepare_percolator_content,
@@ -822,7 +885,18 @@ def es_save_alert_document(
 
     es_document = getattr(es_document_module, es_document_name)
     document = es_document()
-    alert = Alert.objects.get(pk=alert_id)
+    try:
+        alert = Alert.objects.get(pk=alert_id)
+    except Alert.DoesNotExist:
+        # The alert was removed from the DB before the task ran, likely by a user
+        # managing their alerts via the Alerts API.
+        # We can ignore this alert since it no longer exists.
+        logger.warning(
+            "Alert %s no longer exists when processing the indexing task; "
+            "it may have been deleted by the user.",
+            alert_id,
+        )
+        return None
     alert_doc = {
         "timestamp": document.prepare_timestamp(alert),
         "rate": alert.rate,

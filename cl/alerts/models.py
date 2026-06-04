@@ -187,34 +187,6 @@ class DocketAlert(AbstractDateTimeModel):
         super().save(*args, **kwargs)
 
 
-class RealTimeQueue(models.Model):
-    """These are created any time a new item is added to our database.
-
-    The idea here was, back in 2015, to keep a table of new items. Well, why is
-    that necessary? Why can't we just keep track of the last time we ran alerts
-    and then check the date_created field for the table? That'd be much easier.
-
-    Also, this kind of thing should really use Django's contenttypes framework.
-
-    Hindsight is 20/20, but we're here now.
-    """
-
-    date_modified = models.DateTimeField(
-        help_text="the last moment when the item was modified",
-        auto_now=True,
-        db_index=True,
-    )
-    item_type = models.CharField(
-        help_text="the type of item this is, one of: {}".format(
-            ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES)
-        ),
-        max_length=3,
-        choices=SEARCH_TYPES.NAMES,
-        db_index=True,
-    )
-    item_pk = models.IntegerField(help_text="the pk of the item")
-
-
 class DateJSONEncoder(DjangoJSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime):

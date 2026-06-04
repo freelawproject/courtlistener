@@ -1,21 +1,20 @@
-from django.db.models import Exists, OuterRef, Prefetch
 from rest_framework import viewsets
-from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
+from rest_framework.permissions import (
+    DjangoModelPermissions,
+    DjangoModelPermissionsOrAnonReadOnly,
+)
 
 from cl.api.api_permissions import V3APIPermission
-from cl.api.pagination import TinyAdjustablePagination
 from cl.api.utils import (
+    DeferredFieldsMixin,
     LoggingMixin,
     NoFilterCacheListMixin,
-    RECAPUsersReadOnly,
 )
-from cl.disclosures.models import FinancialDisclosure
 from cl.people_db.api_serializers import (
     ABARatingSerializer,
     AttorneySerializer,
     EducationSerializer,
     PartySerializer,
-    PersonDisclosureSerializer,
     PersonSerializer,
     PoliticalAffiliationSerializer,
     PositionSerializer,
@@ -28,7 +27,6 @@ from cl.people_db.filters import (
     AttorneyFilter,
     EducationFilter,
     PartyFilter,
-    PersonDisclosureFilter,
     PersonFilter,
     PoliticalAffiliationFilter,
     PositionFilter,
@@ -50,72 +48,7 @@ from cl.people_db.models import (
 )
 
 
-class PersonDisclosureViewSet(viewsets.ModelViewSet):
-    queryset = (
-        Person.objects.filter(
-            # Only return people that have disclosure sub-objects
-            Exists(
-                FinancialDisclosure.objects.filter(
-                    person=OuterRef("pk"),
-                ).only("pk")
-            ),
-            # Don't include aliases
-            is_alias_of=None,
-        )
-        .prefetch_related(
-            # Prefetch disclosures and positions to avoid query floods
-            Prefetch(
-                "financial_disclosures",
-                queryset=FinancialDisclosure.objects.all()
-                .only("year", "id", "person_id")
-                .order_by("-year"),
-                to_attr="disclosures",
-            ),
-            Prefetch(
-                "positions",
-                queryset=Position.objects.filter(court__isnull=False)
-                .select_related("court")
-                .only("pk", "court_id", "person_id")
-                .order_by("-date_start"),
-                to_attr="court_positions",
-            ),
-        )
-        .only(
-            "name_first",
-            "name_middle",
-            "name_last",
-            "name_suffix",
-            "has_photo",
-            "date_dob",
-            "date_granularity_dob",
-            "slug",
-        )
-        .order_by("-id")
-    )
-    serializer_class = PersonDisclosureSerializer
-    filterset_class = PersonDisclosureFilter
-    pagination_class = TinyAdjustablePagination
-    permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
-        V3APIPermission,
-    ]
-    ordering_fields = (
-        "id",
-        "date_created",
-        "date_modified",
-        "name_last",
-    )
-    # Default cursor ordering key
-    ordering = "-id"
-    # Additional cursor ordering fields
-    cursor_ordering_fields = [
-        "id",
-        "date_created",
-        "date_modified",
-    ]
-
-
-class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PersonViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = (
         Person.objects.all()
         .prefetch_related(
@@ -152,7 +85,9 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PositionViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = Position.objects.all().order_by("-id")
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
@@ -185,7 +120,9 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
+class RetentionEventViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = RetentionEvent.objects.all().order_by("-id")
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
@@ -204,7 +141,9 @@ class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
+class EducationViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = Education.objects.all().order_by("-id")
     serializer_class = EducationSerializer
     filterset_class = EducationFilter
@@ -223,7 +162,7 @@ class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
+class SchoolViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = School.objects.all().order_by("-id")
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
@@ -242,7 +181,9 @@ class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
+class PoliticalAffiliationViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = PoliticalAffiliation.objects.all().order_by("-id")
     serializer_class = PoliticalAffiliationSerializer
     filterset_class = PoliticalAffiliationFilter
@@ -267,7 +208,7 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     ]
 
 
-class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
+class SourceViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
     queryset = Source.objects.all().order_by("-id")
     serializer_class = SourceSerializer
     filterset_class = SourceFilter
@@ -286,7 +227,9 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     cursor_ordering_fields = ["id", "date_modified"]
 
 
-class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
+class ABARatingViewSet(
+    LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
+):
     queryset = ABARating.objects.all().order_by("-id")
     serializer_class = ABARatingSerializer
     filterset_class = ABARatingFilter
@@ -313,7 +256,7 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
 class PartyViewSet(
     LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
 ):
-    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
+    permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = PartySerializer
     filterset_class = PartyFilter
     ordering_fields = (
@@ -340,7 +283,7 @@ class PartyViewSet(
 class AttorneyViewSet(
     LoggingMixin, NoFilterCacheListMixin, viewsets.ModelViewSet
 ):
-    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
+    permission_classes = (DjangoModelPermissions, V3APIPermission)
     serializer_class = AttorneySerializer
     filterset_class = AttorneyFilter
     ordering_fields = (

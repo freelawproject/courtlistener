@@ -186,7 +186,7 @@ class Command(VerboseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--queue",
-            default="batch1",
+            default="iquery",
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(

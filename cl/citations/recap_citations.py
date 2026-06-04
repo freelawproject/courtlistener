@@ -11,8 +11,9 @@ from cl.citations.match_citations import (
 from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.citations.unmatched_citations_utils import handle_unmatched_citations
 from cl.citations.utils import make_get_citations_kwargs
+from cl.search.documents import ESRECAPDocument
 from cl.search.models import OpinionsCitedByRECAPDocument, RECAPDocument
-from cl.search.tasks import index_related_cites_fields
+from cl.search.tasks import index_related_cites_fields, percolate_document
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -25,13 +26,22 @@ def store_recap_citations(document: RECAPDocument) -> None:
 
     :return: None
     """
-    # Extract the citations from the document's text
-    citations: list[CitationBase] = get_citations(
-        tokenizer=HYPERSCAN_TOKENIZER, **make_get_citations_kwargs(document)
-    )
 
-    # If no citations are found, then there is nothing else to do for now.
+    chunks = make_get_citations_kwargs(document)
+    citations = []
+    for chunk in chunks:
+        # Extract the citations from the document's text
+        cite_chunk: list[CitationBase] = get_citations(
+            tokenizer=HYPERSCAN_TOKENIZER,
+            **chunk,
+        )
+        citations.extend(cite_chunk)
+
+    # If no citations are found, abort the resolution process, but perform
+    # the RECAPDocument percolation before aborting, since the percolation
+    # was previously delayed.
     if not citations:
+        percolate_document(ESRECAPDocument, document.pk, document)
         return
 
     # Resolve all those different citation objects to Opinion objects,

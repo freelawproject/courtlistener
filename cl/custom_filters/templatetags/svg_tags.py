@@ -1,7 +1,7 @@
 from django import template
 from django.conf import settings
 from django.contrib.staticfiles.finders import find
-from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -18,8 +18,12 @@ def svg(name, **kwargs):
     ```
 
     Note HTML attributes are passed directly with minor adjustments:
+
     - Use snake case instead of kebab, as template tags don't support kebab.
     - To include Alpine bindings, use "__" instead of ":" (e.g. `x_bind__class="w-full"`)
+    - Passing class= here will inject it into every element that already has a class, so
+      only use the class argument when no nested tags include their own class attributes,
+      otherwise style the SVG’s parent container.
     """
     relative_path = f"svg/{name}.svg"
     absolute_path = find(relative_path)
@@ -54,4 +58,4 @@ def svg(name, **kwargs):
         key = key.replace("_", "-")
         svg_content = svg_content.replace("<svg", f'<svg {key}="{value}"')
 
-    return format_html(svg_content.replace("<svg", '<svg role="img"'))
+    return mark_safe(svg_content.replace("<svg", '<svg role="img"'))

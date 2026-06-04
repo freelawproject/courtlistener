@@ -6,7 +6,6 @@ import os
 import socket
 from contextlib import contextmanager
 
-from django.conf import settings
 from django.core.management import call_command
 from django.test.utils import override_settings, tag
 from selenium import webdriver
@@ -20,6 +19,7 @@ from timeout_decorator import TimeoutError
 
 from cl.lib.decorators import retry
 from cl.lib.test_helpers import SerializeLockFileTestMixin
+from cl.lib.utils import create_selenium_driver
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
 
@@ -51,24 +51,7 @@ class BaseSeleniumTest(
 
     @staticmethod
     def _create_browser() -> webdriver.Chrome:
-        options = webdriver.ChromeOptions()
-        if settings.SELENIUM_HEADLESS is True:
-            options.add_argument("headless")
-        options.add_argument("silent")
-
-        # Workaround for
-        # https://bugs.chromium.org/p/chromium/issues/detail?id=1033941
-        options.add_argument(
-            "--disable-features=AvoidFlashBetweenNavigation,PaintHolding"
-        )
-
-        if settings.DOCKER_SELENIUM_HOST:
-            return webdriver.Remote(
-                settings.DOCKER_SELENIUM_HOST,
-                options=options,
-                keep_alive=True,
-            )
-        return webdriver.Chrome(options=options, keep_alive=True)
+        return create_selenium_driver()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -83,6 +66,7 @@ class BaseSeleniumTest(
         cls.browser.implicitly_wait(5)
 
     def setUp(self) -> None:
+        super().setUp()
         self.reset_browser()
         self.rebuild_index("audio.Audio")
         self.delete_index("search.OpinionCluster")
@@ -99,11 +83,12 @@ class BaseSeleniumTest(
             )
             print(f"\nSaving screenshot in docker image at: /tmp/{filename}")
             self.browser.save_screenshot(f"/tmp/{filename}")
+        super().tearDown()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        super().tearDownClass()
         cls.browser.quit()
+        super().tearDownClass()
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
     def assert_text_in_node(self, text: str, tag_name: str) -> None:

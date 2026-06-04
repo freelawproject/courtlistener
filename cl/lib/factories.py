@@ -11,7 +11,7 @@ class RelatedFactoryVariableList(RelatedFactoryList):
     Define how many objects do you want:
 
         court_scotus = CourtFactory(id="scotus")
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Lorem v. Ipsum",
@@ -25,7 +25,7 @@ class RelatedFactoryVariableList(RelatedFactoryList):
     Define each related object:
 
         court_scotus = CourtFactory(id="scotus")
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=court_scotus,
                 case_name="Foo v. Bar",

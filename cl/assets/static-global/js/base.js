@@ -226,16 +226,20 @@ $(document).ready(function () {
   //////////////////////////
   // Popup Cookie Handling//
   //////////////////////////
-  $('.alert-dismissible button').on("click", function () {
-    let that = $(this);
-    let duration = parseInt(that.data('duration'), 10);
-    let cookie_name = that.data('cookie-name');
-    let date = new Date();
-    date.setTime(date.getTime() + (duration * 24 * 60 * 60 * 1000));
-    let expires = "; expires=" + date.toGMTString();
-    document.cookie = cookie_name + "=" + 'true' + expires + "; samesite=lax; path=/";
-    that.closest('.alert-dismissible').addClass('hidden');
-  });
+  function popupCookieHandling(buttonSelector, containerSelector) {
+    $(buttonSelector).on('click', function () {
+      let that = $(this);
+      let duration = parseInt(that.data('duration'), 10);
+      let cookie_name = that.data('cookie-name');
+      let date = new Date();
+      date.setTime(date.getTime() + (duration * 24 * 60 * 60 * 1000));
+      let expires = '; expires=' + date.toGMTString();
+      document.cookie = cookie_name + '=' + 'true' + expires + '; samesite=lax; path=/';
+      that.closest(containerSelector).addClass('hidden');
+    });
+  }
+  popupCookieHandling('.alert-dismissible button', '.alert-dismissible')
+  popupCookieHandling('[data-dismissible-alert] button', '[data-dismissible-alert]')
 
   ///////////////////////
   // Utility Functions //
@@ -351,4 +355,50 @@ if (form && button) {
     button.disabled = true;
   });
 }
+
+/*
+  Keyword / Semantic search-mode toggle icon.
+  See cl/search/templates/includes/search_mode_icon.html.
+*/
+function handleSearchModeToggle() {
+  const $icon = $(this);
+  const $toggle = $icon.closest('.input-group').find('.search-mode-toggle');
+  const $hidden = $icon.closest('.input-group').find('.search-mode-value');
+  const $iconEl = $toggle.find('.search-mode-icon');
+  const $input = $icon.closest('.input-group').find('input[name="q"]');
+  const isSemantic = !$hidden.val();
+
+  $hidden.val(isSemantic ? 'true' : '').prop('disabled', !isSemantic);
+  $iconEl.text(isSemantic ? '?' : '&');
+  $toggle.toggleClass('semantic-active', isSemantic);
+  $toggle.attr('aria-label', isSemantic
+    ? 'Semantic search active, click for keyword search'
+    : 'Keyword search active, click for semantic search');
+  $toggle.attr('title', isSemantic
+    ? 'Switch to keyword search'
+    : 'Switch to semantic search');
+  $input.attr('placeholder', isSemantic
+    ? 'Natural language search, use "quotes" for exact terms'
+    : 'Keyword(s) search with operators');
+  // Hide the alert bell in semantic mode (alerts don't support semantic queries).
+  // Don't re-show on switch to keyword — it will appear after the next search.
+  if (isSemantic) {
+    var $alertBell = $icon.closest('.input-group').find('.input-group-addon-blended');
+    if ($alertBell.length) $alertBell.hide();
+  }
+  try { localStorage.setItem('searchMode', isSemantic ? 'semantic' : 'keyword'); } catch (e) {}
+}
+
+$(function () {
+  $('.search-mode-toggle').on('click', handleSearchModeToggle);
+  $('.search-mode-toggle').on('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleSearchModeToggle.call(this);
+    }
+  });
+
+  // localStorage restore is handled by an inline script in
+  // search_mode_icon.html to avoid a visual flash.
+});
 

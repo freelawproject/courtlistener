@@ -8,8 +8,9 @@ from django.core.management import call_command
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.dateformat import format
-from django.utils.timezone import now
-from elasticsearch_dsl import Q, connections
+from django.utils.timezone import localtime, now
+from elasticsearch.dsl import Q, connections
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
@@ -23,7 +24,6 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.alerts.utils import (
-    build_plain_percolator_query,
     has_document_alert_hit_been_triggered,
     percolate_es_document,
     prepare_percolator_content,
@@ -33,7 +33,11 @@ from cl.alerts.utils import (
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.api.utils import get_webhook_deprecation_date
-from cl.donate.models import NeonMembership
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.lib.date_time import midnight_pt
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
@@ -43,6 +47,7 @@ from cl.people_db.factories import (
     PartyFactory,
     PartyTypeFactory,
 )
+from cl.people_db.models import Attorney
 from cl.recap.factories import DocketWithBankruptcyDataFactory
 from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
@@ -55,14 +60,24 @@ from cl.search.documents import (
 )
 from cl.search.factories import (
     BankruptcyInformationFactory,
-    DocketEntryWithParentsFactory,
+    CitationWithParentsFactory,
+    CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
+    OpinionClusterFactory,
+    OpinionFactory,
     RECAPDocumentFactory,
 )
-from cl.search.models import Docket
-from cl.search.tasks import index_docket_parties_in_es
-from cl.stats.models import Stat
-from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
+from cl.search.models import Docket, RECAPDocument
+from cl.search.tasks import (
+    index_docket_parties_in_es,
+)
+from cl.tests.cases import (
+    ESIndexTestCase,
+    MockTallyStatMixin,
+    SearchAlertsAssertions,
+    TestCase,
+)
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -71,20 +86,33 @@ from cl.users.factories import UserProfileWithParentsFactory
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_sweep",
 )
+@override_switch("increment-stats", active=True)
+@override_settings(WAFFLE_CACHE_PREFIX="RECAPAlertsSweepIndexTest")
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
+    MockTallyStatMixin,
+    RECAPSearchTestCase,
+    ESIndexTestCase,
+    TestCase,
+    SearchAlertsAssertions,
 ):
     """
     RECAP Alerts Sweep Index Tests
     """
 
+    @staticmethod
+    def rebuild_percolator_index():
+        RECAPPercolator._index._name = "recap_percolator_sweep"
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        # Mock indexing date to the previous day since the command currently
-        # runs early each day.
-        date_now = midnight_pt(now().date())
+
+        # runs early each day. Use minus two hours to prevent errors caused by
+        # Daylight Saving Time transitions.
+        date_now = midnight_pt(now().date()) - datetime.timedelta(hours=2)
         cls.mock_date_indexing = date_now - datetime.timedelta(days=1)
         cls.mock_date = date_now
         with (
@@ -95,13 +123,20 @@ class RECAPAlertsSweepIndexTest(
 
             cls.user_profile = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.user_profile_2 = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile_2.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile_2.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.user_profile_no_member = UserProfileWithParentsFactory()
+            cls.user_profile_unlimited_alerts = UserProfileWithParentsFactory(
+                unlimited_docket_alerts=True
+            )
             cls.webhook_enabled = WebhookFactory(
                 user=cls.user_profile.user,
                 event_type=WebhookEventType.SEARCH_ALERT,
@@ -110,6 +145,7 @@ class RECAPAlertsSweepIndexTest(
             )
 
     def setUp(self):
+        super().setUp()
         self.r = get_redis_interface("CACHE")
         self.r.delete("alert_sweep:task_id")
         keys = self.r.keys("alert_hits_sweep:*")
@@ -120,13 +156,21 @@ class RECAPAlertsSweepIndexTest(
         """Test filter RECAP alerts that met the conditions to be sent:
         - RECAP type alert.
         - RT or DLY rate
-        - For RT rate the user must have an active membership.
+        - RT alerts require the user to have an active membership or the
+        unlimited search alerts flag.
         """
 
         rt_recap_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test RT RECAP Alert",
+            query="docket_number=1:21-bk-1234&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        rt_recap_alert_unlimited_flag = AlertFactory(
+            user=self.user_profile_unlimited_alerts.user,
+            rate=Alert.REAL_TIME,
+            name="Unlimited Search - Test RT RECAP Alert",
             query="docket_number=1:21-bk-1234&type=r",
             alert_type=SEARCH_TYPES.RECAP,
         )
@@ -157,9 +201,9 @@ class RECAPAlertsSweepIndexTest(
             call_command("cl_send_recap_alerts", testing_mode=True)
             alerts_runtime_naive = datetime.datetime.now()
 
-        # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
+        # Validate that 3 emails were sent: one for each valid alert above.
         self.assertEqual(
-            len(mail.outbox), 2, msg="Outgoing emails don't match."
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(rt_recap_alert.name, html_content)
@@ -182,6 +226,9 @@ class RECAPAlertsSweepIndexTest(
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(rt_recap_alert_unlimited_flag.name, html_content)
+
+        html_content = self.get_html_content_from_email(mail.outbox[-1])
         # Confirm that query overridden in the 'View Full Results' URL to
         # include a filter by timestamp.
         self._assert_timestamp_filter(
@@ -263,7 +310,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(mock_two_days_before, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -308,7 +355,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -347,7 +394,7 @@ class RECAPAlertsSweepIndexTest(
                 docket_number="1:21-bk-1254",
                 source=Docket.RECAP,
             )
-            alert_de_old = DocketEntryWithParentsFactory(
+            alert_de_old = DocketEntryFactory(
                 docket=docket_old,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -385,7 +432,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_old_2.document_number = 3
+            rd_old_2.document_number = "3"
             rd_old_2.save()
 
         # Run the indexer. No new documents re_indexed.
@@ -519,7 +566,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -909,7 +956,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1267,7 +1314,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=self.de.docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1361,7 +1408,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=self.de.docket,
                 entry_number=2,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1528,7 +1575,7 @@ class RECAPAlertsSweepIndexTest(
                 )
                 dockets_created.append(docket_created)
 
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -1859,7 +1906,7 @@ class RECAPAlertsSweepIndexTest(
         )
 
         # Send scheduled Monthly alerts and check assertions.
-        current_date = now().replace(day=1, hour=8)
+        current_date = localtime(now()).replace(day=1, hour=8)
         with time_machine.travel(current_date, tick=False):
             call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
             alerts_runtime_naive = datetime.datetime.now()
@@ -1937,7 +1984,7 @@ class RECAPAlertsSweepIndexTest(
             # RECAPDocument filed today that belongs to a docket filed outside
             # the estimation range.
             date_outside_range = now() - datetime.timedelta(days=102)
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Frequency Test RECAP",
@@ -1979,7 +2026,7 @@ class RECAPAlertsSweepIndexTest(
             # RECAPDocument filed today that belongs to a docket filed outside
             # the estimation range.
             date_outside_range = now() - datetime.timedelta(days=102)
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Frequency Test RECAP 2",
@@ -2051,9 +2098,7 @@ class RECAPAlertsSweepIndexTest(
         are properly send by the sweep index without duplicating alerts.
         """
         # Rename percolator index for this test to avoid collisions.
-        RECAPPercolator._index._name = "recap_percolator_sweep"
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        self.rebuild_percolator_index()
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_only_alert = AlertFactory(
@@ -2104,7 +2149,7 @@ class RECAPAlertsSweepIndexTest(
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -2118,21 +2163,16 @@ class RECAPAlertsSweepIndexTest(
                 pacer_doc_id="0190645981",
                 plain_text="plain text lorem",
             )
+        self.mock_tally_stat.reset_mock()
         with time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
 
-        # Confirm Stat object is properly created and updated.
-        stats_objects = Stat.objects.all()
-        self.assertEqual(
-            stats_objects.count(), 1, "Wrong number of stats objects."
-        )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 1, "Wrong number of stats alerts sent."
-        )
+        # Confirm tally_stat was called once by the RT command.
+        self.mock_tally_stat.assert_called_once()
+        self.assertEqual(self.mock_tally_stat.call_args.kwargs["inc"], 1)
 
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
@@ -2283,19 +2323,13 @@ class RECAPAlertsSweepIndexTest(
             1,
         )
 
-        # Confirm Stat object is properly updated.
-        self.assertEqual(
-            stats_objects.count(), 2, "Wrong number of stats objects."
+        # Confirm total stat increment is 2: 1 from RT + 1 from sweep.
+        # (tally_stat may be called more than twice since the sweep command
+        # calls it separately for RT and DLY rates, some with inc=0.)
+        total_inc = sum(
+            c.kwargs["inc"] for c in self.mock_tally_stat.call_args_list
         )
-        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
-        self.assertEqual(
-            stats_objects[0].count, 2, "Wrong number of stats alerts sent."
-        )
-        self.assertEqual(stats_objects[1].name, "alerts.sent.dly")
-        self.assertEqual(
-            stats_objects[1].count, 0, "Wrong number of stats alerts sent."
-        )
-
+        self.assertEqual(total_inc, 2)
         docket.delete()
 
     def test_case_only_alerts(self, mock_prefix) -> None:
@@ -2408,7 +2442,7 @@ class RECAPAlertsSweepIndexTest(
             time_machine.travel(self.mock_date_indexing, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -2658,12 +2692,18 @@ class RECAPAlertsPercolatorTest(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
+
         date_now = midnight_pt(now().date())
         cls.mock_date = date_now.replace(
             hour=20, minute=0, second=0, microsecond=0
         )
         with time_machine.travel(cls.mock_date, tick=False):
             super().setUpTestData()
+            cls.court = CourtFactory(
+                id="cand",
+                jurisdiction="FB",
+                citation_string="California Bank.",
+            )
             cls.docket_3 = DocketFactory(
                 court=cls.court,
                 case_name="SUBPOENAS SERVED OFF",
@@ -2685,7 +2725,9 @@ class RECAPAlertsPercolatorTest(
 
             cls.user_profile = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.webhook_enabled = WebhookFactory(
                 user=cls.user_profile.user,
@@ -2695,7 +2737,9 @@ class RECAPAlertsPercolatorTest(
             )
             cls.user_profile_2 = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
-                level=NeonMembership.LEGACY, user=cls.user_profile_2.user
+                level=NeonMembershipLevel.LEGACY,
+                user=cls.user_profile_2.user,
+                payment_status=MembershipPaymentStatus.SUCCEEDED,
             )
             cls.user_profile_no_member = UserProfileWithParentsFactory()
             cls.webhook_enabled = WebhookFactory(
@@ -2705,14 +2749,56 @@ class RECAPAlertsPercolatorTest(
                 enabled=True,
             )
 
-    def setUp(self):
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        # Parties with 1 attorney to use "under limit".
+        cls.parties_one_attorney = [
+            {
+                "attorneys": [
+                    {
+                        "contact": "Littler Mendelson LCC\n3344 Peachtree Road, NE\nSuite 1000\nAtlanta, GA 30326-4083\n404-443-000\nFax: 404-000-000\nEmail: lpp@mail.com\n",
+                        "name": "John Limit Attorney",
+                        "roles": ["LEAD ATTORNEY"],
+                    },
+                ],
+                "date_terminated": None,
+                "extra_info": "",
+                "name": "Defendant Janet Dolor",
+                "type": "Defendant",
+            },
+        ]
 
+        # Parties with 2 attorneys to use as "over limit".
+        cls.parties_two_attorneys = [
+            {
+                "attorneys": [
+                    {
+                        "contact": "Littler Test LCC\n3344 Peachtree Road, NE\nSuite 1000\nAtlanta, GA 30326-4083\n404-443-000\nFax: 404-000-000\nEmail: lpp@mail.com\n",
+                        "name": "John Limit Attorney",
+                        "roles": ["ATTORNEY TO BE NOTICED"],
+                    },
+                    {
+                        "contact": "Littler Test LCC\n3344 Peachtree Road, NE\nSuite 1000\nAtlanta, GA 30326-4083\n404-443-000\nFax: 404-000-000\nEmail: lpp@mail.com\n",
+                        "name": "Jane Limit Attorney",
+                        "roles": ["ATTORNEY TO BE NOTICED"],
+                    },
+                ],
+                "date_terminated": None,
+                "extra_info": "",
+                "name": "Defendant Janet Dolor",
+                "type": "Defendant",
+            },
+        ]
+
+    def _clean_alert_hits(self):
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys("alert_hits_percolator:*")
         if keys:
             self.r.delete(*keys)
+
+    def setUp(self):
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
+        self._clean_alert_hits()
 
         self.percolator_call_count = 0
 
@@ -2733,43 +2819,6 @@ class RECAPAlertsPercolatorTest(
             f"Expected {expected} method calls, but got {self.percolator_call_count}"
         )
         self.percolator_call_count = 0
-
-    @staticmethod
-    def confirm_query_matched(response, query_id) -> bool:
-        """Confirm if a percolator query matched."""
-
-        matched = False
-        for hit in response:
-            if hit.meta.id == query_id:
-                matched = True
-        return matched
-
-    @staticmethod
-    def save_percolator_query(cd):
-        query = build_plain_percolator_query(cd)
-        query_dict = query.to_dict()
-        percolator_query = RECAPPercolator(
-            percolator_query=query_dict,
-            rate=Alert.REAL_TIME,
-            date_created=now(),
-        )
-        percolator_query.save(refresh=True)
-
-        return percolator_query.meta.id
-
-    @staticmethod
-    def prepare_and_percolate_document(app_label, document_id):
-        percolator_index, es_document_index, documents_to_percolate = (
-            prepare_percolator_content(app_label, document_id)
-        )
-        responses = percolate_es_document(
-            str(document_id),
-            percolator_index,
-            es_document_index,
-            documents_to_percolate,
-            app_label=app_label,
-        )
-        return responses
 
     @classmethod
     def delete_documents_from_index(cls, index_alias, queries):
@@ -2794,7 +2843,7 @@ class RECAPAlertsPercolatorTest(
             "party": "Defendant Jane Roe",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         app_label = "search.RECAPDocument"
         responses = self.prepare_and_percolate_document(
@@ -2814,7 +2863,7 @@ class RECAPAlertsPercolatorTest(
             "document_number": "1",
             "order_by": "score desc",
         }
-        query_id_1 = self.save_percolator_query(cd)
+        query_id_1 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_1)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2833,7 +2882,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) AND (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_2 = self.save_percolator_query(cd)
+        query_id_2 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_2)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2856,7 +2905,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) OR (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_3 = self.save_percolator_query(cd)
+        query_id_3 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_3)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2894,7 +2943,7 @@ class RECAPAlertsPercolatorTest(
             "description": "Leave to File",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         app_label = "search.RECAPDocument"
         responses = self.prepare_and_percolate_document(
@@ -2918,7 +2967,7 @@ class RECAPAlertsPercolatorTest(
             "description": "Amicus Curiae",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd_att.pk)
@@ -2941,7 +2990,7 @@ class RECAPAlertsPercolatorTest(
             "document_number": "1",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2962,7 +3011,7 @@ class RECAPAlertsPercolatorTest(
             "q": "Leave to File",
             "order_by": "score desc",
         }
-        query_id_2 = self.save_percolator_query(cd)
+        query_id_2 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_2)
         responses = self.prepare_and_percolate_document(
             app_label, str(self.rd.pk)
@@ -2995,7 +3044,7 @@ class RECAPAlertsPercolatorTest(
             "document_number": "1",
             "order_by": "score desc",
         }
-        query_id = self.save_percolator_query(cd)
+        query_id = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3013,7 +3062,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) AND (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_1 = self.save_percolator_query(cd)
+        query_id_1 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_1)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3031,7 +3080,7 @@ class RECAPAlertsPercolatorTest(
             "q": "(SUBPOENAS SERVED ON) OR (Amicus Curiae Lorem Served)",
             "order_by": "score desc",
         }
-        query_id_2 = self.save_percolator_query(cd)
+        query_id_2 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_2)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3057,7 +3106,7 @@ class RECAPAlertsPercolatorTest(
             "filed_after": datetime.date(2015, 8, 16),
             "order_by": "score desc",
         }
-        query_id_3 = self.save_percolator_query(cd)
+        query_id_3 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_3)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3083,7 +3132,7 @@ class RECAPAlertsPercolatorTest(
             "case_name": "SUBPOENAS SERVED OFF",
             "order_by": "score desc",
         }
-        query_id_4 = self.save_percolator_query(cd)
+        query_id_4 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_4)
         responses = percolate_es_document(
             str(self.docket_3.pk),
@@ -3104,7 +3153,7 @@ class RECAPAlertsPercolatorTest(
             "case_name": "SUBPOENAS SERVED OFF",
             "order_by": "score desc",
         }
-        query_id_5 = self.save_percolator_query(cd)
+        query_id_5 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_5)
         responses = percolate_es_document(
             str(self.de_1.docket.pk),
@@ -3125,7 +3174,7 @@ class RECAPAlertsPercolatorTest(
             "q": "SUBPOENAS SERVED ON",
             "order_by": "score desc",
         }
-        query_id_6 = self.save_percolator_query(cd)
+        query_id_6 = self.save_percolator_query(cd, RECAPPercolator)
         created_queries_ids.append(query_id_6)
         responses = percolate_es_document(
             str(self.de.docket.pk),
@@ -3277,7 +3326,7 @@ class RECAPAlertsPercolatorTest(
             time_machine.travel(self.mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED OFF",
@@ -3346,7 +3395,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de_2 = DocketEntryWithParentsFactory(
+            alert_de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED ON",
@@ -3432,7 +3481,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            rd_2.document_number = 1
+            rd_2.document_number = "2"
             rd_2.save()
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
@@ -3626,7 +3675,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="SUBPOENAS SERVED OFF",
@@ -3694,7 +3743,7 @@ class RECAPAlertsPercolatorTest(
                 if i < 2:
                     docket_case_names.append(docket_created.case_name)
 
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -4062,7 +4111,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -4250,6 +4299,7 @@ class RECAPAlertsPercolatorTest(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
                 docket_number="1:21-bk-1234",
+                docket_number_raw="1:21-bk-1234",
                 source=Docket.RECAP,
                 pacer_case_id="999555",
             )
@@ -4404,6 +4454,353 @@ class RECAPAlertsPercolatorTest(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
 
+    @override_settings(MAX_ATTORNEYS_TO_PERCOLATE=1)
+    def test_skip_parties_percolation_when_attorneys_exceed_limit(
+        self, mock_prefix
+    ) -> None:
+        """Confirm that when the number of attorneys exceeds
+        MAX_ATTORNEYS_TO_PERCOLATE, percolation is skipped on docket
+        save and index_docket_parties_in_es is not called, so no percolation
+        happens at all.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Attorney Limit",
+                query='atty_name="John Limit Attorney"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Percolation should be skipped on docket save.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = Docket(
+                court=self.court,
+                case_name="Attorney Limit Case",
+                docket_number="1:21-bk-9999",
+                docket_number_raw="1:21-bk-9999",
+                source=Docket.RECAP,
+                pacer_case_id="999888",
+            )
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_two_attorneys, docket
+            )
+            docket.save()
+            add_parties_and_attorneys(docket, self.parties_two_attorneys)
+
+        # Confirm the attorney count from the dict matches the DB count.
+        dict_attorney_count = sum(
+            len(p.get("attorneys", [])) for p in self.parties_two_attorneys
+        )
+        db_attorney_count = (
+            Attorney.objects.filter(roles__docket=docket).distinct().count()
+        )
+        self.assertEqual(dict_attorney_count, db_attorney_count)
+
+        # No alert matched via percolation.
+        self.reset_and_assert_percolator_count(expected=0)
+        # set_skip_percolation_if_parties_data should return False.
+        self.assertFalse(percolate_parties)
+        # skip_percolator_request should not exist.
+        self.assertFalse(getattr(docket, "skip_percolator_request", False))
+
+        # When attorneys are within the limit, percolation should be skipped
+        # on docket save and happen after merging parties.
+        with (
+            mock.patch(
+                "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    has_document_alert_hit_been_triggered, *args, **kwargs
+                ),
+            ),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.refresh_from_db()
+            docket.case_name = "Attorney Limit Updated"
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_one_attorney, docket
+            )
+            docket.save()
+
+        # No percolation on docket save since skip was set.
+        self.reset_and_assert_percolator_count(expected=0)
+        # skip_percolator_request should be True.
+        self.assertTrue(docket.skip_percolator_request)
+        # set_skip_percolation_if_parties_data should return True.
+        self.assertTrue(percolate_parties)
+
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ):
+            add_parties_and_attorneys(docket, self.parties_one_attorney)
+            index_docket_parties_in_es.delay(docket.pk)
+
+        # Percolation is performed upon the merging of parties.
+        self.reset_and_assert_percolator_count(expected=1)
+
+        docket.delete()
+
+    def test_recap_document_parties_percolation_based_on_attorney_limit(
+        self, mock_prefix
+    ) -> None:
+        """Confirm that parties data is included or excluded from
+        percolation based on the attorney count relative to
+        MAX_ATTORNEYS_TO_PERCOLATE for RECAPDocuments.
+        """
+
+        docket = DocketFactory(
+            court=self.court,
+            case_name="Party Limit Docket Case",
+            date_filed=datetime.date(2025, 8, 16),
+            docket_number="1:21-bk-7888",
+            source=Docket.RECAP,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Cross Party Limit",
+                query='party_name="Janet Dolor"&q=MOTION Sed que ipsa&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            non_party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Non-Party RD Limit",
+                query="q=MOTION Sed que ipsa&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Under limit: parties are percolated, both alerts should match.
+        with (
+            self.subTest("Under limit - parties percolated"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=10),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            alert_de = DocketEntryFactory(
+                docket=docket,
+                entry_number=2,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION Sed que ipsa quae ab illo inventore",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File Party Limit Test",
+                document_number="2",
+                pacer_doc_id="01803665243326",
+            )
+            add_parties_and_attorneys(docket, self.parties_one_attorney)
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # Both alerts should match since parties are within the limit.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(party_alert.name, html_content)
+        self.assertIn(non_party_alert.name, html_content)
+
+        mail.outbox.clear()
+        rd.delete()
+        alert_de.delete()
+
+        # Over limit: parties excluded, only non-party alert matches.
+        with (
+            self.subTest("Over limit - parties excluded"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=1),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(self.mock_date, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            alert_de = DocketEntryFactory(
+                docket=docket,
+                entry_number=3,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION Sed que ipsa quae ab illo inventore",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File Party Limit Test",
+                document_number="3",
+                pacer_doc_id="01803665243327",
+            )
+            add_parties_and_attorneys(docket, self.parties_two_attorneys)
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # The party-based alert should not match since parties data is
+        # excluded from percolation due to attorney count exceeding the
+        # limit. The non-party alert should still match.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(non_party_alert.name, html_content)
+        self.assertNotIn(party_alert.name, html_content)
+
+        rd.delete()
+        alert_de.delete()
+        docket.delete()
+
+    def test_docket_parties_percolation_based_on_attorney_limit(
+        self, mock_prefix
+    ) -> None:
+        """Confirm that parties data is included or excluded from
+        percolation based on the attorney count relative to
+        MAX_ATTORNEYS_TO_PERCOLATE for Dockets.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Docket Party Limit",
+                query='atty_name="John Limit Attorney"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            non_party_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Non-Party Docket Limit",
+                query='case_name="Attorney Limit Docket Case"&type=r',
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+
+        # Under the limit: parties are percolated, both alerts should match.
+        with (
+            self.subTest("Under limit - parties percolated"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=10),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket = Docket(
+                court=self.court,
+                case_name="Attorney Limit Docket Case",
+                docket_number="1:21-bk-8888",
+                docket_number_raw="1:21-bk-8888",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2025, 8, 16),
+                pacer_case_id="324242",
+            )
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_one_attorney, docket
+            )
+            docket.save()
+
+        with (
+            self.subTest("Under limit - parties percolated"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=10),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.refresh_from_db()
+            add_parties_and_attorneys(docket, self.parties_one_attorney)
+            index_docket_parties_in_es.delay(
+                docket.pk, percolate_parties=percolate_parties
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # Both alerts should match since parties are within the limit.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(party_alert.name, html_content)
+        self.assertIn(non_party_alert.name, html_content)
+
+        # Cleanup for next test.
+        mail.outbox.clear()
+        self._clean_alert_hits()
+
+        # Over the limit: parties excluded, only non-party alert matches.
+        with (
+            self.subTest("Over limit - parties excluded"),
+            override_settings(MAX_ATTORNEYS_TO_PERCOLATE=1),
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            docket.skip_percolator_request = False  # Restart status
+            docket.case_name = "Attorney Limit Docket Case 2"
+            percolate_parties = set_skip_percolation_if_parties_data(
+                self.parties_two_attorneys, docket
+            )
+
+            docket.save()
+            add_parties_and_attorneys(docket, self.parties_two_attorneys)
+            index_docket_parties_in_es.delay(
+                docket.pk, percolate_parties=percolate_parties
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        # The party-based alert should not match since parties data is
+        # excluded from percolation due to attorney count exceeding the
+        # limit. The non-party alert should still match.
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(non_party_alert.name, html_content)
+        self.assertNotIn(party_alert.name, html_content)
+
+        docket.delete()
+
     def test_case_only_alerts(self, mock_prefix) -> None:
         """Confirm that case-only alerts are properly sent and that they are
         triggered only once per case. This means that if a Docket or a
@@ -4442,6 +4839,7 @@ class RECAPAlertsPercolatorTest(
                 cause="405 Civil",
                 jurisdiction_type="U.S. Government Defendant",
                 jury_demand="1,000,000",
+                date_filed=datetime.date(2024, 8, 19),
             )
 
         # Send scheduled Weekly alerts.
@@ -4535,7 +4933,7 @@ class RECAPAlertsPercolatorTest(
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            alert_de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
@@ -4757,3 +5155,152 @@ class RECAPAlertsPercolatorTest(
         docket_only_alert.delete()
         docket.delete()
         docket_2.delete()
+
+    def test_percolate_rd_upon_cites_fields_update(self, mock_prefix) -> None:
+        """Test RECAPDocument percolation to match queries that involve the
+        cites field.
+        """
+
+        rd_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion = OpinionFactory(
+                cluster=OpinionClusterFactory(docket=self.de.docket)
+            )
+            rd_cites_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion cites",
+                query=f"q=cites:{opinion.pk}&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=self.de,
+                description="Motion to File",
+                document_number="5",
+                pacer_doc_id=3243434,
+                is_available=True,
+            )
+            CitationWithParentsFactory.create(
+                volume="948",
+                reporter="F.3d",
+                page="593",
+                cluster=opinion.cluster,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            mock.patch(
+                "cl.alerts.tasks.prepare_percolator_content",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    prepare_percolator_content, *args, **kwargs
+                ),
+            ),
+            time_machine.travel(rd_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd.plain_text = (
+                "In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020)"
+            )
+            rd.ocr_status = RECAPDocument.OCR_COMPLETE
+            rd.save(
+                update_fields=["ocr_status", "plain_text"],
+            )
+
+        # A single percolator call upon plain_text extraction and citation matching.
+        self.reset_and_assert_percolator_count(expected=1)
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
+        self.assertIn(rd_cites_alert.name, html_content)
+        self.assertIn(rd_cites_alert.name, txt_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rd_cites_alert.name,
+            1,
+            self.rd.docket_entry.docket.case_name,
+            1,
+        )
+
+    def test_percolates_rd_upon_plain_text_extraction_if_no_citations(
+        self, mock_prefix
+    ) -> None:
+        """The RECAPDocument percolation upon the plain_text extraction is delayed
+        in order to avoid two percolation requests if the plain_text contains
+        citations. But in case no citations are found the document should still
+        be percolated to match other types of alerts with no citations.
+        """
+
+        rd_indexing_time = self.mock_date - datetime.timedelta(seconds=15)
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_no_cites = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Opinion cites",
+                query="q=Plain text extracted&type=r",
+                alert_type=SEARCH_TYPES.RECAP,
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=self.de,
+                description="Motion to File",
+                document_number="6",
+                pacer_doc_id=3243478,
+                is_available=True,
+            )
+
+        with (
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            mock.patch(
+                "cl.alerts.tasks.prepare_percolator_content",
+                side_effect=lambda *args,
+                **kwargs: self.count_percolator_calls(
+                    prepare_percolator_content, *args, **kwargs
+                ),
+            ),
+            time_machine.travel(rd_indexing_time, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            rd.plain_text = "Plain text extracted no citations."
+            rd.ocr_status = RECAPDocument.OCR_COMPLETE
+            rd.save(
+                update_fields=["ocr_status", "plain_text"],
+            )
+
+        # A single percolator call upon plain_text extraction and citation matching.
+        self.reset_and_assert_percolator_count(expected=1)
+
+        # The plain_text alert should be triggered.
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        txt_content = mail.outbox[0].body
+
+        self.assertIn(rd_no_cites.name, html_content)
+        self.assertIn(rd_no_cites.name, txt_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            rd_no_cites.name,
+            1,
+            self.rd.docket_entry.docket.case_name,
+            1,
+        )

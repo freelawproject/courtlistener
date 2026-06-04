@@ -68,6 +68,7 @@ class SchoolAdmin(admin.ModelAdmin):
         "name",
     )
     inlines = (NotesInline,)
+    autocomplete_fields = ("is_alias_of",)
 
 
 @admin.register(Education)

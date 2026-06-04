@@ -16,6 +16,7 @@ from localflavor.us.models import USStateField
 from cl.api.utils import invert_user_logs
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.redis_utils import get_redis_interface
 
 donation_exclusion_codes = [
     1,  # Unknown error
@@ -156,6 +157,17 @@ class UserProfile(models.Model):
             return False
 
     @property
+    def is_eligible_for_rt_search_alerts(self) -> bool:
+        """
+        Determine whether the user is eligible to receive real-time search
+        alerts.
+
+        :return bool: True if the user is either an active member or has the
+        unlimited docket alerts flag enabled.
+        """
+        return self.is_member or self.unlimited_docket_alerts
+
+    @property
     def email_grants_unlimited_docket_alerts(self) -> bool:
         """Does the user's email grant them unlimited docket alerts?
 
@@ -204,6 +216,15 @@ class UserProfile(models.Model):
         end = datetime.today()
         data = invert_user_logs(start, end, add_usernames=False)
         return data[self.user.pk]
+
+    @property
+    def total_api_usage(self) -> int:
+        """Lifetime count of API requests for this user across v3 + v4."""
+        r = get_redis_interface("STATS")
+        pipe = r.pipeline()
+        for api_prefix in ("v3", "v4"):
+            pipe.zscore(f"api:{api_prefix}.user.counts", self.user_id)
+        return sum(int(count) for count in pipe.execute() if count)
 
     def __str__(self) -> str:
         return f"{self.user.username}"

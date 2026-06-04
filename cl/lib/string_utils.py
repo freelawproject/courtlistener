@@ -129,7 +129,7 @@ def normalize_dashes(text: str) -> str:
     figure_dash = "‒"
     horizontal_bar = "―"
     return re.sub(
-        rf"[{en_dash}{em_dash}{hyphen}{non_breaking_hyphen}{figure_dash}{horizontal_bar}]",
+        rf"[{normal_dash}{en_dash}{em_dash}{hyphen}{non_breaking_hyphen}{figure_dash}{horizontal_bar}]+",
         normal_dash,
         text,
     )

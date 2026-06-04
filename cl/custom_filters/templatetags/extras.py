@@ -3,7 +3,6 @@ import re
 import urllib.parse
 from datetime import UTC, datetime
 
-import waffle
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
@@ -11,14 +10,13 @@ from django.template.context import RequestContext
 from django.template.defaultfilters import date as date_filter
 from django.utils.dateparse import parse_datetime
 from django.utils.formats import date_format
-from django.utils.html import format_html
-from django.utils.http import urlencode
+from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import make_aware
-from elasticsearch_dsl import AttrDict, AttrList
+from elasticsearch.dsl import AttrDict, AttrList
 
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
-from cl.search.models import SEARCH_TYPES, Court, Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Court
 
 register = template.Library()
 
@@ -159,64 +157,12 @@ def get_es_doc_content(
         return ""
 
 
-# sourced from: https://stackoverflow.com/questions/2272370/sortable-table-columns-in-django
-@register.simple_tag
-def url_replace(request, value):
-    field = "order_by"
-    dict_ = request.GET.copy()
-    if field in dict_.keys():
-        if dict_[field].startswith("-") and dict_[field].lstrip("-") == value:
-            dict_[field] = value  # desc to asc
-        elif dict_[field] == value:
-            dict_[field] = f"-{value}"
-        else:  # order_by for different column
-            dict_[field] = value
-    else:  # No order_by
-        dict_[field] = value
-    return urlencode(sorted(dict_.items()))
-
-
-@register.simple_tag
-def sort_caret(request, value) -> SafeString:
-    current = request.GET.get("order_by", "*UP*")
-    caret = '&nbsp;<i class="gray fa fa-angle-up"></i>'
-    if current == value or current == f"-{value}":
-        if current.startswith("-"):
-            caret = '&nbsp;<i class="gray fa fa-angle-down"></i>'
-    return mark_safe(caret)
-
-
 @register.simple_tag
 def citation(obj) -> SafeString:
-    if isinstance(obj, Docket):
-        # Dockets do not have dates associated with them.  This is more
-        # of a "weak citation".  It is there to allow people to find the
-        # docket
-        docket = obj
-        date_of_interest = None
-        ecf = ""
-    elif isinstance(obj, DocketEntry):
-        docket = obj.docket
-        date_of_interest = obj.date_filed
-        ecf = obj.entry_number
-    else:
-        raise NotImplementedError(f"Object not recongized in {__name__}")
+    # Inline import to avoid circular dependency
+    from cl.opinion_page.utils import build_citation_string
 
-    # We want to build a citation that follows the Bluebook format as much
-    # as possible.  For documents from a case that looks like:
-    #   name_bb, case_bb, (court_bb date_bb) ECF No. {ecf}"
-    # If this is a citation to just a docket then we leave off the ECF number
-    # For opinions there is no need as the title of the block IS the citation
-    if date_of_interest:
-        date_of_interest = date_of_interest.strftime("%b %d, %Y")
-    result = f"{docket.case_name}, {docket.docket_number}, ("
-    result = result + docket.court.citation_string
-    if date_of_interest:
-        result = f"{result} {date_of_interest}"
-    result = f"{result})"
-    if ecf:
-        result = f"{result} ECF No. {ecf}"
-    return result
+    return build_citation_string(obj)
 
 
 @register.simple_tag
@@ -244,6 +190,60 @@ def render_string_or_list(value: any) -> any:
     if isinstance(value, (list | AttrList)):
         return ", ".join(str(item) for item in value)
     return value
+
+
+# HTML tag pattern for splitting text into tags vs. content.
+_HTML_TAG_RE = re.compile(r"(<[^>]+>)")
+
+
+@register.filter(is_safe=True)
+def highlight_query(text: str, query: str) -> str:
+    """Wrap quoted phrases from *query* in ``<mark>`` tags within
+    already-escaped HTML text.
+
+    Only quoted phrases (e.g. ``"fair use"``) are highlighted — these
+    correspond to the keyword component of a hybrid semantic search.
+
+    Designed to run *after* ``linebreaksbr`` and ``read_more`` so that
+    the ``<mark>`` tags are never broken by word-level truncation.
+    Only highlights inside text content — HTML tags are left untouched.
+
+    :param text: The rendered HTML string (already escaped).
+    :param query: The raw search query typed by the user.
+    :return: HTML-safe string with matching phrases wrapped in
+        ``<mark>``.
+    """
+    if not query or not text:
+        return text
+
+    text = str(text)
+
+    # Only extract quoted phrases — these are the keyword part of a
+    # hybrid search and the only terms we want to visually highlight.
+    phrases = [p.strip() for p in re.findall(r'"([^"]*)"', query) if p.strip()]
+    if not phrases:
+        return text
+
+    # HTML-escape each phrase so it matches against the already-escaped
+    # text (e.g. & → &amp;), then regex-escape for safe pattern use,
+    # sorted by length to avoid partial matches (e.g. "fair use" before "fair").
+    pattern = "|".join(
+        re.escape(escape(p)) for p in sorted(phrases, key=len, reverse=True)
+    )
+
+    # Split into HTML tags and text runs; only highlight in text runs.
+    # Word boundaries (\b) prevent partial matches inside longer words.
+    parts = _HTML_TAG_RE.split(text)
+    for i, part in enumerate(parts):
+        if not part.startswith("<"):
+            parts[i] = re.sub(
+                rf"\b({pattern})\b",
+                r"<mark>\1</mark>",
+                part,
+                flags=re.IGNORECASE,
+            )
+
+    return mark_safe("".join(parts))
 
 
 @register.filter
@@ -282,7 +282,7 @@ def extract_q_value(query: str) -> str:
 
 
 @register.simple_tag(takes_context=True)
-def alerts_supported(context: RequestContext, search_type: str) -> str:
+def alerts_supported(context: RequestContext, search_type: str) -> bool:
     """Determine if search alerts are supported based on the search type and flag
     status.
 
@@ -292,10 +292,11 @@ def alerts_supported(context: RequestContext, search_type: str) -> str:
     :return: True if alerts are supported, False otherwise.
     """
 
-    request = context["request"]
-    if search_type == SEARCH_TYPES.RECAP:
-        return waffle.flag_is_active(request, "recap-alerts-active")
-    return search_type in (SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT)
+    return search_type in (
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.RECAP,
+    )
 
 
 @register.filter
@@ -441,6 +442,27 @@ def has_attr(obj, attr_name):
 
 
 @register.filter
+def get_item(obj, key):
+    """Get item using bracket notation. Works for dicts, forms, lists, etc."""
+    try:
+        return obj[key]
+    except (KeyError, TypeError, IndexError):
+        return ""
+
+
+@register.filter
 def get_attr(obj, attr_name):
     """Return the value of the attribute attr_name."""
     return getattr(obj, attr_name, "")
+
+
+@register.simple_tag
+def get_request_value(request_get, field_name):
+    """Simple tag to get value from request.GET given a field name"""
+    return request_get.get(field_name, "")
+
+
+@register.simple_tag
+def render_field_with_id(field, field_id):
+    """Render a form field with a custom ID attribute."""
+    return field.as_widget(attrs={"id": field_id})

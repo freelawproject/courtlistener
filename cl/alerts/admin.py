@@ -3,7 +3,6 @@ from django.contrib import admin
 from cl.alerts.models import (
     Alert,
     DocketAlert,
-    RealTimeQueue,
     ScheduledAlertHit,
 )
 
@@ -48,17 +47,6 @@ class DocketAlertInline(admin.TabularInline):
         "user",
         "docket",
     )
-
-
-@admin.register(RealTimeQueue)
-class RealTimeQueueAdmin(admin.ModelAdmin):
-    list_filter = ("item_type",)
-    list_display = (
-        "__str__",
-        "item_type",
-        "item_pk",
-    )
-    readonly_fields = ("date_modified",)
 
 
 @admin.register(ScheduledAlertHit)

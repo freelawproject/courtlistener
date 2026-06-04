@@ -1,18 +1,29 @@
+from typing import cast
+
 from django.apps import apps
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
+from django.db.models import Model
 from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
-from cl.api.admin import WebhookInline
+from cl.api.admin import APIThrottleInline, WebhookInline
+from cl.api.utils import apply_membership_throttles
 from cl.donate.admin import (
     DonationInline,
     MonthlyDonationInline,
     NeonMembershipInline,
 )
-from cl.favorites.admin import NoteInline, UserTagInline
-from cl.lib.admin import AdminTweaksMixin, build_admin_url
+from cl.donate.models import NeonMembership
+from cl.favorites.admin import NoteInline, PrayerInline, UserTagInline
+from cl.favorites.models import UserTag
+from cl.lib.admin import (
+    AdminLinkConfig,
+    AdminTweaksMixin,
+    generate_admin_links,
+)
+from cl.search.models import SearchQuery
 from cl.users.models import (
     BarMembership,
     EmailFlag,
@@ -21,8 +32,12 @@ from cl.users.models import (
     UserProfile,
 )
 
-UserProxyEvent = apps.get_model("users", "UserProxyEvent")
-UserProfileEvent = apps.get_model("users", "UserProfileEvent")
+UserProxyEvent: type[Model] = cast(
+    type[Model], apps.get_model("users", "UserProxyEvent")
+)
+UserProfileEvent: type[Model] = cast(
+    type[Model], apps.get_model("users", "UserProfileEvent")
+)
 
 
 class TokenInline(admin.StackedInline):
@@ -50,18 +65,21 @@ admin.site.unregister(User)
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     form = CustomUserChangeForm  # optimize queryset for user_permissions field
-    change_form_template = "admin/user_change_form.html"
+    change_form_template = "admin/change_form_with_custom_links.html"
+    readonly_fields = ("api_calls_count",)
     inlines = (
         UserProfileInline,
         DonationInline,
         MonthlyDonationInline,
+        PrayerInline,
         AlertInline,
         DocketAlertInline,
-        WebhookInline,
         NoteInline,
         UserTagInline,
-        TokenInline,
         NeonMembershipInline,
+        TokenInline,
+        WebhookInline,
+        APIThrottleInline,
     )
     list_display = (
         "username",
@@ -74,31 +92,103 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "profile__stub_account",
     )
     search_help_text = (
-        "Search Users by username, first name, last name, or email."
+        "Search Users by username, first name, last name, email, or pk."
     )
     search_fields = (
         "username",
         "first_name",
         "last_name",
         "email",
+        "pk",
     )
+    actions = ["refresh_api_throttles"]
+
+    @admin.action(
+        description="Refresh API throttles from active Neon membership"
+    )
+    def refresh_api_throttles(self, request, queryset):
+        """Resync MEMBERSHIP-source API throttles for the selected users
+        from each user's current active Neon membership.
+
+        MANUAL-source throttles are never touched (the helper only
+        manages MEMBERSHIP rows).
+        """
+        refreshed = 0
+        skipped: list[str] = []
+        not_updated: list[str] = []
+
+        for user in queryset.select_related("membership"):
+            try:
+                membership = user.membership
+            except NeonMembership.DoesNotExist:
+                membership = None
+
+            if not membership or not membership.is_active:
+                skipped.append(user.username)
+                continue
+
+            if apply_membership_throttles(user, membership.level):
+                refreshed += 1
+            else:
+                not_updated.append(user.username)
+
+        if refreshed:
+            self.message_user(
+                request,
+                f"Refreshed API throttles for {refreshed} user(s).",
+                level=messages.SUCCESS,
+            )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped (no active Neon membership): {', '.join(skipped)}",
+                level=messages.ERROR,
+            )
+        if not_updated:
+            self.message_user(
+                request,
+                f"Could not refresh throttles (no matching membership level): {', '.join(not_updated)}",
+                level=messages.ERROR,
+            )
+
+    def api_calls_count(self, obj):
+        if obj.id is None:
+            # New user, no API usage, bail.
+            return 0
+
+        return obj.profile.total_api_usage
+
+    api_calls_count.short_description = "API Calls Count"
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         """Add links to related event admin pages filtered by user/profile."""
         extra_context = extra_context or {}
         user = self.get_object(request, object_id)
 
-        extra_context["proxy_events_url"] = build_admin_url(
-            UserProxyEvent,
-            {"pgh_obj": object_id},
-        )
+        custom_links: list[AdminLinkConfig] = [
+            {
+                "label": "UserProxy Events",
+                "model_class": UserProxyEvent,
+                "query_params": {"pgh_obj": object_id},
+            },
+            {
+                "label": "UserProfile Events",
+                "model_class": UserProfileEvent,
+                "query_params": {"pgh_obj": user.profile.pk},
+            },
+            {
+                "label": "Search Queries",
+                "model_class": SearchQuery,
+                "query_params": {"user": object_id},
+            },
+            {
+                "label": "Tags",
+                "model_class": UserTag,
+                "query_params": {"user": object_id},
+            },
+        ]
 
-        if user and hasattr(user, "profile"):
-            profile_id = user.profile.pk
-            extra_context["profile_events_url"] = build_admin_url(
-                UserProfileEvent,
-                {"pgh_obj": profile_id},
-            )
+        extra_context["custom_links"] = generate_admin_links(custom_links)
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context

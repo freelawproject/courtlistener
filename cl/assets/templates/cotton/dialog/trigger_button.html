@@ -1,0 +1,12 @@
+<c-vars class=""/>
+
+<c-button
+  touch_target="true"
+  x-on:click="open"
+  x-bind:aria-controls="dialogId"
+  x-bind:aria-expanded="isOpen"
+  aria-haspopup="dialog"
+  class="bg-white relative flex items-center justify-center border border-greyscale-300 outline-none text-greyscale-800 rounded-[10px] p-2 group-focus-visible:ring-4 group-focus-visible:ring-greyscale-300 group-hover:bg-greyscale-100 {{ class }}"
+>
+  {{ slot }}
+</c-button>

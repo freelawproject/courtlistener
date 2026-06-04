@@ -10,7 +10,7 @@ def base_bot_matcher(
     Matching is done by seeing if any of the items in the list of known_bots
     is in the user agent for the request provided.
     """
-    ua = request.META.get("HTTP_USER_AGENT", "Testing U-A")
+    ua = request.headers.get("user-agent", "Testing U-A")
     for bot in known_bots:
         if bot in ua.lower():
             return True
@@ -33,19 +33,5 @@ def is_bot(request: HttpRequest) -> bool:
         "twiceler",
         "yandexbot",
         "yodaobot",
-    ]
-    return base_bot_matcher(request, known_bots)
-
-
-def is_og_bot(request: HttpRequest) -> bool:
-    """Check if it's a bot that understands opengraph / twitter cards"""
-    known_bots = [
-        "facebookexternalhit",
-        "iframely",  # A service for getting open graph data?
-        "LinkedInBot",
-        "mastodon",
-        "skypeuripreview",
-        "slackbot-linkexpanding",
-        "twitterbot",
     ]
     return base_bot_matcher(request, known_bots)

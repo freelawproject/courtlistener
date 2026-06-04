@@ -1,0 +1,15 @@
+{% load svg_tags %}
+
+<c-vars icon=""></c-vars>
+
+<a
+  {{ attrs }}
+  class="w-28 flex flex-col justify-center items-center gap-4 group scroll-m-21"
+>
+  <div aria-hidden="true" class="md:w-15 md:h-15 w-13 h-13 p-3.5 rounded-full bg-greyscale-100 text-greyscale-400 group-hover:bg-greyscale-200">
+    {% svg icon class="md:w-8 md:h-8 w-6 h-6" %}
+  </div>
+  <span class="flex items-center justify-center text-center w-28 h-10 text-sm font-medium text-greyscale-900">
+    {{ slot }}
+  </span>
+</a>

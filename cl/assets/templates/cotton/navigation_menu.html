@@ -2,9 +2,11 @@
 {% require_script "js/alpine/components/navigation_menu.js" %}
 {% require_script "js/alpine/composables/intersect.js" %}
 {% require_script "js/alpine/composables/focus.js" %}
-{% require_script "js/alpine/plugins/intersect@3.14.8" defer=True %}
-{% require_script "js/alpine/plugins/collapse@3.14.8" defer=True %}
-{% require_script "js/alpine/plugins/focus@3.14.8" defer=True %}
+{% require_script "js/alpine/plugins/intersect" defer=True %}
+{% require_script "js/alpine/plugins/collapse" defer=True %}
+{% require_script "js/alpine/plugins/focus" defer=True %}
+{# frontend-checks-skip: check_hardcoded_ids #}
+{# This component is a singleton so hardcoded IDs are intentional #}
 
 <c-vars nav_items ></c-vars>
 {{ nav_items|json_script:"nav-items" }}
@@ -24,7 +26,7 @@
       class="w-full"
       role="none"
     >
-      <div class="ml-1 text-sm font-sans flex justify-start items-center flex-wrap">
+      <div class="ml-1 text-sm font-sans flex justify-start items-center">
         {% svg "ellipse" x_show="hasNestedItems" x_bind__fill="markerClass" data_intersect_target=item.href aria_hidden="true" %}
         <a
           x-bind:class="itemClass"
@@ -51,7 +53,7 @@
             data-intersect-target="{{ item.href }}"
             class="transition-transform duration-200 flex justify-center items-center w-4 h-4"
             aria-hidden="true"
-          >{% svg 'chevron' class="w-full h-full" %}
+          >{% svg 'chevron' class="w-full h-full text-greyscale-400" %}
           </span>
         </button>
       </div>
@@ -98,7 +100,7 @@
       x-text="visibleSectionText"
       aria-hidden="true"
     ></span>
-    {% svg "chevron" aria_hidden="true" %}
+    {% svg "chevron" aria_hidden="true" class="text-greyscale-400" %}
   </button>
 
   <nav>
@@ -122,7 +124,7 @@
     x-transition:leave-end="opacity-0"
   >
     <template x-for="option in options" :key="option.href">
-      <li class="relative cursor-default py-[1px] px-1.5 select-none" role="none">
+      <li class="w-full relative cursor-default py-[1px] px-1.5 select-none" role="none">
         <a
           x-on:click="closeMenu"
           x-bind:href="option.href"
@@ -139,13 +141,14 @@
         >
           <ul class="flex flex-col w-full list-none pl-0" role="menu">
             <template x-for="subItem in option.children">
-              <li class="w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600" role="none">
+              <li class="hover:bg-greyscale-100 rounded-md flex w-full pl-7.5 py-1.5 font-normal text-sm text-greyscale-600" role="none">
                 <a
                   x-on:click="closeMenu"
                   x-bind:href="subItem.href"
                   x-bind:data-intersect-target="subItem.href"
                   x-text="subItem.text"
                   role="menuitem"
+                  class="w-full"
                 ></a>
               </li>
             </template>

@@ -8,9 +8,9 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
-from elasticsearch_dsl import MultiSearch, Q, Search
-from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit
+from elasticsearch.dsl import MultiSearch, Q, Search
+from elasticsearch.dsl.query import Query
+from elasticsearch.dsl.response import Hit
 from redis import Redis
 
 from cl.alerts.models import (
@@ -34,17 +34,24 @@ from cl.lib.types import CleanData
 from cl.recap.constants import bankruptcy_data_fields
 from cl.search.constants import (
     ALERTS_HL_TAG,
+    SEARCH_OPINION_CHILD_HL_FIELDS,
+    SEARCH_OPINION_HL_FIELDS,
+    SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
+    opinion_boosts_es,
     recap_boosts_es,
 )
 from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    DocketDocumentPlain,
+    ESOpinionDocumentPlain,
     ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
+    OpinionPercolator,
     RECAPPercolator,
 )
 from cl.search.models import SEARCH_TYPES, Docket
@@ -55,7 +62,7 @@ from cl.search.types import (
     SearchAlertHitType,
 )
 
-COMMON_QUERY_PARAMS = {"type", "order_by"}
+COMMON_QUERY_PARAMS = {"type", "order_by", "semantic", "highlight"}
 
 
 @dataclass
@@ -116,7 +123,7 @@ def create_percolator_search_query(
     s = Search(index=index_name)
     s = s.query(final_query)
     s = s.source(includes=["id"])
-    s = s.sort("date_created")
+    s = s.sort("id")
     s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
     if search_after:
         s = s.extra(search_after=search_after)
@@ -128,7 +135,8 @@ def percolate_es_document(
     percolator_index: str,
     document_index: str | None = None,
     documents_to_percolate: (
-        tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None
+        tuple[ESDictDocument, ESDictDocument | None, ESDictDocument | None]
+        | None
     ) = None,
     app_label: str | None = None,
     main_search_after: int | None = None,
@@ -156,6 +164,7 @@ def percolate_es_document(
     Docket percolator response (if applicable).
     """
 
+    percolate_query_child = percolate_query_parent = None
     if document_index:
         # If document_index is provided, use it along with the document_id to refer
         # to the document to percolate.
@@ -175,15 +184,23 @@ def percolate_es_document(
             field="percolator_query",
             document=main_document_content_plain,
         )
-        percolate_query_child = Q(
-            "percolate",
-            field="percolator_query",
-            document=child_document,
+        percolate_query_child = (
+            Q(
+                "percolate",
+                field="percolator_query",
+                document=child_document,
+            )
+            if child_document
+            else None
         )
-        percolate_query_parent = Q(
-            "percolate",
-            field="percolator_query",
-            document=parent_document,
+        percolate_query_parent = (
+            Q(
+                "percolate",
+                field="percolator_query",
+                document=parent_document,
+            )
+            if parent_document
+            else None
         )
     else:
         raise NotImplementedError(
@@ -235,6 +252,18 @@ def percolate_es_document(
             s = add_es_highlighting(
                 s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
             )
+        case "search.Opinion":
+            child_highlight_options, _ = build_highlights_dict(
+                SEARCH_OPINION_CHILD_HL_FIELDS, ALERTS_HL_TAG
+            )
+            parent_highlight_options, _ = build_highlights_dict(
+                SEARCH_OPINION_HL_FIELDS, ALERTS_HL_TAG
+            )
+            child_highlight_options["fields"].update(
+                parent_highlight_options["fields"]
+            )
+            extra_options = {"highlight": child_highlight_options}
+            s = s.extra(**extra_options)
         case _:
             raise NotImplementedError(
                 "Percolator search alerts not supported for %s", app_label
@@ -388,6 +417,11 @@ def scheduled_alert_hits_limit_reached(
     """Check if the alert hits limit has been reached for a specific alert-user
      combination.
 
+    For child documents (RECAPDocument, Opinion), two limits are checked:
+        1. Per-parent limit: caps child hits per parent object.
+        2. Global alert limit: caps distinct parent objects per alert.
+    If either limit is reached, returns True.
+
     :param alert_pk: The alert_id.
     :param user_pk: The user_id.
     :param content_type: The related content_type.
@@ -396,44 +430,50 @@ def scheduled_alert_hits_limit_reached(
     :return: True if the limit has been reached, otherwise False.
     """
 
-    if child_document:
-        # To limit child hits in case, count ScheduledAlertHits related to the
-        # alert, user and parent document.
-        hits_count = ScheduledAlertHit.objects.filter(
-            alert_id=alert_pk,
-            user_id=user_pk,
-            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-            content_type=content_type,
-            object_id=object_id,
-        ).count()
-        hits_limit = settings.RECAP_CHILD_HITS_PER_RESULT + 1
-    else:
-        # To limit hits in an alert count ScheduledAlertHits related to the
-        # alert and user.
-        hits_count = (
-            ScheduledAlertHit.objects.filter(
-                alert_id=alert_pk,
-                user_id=user_pk,
-                hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-                content_type=content_type,
-            )
-            .only("object_id")
-            .distinct("object_id")
-        ).count()
-        hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT
+    base_filter = ScheduledAlertHit.objects.filter(
+        alert_id=alert_pk,
+        user_id=user_pk,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+    )
 
-    if hits_count >= hits_limit:
-        if child_document:
-            logger.info(
-                f"Skipping child hit for Alert ID: {alert_pk} and object_id "
-                f"{object_id}, there are {hits_count} child hits stored for this alert-instance."
-            )
-        else:
-            logger.info(
-                f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} "
-                f"hits stored for this alert."
-            )
+    # Child-specific per-parent limit
+    if child_document and content_type:
+        child_hits_count = base_filter.filter(object_id=object_id).count()
+        if child_hits_count > 0:
+            # Parent case already scheduled. Only enforce per-parent
+            # child limit.
+            is_opinion_hit = content_type.model == "opinion"
+            child_hits_limit = (
+                settings.OPINION_HITS_PER_RESULT
+                if is_opinion_hit
+                else settings.RECAP_CHILD_HITS_PER_RESULT
+            ) + 1
+            if child_hits_count >= child_hits_limit:
+                log_fn = logger.error if is_opinion_hit else logger.info
+                log_fn(
+                    "Skipping child hit for Alert ID: %s and object_id %s, there "
+                    "are %s child hits stored for this alert-instance.",
+                    alert_pk,
+                    object_id,
+                    child_hits_count,
+                )
+                return True
+            # Child limit not reached, allow this hit.
+            return False
+
+    # Global alert limit
+    global_hits_count = (
+        base_filter.only("object_id").distinct("object_id").count()
+    )
+    if global_hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
+        logger.info(
+            "Skipping hit for Alert ID: %s, there are %s distinct hits stored "
+            "for this alert.",
+            alert_pk,
+            global_hits_count,
+        )
         return True
+
     return False
 
 
@@ -499,14 +539,24 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             SEARCH_TYPES.RECAP
             | SEARCH_TYPES.DOCKETS
             | SEARCH_TYPES.RECAP_DOCUMENT
+            | SEARCH_TYPES.OPINION
         ):
-            text_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
-            text_fields.extend(
-                add_fields_boosting(
-                    cd,
-                    list(recap_boosts_es.keys()),
+            if cd["type"] == SEARCH_TYPES.OPINION:
+                text_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
+                text_fields.extend(
+                    add_fields_boosting(
+                        cd,
+                        list(opinion_boosts_es.keys()),
+                    )
                 )
-            )
+            else:
+                text_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
+                text_fields.extend(
+                    add_fields_boosting(
+                        cd,
+                        list(recap_boosts_es.keys()),
+                    )
+                )
             child_filters = build_has_child_filters(cd)
             parent_filters = build_join_es_filters(cd)
             parent_filters.extend(child_filters)
@@ -517,7 +567,7 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
 
             match parent_filters, string_query:
                 case [[], []]:
-                    NotImplementedError(
+                    raise NotImplementedError(
                         "Indexing match-all queries is not supported."
                     )
                 case [[], _]:
@@ -659,7 +709,15 @@ def prepare_percolator_content(
             es_document_index = AudioDocument._index._name
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
-            es_document_index = DocketDocument._index._name
+            model = apps.get_model(app_label)
+            docket = model.objects.get(pk=document_id)
+            document_content_plain = DocketDocumentPlain().prepare(docket)
+            del document_content_plain["docket_child"]
+            documents_to_percolate = (
+                document_content_plain,
+                None,
+                None,
+            )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
             model = apps.get_model(app_label)
@@ -688,6 +746,19 @@ def prepare_percolator_content(
                 parent_document_content,
             )
 
+        case "search.Opinion":
+            percolator_index = OpinionPercolator._index._name
+            model = apps.get_model(app_label)
+            opinion = model.objects.get(pk=document_id)
+            document_content_plain = ESOpinionDocumentPlain().prepare(opinion)
+            # Remove cluster_child to avoid document parsing errors.
+            del document_content_plain["cluster_child"]
+
+            documents_to_percolate = (
+                document_content_plain,
+                None,
+                None,
+            )
         case _:
             raise NotImplementedError(
                 "Percolator search alerts not supported for %s", app_label
@@ -709,17 +780,52 @@ def set_skip_percolation_if_bankruptcy_data(
         d.skip_percolator_request = True
 
 
+def _exceeds_attorney_limit(
+    parties_data: list[dict[str, Any]], limit: int
+) -> bool:
+    """Check if total attorneys in parties data exceeds the given limit.
+
+    Stops counting early once the limit is exceeded for efficiency, since
+    parties data can be very large.
+
+    :param parties_data: A list of dicts containing the parties data.
+    :param limit: The maximum number of attorneys allowed.
+    :return: True if the total number of attorneys exceeds the limit.
+    """
+    count = 0
+    for party in parties_data:
+        count += len(party.get("attorneys", []))
+        if count > limit:
+            return True
+    return False
+
+
 def set_skip_percolation_if_parties_data(
     parties_data: list[dict[str, Any]], d: Docket
-) -> None:
+) -> bool:
     """Set skip percolation flag if parties data is present.
+
+    If parties data is available and the attorney count does not exceed the
+    limit, percolation is skipped during docket save(), since percolation
+    will be scheduled after merging and indexing parties.
 
     :param parties_data: A list of dicts containing the parties data.
     :param d: The docket to be saved.
-    :return: None
+    :return: True if the docket should be percolated after merging parties,
+    False otherwise.
     """
-    if parties_data:
-        d.skip_percolator_request = True
+    if not parties_data:
+        return False
+
+    if _exceeds_attorney_limit(
+        parties_data, settings.MAX_ATTORNEYS_TO_PERCOLATE
+    ):
+        # Party limit exceeded. Do not skip percolation. The docket will be
+        # percolated without considering parties via the ES signal processor.
+        return False
+
+    d.skip_percolator_request = True
+    return True
 
 
 def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:

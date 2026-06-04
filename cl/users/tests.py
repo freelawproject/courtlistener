@@ -1,6 +1,8 @@
 import json
+import time
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from itertools import product
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -8,10 +10,12 @@ from unittest.mock import MagicMock, patch
 import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.contrib import admin
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.cache import cache as django_cache
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -19,22 +23,43 @@ from django.core.mail import (
     send_mail,
 )
 from django.test import AsyncClient
+from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
-from django_ses import signals
+from django_ses import SESBackend, signals
+from rest_framework.authtoken.models import Token
+from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
-from cl.alerts.factories import DocketAlertFactory
+from cl.alerts.factories import (
+    AlertFactory,
+    DocketAlertFactory,
+    DocketAlertWithParentsFactory,
+)
 from cl.alerts.models import DocketAlert, DocketAlertEvent
-from cl.api.factories import WebhookEventFactory, WebhookFactory
+from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
+from cl.api.factories import (
+    APIThrottleFactory,
+    WebhookEventFactory,
+    WebhookFactory,
+)
 from cl.api.models import (
+    APIThrottle,
+    ThrottleType,
     Webhook,
     WebhookEvent,
     WebhookEventType,
     WebhookVersions,
+)
+from cl.api.utils import clear_tiered_cache
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
 )
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
@@ -45,7 +70,10 @@ from cl.favorites.models import (
 )
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    SimpleUserDataMixin,
+    UserProfileWithParentsFactory,
+)
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
@@ -53,10 +81,12 @@ from cl.tests.cases import (
     ESIndexTestCase,
     LiveServerTestCase,
     RestartSentEmailQuotaMixin,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_client
+from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
     get_email_body,
@@ -83,6 +113,7 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
+from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 
 
 class UserTest(LiveServerTestCase):
@@ -430,6 +461,104 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             reverse("delete_profile_done"),
         )
 
+    async def test_reset_api_token_get_renders_confirmation(self) -> None:
+        """The reset page renders a password-confirmation form."""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Reset My API Token")
+        self.assertContains(r, "csrfmiddlewaretoken")
+
+    async def test_reset_api_token_shows_recent_usage_count(self) -> None:
+        """The confirmation page surfaces the recent API request count."""
+        # Prime the throttle cache the same way ExceptionalUserRateThrottle
+        # does: a list of unix timestamps keyed by user pk. We seed three
+        # recent timestamps and one outside the 5-minute window.
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        now_ts = time.time()
+        cache_key = UserRateThrottle.cache_format % {
+            "scope": "user",
+            "ident": user.pk,
+        }
+        django_cache.set(
+            cache_key,
+            [now_ts - 1, now_ts - 60, now_ts - 290, now_ts - 600],
+        )
+        self.addCleanup(django_cache.delete, cache_key)
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "<strong>3</strong>")
+        self.assertContains(r, "fa-exclamation-triangle")
+        self.assertContains(r, "alert-warning")
+
+    async def test_reset_api_token_rotates_with_valid_password(self) -> None:
+        """Posting the correct password swaps the token for a new one."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("view_api_token"))
+
+        # Exactly one token still exists for the user, and the key changed.
+        tokens = Token.objects.filter(user=user)
+        self.assertEqual(await tokens.acount(), 1)
+        new_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertNotEqual(new_key, old_key)
+
+    async def test_reset_api_token_rejects_wrong_password(self) -> None:
+        """A wrong password leaves the existing token untouched."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "not-the-password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Your password was invalid")
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
+
+    async def test_reset_api_token_requires_login(self) -> None:
+        """Anonymous POSTs are redirected to login, no token is changed."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r.headers.get("Location", ""))
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
+
     def test_generate_recap_dot_email_addresses(self) -> None:
         # Test simple username
         u = User.objects.get(username="pandora")
@@ -558,6 +687,164 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    async def test_redirect_to_search_alerts_if_no_alerts(self):
+        """Tests redirection to search alerts when a user has no alerts"""
+        # Create a user profile with no associated alerts
+        user_with_no_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_no_alert.user.username, password="password"
+        )
+        # Load the 'profile_alerts' URL and follow redirects
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that the request was redirected to 'profile_search_alerts'.
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_redirect_to_docket_alerts_if_no_search_alerts(self):
+        """Tests redirection to docket alerts page when a user has no search alerts."""
+        # Create a user profile
+        user_with_docket_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        # Create a docket and a docket alert associated with the user
+        docket = await sync_to_async(DocketFactory)()
+        await sync_to_async(DocketAlertFactory)(
+            docket=docket, user=user_with_docket_alert.user
+        )
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_docket_alert.user, password="password"
+        )
+        # Load the 'profile_alerts' URL and follow redirects
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that the request was redirected to 'profile_docket_alerts'
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_docket_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_redirect_to_search_alerts_if_has_search_alerts(self):
+        """Tests redirection to search alerts page when a user has search alerts, regardless of docket alerts."""
+        # Create a user profile
+        user_with_search_alert = await sync_to_async(
+            UserProfileWithParentsFactory
+        )()
+        await self.async_client.alogin(
+            username=user_with_search_alert.user.username, password="password"
+        )
+        # Create a search alert for the user.
+        await sync_to_async(AlertFactory)(user=user_with_search_alert.user)
+        # Loads the 'profile_alerts' page and follow redirects.
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert redirection to the 'profile_search_alerts' page.
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+        # Create a docket and a docket alert for the same user.
+        docket = await sync_to_async(DocketFactory)()
+        await sync_to_async(DocketAlertFactory)(
+            docket=docket, user=user_with_search_alert.user
+        )
+        # Loads the 'profile_alerts' page and follow redirects.
+        r = await self.async_client.get(reverse("profile_alerts"), follow=True)
+        # Assert that it still redirects to 'profile_search_alerts' because a
+        # search alert exists
+        self.assertRedirects(
+            r,
+            expected_url=reverse("profile_search_alerts"),
+            target_status_code=HTTPStatus.OK,
+        )
+
+    async def test_docket_alerts_sorting(self):
+        """Tests docket ordering on the docket alerts page."""
+        # Create a user profile
+        up = await sync_to_async(UserProfileWithParentsFactory)()
+        user_with_docket_alerts = up.user
+        # Create some dockets and docket alerts associated with the user
+        das = []
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now() - timedelta(days=2),
+                docket__date_filed=now().date() - timedelta(days=2),
+            )
+        )
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now() - timedelta(days=1),
+                docket__date_filed=now().date() - timedelta(days=1),
+            )
+        )
+        das.append(
+            await sync_to_async(DocketAlertWithParentsFactory)(
+                user=user_with_docket_alerts,
+                date_last_hit=now(),
+                docket__date_filed=now().date(),
+            )
+        )
+        # Log in the created user
+        await self.async_client.alogin(
+            username=user_with_docket_alerts, password="password"
+        )
+
+        tests = (
+            ("", lambda x: x.date_last_hit),
+            ("invalid", lambda x: x.date_last_hit),
+            ("hit", lambda x: x.date_last_hit),
+            ("name", lambda x: x.docket.case_name),
+            ("court", lambda x: x.docket.court.short_name),
+            ("date_filed", lambda x: x.docket.date_filed),
+            ("docket_number", lambda x: x.docket.docket_number),
+        )
+
+        # Create ascending/descending tests for each test case in the form:
+        # ("hit", lambda, "-"), etc.
+        tests = ((*x, y) for x, y in product(tests, ["", "-"]))
+
+        for order_name, sorter, direction in tests:
+            with self.subTest(
+                "Checking docket alert sorting",
+                order_by=f"{direction}{order_name}",
+            ):
+                r = await self.async_client.get(
+                    reverse("profile_docket_alerts"),
+                    query_params={"order_by": f"{direction}{order_name}"},
+                )
+                c = r.context
+                if order_name in ("", "invalid"):
+                    direction = "-"
+                    order_name = "hit"
+                das.sort(key=sorter, reverse=True if direction else False)
+                self.assertEqual(
+                    list(c["docket_alerts"]),
+                    das,
+                    f"\nExpected {order_name}: {[sorter(x) for x in das]}\n"
+                    f"Got      {order_name}: {[sorter(x) for x in c['docket_alerts']]}",
+                )
+
+                sorting_fields = c["sorting_fields"]
+                for col, vals in sorting_fields.items():
+                    # Test url_param
+                    if order_name == col and direction == "":
+                        self.assertEqual(vals["url_param"], f"-{order_name}")
+                    else:
+                        self.assertEqual(vals["url_param"], col)
+                    # Test direction
+                    if order_name == col and direction == "-":
+                        self.assertEqual(vals["direction"], "down")
+                    else:
+                        self.assertEqual(vals["direction"], "up")
 
 
 class DisposableEmailTest(SimpleUserDataMixin, TestCase):
@@ -1379,8 +1666,10 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
-        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body goes here</p>\n"
+        )
 
         # Confirm if email is sent
         self.assertEqual(len(mail.outbox), 1)
@@ -1394,8 +1683,48 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here\n")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
+
+    @patch("boto3.Session")
+    def test_email_as_bytes_ses_compatibility(
+        self, mock_session: MagicMock
+    ) -> None:
+        """Verify django-ses email sending works with Python 3.13.
+
+        This is a regression test for issue #6736 where Python 3.13 removed
+        the `linesep` parameter from Message.as_bytes(), causing a TypeError
+        when sending emails via django-ses. The fix was to upgrade django-ses
+        to a version with Python 3.13 support (4.6.0+).
+
+        This test uses the actual SESBackend with a mocked boto3 session to
+        exercise the code path that calls message.as_bytes().
+        """
+        # Mock the boto3 session and SES client
+        mock_client = MagicMock()
+        mock_client.send_raw_email.return_value = {
+            "MessageId": "test-id",
+            "ResponseMetadata": {"RequestId": "test-request-id"},
+        }
+        mock_session.return_value.client.return_value = mock_client
+
+        email = EmailMultiAlternatives(
+            subject="Test as_bytes compatibility",
+            body="Plain text body",
+            from_email="testing@courtlistener.com",
+            to=["success@simulator.amazonses.com"],
+        )
+        email.attach_alternative("<p>HTML body</p>", "text/html")
+
+        # Send through the actual SES backend - this exercises the code path
+        # that calls message.as_bytes() internally. Before django-ses 4.6.0,
+        # this would raise: TypeError: Message.as_bytes() got an unexpected
+        # keyword argument 'linesep'
+        backend = SESBackend()
+        backend.send_messages([email])
+
+        # Verify the mocked SES client was called
+        mock_client.send_raw_email.assert_called_once()
 
     def test_email_message_class(self) -> None:
         """This test checks if Django EmailMessage class works properly using
@@ -1407,7 +1736,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             "Body goes here",
             "testing@courtlistener.com",
             ["success@simulator.amazonses.com"],
-            ["bcc_success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
             reply_to=["reply_success@simulator.amazonses.com"],
@@ -1421,7 +1750,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
         self.assertEqual(
             stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
         )
@@ -1447,7 +1776,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message only has plain/text version
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
         self.assertEqual(html_body, "")
 
     def test_multialternative_email(self) -> None:
@@ -1475,9 +1804,11 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here 世界 ñ ⚖️")
         self.assertEqual(
-            stored_email[0].html_message, "<p>Body goes here 世界 ñ ⚖️</p>"
+            stored_email[0].plain_text, "Body goes here 世界 ñ ⚖️\n"
+        )
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body goes here 世界 ñ ⚖️</p>\n"
         )
         self.assertEqual(
             stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
@@ -1501,8 +1832,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has a plain and html version
-        self.assertEqual(plaintext_body, "Body goes here 世界 ñ ⚖️")
-        self.assertEqual(html_body, "<p>Body goes here 世界 ñ ⚖️</p>")
+        self.assertEqual(plaintext_body, "Body goes here 世界 ñ ⚖️\n")
+        self.assertEqual(html_body, "<p>Body goes here 世界 ñ ⚖️</p>\n")
 
     def test_multialternative_only_plain_email(self) -> None:
         """This test checks if Django EmailMultiAlternatives class works
@@ -1524,7 +1855,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
         self.assertEqual(stored_email[0].html_message, "")
 
         # Confirm if email is sent
@@ -1541,7 +1872,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertTrue(message_sent.extra_headers["X-Entity-Ref-ID"])
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has only plain/text version
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
         self.assertEqual(html_body, "")
 
     def test_multialternative_only_html_email(self) -> None:
@@ -1564,7 +1895,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.latest("id")
-        self.assertEqual(stored_email.html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email.html_message, "<p>Body goes here</p>\n")
         self.assertEqual(stored_email.plain_text, "")
 
         # Confirm if email is sent
@@ -1579,7 +1910,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has only html/text version
         self.assertEqual(plaintext_body, "")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
 
     def test_sending_email_with_attachment(self) -> None:
         """This test checks if Django EmailMessage class works
@@ -1591,7 +1922,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             "Body goes here",
             "testing@courtlistener.com",
             ["success@simulator.amazonses.com"],
-            ["bcc_success@simulator.amazonses.com"],
+            bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
@@ -1731,7 +2062,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             stored_email.plain_text,
             stored_email.from_email,
             stored_email.to,
-            stored_email.bcc,
+            bcc=stored_email.bcc,
             cc=stored_email.cc,
             reply_to=stored_email.reply_to,
             headers=stored_email.headers,
@@ -1753,8 +2084,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         plaintext_body, html_body = get_email_body(message)
         # Compare second message sent with the original message content
         self.assertEqual(message_sent.subject, "This is the subject")
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here\n")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["success@simulator.amazonses.com"])
         self.assertEqual(
@@ -1839,7 +2170,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
                 "bounce@simulator.amazonses.com",
                 "<complaint@simulator.amazonses.com>",
             ],
-            ["BCC User <bcc@example.com>", "bcc@example.com"],
+            bcc=["BCC User <bcc@example.com>", "bcc@example.com"],
             cc=["CC User <cc@example.com>", "cc@example.com"],
             reply_to=["Reply User <another@example.com>", "reply@example.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
@@ -1877,12 +2208,12 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         plaintext_body, html_body = get_email_body(message)
 
         # Confirm if normal email version is sent
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
 
         # Retrieve stored email and compare content
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 1)
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here\n")
         self.assertEqual(
             stored_email[0].from_email,
             "User Admin <testing@courtlistener.com>",
@@ -2165,7 +2496,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             [
                 "Admin User <success@simulator.amazonses.com>",
             ],
-            ("BCC User <bcc@example.com>", "bcc@example.com"),
+            bcc=("BCC User <bcc@example.com>", "bcc@example.com"),
         )
         email.send()
         message_sent = mail.outbox[1]
@@ -2216,7 +2547,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             [
                 "Admin User <success@simulator.amazonses.com>",
             ],
-            ("BCC User <bcc@example.com>", "bcc@example.com"),
+            bcc=("BCC User <bcc@example.com>", "bcc@example.com"),
         )
         email.send()
         message_sent = mail.outbox[1]
@@ -2483,8 +2814,8 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         # Compare second message sent with the original message content
         self.assertEqual(message_sent.subject, "This is the subject")
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here\n")
+        self.assertEqual(html_body, "<p>Body goes here</p>\n")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["new_address@courtlistener.com"])
         self.assertEqual(message_sent.bcc, [])
@@ -2521,7 +2852,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         message = message_sent.message()
         plaintext_body, html_body = get_email_body(message)
         self.assertEqual(message_sent.subject, "This is the subject")
-        self.assertEqual(plaintext_body, "Body goes here")
+        self.assertEqual(plaintext_body, "Body goes here\n")
         self.assertEqual(message_sent.from_email, "testing@courtlistener.com")
         self.assertEqual(message_sent.to, ["anon_address@courtlistener.com"])
 
@@ -2618,7 +2949,7 @@ class RetryFailedEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Emails are sent
         self.assertEqual(len(mail.outbox), 2)
         # Retrieve the stored messages and update its message_id for testing
-        stored_emails = list(EmailSent.objects.all())
+        stored_emails = list(EmailSent.objects.all().order_by("pk"))
         stored_emails[0].message_id = "5e9b3e8e-93c8-497f-abd4-00f6ddd566f0"
         stored_emails[0].save()
 
@@ -3437,6 +3768,54 @@ class WebhooksHTMXTests(APITestCase):
         # Webhook failure count shouldn't be increased by a webhook test event
         self.assertEqual(webhook_event_last.webhook.failure_count, 0)
 
+    async def test_send_webhook_test_all_types(self) -> None:
+        """Can we send a webhook test event for all webhook types?"""
+
+        test_cases = {
+            f"{event_type.label} - {version.label}": {
+                "event_type": event_type,
+                "version": version,
+            }
+            for event_type, version in product(
+                WebhookEventType, WebhookVersions
+            )
+        }
+
+        for label, params in test_cases.items():
+            with self.subTest(label=label):
+                await Webhook.objects.all().adelete()
+                await WebhookEvent.objects.all().adelete()
+                await self.make_a_webhook(
+                    self.client,
+                    event_type=params["event_type"],
+                    version=params["version"],
+                )
+                webhooks = Webhook.objects.all()
+                self.assertEqual(await webhooks.acount(), 1)
+
+                webhooks_first = await webhooks.afirst()
+                webhook_1_path_test = reverse(
+                    "webhooks-test-webhook",
+                    kwargs={"pk": webhooks_first.pk, "format": "json"},
+                )
+                with mock.patch(
+                    "cl.api.webhooks.requests.post",
+                    side_effect=lambda *args, **kwargs: MockPostResponse(
+                        200, mock_raw=True
+                    ),
+                ):
+                    response = await self.client.post(webhook_1_path_test, {})
+                # Compare the test webhook event data.
+                self.assertEqual(response.status_code, HTTPStatus.OK)
+                webhook_event = WebhookEvent.objects.all().order_by(
+                    "date_created"
+                )
+                webhook_event_first = await webhook_event.afirst()
+                self.assertEqual(
+                    webhook_event_first.status_code, HTTPStatus.OK
+                )
+                self.assertEqual(webhook_event_first.debug, True)
+
     async def test_list_webhook_events(self) -> None:
         """Can we list the user's webhook events?"""
 
@@ -3701,3 +4080,438 @@ class NeonAccountUpdateTest(TestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         create_account_mock.delay.assert_called_once_with(self.up.user.pk)
         update_account_mock.delay.assert_not_called()
+
+
+@patch("cl.users.views.OptInConsentForm.is_valid", new=lambda self: True)
+@patch(
+    "cl.custom_filters.decorators.verify_honeypot_value",
+    new=lambda request, field_name: None,
+)
+class RegisterViewTest(TestCase):
+    async def test_register_with_valid_ascii_username(self) -> None:
+        """Register a user with a valid username."""
+        data = {
+            "username": "admin1",
+            "email": "admin1@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertTrue(await User.objects.filter(username="admin1").aexists())
+
+    async def test_register_rejects_homoglyph_username(self) -> None:
+        """Register a user with an invalid username containing a homoglyph.
+        It must be rejected:
+        """
+
+        invalid_username = "adm" + "\u0456" + "n2"
+        data = {
+            "username": invalid_username,
+            "email": "admin2@example.com",
+            "first_name": "User",
+            "last_name": "Admin",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # The user must not be registered.
+        self.assertFalse(
+            await User.objects.filter(username=invalid_username).aexists()
+        )
+
+        form = response.context.get("form")
+        self.assertIsNotNone(form, "Expected 'form' in template context")
+        # The username field should display an error.
+        self.assertIn("username", form.errors)
+
+
+class UserAdminApiCallsCountTest(TestCase):
+    """Tests for UserAdmin.api_calls_count.
+
+    Fixes COURTLISTENER-C5S: DataError when visiting /admin/auth/user/add/
+    because obj.id is None for unsaved users.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    def setUp(self) -> None:
+        self.user_admin = UserAdmin(model=User, admin_site=admin.site)
+
+    def test_api_calls_count_returns_zero_for_unsaved_user(self) -> None:
+        """api_calls_count should return 0 when obj.id is None."""
+        unsaved_user = User()
+        result = self.user_admin.api_calls_count(unsaved_user)
+        self.assertEqual(result, 0)
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_api_calls_count_sums_v3_and_v4(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """api_calls_count should sum scores from both v3 and v4 keys."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+        mock_get_redis.return_value = mock_redis
+        result = self.user_admin.api_calls_count(self.user)
+        self.assertEqual(result, 15)
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_api_calls_count_handles_no_redis_data(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """api_calls_count should return 0 when Redis has no data."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+        mock_get_redis.return_value = mock_redis
+        result = self.user_admin.api_calls_count(self.user)
+        self.assertEqual(result, 0)
+
+
+class UserProfileTotalApiUsageTest(TestCase):
+    """Tests for UserProfile.total_api_usage."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_sums_v3_and_v4_counts(self, mock_get_redis: MagicMock) -> None:
+        """Lifetime total combines v3 and v4 ZSCORE values."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 15)
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_returns_zero_when_no_redis_data(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """No Redis entries means a zero total, not a crash."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 0)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsageTest")
+class ViewApiUsageTest(TestCase):
+    """Tests for /profile/api-usage/."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
+    def test_switch_off_hides_new_sections(self) -> None:
+        """With the switch off, only the recent-usage section renders."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotContains(response, "Your Access Level")
+        self.assertNotContains(response, "Your Total API Usage")
+        self.assertContains(response, "Your API Recent Usage")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_switch_on_shows_default_throttle_rates(self) -> None:
+        """Without overrides, access level falls back to settings defaults."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Your Access Level")
+        # Default rate exposed in DEFAULT_THROTTLE_RATES["user"].
+        self.assertContains(response, "per day")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_switch_on_shows_override_rates(self) -> None:
+        """User APIThrottle overrides replace the defaults in the listing."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+        )
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="500/day",
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "per minute")
+        self.assertContains(response, "per day")
+        # Default "per hour" rate should NOT appear — overrides replace it.
+        self.assertNotContains(response, "per hour")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    def test_blocked_user_filters_zero_rates(self) -> None:
+        """A 0/min row is dropped — we don't advertise blocked as a limit."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+        )
+        response = self.client.get(self.url)
+        # Heading still renders, but no rate rows for the blocked user.
+        self.assertNotContains(response, "per minute")
+
+    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+    @patch("cl.users.models.get_redis_interface")
+    def test_total_section_shows_count_and_donate(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """Lifetime total renders with a donate link when count > 0."""
+        mock_redis = MagicMock()
+        mock_pipe = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+        # pipeline.execute() returns results for v3 then v4 zscore calls
+        mock_pipe.execute.return_value = [42.0, 0.0]
+        mock_get_redis.return_value = mock_redis
+
+        response = self.client.get(self.url)
+        self.assertContains(response, "Your Total API Usage")
+        self.assertNotContains(response, "No API usage yet")
+        self.assertContains(response, "42")
+        self.assertContains(response, "donate.free.law/forms/supportflp")
+
+    def test_unauthenticated_redirected(self) -> None:
+        """The view is login-required."""
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertIn("/sign-in/", response["Location"])
+
+
+class TagZohoRecordForMembershipTest(TestCase):
+    """Tests for the tag_zoho_record_for_membership Celery task."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_lead_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead when a Lead match is found by CL ID/email."""
+        mock_lead = MagicMock()
+        mock_lead.get_id.return_value = 42
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = [mock_lead]
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_only_contact_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Falls back to the Contact module when no Lead match is found."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contact = MagicMock()
+        mock_contact.get_id.return_value = 99
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = [
+            mock_contact
+        ]
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.EDU
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_no_record_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when neither a Lead nor Contact match exists."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = []
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()
+
+
+class TagZohoRecordTest(SimpleTestCase):
+    """Tests for the tag_zoho_record Celery task (chained, no search)."""
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_record_info_points_to_lead(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Leads", 42), NeonMembershipLevel.TIER_1)
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_record_info_points_to_contact(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Contact directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Contacts", 99), NeonMembershipLevel.EDU)
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_record_info_is_none(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when the upstream task returned no record."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(None, NeonMembershipLevel.TIER_1)
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()
+
+
+@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+class RefreshAPIThrottlesAdminTest(TestCase):
+    def setUp(self):
+        self.staff = UserFactory(is_staff=True, is_superuser=True)
+        self.target = UserProfileWithParentsFactory().user
+        self.client = Client()
+        self.client.force_login(self.staff)
+        self.changelist_url = reverse("admin:auth_user_changelist")
+
+    def _run_action(self, *user_pks):
+        return self.client.post(
+            self.changelist_url,
+            {
+                "action": "refresh_api_throttles",
+                "_selected_action": [str(pk) for pk in user_pks],
+            },
+            follow=True,
+        )
+
+    def test_action_refreshes_throttles_for_active_member(self):
+        """The action installs Tier 1 rates for an active Tier 1 member."""
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="t1",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(self.target.pk)
+
+        rates = sorted(
+            APIThrottle.objects.filter(
+                user=self.target,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(rates, sorted(["10/min", "75/hour", "300/day"]))
+
+    def test_action_skips_user_without_active_membership(self):
+        """Users with no active membership are skipped with a warning."""
+        r = self._run_action(self.target.pk)
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no active Neon membership" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+    def test_action_warns_when_level_has_no_mapping(self):
+        """An active membership whose level isn't in LEVEL_TO_RATES is reported."""
+        # BASIC has no entry in LEVEL_TO_RATES, so apply_membership_throttles
+        # returns False even though the membership is active.
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="basic",
+            level=NeonMembershipLevel.BASIC,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        r = self._run_action(self.target.pk)
+
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no matching membership level" in m for m in msgs))
+        # No success message should appear, and no rows should be written.
+        self.assertFalse(any("Refreshed API throttles" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+    def test_action_handles_mixed_queryset(self):
+        """Action refreshes active members and skips inactive ones in one run."""
+        active = UserProfileWithParentsFactory().user
+        NeonMembership.objects.create(
+            user=active,
+            neon_id="t2",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(active.pk, self.target.pk)
+
+        # Active user got rates
+        self.assertTrue(
+            APIThrottle.objects.filter(
+                user=active,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).exists()
+        )
+        # Inactive user got nothing
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())

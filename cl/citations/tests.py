@@ -9,11 +9,13 @@ from unittest.mock import Mock, patch
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from bs4 import BeautifulSoup
+from celery.exceptions import Retry
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache as default_cache
 from django.core.management import call_command
+from django.db import OperationalError
 from django.db.models.signals import post_delete, post_save
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from elasticsearch import NotFoundError
 from eyecite import get_citations
@@ -66,14 +68,20 @@ from cl.citations.utils import (
     make_get_citations_kwargs,
 )
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
-from cl.search.documents import ParentheticalGroupDocument
+from cl.search.documents import (
+    ES_CHILD_ID,
+    OpinionClusterDocument,
+    ParentheticalGroupDocument,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
-    DocketEntryWithParentsFactory,
+    DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryMultipleOpinions,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterFactory,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithMultipleOpinionsFactory,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     RECAPDocumentFactory,
 )
@@ -88,9 +96,9 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+from cl.search.tasks import index_parent_and_child_docs
 from cl.tests.cases import (
     ESIndexTestCase,
-    SimpleTestCase,
     TestCase,
     TransactionTestCase,
 )
@@ -99,7 +107,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-class CitationTextTest(SimpleTestCase):
+class CitationTextTest(TestCase):
     def test_make_html_from_plain_text(self) -> None:
         """Can we convert the plain text of an opinion into HTML?"""
         # fmt: off
@@ -220,7 +228,9 @@ class CitationTextTest(SimpleTestCase):
                 with mock.patch(
                     "eyecite.find.find_reference_citations_from_markup"
                 ) as mock_func:
-                    get_citations_kwargs = make_get_citations_kwargs(opinion)
+                    get_citations_kwargs = make_get_citations_kwargs(opinion)[
+                        0
+                    ]
                     citations = get_citations(
                         tokenizer=HYPERSCAN_TOKENIZER,
                         **get_citations_kwargs,
@@ -241,6 +251,40 @@ class CitationTextTest(SimpleTestCase):
                     expected_html,
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
+
+    def test_create_html_with_citations_if_chunked(self):
+        """Test create html split over chunks"""
+        opinion = OpinionWithChildrenFactory(
+            html="<html>Something something 1 U.S. 1 something something 1 U.S. 1 something something</html>",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=CourtFactory(id="ca")),
+                case_name="Foo v. Bar",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+
+        expected = (
+            "<html>Something something "
+            '<span class="citation no-link">1 U.S. 1</span> '
+            "something something "
+            '<span class="citation no-link">1 U.S. 1</span> '
+            "something something</html>"
+        )
+
+        # override default 200_000 with 50 to prove works
+        with patch(
+            "cl.citations.tasks.make_get_citations_kwargs",
+            side_effect=lambda op: make_get_citations_kwargs(
+                op, chunk_size=50
+            ),
+        ):
+            store_opinion_citations_and_update_parentheticals(
+                opinion,
+                update_citation_count=False,
+                disable_parenthetical_groups=True,
+            )
+
+        self.assertEqual(opinion.html_with_citations, expected)
 
     def test_no_citations_found_or_resolved(self) -> None:
         """Ensure that we get `html_with_citations` when no citations are found"""
@@ -263,7 +307,7 @@ class CitationTextTest(SimpleTestCase):
         # end to end
         opinion = OpinionWithChildrenFactory(
             plain_text="No citations found here",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=CourtFactory(id="ca")),
                 case_name="Some placeholder",
                 date_filed=date(2025, 4, 25),
@@ -322,7 +366,7 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -398,7 +442,7 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(html=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -450,7 +494,7 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(xml_harvard=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -508,7 +552,7 @@ class CitationTextTest(SimpleTestCase):
                 expected_html=expected_html,
             ):
                 opinion = Opinion(plain_text=s)
-                get_citations_kwargs = make_get_citations_kwargs(opinion)
+                get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
                 citations = get_citations(
                     tokenizer=HYPERSCAN_TOKENIZER,
                     **get_citations_kwargs,
@@ -562,7 +606,7 @@ class CitationTextTest(SimpleTestCase):
                 pk="MATCH_ID",
                 cluster=Mock(OpinionCluster(id=1234), case_name=case_name),
             )
-            get_citations_kwargs = make_get_citations_kwargs(opinion)
+            get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
             citations = get_citations(
                 tokenizer=HYPERSCAN_TOKENIZER,
                 **get_citations_kwargs,
@@ -605,7 +649,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
         cls.recap_doc = RECAPDocumentFactory.create(
             plain_text=plain_text,
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
-            docket_entry=DocketEntryWithParentsFactory(),
+            docket_entry=DocketEntryFactory(),
         )
         # Courts
         court_ca2 = cls.court_ca2 = CourtFactory(id="ca2")
@@ -615,7 +659,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
             volume="948",
             reporter="F.3d",
             page="593",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_ca2),
                 case_name="Fisher v. SD Protection Inc.",
                 date_filed=date(2020, 1, 1),
@@ -627,7 +671,7 @@ class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
             volume="796",
             reporter="F.3d",
             page="199",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_ca2),
                 case_name="Cheeks v. Freeport Pancake House, Inc.",
                 date_filed=date(2015, 1, 1),
@@ -722,7 +766,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Foo v. Bar",
                 date_filed=date(
@@ -736,7 +780,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="2",
             reporter="F.3d",
             page="2",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_ca1),
                 case_name="Qwerty v. Uiop",
                 date_filed=date(2000, 1, 1),  # F.3d must be after 1993
@@ -754,7 +798,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="50",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Lorem v. Ipsum",
             ),
@@ -765,7 +809,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="999",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Abcdef v. Ipsum",
                 sub_opinions=RelatedFactory(
@@ -781,7 +825,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="123",
             reporter="U.S.",
             page="123",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_scotus),
                 case_name="Bush v. Gore",
                 date_filed=date.today(),  # Must be later than any cited opinion
@@ -793,11 +837,28 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
+        # It includes a self citation in the title (like lawbox opinions)
+        cls.citation5a = CitationWithParentsFactory.create(
+            volume="123",
+            reporter="U.S.",
+            page="123",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=cls.court_scotus),
+                case_name="Bush v. Gore",
+                date_filed=date.today(),  # Must be later than any cited opinion
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="123 U.S. 123 Bush v. Gore America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                ),
+            ),
+        )
+
         cls.citation6 = CitationWithParentsFactory.create(
             volume="114",
             reporter="F.3d",
             page="1182",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Foo v. Bar",
                 date_filed=date(1997, 4, 10),
@@ -808,7 +869,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="114",
             reporter="F.3d",
             page="1182",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Lorem v. Ipsum",
                 date_filed=date(1997, 4, 8),
@@ -819,7 +880,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="John v. Doe",
                 date_filed=date(1997, 4, 9),
@@ -835,7 +896,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="114",
             reporter="F.3d",
             page="1181",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Lorem v. Ipsum",
                 date_filed=date(1997, 4, 8),
@@ -846,7 +907,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="114",
             reporter="F.3d",
             page="1181",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Lorem v. Ipsum",
                 date_filed=date(1997, 4, 8),
@@ -857,7 +918,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="U.S.",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=cls.court_ca5),
                 case_name="Foo v. Bar",
                 date_filed=date(1997, 4, 9),
@@ -873,7 +934,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             volume="8",
             reporter="Barb.",
             page="415",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 case_name="Shaffer v. Lee",
                 date_filed=date(1850, 4, 9),
                 sub_opinions=RelatedFactory(
@@ -884,7 +945,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ),
         )
 
-        cls.cluster_1 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_1 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_illappct,
                 case_name="People v. Williams",
@@ -898,7 +959,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_2 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_2 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_illappct,
                 case_name="People v. Jackson",
@@ -912,7 +973,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_3 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_3 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_nj,
                 case_name="State v. Gatson",
@@ -926,7 +987,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_4 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_4 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_nj,
                 case_name="State v. Gerrard",
@@ -938,7 +999,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_5 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_5 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_dc,
                 case_name="Good v. United States",
@@ -950,7 +1011,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             ],
         )
 
-        cls.cluster_6 = OpinionClusterFactoryMultipleOpinions(
+        cls.cluster_6 = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(
                 court=cls.court_dc,
                 case_name="Duncan v. United States",
@@ -971,7 +1032,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_1_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=307,
+                volume="307",
                 reporter="Ill. Dec.",
                 page=312,
                 type=Citation.STATE,
@@ -980,7 +1041,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_2_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=203,
+                volume="203",
                 reporter="N.J.",
                 page=92,
                 type=Citation.STATE,
@@ -989,7 +1050,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         for cluster in cls.same_citation_3_clusters:
             Citation.objects.create(
                 cluster=cluster,
-                volume=172,
+                volume="172",
                 reporter="A.3d",
                 page=459,
                 type=Citation.STATE_REGIONAL,
@@ -1014,7 +1075,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                     volume="3",
                     reporter="U.S.",
                     page="888",
-                    cluster=OpinionClusterFactoryWithChildrenAndParents(
+                    cluster=OpinionClusterWithChildrenAndParentsFactory(
                         docket=DocketFactory(court=self.court_scotus),
                         case_name="Obama v. Clinton",
                         date_filed=date.today(),
@@ -1033,7 +1094,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                 volume="3",
                 reporter="U.S.",
                 page="888",
-                cluster=OpinionClusterFactoryWithChildrenAndParents(
+                cluster=OpinionClusterWithChildrenAndParentsFactory(
                     docket=DocketFactory(court=self.court_scotus),
                     case_name="America v. Maxwell",
                     date_filed=date.today(),
@@ -1342,7 +1403,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
 
         # Verify if the annotated citation is correct
         opinion = self.citation8.cluster.sub_opinions.all().first()
-        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
         citations = get_citations(
             tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
         )
@@ -1357,7 +1418,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # Verify if we can annotate multiple citations that can't be
         # disambiguated
         opinion = self.citation11.cluster.sub_opinions.all().first()
-        get_citations_kwargs = make_get_citations_kwargs(opinion)
+        get_citations_kwargs = make_get_citations_kwargs(opinion)[0]
         citations = get_citations(
             tokenizer=HYPERSCAN_TOKENIZER, **get_citations_kwargs
         )
@@ -1457,6 +1518,30 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
                         ).count(),
                         1,
                     )
+
+    def test_opinionscited_no_self_creation(self) -> None:
+        """Make sure no OpinionsCited have been created when self citation is included in opinion
+        content from cluster"""
+        opinion5a = Opinion.objects.get(cluster__pk=self.citation5a.cluster_id)
+
+        citing = opinion5a
+        find_citations_and_parentheticals_for_opinion_by_pks.delay(
+            [opinion5a.pk]
+        )
+
+        # Verify that self citation is in opinion text
+        citation_str = f"{self.citation5a.volume} {self.citation5a.reporter} {self.citation5a.page}"
+        self.assertIn(
+            citation_str,
+            opinion5a.plain_text,
+            "Self citation is not in plain text object",
+        )
+
+        # Verify no OpinionsCited was created to self opinion form same cluster
+        results = OpinionsCited.objects.filter(cited_opinion=citing)
+        self.assertEqual(
+            results.count(), 0, "OpinionsCited created to self opinion"
+        )
 
     def test_no_duplicate_parentheticals_from_parallel_cites(self) -> None:
         citing = Opinion.objects.get(cluster__pk=self.citation4.cluster_id)
@@ -1569,7 +1654,7 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         # have Parentheticals for
         opinion5 = Opinion.objects.get(cluster__pk=self.citation5.cluster_id)
         find_citations_and_parentheticals_for_opinion_by_pks(
-            opinion_pks=[opinion5.pk], disconnect_pg_signals=True
+            opinion_pks=[opinion5.pk], disable_parenthetical_groups=True
         )
         self.assertEqual(
             post_save.receivers[-1][0][0],
@@ -1623,6 +1708,25 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
             cited_count,
             new_count,
             "citation_count was update even when update was disabled",
+        )
+
+    def test_citation_string_volume(self) -> None:
+        """Can we store volume numbers with letters or additional characters?"""
+
+        self.alphanumeric_citation = CitationWithParentsFactory.create(
+            volume="71A",
+            reporter="A.F.T.R.2d (RIA)",
+            page="3011",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=self.court_scotus),
+                case_name="Foo v. Bar",
+                date_filed=date(2025, 7, 31),
+            ),
+        )
+
+        self.assertEqual(self.alphanumeric_citation.volume, "71A")
+        self.assertEqual(
+            str(self.alphanumeric_citation), "71A A.F.T.R.2d (RIA) 3011"
         )
 
 
@@ -1699,7 +1803,7 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             volume="1",
             reporter="Yeates",
             page="1",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 # Yeates was published from 1791 to 1808
                 date_filed=date(1800, 1, 1),
             ),
@@ -1710,7 +1814,7 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             volume="56",
             reporter="F.2d",
             page="9",
-            cluster=OpinionClusterFactoryWithChildrenAndParents(
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(court=court_scotus),
                 case_name="Foo v. Bar",
                 date_filed=date.today(),  # Must be later than any cited opinion
@@ -2606,9 +2710,9 @@ class CitationLookUpApiTest(
     ) -> None:
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=1, reporter="Handy", page="150", type=1)
+        )(volume="1", reporter="Handy", page="150", type=1)
         haw_citation = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=1, reporter="Haw.", page="150", type=1
+            volume="1", reporter="Haw.", page="150", type=1
         )
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2825,7 +2929,7 @@ class CitationLookUpApiTest(
     ) -> None:
         la_rue_citation = await sync_to_async(
             CitationWithParentsFactory.create
-        )(volume=139, reporter="U.S.", page="601", type=1)
+        )(volume="139", reporter="U.S.", page="601", type=1)
 
         text_citation = (
             "the majority of the court was of opinion that the transfer of the "
@@ -2905,7 +3009,7 @@ class CitationLookUpApiTest(
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
-        return_value="20/m",
+        return_value=["20/m"],
     )
     async def test_can_throttle_user_when_querying_exact_rate_limit(
         self, get_rate_mock, throttle_logic_mock
@@ -2951,7 +3055,7 @@ class CitationLookUpApiTest(
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
-        return_value="20/m",
+        return_value=["20/m"],
     )
     async def test_can_throttle_user_exceeding_citation_limit_by_small_number(
         self, get_rate_mock, throttle_logic_mock
@@ -3039,7 +3143,7 @@ class CitationLookUpApiTest(
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
-        return_value="20/m",
+        return_value=["20/m"],
     )
     async def test_can_throttle_user_exceeding_citation_limit_by_big_margin(
         self, get_rate_mock, throttle_logic_mock
@@ -3078,6 +3182,24 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=3)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
+    async def test_can_filter_out_citation_with_string_volume(
+        self, cache_key_mock
+    ):
+        """Can we filter using a citation with a character in the volume?"""
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": ("71A A.F.T.R.2d (RIA) 4660")},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(
+            first_citation["citation"], "71A A.F.T.R.2d (RIA) 4660"
+        )
+
 
 class UnmatchedCitationTest(TransactionTestCase):
     """Test UnmatchedCitation model and related logic"""
@@ -3104,7 +3226,7 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.cluster = OpinionClusterFactoryWithChildrenAndParents()
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
         cls.opinion = cls.cluster.sub_opinions.first()
         UnmatchedCitation.objects.all().delete()
 
@@ -3188,7 +3310,7 @@ class UnmatchedCitationTest(TransactionTestCase):
 
     def test_self_citation(self) -> None:
         """Can we prevent a self citation being stored as UnmatchedCitation?"""
-        cluster = OpinionClusterFactoryWithChildrenAndParents()
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
         CitationWithParentsFactory.create(
             volume="948",
             reporter="F.3d",
@@ -3207,3 +3329,289 @@ class UnmatchedCitationTest(TransactionTestCase):
         self.assertEqual(
             count, 0, "Self-cite has been stored as UnmatchedCitation"
         )
+
+    def test_saving_non_standard_year_format(self) -> None:
+        """Can we prevent crash with atypical year format?"""
+
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
+        eyecite_citations = get_citations(
+            """2018 WL 1915078, at *2 (Mass. 1993-94).""",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        handle_unmatched_citations(opinion, eyecite_citations, {})
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=opinion).all()
+        )
+        self.assertEqual(
+            len(unmatched_citations),
+            1,
+            "Incorrect number of citations saved",
+        )
+
+    def test_saving_volume_string(self) -> None:
+        """Can we save volume numbers with letters or additional characters?"""
+
+        cluster = OpinionClusterWithChildrenAndParentsFactory()
+        eyecite_citations = get_citations(
+            """71A A.F.T.R.2d (RIA) 3011""",
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
+        opinion = cluster.sub_opinions.first()
+        handle_unmatched_citations(opinion, eyecite_citations, {})
+        unmatched_citations = list(
+            UnmatchedCitation.objects.filter(citing_opinion=opinion).all()
+        )
+        self.assertEqual(
+            len(unmatched_citations),
+            1,
+            "Incorrect number of citations saved",
+        )
+        self.assertEqual(
+            str(unmatched_citations[0]), "71A A.F.T.R.2d (RIA) 3011"
+        )
+
+
+class TasksTest(TestCase):
+    """Test citations tasks"""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+
+        cls.ca_court = CourtFactory(id="ca")
+
+        cls.opinion_1 = OpinionWithChildrenFactory(
+            plain_text="Sample text 1",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 1",
+                date_filed=date(2025, 4, 25),
+            ),
+        )
+
+        cls.opinion_2 = OpinionWithChildrenFactory(
+            plain_text="Sample text 2",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 2",
+                date_filed=date(2025, 4, 26),
+            ),
+        )
+        cls.opinion_3 = OpinionWithChildrenFactory(
+            plain_text="Sample text 3",
+            cluster=OpinionClusterWithChildrenAndParentsFactory(
+                docket=DocketFactory(court=cls.ca_court),
+                case_name="Opinion 3",
+                date_filed=date(2025, 4, 27),
+            ),
+        )
+
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
+    )
+    @patch("celery.app.task.Task.retry", side_effect=Retry())
+    def test_operational_error_does_not_cause_recursion(
+        self, mock_retry, mock_store
+    ):
+        """Ensure retry of failed opinion ids by OperationalError triggers retry but does not cause recursion"""
+
+        # Simulate every call raises OperationalError
+        mock_store.side_effect = OperationalError()
+
+        # Call the task once, it should raise Retry
+        with self.assertRaises(Retry):
+            find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                args=([self.opinion_1.id, self.opinion_2.id], False, False),
+                throw=True,
+            )
+
+        # Confirm retry was triggered once with the batch of ids
+        mock_retry.assert_called_once()
+        retry_args = mock_retry.call_args.kwargs
+
+        self.assertIsInstance(retry_args["exc"], OperationalError)
+        self.assertEqual(
+            sorted(retry_args["args"][0]),
+            sorted([self.opinion_1.id, self.opinion_2.id]),
+        )
+        self.assertEqual(retry_args["args"][1:], (False, False))
+
+        self.assertEqual(retry_args["countdown"], 5)
+
+    @patch("celery.app.task.Task.retry", side_effect=Retry())
+    @patch(
+        "cl.citations.tasks.store_opinion_citations_and_update_parentheticals"
+    )
+    def test_operational_error_accumulates_failed_ids_and_retries_together(
+        self, mock_store, mock_retry
+    ):
+        """Ensure multiple OperationalError cases are retried in batch with self.retry"""
+
+        def side_effect(opinion, *_):
+            """Mocks store_opinion_citations_and_update_parentheticals call
+            Simulates a failure for opinion_1 and opinon_3
+
+            :param opinion: The opinion object being processed
+            :param *_: Ignored positional arguments passed by the task
+            :return: None for all other opinions to simulate success
+            """
+            if opinion.id in [self.opinion_2.id, self.opinion_3.id]:
+                raise OperationalError()
+            return None
+
+        mock_store.side_effect = side_effect
+
+        with self.assertRaises(Retry):
+            find_citations_and_parentheticals_for_opinion_by_pks.apply(
+                args=(
+                    [self.opinion_1.id, self.opinion_2.id, self.opinion_3.id],
+                    False,
+                    False,
+                ),
+                throw=True,
+            )
+
+        called_args = mock_retry.call_args.kwargs
+
+        self.assertEqual(called_args["countdown"], 5)
+        self.assertIsInstance(called_args["exc"], OperationalError)
+        self.assertEqual(
+            set(called_args["args"][0]),
+            {self.opinion_2.id, self.opinion_3.id},
+            "Should retry only failed opinion IDs",
+        )
+
+
+class CountCitationsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        court = CourtFactory(id="illappct")
+        docket = DocketFactory.create(court=court)
+
+        # 1 cluster with 0 citations to it
+        cls.cluster1 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_000
+        )
+        cluster1_opinion = OpinionFactory(cluster=cls.cluster1)
+
+        # 1 cluster with 2 subopinions, each with one citation to it
+        cls.cluster2 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_001
+        )
+        cluster2_opinion1 = OpinionFactory(cluster=cls.cluster2)
+        cluster2_opinion2 = OpinionFactory(cluster=cls.cluster2)
+
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster2_opinion1,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster2_opinion2,
+            depth=1,
+        )
+
+        # 1 cluster with 1 sub opinion, and 3 citations to it
+        cls.cluster3 = OpinionClusterFactory(
+            docket=docket, citation_count=0, id=1_000_002
+        )
+        cluster3_opinion = OpinionFactory(cluster=cls.cluster3)
+
+        OpinionsCited.objects.create(
+            citing_opinion=cluster1_opinion,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster2_opinion1,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=cluster2_opinion2,
+            cited_opinion=cluster3_opinion,
+            depth=1,
+        )
+
+    def test_count_citations_from_opinions_cited(self):
+        """Can we compute OpinionCluster.citation_count using OpinionsCited?"""
+        call_command(
+            "count_citations",
+            count_from_opinions_cited=True,
+            start_cluster_id=1_000_000,
+            end_cluster_id=1_001_000,
+        )
+        self.cluster1.refresh_from_db()
+        self.cluster2.refresh_from_db()
+        self.cluster3.refresh_from_db()
+        self.assertEqual(self.cluster1.citation_count, 0, "Count should be 0")
+        self.assertEqual(
+            self.cluster2.citation_count,
+            2,
+            "Count should be 2, 1 per each subopinion",
+        )
+        self.assertEqual(self.cluster3.citation_count, 3, "Count should be 3")
+
+
+class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.rebuild_index("search.OpinionCluster")
+
+    def test_cite_count_reindex(self):
+        """Can we update OpinionClusterDocument.citeCount?"""
+        cite_count = 10
+        cluster = OpinionClusterWithChildrenAndParentsFactory.create(
+            citation_count=cite_count
+        )
+        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+        doc = OpinionClusterDocument.get(id=cluster.id)
+        self.assertEqual(doc.citeCount, cite_count)
+
+        # make a change that won't be catched by signals
+        OpinionCluster.objects.filter(id=cluster.id).update(
+            citation_count=cite_count + 1
+        )
+
+        call_command(
+            "reindex_es_cite_fields",
+            reindex_target="citeCount",
+            start_id=cluster.id - 10,
+            end_id=cluster.id + 10,
+        )
+
+        doc = OpinionClusterDocument.get(id=cluster.id)
+        self.assertEqual(doc.citeCount, cite_count + 1)
+
+    def test_cites_reindex(self):
+        """Can we update the OpinionDocument.cites field?"""
+        cluster = OpinionClusterWithChildrenAndParentsFactory.create()
+        opinion = cluster.sub_opinions.first()
+        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+
+        another_cluster = OpinionClusterWithChildrenAndParentsFactory.create()
+        another_opinion = another_cluster.sub_opinions.first()
+
+        created = OpinionsCited.objects.create(
+            citing_opinion=another_opinion, cited_opinion=another_opinion
+        )
+        # prevent triggering the signal using .update
+        OpinionsCited.objects.filter(id=created.id).update(
+            citing_opinion=opinion
+        )
+
+        doc = OpinionClusterDocument.get(id=ES_CHILD_ID(opinion.id).OPINION)
+        self.assertFalse(another_opinion.id in doc["cites"])
+
+        call_command(
+            "reindex_es_cite_fields",
+            reindex_target="cites",
+            start_id=opinion.id - 10,
+            end_id=opinion.id + 10,
+        )
+        doc = OpinionClusterDocument.get(id=ES_CHILD_ID(opinion.id).OPINION)
+        self.assertTrue(another_opinion.id in doc["cites"])

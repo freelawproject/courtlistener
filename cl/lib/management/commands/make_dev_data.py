@@ -3,6 +3,7 @@ from django.core.management.base import CommandParser
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.api.factories import WebhookEventWithParentsFactory
 from cl.audio.factories import AudioWithParentsFactory
+from cl.disclosures.factories import PersonWithDisclosuresFactory
 from cl.favorites.factories import PrayerFactory
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
@@ -10,15 +11,19 @@ from cl.recap.factories import FjcIntegratedDatabaseFactory
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketEntryForDocketFactory,
     DocketEntryReuseParentsFactory,
-    DocketEntryWithParentsFactory,
     DocketFactory,
     DocketWithChildrenFactory,
     OpinionClusterWithParentsFactory,
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
     RECAPDocumentFactory,
+)
+from cl.search.state.texas.factories import (
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
 )
 from cl.users.factories import UserFactory
 
@@ -28,7 +33,7 @@ FACTORIES = {
     101: DocketFactory,
     102: OpinionClusterWithParentsFactory,
     103: OpinionWithParentsFactory,
-    104: DocketEntryWithParentsFactory,
+    104: DocketEntryFactory,
     105: ParentheticalWithParentsFactory,
     106: FjcIntegratedDatabaseFactory,
     107: DocketEntryForDocketFactory,
@@ -38,6 +43,7 @@ FACTORIES = {
     # People DB app
     200: PersonFactory,
     201: PersonWithChildrenFactory,
+    202: PersonWithDisclosuresFactory,
     # Users
     300: UserFactory,
     # Citations
@@ -49,6 +55,9 @@ FACTORIES = {
     600: AudioWithParentsFactory,
     # API
     700: WebhookEventWithParentsFactory,
+    # Texas
+    800: TexasDocketEntryFactory,
+    801: TexasDocumentFactory,
 }
 factories_str = "\n".join(f"{k}: {v}" for k, v in FACTORIES.items())
 
@@ -117,6 +126,10 @@ class Command(VerboseCommand):
                 (
                     "docket alerts and their parent objects",
                     DocketAlertWithParentsFactory,
+                ),
+                (
+                    "audio and their parent objects",
+                    AudioWithParentsFactory,
                 ),
             ):
                 logger.info(f"Making {count} {note}")

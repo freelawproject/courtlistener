@@ -1,0 +1,46 @@
+name: General
+description: File a general issue
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <p align="center"><em>Thank you for filing a general issue!</em></p>
+
+        > [!IMPORTANT]
+        > - Please provide a descriptive title.
+        > - Please search existing issues to avoid creating duplicates.
+        > - For bug reports, please use the bug reports template.
+        > - For enhancement requests, please use GitHub Discussions.
+        > - Please fill out the template below to the best of your ability.
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the issue.
+      description: Describe the issue clearly and concisely.
+      placeholder: Tell us what this issue is all about!
+    validations:
+      required: true
+  - type: textarea
+    id: related-issue
+    attributes:
+      label: Related Issue
+      description: If applicable, add links to related issues.
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the issue.
+    validations:
+      required: false
+  - type: dropdown
+    id: type
+    attributes:
+      label: What type of issue is this?
+      options:
+        - Research
+        - To Do
+        - Other
+    validations:
+      required: true

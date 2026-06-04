@@ -19,7 +19,6 @@ class JurisdictionPodcast(JurisdictionFeed):
         "the CourtListener.com initiative. Not an official podcast."
     )
     subtitle = description
-    summary = description
     iTunes_name = "Free Law Project"
     iTunes_email = "feeds@courtlistener.com"
     iTunes_image_url = f"{static('png/producer-2000x2000.png')}"
@@ -45,8 +44,12 @@ class JurisdictionPodcast(JurisdictionFeed):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         search_query = AudioDocument.search()
-        items = do_es_feed_query(search_query, cd, rows=20)
-        return items
+        return do_es_feed_query(
+            search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field="local_path",
+        )
 
     def feed_extra_kwargs(self, obj):
         extra_args = {
@@ -110,30 +113,77 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         search_query = AudioDocument.search()
-        items = do_es_feed_query(search_query, cd, rows=20)
-        return items
+        return do_es_feed_query(
+            search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field="local_path",
+        )
 
 
 class SearchPodcast(JurisdictionPodcast):
-    title = "CourtListener.com Custom Oral Argument Podcast"
+    def _get_search_summary(self, request):
+        """Build a human-readable search summary from GET params.
+
+        Caches on the request to avoid re-parsing the form in
+        title/description/subtitle.
+        """
+        if hasattr(request, "_summary_cache"):
+            return request._summary_cache
+
+        summary = ""
+        search_form = SearchForm(request.GET)
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
+            courts: list[bool] = [
+                v for k, v in cd.items() if k.startswith("court_")
+            ]
+            selected = courts.count(True)
+            court_count_human = (
+                "All" if selected == len(courts) else str(selected)
+            )
+            summary = search_form.as_text(court_count_human)
+
+        request._summary_cache = summary
+        return summary
+
+    def title(self, obj):
+        if summary := self._get_search_summary(obj):
+            return f"{summary} — CourtListener Oral Arguments"
+        return "CourtListener.com Custom Oral Argument Podcast"
+
+    def description(self, obj):
+        if summary := self._get_search_summary(obj):
+            return (
+                f"Oral arguments matching: {summary}. "
+                "A custom podcast by Free Law Project via "
+                "CourtListener.com."
+            )
+        return (
+            "A chronological podcast of oral arguments with improved "
+            "files and meta data. Hosted by Free Law Project through "
+            "the CourtListener.com initiative."
+        )
+
+    def subtitle(self, obj):
+        return self.description(obj)
 
     def get_object(self, request, get_string):
         return request
 
     def items(self, obj):
         search_form = SearchForm(obj.GET)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            override_params = {
-                "order_by": "dateArgued desc",
-            }
-            cd.update(override_params)
-            search_query = AudioDocument.search()
-            items = do_es_feed_query(
-                search_query,
-                cd,
-                rows=20,
-            )
-            return items
-        else:
+        if not search_form.is_valid():
             return []
+        cd = search_form.cleaned_data
+        override_params = {
+            "order_by": "dateArgued desc",
+        }
+        cd.update(override_params)
+        search_query = AudioDocument.search()
+        return do_es_feed_query(
+            search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field="local_path",
+        )

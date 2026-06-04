@@ -1,11 +1,15 @@
 import logging
 import string
 
+from django.conf import settings
 from django.db.utils import IntegrityError
 from factory import (
+    DictFactory,
     Faker,
     Iterator,
     LazyAttribute,
+    LazyFunction,
+    List,
     RelatedFactory,
     SelfAttribute,
     SubFactory,
@@ -17,10 +21,11 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 
 from cl.lib.factories import RelatedFactoryVariableList
 from cl.people_db.factories import PersonFactory
+from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     BankruptcyInformation,
+    CaseTransfer,
     Citation,
     Court,
     Docket,
@@ -32,6 +37,9 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SCOTUSDocketEntry,
+    SCOTUSDocument,
+    TrialCourtData,
 )
 from cl.tests.providers import LegalProvider
 
@@ -71,6 +79,56 @@ class CourtFactory(DjangoModelFactory):
                 count = count + 1
                 if count > 3:
                     raise (exp)
+
+
+class DocketFactory(DjangoModelFactory):
+    class Meta:
+        model = Docket
+        skip_postgeneration_save = True
+
+    source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
+    court = SubFactory(CourtFactory)
+    appeal_from = SubFactory(CourtFactory)
+    case_name_short = LazyAttribute(
+        lambda self: cnt.make_case_name_short(self.case_name)
+    )
+    case_name = Faker("case_name")
+    case_name_full = Faker("case_name", full=True)
+    pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    docket_number = Faker("federal_district_docket_number")
+    docket_number_raw = SelfAttribute("docket_number")
+    slug = Faker("slug")
+    date_argued = Faker("date_object")
+    view_count = 0
+
+    """
+    This hook is necessary to make this factory compatible with the
+    `make_dev_command` by delegating the file creation to the hook, we prevent
+    the model from trying to use our storage settings when the field is not
+    explicitly requested
+    """
+
+    @post_generation
+    def filepath_local(self, create, extracted, **kwargs):
+        """Attaches a stub file to an instance of this factory."""
+        if extracted:
+            self.filepath_local = extracted
+        elif kwargs:
+            # Factory Boy uses the `evaluate` method of each field to calculate
+            # values for object creation. The FileField class only requires the
+            # extra dictionary to create the stub django file.
+            #
+            # Learn more about FactoryBoy's `FileField` class:
+            # https://github.com/FactoryBoy/factory_boy/blob/ac49fb40ec424276c3cd3ca0925ba99a626f05f7/factory/django.py#L249
+            self.filepath_local = FileField().evaluate(None, None, kwargs)
+
+        if create:
+            # Use a Docket queryset to persist filepath_local instead of calling
+            # save(), which can trigger duplicate post_save signals, potentially
+            # causing issues in certain testing scenarios.
+            Docket.objects.filter(pk=self.pk).update(
+                filepath_local=self.filepath_local
+            )
 
 
 class ParentheticalFactory(DjangoModelFactory):
@@ -117,19 +175,6 @@ class OpinionWithChildrenFactory(OpinionFactory):
     )
 
 
-class CitationWithParentsFactory(DjangoModelFactory):
-    class Meta:
-        model = Citation
-
-    volume = Faker("random_int", min=1, max=100)
-    reporter = "U.S."
-    page = Faker("random_int", min=1, max=100)
-    type = 1
-    cluster = SubFactory(
-        "cl.search.factories.OpinionClusterFactoryWithChildrenAndParents",
-    )
-
-
 class OpinionWithParentsFactory(OpinionFactory):
     cluster = SubFactory(
         "cl.search.factories.OpinionClusterWithParentsFactory",
@@ -147,67 +192,61 @@ class OpinionClusterFactory(DjangoModelFactory):
     case_name_full = Faker("case_name", full=True)
     date_filed = Faker("date")
     slug = Faker("slug")
-    source = FuzzyChoice(SOURCES.NAMES, getter=lambda c: c[0])
+    source = FuzzyChoice(ClusterSources.NAMES, getter=lambda c: c[0])
     precedential_status = FuzzyChoice(
         PRECEDENTIAL_STATUS.NAMES, getter=lambda c: c[0]
     )
 
 
-class OpinionClusterFactoryWithChildren(OpinionClusterFactory):
+class OpinionClusterWithChildrenFactory(OpinionClusterFactory):
     sub_opinions = RelatedFactory(
         OpinionWithChildrenFactory,
         factory_related_name="cluster",
     )
 
 
-class DocketParentMixin(DjangoModelFactory):
+class OpinionClusterWithParentsFactory(OpinionClusterFactory):
+    """Make an OpinionCluster with Docket parents"""
+
     docket = SubFactory(
-        "cl.search.factories.DocketFactory",
-        # Set the case names on the docket to the ones on this object
-        # if it has them. Else generate the case name values.
-        case_name=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name",
-                Faker("case_name").evaluate(None, None, {"locale": None}),
-            )
-        ),
-        case_name_short=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name_short",
-                cnt.make_case_name_short(self.case_name),
-            )
-        ),
-        case_name_full=LazyAttribute(
-            lambda self: getattr(
-                self.factory_parent,
-                "case_name_full",
-                Faker("case_name", full=True).evaluate(
-                    None, None, {"locale": None}
-                ),
-            )
-        ),
+        DocketFactory,
+        case_name=SelfAttribute("..case_name"),
+        case_name_full=SelfAttribute("..case_name_full"),
+        case_name_short=SelfAttribute("..case_name_short"),
     )
 
 
-class OpinionClusterFactoryWithChildrenAndParents(
-    OpinionClusterFactory, DocketParentMixin
+class OpinionClusterWithChildrenAndParentsFactory(
+    OpinionClusterWithChildrenFactory, OpinionClusterWithParentsFactory
 ):
-    sub_opinions = RelatedFactory(
-        OpinionWithChildrenFactory,
-        factory_related_name="cluster",
-    )
     precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
 
 
-class OpinionClusterWithParentsFactory(
-    OpinionClusterFactory,
-    DocketParentMixin,
+class OpinionClusterWithMultipleOpinionsFactory(
+    OpinionClusterWithParentsFactory
 ):
-    """Make an OpinionCluster with Docket parents"""
+    """Make an OpinionCluster with Docket parent and multiple opinions"""
 
-    pass
+    class Meta:
+        skip_postgeneration_save = True
+
+    sub_opinions = RelatedFactoryVariableList(
+        factory=OpinionWithChildrenFactory,
+        factory_related_name="cluster",
+        size=3,  # by default create 3 opinions
+    )
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
+
+
+class CitationWithParentsFactory(DjangoModelFactory):
+    class Meta:
+        model = Citation
+
+    volume = Faker("random_int", min=1, max=100)
+    reporter = "U.S."
+    page = Faker("random_int", min=1, max=100)
+    type = 1
+    cluster = SubFactory(OpinionClusterWithChildrenAndParentsFactory)
 
 
 class DocketEntryFactory(DjangoModelFactory):
@@ -215,7 +254,7 @@ class DocketEntryFactory(DjangoModelFactory):
         model = DocketEntry
 
     description = Faker("text", max_nb_chars=750)
-    docket = SubFactory("cl.search.factories.DocketFactory")
+    docket = SubFactory(DocketFactory)
 
 
 class RECAPDocumentFactory(DjangoModelFactory):
@@ -225,11 +264,67 @@ class RECAPDocumentFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
     docket_entry = SubFactory(DocketEntryFactory)
     document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    pacer_doc_id = Faker("numerify", text="%#####")
+
+    @classmethod
+    def _generate(cls, strategy, params):
+        """
+        If document_number is specified, also set the DocketEntry's
+        entry_number.
+        """
+        if params.get("document_number", ""):
+            params["docket_entry__entry_number"] = params["document_number"]
+        return super()._generate(strategy, params)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        obj = model_class(*args, **kwargs)
+        cls._fixup(obj)
+        obj.save()
+        return obj
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If the document has a DocketEntry that is part of a Docket and it
+        doesn't have an entry_number, set it to the highest entry in the docket
+        and then set the document_number to match.
+        """
+        if (
+            not obj.document_number
+            and (de := obj.docket_entry)
+            and (d := de.docket)
+        ):
+            if not de.entry_number:
+                de.entry_number = 1
+                if d.docket_entries.exclude(entry_number=None).exists():
+                    de.entry_number += (
+                        d.docket_entries.exclude(entry_number=None)
+                        .order_by("-entry_number")
+                        .values_list("entry_number")[0][0]
+                    )
+                de.save()
+            obj.document_number = str(de.entry_number)
 
 
-class DocketReuseParentMixin(DjangoModelFactory):
-    docket = Iterator(Docket.objects.all())
+class RECAPAttachmentFactory(RECAPDocumentFactory):
+    document_type = RECAPDocument.ATTACHMENT
+
+    @classmethod
+    def _fixup(cls, obj):
+        """
+        If an attachment_number wasn't specificed, then set it to the highest
+        for the docket entry.
+        """
+        super()._fixup(obj)
+        if not obj.attachment_number and (de := obj.docket_entry):
+            obj.attachment_number = 1
+            if de.recap_documents.exclude(attachment_number=None).exists():
+                obj.attachment_number += (
+                    de.recap_documents.exclude(attachment_number=None)
+                    .order_by("-attachment_number")
+                    .values_list("attachment_number")[0][0]
+                )
 
 
 class DocketEntryForDocketFactory(DjangoModelFactory):
@@ -249,94 +344,17 @@ class DocketEntryForDocketFactory(DjangoModelFactory):
     description = Faker("text", max_nb_chars=750)
 
 
-class DocketEntryWithParentsFactory(
-    DocketEntryFactory,
-    DocketParentMixin,
-):
-    """Make a DocketEntry with Docket parents"""
-
-    pass
-
-
-class DocketEntryReuseParentsFactory(
-    DocketEntryFactory,
-    DocketReuseParentMixin,
-):
+class DocketEntryReuseParentsFactory(DocketEntryFactory):
     """Make a DocketEntry using existing Dockets as parents"""
 
-    pass
-
-
-class DocketFactory(DjangoModelFactory):
-    class Meta:
-        model = Docket
-        skip_postgeneration_save = True
-
-    source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
-    court = SubFactory(CourtFactory)
-    appeal_from = SubFactory(CourtFactory)
-    case_name_short = LazyAttribute(
-        lambda self: cnt.make_case_name_short(self.case_name)
-    )
-    case_name = Faker("case_name")
-    case_name_full = Faker("case_name", full=True)
-    pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
-    docket_number = Faker("federal_district_docket_number")
-    slug = Faker("slug")
-    date_argued = Faker("date_object")
-    view_count = 0
-
-    """
-    This hook is necessary to make this factory compatible with the
-    `make_dev_command` by delegating the file creation to the hook, we prevent
-    the model from trying to use our storage settings when the field is not
-    explicitly requested
-    """
-
-    @post_generation
-    def filepath_local(self, create, extracted, **kwargs):
-        """Attaches a stub file to an instance of this factory."""
-        if extracted:
-            self.filepath_local = extracted
-        elif kwargs:
-            # Factory Boy uses the `evaluate` method of each field to calculate
-            # values for object creation. The FileField class only requires the
-            # extra dictionary to create the stub django file.
-            #
-            # Learn more about FactoryBoy's `FileField` class:
-            # https://github.com/FactoryBoy/factory_boy/blob/ac49fb40ec424276c3cd3ca0925ba99a626f05f7/factory/django.py#L249
-            self.filepath_local = FileField().evaluate(None, None, kwargs)
-
-        if create:
-            # Use a Docket queryset to persist filepath_local instead of calling
-            # save(), which can trigger duplicate post_save signals, potentially
-            # causing issues in certain testing scenarios.
-            Docket.objects.filter(pk=self.pk).update(
-                filepath_local=self.filepath_local
-            )
+    docket = Iterator(Docket.objects.all())
 
 
 class DocketWithChildrenFactory(DocketFactory):
     clusters = RelatedFactory(
-        OpinionClusterFactoryWithChildren,
+        OpinionClusterWithChildrenFactory,
         factory_related_name="docket",
     )
-
-
-class OpinionClusterFactoryMultipleOpinions(
-    OpinionClusterFactory, DocketParentMixin
-):
-    """Make an OpinionCluster with Docket parent and multiple opinions"""
-
-    class Meta:
-        skip_postgeneration_save = True
-
-    sub_opinions = RelatedFactoryVariableList(
-        factory=OpinionWithChildrenFactory,
-        factory_related_name="cluster",
-        size=3,  # by default create 3 opinions
-    )
-    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
 
 
 class OpinionsCitedWithParentsFactory(DjangoModelFactory):
@@ -345,12 +363,8 @@ class OpinionsCitedWithParentsFactory(DjangoModelFactory):
     class Meta:
         model = OpinionsCited
 
-    citing_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
-    cited_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
-    )
+    citing_opinion = SubFactory(OpinionFactory)
+    cited_opinion = SubFactory(OpinionFactory)
 
 
 class BankruptcyInformationFactory(DjangoModelFactory):
@@ -361,15 +375,152 @@ class BankruptcyInformationFactory(DjangoModelFactory):
     trustee_str = Faker("name_female")
 
 
+class SCOTUSDocketEntryFactory(DjangoModelFactory):
+    class Meta:
+        model = SCOTUSDocketEntry
+
+    docket = SubFactory(DocketFactory)
+    entry_number = Faker("random_int", min=1, max=1000)
+    description = Faker("text", max_nb_chars=750)
+    date_filed = Faker("date")
+    sequence_number = Faker("numerify", text="########")
+
+
+class SCOTUSDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = SCOTUSDocument
+
+    docket_entry = SubFactory(SCOTUSDocketEntryFactory)
+    document_number = Faker("random_int", min=1, max=1000)
+    attachment_number = Faker("random_int", min=1, max=10)
+    url = Faker("url")
+    description = Faker("text", max_nb_chars=20)
+
+
 class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
     """Make a OpinionsCitedByRECAPDocument with parents"""
 
     class Meta:
         model = OpinionsCitedByRECAPDocument
 
-    citing_document = SubFactory(
-        "cl.search.factories.RECAPDocumentFactory",
+    citing_document = SubFactory(RECAPDocumentFactory)
+    cited_opinion = SubFactory(OpinionFactory)
+
+
+class EmbeddingDataFactory(DictFactory):
+    chunk_number = Faker("pyint", min_value=0, max_value=100)
+    chunk = Faker("text", max_nb_chars=500)
+    embedding = LazyFunction(
+        lambda: [
+            0.036101438105106354
+            for _ in range(
+                settings.EMBEDDING_DIMENSIONS,
+            )
+        ]
     )
-    cited_opinion = SubFactory(
-        "cl.search.factories.OpinionFactory",
+
+
+class EmbeddingsDataFactory(DictFactory):
+    id = Faker("pyint", min_value=1, max_value=100)
+    embeddings = List([SubFactory(EmbeddingDataFactory)])
+
+
+class SCOTUSAttachmentDataFactory(DictFactory):
+    document_url = Faker("url")
+    description = Faker("text", max_nb_chars=20)
+    document_number = Faker("pyint", min_value=1, max_value=1000)
+
+
+class SCOTUSDocketEntryDataFactory(DictFactory):
+    attachments = List([SubFactory(SCOTUSAttachmentDataFactory)])
+    date_filed = Faker("date_object")
+    description = Faker("text", max_nb_chars=20)
+    description_html = Faker("text", max_nb_chars=20)
+    document_number = Faker("pyint", min_value=1, max_value=1000)
+
+
+class SCOTUSAttorneyDataFactory(DictFactory):
+    """Factory for SCOTUS attorney dicts."""
+
+    address = Faker("street_address")
+    city = Faker("city")
+    email = Faker("email")
+    is_counsel_of_record = Faker("boolean")
+    name = Faker("name")
+    phone = Faker("phone_number")
+    state = Faker("state_abbr")
+    title = Faker("company")
+    zip = Faker("postcode")
+
+
+class SCOTUSPartyDataFactory(DictFactory):
+    """Factory for SCOTUS party dicts."""
+
+    attorneys = List([SubFactory(SCOTUSAttorneyDataFactory)])
+    name = Faker("company")
+    type = Faker(
+        "random_element",
+        elements=["Petitioner", "Respondent", "Amicus Curiae"],
     )
+
+
+class ScotusDocketDataFactory(DictFactory):
+    capital_case = Faker("boolean")
+    case_name = Faker("case_name")
+    date_filed = Faker("date_object")
+    discretionary_court_decision = Faker("date_object")
+    docket_number = Faker("federal_district_docket_number")
+    links = Faker("federal_district_docket_number")
+    lower_court = Faker("court_name")
+    lower_court_case_numbers = []
+    lower_court_case_numbers_raw = Faker("federal_district_docket_number")
+    lower_court_decision_date = Faker("date_object")
+    lower_court_rehearing_denied_date = Faker("date_object")
+    questions_presented = Faker("url")
+    docket_entries = List([SubFactory(SCOTUSDocketEntryDataFactory)])
+    parties = List([SubFactory(SCOTUSPartyDataFactory)])
+
+
+class CaseTransferFactory(DjangoModelFactory):
+    origin_court = SubFactory(CourtFactory)
+    origin_docket_number = LazyAttribute(
+        lambda ct: ct.origin_docket.docket_number if ct.origin_docket else None
+    )
+    origin_docket = SubFactory(DocketFactory)
+    destination_court = SubFactory(CourtFactory)
+    destination_docket_number = LazyAttribute(
+        lambda ct: ct.destination_docket.docket_number
+        if ct.destination_docket
+        else None
+    )
+    destination_docket = SubFactory(DocketFactory)
+    transfer_date = Faker("date_object")
+    transfer_type = Faker(
+        "random_element",
+        elements=(
+            CaseTransfer.APPEAL,
+            CaseTransfer.WORKLOAD,
+            CaseTransfer.MERGE,
+            CaseTransfer.JURISDICTION,
+        ),
+    )
+
+    class Meta:
+        model = CaseTransfer
+
+
+class TrialCourtDataFactory(DjangoModelFactory):
+    docket = SubFactory(DocketFactory)
+    docket_number_trial = Faker("federal_district_docket_number")
+    docket_number_raw_trial = SelfAttribute("docket_number_trial")
+    judge_str = Faker("name")
+    judge = SubFactory(PersonFactory)
+    reporter = Faker("name")
+    date_filed = Faker("date_object")
+    court_name = Faker("court_name")
+    court = SubFactory(CourtFactory)
+    punishment = Faker("pystr")
+    county = Faker("pystr")
+
+    class Meta:
+        model = TrialCourtData

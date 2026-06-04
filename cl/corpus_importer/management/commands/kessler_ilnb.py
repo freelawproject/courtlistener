@@ -17,7 +17,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer_session import ProxyPacerSession, SessionData
-from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import DocketEntry, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -125,7 +125,7 @@ def get_final_docs(options):
                     ),
                     tag=TAG_FINALS,
                 ).set(queue=q),
-                extract_recap_pdf.si(rd_pk).set(queue=q),
+                extract_pdf_document.si(rd_pk).set(queue=q),
             ).apply_async()
 
 

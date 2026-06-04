@@ -18,7 +18,7 @@ from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.lib.utils import append_value_in_cache
 from cl.recap.models import PROCESSING_STATUS, REQUEST_TYPE, PacerFetchQueue
 from cl.recap.tasks import fetch_pacer_doc_by_rd_and_mark_fq_completed
-from cl.scrapers.tasks import extract_recap_pdf
+from cl.scrapers.tasks import extract_pdf_document
 from cl.search.models import Court, RECAPDocument
 
 
@@ -208,7 +208,11 @@ class Command(VerboseCommand):
         self.recap_documents = (
             RECAPDocument.objects.filter(*filters)
             .exclude(pk__in=ids_to_skip)
-            .select_related("docket_entry__docket")
+            .exclude(
+                Q(description__icontains="transcript")
+                | Q(docket_entry__description__icontains="transcript")
+            )
+            .select_related("docket_entry", "docket_entry__docket")
             .values(
                 "id",
                 "page_count",
@@ -256,7 +260,7 @@ class Command(VerboseCommand):
             user_id=self.user.pk,
         )
         fetch_pacer_doc_by_rd_and_mark_fq_completed.si(
-            rd_pk, fq.pk
+            rd_pk, fq.pk, omit_page_count=True
         ).apply_async(queue=self.queue_name)
         append_value_in_cache(self.docs_to_process_cache_key(), (rd_pk, fq.pk))
         self.total_launched += 1
@@ -515,7 +519,9 @@ class Command(VerboseCommand):
             fetch_was_successful = fq.status == PROCESSING_STATUS.SUCCESSFUL
             if fetch_was_successful and has_pdf and needs_ocr:
                 self.throttle.maybe_wait()
-                extract_recap_pdf.si(rd.pk).apply_async(queue=self.queue_name)
+                extract_pdf_document.si(rd.pk).apply_async(
+                    queue=self.queue_name
+                )
                 processed_count += 1
                 logger.info(
                     "Processed %d/%d (%.0f%%), last document scheduled: %d",

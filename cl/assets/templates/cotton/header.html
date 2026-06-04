@@ -1,0 +1,244 @@
+{% load static svg_tags component_tags %}
+{# frontend-checks-skip: check_hardcoded_ids #}
+{# This component is a singleton so hardcoded IDs are intentional #}
+
+<c-vars variant request csrf_token class=""></c-vars>
+
+<header
+  class="relative w-full {% if variant == "homepage" %}h-18 {% else %}md:max-h-[--desktop-header-height] max-md:h-18 {% endif %} px-4 lg:px-10 py-3 md:py-2.5 {{ class }}"
+>
+<div class="capped-width flex justify-between items-center gap-4">
+  <a href="#main" class="skip-link">Skip to main content</a>
+  <a href="#footer" class="skip-link">Skip to footer</a>
+
+  {# HOMEPAGE VARIANT #}
+  {% if variant == "homepage" %}
+    <c-menu-button>
+      <c-slot name="button_content">
+        Support&nbsp;FLP
+        <span
+          class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+          aria-hidden="true"
+        >{% svg 'chevron' class="w-full h-full text-white" %}
+        </span>
+      </c-slot>
+      <c-slot name="menu_content">
+        <c-menu-button.item
+          href="https://donate.free.law/forms/supportflp"
+          icon="money_hand"
+          item_class="px-4 py-1.5 text-md text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+          li_class="hover:bg-greyscale-50"
+        >
+          Make a Donation
+        </c-menu-button.item>
+        <c-menu-button.item
+          href="https://free.law/membership/"
+          icon="group"
+          item_class="px-4 py-1.5 text-md text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+          li_class="hover:bg-greyscale-50"
+        >
+          Become a Member
+        </c-menu-button.item>
+      </c-slot>
+    </c-menu-button>
+
+  {# DEFAULT VARIANT #}
+  {% else %}
+    {# COURTLISTENER LOGO #}
+    <div class="w-[226px] lg:min-w-[226px] flex justify-start" aria-label="Go to homepage">
+      <div class="md:h-21 md:w-45 h-12 w-[106px]">
+        {% svg "logos/courtlistener" class="md:h-21 h-12" %}
+      </div>
+    </div>
+
+    {# DESKTOP SEARCH BAR #}
+    <c-corpus-search :request="request" class="w-full h-12 hidden md:flex" only>
+    <div class="contents h-fit" x-trap.noscroll.inert="advancedFiltersExpandedDesktop">
+      <c-corpus-search.scope
+        class="!rounded-r-none text-greyscale-600"
+        menu_class="left-0 top-12 w-55 text-md font-cooper text-greyscale-800"
+        item_class="py-1.5"
+        only
+      />
+      <c-corpus-search.input :request="request" only>
+        {#    Advanced Filters Trigger Button    #}
+        <c-button
+          variant="outline"
+          aria-label="Toggle advanced filters panel open/closed"
+          x-on:click="toggleAdvancedFiltersDesktop"
+          x-bind:aria-expanded="advancedFiltersExpandedDesktop"
+          aria-haspopup="dialog"
+          aria-controls="advanced-filters-panel"
+          class="max-h-9 bg-white max-lg:px-2 aria-expanded:bg-greyscale-200 aria-expanded:ring-greyscale-300 aria-expanded:ring-2"
+        >
+          {% svg "funnel" class="text-greyscale-400 flex-grow-0 h-5 w-5" aria_hidden="true" %}
+          <span class="max-lg:hidden">Filters</span>
+        </c-button>
+      </c-corpus-search.input>
+
+      {#   Search Button   #}
+      <c-corpus-search.button class="rounded-l-none rounded-r-xl" only>
+        {% svg "magnifier" class="text-white" aria_hidden="true" %}
+      </c-corpus-search.button>
+
+      {#  Advanced Filters Overlay  #}
+      <div
+        class="fixed w-screen h-screen bg-greyscale-600/40 inset-x-0 top-26 z-10"
+        x-show="advancedFiltersExpandedDesktop"
+        x-on:click="toggleAdvancedFiltersDesktop"
+        x-transition.opacity.duration.200ms
+        aria-hidden="true"
+      ></div>
+      {#   Advanced Filters Panel   #}
+      <div
+        id="advanced-filters-panel"
+        role="dialog"
+        aria-labelledby="advanced-filters-title"
+        class="fixed w-screen py-6 px-10 bg-white inset-x-0 top-26 border-b border-greyscale-200 z-10 md:overflow-visible overflow-auto max-h-[--desktop-header-filters-height]"
+        x-show="advancedFiltersExpandedDesktop"
+        x-on:keyup.esc.window="closeAdvancedFiltersDesktopIfOpen"
+        x-collapse.duration.250ms
+      >
+        <div class="capped-width">
+          <h2 id="advanced-filters-title" class="sr-only">Advanced filters</h2>
+          <c-corpus-search.filters :request="request" :search_form="search_form" form_prefix="desktop" only/>
+        </div>
+      </div>
+    </div>
+
+    </c-corpus-search>
+  {% endif %}
+
+  {# RIGHT-SIDE BUTTON(S) #}
+  <div class="lg:w-[--profile-menu-width] flex justify-end items-center relative">
+    {# MOBILE SEARCH TRIGGER + DIALOG #}
+    {% if variant != "homepage" %}
+      <c-corpus-search class="md:hidden" only>
+        <c-corpus-search.mobile.dialog :request="request" :search_form="search_form" form_prefix="mobile" only>
+          <c-slot name="trigger_button">
+            <c-dialog.trigger-button>
+              {% svg "magnifier" class="text-greyscale-400 w-5 h-5" %}
+            </c-dialog.trigger-button>
+          </c-slot>
+        </c-corpus-search.mobile.dialog>
+      </c-corpus-search>
+    {% endif %}
+
+    {% if request.user.is_authenticated %}
+      <c-menu-button
+        button_variant="outline"
+        button_class="bg-white hover:shadow-md hover:border-greyscale-300 hover:bg-greyscale-50 text-greyscale-800 rounded-[10px] px-2.5 py-2 text-sm items-center"
+        menu_class="z-20 w-[--profile-menu-width] border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+        position="bottom-end"
+        widget_aria_label="User account menu"
+        trigger_aria_label="Toggle account menu"
+        menu_aria_label="Account navigation"
+      >
+        <c-slot name="button_content">
+          {% svg "avatar" class="border-greyscale-300 border rounded-full" aria_hidden="true" %}
+          Profile
+          <span
+            class="transition-transform duration-200 group-aria-[expanded=true]:rotate-180 flex justify-center items-center w-4 h-4"
+            aria-hidden="true"
+          >{% svg "chevron" class="w-full h-full text-greyscale-400" %}
+          </span>
+        </c-slot>
+        <c-slot name="menu_content">
+          <c-menu-button.item
+            href="{% url 'profile_alerts' %}"
+            icon="bell_outline"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Alerts
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'profile_notes' %}"
+            icon="bookmark"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Notes
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'tag_list' username=request.user.username %}"
+            icon="tag"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Tags
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'view_api' %}"
+            icon="code"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Developer Tools
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'user_prayers' request.user.username %}"
+            icon="donate"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Prayers
+          </c-menu-button.item>
+          <c-menu-button.divider />
+          <c-menu-button.item
+            href="{% url 'profile_your_support' %}"
+            icon="donate"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Your Support
+          </c-menu-button.item>
+          <c-menu-button.item
+            href="{% url 'view_settings' %}"
+            icon="avatar_outline"
+            icon_class="text-greyscale-400"
+            item_class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+            li_class="py-[1px] hover:bg-greyscale-100"
+          >
+            Account
+          </c-menu-button.item>
+          <li role="none" class="py-[1px] hover:bg-greyscale-100">
+            <form id="logout-form" method="post" action="{% url 'sign-out' %}">
+              {% csrf_token %}
+              <button
+                x-menu:item
+                type="submit"
+                class="py-2 px-2.5 text-sm text-greyscale-800 flex flex-row justify-start items-center gap-2 w-full"
+              >
+                {% svg "sign_out" aria_hidden="true" class="text-greyscale-400" %}
+                Sign out
+              </button>
+            </form>
+          </li>
+        </c-slot>
+      </c-menu-button>
+    {% else %}
+
+      {#   Signed-out button   #}
+      <div class="flex flex-row flex-nowrap items-center">
+        {% if request.path != "/sign-out/" %}
+          <c-button variant="ghost" href="{% url "sign-in" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}" class="md:h-9">Login</c-button>
+        {% else %}
+          <c-button variant="ghost" href="{% url "sign-in" %}" class="md:h-9">Login</c-button>
+        {% endif %}
+        <c-button
+          variant="grey"
+          href="{% url "register" %}?next={{request.path}}?{{get_string|urlencode}}{% if results %}page={{results.number}}{% endif %}"
+          class="md:h-9 {% if variant == 'homepage' %}bg-white{% endif %}"
+        >Sign&nbsp;Up</c-button>
+      </div>
+    {% endif %}
+  </div>
+</div>
+</header>

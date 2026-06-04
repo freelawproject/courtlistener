@@ -64,22 +64,29 @@ class CreateAlertForm(ModelForm):
         )
         quotas = RECAP_ALERT_QUOTAS[quotas_key]
         is_member = self.user.profile.is_member
+        has_unlimited_alerts = self.user.profile.unlimited_docket_alerts
         if is_member:
             level_key = self.user.membership.level
         else:
             level_key = "free"
 
-        flp_membership = "https://donate.free.law/forms/membership"
-        # Only members can create RT alerts
-        if rate == Alert.REAL_TIME and not is_member:
+        flp_membership = "https://free.law/membership/"
+        # Only members or user with unlimited alerts can create RT alerts
+        if rate == Alert.REAL_TIME and not (
+            self.user.profile.is_eligible_for_rt_search_alerts
+        ):
             msg = format_html(
                 "You must be a <a href='{}' target='_blank'>member</a> to create Real Time alerts.",
                 flp_membership,
             )
             raise ValidationError(msg)
 
-        # Only check quotas for RECAP or DOCKETS alerts
-        if self.current_type in {SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS}:
+        # If the user doesn't have unlimited alerts, only check quotas for
+        # RECAP or DOCKETS alert types
+        if not has_unlimited_alerts and self.current_type in {
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+        }:
             allowed = quotas.get(level_key, quotas.get("free", 0))
 
             query_params = {"user": self.user}
@@ -99,15 +106,17 @@ class CreateAlertForm(ModelForm):
                 # exclude the alert being edited from the count
                 alerts_count = alerts_count.exclude(pk=self.instance.pk)
             used = alerts_count.count()
-            profile_url = reverse("profile_alerts")
+            profile_url = reverse("profile_search_alerts")
 
             if used + 1 > allowed:
                 if is_member:
+                    neon_id = self.user.membership.neon_id
+                    upgrade_flp_membership = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
                     msg = format_html(
                         "You've used all of the alerts included with your membership. "
                         "To create this alert, <a href='{}' target='_blank'>upgrade your membership</a> or "
                         "<a href='{}'>disable a RECAP Alert</a>.",
-                        flp_membership,
+                        upgrade_flp_membership,
                         profile_url,
                     )
                 else:

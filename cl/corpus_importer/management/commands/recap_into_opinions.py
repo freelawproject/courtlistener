@@ -5,7 +5,8 @@ from django.db.models import Q
 from cl.corpus_importer.tasks import recap_document_into_opinions
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.search.models import SOURCES, Court, OpinionCluster, RECAPDocument
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Court, OpinionCluster, RECAPDocument
 
 
 def import_opinions_from_recap(
@@ -58,7 +59,7 @@ def import_opinions_from_recap(
         latest_date_filed = (
             OpinionCluster.objects.using(db_connection)
             .filter(docket__court=court)
-            .exclude(source=SOURCES.RECAP)
+            .exclude(source=ClusterSources.RECAP)
             .order_by("-date_filed")
             .values_list("date_filed", flat=True)
             .first()
@@ -77,21 +78,29 @@ def import_opinions_from_recap(
                 is_available=True,
                 is_free_on_pacer=True,
             )
-            .only("id")
+            .only("id", "sha1")
+            .values_list("id", "sha1")
             .order_by("id")
         )
 
+        seen_sha1 = set()
         throttle = CeleryThrottle(queue_name=queue)
-        for recap_document in recap_documents.iterator():
+        for recap_document_id, sha1 in recap_documents.iterator():
+            if sha1 in seen_sha1:
+                logger.info("Skipping repeated hash %s", sha1)
+                continue
+
             logger.info(
-                f"{count}: Importing rd {recap_document.id} in {court.id}"
+                f"{count}: Importing rd {recap_document_id} in {court.id}"
             )
             throttle.maybe_wait()
             recap_document_into_opinions.apply_async(
-                args=[{}, recap_document.id, skip_citation_finding],
+                args=[{}, recap_document_id, skip_citation_finding],
                 queue=queue,
             )
+            seen_sha1.add(sha1)
             count += 1
+
             if total_count > 0 and count >= total_count:
                 logger.info(
                     f"RECAP import completed for {total_count} documents"

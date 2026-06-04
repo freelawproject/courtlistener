@@ -1,4 +1,4 @@
-{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}
+{% load static %}{% load humanize %}{% load widget_tweaks %}{% load extras %}{% load waffle_tags %}{% load svg_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,10 +83,13 @@
   {% block header %}
   <header class="row">
     <!-- Donate Banner -->
-    {% if FUNDRAISING_MODE %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
-    {% endif %}
-
+    {% flag "donate_banner" %}
+      {% include 'includes/dismissible_nav_banner.html' with responsive=True cookie_sleep_duration=3 link="https://donate.free.law/forms/supportcl" cookie_name="2025_eoy_banner" button_text="Donate Today" text="Donate before December 31 and tell us how CourtListener helped you—your support and your story power the future of open law." title="You built today’s CourtListener. Help build what&nbsp;comes&nbsp;next." %}
+    {% endflag %}
+    <!-- Semantic Search Banner -->
+    {% flag "semantic_search_banner" %}
+      {% include 'includes/dismissible_nav_banner.html' with request=request link="https://free.law/2026/05/04/semantic-search-on-courtlistener" cookie_name="semantic_search_banner" button_text="Learn more here!" text="📣 <strong>The Wait is Over!</strong> Semantic search is now available on CourtListener. Already live in our API, you can now <strong>search case law using natural language</strong> directly on the website. Click the <strong>&</strong> / <strong>?</strong> toggle to switch between keyword and natural language search." only %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
@@ -170,7 +173,7 @@
                 <li><a href="https://free.law/about/" tabindex="200">About</a></li>
                 <li><a href="{% url "faq" %}" tabindex="201">FAQ</a></li>
                 <li class="visible-xs">
-                  <a href="https://donate.free.law/forms/membership"
+                  <a href="https://free.law/membership/"
                      tabindex="203">Become a Member</a>
                 </li>
                 <li>
@@ -215,13 +218,10 @@
                      tabindex="102">Look Up Citations</a>
                 </li>
                 <li>
-                  <a href="{% url "mapper_homepage" %}" tabindex="102">Citation Visualizations</a>
-                </li>
-                <li>
                   <a href="{% url "coverage_opinions" %}" tabindex="103">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "case_law_api_help" %}" tabindex="104">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/case-law" tabindex="104">API</a>
                 </li>
               </ul>
             </li>
@@ -251,7 +251,7 @@
                   <a href="https://free.law/data-consulting/" tabindex="206">Bulk Data Service</a>
                 </li>
                 <li>
-                  <a href="{% url "pacer_api_help" %}" tabindex="207">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/pacer-data" tabindex="207">API</a>
                 </li>
               </ul>
             </li>
@@ -274,7 +274,7 @@
                   <a href="{% url "coverage_oa" %}" tabindex="304">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "oral_argument_api_help" %}" tabindex="305">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/oral-arguments" tabindex="305">API</a>
                 </li>
               </ul>
             </li>
@@ -288,10 +288,10 @@
                   <a href="{% url "advanced_p" %}" tabindex="401">Search Judges</a>
                 </li>
                 <li>
-                  <a href="https://free.law/projects/judge-db" tabindex="404">About this Collection</a>
+                  <a href="https://free.law/datasets#judges-db" tabindex="404">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "judge_api_help" %}" tabindex="405">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/judges" tabindex="405">API</a>
                 </li>
               </ul>
             </li>
@@ -302,13 +302,13 @@
                  data-toggle="dropdown">Financial Disclosures&nbsp;<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_fd" %}" tabindex="501">Search Financial Disclosures</a>
+                  <a href="{% url "financial_disclosures_home" %}" tabindex="501">Search Financial Disclosures</a>
                 </li>
                 <li>
                   <a href="{% url "coverage_fds" %}" tabindex="502">About this Collection</a>
                 </li>
                 <li>
-                  <a href="{% url "financial_disclosures_api_help" %}" tabindex="503">API</a>
+                  <a href="{{ WIKI_API_URL }}/rest/v4/financial-disclosures" tabindex="503">API</a>
                 </li>
               </ul>
             </li>
@@ -316,9 +316,9 @@
           <ul class="nav navbar-nav navbar-right">
             <li
               class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-              <a href="https://donate.free.law/forms/membership"
+              <a href="https://free.law/membership/"
                  tabindex="600"
-                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Donate</a>
+                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Join FLP</a>
             </li>
           </ul>
         </div>
@@ -373,7 +373,7 @@
               <a href="{% url "help_home" %}" tabindex="11001">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
             </div>
             <div class="footer-item">
-              <a href="https://donate.free.law/forms/membership" tabindex="11002">Donate</a>
+              <a href="https://donate.free.law/forms/supportflp" tabindex="11002">Donate</a>
             </div>
           </div>
 
@@ -382,7 +382,7 @@
               <a href="{% url "coverage" %}" tabindex="11003">About Our Data</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "api_index" %}" tabindex="11004">APIs &amp; Bulk Data</a>
+              <a href="{{ WIKI_API_URL }}" tabindex="11004">APIs &amp; Bulk Data</a>
             </div>
             <div class="footer-item">
               <a href="{% url "feeds_info" %}" tabindex="11005">Feeds</a> <span
@@ -405,7 +405,7 @@
               <a href="https://free.law/data-consulting/" tabindex="11009">Data Services</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "contribute" %}" tabindex="11010">Contribute</a>
+              <a href="https://free.law/volunteer" tabindex="11010">Contribute</a>
             </div>
           </div>
 
@@ -424,7 +424,7 @@
       </div>
     </div>
     <div class="col-sm-4 text-right" id="donate-image">
-      <a href="https://donate.free.law/forms/membership"  tabindex="11014">
+      <a href="https://donate.free.law/forms/supportflp"  tabindex="11014">
         <img src="{% static "png/donate-button.png" %}"
              alt="Donate to support our work"
              height="75"
@@ -441,32 +441,33 @@
 
 {% block social %}
 <div class="text-center hidden-print" id="social-container">
-  <a href="https://free.law/"
-     class="fa-stack fa-lg"
-     tabindex="12000">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-link fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://x.com/freelawproject"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12001">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
-     class="fa-stack fa-lg"
-     tabindex="12002">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-newspaper-o fa-stack-1x fa-inverse"></i>
-  </a>
-  <a href="https://github.com/freelawproject/courtlistener"
-     rel="noreferrer"
-     class="fa-stack fa-lg"
-     tabindex="12003">
-    <i class="fa fa-circle fa-stack-2x gray"></i>
-    <i class="fa fa-github fa-stack-1x fa-inverse"></i>
-  </a>
+  <a
+    aria-label="LinkedIn - Free Law Project (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    rel="noopener noreferrer"
+    href="https://www.linkedin.com/company/free-law-project/"
+  >{% svg "logos/linkedin" width="24" height="24" aria_hidden="true" %}</a>
+  <a
+    aria-label="Bluesky - Free Law Project (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    rel="noopener noreferrer"
+    href="https://bsky.app/profile/free.law"
+  >{% svg "logos/bluesky" width="24" height="24" aria_hidden="true" %}</a>
+  <a
+    aria-label="GitHub repository (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    rel="noopener noreferrer"
+    href="https://github.com/freelawproject/courtlistener"
+  >{% svg "logos/github" width="24" height="24" aria_hidden="true" %}</a>
+  <a
+    aria-label="Subscribe to the Free Law Project newsletter (opens in a new tab)"
+    target="_blank"
+    class="gray"
+    href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9"
+  >{% svg "newspaper" width="24" height="24" aria_hidden="true" %}</a>
 </div>
 {% endblock %}
 
@@ -493,6 +494,12 @@
       recapBonusAlerts = {{ DOCKET_ALERT_RECAP_BONUS|default:0 }};
 
 </script>
+
+{% if track_events %}
+<input id="event_label" type="hidden" value="{{ event_label }}">
+<script type="text/javascript" src="{% static "js/event-utils.js" %}"></script>
+{% endif %}
+
 
 {# Allows your own scripts in the footer. #}
 {% block footer-scripts %}{% endblock %}

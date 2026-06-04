@@ -2,8 +2,12 @@ from collections.abc import Awaitable, Callable
 
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.http import HttpRequest, HttpResponseBase
+from django.template import TemplateDoesNotExist
+from django.template.loader import get_template
 from django.template.response import TemplateResponse
 from waffle import flag_is_active
+
+from cl.search.forms import CorpusSearchForm
 
 
 class RobotsHeaderMiddleware:
@@ -80,16 +84,40 @@ class IncrementalNewTemplateMiddleware:
         return response
 
     def process_template_response(self, request, response):
-        use_new_design = flag_is_active(request, "use_new_design")
-
+        # don't remove short-circuit evaluation as flag_is_active hits the db
         if (
-            use_new_design
-            and isinstance(response, TemplateResponse)
-            and not response.is_rendered
+            not isinstance(response, TemplateResponse)
+            or response.is_rendered
+            or not flag_is_active(request, "use_new_design")
         ):
-            old_template = response.template_name
-            if isinstance(old_template, str):
-                new_template = f"v2_{old_template}"
-                response.template_name = [new_template, old_template]
+            return response
+
+        # {response.template_name} could return a list if TemplateView is used directly
+        old_template = response.template_name
+        if isinstance(old_template, (list, tuple)):
+            # Check if the first template exists anywhere in the project
+            try:
+                get_template(old_template[0])
+                old_template = old_template[0]
+            except TemplateDoesNotExist:
+                old_template = (
+                    old_template[1]
+                    if len(old_template) > 1
+                    else old_template[0]
+                )
+
+        if not isinstance(old_template, str):
+            return response
+
+        new_template_name = f"v2_{old_template}"
+
+        try:
+            # verify the new template actually exists
+            get_template(new_template_name)
+        except TemplateDoesNotExist:
+            return response
+
+        response.template_name = new_template_name
+        response.context_data["search_form"] = CorpusSearchForm()
 
         return response

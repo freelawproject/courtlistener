@@ -1,6 +1,5 @@
 from django.core.exceptions import ValidationError
 from django.http import QueryDict
-from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
 
 from cl.alerts.models import (
@@ -10,7 +9,7 @@ from cl.alerts.models import (
     validate_recap_alert_type,
 )
 from cl.alerts.utils import is_match_all_query
-from cl.api.utils import HyperlinkedModelSerializerWithId
+from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 from cl.search.models import SEARCH_TYPES
 
 

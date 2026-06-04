@@ -1,9 +1,12 @@
 from http import HTTPStatus
+from typing import NoReturn
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
 from cl.celery_init import fail_task
+from cl.lib.celery_utils import get_queue_length
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.utils import (
     check_elasticsearch,
@@ -43,9 +46,17 @@ def replication_status(request: HttpRequest) -> HttpResponse:
 
 def elasticsearch_status(request: HttpRequest) -> JsonResponse:
     """Checks the health of the Elasticsearch cluster."""
+    if settings.ELASTICSEARCH_DISABLED:
+        return JsonResponse(
+            {"is_elastic_up": True, "elasticsearch_disabled": True},
+            status=HTTPStatus.OK,
+        )
     is_elastic_up = check_elasticsearch()
     return JsonResponse(
-        {"is_elastic_up": is_elastic_up},
+        {
+            "is_elastic_up": is_elastic_up,
+            "elasticsearch_disabled": False,
+        },
         status=(
             HTTPStatus.OK
             if is_elastic_up
@@ -69,10 +80,18 @@ def redis_writes(request: HttpRequest) -> HttpResponse:
     return HttpResponse("Successful Redis write.", content_type="text/plain")
 
 
-def sentry_fail(request: HttpRequest) -> HttpResponse:
-    division_by_zero = 1 / 0
+def sentry_fail(request: HttpRequest) -> NoReturn:
+    raise ZeroDivisionError("Intentional error for Sentry")
 
 
 def celery_fail(request: HttpRequest) -> HttpResponse:
     fail_task.delay()
     return HttpResponse("Successfully failed Celery.")
+
+
+def celery_queue_lengths(request: HttpRequest) -> HttpResponse:
+    queue_lengths = {}
+    for q in settings.CELERY_QUEUES:
+        queue_lengths[q] = get_queue_length(q)
+
+    return JsonResponse(queue_lengths)

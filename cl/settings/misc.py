@@ -35,6 +35,9 @@ IA_OA_COLLECTIONS: list[str] = env(
 LASC_USERNAME = env("LASC_USERNAME", default="")
 LASC_PASSWORD = env("LASC_PASSWORD", default="")
 
+# TAMES (Texas courts CaseMail)
+TAMES_USER = env("TAMES_USER", default="")
+
 # Google auth
 here = os.path.dirname(os.path.realpath(__file__))
 GOOGLE_AUTH = {
@@ -43,10 +46,21 @@ GOOGLE_AUTH = {
 }
 
 
+################
+# Stats / Metrics
+################
+STAT_METRICS_PREFIX = "prometheus:stat:"
+
+
+########
+# Wiki #
+########
+WIKI_API_BASE_URL = "https://wiki.free.law/c/courtlistener/help/api"
+
+
 ##############
 # Super Misc #
 ##############
-FUNDRAISING_MODE = env("FUNDRAISING_MODE", default=False)
 
 # Key for Follow the Money API
 FTM_KEY = env("FTM_KEY", default="")
@@ -65,4 +79,16 @@ CAP_R2_BUCKET_NAME = env("CAP_R2_BUCKET_NAME", default="cap-static")
 # Webhooks
 WEBHOOK_V1_DEPRECATION_DATE = env(
     "WEBHOOK_V1_DEPRECATION_DATE", default="2024-11-18"
+)
+
+# OCR extraction
+# Minimum number of characters between common headers to consider that the page
+# does not need OCR.
+CHARS_THRESHOLD_OCR_PER_PAGE = env.int(
+    "CHARS_THRESHOLD_OCR_PER_PAGE", default=200
+)
+
+# SCOTUS email subscription
+SCOTUS_RECAP_EMAIL = env(
+    "SCOTUS_RECAP_EMAIL", default="notifications@scotus.recap.email"
 )

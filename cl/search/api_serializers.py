@@ -1,18 +1,30 @@
 from datetime import UTC
+from typing import Any
 
-from drf_dynamic_fields import DynamicFieldsMixin
+from django.conf import settings
+from elasticsearch.dsl.response import Hit
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from cl.api.utils import HyperlinkedModelSerializerWithId
+from cl.api.utils import (
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+    NestedDynamicFieldsMixin,
+    RetrieveFilteredFieldsMixin,
+)
 from cl.audio.models import Audio
-from cl.custom_filters.templatetags.extras import get_highlight
+from cl.custom_filters.templatetags.extras import (
+    get_highlight,
+    render_string_or_list,
+)
 from cl.lib.document_serializer import (
     CoerceDateField,
+    CoerceDateTimeField,
     DocumentSerializer,
     HighlightedField,
     NoneToListField,
     NullableListField,
+    SuppressHighlightsField,
     TimeStampField,
 )
 from cl.people_db.models import PartyType, Person
@@ -29,7 +41,9 @@ from cl.search.documents import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    BankruptcyInformation,
     Citation,
+    ClusterRedirection,
     Court,
     Docket,
     DocketEntry,
@@ -40,10 +54,23 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
+from cl.search.types import ESDictDocument
 
 inverted_o_type_index_map = {
     value: key for key, value in o_type_index_map.items()
 }
+
+
+def get_value_from_es_obj(obj: dict | ESDictDocument | Hit, field: str) -> Any:
+    """Retrieve a value field from an ES object or dict.
+
+    :param obj: The object or dict to access.
+    :param field: The field name to retrieve.
+    :return: The value of the field, or None if not present.
+    """
+    if isinstance(obj, dict):
+        return obj.get(field, None)
+    return getattr(obj, field, None)
 
 
 class PartyTypeSerializer(
@@ -60,14 +87,30 @@ class PartyTypeSerializer(
 
 
 class OriginalCourtInformationSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     class Meta:
         model = OriginatingCourtInformation
         fields = "__all__"
 
 
-class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class BankruptcyInformationSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    class Meta:
+        model = BankruptcyInformation
+        fields = "__all__"
+
+
+class DocketSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     court = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="court-detail",
@@ -102,6 +145,10 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         queryset=Person.objects.all(),
         style={"base_template": "input.html"},
     )
+    bankruptcy_information = serializers.HyperlinkedRelatedField(
+        read_only=True,
+        view_name="bankruptcyinformation-detail",
+    )
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
@@ -117,7 +164,9 @@ class DocketSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class RECAPDocumentSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     tags = serializers.HyperlinkedRelatedField(
         many=True,
@@ -135,7 +184,9 @@ class RECAPDocumentSerializer(
 
 
 class DocketEntrySerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     docket = serializers.HyperlinkedRelatedField(
         many=False,
@@ -154,13 +205,21 @@ class FullDocketSerializer(DocketSerializer):
     docket_entries = DocketEntrySerializer(many=True, read_only=True)
 
 
-class CourtSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class CourtSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     class Meta:
         model = Court
         exclude = ("notes",)
 
 
-class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class OpinionSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
     )
@@ -191,7 +250,9 @@ class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class OpinionsCitedSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     # These attributes seem unnecessary and this endpoint serializes the same
     # data without them, but when they're not here the API does a query that
@@ -223,8 +284,19 @@ class CitationSerializer(ModelSerializer):
         )
 
 
+class ClusterRedirectionSerializer(ModelSerializer):
+    class Meta:
+        model = ClusterRedirection
+        exclude = (
+            "id",
+            "cluster",
+        )
+
+
 class OpinionClusterSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     absolute_url = serializers.CharField(
         source="get_absolute_url", read_only=True
@@ -255,13 +327,20 @@ class OpinionClusterSerializer(
         style={"base_template": "input.html"},
     )
     citations = CitationSerializer(many=True)
+    cluster_redirections = ClusterRedirectionSerializer(
+        many=True, read_only=True, source="merged_clusters"
+    )
 
     class Meta:
         model = OpinionCluster
         fields = "__all__"
 
 
-class TagSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class TagSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     class Meta:
         model = Tag
         fields = "__all__"
@@ -355,15 +434,30 @@ class V3OpinionESResultSerializer(DocumentSerializer):
     timestamp = TimeStampField(read_only=True)
     status = serializers.SerializerMethodField(read_only=True)
 
+    # Datetime fields for V3
+    dateFiled = CoerceDateTimeField(read_only=True)
+    dateArgued = CoerceDateTimeField(read_only=True)
+    dateReargued = CoerceDateTimeField(read_only=True)
+    dateReargumentDenied = CoerceDateTimeField(read_only=True)
+
+    caseName = SuppressHighlightsField(read_only=True)
+    court_citation_string = SuppressHighlightsField(read_only=True)
+    docketNumber = SuppressHighlightsField(read_only=True)
+    suitNature = SuppressHighlightsField(read_only=True)
+
     def get_type(self, obj):
-        return inverted_o_type_index_map.get(obj.type)
+        return inverted_o_type_index_map.get(
+            get_value_from_es_obj(obj, "type")
+        )
 
     def get_status(self, obj):
-        return PRECEDENTIAL_STATUS.get_status_value_reverse(obj.status)
+        return PRECEDENTIAL_STATUS.get_status_value_reverse(
+            get_value_from_es_obj(obj, "status")
+        )
 
     def get_snippet(self, obj):
         # If the snippet has not yet been set upstream, set it here.
-        return get_highlight(obj, "text")
+        return get_highlight(render_string_or_list(obj), "text")
 
     class Meta:
         document = OpinionDocument
@@ -387,6 +481,11 @@ class ScoreDataSerializer(serializers.Serializer):
     bm25 = serializers.FloatField(read_only=True, source="bm25_score")
 
 
+class SemanticSearchScoreSerializer(serializers.Serializer):
+    bm25 = serializers.FloatField(read_only=True, source="bm25_score")
+    semantic = serializers.FloatField(read_only=True, source="semantic_score")
+
+
 class BaseMetaDataSerializer(serializers.Serializer):
     """The metadata serializer V4 Search API."""
 
@@ -399,7 +498,26 @@ class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
     Includes the score field.
     """
 
-    score = ScoreDataSerializer(source="*", read_only=True)
+    score = serializers.SerializerMethodField(source="*", read_only=True)
+
+    def get_score(self, obj):
+        """
+        Returns the appropriate score serialization for a given result object.
+
+        If the `semantic` keyword is included in the query string with a truthy value,
+        this method uses `SemanticSearchScoreSerializer`, which includes both semantic
+        and BM25 scores. Otherwise, it defaults to `ScoreDataSerializer`. If the request
+        context is not available, it also falls back to `ScoreDataSerializer`.
+        """
+        request = self.context.get("request", None)
+        if not request:
+            return ScoreDataSerializer(obj).data
+
+        semantic = request.GET.get("semantic", False)
+        serializer_class = (
+            SemanticSearchScoreSerializer if semantic else ScoreDataSerializer
+        )
+        return serializer_class(obj).data
 
 
 class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
@@ -732,3 +850,12 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_doc_id",
             "trustee_str",
         )
+
+
+class VectorSerializer(serializers.Serializer):
+    embedding = serializers.ListField(
+        child=serializers.FloatField(),
+        min_length=settings.EMBEDDING_DIMENSIONS,
+        max_length=settings.EMBEDDING_DIMENSIONS,
+        required=False,
+    )

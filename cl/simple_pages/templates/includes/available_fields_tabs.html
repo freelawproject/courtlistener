@@ -1,7 +1,9 @@
-{% load extras %}
+{% load extras waffle_tags %}
 <ul class="nav nav-tabs" role="tablist">
   <li role="presentation" class="active"><a href="#list-fields-opinions" aria-controls="list-fields-opinions" role="tab" data-toggle="tab">Opinions</a></li>
-  <li role="presentation"><a href="#list-fields-parentheticals" aria-controls="list-fields-parentheticals" role="tab" data-toggle="tab">Parentheticals</a></li>
+  {% flag "parenthetical-search" %}
+    <li role="presentation"><a href="#list-fields-parentheticals" aria-controls="list-fields-parentheticals" role="tab" data-toggle="tab">Parentheticals</a></li>
+  {% endflag %}
   <li role="presentation"><a href="#list-fields-recap_archive" aria-controls="list-fields-recap" role="tab" data-toggle="tab">RECAP</a></li>
   <li role="presentation"><a href="#list-fields-oral_arguments" aria-controls="list-fields-oral-arguments" role="tab" data-toggle="tab">Oral Arguments</a></li>
   <li role="presentation"><a href="#list-fields-judges" aria-controls="list-fields-judges" role="tab" data-toggle="tab">Judges</a></li>

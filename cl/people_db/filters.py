@@ -2,7 +2,6 @@ import rest_framework_filters as filters
 from django.db.models import Prefetch, QuerySet
 
 from cl.api.utils import (
-    ALL_TEXT_LOOKUPS,
     BASIC_TEXT_LOOKUPS,
     DATE_LOOKUPS,
     DATETIME_LOOKUPS,
@@ -10,7 +9,6 @@ from cl.api.utils import (
     FilterManyToManyMixin,
     NoEmptyFilterSet,
 )
-from cl.people_db.lookup_utils import lookup_judge_by_name_components
 from cl.people_db.models import (
     ABARating,
     Attorney,
@@ -80,7 +78,7 @@ class SchoolFilter(NoEmptyFilterSet):
             "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
-            "name": ALL_TEXT_LOOKUPS,
+            "name": BASIC_TEXT_LOOKUPS,
             "ein": ["exact"],
         }
 
@@ -135,7 +133,7 @@ class PositionFilter(NoEmptyFilterSet):
             "person": ["exact"],
             "appointer": ["exact"],
             "predecessor": ["exact"],
-            "job_title": ALL_TEXT_LOOKUPS,
+            "job_title": BASIC_TEXT_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_nominated": DATE_LOOKUPS,
@@ -158,24 +156,6 @@ class PositionFilter(NoEmptyFilterSet):
             "location_city": BASIC_TEXT_LOOKUPS,
             "location_state": BASIC_TEXT_LOOKUPS,
         }
-
-
-class PersonDisclosureFilter(NoEmptyFilterSet):
-    """Filters for looking up judges in the disclosure pages"""
-
-    fullname = filters.Filter(method="filter_fullname")
-
-    def filter_fullname(
-        self,
-        queryset: QuerySet,
-        name: str,
-        value: str,
-    ) -> QuerySet:
-        return lookup_judge_by_name_components(queryset, value)
-
-    class Meta:
-        model = Person
-        fields = {}
 
 
 class PersonFilter(NoEmptyFilterSet):
@@ -284,7 +264,7 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
             "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
-            "name": ALL_TEXT_LOOKUPS,
+            "name": BASIC_TEXT_LOOKUPS,
         }
 
     def filter_join_tables(
@@ -361,7 +341,7 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
             "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
-            "name": ALL_TEXT_LOOKUPS,
+            "name": BASIC_TEXT_LOOKUPS,
         }
 
     def filter_roles(self, qs: QuerySet, name: str, value: bool) -> QuerySet:

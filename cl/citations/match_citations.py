@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from typing import no_type_check
 
 from asgiref.sync import async_to_sync
-from elasticsearch_dsl.response import Hit
+from elasticsearch.dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,
@@ -76,13 +76,15 @@ def resolve_fullcase_citation(
             page = full_citation.corrected_page()
             if (
                 volume is not None
-                and volume.isdigit()
                 and reporter is not None
                 and page is not None
             ):
                 clusters, _count = async_to_sync(
                     get_clusters_from_citation_str
                 )(volume=volume, reporter=reporter, page=page)
+
+                if _count == 0:
+                    return NO_MATCH_RESOURCE
 
                 # exclude self links
                 if getattr(full_citation, "citing_opinion", False):

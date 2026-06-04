@@ -8,20 +8,21 @@ from unittest import mock
 import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
-from django.contrib import admin
-from django.core.cache import cache
+from django.contrib import admin, messages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.paginator import Paginator
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
 
 from cl.alerts.utils import add_cutoff_timestamp_filter
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    build_search_feed_query,
     compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
@@ -33,6 +34,10 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_index_utils import (
     get_parties_from_case_name,
     get_parties_from_case_name_bankr,
+)
+from cl.lib.search_utils import (
+    enrich_search_results,
+    get_results_from_paginator,
 )
 from cl.lib.test_helpers import (
     RECAPSearchTestCase,
@@ -57,13 +62,13 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
+from cl.search.api_utils import CursorESList
 from cl.search.api_views import SearchV4ViewSet
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
     DocketEntryFactory,
-    DocketEntryWithParentsFactory,
     DocketFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -118,6 +123,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
+
+    @staticmethod
+    def _clean_micro_cache():
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_test:*")
+        if keys:
+            r.delete(*keys)
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -555,7 +567,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Filter by case by docket_number containing repeated numbers like: 1:21-bk-0021
         with self.captureOnCommitCallbacks(execute=True):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket__docket_number="1:21-bk-0021",
                 docket__court=self.court,
                 docket__source=Docket.RECAP,
@@ -657,6 +669,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
         await self._test_article_count(params, 1, "filed_before")
 
+    async def test_entry_filed_after_filter(self) -> None:
+        """Confirm entry_filed_after filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_after": "2015-08-19",
+        }
+
+        # Frontend
+        r = await self._test_article_count(params, 1, "filed_after")
+        self.assertIn(self.de.description, r.content.decode())
+
+    async def test_entry_filed_before_filter(self) -> None:
+        """Confirm entry_filed_before filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_before": "2014-07-05",
+        }
+
+        # Frontend, 1 result expected since RECAPDocuments are grouped by case
+        r = await self._test_article_count(params, 1, "filed_before")
+        self.assertIn(self.de_1.description, r.content.decode())
+
     async def test_document_number_filter(self) -> None:
         """Confirm document number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
@@ -696,7 +730,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # add a document that is not available to the new docket
         with self.captureOnCommitCallbacks(execute=True):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -755,7 +789,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 nature_of_suit="440",
                 source=Docket.RECAP,
             )
-            e_1_d_1 = DocketEntryWithParentsFactory(
+            e_1_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -767,7 +801,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=True,
                 page_count=5,
             )
-            e_2_d_1 = DocketEntryWithParentsFactory(
+            e_2_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
@@ -786,7 +820,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_number="1:17-cv-04465",
                 source=Docket.RECAP,
             )
-            e_28_d_2 = DocketEntryWithParentsFactory(
+            e_28_d_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=28,
                 description="ORDER granting 27 Motion to Continue",
@@ -797,7 +831,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=False,
                 page_count=5,
             )
-            e_29_d_2 = DocketEntryWithParentsFactory(
+            e_29_d_2 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=29,
                 description="ORDER granting 23 Motion for More Definite Statement. Signed by Judge Mary H Murguia",
@@ -814,7 +848,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_number="1:17-cv-04465",
                 source=Docket.RECAP,
             )
-            e_14_d_3 = DocketEntryWithParentsFactory(
+            e_14_d_3 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=14,
                 description="Petition Completed March 29, 2019 Filed by Debtor Kathleen B. Thomas",
@@ -824,7 +858,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 document_number="14",
                 is_available=False,
             )
-            e_27_d_3 = DocketEntryWithParentsFactory(
+            e_27_d_3 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=27,
                 description="Financial Management Course Certificate Filed by Debtor Kathleen B. Thomas",
@@ -1019,7 +1053,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 nature_of_suit="440",
                 source=Docket.RECAP,
             )
-            e_1_d_1 = DocketEntryWithParentsFactory(
+            e_1_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1048,7 +1082,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=True,
                 page_count=5,
             )
-            e_2_d_1 = DocketEntryWithParentsFactory(
+            e_2_d_1 = DocketEntryFactory(
                 docket=docket,
                 entry_number=2,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1083,7 +1117,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 ),
                 docket=docket_2,
             )
-            d3 = DocketEntryWithParentsFactory(
+            d3 = DocketEntryFactory(
                 docket=docket_2,
                 entry_number=3,
                 date_filed=datetime.date(2015, 8, 19),
@@ -1118,7 +1152,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 ),
                 docket=docket_3,
             )
-            d4 = DocketEntryWithParentsFactory(
+            d4 = DocketEntryFactory(
                 docket=docket_3,
                 entry_number=4,
                 date_filed=datetime.date(2015, 8, 19),
@@ -2079,7 +2113,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         async_to_sync(self._test_article_count)(params, 2, "order score desc")
 
         with self.captureOnCommitCallbacks(execute=True):
-            de_4 = DocketEntryWithParentsFactory(
+            de_4 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-1236",
                     court=self.court_2,
@@ -2112,7 +2146,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             index_docket_parties_in_es.delay(de_4.docket.pk)
 
-            de_5 = DocketEntryWithParentsFactory(
+            de_5 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-1238",
                     court=self.court_2,
@@ -2127,7 +2161,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Docket entry with a very old date_filed.
-            de_6 = DocketEntryWithParentsFactory(
+            de_6 = DocketEntryFactory(
                 docket=DocketFactory(
                     docket_number="12-0000",
                     court=self.court_2,
@@ -2373,7 +2407,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
             # District document initial document available
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=district_court,
                     case_name="Lorem District vs Complaint Available",
@@ -2406,7 +2440,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # District document initial document not available
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=district_court,
                     case_name="Lorem District vs Complaint Not Available",
@@ -2436,7 +2470,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Appellate document initial not available and not pacer_doc_id
-            de_3 = DocketEntryWithParentsFactory(
+            de_3 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Appellate Complaint Not Available no pacer_doc_id",
@@ -2456,7 +2490,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Appellate document initial document available
-            de_4 = DocketEntryWithParentsFactory(
+            de_4 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Lorem Appellate vs Complaint Available",
@@ -2480,7 +2514,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Appellate document notice of appeal not available
-            de_5 = DocketEntryWithParentsFactory(
+            de_5 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Lorem Appellate vs Notice of appeal not Available",
@@ -2510,7 +2544,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(empty_docket)
             # Bankruptcy document initial document available
-            de_6 = DocketEntryWithParentsFactory(
+            de_6 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Bankruptcy vs Petition Available",
@@ -2533,7 +2567,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
 
             # Bankruptcy document initial document not available
-            de_7 = DocketEntryWithParentsFactory(
+            de_7 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Bankruptcy vs Petition Not Available",
@@ -2658,18 +2692,88 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         for docket in dockets_to_remove:
             docket.delete()
 
+    async def test_get_results_from_paginator(self) -> None:
+        """Assert Paginator Page objects are handled as expected."""
+
+        # Make basic paginator with 50 elements, 10 per page
+        num_items = 50
+        per_page = 10
+        num_pages = num_items // per_page
+        self.assertEqual(num_pages, 5)
+
+        a = [1] * num_items
+        p = Paginator(a, per_page)
+
+        # Default page_num 1
+        r = get_results_from_paginator(p)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+
+        # Not integer page_num should return first page
+        r = get_results_from_paginator(p, page_num="a")
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+
+        # Higher page number should return last page
+        r = get_results_from_paginator(p, page_num=num_pages + 1)
+        self.assertEqual(r.number, num_pages)
+        self.assertEqual(r.has_previous(), True)
+        self.assertEqual(r.has_next(), False)
+
+        # Empty paginator should return a single empty page
+        p = Paginator([], 1)
+
+        # Default page_num 1
+        r = get_results_from_paginator(p)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+        # Not integer page_num should return first page
+        r = get_results_from_paginator(p, page_num="a")
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+        # Higher page number should return last page
+        r = get_results_from_paginator(p, page_num=2)
+        self.assertEqual(r.number, 1)
+        self.assertEqual(r.has_previous(), False)
+        self.assertEqual(r.has_next(), False)
+
+    async def test_enrich_search_results(self) -> None:
+        """Assert Paginator Page objects are enriched as expected.
+        Ideally, this would validate each step of the enrichment,
+        but those tests do not appear to exist yet
+        """
+
+        # Create empty paginator
+        paginator = Paginator([], 1)
+        page = paginator.page(1)
+
+        search_type = SEARCH_TYPES.OPINION
+        get_params = {}
+
+        r = enrich_search_results(page, search_type, get_params)
+
+        # Shouldn't be a response
+        self.assertIsNone(r)
+
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_test:",
+    )
     @mock.patch("cl.lib.search_utils.fetch_es_results")
     @override_settings(
         RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
     )
-    async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
+    async def test_micro_cache_for_search_results(
+        self, mock_fetch_es, mock_cache_key
+    ) -> None:
         """Assert micro-cache for search results behaves properly."""
 
         # Clean search_results_cache before starting the test.
-        r = get_redis_interface("CACHE")
-        keys = r.keys("search_results_cache")
-        if keys:
-            r.delete(*keys)
+        self._clean_micro_cache()
 
         mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
             *args, **kwargs
@@ -2791,7 +2895,61 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 0, "filter + text query")
         # fetch_es_results is called this time; the cache is not used.
         self.assertEqual(mock_fetch_es.call_count, 5)
-        cache.clear()
+        self._clean_micro_cache()
+
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.lib.search_utils.get_micro_cache_key",
+        return_value="search_results_cache_test:",
+    )
+    @mock.patch("cl.lib.search_utils.fetch_es_results")
+    async def test_search_micro_cache_ignore_invalid_params(
+        self, mock_fetch_es, mock_cache_key
+    ) -> None:
+        """Confirm that invalid search parameters are ignored when caching a
+        Search Frontend request.
+        """
+
+        mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
+            *args, **kwargs
+        )
+        self._clean_micro_cache()
+
+        # Initial request.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = await self._test_article_count(
+            search_params, 2, "filter + text query"
+        )
+        self.assertEqual(
+            mock_fetch_es.call_count, 1, "Wrong number of query calls."
+        )
+
+        # Same request with an additional invalid parameter.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "fake_param": "fake",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = await self._test_article_count(
+            search_params, 2, "filter + text query"
+        )
+        # The request ignores the invalid parameter, so the cache key remains the same
+        # and the response is retrieved from the cache.
+        self.assertEqual(
+            mock_fetch_es.call_count, 1, "Wrong number of query calls."
+        )
+        self._clean_micro_cache()
 
     def test_uses_exact_version_for_case_name_field(self) -> None:
         """Confirm that stemming and synonyms are disabled on the case_name
@@ -2799,7 +2957,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            de = DocketEntryWithParentsFactory(
+            de = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Howell v. Indiana",
@@ -2933,7 +3091,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Add docket with no document
         mock_date = now().replace(
-            day=29, hour=0, minute=0, second=0, microsecond=0
+            day=28, hour=0, minute=0, second=0, microsecond=0
         )
         with (
             time_machine.travel(mock_date, tick=False),
@@ -2983,7 +3141,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             time_machine.travel(mock_date, tick=False),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            entry = DocketEntryWithParentsFactory(
+            entry = DocketEntryFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2015, 8, 19),
@@ -3098,6 +3256,90 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         d_2.delete()
         d_3.delete()
 
+    def test_relative_dates_entry_filed_filtering(self):
+        """Confirm that the relative date filter works properly for the
+        entry_date_filed  field by returning the expected documents within
+        the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            de_1 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="SUBPOENAS SERVED 9 days ago",
+            )
+
+            # 40 days ago
+            de_2 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                description="SUBPOENAS SERVED 40 days ago",
+            )
+
+            # 400 days ago
+            de_3 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                description="SUBPOENAS SERVED 400 days ago",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No document within the range.
+            ("9d ago", [rd_1]),  # Only the 9-day old
+            ("past 10 days", [rd_1]),  # Only the 9-day old
+            ("30d ago", [rd_1]),  # only the 9-day old
+            ("60d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1m ago", [rd_1]),  # only the 9-day old
+            ("2m ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("365d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1y ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("2y ago", [rd_1, rd_2, rd_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                cd = {**params, "entry_date_filed_after": relative_date}
+                r = async_to_sync(self._test_article_count)(
+                    cd,
+                    len(expected_cases),
+                    f"entry_date_filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for rd in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(rd.description, r.content.decode())
+
+        de_1.docket.delete()
+        de_2.docket.delete()
+        de_3.docket.delete()
+
     def test_invalid_relative_date_syntax(self):
         """Confirm that a custom error is displayed to users when they enter an
         invalid relative date syntax.
@@ -3140,7 +3382,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(1832, 2, 23),
         )
         cls.rd_old = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_old,
                 entry_number=1,
                 description="",
@@ -3159,7 +3401,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2024, 2, 23),
         )
         cls.rd_recent = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_recent,
                 entry_number=1,
                 description="",
@@ -3180,7 +3422,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2022, 2, 23),
         )
         cls.rd_low_relevance = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_low_relevance,
                 entry_number=1,
                 description="",
@@ -3201,7 +3443,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2022, 2, 23),
         )
         cls.rd_high_relevance = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance,
                 entry_number=1,
                 description="",
@@ -3223,7 +3465,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(1900, 2, 23),
         )
         cls.rd_high_relevance_old_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance_old_date,
                 entry_number=1,
                 description="",
@@ -3244,7 +3486,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=None,
         )
         cls.rd_high_relevance_null_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_high_relevance_null_date,
                 entry_number=1,
                 description="",
@@ -3264,7 +3506,7 @@ class RECAPSearchDecayRelevancyTest(
             date_filed=datetime.date(2024, 12, 23),
         )
         cls.rd_low_relevance_new_date = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_low_relevance_new_date,
                 entry_number=1,
                 description="",
@@ -3459,7 +3701,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         cls.court_api = CourtFactory(
             id="ca9", jurisdiction="F", citation_string="Appeals. CA9."
         )
-        cls.de_api = DocketEntryWithParentsFactory(
+        cls.de_api = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court_api,
                 case_name="America vs API Lorem",
@@ -3515,7 +3757,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             docket=cls.de_api.docket, trustee_str="Lorem Ipsum"
         )
 
-        cls.de_empty_fields_api = DocketEntryWithParentsFactory(
+        cls.de_empty_fields_api = DocketEntryFactory(
             docket=DocketFactory(
                 court=cls.court_api,
                 date_reargued=None,
@@ -3660,6 +3902,32 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         await self._test_api_results_count(
             params, expected_results, "filed_before"
         )
+
+    @skip_if_common_tests_skipped
+    async def test_entry_filed_after_filter(self) -> None:
+        """Confirm entry_filed_after filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_after": "2020-08-19",
+        }
+        # API
+        r = await self._test_api_results_count(
+            params, 1, "entry_date_filed_after"
+        )
+        self.assertIn(self.de_api.description, r.content.decode())
+
+    @skip_if_common_tests_skipped
+    async def test_entry_filed_before_filter(self) -> None:
+        """Confirm entry_filed_before filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "entry_date_filed_before": "2014-07-05",
+        }
+        # API, 1 result expected since RECAPDocuments are grouped by case
+        r = await self._test_api_results_count(
+            params, 1, "entry_date_filed_before"
+        )
+        self.assertIn(self.de_1.description, r.content.decode())
 
     @skip_if_common_tests_skipped
     async def test_document_number_filter(self) -> None:
@@ -4105,26 +4373,26 @@ class RECAPSearchAPIV3Test(
 
 class DocketESResultSerializerTest(DocketESResultSerializer):
     """The serializer class for testing DOCKETS search type results. Includes a
-    date_score field for testing purposes.
+    test_score field for testing purposes.
     """
 
-    date_score = CharField(read_only=True)
+    test_score = CharField(read_only=True)
 
 
 class RECAPDocumentESResultSerializerTest(RECAPDocumentESResultSerializer):
     """The serializer class for testing RECAP_DOCUMENT search type results.
-    Includes a date_score field for testing purposes.
+    Includes a test_score field for testing purposes.
     """
 
-    date_score = CharField(read_only=True)
+    test_score = CharField(read_only=True)
 
 
 class RECAPESResultSerializerTest(RECAPESResultSerializer):
     """The serializer class for resting RECAP search type results. Includes a
-    date_score field for testing purposes.
+    test_score field for testing purposes.
     """
 
-    date_score = CharField(read_only=True)
+    test_score = CharField(read_only=True)
 
 
 class RECAPSearchAPIV4Test(
@@ -4155,6 +4423,13 @@ class RECAPSearchAPIV4Test(
             index_docket_parties_in_es.delay(cls.de_api.docket.pk)
 
     @staticmethod
+    def _clean_micro_cache():
+        r = get_redis_interface("CACHE")
+        keys = r.keys(":1:search_results_cache_api_test:*")
+        if keys:
+            r.delete(*keys)
+
+    @staticmethod
     def mock_merge_unavailable_fields_on_parent_document(*args, **kwargs):
         """Mock function that first deletes a specific RECAPDocument
         and then calls the original merge function with the provided arguments.
@@ -4167,12 +4442,12 @@ class RECAPSearchAPIV4Test(
     @staticmethod
     def mock_set_results_highlights(results, search_type):
         """Intercepts set_results_highlights as a helper to append the
-        date_score for testing purposes.
+        test_score for testing purposes.
         """
         set_results_highlights(results, search_type)
         for result in results:
             if hasattr(result.meta, "sort"):
-                result["date_score"] = result.meta.sort[0]
+                result["test_score"] = result.meta.sort[0]
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -4426,7 +4701,7 @@ class RECAPSearchAPIV4Test(
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             # This Docket will be matched only by its RECAPDocument.
-            docket_entry_recent = DocketEntryWithParentsFactory(
+            docket_entry_recent = DocketEntryFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Lorem Ipsum",
                 docket__case_name_full="",
@@ -4654,14 +4929,14 @@ class RECAPSearchAPIV4Test(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_1 = r.data["results"][0]["date_score"]
+                date_score_1 = r.data["results"][0]["test_score"]
 
                 traveler.shift(datetime.timedelta(minutes=1))
                 r = self.client.get(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_2 = r.data["results"][0]["date_score"]
+                date_score_2 = r.data["results"][0]["test_score"]
                 self.assertEqual(date_score_1, date_score_2)
 
                 # Two first-page requests (no cursor) made on different days
@@ -4672,14 +4947,14 @@ class RECAPSearchAPIV4Test(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_1 = r.data["results"][0]["date_score"]
+                date_score_1 = r.data["results"][0]["test_score"]
 
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(
                     reverse("search-list", kwargs={"version": "v4"}),
                     search_params,
                 )
-                date_score_2 = r.data["results"][0]["date_score"]
+                date_score_2 = r.data["results"][0]["test_score"]
 
                 self.assertNotEqual(date_score_2, date_score_1)
 
@@ -4689,14 +4964,14 @@ class RECAPSearchAPIV4Test(
                 next_page = r.data["next"]
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(next_page)
-                date_score_next_1 = r.data["results"][0]["date_score"]
+                date_score_next_1 = r.data["results"][0]["test_score"]
 
                 # Two next_page requests preserve the same scores even though
                 # they are executed on different days. Since scores are computed
                 # based on the cursor context date.
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(next_page)
-                date_score_next_2 = r.data["results"][0]["date_score"]
+                date_score_next_2 = r.data["results"][0]["test_score"]
                 previous_page = r.data["previous"]
                 self.assertEqual(date_score_next_1, date_score_next_2)
 
@@ -4704,8 +4979,142 @@ class RECAPSearchAPIV4Test(
                 # as the first request that showed the document.
                 traveler.shift(datetime.timedelta(days=1))
                 r = self.client.get(previous_page)
-                date_score_previous_2 = r.data["results"][0]["date_score"]
+                date_score_previous_2 = r.data["results"][0]["test_score"]
                 self.assertEqual(date_score_2, date_score_previous_2)
+
+    @override_settings(SEARCH_API_PAGE_SIZE=1)
+    @mock.patch.object(
+        SearchV4ViewSet,
+        "supported_search_types",
+        {
+            SEARCH_TYPES.RECAP: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP
+                ]["document_class"],
+                "serializer_class": RECAPESResultSerializerTest,
+            },
+            SEARCH_TYPES.DOCKETS: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.DOCKETS
+                ]["document_class"],
+                "serializer_class": DocketESResultSerializerTest,
+            },
+            SEARCH_TYPES.RECAP_DOCUMENT: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP_DOCUMENT
+                ]["document_class"],
+                "serializer_class": RECAPDocumentESResultSerializerTest,
+            },
+        },
+    )
+    @mock.patch(
+        "cl.search.api_utils.set_results_highlights",
+        side_effect=mock_set_results_highlights,
+    )
+    def test_stable_results_decay_relevance_score_sorting(
+        self, mock_set_results_highlights
+    ) -> None:
+        """Test whether result scores remain stable across pagination when
+        using the custom decay relevance function, avoiding the impact of time
+        on the scores.
+        """
+
+        # Query string, order by score desc
+        search_params = {
+            "q": "SUBPOENAS SERVED",
+            "order_by": "score desc",
+            "highlight": False,
+        }
+
+        # string query score asc
+        score_asc_string_query = search_params
+        # match_all query score asc
+        score_asc_match_all = search_params.copy()
+        del score_asc_match_all["q"]
+
+        tests_params = [
+            score_asc_string_query,
+            score_asc_match_all,
+        ]
+        # Generate tests for all the search types.
+        all_tests = []
+        for test_param in tests_params:
+            for search_type in [
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+                SEARCH_TYPES.RECAP_DOCUMENT,
+            ]:
+                test_param_copy = test_param.copy()
+                test_param_copy["type"] = search_type
+                all_tests.append(test_param_copy)
+
+        original_datetime = now().replace(day=1, hour=5, minute=0)
+        for search_params in all_tests:
+            with (
+                self.subTest(
+                    search_params=search_params, msg="Test stable scores."
+                ),
+                time_machine.travel(original_datetime, tick=False) as traveler,
+            ):
+                # Two first-page requests (no cursor) made on the same day will
+                # now have consistent scores because scores are now computed
+                # based on the same day's date.
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_1 = r.data["results"][0]["test_score"]
+
+                traveler.shift(datetime.timedelta(minutes=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_2 = r.data["results"][0]["test_score"]
+                self.assertEqual(bm25_score_1, bm25_score_2)
+
+                # Two first-page requests (no cursor) made on different days
+                # will present scores variations, due to it being a different
+                # day.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_1 = r.data["results"][0]["test_score"]
+
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                bm25_score_2 = r.data["results"][0]["test_score"]
+
+                self.assertNotEqual(bm25_score_2, bm25_score_1)
+
+                # Two next_page requests preserve the same scores even thought
+                # they are executed on different days. Since scores are computed
+                # base on the cursor context date.
+                next_page = r.data["next"]
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
+                bm25_score_next_1 = r.data["results"][0]["test_score"]
+
+                # Two next_page requests preserve the same scores even though
+                # they are executed on different days. Since scores are computed
+                # based on the cursor context date.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
+                bm25_score_next_2 = r.data["results"][0]["test_score"]
+                previous_page = r.data["previous"]
+                self.assertEqual(bm25_score_next_1, bm25_score_next_2)
+
+                # Now, going to the previous page, the score should be the same
+                # as the first request that showed the document.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(previous_page)
+                bm25_score_previous_2 = r.data["results"][0]["test_score"]
+                self.assertEqual(bm25_score_2, bm25_score_previous_2)
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_cursor_api_pagination_for_r_type(self) -> None:
@@ -4715,7 +5124,7 @@ class RECAPSearchAPIV4Test(
         dockets_to_create = 20
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(dockets_to_create):
-                docket_entry = DocketEntryWithParentsFactory(
+                docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
                 )
                 RECAPDocumentFactory(
@@ -5159,6 +5568,219 @@ class RECAPSearchAPIV4Test(
             docket_1.delete()
             docket_3.delete()
 
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.search.api_utils.get_micro_cache_key",
+        return_value="search_results_cache_api_test:",
+    )
+    @mock.patch(
+        "cl.search.api_utils.CursorESList.perform_es_query",
+        autospec=True,
+        wraps=CursorESList.perform_es_query,
+    )
+    def test_recap_micro_cache_for_search_api(
+        self, mock_es_query, mock_cache_key
+    ) -> None:
+        """Assert micro-cache for search API results behaves properly."""
+
+        self._clean_micro_cache()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 0",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 1",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2023, 2, 23),
+            )
+            docket_1 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 2",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2022, 2, 23),
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+
+        # Page 1
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+
+        p1_first_result_id = r.data["results"][0]["docket_id"]
+        self.assertEqual(mock_es_query.call_count, 1)
+
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertIn("<mark>", r.data["results"][0]["caseName"])
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+
+        first_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # Page 2
+        r = self.client.get(next_page)
+        p2_first_result_id = r.data["results"][0]["docket_id"]
+        self.assertEqual(mock_es_query.call_count, 2)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+
+        second_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(second_page_ids & first_page_ids)
+
+        # Page 3
+        r = self.client.get(next_page)
+        p3_first_result_id = r.data["results"][0]["docket_id"]
+        self.assertEqual(mock_es_query.call_count, 3)
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertFalse(r.data["next"])
+
+        third_page_ids = {result["docket_id"] for result in r.data["results"]}
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(second_page_ids & third_page_ids)
+
+        # Cached requests.
+        # Page 3
+        r = self.client.get(next_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        previous_page = r.data["previous"]
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertFalse(r.data["next"])
+        self.assertTrue(previous_page)
+        cached_third_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+        # Confirm that the content and order match in the cached response.
+        self.assertEqual(third_page_ids, cached_third_page_ids)
+        self.assertEqual(p3_first_result_id, r.data["results"][0]["docket_id"])
+
+        # Page 2
+        r = self.client.get(previous_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        previous_page = r.data["previous"]
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertTrue(r.data["next"])
+        self.assertTrue(previous_page)
+        cached_second_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+
+        # Confirm that the content and order match in the cached response.
+        self.assertEqual(p2_first_result_id, r.data["results"][0]["docket_id"])
+        self.assertEqual(second_page_ids, cached_second_page_ids)
+
+        # Page 1
+        r = self.client.get(previous_page)
+        # An ES request shouldn’t be made.
+        self.assertEqual(mock_es_query.call_count, 3)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertIn("<mark>", r.data["results"][0]["caseName"])
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertTrue(r.data["next"])
+        self.assertFalse(r.data["previous"])
+        cached_first_page_ids = {
+            result["docket_id"] for result in r.data["results"]
+        }
+
+        # Confirm that the content and order match in the cached response.
+        self.assertEqual(first_page_ids, cached_first_page_ids)
+        self.assertEqual(p1_first_result_id, r.data["results"][0]["docket_id"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0.delete()
+            docket_1.delete()
+            docket.delete()
+
+        self._clean_micro_cache()
+
+    @override_settings(
+        SEARCH_API_PAGE_SIZE=2, ELASTICSEARCH_API_MICRO_CACHE_ENABLED=True
+    )
+    @mock.patch(
+        "cl.search.api_utils.get_micro_cache_key",
+        return_value="search_results_cache_api_test:",
+    )
+    @mock.patch(
+        "cl.search.api_utils.CursorESList.perform_es_query",
+        autospec=True,
+        wraps=CursorESList.perform_es_query,
+    )
+    def test_search_micro_cache_ignore_invalid_params(
+        self, mock_es_query, mock_cache_key
+    ) -> None:
+        """Confirm that invalid search parameters are ignored when caching a
+        Search API request.
+        """
+        self._clean_micro_cache()
+
+        # Initial request.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(
+            mock_es_query.call_count, 1, "Wrong number of query calls."
+        )
+
+        # Same request with an additional invalid parameter.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "case_name": "SUBPOENAS SERVED",
+            "fake_param": "fake",
+            "order_by": "dateFiled desc",
+            "highlight": True,
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        # The request ignores the invalid parameter, so the cache key remains the same
+        # and the response is retrieved from the cache.
+        self.assertEqual(
+            len(r.data["results"]),
+            2,
+        )
+        self.assertEqual(
+            mock_es_query.call_count, 1, "Wrong number of query calls."
+        )
+        self._clean_micro_cache()
+
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_more_docs_field(self) -> None:
         """Test the more_docs fields to be shown properly when a docket has
@@ -5166,13 +5788,13 @@ class RECAPSearchAPIV4Test(
 
         rds_to_create = settings.RECAP_CHILD_HITS_PER_RESULT + 1
         with self.captureOnCommitCallbacks(execute=True):
-            docket_entry = DocketEntryWithParentsFactory(
+            docket_entry = DocketEntryFactory(
                 docket__source=Docket.RECAP,
             )
             for i in range(rds_to_create):
                 RECAPDocumentFactory(
                     docket_entry=docket_entry,
-                    document_number=i,
+                    document_number=str(i),
                 )
 
         search_params = {
@@ -5269,7 +5891,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            de_no_cites = DocketEntryWithParentsFactory(
+            de_no_cites = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     date_reargued=None,
@@ -5314,7 +5936,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True):
-            docket_entry = DocketEntryWithParentsFactory(
+            docket_entry = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     source=Docket.RECAP_AND_SCRAPER,
@@ -5354,7 +5976,7 @@ class RECAPSearchAPIV4Test(
         """
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            latest_null_date_filed = DocketEntryWithParentsFactory(
+            latest_null_date_filed = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court_api,
                     date_reargued=None,
@@ -5499,7 +6121,7 @@ class RECAPSearchAPIV4Test(
         dockets_to_create = 10
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(dockets_to_create):
-                docket_entry = DocketEntryWithParentsFactory(
+                docket_entry = DocketEntryFactory(
                     docket__source=Docket.RECAP,
                 )
                 RECAPDocumentFactory(
@@ -5812,6 +6434,97 @@ class RECAPSearchAPIV4Test(
         d_2.delete()
         d_3.delete()
 
+    def test_relative_dates_entry_filed_filtering(self):
+        """Confirm that the relative date filter works properly for the
+        entry_date_filed  field by returning the expected documents within
+        the requested range.
+        """
+
+        today = now().replace(hour=23, minute=59, second=0, microsecond=0)
+        with (
+            time_machine.travel(today, tick=False),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            # 9 days ago
+            de_1 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=9)).date(),
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="SUBPOENAS SERVED 9 days ago",
+            )
+
+            # 40 days ago
+            de_2 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=40)).date(),
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                description="SUBPOENAS SERVED 40 days ago",
+            )
+
+            # 400 days ago
+            de_3 = DocketEntryFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Ipsum SUBPOENAS Lorem",
+                docket__case_name_full="",
+                docket__date_filed=datetime.date(2010, 2, 23),
+                date_filed=(today - datetime.timedelta(days=400)).date(),
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                description="SUBPOENAS SERVED 400 days ago",
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Ipsum SUBPOENAS Lorem",
+        }
+
+        test_cases = [
+            ("1d ago", []),  # No document within the range.
+            ("9d ago", [rd_1]),  # Only the 9-day old
+            ("past 10 days", [rd_1]),  # Only the 9-day old
+            ("30d ago", [rd_1]),  # only the 9-day old
+            ("60d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1m ago", [rd_1]),  # only the 9-day old
+            ("2m ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("365d ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("1y ago", [rd_1, rd_2]),  # 10-day + 40-day old
+            ("2y ago", [rd_1, rd_2, rd_3]),  # all of them
+        ]
+
+        for relative_date, expected_cases in test_cases:
+            with self.subTest(expr=relative_date):
+                search_params = {
+                    **params,
+                    "entry_date_filed_after": relative_date,
+                }
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(
+                    len(r.data["results"]),
+                    len(expected_cases),
+                    f"entry_date_filed_after={relative_date}, expected {len(expected_cases)}",
+                )
+                for rd in expected_cases:
+                    # Confirm the right cases are displayed.
+                    self.assertIn(rd.description, r.content.decode())
+
+        de_1.docket.delete()
+        de_2.docket.delete()
+        de_3.docket.delete()
+
     def test_invalid_relative_date_syntax(self):
         """Confirm that a custom error is displayed to users when they enter an
         invalid relative date syntax.
@@ -5849,11 +6562,17 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             testing_mode=True,
         )
 
+    def setUp(self):
+        r = get_redis_interface("CACHE")
+        keys = r.keys("*search_feed_cache:*")
+        if keys:
+            r.delete(*keys)
+
     def test_do_recap_search_feed_have_content(self) -> None:
         """Can we make a RECAP Search Feed?"""
         with self.captureOnCommitCallbacks(execute=True):
             # Docket entry without date_filed it should be excluded from feed.
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Ipsum",
@@ -6047,7 +6766,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Lorem Ipsum",
@@ -6126,6 +6845,141 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             response.content.decode(),
         )
 
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=True)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_cache_hit(self, mock_build_query: mock.Mock) -> None:
+        """Can we cache RECAP feed results and retrieve them on subsequent
+        requests?
+        """
+        mock_build_query.side_effect = build_search_feed_query
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+
+        # First request - results will be cached
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        # Second request with same parameters should return cached results
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should NOT be called again (cache hit)
+        self.assertEqual(
+            mock_build_query.call_count,
+            1,
+            msg="build_search_feed_query should only be called once when cache hits",
+        )
+
+        # Responses should be identical
+        self.assertEqual(response_1.content, response_2.content)
+
+        # Verify content is valid feed XML
+        xml_tree = etree.fromstring(response_2.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = xml_tree.xpath("//atom:entry", namespaces=namespaces)
+        self.assertGreater(len(entries), 0, msg="Feed should contain entries")
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=True)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_cache_miss_on_different_params(
+        self, mock_build_query: mock.Mock
+    ) -> None:
+        """Does cache miss when parameters change?"""
+
+        # Set up the mock to call the real function
+        mock_build_query.side_effect = build_search_feed_query
+
+        params_1 = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+        params_2 = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Leave to File",
+        }
+
+        # First request
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params_1,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        # Second request with different parameters should not hit same cache
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params_2,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should be called again (cache miss)
+        self.assertEqual(
+            mock_build_query.call_count,
+            2,
+            msg="build_search_feed_query should be called twice for different parameters",
+        )
+
+        # Responses should be different
+        self.assertNotEqual(response_1.content, response_2.content)
+
+    @override_settings(ELASTICSEARCH_FEED_MICRO_CACHE_ENABLED=False)
+    @mock.patch("cl.lib.elasticsearch_utils.build_search_feed_query")
+    def test_recap_feed_no_cache_when_disabled(
+        self, mock_build_query: mock.Mock
+    ) -> None:
+        """Does caching not occur when ELASTICSEARCH_API_MICRO_CACHE_ENABLED
+        is False?
+        """
+        # Set up the mock to call the real function
+        mock_build_query.side_effect = build_search_feed_query
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "court": self.court.pk,
+        }
+
+        # Make two requests - caching should be disabled
+        response_1 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_1.status_code)
+        # build_search_feed_query should be called on first request
+        self.assertEqual(mock_build_query.call_count, 1)
+
+        response_2 = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(200, response_2.status_code)
+        # build_search_feed_query should be called again (no cache)
+        self.assertEqual(
+            mock_build_query.call_count,
+            2,
+            msg="build_search_feed_query should be called twice when caching disabled",
+        )
+
+        # Both responses should still be identical (same query)
+        # but they are generated independently without cache
+        self.assertEqual(response_1.content, response_2.content)
+
+        # Verify content is valid feed XML
+        xml_tree = etree.fromstring(response_2.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = xml_tree.xpath("//atom:entry", namespaces=namespaces)
+        self.assertGreater(len(entries), 0, msg="Feed should contain entries")
+
 
 class IndexDocketRECAPDocumentsCommandTest(
     ESIndexTestCase, TransactionTestCase
@@ -6144,7 +6998,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             date_argued=datetime.date(2012, 6, 23),
             source=Docket.HARVARD,
         )
-        self.de = DocketEntryWithParentsFactory(
+        self.de = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 date_filed=datetime.date(2015, 8, 16),
@@ -6165,7 +7019,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             attachment_number=2,
             document_type=RECAPDocument.ATTACHMENT,
         )
-        self.de_1 = DocketEntryWithParentsFactory(
+        self.de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 date_filed=datetime.date(2016, 8, 16),
@@ -6445,8 +7299,8 @@ class IndexDocketRECAPDocumentsCommandTest(
         child_count = len(article[0].xpath(".//h4"))
         self.assertEqual(2, child_count)
 
-    @mock.patch("cl.search.admin.delete_from_ia")
-    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    @mock.patch("cl.search.utils.delete_from_ia")
+    @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_re_index_recap_documents_sealed(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
@@ -6512,6 +7366,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         recap_admin.message_user.assert_called_once_with(
             request,
             "Successfully sealed and removed 1 document(s).",
+            messages.SUCCESS,
         )
 
         # Re-index RDs sealed documents.
@@ -6586,7 +7441,7 @@ class RECAPIndexingTest(
     def test_minute_entry_indexing(self) -> None:
         """Confirm a minute entry can be properly indexed."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -6607,7 +7462,7 @@ class RECAPIndexingTest(
         """Confirm an unnumbered entry which uses the pacer_doc_id as number
         can be properly indexed."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -6638,7 +7493,7 @@ class RECAPIndexingTest(
             source=Docket.HARVARD,
         )
 
-        docket_entry_1 = DocketEntryWithParentsFactory(
+        docket_entry_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED ON",
@@ -6674,7 +7529,7 @@ class RECAPIndexingTest(
             pacer_doc_id="018036652436",
         )
 
-        docket_entry_2 = DocketEntryWithParentsFactory(
+        docket_entry_2 = DocketEntryFactory(
             docket=DocketFactory(
                 docket_number="12-1235",
                 court=self.court,
@@ -6724,7 +7579,7 @@ class RECAPIndexingTest(
             nature_of_suit="440",
             source=Docket.HARVARD,
         )
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="Lorem Ipsum",
@@ -6941,7 +7796,7 @@ class RECAPIndexingTest(
         self.assertEqual(judge_2.pk, rd_doc.referred_to_id)
 
         # Update docket entry ID.
-        de_2 = DocketEntryWithParentsFactory(
+        de_2 = DocketEntryFactory(
             docket=de_1.docket,
             description="Notification docket entry 2",
         )
@@ -7001,7 +7856,7 @@ class RECAPIndexingTest(
         judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
         )
-        de = DocketEntryWithParentsFactory(
+        de = DocketEntryFactory(
             docket=DocketFactory(
                 court=self.court,
                 case_name="USA vs Bank Lorem",
@@ -7414,7 +8269,7 @@ class RECAPIndexingTest(
                 es_save_document, True, *args, **kwargs
             ),
         ):
-            de_1 = DocketEntryWithParentsFactory(
+            de_1 = DocketEntryFactory(
                 docket=docket,
                 date_filed=datetime.date(2015, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -7439,7 +8294,7 @@ class RECAPIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            de_2 = DocketEntryWithParentsFactory(
+            de_2 = DocketEntryFactory(
                 docket=docket,
             )
             RECAPDocumentFactory(
@@ -7506,7 +8361,7 @@ class RECAPIndexingTest(
         docket_2 = DocketFactory(
             court=self.court, docket_number="21-0000", source=Docket.RECAP
         )
-        de_2 = DocketEntryWithParentsFactory(
+        de_2 = DocketEntryFactory(
             docket=docket_2,
             date_filed=datetime.date(2016, 8, 19),
             description="Notification for Lorem Ipsum",
@@ -7706,7 +8561,7 @@ class RECAPIndexingTest(
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
 
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2024, 8, 19),
             entry_number=1,
@@ -7943,8 +8798,8 @@ class RECAPIndexingTest(
         docket_doc_no_parties.delete()
         docket_with_no_parties_no_separator.delete()
 
-    @mock.patch("cl.search.admin.delete_from_ia")
-    @mock.patch("cl.search.admin.invalidate_cloudfront")
+    @mock.patch("cl.search.utils.delete_from_ia")
+    @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_seal_documents_action(
         self, mock_delete_from_ia, mock_invalidate_cloudfront
     ):
@@ -7957,7 +8812,7 @@ class RECAPIndexingTest(
             case_name="Vargas v. Wilkins",
             source=Docket.RECAP,
         )
-        de_1 = DocketEntryWithParentsFactory(
+        de_1 = DocketEntryFactory(
             docket=docket,
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -7965,7 +8820,7 @@ class RECAPIndexingTest(
         )
         rd_1 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=1,
+            document_number="1",
             is_available=True,
             page_count=5,
             filepath_local="test.pdf",
@@ -7973,7 +8828,7 @@ class RECAPIndexingTest(
         )
         rd_2 = RECAPDocumentFactory(
             docket_entry=de_1,
-            document_number=2,
+            document_number="2",
             is_available=True,
             page_count=10,
             filepath_local="test.pdf",
@@ -8005,6 +8860,7 @@ class RECAPIndexingTest(
         recap_admin.message_user.assert_called_once_with(
             request,
             "Successfully sealed and removed 2 document(s).",
+            messages.SUCCESS,
         )
 
         # Confirm DB update:
@@ -8451,7 +9307,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             source=Docket.RECAP,
         )
         cls.rd_2 = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_2,
             ),
             document_number="2",
@@ -8467,7 +9323,7 @@ class RECAPFixBrokenRDLinksTest(ESIndexTestCase, TestCase):
             source=Docket.RECAP,
         )
         cls.rd_3 = RECAPDocumentFactory(
-            docket_entry=DocketEntryWithParentsFactory(
+            docket_entry=DocketEntryFactory(
                 docket=cls.docket_3,
             ),
             document_number="3",

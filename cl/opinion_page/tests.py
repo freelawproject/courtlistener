@@ -7,21 +7,33 @@ from datetime import date
 from http import HTTPStatus
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.paginator import Paginator
 from django.db import connection
-from django.test import AsyncRequestFactory, RequestFactory, override_settings
+from django.template import engines
+from django.test import (
+    AsyncRequestFactory,
+    RequestFactory,
+    SimpleTestCase,
+    override_settings,
+)
 from django.test.client import AsyncClient
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
+from lxml.html import fromstring
+from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
+from cl.favorites.models import GenericCount
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -33,6 +45,7 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.forms import (
+    DocketEntryFilterForm,
     MeCourtUploadForm,
     MissCourtUploadForm,
     MoCourtUploadForm,
@@ -40,16 +53,21 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    es_get_citing_and_related_clusters_with_cache,
+    build_docket_metadata,
+    build_docket_tabs,
+    build_originating_court_metadata,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
 from cl.opinion_page.views import (
-    download_docket_entries_csv,
     fetch_docket_entries,
+    get_downloads_context,
     get_prev_next_volumes,
+    view_recap_document,
 )
 from cl.people_db.factories import (
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PositionFactory,
@@ -67,26 +85,33 @@ from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
+    RECAPAttachmentFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
+    ClusterRedirection,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
-from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
-from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+from cl.users.factories import (
+    UserFactory,
+    UserProfileWithParentsFactory,
+    UserWithChildProfileFactory,
+)
 
 
 class TitleTest(SimpleTestCase):
@@ -95,6 +120,42 @@ class TitleTest(SimpleTestCase):
         # No docket number
         d = Docket(case_name="foo", docket_number=None)
         self.assertEqual(make_docket_title(d), "foo")
+
+
+class GetDownloadsContextTest(TestCase):
+    """Test get_downloads_context filters out superseded opinion versions.
+
+    See: https://github.com/freelawproject/courtlistener/issues/7179
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            date_filed=datetime.date.today(),
+        )
+        # Old version opinion with a PDF
+        cls.old_opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            local_path="pdf/old_version.pdf",
+        )
+        # New (main) version opinion with a PDF
+        cls.new_opinion = OpinionFactory.create(
+            cluster=cls.cluster,
+            type=Opinion.COMBINED,
+            local_path="pdf/new_version.pdf",
+        )
+        # Mark old opinion as superseded by pointing to the new one
+        cls.old_opinion.main_version = cls.new_opinion
+        cls.old_opinion.save()
+
+    async def test_pdf_path_uses_main_version(self) -> None:
+        """Does get_downloads_context return the main version PDF?"""
+        context = await get_downloads_context(self.cluster)
+        self.assertTrue(context["has_downloads"])
+        self.assertIn("new_version", context["pdf_path"])
+        self.assertNotIn("old_version", context["pdf_path"])
 
 
 class SimpleLoadTest(TestCase):
@@ -113,6 +174,7 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
+@override_flag("citing_and_related_enabled", True)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -192,42 +254,189 @@ class OpinionPageLoadTest(
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn("33 state 1", response.content.decode())
 
-    async def test_es_get_citing_clusters_with_cache(self) -> None:
-        """Does es_get_citing_and_related_clusters_with_cache return the
-        correct clusters citing and the total cites count?
-        """
 
-        request = AsyncRequestFactory().get("/")
-        result = await es_get_citing_and_related_clusters_with_cache(
-            self.o_cluster_3, request
-        )
-        clusters = result.citing_clusters
-        count = result.citing_cluster_count
-
-        c_list_names = [c["caseName"] for c in clusters]
-        expected_clusters = [
-            self.o_cluster_1.case_name,
-            self.o_cluster_2.case_name,
-            self.o_cluster_4.case_name,
-        ]
-        # Compare expected clusters citing and total count.
-        self.assertEqual(set(c_list_names), set(expected_clusters))
-        self.assertEqual(count, len(expected_clusters))
-
-
-class DocumentPageRedirection(TestCase):
+class ViewRecapDocumentTest(TestCase):
     """
-    Test to make sure the document page of appellate entries redirect users
-    to the attachment page if the main document got converted into an attachment
+    Tests for view_recap_document
     """
 
     @classmethod
     def setUpTestData(cls):
-        cls.court = CourtFactory(id="ca1", jurisdiction="F")
-        cls.docket = DocketFactory(
-            court=cls.court, source=Docket.RECAP, pacer_case_id="104490"
+        cls.docket = DocketFactory()
+
+    async def get(self, follow=False, params=None, **kwargs):
+        kwargs["slug"] = ""
+        if "att_num" in kwargs:
+            path = reverse(
+                "view_recap_attachment",
+                kwargs=kwargs,
+            )
+        else:
+            path = reverse(
+                "view_recap_document",
+                kwargs=kwargs,
+            )
+        if params:
+            path += f"?{urlencode(params)}"
+
+        return await self.async_client.get(path, follow=follow)
+
+    async def test_invalid_docket(self) -> None:
+        r = await self.get(docket_id=0, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_invalid_document(self) -> None:
+        r = await self.get(docket_id=self.docket.id, doc_num=0)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_valid_document(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
         )
-        cls.de_data = DocketEntriesDataFactory(
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(rd, c["rd"])
+        self.assertIsNotNone(c["title"])
+        self.assertIsNone(c["og_file_path"])
+        self.assertIsNotNone(c["note_form"])
+        self.assertTrue(c["private"])
+        self.assertIsNotNone(c["timezone"])
+        self.assertFalse(c["redirect_to_pacer_modal"])
+        self.assertFalse(c["authorities"])
+        self.assertFalse(c["attachments"])
+
+    async def test_invalid_attachment(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        r = await self.get(
+            docket_id=self.docket.id, doc_num=rd.document_number, att_num=1
+        )
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_attachment(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        ra = await sync_to_async(RECAPAttachmentFactory)(
+            docket_entry=rd.docket_entry
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=ra.document_number,
+            att_num=ra.attachment_number,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(ra, c["rd"])
+        self.assertEqual(
+            set([rd.attachment_number, ra.attachment_number]),
+            {x["attachment_number"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.description, ra.description]),
+            {x["description"] for x in c["attachments"]},
+        )
+        self.assertEqual(
+            set([rd.get_absolute_url(), ra.get_absolute_url()]),
+            {x["url"] for x in c["attachments"]},
+        )
+
+    async def test_redirect_to_attachment(self) -> None:
+        # Check redirect if main doc converted to attachment
+        ra_nodoc = await sync_to_async(RECAPAttachmentFactory)(
+            attachment_number=1, docket_entry__docket=self.docket
+        )
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=ra_nodoc.document_number,
+            follow=True,
+        )
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context
+        self.assertEqual(ra_nodoc, c["rd"])
+
+    async def test_download_redirect(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        rd.is_available = True
+        rd.filepath_local = "/tmp/test.pdf"
+        await sync_to_async(rd.save)()
+        with self.subTest("Check download_redirect download"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_to_download": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.filepath_local.url)
+
+        with self.subTest("Check redirect_or_modal download"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_or_modal": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.filepath_local.url)
+
+        rd.is_available = False
+        await sync_to_async(rd.save)()
+        with self.subTest("Check download_redirect to PACER"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_to_download": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.FOUND)
+            self.assertEqual(r["Location"], rd.pacer_url)
+
+        with self.subTest("Check redirect_or_modal flag"):
+            r = await self.get(
+                docket_id=self.docket.id,
+                doc_num=rd.document_number,
+                params={"redirect_or_modal": True},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            c = r.context
+            self.assertEqual(rd, c["rd"])
+            self.assertTrue(c["redirect_to_pacer_modal"])
+
+    async def test_og_override(self) -> None:
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__docket=self.docket
+        )
+        req = AsyncRequestFactory().get(
+            reverse(
+                "view_recap_document",
+                kwargs={"docket_id": 1, "doc_num": 1, "slug": ""},
+            )
+        )
+        req.user = AnonymousUser()
+        req.auser = AsyncMock(return_value=req.user)
+        r = await view_recap_document(
+            req, self.docket.id, rd.document_number, is_og_bot=True
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        c = r.context_data
+        self.assertEqual(rd, c["rd"])
+        self.assertIsNotNone(c["og_file_path"])
+
+    async def test_appellate_redirect_to_attachment_page(self) -> None:
+        """
+        Test to make sure the document page of appellate entries redirect users
+        to the attachment page if the main document got converted into an attachment
+        """
+        court = await sync_to_async(CourtFactory)(id="ca1", jurisdiction="F")
+        docket = await sync_to_async(DocketFactory)(
+            court=court, source=Docket.RECAP, pacer_case_id="104490"
+        )
+        de_data = await sync_to_async(DocketEntriesDataFactory)(
             docket_entries=[
                 DocketEntryDataFactory(
                     pacer_doc_id="288651",
@@ -235,11 +444,9 @@ class DocumentPageRedirection(TestCase):
                 )
             ],
         )
-        async_to_sync(add_docket_entries)(
-            cls.docket, cls.de_data["docket_entries"]
-        )
+        await add_docket_entries(docket, de_data["docket_entries"])
 
-        cls.att_data = AppellateAttachmentPageFactory(
+        att_data = await sync_to_async(AppellateAttachmentPageFactory)(
             attachments=[
                 AppellateAttachmentFactory(
                     attachment_number=1, pacer_doc_id="288651"
@@ -249,26 +456,18 @@ class DocumentPageRedirection(TestCase):
             pacer_doc_id="288651",
             pacer_case_id="104490",
         )
-        async_to_sync(merge_attachment_page_data)(
-            cls.court,
-            cls.att_data["pacer_case_id"],
-            cls.att_data["pacer_doc_id"],
+        await merge_attachment_page_data(
+            court,
+            att_data["pacer_case_id"],
+            att_data["pacer_doc_id"],
             None,
             "",
-            cls.att_data["attachments"],
+            att_data["attachments"],
         )
 
-    async def test_redirect_to_attachment_page(self) -> None:
-        """Does the page redirect to the attachment page?"""
-        path = reverse(
-            "view_recap_document",
-            kwargs={
-                "docket_id": self.docket.pk,
-                "doc_num": 1,
-                "slug": self.docket.slug,
-            },
+        r = await self.get(
+            docket_id=docket.pk, doc_num=1, slug=docket.slug, follow=True
         )
-        r = await self.async_client.get(path, follow=True)
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
@@ -572,7 +771,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -587,7 +786,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="3",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -602,7 +801,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -617,7 +816,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="coloctapp")
@@ -631,8 +830,8 @@ class CitationRedirectorTest(TestCase):
         volume_next, volume_previous = await get_prev_next_volumes(
             "COA", "2017"
         )
-        self.assertEqual(volume_previous, 2016)
-        self.assertEqual(volume_next, 2018)
+        self.assertEqual(volume_previous, "2016")
+        self.assertEqual(volume_next, "2018")
 
         # Delete previous
         await test_obj.adelete()
@@ -642,7 +841,7 @@ class CitationRedirectorTest(TestCase):
             "COA", "2017"
         )
         self.assertEqual(volume_previous, None)
-        self.assertEqual(volume_next, 2018)
+        self.assertEqual(volume_next, "2018")
 
         # Create new test data
         await sync_to_async(CitationWithParentsFactory.create)(
@@ -650,7 +849,7 @@ class CitationRedirectorTest(TestCase):
             reporter="U.S.",
             page="1",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=await sync_to_async(DocketFactory)(
                     court=await sync_to_async(CourtFactory)(id="scotus")
@@ -666,6 +865,58 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
+
+        # Create new test data
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="71",
+            reporter="A.F.T.R.2d (RIA)",
+            page="4114",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Jane v. Doe",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="71A",
+            reporter="A.F.T.R.2d (RIA)",
+            page="3011",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Foo v. Bar",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        await sync_to_async(CitationWithParentsFactory.create)(
+            volume="72",
+            reporter="A.F.T.R.2d (RIA)",
+            page="6029",
+            cluster=await sync_to_async(
+                OpinionClusterWithChildrenAndParentsFactory
+            )(
+                docket=await sync_to_async(DocketFactory)(
+                    court=await sync_to_async(CourtFactory)(id="mowd")
+                ),
+                case_name="Bar v. Foo",
+                date_filed=datetime.date(1991, 2, 5),
+            ),
+        )
+
+        volume_next, volume_previous = await get_prev_next_volumes(
+            "A.F.T.R.2d (RIA)", "71A"
+        )
+        self.assertEqual(volume_previous, "71")
+        self.assertEqual(volume_next, "72")
 
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
@@ -701,7 +952,7 @@ class CitationRedirectorTest(TestCase):
             reporter="COA",
             page="40M",
             cluster=await sync_to_async(
-                OpinionClusterFactoryWithChildrenAndParents
+                OpinionClusterWithChildrenAndParentsFactory
             )(
                 docket=df,
                 case_name="People v. Davis",
@@ -744,7 +995,7 @@ class CitationRedirectorTest(TestCase):
 
     async def test_can_filter_out_non_case_law_citation(self):
         chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
-            volume=22, reporter="U.S.", page="444", type=1
+            volume="22", reporter="U.S.", page="444", type=1
         )
         r = await self.async_client.post(
             reverse("citation_homepage"),
@@ -767,6 +1018,87 @@ class CitationRedirectorTest(TestCase):
 
         self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    async def test_disambiguated_reporter_variants_redirect_properly(self):
+        """Can we resolve correctly some reporter variants with collisions to slug?"""
+
+        test_pairs = [
+            ("Vr.", "vroom"),
+            ("V.R.", "vt"),
+            ("Black Rep.", "black"),
+            ("Black. Rep.", "blackf"),
+            ("Cal. App. 2d Supp", "cal-app-2d"),
+            ("Cal. App. 2d Supp.", "cal-app-supp-2d"),
+            ("CLR", "conn-l-rptr"),
+            ("Cl.R.", "cl-ch"),
+            ("Dec. Commr. Pat.", "dec-com-pat"),
+            ("Dec. Comm'r Pat.", "dec-commr-pat"),
+            ("Hayw. & H.", "hayw-hdc"),
+            ("Hayw.& H.", "hay-haz"),
+            ("Johns.(N.Y.)", "johns-ch"),
+            ("Johns.N.Y.", "johns"),
+            ("Mt.", "mont"),
+            ("mt", "mt"),
+            ("Pa.C.", "pa-commw"),
+            ("Pac.", "p"),
+            ("Sc.", "scam"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                if r.redirect_chain:
+                    # Get path from the redirection from string to slug reporter
+                    path = r.redirect_chain[-1][0]
+                else:
+                    # No redirect, mt is a variation but matches its slug
+                    path = r.asgi_request.path
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
+
+    async def test_too_ambiguous_reporter_variations(self):
+        """Some abbreviations are too ambiguous to resolve safely"""
+
+        test_pairs = [
+            ("B.R.", "br"),
+            ("BR", "br"),
+            ("Wash.", "wash"),
+            ("WASH", "wash"),
+            ("HOW", "how"),
+            ("How.", "how"),
+            ("OKla.", "okla"),
+            ("Okla.", "okla"),
+            ("S.C.", "sc"),
+        ]
+
+        for variation, expected_slug in test_pairs:
+            with self.subTest(variation=variation):
+                r = await self.async_client.get(
+                    reverse(
+                        "citation_redirector",
+                        kwargs={"reporter": variation},
+                    ),
+                    follow=True,
+                )
+                # Get path from the redirection from string to slug reporter
+                path = r.redirect_chain[-1][0] if r.redirect_chain else None
+
+                expected_path = f"/c/{expected_slug}/"
+                self.assertEqual(
+                    expected_path,
+                    path,
+                    msg=f"Expected path: {expected_path} is different from the obtained path: {path}",
+                )
 
 
 class ViewRecapDocketTest(TestCase):
@@ -796,15 +1128,30 @@ class ViewRecapDocketTest(TestCase):
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
         cls.court_appellate = CourtFactory(id="ca1", jurisdiction="F")
+        cls.og_info_appellate = OriginatingCourtInformation.objects.create(
+            docket_number="1:23-cv-456"
+        )
         cls.docket_appellate = DocketFactory(
             court=cls.court_appellate,
             source=Docket.RECAP,
+            appeal_from=cls.court,
+            originating_court_information=cls.og_info_appellate,
         )
 
     async def test_regular_docket_url(self) -> None:
         """Can we load a regular docket sheet?"""
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_appellate_docket_with_appeal_from_loads(self) -> None:
+        """Regression for #7306: appellate docket loads in async view."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket_appellate.pk, self.docket_appellate.slug],
+            )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
@@ -1016,12 +1363,13 @@ class DocketSitemapTest(SitemapTest):
             date_filed=datetime.date.today(),
         )
         # Included b/c many views
-        DocketFactory.create(
+        docket = DocketFactory.create(
             source=Docket.RECAP,
             blocked=False,
-            view_count=50,
             date_filed=datetime.date.today() - datetime.timedelta(days=60),
         )
+        label = f"d.{docket.pk}:view"
+        GenericCount.objects.create(label=label, value=50)
         # Excluded b/c blocked
         DocketFactory.create(
             source=Docket.RECAP,
@@ -1533,6 +1881,7 @@ class UploadPublication(TestCase):
             court_id="tennworkcompcl",
             pacer_case_id=None,
             docket_number="1234123",
+            docket_number_raw="1234123",
             case_name="One v. Two",
         )
         oc = OpinionCluster.objects.create(
@@ -1565,7 +1914,7 @@ class UploadPublication(TestCase):
 class TestBlockSearchItemAjax(TestCase):
     @classmethod
     def setUpTestData(cls):
-        # User admin
+        # User admin (superuser)
         cls.admin = UserProfileWithParentsFactory.create(
             user__username="admin",
             user__password=make_password("password"),
@@ -1577,11 +1926,33 @@ class TestBlockSearchItemAjax(TestCase):
         # Courts
         court_ca2 = CourtFactory(id="ca2")
         # cluster
-        cls.cluster = OpinionClusterFactoryWithChildrenAndParents(
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory(
             docket=DocketFactory(court=court_ca2),
             case_name="Fisher v. SD Protection Inc.",
             date_filed=date(2020, 1, 1),
         )
+
+        # User with only view permissions
+        cls.viewer = UserProfileWithParentsFactory(
+            user__username="block_viewer",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        view_perms = Permission.objects.filter(
+            codename__in=["view_docket", "view_opinioncluster"]
+        )
+        cls.viewer.user.user_permissions.add(*view_perms)
+
+        # User with only change_docket, no change_opinioncluster permission
+        cls.docket_only = UserProfileWithParentsFactory(
+            user__username="block_docket_only",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        docket_perms = Permission.objects.filter(
+            codename__in=["view_docket", "change_docket"]
+        )
+        cls.docket_only.user.user_permissions.add(*docket_perms)
 
     async def test_return_404_for_invalid_type(self) -> None:
         """is it returning 404 for invalid types?"""
@@ -1638,6 +2009,253 @@ class TestBlockSearchItemAjax(TestCase):
 
         await self.cluster.arefresh_from_db()
         self.assertTrue(self.cluster.blocked)
+
+    async def test_block_item_denied_without_permission(self) -> None:
+        """Users without change_docket should get a 403 when trying
+        to block"""
+        client = AsyncClient()
+        await client.aforce_login(user=self.viewer.user)
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_block_cluster_denied_without_cluster_permission(
+        self,
+    ) -> None:
+        """Users with change_docket but not change_opinioncluster should
+        get a 403 when trying to block a cluster using Block Cluster and
+        Docket button"""
+        client = AsyncClient()
+        await client.aforce_login(user=self.docket_only.user)
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.pk, "type": "cluster"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_block_docket_allowed_with_permission(self) -> None:
+        """Users with change_docket should be able to block a docket."""
+        client = AsyncClient()
+        await client.aforce_login(user=self.docket_only.user)
+        response = await client.post(
+            reverse("block_item"),
+            data={"id": self.cluster.docket.pk, "type": "docket"},
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+
+class TestAdminButtonsVisibility(TestCase):
+    """Test that admin buttons are shown or hidden based on user permissions
+    across the opinion, docket, and RECAP document pages."""
+
+    @classmethod
+    def setUpTestData(cls):
+        court = CourtFactory(id="ca3")
+        cls.docket = DocketFactory(
+            court=court, source=Docket.RECAP, case_name="Foo v. Bar"
+        )
+        cls.de = DocketEntryFactory(docket=cls.docket)
+        cls.rd = RECAPDocumentFactory(docket_entry=cls.de)
+        cls.cluster = OpinionClusterWithChildrenAndParentsFactory(
+            docket=DocketFactory(court=court, case_name="Jane v. Doe"),
+            case_name="Jane v. Doe",
+            date_filed=date(2020, 1, 1),
+        )
+
+        # User with view only permissions
+        cls.viewer = UserProfileWithParentsFactory(
+            user__username="viewer",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        view_perms = Permission.objects.filter(
+            codename__in=[
+                "view_docket",
+                "view_opinioncluster",
+                "view_opinion",
+                "view_docketentry",
+                "view_recapdocument",
+            ]
+        )
+        cls.viewer.user.user_permissions.add(*view_perms)
+
+        # User with view + change permissions
+        cls.editor = UserProfileWithParentsFactory(
+            user__username="editor",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        change_perms = Permission.objects.filter(
+            codename__in=[
+                "view_docket",
+                "change_docket",
+                "view_opinioncluster",
+                "change_opinioncluster",
+                "view_opinion",
+                "change_opinion",
+                "view_docketentry",
+                "change_docketentry",
+                "view_recapdocument",
+                "change_recapdocument",
+            ]
+        )
+        cls.editor.user.user_permissions.add(*change_perms)
+
+        # User with only docket permissions
+        cls.docket_only = UserProfileWithParentsFactory(
+            user__username="docket_only",
+            user__password=make_password("password"),
+            user__is_staff=True,
+        )
+        docket_perms = Permission.objects.filter(
+            codename__in=["view_docket", "change_docket"]
+        )
+        cls.docket_only.user.user_permissions.add(*docket_perms)
+
+    def _get_opinion_url(self):
+        return reverse(
+            "view_case",
+            args=[self.cluster.pk, self.cluster.slug],
+        )
+
+    def _get_docket_url(self):
+        return reverse(
+            "view_docket",
+            args=[self.docket.pk, self.docket.slug],
+        )
+
+    def _get_recap_doc_url(self):
+        return reverse(
+            "view_recap_document",
+            kwargs={
+                "docket_id": self.docket.pk,
+                "doc_num": self.rd.document_number,
+                "slug": self.docket.slug,
+            },
+        )
+
+    def _admin_url(self, route, pk):
+        """Build a resolved admin URL for assertion checks."""
+        return reverse(f"admin:{route}", args=[pk])
+
+    async def test_opinion_page_viewer_sees_admin_buttons(self) -> None:
+        """Users with view permissions should see Docket, Cluster,
+        and Opinion buttons but not the Block button."""
+        await self.async_client.aforce_login(self.viewer.user)
+        r = await self.async_client.get(self._get_opinion_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.cluster.docket.pk
+        )
+        cluster_edit_url = self._admin_url(
+            "search_opinioncluster_change", self.cluster.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, cluster_edit_url)
+        self.assertContains(r, "/admin/search/opinion/")
+        self.assertNotContains(r, "block-item")
+
+    async def test_opinion_page_editor_sees_block_button(self) -> None:
+        """Users with change permissions should see the Block button."""
+        await self.async_client.aforce_login(self.editor.user)
+        r = await self.async_client.get(self._get_opinion_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.cluster.docket.pk
+        )
+        cluster_edit_url = self._admin_url(
+            "search_opinioncluster_change", self.cluster.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, cluster_edit_url)
+        self.assertContains(r, "block-item")
+
+    async def test_opinion_page_docket_only_sees_docket_button(self) -> None:
+        """Users with only docket permissions should see the Docket
+        button but not Cluster, Opinion, or Block buttons."""
+        await self.async_client.aforce_login(self.docket_only.user)
+        r = await self.async_client.get(self._get_opinion_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.cluster.docket.pk
+        )
+        cluster_edit_url = self._admin_url(
+            "search_opinioncluster_change", self.cluster.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertNotContains(r, cluster_edit_url)
+        self.assertNotContains(r, "/admin/search/opinion/")
+        self.assertNotContains(r, "block-item")
+
+    async def test_docket_page_viewer_sees_edit_no_block(self) -> None:
+        """Users with view-only permissions should see Edit Docket but
+        not the Block button."""
+        await self.async_client.aforce_login(self.viewer.user)
+        r = await self.async_client.get(self._get_docket_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertNotContains(r, "block-item")
+
+    async def test_docket_page_editor_sees_block_button(self) -> None:
+        """Users with change_docket should see the Block button."""
+        await self.async_client.aforce_login(self.editor.user)
+        r = await self.async_client.get(self._get_docket_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, "block-item")
+
+    async def test_recap_page_viewer_sees_admin_buttons(self) -> None:
+        """Users with view permissions should see Docket, Docket Entry,
+        and RECAP Document buttons."""
+        await self.async_client.aforce_login(self.viewer.user)
+        r = await self.async_client.get(self._get_recap_doc_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        de_edit_url = self._admin_url("search_docketentry_change", self.de.pk)
+        rd_edit_url = self._admin_url(
+            "search_recapdocument_change", self.rd.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, de_edit_url)
+        self.assertContains(r, rd_edit_url)
+
+    async def test_recap_page_editor_sees_all_buttons(self) -> None:
+        """Users with change permissions should see all buttons."""
+        await self.async_client.aforce_login(self.editor.user)
+        r = await self.async_client.get(self._get_recap_doc_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        de_edit_url = self._admin_url("search_docketentry_change", self.de.pk)
+        rd_edit_url = self._admin_url(
+            "search_recapdocument_change", self.rd.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertContains(r, de_edit_url)
+        self.assertContains(r, rd_edit_url)
+
+    async def test_recap_page_docket_only_sees_docket_button(self) -> None:
+        """Users with only docket permissions should see the Docket
+        button but not Docket Entry or RECAP Document buttons."""
+        await self.async_client.aforce_login(self.docket_only.user)
+        r = await self.async_client.get(self._get_recap_doc_url())
+        docket_edit_url = self._admin_url(
+            "search_docket_change", self.docket.pk
+        )
+        de_edit_url = self._admin_url("search_docketentry_change", self.de.pk)
+        rd_edit_url = self._admin_url(
+            "search_recapdocument_change", self.rd.pk
+        )
+        self.assertContains(r, docket_edit_url)
+        self.assertNotContains(r, de_edit_url)
+        self.assertNotContains(r, rd_edit_url)
 
 
 class DocketEntryFileDownload(TestCase):
@@ -1810,10 +2428,24 @@ class DocketEntryFileDownload(TestCase):
                 "private": True,
             },
         )
-        response = download_docket_entries_csv(
-            self.request, self.mocked_docket.id
+
+        self.client.login(username=self.user.username, password="password")
+
+        response = self.client.get(
+            reverse(
+                "view_download_docket",
+                kwargs={"docket_id": self.mocked_docket.id},
+            )
         )
         self.assertEqual(response["Content-Type"], "text/csv")
+
+    def test_redirect_anonymous_users(self):
+        download_path = reverse(
+            "view_download_docket", kwargs={"docket_id": self.mocked_docket.id}
+        )
+        redirect_path = f"{reverse('sign-in')}?next={download_path}"
+        response = self.client.get(download_path)
+        self.assertRedirects(response, redirect_path)
 
 
 class CachePageIgnoreParamsTest(TestCase):
@@ -1876,3 +2508,514 @@ class CachePageIgnoreParamsTest(TestCase):
         self.assertEqual(response.headers["Cache-Control"], "max-age=300")
         self.assertIn("Expires", response.headers)
         self.assertIn(self.docket.case_name, response.content.decode())
+
+
+class ClusterRedirectionTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.deleted_cluster_id = 99999999
+        cls.redirected_cluster = OpinionClusterWithParentsFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=1,
+            date_filed=datetime.date.today(),
+        )
+        ClusterRedirection.objects.create(
+            cluster=cls.redirected_cluster,
+            deleted_cluster_id=cls.deleted_cluster_id,
+            reason=ClusterRedirection.DUPLICATE,
+        )
+
+    def test_cluster_redirection(self):
+        """Can we permanently redirect a deleted cluster to an existing one?"""
+        deleted_cluster_url = reverse(
+            "view_case", kwargs={"pk": self.deleted_cluster_id, "_": "test"}
+        )
+
+        response = self.client.get(deleted_cluster_url)
+
+        expected_redirect_url = reverse(
+            "view_case",
+            kwargs={"pk": self.redirected_cluster.pk, "_": "test"},
+        )
+
+        self.assertRedirects(
+            response,
+            expected_redirect_url,
+            status_code=301,
+        )
+
+
+class BuildDocketMetadataTest(TestCase):
+    """Test the build_docket_metadata helper function."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="metd", jurisdiction="FB")
+
+    def test_empty_docket_returns_citation_only(self) -> None:
+        """A minimal docket should still return a citation item."""
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            assigned_to=None,
+            referred_to=None,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        labels = [item["label"] for item in items]
+        self.assertIn("Citation", labels)
+
+    def test_metadata_with_judge_link(self) -> None:
+        """A docket with an assigned judge should produce a linked item."""
+        judge = PersonFactory()
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            assigned_to=judge,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        assigned = next(i for i in items if i["label"] == "Assigned To")
+        self.assertEqual(assigned["value"], judge.name_full)
+        self.assertIn("url", assigned)
+
+    def test_metadata_with_search_link(self) -> None:
+        """Fields like cause should produce a nofollow search link."""
+        docket = DocketFactory(
+            court=self.court,
+            source=Docket.COLUMBIA,
+            cause="28:1331",
+            assigned_to=None,
+            referred_to=None,
+        )
+        items = build_docket_metadata(docket, "US/Eastern")
+        cause = next(i for i in items if i["label"] == "Cause")
+        self.assertEqual(cause["value"], "28:1331")
+        self.assertIn("cause", cause["url"])
+        self.assertTrue(cause.get("nofollow"))
+
+        with self.subTest("special characters are URL-encoded"):
+            docket_special = DocketFactory(
+                court=self.court,
+                source=Docket.COLUMBIA,
+                cause="Civil Rights & Liberties",
+                assigned_to=None,
+                referred_to=None,
+            )
+            items = build_docket_metadata(docket_special, "US/Eastern")
+            cause = next(i for i in items if i["label"] == "Cause")
+            self.assertIn("%26", cause["url"])
+            parsed = parse_qs(urlparse(cause["url"]).query)
+            self.assertEqual(parsed["cause"][0], '"Civil Rights & Liberties"')
+
+
+class BuildOriginatingCourtMetadataTest(TestCase):
+    """Test the build_originating_court_metadata helper function."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.appellate_court = CourtFactory(id="ca1", jurisdiction="F")
+        cls.lower_court = CourtFactory(id="dmd", jurisdiction="FD")
+
+    def test_returns_empty_when_no_og_info(self) -> None:
+        """No originating court information yields an empty list."""
+        docket = DocketFactory(court=self.appellate_court, source=Docket.RECAP)
+        items = build_originating_court_metadata(docket, None)
+        self.assertEqual(items, [])
+
+    def test_appealed_from_links_lower_court_docket_number(self) -> None:
+        """When the lower court is known, the lower-court docket number
+        renders as a nofollow RECAP search link via data fields — never as
+        a raw HTML string in the value."""
+        og_info = OriginatingCourtInformation.objects.create(
+            docket_number="1:23-cv-456"
+        )
+        docket = DocketFactory(
+            court=self.appellate_court,
+            source=Docket.RECAP,
+            appeal_from=self.lower_court,
+            originating_court_information=og_info,
+        )
+        items = build_originating_court_metadata(docket, og_info)
+        appealed_from = next(i for i in items if i["label"] == "Appealed From")
+
+        # The displayed value is the lower court name only — no embedded HTML.
+        self.assertEqual(appealed_from["label"], "Appealed From")
+        self.assertEqual(appealed_from["value"], self.lower_court.short_name)
+        self.assertNotIn("<", str(appealed_from["value"]))
+
+        # The lower-court docket number travels as data, not as HTML.
+        self.assertEqual(appealed_from["suffix_text"], "1:23-cv-456")
+        self.assertIn("docket_number=1:23-cv-456", appealed_from["suffix_url"])
+        self.assertIn(
+            f"court={self.lower_court.pk}", appealed_from["suffix_url"]
+        )
+        self.assertTrue(appealed_from["suffix_nofollow"])
+        self.assertNotIn("suffix_is_external", appealed_from)
+
+        # An accessible name describes the link's purpose for assistive tech
+        # (rendered as aria-label, replacing the prior title attribute).
+        self.assertIn("1:23-cv-456", appealed_from["suffix_aria_label"])
+        self.assertIn("RECAP", appealed_from["suffix_aria_label"])
+
+    def test_appealed_from_renders_lower_court_docket_number_as_plain_text(
+        self,
+    ) -> None:
+        """When only the lower court name is known (no FK, no admin link),
+        the lower-court docket number is plain text with no link fields."""
+        og_info = OriginatingCourtInformation.objects.create(
+            docket_number="42"
+        )
+        docket = DocketFactory(
+            court=self.appellate_court,
+            source=Docket.RECAP,
+            appeal_from=None,
+            appeal_from_str="Some State Court",
+            originating_court_information=og_info,
+        )
+        items = build_originating_court_metadata(docket, og_info)
+        appealed_from = next(i for i in items if i["label"] == "Appealed From")
+
+        self.assertEqual(appealed_from["label"], "Appealed From")
+        self.assertEqual(appealed_from["value"], "Some State Court")
+        self.assertEqual(appealed_from["suffix_text"], "42")
+        self.assertNotIn("suffix_url", appealed_from)
+
+
+class BuildDocketTabsTest(SimpleTestCase):
+    """Test the build_docket_tabs helper function."""
+
+    def test_entries_tab_always_present(self) -> None:
+        """The entries tab should always be in the list."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, False, False, False)
+        self.assertEqual(len(tabs), 1)
+        self.assertEqual(tabs[0]["key"], "entries")
+
+    def test_all_tabs_present(self) -> None:
+        """All four tabs should appear when all data exists."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        tabs = build_docket_tabs(docket, True, True, True)
+        keys = [t["key"] for t in tabs]
+        self.assertEqual(keys, ["entries", "parties", "idb", "authorities"])
+
+    def test_conditional_tabs(self) -> None:
+        """Only tabs with data should appear."""
+        docket = MagicMock()
+        docket.get_absolute_url.return_value = "/docket/1/test/"
+        docket.pk = 1
+        docket.slug = "test"
+
+        with self.subTest("parties only"):
+            tabs = build_docket_tabs(docket, True, False, False)
+            keys = [t["key"] for t in tabs]
+            self.assertEqual(keys, ["entries", "parties"])
+
+        with self.subTest("idb only"):
+            tabs = build_docket_tabs(docket, False, True, False)
+            keys = [t["key"] for t in tabs]
+            self.assertEqual(keys, ["entries", "idb"])
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketPageV2TemplateTest(TestCase):
+    """Test that the v2 docket page renders correctly.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
+    namespace from parallel test workers. Without it, the shared Redis
+    cache key gets `CACHE_EMPTY` poisoned by any worker that calls
+    `flag_is_active("use_new_design")` against a DB where this test
+    class didn't enable the flag — flipping our renders to v1.
+    The setting must precede `@override_flag` so the override's own
+    flush/save go through the prefixed key.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            cause="28:1331",
+            nature_of_suit="Contract",
+            date_filed=date(2024, 9, 26),
+        )
+        party = PartyFactory.build()
+        party.save()
+        PartyTypeFactory(docket=cls.docket, party=party)
+
+    async def test_v2_docket_page_renders(self) -> None:
+        """The v2 docket page should render without errors."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        content = r.content.decode()
+        self.assertIn("28:1331", content)
+        self.assertIn("Contract", content)
+
+    async def test_v2_docket_metadata_in_context(self) -> None:
+        """The view should pass metadata and tabs to the template."""
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        self.assertIn("metadata", r.context)
+        self.assertIn("tabs", r.context)
+        self.assertTrue(len(r.context["metadata"]) > 0)
+        self.assertTrue(len(r.context["tabs"]) > 0)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
+@override_flag("use_new_design", active=True)
+class DocketEntryRowsV2Test(TestCase):
+    """Test that v2 docket entry rows render correctly for all states.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
+    namespace from parallel test workers. Without it, the shared Redis
+    cache key gets `CACHE_EMPTY` poisoned by any worker that calls
+    `flag_is_active("use_new_design")` against a DB where this test
+    class didn't enable the flag — flipping our renders to v1.
+    The setting must precede `@override_flag` so the override's own
+    flush/save go through the prefixed key.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            date_filed=date(2024, 4, 21),
+        )
+
+        # Entry 1: regular entry with multiple RECAP document states
+        cls.entry_with_docs = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=1,
+            date_filed=date(2024, 4, 21),
+            description="COMPLAINT against All Defendants",
+        )
+        # Main doc with PDF available locally
+        cls.rd_has_pdf = RECAPDocumentFactory(
+            docket_entry=cls.entry_with_docs,
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            filepath_local=SimpleUploadedFile("test.pdf", b"pdf content"),
+            is_available=True,
+            pacer_doc_id="12345",
+            page_count=10,
+        )
+        # Attachment with PACER-only (no local PDF)
+        cls.rd_pacer_only = RECAPAttachmentFactory(
+            docket_entry=cls.entry_with_docs,
+            document_number="1",
+            attachment_number=1,
+            pacer_doc_id="12346",
+            page_count=4,
+        )
+        # Sealed document
+        cls.rd_sealed = RECAPAttachmentFactory(
+            docket_entry=cls.entry_with_docs,
+            document_number="1",
+            attachment_number=2,
+            is_sealed=True,
+            pacer_doc_id="12347",
+        )
+
+        # Entry 2: minute entry (no entry_number, no documents)
+        cls.minute_entry = DocketEntryFactory(
+            docket=cls.docket,
+            entry_number=None,
+            date_filed=date(2024, 4, 21),
+            description="Case Assigned to Judge Smith",
+        )
+
+    async def _get_docket_page(self) -> str:
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            )
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        return r.content.decode()
+
+    async def test_entry_number_and_date_render(self) -> None:
+        """Entry number and date should appear in the page."""
+        content = await self._get_docket_page()
+        self.assertIn("Apr 21, 2024", content)
+        self.assertIn('id="entry-1"', content)
+        # Date is wrapped in <time datetime="..."> for semantic markup
+        # and accessible exposure of the full date value. WCAG 1.3.1.
+        self.assertIn('<time datetime="2024-04-21"', content)
+
+    async def test_main_document_label(self) -> None:
+        """Main Document label should appear for PACER_DOCUMENT type."""
+        content = await self._get_docket_page()
+        self.assertIn("Main Document", content)
+
+    async def test_attachment_label(self) -> None:
+        """Attachment N label should appear for ATTACHMENT type."""
+        content = await self._get_docket_page()
+        for label in ("Attachment 1", "Attachment 2"):
+            with self.subTest(label=label):
+                self.assertIn(label, content)
+
+    async def test_download_pdf_for_available_docs(self) -> None:
+        """Download PDF button should appear for docs with filepath_local."""
+        content = await self._get_docket_page()
+        self.assertIn("Download PDF", content)
+
+    async def test_buy_on_pacer_for_pacer_only_docs(self) -> None:
+        """Buy on PACER with price should appear for PACER-only docs."""
+        content = await self._get_docket_page()
+        self.assertIn("Buy on PACER", content)
+        self.assertIn("$0.40", content)
+
+    async def test_unavailable_for_sealed_docs(self) -> None:
+        """Unavailable button should appear for sealed documents."""
+        content = await self._get_docket_page()
+        self.assertIn("Unavailable", content)
+
+    async def test_minute_entry_renders(self) -> None:
+        """Minute entries without entry_number should render."""
+        content = await self._get_docket_page()
+        self.assertIn("Case Assigned to Judge Smith", content)
+        self.assertIn(f'id="minute-entry-{self.minute_entry.pk}"', content)
+
+    async def test_empty_state(self) -> None:
+        """Empty state message should show when no entries exist."""
+        empty_docket = await sync_to_async(DocketFactory)(
+            court=self.court,
+            source=Docket.RECAP,
+        )
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[empty_docket.pk, empty_docket.slug],
+            )
+        )
+        self.assertTemplateUsed(r, "v2_docket.html")
+        content = r.content.decode()
+        self.assertIn("No docket entries", content)
+
+    async def test_csv_export_for_authenticated_user(self) -> None:
+        """CSV export button should render for authenticated users."""
+        user = await sync_to_async(UserWithChildProfileFactory)()
+        await sync_to_async(self.async_client.force_login)(user)
+        content = await self._get_docket_page()
+        self.assertIn("Export CSV", content)
+
+    async def test_entries_use_option_d_semantic_markup(self) -> None:
+        """Entries render as an <ol> of <li>, with <dl> for metadata and a nested <ul> for RECAP documents."""
+        content = await self._get_docket_page()
+        self.assertIn('aria-label="Docket entries"', content)
+        self.assertIn('<li id="entry-1"', content)
+        self.assertIn('<dt class="sr-only">Document Number</dt>', content)
+        self.assertIn('<dt class="sr-only">Date Filed</dt>', content)
+        self.assertIn('<dt class="sr-only">Description</dt>', content)
+        self.assertIn('aria-label="Documents for this entry"', content)
+        # Both lists carry an explicit role="list" so Safari + VoiceOver
+        # don't strip list semantics when list-style: none is applied.
+        self.assertIn('<ol role="list"', content)
+        self.assertIn('<ul role="list"', content)
+
+
+class DocketFilterDrawerAttrPropagationTest(TestCase):
+    """The mobile filter drawer auto-opens when a filter submission fails
+    validation, so users can see the error messages inside it. That depends
+    on two pieces of plumbing — `data-has-errors` reaching the drawer's root
+    element via Cotton's `{{ attrs }}` passthrough, and the
+    `x-on:open-filter-drawer` listener being wired up on the same element so
+    `docket_filter.js` can dispatch the open event. Lock both in.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
+        cls.empty_page = Paginator([], 200).get_page(1)
+
+    def _render(self, form: DocketEntryFilterForm) -> str:
+        # Render via a wrapper template that invokes <c-docket-filter> as a
+        # child component, instead of rendering cotton/docket_filter.html
+        # directly — the latter declares `form` and `docket` as c-vars, which
+        # would shadow the context values, defeating the whole point.
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        template_path = os.path.join(
+            settings.INSTALL_ROOT,
+            "cl",
+            "opinion_page",
+            "test_assets",
+            "docket_filter_attr_propagation.html",
+        )
+        with open(template_path, encoding="utf-8") as f:
+            compiled = CottonCompiler().process(f.read())
+        template = engines["django"].from_string(compiled)
+        return template.render(
+            {
+                "docket": self.docket,
+                "form": form,
+                "page_obj": self.empty_page,
+                "request": request,
+            }
+        )
+
+    def _find_drawer(self, html: str):
+        """Return the element with `x-on:open-filter-drawer` (the drawer root).
+
+        Done element-wise instead of XPath because `:` in attribute names
+        isn't first-class in XPath.
+        """
+        for el in fromstring(html).iter():
+            if "x-on:open-filter-drawer" in el.attrib:
+                return el
+        return None
+
+    def test_data_has_errors_lands_on_drawer_when_form_invalid(self) -> None:
+        request = RequestFactory().get("/?entry_gte=abc")
+        request.user = AnonymousUser()
+        form = DocketEntryFilterForm(request.GET, request=request)
+        self.assertFalse(form.is_valid())
+
+        drawer = self._find_drawer(self._render(form))
+
+        self.assertIsNotNone(
+            drawer, "drawer root with open listener not found"
+        )
+        self.assertIn(
+            "data-has-errors",
+            drawer.attrib,
+            "data-has-errors must land on the same element that listens "
+            "for open-filter-drawer — otherwise docket_filter.js can't "
+            "find the drawer to dispatch the open event",
+        )
+        self.assertEqual(drawer.attrib["x-on:open-filter-drawer"], "open")
+
+    def test_no_data_has_errors_when_form_is_clean(self) -> None:
+        request = RequestFactory().get("/")
+        request.user = AnonymousUser()
+        form = DocketEntryFilterForm(request.GET, request=request)
+        self.assertTrue(form.is_valid())
+
+        drawer = self._find_drawer(self._render(form))
+
+        self.assertIsNotNone(drawer)
+        self.assertNotIn("data-has-errors", drawer.attrib)

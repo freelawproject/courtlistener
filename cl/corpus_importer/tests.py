@@ -1,21 +1,34 @@
 import json
 from datetime import date, datetime, timedelta
+from pathlib import Path
+from unittest import mock
 from unittest.mock import call, patch
 
 import eyecite
+import httpx
 import pytest
+import requests
+import responses
 import time_machine
 from bs4 import BeautifulSoup
+from celery.exceptions import Retry
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.state.texas import (
+    TexasCaseParty,
+)
+from juriscraper.state.texas.common import CourtID, CourtType
+from openai import RateLimitError
+from pydantic import ValidationError
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -31,6 +44,7 @@ from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
+from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
@@ -60,6 +74,13 @@ from cl.corpus_importer.management.commands.normalize_judges_opinions import (
 from cl.corpus_importer.management.commands.probe_iquery_pages_daemon import (
     get_latest_pacer_case_id_for_courts,
 )
+from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
+    OUTSTANDING_FAILED_LOOKBACK_DAYS,
+    do_everything,
+    get_and_save_free_document_reports,
+    get_outstanding_failed_dates,
+    report_free_document_scrape_stalls,
+)
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
     check_case_names_match,
     parse_citations,
@@ -68,18 +89,30 @@ from cl.corpus_importer.signals import (
     handle_update_latest_case_id_and_schedule_iquery_sweep,
     update_latest_case_id_and_schedule_iquery_sweep,
 )
+from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.tasks import (
+    MergeResult,
+    classify_case_name_by_llm,
+    download_texas_document,
     generate_ia_json,
     get_and_save_free_document_report,
+    merge_texas_case_transfers,
+    merge_texas_docket,
+    merge_texas_docket_entry,
+    merge_texas_docket_originating_court,
+    merge_texas_document,
+    merge_texas_parties,
+    merge_texas_trial_court_data,
+    normalize_texas_parties,
     probe_or_scrape_iquery_pages,
 )
 from cl.corpus_importer.utils import (
-    ClusterSourceException,
     DocketSourceException,
     compare_documents,
     compute_binary_probe_jitter,
     compute_blocked_court_wait,
     compute_next_binary_probe,
+    create_docket_entry_sequence_numbers,
     get_start_of_quarter,
     merge_case_names,
     merge_docket_numbers,
@@ -88,15 +121,20 @@ from cl.corpus_importer.utils import (
     winnow_case_name,
 )
 from cl.favorites.models import PrayerAvailability
+from cl.lib.model_helpers import make_texas_docket_number_core
 from cl.lib.pacer import process_docket_data
 from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.factories import (
     ABARatingFactory,
+    AttorneyFactory,
     EducationFactory,
+    PartyFactory,
+    PartyTypeFactory,
     PersonFactory,
     PersonWithChildrenFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
+    RoleFactory,
     SchoolFactory,
 )
 from cl.people_db.lookup_utils import (
@@ -104,7 +142,14 @@ from cl.people_db.lookup_utils import (
     find_all_judges,
     find_just_name,
 )
-from cl.people_db.models import Attorney, AttorneyOrganization, Party, Position
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    Party,
+    PartyType,
+    Position,
+    Role,
+)
 from cl.recap.management.commands.nightly_pacer_updates import (
     get_docket_ids_docket_alerts,
     get_docket_ids_missing_info,
@@ -112,15 +157,18 @@ from cl.recap.management.commands.nightly_pacer_updates import (
     get_recap_documents_pray_and_pay,
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
-from cl.scrapers.models import PACERFreeDocumentRow
+from cl.recap.tests.tests import mock_bucket_open
+from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
+from cl.search.cluster_sources import ClusterSources
 from cl.search.factories import (
+    CaseTransferFactory,
     CourtFactory,
     DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactory,
-    OpinionClusterFactoryMultipleOpinions,
-    OpinionClusterFactoryWithChildrenAndParents,
+    OpinionClusterWithChildrenAndParentsFactory,
+    OpinionClusterWithMultipleOpinionsFactory,
     OpinionClusterWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
@@ -128,20 +176,57 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
-    SOURCES,
+    CaseTransfer,
     Citation,
     Court,
     Docket,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
     RECAPDocument,
+    TrialCourtData,
 )
+from cl.search.state.texas.factories import (
+    TexasAppellateBriefDictFactory,
+    TexasAppellateCourtInfoDictFactory,
+    TexasAppellateTransferDictFactory,
+    TexasCaseDocumentDictFactory,
+    TexasCaseEventDictFactory,
+    TexasCasePartyDictFactory,
+    TexasCourtOfAppealsDocketDictFactory,
+    TexasDocketEntryFactory,
+    TexasDocumentFactory,
+    TexasFinalCourtDocketDictFactory,
+    TexasOriginatingCourtDictFactory,
+    TexasOriginatingDistrictCourtDictFactory,
+    TexasSupremeCourtAppellateBriefDictFactory,
+    TexasSupremeCourtCaseEventDictFactory,
+)
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import TestCase
 from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
+from cl.tests.providers import fake
+from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+class UtilsTest(SimpleTestCase):
+    def test_create_docket_entry_sequence_numbers(self):
+        """Do we generate sequence numbers correctly?"""
+        entry_1 = {"date": date.fromisoformat("2025-01-02")}
+        entry_2 = {"date": date.fromisoformat("2025-01-02")}
+        entry_3 = {"date": date.fromisoformat("2025-01-03")}
+
+        output = create_docket_entry_sequence_numbers(
+            [entry_1, entry_3, entry_2]
+        )
+        assert len(output) == 3
+        assert output[0] == "2025-01-02.001"
+        assert output[1] == "2025-01-03.001"
+        assert output[2] == "2025-01-02.002"
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -543,6 +628,249 @@ class PacerDocketParserTest(TestCase):
         self.assertTrue(row[0].pacer_seq_no)
 
 
+class ScrapeFreeOpinionsLoopTest(TestCase):
+    """Tests for the free-opinion catch-up loop and the stall reporter."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create(
+            id="nysd",
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            in_use=True,
+            end_date=None,
+        )
+
+    def _log(self, day: date, status: int) -> PACERFreeDocumentLog:
+        return PACERFreeDocumentLog.objects.create(
+            court_id=self.court.pk,
+            date_queried=day,
+            status=status,
+        )
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_failed_chunk_does_not_abort_remaining_days(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """A single failed day must not bail the rest of the range."""
+        start = date(2025, 11, 1)
+        end = date(2025, 11, 3)
+        # Fail the middle day, succeed the others.
+        mock_fetch.side_effect = lambda court, s, e, day_span=1: s == date(
+            2025, 11, 2
+        )
+
+        get_and_save_free_document_reports(
+            [self.court.pk], start, end, day_span=1
+        )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        self.assertEqual(
+            queried_days,
+            [date(2025, 11, 1), date(2025, 11, 2), date(2025, 11, 3)],
+            "All three days should be attempted despite the middle failure.",
+        )
+
+    def test_get_outstanding_failed_dates(self) -> None:
+        """Only never-succeeded days within the look-back are returned."""
+        before = date(2026, 5, 20)
+        # Failed, never succeeded -> outstanding.
+        self._log(date(2026, 5, 1), PACERFreeDocumentLog.SCRAPE_FAILED)
+        # Failed then succeeded -> not outstanding.
+        self._log(date(2026, 5, 2), PACERFreeDocumentLog.SCRAPE_FAILED)
+        self._log(date(2026, 5, 2), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        # Succeeded only -> not outstanding.
+        self._log(date(2026, 5, 3), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        # Failed but on/after `before` -> covered by the forward range.
+        self._log(date(2026, 5, 20), PACERFreeDocumentLog.SCRAPE_FAILED)
+        # Failed but older than the look-back floor -> dropped.
+        old_day = date(2026, 5, 20) - timedelta(
+            days=OUTSTANDING_FAILED_LOOKBACK_DAYS + 5
+        )
+        self._log(old_day, PACERFreeDocumentLog.SCRAPE_FAILED)
+
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            outstanding = get_outstanding_failed_dates(
+                self.court.pk,
+                before=before,
+                floor=date(2026, 5, 26)
+                - timedelta(days=OUTSTANDING_FAILED_LOOKBACK_DAYS),
+            )
+
+        self.assertEqual(outstanding, [date(2026, 5, 1)])
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_catch_up_retries_outstanding_failed_day(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """The no-date path retries a failed day behind the cursor."""
+        mock_fetch.return_value = False
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            today = date(2026, 5, 26)
+            # Recent success -> cursor becomes today - 5 = 2026-05-21.
+            self._log(
+                today - timedelta(days=3),
+                PACERFreeDocumentLog.SCRAPE_SUCCESSFUL,
+            )
+            # A failed day behind the cursor must be retried.
+            self._log(
+                today - timedelta(days=10), PACERFreeDocumentLog.SCRAPE_FAILED
+            )
+
+            get_and_save_free_document_reports(
+                [self.court.pk], None, None, day_span=1
+            )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        self.assertIn(date(2026, 5, 16), queried_days)
+        # The retried failed day runs before the forward range begins.
+        self.assertEqual(queried_days[0], date(2026, 5, 16))
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.time.sleep"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.fetch_doc_report"
+    )
+    def test_resolved_failed_day_is_kept_but_not_requeried(
+        self, mock_fetch, mock_sleep
+    ) -> None:
+        """A failed day that later succeeded keeps its history and isn't redone."""
+        mock_fetch.return_value = False
+        gap_day = date(2026, 5, 16)
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            today = date(2026, 5, 26)
+            # Recent success -> cursor becomes today - 5 = 2026-05-21.
+            self._log(
+                today - timedelta(days=3),
+                PACERFreeDocumentLog.SCRAPE_SUCCESSFUL,
+            )
+            # gap_day already failed once and later succeeded.
+            self._log(gap_day, PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(gap_day, PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+
+            get_and_save_free_document_reports(
+                [self.court.pk], None, None, day_span=1
+            )
+
+        queried_days = [c.args[1] for c in mock_fetch.call_args_list]
+        # Resolved day must not be re-queried (it has a success row)...
+        self.assertNotIn(gap_day, queried_days)
+        # ...but its failed row is kept as history.
+        self.assertTrue(
+            PACERFreeDocumentLog.objects.filter(
+                court_id=self.court.pk,
+                status=PACERFreeDocumentLog.SCRAPE_FAILED,
+                date_queried=gap_day,
+            ).exists()
+        )
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.logger"
+    )
+    def test_report_stalls_flags_stale_court(self, mock_logger) -> None:
+        """A court whose newest success is too old is reported."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            self._log(date(2026, 4, 1), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+
+        self.assertEqual(stalled, [(self.court.pk, date(2026, 4, 1))])
+        mock_logger.error.assert_called_once()
+        # The Sentry fingerprint groups the alert per court.
+        self.assertEqual(
+            mock_logger.error.call_args.kwargs["extra"]["fingerprint"],
+            ["pacer-free-opinion-stall", self.court.pk],
+        )
+
+    def test_report_stalls_ignores_fresh_court(self) -> None:
+        """A court that advanced recently is not reported."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            self._log(
+                date(2026, 5, 25), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+            )
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+        self.assertEqual(stalled, [])
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.logger"
+    )
+    def test_report_stalls_enumerates_gaps(self, mock_logger) -> None:
+        """Outstanding failed days past the active window are listed as ranges."""
+        with time_machine.travel(datetime(2026, 5, 26), tick=False):
+            # Recent success -> the court itself is not stalled.
+            self._log(
+                date(2026, 5, 25), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+            )
+            # A genuine single-day gap.
+            self._log(date(2026, 3, 1), PACERFreeDocumentLog.SCRAPE_FAILED)
+            # Three consecutive gap days -> collapse into one range.
+            self._log(date(2026, 3, 5), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 6), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 7), PACERFreeDocumentLog.SCRAPE_FAILED)
+            # Failed then succeeded -> resolved, not a gap.
+            self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_FAILED)
+            self._log(date(2026, 3, 2), PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+            # Failed inside the active re-query window -> still being retried.
+            self._log(date(2026, 5, 24), PACERFreeDocumentLog.SCRAPE_FAILED)
+
+            stalled = report_free_document_scrape_stalls(
+                [self.court.pk], stale_days=14
+            )
+
+        self.assertEqual(stalled, [])
+        gap_calls = [
+            c
+            for c in mock_logger.error.call_args_list
+            if c.kwargs.get("extra", {}).get("fingerprint", [None])[0]
+            == "pacer-free-opinion-gaps"
+        ]
+        self.assertEqual(len(gap_calls), 1)
+        # args: (fmt, gap_count, range_count, court_id, range_lines)
+        self.assertEqual(gap_calls[0].args[1], 4)  # 4 gap days
+        self.assertEqual(gap_calls[0].args[2], 2)  # in 2 ranges
+        self.assertEqual(gap_calls[0].args[3], self.court.pk)
+        range_lines = gap_calls[0].args[4]
+        self.assertIn("2026-03-01", range_lines)
+        # Consecutive days collapse into a single "start to end" line.
+        self.assertIn("2026-03-05 to 2026-03-07", range_lines)
+        # Each range is on its own line.
+        self.assertEqual(len(range_lines.splitlines()), 2)
+        self.assertNotIn("2026-03-02", range_lines)
+        self.assertNotIn("2026-05-24", range_lines)
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.report_free_document_scrape_stalls"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.ocr_available"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_pdfs"
+    )
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_and_save_free_document_reports"
+    )
+    def test_do_everything_runs_stall_report(
+        self, mock_reports, mock_pdfs, mock_ocr, mock_stalls
+    ) -> None:
+        """do-everything self-monitors by calling the stall reporter."""
+        do_everything([self.court.pk], None, None, "pacerdoc1", day_span=1)
+        mock_stalls.assert_called_once_with([self.court.pk])
+
+
 class GetQuarterTest(SimpleTestCase):
     """Can we properly figure out when the quarter that we're currently in
     began?
@@ -566,10 +894,25 @@ class GetQuarterTest(SimpleTestCase):
 class IAUploaderTest(TestCase):
     """Tests related to uploading docket content to the Internet Archive"""
 
-    fixtures = [
-        "test_objects_query_counts.json",
-        "attorney_party_dup_roles.json",
-    ]
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket_1 = DocketFactory()
+        cls.docket_2 = DocketFactory()
+        cls.docket_3 = DocketFactory()
+
+        party_1 = PartyFactory.build()
+        party_1.save()
+        party_2 = PartyFactory.build()
+        party_2.save()
+        PartyTypeFactory(docket=cls.docket_1, party=party_1)
+        PartyTypeFactory(docket=cls.docket_2, party=party_2)
+
+        attorney = AttorneyFactory(docket=cls.docket_1)
+        RoleFactory(docket=cls.docket_1, party=party_1, attorney=attorney)
+        RoleFactory(docket=cls.docket_2, party=party_1, attorney=attorney)
+
+        docket_entry = DocketEntryFactory(docket=cls.docket_1)
+        RECAPDocumentFactory(docket_entry=docket_entry)
 
     def test_correct_json_generated(self) -> None:
         """Do we generate the correct JSON for a handful of tricky dockets?
@@ -577,7 +920,7 @@ class IAUploaderTest(TestCase):
         The most important thing here is that we don't screw up how we handle
         m2m relationships, which have a tendency of being tricky.
         """
-        d, j_str = generate_ia_json(1)
+        d, j_str = generate_ia_json(self.docket_1.pk)
         j = json.loads(j_str)
         parties = j["parties"]
         first_party = parties[0]
@@ -609,13 +952,13 @@ class IAUploaderTest(TestCase):
         Let's avoid that.
         """
         with self.assertNumQueries(11):
-            generate_ia_json(1)
+            generate_ia_json(self.docket_1.pk)
 
         with self.assertNumQueries(9):
-            generate_ia_json(2)
+            generate_ia_json(self.docket_2.pk)
 
         with self.assertNumQueries(5):
-            generate_ia_json(3)
+            generate_ia_json(self.docket_3.pk)
 
 
 class HarvardTests(TestCase):
@@ -627,6 +970,7 @@ class HarvardTests(TestCase):
         Each one can be used or turned off.  See the teardown for more.
         :return:
         """
+        super().setUp()
         self.make_filepath_patch = patch(
             "cl.corpus_importer.management.commands.harvard_opinions.filepath_list"
         )
@@ -659,8 +1003,8 @@ class HarvardTests(TestCase):
         self.make_filepath_patch.stop()
         self.read_json_patch.stop()
         self.find_court_patch.stop()
-        Docket.objects.all().delete()
-        Court.objects.all().delete()
+        self.get_fix_list_patch.stop()
+        super().tearDown()
 
     def _get_cite(self, case_law) -> Citation:
         """Fetch first citation added to case
@@ -1071,7 +1415,7 @@ class CorpusImporterManagementCommmandsTests(TestCase):
 
         # Create opinion cluster with opinion and docket
         cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
                     case_name="Foo v. Bar",
@@ -1148,7 +1492,7 @@ class CleanUpMisMatchedDockets(TestCase):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         # Opinion cluster with mis matched docket.
         cls.cluster = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1166,7 +1510,7 @@ class CleanUpMisMatchedDockets(TestCase):
 
         # Opinion cluster with correct docket
         cluster_2 = (
-            OpinionClusterFactoryWithChildrenAndParents(
+            OpinionClusterWithChildrenAndParentsFactory(
                 docket=DocketFactory(
                     court=cls.court,
                     source=Docket.HARVARD,
@@ -1252,8 +1596,8 @@ class HarvardMergerTests(TestCase):
             (<cross_reference><span class="citation no-link">137 S.E. 791</span></cross_reference>), and cit.; <em>Kuck</em> v. <em>State,</em> <cross_reference><span class="citation" data-id="5582722"><a href="/opinion/5732248/kuck-v-state/">149 Ga. 191</a></span></cross_reference>
             (<cross_reference><span class="citation no-link">99 S.E. 622</span></cross_reference>). I concur in the reversal for this additional reason.</p>"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {
@@ -1313,7 +1657,7 @@ class HarvardMergerTests(TestCase):
         }
         self.read_json_func.return_value = case_data
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, Lindley W. Gamp, and John A. Boyhin",
         )
@@ -1330,7 +1674,7 @@ class HarvardMergerTests(TestCase):
         )
 
         # Test that we can ignore matching fields
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             docket=DocketFactory(),
             attorneys="B. B. Giles, for plaintiff in error., Lindley W. Gamp, solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, contra.",
         )
@@ -1353,31 +1697,31 @@ class HarvardMergerTests(TestCase):
         """Test query for Non Harvard Sources"""
 
         OpinionClusterFactory(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             id=1,
             filepath_json_harvard="/the/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.HARVARD_CASELAW,
+            source=ClusterSources.HARVARD_CASELAW,
             docket=DocketFactory(source=Docket.HARVARD),
             id=2,
             filepath_json_harvard="/a/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
+            source=ClusterSources.COLUMBIA_ARCHIVE_M_HARVARD,
             docket=DocketFactory(source=Docket.HARVARD_AND_COLUMBIA),
             id=3,
             filepath_json_harvard="/some/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
             docket=DocketFactory(source=Docket.SCRAPER),
             id=4,
             filepath_json_harvard="/my/file/path.json",
         )
         OpinionClusterFactory(
-            source=SOURCES.COURT_WEBSITE,
+            source=ClusterSources.COURT_WEBSITE,
             docket=DocketFactory(source=Docket.SCRAPER),
             id=5,
             filepath_json_harvard=None,
@@ -1427,10 +1771,11 @@ class HarvardMergerTests(TestCase):
         self.assertEqual([1, 4, 5], list(sorted(cluster_ids)))
 
     def test_add_opinions_without_authors_in_cl(self):
-        """Can we add opinion and update authors"""
+        """Can we add opinions and update empty author_str fields via
+        the Harvard merger?"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {"author_str": "", "plain_text": "My opinion"},
@@ -1451,13 +1796,13 @@ class HarvardMergerTests(TestCase):
         }
         self.read_json_func.return_value = case_data
 
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-
-        authors = list(author_query)
-
-        self.assertEqual(authors, ["", ""])
+        # Before merge: both opinions should have empty authors
+        opinions = Opinion.objects.filter(cluster_id=cluster.id).order_by(
+            "author_str"
+        )
+        self.assertEqual(
+            list(opinions.values_list("author_str", flat=True)), ["", ""]
+        )
 
         cluster_ids = OpinionCluster.objects.filter(
             docket__source__in=[
@@ -1466,37 +1811,29 @@ class HarvardMergerTests(TestCase):
             filepath_json_harvard__isnull=False,
         ).values_list("id", flat=True)
 
-        for id in cluster_ids:
-            merge_opinion_clusters(cluster_id=id)
+        for cluster_id in cluster_ids:
+            merge_opinion_clusters(cluster_id=cluster_id)
 
         cluster.refresh_from_db()
 
-        author_query = Opinion.objects.filter(
-            cluster_id=cluster.id
-        ).values_list("author_str", flat=True)
-
-        authors = list(author_query)
-
+        # After merge: authors should be populated from Harvard data
+        opinions = Opinion.objects.filter(cluster_id=cluster.id).order_by(
+            "author_str"
+        )
+        self.assertEqual(opinions.count(), 2)
         self.assertEqual(
-            Opinion.objects.filter(cluster_id=cluster.id).count(),
-            2,
-            msg="Oops",
+            list(opinions.values_list("author_str", flat=True)),
+            ["Broyles", "Gardner"],
         )
-
-        self.assertNotEqual(
-            Opinion.objects.filter(cluster_id=cluster.id)[0].xml_harvard, ""
-        )
-
+        self.assertNotEqual(opinions[0].xml_harvard, "")
         self.assertEqual(cluster.docket.source, Docket.HARVARD_AND_COLUMBIA)
-
-        self.assertEqual(authors, ["Broyles", "Gardner"])
 
     def test_add_opinions_with_authors_in_cl(self):
         """Can we update an opinion and leave author_str alone if already
         assigned"""
 
-        cluster = OpinionClusterFactoryMultipleOpinions(
-            source=SOURCES.COLUMBIA_ARCHIVE,
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
+            source=ClusterSources.COLUMBIA_ARCHIVE,
             docket=DocketFactory(source=Docket.COLUMBIA),
             sub_opinions__data=[
                 {"author_str": "Broyles", "plain_text": "My opinion"},
@@ -1728,18 +2065,19 @@ class HarvardMergerTests(TestCase):
         """Can we update cluster source?"""
 
         cluster_1 = OpinionClusterWithParentsFactory(
-            source=SOURCES.COURT_WEBSITE
+            source=ClusterSources.COURT_WEBSITE
         )
         update_cluster_source(cluster_1)
         cluster_1.refresh_from_db()
-        self.assertEqual(cluster_1.source, SOURCES.COURT_M_HARVARD)
+        self.assertEqual(cluster_1.source, ClusterSources.COURT_M_HARVARD)
 
-        with self.assertRaises(ClusterSourceException):
-            cluster_2 = OpinionClusterWithParentsFactory(
-                source=SOURCES.INTERNET_ARCHIVE
-            )
-            update_cluster_source(cluster_2)
-            cluster_2.refresh_from_db()
+        # Any source can now be merged with Harvard deterministically
+        cluster_2 = OpinionClusterWithParentsFactory(
+            source=ClusterSources.INTERNET_ARCHIVE
+        )
+        update_cluster_source(cluster_2)
+        cluster_2.refresh_from_db()
+        self.assertEqual(cluster_2.source, "AU")
 
     def test_merge_strings(self):
         """Can we choose the best string to fill the field?"""
@@ -2009,7 +2347,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
         )
 
         # Factory create cluster, data from cluster id: 1589121
-        cluster = OpinionClusterFactoryMultipleOpinions(
+        cluster = OpinionClusterWithMultipleOpinionsFactory(
             case_name="Mendoza v. State",
             case_name_full="Pioquinto MENDOZA, III, Appellant, v. the STATE of Texas, "
             "Appellee",
@@ -2021,7 +2359,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             "Granted Feb. 13, 2002.",
             posture="",
             judges="Alma, Duncan, Lopez, Rickhoff, Sarah, Tom",
-            source=SOURCES.LAWBOX_M_HARVARD,
+            source=ClusterSources.LAWBOX_M_HARVARD,
             docket=DocketFactory(source=Docket.HARVARD),
             sub_opinions__data=[
                 {
@@ -2080,6 +2418,1641 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             )
 
 
+class TexasMergerTest(TestCase):
+    def setUp(self):
+        """Set up texas merger tests"""
+        self.download_task_patch = patch(
+            "cl.corpus_importer.tasks.download_texas_document.si"
+        )
+        self.download_task_mock = self.download_task_patch.start()
+        self.extract_document_patch = patch(
+            "cl.corpus_importer.tasks.extract_formatted_text_document.s"
+        )
+        self.extract_document_mock = self.extract_document_patch.start()
+        self.download_document_patch = patch(
+            "cl.corpus_importer.tasks.download_document_in_stream"
+        )
+        self.download_document_mock = self.download_document_patch.start()
+
+    @classmethod
+    def setUpTestData(cls):
+        """Create test data for Texas merger tests"""
+        cls.texas_sc = CourtFactory.create(id="tex")
+        cls.texas_cca = CourtFactory.create(id="texcrimapp")
+        cls.texas_coa1 = CourtFactory.create(id="txctapp1")
+        cls.texas_dc100 = CourtFactory.create(id="texdistct101")
+        cls.docket_number_coa1 = "01-25-00011-CV"
+        cls.docket_coa1 = DocketFactory.create(
+            court=cls.texas_coa1,
+            docket_number=cls.docket_number_coa1,
+            docket_number_core=make_texas_docket_number_core(
+                cls.docket_number_coa1
+            ),
+        )
+        cls.docket_coa1_entry = TexasDocketEntryFactory.create(
+            docket=cls.docket_coa1,
+        )
+
+    def tearDown(self):
+        """Tear down patches"""
+        self.download_task_patch.stop()
+        self.extract_document_patch.stop()
+        self.download_document_patch.stop()
+
+    def get_random_docket_entry_dict(self, **kwargs):
+        return fake.random_element(
+            (
+                TexasSupremeCourtAppellateBriefDictFactory(**kwargs),
+                TexasSupremeCourtCaseEventDictFactory(**kwargs),
+                TexasAppellateBriefDictFactory(**kwargs),
+                TexasCaseEventDictFactory(**kwargs),
+            )
+        )
+
+    def test_normalize_texas_parties_empty_atty_name(self):
+        party_0 = TexasCasePartyDictFactory(representatives=[""])
+        # Filter out empty representatives
+        parties = [party_0]
+
+        normalized = normalize_texas_parties(parties)
+
+        self.assertEqual(
+            normalized,
+            [
+                {
+                    "name": party_0["name"],
+                    "type": party_0["type"],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "attorneys": [],
+                }
+            ],
+        )
+
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_parties",
+        return_value=MergeResult.created("Party", 1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_case_transfers",
+        return_value=MergeResult.created("CaseTransfer", 1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_trial_court_data",
+        return_value=MergeResult.created("TrialCourtData", 1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_docket_originating_court",
+        return_value=MergeResult.created("OriginatingCourtInformation", 1),
+    )
+    def test_merge_docket_entries_integration(
+        self,
+        mock_texas_oci,
+        mock_texas_tcd,
+        mock_texas_transfers,
+        mock_texas_parties,
+    ):
+        n_events = fake.random_int(min=0, max=30)
+        case_events = sorted(
+            [TexasSupremeCourtCaseEventDictFactory() for _ in range(n_events)],
+            key=lambda ce: ce["date"],
+        )
+
+        if len(case_events) == 0:
+            appellate_brief_indices = []
+        else:
+            appellate_brief_indices = sorted(
+                fake.random_elements(range(len(case_events)), unique=True)
+            )
+
+        appellate_briefs = [
+            TexasSupremeCourtAppellateBriefDictFactory(
+                date=case_events[i]["date"],
+                type=case_events[i]["type"],
+                attachments=case_events[i]["attachments"],
+                remarks=case_events[i]["remarks"],
+            )
+            for i in appellate_brief_indices
+        ]
+
+        actual_flags = [
+            True if i in appellate_brief_indices else False
+            for i in range(len(case_events))
+        ]
+
+        docket_dict = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            case_events=case_events,
+            appellate_briefs=appellate_briefs,
+        )
+        original_docket_entries = [
+            e["pk"] for e in TexasDocketEntry.objects.all().values("pk")
+        ]
+        merge_result = merge_texas_docket(docket_dict)
+
+        docket_entries = list(
+            TexasDocketEntry.objects.exclude(
+                pk__in=original_docket_entries
+            ).order_by("sequence_number")
+        )
+        self.assertEqual(
+            len(docket_entries),
+            len(case_events),
+            f"Generated {len(docket_entries)} docket entries from {len(case_events)} input case events.",
+        )
+
+        ab_index = 0
+        for i, docket_entry in enumerate(docket_entries):
+            self.assertEqual(
+                docket_entry.appellate_brief,
+                actual_flags[i],
+                f"Docket entry {i} has the wrong appellate brief flag (found {docket_entry.appellate_brief}, expected {actual_flags[i]}).",
+            )
+            self.assertEqual(
+                docket_entry.remarks,
+                case_events[i]["remarks"],
+                f"Docket entry {i} has the wrong remarks (found {docket_entry.remarks}, expected {case_events[i]['remarks']}).",
+            )
+            self.assertEqual(
+                docket_entry.disposition,
+                case_events[i]["disposition"],
+                f"Docket entry {i} has the wrong disposition (found {docket_entry.disposition}, expected {case_events[i]['disposition']}).",
+            )
+            if actual_flags[i]:
+                self.assertEqual(
+                    docket_entry.description,
+                    appellate_briefs[ab_index]["description"],
+                    f"Docket entry {i} has the wrong description (found {docket_entry.description}, expected {appellate_briefs[ab_index]['description']}).",
+                )
+                ab_index += 1
+            else:
+                self.assertEqual(
+                    docket_entry.description,
+                    "",
+                    f"Docket entry {i} should not have description (found {docket_entry.description}).",
+                )
+
+    def test_merge_texas_document_new_document(self):
+        """Can we correctly add a new attachment to an existing docket entry?"""
+        docket_entry = self.docket_coa1_entry
+
+        input_document = TexasCaseDocumentDictFactory()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = merge_texas_document(docket_entry, input_document)
+
+        assert result.create is True
+        assert result.success is True
+        assert result.creates.get("TexasDocument")
+        doc_pk = next(iter(result.creates["TexasDocument"]))
+        try:
+            created_document = TexasDocument.objects.get(pk=doc_pk)
+        except ObjectDoesNotExist:
+            created_document = None
+        assert created_document is not None
+        assert created_document.docket_entry_id == docket_entry.id
+        assert created_document.description == input_document["description"]
+        assert str(created_document.media_id) == input_document["media_id"]
+        assert (
+            str(created_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert str(created_document.url) == input_document["document_url"]
+
+        self.download_task_mock.assert_called_once_with(created_document.pk)
+
+    def test_merge_texas_document_existing_document_no_update(self):
+        """Can we correctly handle an existing document with no update needed?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocumentDictFactory()
+
+        # Create an existing and up to date attachment
+        current_document = TexasDocumentFactory.create(
+            docket_entry=docket_entry,
+            description=input_document["description"],
+            media_id=input_document["media_id"],
+            media_version_id=input_document["media_version_id"],
+            url=input_document["document_url"],
+        )
+        current_document.filepath_local = "a"
+        current_document.save()
+
+        result = merge_texas_document(docket_entry, input_document)
+
+        assert result.create is False
+        assert result.update is False
+        assert result.success is True
+        result_document = TexasDocument.objects.get(pk=current_document.pk)
+        assert result_document is not None
+        assert result_document.docket_entry_id == docket_entry.id
+        assert result_document.description == input_document["description"]
+        assert str(result_document.media_id) == input_document["media_id"]
+        assert (
+            str(result_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert str(result_document.url) == input_document["document_url"]
+
+        self.download_task_mock.assert_not_called()
+
+    def test_merge_texas_document_existing_document_update(self):
+        """Can we correctly update an existing document with new version?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocumentDictFactory()
+        old_document = TexasCaseDocumentDictFactory(
+            media_id=input_document["media_id"],
+        )
+
+        current_document = TexasDocumentFactory.create(
+            docket_entry=docket_entry,
+            description=old_document["description"],
+            media_id=old_document["media_id"],
+            media_version_id=old_document["media_version_id"],
+            url=old_document["document_url"],
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = merge_texas_document(docket_entry, input_document)
+
+        assert result.create is False
+        assert result.update is True
+        assert result.success is True
+        assert current_document.pk in result.updates["TexasDocument"]
+        result_document = TexasDocument.objects.get(pk=current_document.pk)
+        assert result_document is not None
+        assert result_document.docket_entry_id == docket_entry.id
+        assert result_document.description == input_document["description"]
+        assert str(result_document.media_id) == input_document["media_id"]
+        assert (
+            str(result_document.media_version_id)
+            == input_document["media_version_id"]
+        )
+        assert str(result_document.url) == input_document["document_url"]
+
+        self.download_task_mock.assert_called_once_with(current_document.pk)
+
+    def test_merge_texas_document_skips_download_when_disabled(self):
+        """Are attachment downloads skipped when download_attachments=False?"""
+        docket_entry = self.docket_coa1_entry
+        input_document = TexasCaseDocumentDictFactory()
+
+        result = merge_texas_document(
+            docket_entry, input_document, download_attachments=False
+        )
+
+        assert result.create is True
+        assert result.success is True
+        assert result.creates.get("TexasDocument")
+        self.download_task_mock.assert_not_called()
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @responses.activate
+    def test_merge_texas_document_plaintext_extraction(
+        self, ext_mock, pcs_mock, throttle_mock
+    ):
+        """
+        Ensure plaintext extraction is triggered by `merge_texas_document`.
+        """
+        pcs_mock.return_value = httpx.Response(200, text="1")
+        # Stop the mocks just for this test
+        self.download_task_patch.stop()
+        self.extract_document_patch.stop()
+        self.download_document_patch.stop()
+
+        input_document = TexasCaseDocumentDictFactory()
+
+        # Slight optimization for the failure case where the merger fails to
+        # request a PDF
+        def get_test_pdf(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+                return 200, {"Content-Type": "application/pdf"}, f.read()
+
+        response = responses.add_callback(
+            responses.GET,
+            input_document["document_url"],
+            callback=get_test_pdf,
+        )
+
+        docket_entry = self.docket_coa1_entry
+        with self.captureOnCommitCallbacks(execute=True):
+            result = merge_texas_document(docket_entry, input_document)
+        docket_entry.refresh_from_db()
+        doc_pk = next(iter(result.creates["TexasDocument"]))
+        document = TexasDocument.objects.get(pk=doc_pk)
+
+        self.assertEqual(response.call_count, 1)
+        self.assertEqual(document.url, input_document["document_url"])
+        self.assertTrue(document.filepath_local)
+        self.assertIsNone(document.processing_error)
+        self.assertIn("UNITED", document.plain_text)
+
+    def test_merge_texas_docket_entry_new_entry(self):
+        """Can we correctly handle a docket entry?"""
+        case_event = TexasCaseEventDictFactory(
+            attachments=[TexasCaseDocumentDictFactory()],
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+        appellate_brief = None
+        if fake.boolean():
+            appellate_brief = TexasAppellateBriefDictFactory(
+                date=case_event["date"],
+                type=case_event["type"],
+                attachments=case_event["attachments"],
+            )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            output = merge_texas_docket_entry(
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
+            )
+
+        assert output.create is True
+        assert output.update is False
+        assert output.success is True
+        assert "TexasDocketEntry" in output.creates
+        entry_pk = next(iter(output.creates["TexasDocketEntry"]))
+        created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == case_event["type"]
+        assert created_docket_entry.disposition == case_event["disposition"]
+        assert created_docket_entry.description == (
+            appellate_brief["description"] if appellate_brief else ""
+        )
+        assert created_docket_entry.remarks == case_event.get("remarks", "")
+        assert created_docket_entry.date_filed == case_event["date"]
+        n_attachments = TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).count()
+        assert n_attachments == 1
+        assert self.extract_document_mock.call_count == 1
+
+    def test_merge_texas_docket_entry_no_update(self):
+        """Can we correctly handle a docket entry update noop?"""
+        case_event = TexasCaseEventDictFactory(
+            attachments=[TexasCaseDocumentDictFactory()],
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+        appellate_brief = None
+        if fake.boolean():
+            appellate_brief = TexasAppellateBriefDictFactory(
+                date=case_event["date"],
+                type=case_event["type"],
+                attachments=case_event["attachments"],
+            )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = merge_texas_docket_entry(
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
+            )
+        entry_pk = next(iter(result.creates["TexasDocketEntry"]))
+        documents = TexasDocument.objects.filter(docket_entry_id=entry_pk)
+        for document in documents:
+            document.filepath_local = "a"
+            document.save()
+        # Reset call count
+        self.extract_document_mock.reset_mock()
+
+        # noop
+        with self.captureOnCommitCallbacks(execute=True):
+            output = merge_texas_docket_entry(
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
+            )
+
+        assert output.create is False
+        assert output.update is True
+        assert output.success is True
+        assert entry_pk in output.updates["TexasDocketEntry"]
+        created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == case_event["type"]
+        assert created_docket_entry.disposition == case_event["disposition"]
+        assert created_docket_entry.description == (
+            appellate_brief["description"] if appellate_brief else ""
+        )
+        assert created_docket_entry.remarks == case_event.get("remarks", "")
+        assert created_docket_entry.date_filed == case_event["date"]
+        n_attachments = TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).count()
+        assert n_attachments == len(case_event["attachments"])
+        assert self.extract_document_mock.call_count == 0
+
+    def test_merge_texas_docket_entry_add_document(self):
+        """Can we correctly add a new document to an existing docket entry?"""
+        case_event = TexasCaseEventDictFactory(
+            attachments=[TexasCaseDocumentDictFactory()],
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+        appellate_brief = None
+        if fake.boolean():
+            appellate_brief = TexasAppellateBriefDictFactory(
+                date=case_event["date"],
+                type=case_event["type"],
+                attachments=case_event["attachments"],
+            )
+        initial_n_attachments = len(case_event["attachments"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = merge_texas_docket_entry(
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
+            )
+        entry_pk = next(iter(result.creates["TexasDocketEntry"]))
+        documents = TexasDocument.objects.filter(docket_entry_id=entry_pk)
+        for document in documents:
+            document.filepath_local = "a"
+            document.save()
+        # Reset call count
+        self.extract_document_mock.reset_mock()
+
+        case_event["attachments"].append(TexasCaseDocumentDictFactory())
+        with self.captureOnCommitCallbacks(execute=True):
+            output = merge_texas_docket_entry(
+                self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
+            )
+
+        assert output.create is True
+        assert output.update is True
+        assert output.success is True
+        assert entry_pk in output.updates["TexasDocketEntry"]
+        created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
+        assert created_docket_entry.docket_id == self.docket_coa1.id
+        assert created_docket_entry.entry_type == case_event["type"]
+        assert created_docket_entry.remarks == case_event.get("remarks", "")
+        assert created_docket_entry.description == (
+            appellate_brief["description"] if appellate_brief else ""
+        )
+        assert created_docket_entry.disposition == case_event["disposition"]
+        assert created_docket_entry.date_filed == case_event["date"]
+        n_attachments = TexasDocument.objects.filter(
+            docket_entry_id=created_docket_entry.id
+        ).count()
+        assert n_attachments == initial_n_attachments + 1
+        assert self.extract_document_mock.call_count == 1
+
+    def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
+        """When multiple entries match by date/type/brief, use the one with matching sequence number."""
+        # Create two entries with same date, type, and appellate_brief
+        existing_entry_1 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-02"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-02.000",
+            disposition="First entry",
+        )
+        existing_entry_2 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-02"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-02.001",
+            disposition="Second entry",
+        )
+
+        case_event = TexasCaseEventDictFactory(
+            attachments=[],
+            disposition="Updated disposition",
+            date=date.fromisoformat("2025-01-02"),
+            type="Brief",
+        )
+        appellate_brief = TexasAppellateBriefDictFactory(
+            date=case_event["date"],
+            type=case_event["type"],
+            attachments=case_event["attachments"],
+        )
+
+        # Should match the second entry by sequence number
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-02.001", case_event, appellate_brief
+        )
+
+        assert output.create is False
+        assert output.update is True
+        assert output.success is True
+        assert existing_entry_2.pk in output.updates["TexasDocketEntry"]
+        updated_entry = TexasDocketEntry.objects.get(pk=existing_entry_2.pk)
+        assert updated_entry.disposition == case_event["disposition"]
+        assert updated_entry.sequence_number == "2025-01-02.001"
+        # Ensure the first entry was not modified
+        existing_entry_1.refresh_from_db()
+        assert existing_entry_1.disposition == "First entry"
+
+    def test_merge_texas_docket_entry_single_match_updates_entry(self):
+        """When exactly one entry matches by date/type/brief, update it even
+        with different sequence number."""
+        existing_entry = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-04"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-04.000",
+            disposition="Original description",
+        )
+
+        case_event = TexasCaseEventDictFactory(
+            attachments=[],
+            disposition="Updated disposition",
+            date=date.fromisoformat("2025-01-04"),
+            type="Brief",
+        )
+        appellate_brief = TexasAppellateBriefDictFactory(
+            date=case_event["date"],
+            type=case_event["type"],
+            attachments=case_event["attachments"],
+        )
+
+        # Should update existing entry and change its sequence number
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-04.001", case_event, appellate_brief
+        )
+
+        assert output.create is False
+        assert output.update is True
+        assert output.success is True
+        assert existing_entry.pk in output.updates["TexasDocketEntry"]
+        updated_entry = TexasDocketEntry.objects.get(pk=existing_entry.pk)
+        assert updated_entry.disposition == case_event["disposition"]
+        assert updated_entry.sequence_number == "2025-01-04.001"
+
+    def test_merge_texas_docket_entry_multiple_matches_without_sequence(self):
+        """When multiple entries match by date/type/brief but none match sequence, create a new entry."""
+        # Create two entries with same date, type, and appellate_brief
+        existing_entry_1 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-03"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-03.000",
+            disposition="First entry",
+        )
+        existing_entry_2 = TexasDocketEntryFactory.create(
+            docket=self.docket_coa1,
+            date_filed=date.fromisoformat("2025-01-03"),
+            entry_type="Brief",
+            appellate_brief=True,
+            sequence_number="2025-01-03.001",
+            disposition="Second entry",
+        )
+        case_event = TexasCaseEventDictFactory(
+            attachments=[],
+            disposition="New third entry",
+            date=date.fromisoformat("2025-01-03"),
+            type="Brief",
+        )
+        appellate_brief = TexasAppellateBriefDictFactory(
+            date=case_event["date"],
+            type=case_event["type"],
+            attachments=case_event["attachments"],
+        )
+
+        # Should create a new entry since no sequence number matches
+        output = merge_texas_docket_entry(
+            self.docket_coa1, "2025-01-03.002", case_event, appellate_brief
+        )
+
+        assert output.create is True
+        assert output.update is False
+        assert output.success is True
+        assert "TexasDocketEntry" in output.creates
+        entry_pk = next(iter(output.creates["TexasDocketEntry"]))
+        assert entry_pk not in (existing_entry_1.pk, existing_entry_2.pk)
+        new_entry = TexasDocketEntry.objects.get(pk=entry_pk)
+        assert new_entry.disposition == case_event["disposition"]
+        assert new_entry.sequence_number == "2025-01-03.002"
+        # Ensure existing entries were not modified
+        existing_entry_1.refresh_from_db()
+        existing_entry_2.refresh_from_db()
+        assert existing_entry_1.disposition == "First entry"
+        assert existing_entry_2.disposition == "Second entry"
+
+    def test_merge_single_party_with_attorney(self):
+        """Can we merge a single party with an attorney?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Test Party",
+                type="Appellant",
+                representatives=["Test Attorney"],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check party was created
+        assert Party.objects.filter(name="Test Party").exists()
+        party = Party.objects.get(name="Test Party")
+
+        # Check party type was associated with docket
+        assert PartyType.objects.filter(
+            docket=self.docket_coa1, party=party, name="Appellant"
+        ).exists()
+
+        # Check attorney was created
+        assert Attorney.objects.filter(name="Test Attorney").exists()
+
+        # Check role was created linking party, attorney, and docket
+        assert Role.objects.filter(
+            docket=self.docket_coa1,
+            party=party,
+            attorney__name="Test Attorney",
+        ).exists()
+
+    def test_merge_multiple_parties(self):
+        """Can we merge multiple parties?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Appellant Party",
+                type="Appellant",
+                representatives=["Appellant Attorney"],
+            ),
+            TexasCaseParty(
+                name="Appellee Party",
+                type="Appellee",
+                representatives=[
+                    "Appellee Attorney One",
+                    "Appellee Attorney Two",
+                ],
+            ),
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check both parties were created
+        assert Party.objects.filter(name="Appellant Party").exists()
+        assert Party.objects.filter(name="Appellee Party").exists()
+
+        # Check all attorneys were created
+        assert Attorney.objects.filter(name="Appellant Attorney").exists()
+        assert Attorney.objects.filter(name="Appellee Attorney One").exists()
+        assert Attorney.objects.filter(name="Appellee Attorney Two").exists()
+
+        # Check correct number of roles
+        assert Role.objects.filter(docket=self.docket_coa1).count() == 3
+
+    def test_merge_party_without_representatives(self):
+        """Can we merge a party that has no representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Pro Se Party",
+                type="Appellant",
+                representatives=[],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, parties)
+
+        # Check party was created
+        assert Party.objects.filter(name="Pro Se Party").exists()
+
+        # Check party type exists
+        party = Party.objects.get(name="Pro Se Party")
+        assert PartyType.objects.filter(
+            docket=self.docket_coa1, party=party, name="Appellant"
+        ).exists()
+
+        # No attorneys should be created for this party
+        assert (
+            Role.objects.filter(docket=self.docket_coa1, party=party).count()
+            == 0
+        )
+
+    def test_merge_empty_parties_preserves_existing(self):
+        """Does merging empty parties preserve existing party data?"""
+        # First add some parties
+        initial_parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Existing Party",
+                type="Appellant",
+                representatives=["Existing Attorney"],
+            )
+        ]
+        merge_texas_parties(self.docket_coa1, initial_parties)
+        initial_party_count = self.docket_coa1.parties.count()
+
+        # Now merge empty list
+        merge_texas_parties(self.docket_coa1, [])
+
+        # Existing parties should be preserved
+        assert self.docket_coa1.parties.count() == initial_party_count
+
+    def test_normalize_single_party_no_representatives(self):
+        """Can we normalize a party without representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="John Doe",
+                type="Appellant",
+                representatives=[],
+            )
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 1
+        assert result[0]["name"] == "John Doe"
+        assert result[0]["type"] == "Appellant"
+        assert result[0]["date_terminated"] is None
+        assert result[0]["extra_info"] == ""
+        assert result[0]["attorneys"] == []
+
+    def test_normalize_single_party_with_representatives(self):
+        """Can we normalize a party with multiple representatives?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Jane Smith",
+                type="Appellee",
+                representatives=[
+                    "Attorney One",
+                    "Attorney Two",
+                    "Attorney Three",
+                ],
+            )
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 1
+        assert result[0]["name"] == "Jane Smith"
+        assert result[0]["type"] == "Appellee"
+        assert len(result[0]["attorneys"]) == 3
+
+        # First attorney should be lead
+        assert result[0]["attorneys"][0]["name"] == "Attorney One"
+        assert result[0]["attorneys"][0]["contact"] == "Attorney One"
+        assert result[0]["attorneys"][0]["roles"] == ["LEAD_ATTORNEY"]
+
+        # Subsequent attorneys should have UNKNOWN role
+        assert result[0]["attorneys"][1]["name"] == "Attorney Two"
+        assert result[0]["attorneys"][1]["roles"] == ["UNKNOWN"]
+        assert result[0]["attorneys"][2]["name"] == "Attorney Three"
+        assert result[0]["attorneys"][2]["roles"] == ["UNKNOWN"]
+
+    def test_normalize_multiple_parties(self):
+        """Can we normalize multiple parties?"""
+        parties: list[TexasCaseParty] = [
+            TexasCaseParty(
+                name="Petitioner Corp",
+                type="Petitioner",
+                representatives=["Lead Counsel"],
+            ),
+            TexasCaseParty(
+                name="Respondent LLC",
+                type="Respondent",
+                representatives=["Defense Attorney", "Co-Counsel"],
+            ),
+        ]
+        result = normalize_texas_parties(parties)
+        assert len(result) == 2
+
+        assert result[0]["name"] == "Petitioner Corp"
+        assert result[0]["type"] == "Petitioner"
+        assert len(result[0]["attorneys"]) == 1
+        assert result[0]["attorneys"][0]["roles"] == ["LEAD_ATTORNEY"]
+
+        assert result[1]["name"] == "Respondent LLC"
+        assert result[1]["type"] == "Respondent"
+        assert len(result[1]["attorneys"]) == 2
+
+    def test_normalize_empty_parties_list(self):
+        """Can we handle an empty parties list?"""
+        result = normalize_texas_parties([])
+        assert result == []
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @responses.activate
+    def test_download_texas_document_pdf_success(
+        self, ext_mock, pcs_mock, throttle_mock
+    ):
+        """Can we successfully download a PDF for a TexasDocument?"""
+        self.download_document_patch.stop()
+        texas_document = TexasDocumentFactory.create()
+
+        def get_test_pdf(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with mock_bucket_open("ocr_pdf_test.pdf", "rb") as f:
+                return 200, {"Content-Type": "application/pdf"}, f.read()
+
+        pdf_response = responses.add_callback(
+            responses.GET,
+            texas_document.url,
+            callback=get_test_pdf,
+        )
+
+        pcs_mock.return_value = httpx.Response(200, text="1")
+
+        result = download_texas_document(texas_document.pk)
+
+        assert result is not None
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local is not None
+        assert texas_document.page_count == 1
+        assert texas_document.processing_error is None
+        assert pdf_response.call_count == 1
+        assert pcs_mock.call_count == 1
+
+    def test_download_texas_document_not_found(self):
+        """Do we handle a missing TexasDocument gracefully?"""
+        non_existent_pk = 99999
+
+        result = download_texas_document(non_existent_pk)
+
+        assert result is None
+        self.download_document_mock.assert_not_called()
+
+    def test_download_texas_document_download_failure(self):
+        """Do we handle a failed document download gracefully?"""
+        texas_document = TexasDocumentFactory.create(
+            url="https://example.com/sample.pdf",
+        )
+
+        # Mock failed download
+        self.download_document_mock.return_value.__enter__.return_value = None
+
+        result = download_texas_document(texas_document.pk)
+
+        assert result is None
+        self.download_document_mock.assert_called_once_with(
+            "https://example.com/sample.pdf",
+            texas_document.pk,
+            "texas_",
+            require_pdf=False,
+        )
+        texas_document.refresh_from_db()
+        assert not texas_document.filepath_local
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    def test_download_texas_document_html(self, ext_mock, throttle_mock):
+        """Does an HTML document get saved to filepath_local?"""
+        from tempfile import NamedTemporaryFile
+
+        texas_document = TexasDocumentFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"<html>test</html>")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "abc123sha1",
+            )
+
+            result = download_texas_document(texas_document.pk)
+
+        # HTML is extractable, so pk is returned and chain continues
+        assert result == texas_document.pk
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert texas_document.sha1 == "abc123sha1"
+        assert ".html" in texas_document.filepath_local.name
+        assert texas_document.processing_error is None
+        # No page_count for non-PDFs
+        assert texas_document.page_count is None
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".mp3")
+    def test_download_texas_document_mp3_breaks_chain(
+        self, ext_mock, throttle_mock
+    ):
+        """Does an MP3 get saved but skip the extract chain?"""
+        from tempfile import NamedTemporaryFile
+
+        texas_document = TexasDocumentFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake mp3 data")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "mp3sha1hash",
+            )
+
+            result = download_texas_document(texas_document.pk)
+
+        # MP3 is not extractable — chain broken, None returned
+        assert result is None
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert texas_document.sha1 == "mp3sha1hash"
+        assert ".mp3" in texas_document.filepath_local.name
+        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert texas_document.processing_error is None
+        assert not texas_document.plain_text
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".docx")
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    def test_download_texas_document_unknown_extension_logged(
+        self, logger_mock, ext_mock, throttle_mock
+    ):
+        """Do we log a warning for unknown file types but still save them?"""
+        from tempfile import NamedTemporaryFile
+
+        texas_document = TexasDocumentFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake docx data")
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "docxsha1",
+            )
+
+            result = download_texas_document(texas_document.pk)
+
+        # Unknown extension is not extractable — chain broken, None returned
+        assert result is None
+        # Should log a warning about the unknown extension
+        logger_mock.warning.assert_any_call(
+            "Texas document download: Unexpected file extension "
+            "'%s' for TexasDocument %s from %s. Proceeding anyway.",
+            ".docx",
+            texas_document.pk,
+            texas_document.url,
+        )
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert texas_document.sha1 == "docxsha1"
+        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert texas_document.processing_error is None
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @responses.activate
+    def test_download_texas_document_wpd_extracts_text(self, throttle_mock):
+        """Does a WPD file get downloaded, stored, and its text extracted?"""
+        self.download_task_patch.stop()
+        self.extract_document_patch.stop()
+        self.download_document_patch.stop()
+
+        input_document = TexasCaseDocumentDictFactory()
+
+        wpd_path = settings.MEDIA_ROOT / "test/search/opinion_wpd.wpd"
+
+        def get_test_wpd(
+            request: requests.Request,
+        ) -> tuple[int, dict[str, str], bytes]:
+            with open(wpd_path, "rb") as f:
+                return (
+                    200,
+                    {"Content-Type": "application/octet-stream"},
+                    f.read(),
+                )
+
+        response = responses.add_callback(
+            responses.GET,
+            input_document["document_url"],
+            callback=get_test_wpd,
+        )
+
+        docket_entry = self.docket_coa1_entry
+        with self.captureOnCommitCallbacks(execute=True):
+            result = merge_texas_document(docket_entry, input_document)
+        document = TexasDocument.objects.get(
+            pk=list(result.creates["TexasDocument"])[0]
+        )
+
+        self.assertEqual(response.call_count, 1)
+        self.assertTrue(document.filepath_local)
+        self.assertIn(".wpd", document.filepath_local.name)
+        # page_count should not be set for non-PDFs
+        self.assertIsNone(document.page_count)
+        # WPD extraction should produce text
+        self.assertTrue(document.plain_text)
+        self.assertIsNone(document.processing_error)
+
+    @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
+    @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
+    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    def test_html_download_and_extraction_strips_tags(
+        self, ext_mock, microservice_mock, throttle_mock
+    ):
+        """Does an HTML document get downloaded with text extracted and
+        HTML tags stripped, ending with OCR_UNNECESSARY?"""
+        from tempfile import NamedTemporaryFile
+
+        from asgiref.sync import async_to_sync
+
+        from cl.scrapers.tasks import extract_formatted_text_document_base
+
+        texas_document = TexasDocumentFactory.create()
+        html_content = (
+            "<html><body><p>Hello <strong>world</strong></p></body></html>"
+        )
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(html_content.encode())
+            tmp.flush()
+            tmp.seek(0)
+            self.download_document_mock.return_value.__enter__.return_value = (
+                tmp,
+                "htmlsha1hash",
+            )
+
+            download_result = download_texas_document(texas_document.pk)
+
+        # HTML is extractable — pk returned and chain continues
+        assert download_result == texas_document.pk
+        texas_document.refresh_from_db()
+        assert texas_document.filepath_local
+        assert ".html" in texas_document.filepath_local.name
+
+        # Mock Doctor returning HTML content
+        microservice_mock.return_value = httpx.Response(
+            200,
+            json={
+                "content": html_content,
+                "extracted_by_ocr": False,
+            },
+        )
+
+        # Run extraction with strip_html_tags=True (as the management
+        # command's extract_texas_documents does for HTML docs)
+        async_to_sync(extract_formatted_text_document_base)(
+            texas_document.pk,
+            check_if_needed=False,
+            model_name="search.TexasDocument",
+            strip_html_tags=True,
+        )
+
+        texas_document.refresh_from_db()
+        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
+        assert texas_document.processing_error is None
+        assert "<" not in texas_document.plain_text
+        assert "Hello" in texas_document.plain_text
+        assert "world" in texas_document.plain_text
+
+    def test_merge_texas_docket_originating_court_creates_new(self):
+        """Can we create new originating court information?"""
+        self.docket_coa1.originating_court_information = None
+        self.docket_coa1.save()
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            docket_number=self.docket_number_coa1,
+            docket_number_raw=self.docket_number_coa1,
+            originating_court=TexasOriginatingDistrictCourtDictFactory(
+                district=5,
+            ),
+        )
+
+        result = merge_texas_docket_originating_court(
+            self.docket_coa1, docket_data
+        )
+
+        assert result.create is True
+        assert result.success is True
+
+        self.docket_coa1.refresh_from_db()
+        originating_info = self.docket_coa1.originating_court_information
+        assert originating_info is not None
+        assert (
+            originating_info.docket_number
+            == docket_data["originating_court"]["case"]
+        )
+        assert (
+            originating_info.docket_number_raw
+            == docket_data["originating_court"]["case"]
+        )
+        assert (
+            originating_info.court_reporter
+            == docket_data["originating_court"]["reporter"]
+        )
+        assert (
+            originating_info.assigned_to_str
+            == docket_data["originating_court"]["judge"]
+        )
+
+    def test_merge_texas_docket_originating_court_updates_existing(self):
+        """Can we update existing originating court information?"""
+        # Create existing originating court information
+        self.docket_coa1.originating_court_information = (
+            OriginatingCourtInformation.objects.create(
+                docket_number_raw="OLD-123",
+                docket_number="OLD-123",
+                court_reporter="Old Reporter",
+                assigned_to_str="Old Judge",
+            )
+        )
+        self.docket_coa1.save()
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory()
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            docket_number_raw=self.docket_number_coa1,
+            originating_court=originating_court,
+        )
+
+        result = merge_texas_docket_originating_court(
+            self.docket_coa1, docket_data
+        )
+
+        assert result.create is False
+        assert result.success is True
+
+        self.docket_coa1.refresh_from_db()
+        updated_info = self.docket_coa1.originating_court_information
+        assert updated_info is not None
+        assert updated_info.docket_number == originating_court["case"]
+        assert updated_info.docket_number_raw == originating_court["case"]
+        assert updated_info.court_reporter == originating_court["reporter"]
+        assert updated_info.assigned_to_str == originating_court["judge"]
+
+    def test_merge_texas_case_transfers_appellate_court_from_trial(self):
+        """Can we create a CaseTransfer for an appellate court case?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.destination_court == self.texas_coa1
+        assert transfer.destination_docket_number == self.docket_number_coa1
+        assert transfer.origin_court == texas_district
+        assert transfer.origin_docket_number == originating_court["case"]
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+        assert transfer.transfer_date == docket_data["date_filed"]
+
+    def test_merge_texas_case_transfers_appellate_with_workload_transfer(
+        self,
+    ):
+        """Can we create CaseTransfer for appellate case with work sharing?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        texas_coa2 = CourtFactory.create(id="txctapp2")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        transfer_from = TexasAppellateTransferDictFactory(
+            court_id=CourtID.SECOND_COURT_OF_APPEALS.value,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=transfer_from,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 2
+
+        appeal_transfer = transfers.get(transfer_type=CaseTransfer.APPEAL)
+        assert appeal_transfer.destination_court == self.texas_coa1
+        assert (
+            appeal_transfer.destination_docket_number
+            == self.docket_number_coa1
+        )
+        assert appeal_transfer.origin_court == texas_district
+        assert (
+            appeal_transfer.origin_docket_number == originating_court["case"]
+        )
+
+        workload_transfer = transfers.get(transfer_type=CaseTransfer.WORKLOAD)
+        assert workload_transfer.destination_court == self.texas_coa1
+        assert (
+            workload_transfer.destination_docket_number
+            == self.docket_number_coa1
+        )
+        assert workload_transfer.origin_court == texas_coa2
+        assert (
+            workload_transfer.origin_docket_number
+            == transfer_from["origin_docket"]
+        )
+
+    def test_merge_texas_case_transfers_supreme_court(self):
+        """Can we create a CaseTransfer for a Supreme Court case?"""
+        docket_sc = DocketFactory.create(court=self.texas_sc)
+
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            _n_cases=1,
+            case_number=[self.docket_number_coa1],
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            docket_number=docket_sc.docket_number,
+            appeals_court=appeals_court,
+            is_direct_appeal=False,
+        )
+
+        result = merge_texas_case_transfers(docket_sc, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        self.assertEqual(transfers.count(), 1)
+        transfer = transfers.first()
+        self.assertEqual(transfer.destination_court, self.texas_sc)
+        self.assertEqual(
+            transfer.destination_docket_number, docket_sc.docket_number
+        )
+        self.assertEqual(transfer.origin_court, self.texas_coa1)
+        self.assertEqual(
+            transfer.origin_docket_number, self.docket_number_coa1
+        )
+        self.assertEqual(transfer.transfer_type, CaseTransfer.APPEAL)
+        self.assertEqual(transfer.transfer_date, docket_data["date_filed"])
+
+    def test_merge_texas_case_transfers_cca_from_appellate(self):
+        """Can we create a CaseTransfer for CCA from appellate court?"""
+        docket_cca = DocketFactory.create(court=self.texas_cca)
+
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            _n_cases=1,
+            case_number=[self.docket_number_coa1],
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
+            docket_number=docket_cca.docket_number,
+            appeals_court=appeals_court,
+            is_direct_appeal=False,
+        )
+
+        result = merge_texas_case_transfers(docket_cca, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        self.assertEqual(transfers.count(), 1)
+        transfer = transfers.first()
+        self.assertEqual(transfer.destination_court, self.texas_cca)
+        self.assertEqual(
+            transfer.destination_docket_number, docket_cca.docket_number
+        )
+        self.assertEqual(transfer.origin_court, self.texas_coa1)
+        self.assertEqual(
+            transfer.origin_docket_number, self.docket_number_coa1
+        )
+        self.assertEqual(transfer.transfer_type, CaseTransfer.APPEAL)
+
+    def test_merge_texas_case_transfers_cca_death_penalty_direct_appeal(
+        self,
+    ):
+        """Can we handle death penalty direct appeals to CCA?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        docket_cca = DocketFactory.create(court=self.texas_cca)
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.COURT_OF_CRIMINAL_APPEALS.value,
+            docket_number=docket_cca.docket_number,
+            originating_court=originating_court,
+            is_direct_appeal=True,
+        )
+
+        result = merge_texas_case_transfers(docket_cca, docket_data)
+
+        assert result.success is True
+        assert result.create is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.destination_court == self.texas_cca
+        assert transfer.destination_docket_number == docket_cca.docket_number
+        assert transfer.origin_court == texas_district
+        assert transfer.origin_docket_number == originating_court["case"]
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+
+    def test_merge_texas_case_transfers_no_trial_court_info(self):
+        """Do we handle appellate cases without trial court info?"""
+        originating_court = TexasOriginatingCourtDictFactory(
+            court_type=CourtType.UNKNOWN.value,
+            case="",
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 0
+
+    def test_merge_texas_case_transfers_duplicate_handling(self):
+        """Do we properly handle duplicate CaseTransfer objects?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        CaseTransferFactory.create(
+            origin_court=texas_district,
+            origin_docket=None,
+            origin_docket_number=originating_court["case"],
+            destination_court=self.texas_coa1,
+            destination_docket_number=self.docket_number_coa1,
+            destination_docket=self.docket_coa1,
+            transfer_date=docket_data["date_filed"],
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+        assert result.create is False
+
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+
+    def test_merge_texas_case_transfers_multiple(self):
+        """Can we correctly handle multiple appellate transfers on one docket?"""
+
+        aci = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value, _n_cases=3
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            appeals_court=aci,
+            is_direct_appeal=False,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+        transfers = CaseTransfer.objects.all()
+        self.assertEqual(transfers.count(), 3)
+        source_dns = set(aci["case_number"])
+        db_dns = set(transfer.origin_docket_number for transfer in transfers)
+        self.assertEqual(source_dns, db_dns)
+
+    def test_merge_texas_case_transfers_appellate_with_unknown_workload_transfer_court(
+        self,
+    ):
+        """Do we gracefully skip workload transfers when the origin court is unknown?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        transfer_from = TexasAppellateTransferDictFactory(
+            court_id=CourtID.UNKNOWN.value,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=transfer_from,
+        )
+
+        result = merge_texas_case_transfers(self.docket_coa1, docket_data)
+
+        assert result.success is True
+
+        # Only the appeal transfer should be created; the workload transfer
+        # should be skipped because the origin court is unknown.
+        transfers = CaseTransfer.objects.all()
+        assert transfers.count() == 1
+        transfer = transfers.first()
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+        assert transfer.origin_court == texas_district
+
+    def test_merge_texas_docket_appellate_sets_appeal_from(self):
+        """Does merge_texas_docket set appeal_from for appellate courts?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert self.docket_coa1.pk in result.updates["Docket"]
+
+        self.docket_coa1.refresh_from_db()
+        assert self.docket_coa1.date_filed == docket_data["date_filed"]
+        assert self.docket_coa1.cause == docket_data["case_type"]
+        assert self.docket_coa1.appeal_from_id == "texdistct6"
+        assert self.docket_coa1.appeal_from_str == texas_district.full_name
+
+    def test_merge_texas_docket_existing_docket_marked_as_update(self):
+        """Does merge_texas_docket record an existing docket as an update?"""
+        CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            docket_number=self.docket_number_coa1,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        # Precondition: the docket we're about to merge already exists.
+        assert Docket.objects.filter(pk=self.docket_coa1.pk).exists()
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert self.docket_coa1.pk not in result.creates.get("Docket", set())
+        assert self.docket_coa1.pk in result.updates.get("Docket", set())
+
+    def test_merge_texas_docket_final_court_sets_appeal_from(self):
+        """Does merge_texas_docket set appeal_from for final courts?"""
+        sc_dn = "25-1066"
+        docket_sc = DocketFactory.create(
+            court=self.texas_sc,
+            docket_number=sc_dn,
+            docket_number_core=make_texas_docket_number_core(sc_dn),
+        )
+        appeals_court = TexasAppellateCourtInfoDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            docket_number=docket_sc.docket_number,
+            appeals_court=appeals_court,
+            originating_court=TexasOriginatingDistrictCourtDictFactory(
+                district=100
+            ),
+            is_direct_appeal=False,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert docket_sc.pk in result.updates["Docket"]
+
+        docket_sc.refresh_from_db()
+        assert docket_sc.date_filed == docket_data["date_filed"]
+        assert docket_sc.cause == docket_data["case_type"]
+        assert docket_sc.appeal_from_id == "txctapp1"
+        assert docket_sc.appeal_from_str == self.texas_coa1.full_name
+
+    def test_merge_texas_docket_appeal_from_missing_court(self):
+        docket_dict = TexasFinalCourtDocketDictFactory.create(
+            is_direct_appeal=False,
+            appeals_court=TexasAppellateCourtInfoDictFactory(
+                court_id="texas_coa17", district="Not Real Court of Appeals"
+            ),
+        )
+
+        result = merge_texas_docket(docket_dict)
+
+        assert result.success is True
+
+        docket_pk = next(iter(result.creates["Docket"]))
+        docket = Docket.objects.get(pk=docket_pk)
+
+        assert (
+            docket.appeal_from_str == docket_dict["appeals_court"]["district"]
+        )
+        assert docket.appeal_from is None
+
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_case_transfers",
+        return_value=MergeResult.created("CaseTransfer", 1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_docket_entry",
+        return_value=MergeResult.created("TexasDocketEntry", 1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_parties",
+        return_value=MergeResult.created("Party", 1),
+    )
+    @patch(
+        "cl.corpus_importer.tasks.merge_texas_docket_originating_court",
+        return_value=MergeResult.created("OriginatingCourtInformation", 1),
+    )
+    def test_merge_texas_docket_populates_all_fields(
+        self, mock_oci, mock_parties, mock_entry, mock_transfers
+    ):
+        """Does merge_texas_docket populate all Docket fields from input data?"""
+        texas_district = CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasCourtOfAppealsDocketDictFactory(
+            court_id=CourtID.FIRST_COURT_OF_APPEALS.value,
+            originating_court=originating_court,
+            transfer_from=None,
+        )
+
+        result = merge_texas_docket(docket_data)
+
+        assert result.success is True
+        assert result.creates.get("Docket")
+        docket_pk = next(iter(result.creates["Docket"]))
+
+        docket = Docket.objects.get(pk=docket_pk)
+        assert docket.source & Docket.SCRAPER
+        assert docket.court_id == "txctapp1"
+        assert docket.docket_number == docket_data["docket_number"]
+        assert docket.docket_number_core == make_texas_docket_number_core(
+            docket_data["docket_number"]
+        )
+        assert docket.docket_number_raw == docket_data["docket_number"]
+        assert docket.case_name == docket_data["case_name"]
+        assert docket.case_name_full == docket_data["case_name_full"]
+        assert docket.date_filed == docket_data["date_filed"]
+        assert docket.cause == docket_data["case_type"]
+        assert docket.appeal_from_id == "texdistct6"
+        assert docket.appeal_from_str == texas_district.full_name
+
+    def test_merge_trial_court_data(self):
+        """Can we create and then update TrialCourtData?"""
+        # Test written with the help of Claude Code
+        texas_district = CourtFactory.create(id="texdistct6")
+        originating_court = TexasOriginatingDistrictCourtDictFactory(
+            district=5,
+        )
+        docket_data = TexasFinalCourtDocketDictFactory(
+            court_id=CourtID.SUPREME_COURT.value,
+            originating_court=originating_court,
+        )
+
+        docket_sc = DocketFactory.create(court=self.texas_sc)
+        result = merge_texas_trial_court_data(docket_sc, docket_data)
+
+        assert result.create is True
+        assert result.success is True
+        assert result.creates.get("TrialCourtData")
+        tcd_pk = next(iter(result.creates["TrialCourtData"]))
+
+        tcd = TrialCourtData.objects.get(pk=tcd_pk)
+        assert tcd.docket_id == docket_sc.pk
+        assert tcd.docket_number_raw_trial == originating_court["case"]
+        assert tcd.docket_number_trial == originating_court["case"]
+        assert tcd.judge_str == originating_court["judge"]
+        assert tcd.reporter == originating_court["reporter"]
+        assert tcd.punishment == originating_court["punishment"]
+        assert tcd.county == originating_court["county"]
+        assert tcd.court == texas_district
+        assert tcd.court_name == texas_district.full_name
+
+        # Merging the same data again should be unnecessary
+        result2 = merge_texas_trial_court_data(docket_sc, docket_data)
+        tcd.refresh_from_db()
+        assert result2.create is False
+        assert result2.update is False
+        assert result2.success is True
+        assert tcd.docket_number_raw_trial == originating_court["case"]
+        assert tcd.docket_number_trial == originating_court["case"]
+        assert tcd.judge_str == originating_court["judge"]
+        assert tcd.reporter == originating_court["reporter"]
+        assert tcd.punishment == originating_court["punishment"]
+        assert tcd.county == originating_court["county"]
+        assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
+
+        # Merging changed data should update
+        new_dn = originating_court["case"] + "Different"
+        originating_court["case"] = new_dn
+
+        result3 = merge_texas_trial_court_data(docket_sc, docket_data)
+        tcd.refresh_from_db()
+        assert result3.create is False
+        assert result3.update is True
+        assert result3.success is True
+        assert tcd.docket_number_raw_trial == originating_court["case"]
+        assert tcd.docket_number_trial == new_dn
+        assert tcd.judge_str == originating_court["judge"]
+        assert tcd.reporter == originating_court["reporter"]
+        assert tcd.punishment == originating_court["punishment"]
+        assert tcd.county == originating_court["county"]
+        assert tcd.pk in result3.updates["TrialCourtData"]
+        assert TrialCourtData.objects.filter(docket=docket_sc).count() == 1
+
+
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
 @override_settings(
     IQUERY_CASE_PROBE_DAEMON_ENABLED=True,
@@ -2091,7 +4064,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        Court.objects.all().delete()
+        super().setUpTestData()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FB")
         cls.court_txed = CourtFactory(id="txed", jurisdiction="FB")
@@ -2105,6 +4078,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_mowd = CourtFactory(id="mowd", jurisdiction="FB")
 
     def setUp(self) -> None:
+        super().setUp()
         self.r = get_redis_interface("CACHE")
         keys_to_clean = [
             "iquery:highest_known_pacer_case_id",
@@ -2898,10 +4872,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 5):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2922,7 +4903,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -2979,10 +4963,17 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_cacd = r.get(f"iquery:court_wait:{self.court_vib.pk}")
         self.assertEqual(court_wait_cacd, None)
 
+        monday = datetime(2025, 7, 21)
+        monday_local = timezone.make_aware(
+            monday, timezone.get_default_timezone()
+        )
         for test in range(1, 30):
             with self.subTest(test=test):
                 r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                with (
+                    time_machine.travel(monday_local, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
                     call_command(
                         "probe_iquery_pages_daemon",
                         testing_iterations=1,
@@ -2999,7 +4990,10 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Test one more attempt. The alert error should be triggered.
         r.delete(f"iquery:court_wait:{self.court_vib.pk}")
-        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            time_machine.travel(monday_local, tick=False),
+            patch("cl.lib.decorators.time.sleep") as mock_sleep,
+        ):
             call_command(
                 "probe_iquery_pages_daemon",
                 testing_iterations=1,
@@ -3018,6 +5012,80 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_vib.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch("cl.corpus_importer.tasks.logger")
+    @patch(
+        "cl.corpus_importer.management.commands.probe_iquery_pages_daemon.logger"
+    )
+    @override_settings(
+        IQUERY_EMPTY_PROBES_LIMIT_HOURS={
+            "default": 0.41,
+        },
+        IQUERY_PROBE_WAIT=300,
+    )
+    def test_probe_iquery_pages_daemon_ignores_empty_probes_on_weekends(
+        self, mock_logger_daemon, mock_logger, mock_cookies
+    ):
+        """Test probe_iquery_pages_daemon ignores empty probes on weekends.
+        Courts typically do not publish new cases on weekends.
+        """
+
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cacd.pk, 0)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_vib.pk}", 100, ex=3600)
+        r.set(f"iquery:court_wait:{self.court_mowd.pk}", 1000, ex=3600)
+
+        court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
+        self.assertEqual(court_wait_cacd, None)
+
+        saturday = datetime(2025, 7, 19)
+        saturday_local = timezone.make_aware(
+            saturday, timezone.get_default_timezone()
+        )
+        sunday = datetime(2025, 7, 20)
+        sunday_local = timezone.make_aware(
+            sunday, timezone.get_default_timezone()
+        )
+        for test in range(1, 6):
+            with self.subTest(test=test):
+                r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
+                weekend_day = sunday_local if test % 2 == 0 else saturday_local
+                with (
+                    time_machine.travel(weekend_day, tick=False),
+                    patch("cl.lib.decorators.time.sleep") as mock_sleep,
+                ):
+                    call_command(
+                        "probe_iquery_pages_daemon",
+                        testing_iterations=1,
+                    )
+
+                # court_empty_probe_attempts for court 'cacd' shouldn't be
+                # incremented, since all empty probes are occurring over the
+                # weekend.
+                empty_probe_attempts = r.get(
+                    f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
+                )
+                self.assertEqual(empty_probe_attempts, None)
+                mock_logger.info.assert_called_with(
+                    "Ignoring empty probe over the weekend for court %s - case IDs from %s to %s.",
+                    self.court_cacd.pk,
+                    str(0),
+                    str(416),
+                )
 
     @patch(
         "cl.scrapers.tasks.CaseQuery",
@@ -3721,19 +5789,21 @@ class AWSManifestTest(TestCase):
         ):
             opinion_1 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                    source=ClusterSources.HARVARD_CASELAW,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=False,
             )
             opinion_2 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                    source=ClusterSources.HARVARD_CASELAW,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=False,
             )
             opinion_3 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.COURT_WEBSITE, docket=DocketFactory()
+                    source=ClusterSources.COURT_WEBSITE, docket=DocketFactory()
                 ),
                 extracted_by_ocr=True,
             )
@@ -3748,13 +5818,15 @@ class AWSManifestTest(TestCase):
             opinion_3.save()
             opinion_4 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.COLUMBIA_ARCHIVE, docket=DocketFactory()
+                    source=ClusterSources.COLUMBIA_ARCHIVE,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=True,
             )
             opinion_5 = OpinionWithParentsFactory(
                 cluster=OpinionClusterFactory(
-                    source=SOURCES.HARVARD_CASELAW, docket=DocketFactory()
+                    source=ClusterSources.HARVARD_CASELAW,
+                    docket=DocketFactory(),
                 ),
                 extracted_by_ocr=False,
             )
@@ -3820,3 +5892,173 @@ class AWSManifestTest(TestCase):
         self.assertIn(old_audio_2.id, record_ids)
         # Verify that the old record that was not updated is NOT included
         self.assertNotIn(old_audio_3.id, record_ids)
+
+
+class LlmTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.court_ga = CourtFactory(id="gasd")
+        cls.opinion_cluster = OpinionClusterWithChildrenAndParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_ga,
+                case_name="Carrecter v. Herrin",
+            ),
+            case_name="Carrecter v. Herrin",
+            case_name_short="Carrecter",
+            date_filed=date.today(),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="IN THE UNITED STATES DISTRICT COURT \nFOR THE SOUTHERN DISTRICT OF GEORGIA \nSTATESBORO DIVISION \n\nJMARKUS CARRECTER, \nPlaintiff,                           CIVIL ACTION NO.: 6:25-cv-17 \n      Vv.\nGEORGE HERRIN, JR., TYRONE OLIVER,  | \nand GREGORY DOZIER, \n            Defendants. \n\nORDER \n     The  Magistrate  Judge  issued  a  Report  and  Recommendation  for the  Court  to  dismiss \nPlaintiff's  cause  of  action.   Doc.  7.   Plaintiff did  not  file  Objections  to  this  Report  and \nRecommendation, and the time to do so has elapsed.  Accordingly, upon review, I find no clear \nerror  in  the  Magistrate  Judge’s  Report  and  Recommendation  and  ADOPT  the  Report  and \nRecommendation as the opinion of the Court.  See Macort v. Prem, Inc., 208 F. App’x 781, 784 \n(11th  Cir,  2006)  (If no  specific  objections  are  made  or  no  objections  are  made  at  all,  “the \nappropriate standard of review for the report and recommendation is clear error.”).  1 DISMISS \nwithout prejudice Plaintiffs Complaint, DIRECT the Clerk of Court to CLOSE this case and \nenter the appropriate judgment of dismissal, and DENY Plaintiff leave to file in forma pauperis. \n     SO ORDERED, this        day of September, 2025. \n\n                                               GL: \n                         /              BOL \n                        /       HONORABLEY’RANDAL HALL \n                        \\     UNITED STATES DISTRICT COURT \n                              SOUTHERN DISTRICT OF GEORGIA ",
+            ),
+        )
+
+        cls.de = DocketEntryFactory(
+            docket=cls.opinion_cluster.docket,
+            entry_number=8,
+        )
+        cls.recap_doc = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            pacer_doc_id="05705053987",
+            document_number="8",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        cls.valid_response = CaseNameExtractionResponse(
+            is_opinion=True,
+            case_name_short="Carrecter",
+            case_name="'Carrecter v. Herri",
+            case_name_full="JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+            case_name_match=True,
+            needs_ocr=False,
+            error=None,
+        )
+
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    def test_classify_opinion_case_name_task_updates_fields(
+        self, mock_call_llm
+    ):
+        """Verifies that the classify_opinion_case_name_task updates OpinionCluster fields correctly"""
+        mock_call_llm.return_value = self.valid_response
+
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
+
+        self.opinion_cluster.refresh_from_db()
+
+        self.assertEqual(
+            self.opinion_cluster.case_name_full,
+            "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    @mock.patch.object(classify_case_name_by_llm, "retry", autospec=True)
+    def test_classify_opinion_case_name_task_retries_on_ratelimit(
+        self, mock_retry, mock_call_llm
+    ):
+        """Tests that the task retries once when call_llm raises a RateLimitError,
+        then proceeds successfully with a valid response on retry.
+        """
+
+        error_body = b'{"error":{"message":"Rate limit exceeded","type":"rate_limit_exceeded"}}'
+        mock_response = MockResponse(429, error_body)
+        setattr(mock_response, "request", {})
+        setattr(mock_response, "headers", {"x-request-id": "1"})
+
+        # Side effect list: raise first, then return success json on retry
+        side_effects = [
+            RateLimitError(
+                "Rate limit exceeded", response=mock_response, body=error_body
+            ),
+            self.valid_response,
+        ]
+
+        def call_llm_side_effect(*args, **kwargs):
+            result = side_effects.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        mock_call_llm.side_effect = call_llm_side_effect
+
+        # patch retry so it raises celery.exceptions.Retry
+        mock_retry.side_effect = Retry()
+
+        with self.assertRaises(Retry):
+            # expected retry exception
+            classify_case_name_by_llm(
+                self.opinion_cluster.pk, self.recap_doc.pk
+            )
+
+        mock_retry.assert_called_once()
+
+        # After retry exception, manually call the task again with successful mock response
+        # to simulate the retry handling completing successfully.
+        mock_call_llm.side_effect = None
+        mock_call_llm.return_value = self.valid_response
+
+        classify_case_name_by_llm(self.opinion_cluster.pk, self.recap_doc.pk)
+        self.opinion_cluster.refresh_from_db()
+
+        self.assertEqual(
+            self.opinion_cluster.case_name_full,
+            "JMARKUS CARRECTER, Plaintiff, v. GEORGE HERRIN, JR., TYRONE OLIVER, and GREGORY DOZIER, Defendants.",
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.call_llm")
+    @mock.patch("cl.corpus_importer.tasks.logger")
+    @mock.patch.dict(
+        "os.environ", {"OPENAI_CASE_LAW_INFERENCE_KEY": "123"}, clear=True
+    )
+    def test_classify_case_name_by_llm_handles_validation_error(
+        self, mock_logger, mock_call_llm
+    ):
+        """Test that classify_case_name_by_llm catches Pydantic ValidationError from call_llm and handles it correctly
+        by logging and returning without an exception
+        """
+
+        mock_call_llm.side_effect = ValidationError.from_exception_data(
+            "Invalid data", line_errors=[]
+        )
+
+        result = classify_case_name_by_llm(
+            self.opinion_cluster.pk, self.recap_doc.pk
+        )
+
+        self.assertIsNone(result)
+
+        # Logger.error should have been called at least once with validation error message
+        mock_logger.error.assert_called()
+        called_messages = [
+            args[0] for args, _ in mock_logger.error.call_args_list
+        ]
+        self.assertTrue(
+            any(
+                "validation error" in message.lower()
+                for message in called_messages
+            )
+        )
+
+
+class TamesMissingFileTest(SimpleTestCase):
+    """Test detection of TAMES 'File not found' error pages."""
+
+    test_dir = (
+        Path(settings.INSTALL_ROOT) / "cl" / "corpus_importer" / "test_assets"
+    )
+
+    def test_missing_file_page_detected(self):
+        """Verify a TAMES 'File not found' page is correctly identified."""
+        fixture_path = self.test_dir / "missing_file.html"
+        with open(fixture_path, "rb") as f:
+            self.assertTrue(is_missing_file_page(f.read()))
+
+    def test_normal_page_not_flagged(self):
+        """Verify a normal HTML page is not flagged as missing."""
+        normal_html = b"<html><body><p>Normal page content</p></body></html>"
+        self.assertFalse(is_missing_file_page(normal_html))

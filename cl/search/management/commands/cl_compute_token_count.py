@@ -2,15 +2,16 @@ from math import ceil
 
 import nh3
 from django.contrib.humanize.templatetags.humanize import intword
+from django.db import DEFAULT_DB_ALIAS
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.string_utils import get_token_count_from_string
-from cl.search.models import Opinion, RECAPDocument
+from cl.search.models import SEARCH_TYPES, Opinion, RECAPDocument
 
 
 def get_recap_random_dataset(
-    percentage: float = 0.1,
+    percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[RECAPDocument]:
     """
     Creates a queryset that retrieves a random sample of RECAPDocuments from
@@ -23,18 +24,20 @@ def get_recap_random_dataset(
     Args:
         percentage (float): A floating-point value between 0 and 100(inclusive)
          representing the percentage of documents to sample. Defaults to 0.1.
+        db_connection (str): The database connection alias to use for the
+            query. Defaults to "default".
 
     Returns:
         A Django QuerySet containing a random sample of RECAPDocument objects.
     """
-    return RECAPDocument.objects.raw(
+    return RECAPDocument.objects.using(db_connection).raw(
         f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
         "where is_available= True and plain_text <> '' and page_count > 0"
     )
 
 
 def get_opinions_random_dataset(
-    percentage: float = 0.1,
+    percentage: float = 0.1, db_connection: str = "default"
 ) -> QuerySet[Opinion]:
     """
     Creates a queryset that retrieves a random sample of Opinions from the
@@ -43,11 +46,13 @@ def get_opinions_random_dataset(
     Args:
         percentage (float): A floating-point value between 0 and 100(inclusive)
          representing the percentage of documents to sample. Defaults to 0.1.
+        db_connection (str): The database connection alias to use for the
+            query. Defaults to "default".
 
     Returns:
         A Django QuerySet containing a random sample of Opinion objects.
     """
-    return Opinion.objects.raw(
+    return Opinion.objects.using(db_connection).raw(
         f"SELECT * FROM search_opinion TABLESAMPLE SYSTEM ({percentage}) "
     )
 
@@ -117,15 +122,83 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--type",
+            type=str,
+            choices=[SEARCH_TYPES.RECAP_DOCUMENT, SEARCH_TYPES.OPINION],
+            required=True,
+            help=(
+                "Specify which dataset to compute token count for: "
+                f"({', '.join([SEARCH_TYPES.RECAP_DOCUMENT, SEARCH_TYPES.OPINION])})"
+            ),
+        )
+        parser.add_argument(
             "--percentage",
             type=float,
-            default=0.1,
-            help="specifies the proportion of the table to be sampled",
+            default=1.0,
+            help=(
+                "Specifies the proportion of the table to be sampled (0.0 to "
+                "100.0 percent). Defaults to 1.0."
+            ),
+        )
+        parser.add_argument(
+            "--database",
+            type=str,
+            default=DEFAULT_DB_ALIAS,
+            help="Let the user decide which DB name to use",
         )
 
-    def handle(self, *args, **options):
-        percentage = options["percentage"]
-        rd_queryset = get_recap_random_dataset(percentage)
+    def _compute_case_law_token_count(
+        self, percentage: float, db_connection: str
+    ):
+        """
+        Computes and reports token counts for Caselaw dataset.
+        """
+        opinion_queryset = get_opinions_random_dataset(
+            percentage, db_connection
+        )
+        self.stdout.write("Starting to retrieve the random Opinion dataset.")
+        token_count = []
+        words_per_opinion = []
+        for opinion in opinion_queryset.iterator():
+            text = get_clean_opinion_text(opinion)
+            count = get_token_count_from_string(text)
+            words_per_opinion.append(len(text.split()))
+            token_count.append(count)
+
+        self.stdout.write("Computing averages.")
+        sample_size = len(token_count)
+        avg_tokens_per_opinion = compute_avg_from_list(token_count)
+        avg_words_per_opinion = compute_avg_from_list(words_per_opinion)
+
+        self.stdout.write(
+            "Counting the total number of Opinions in the Archive."
+        )
+        total_opinions = Opinion.objects.using(db_connection).all().count()
+        total_token_in_caselaw = avg_tokens_per_opinion * total_opinions
+
+        self.stdout.write(f"Size of the dataset: {len(token_count)}")
+        self.stdout.write(
+            f"Average tokens per opinion: {avg_tokens_per_opinion}"
+        )
+        self.stdout.write(
+            f"Average words per opinion: {avg_words_per_opinion}"
+        )
+        self.stdout.write("-" * 20)
+        self.stdout.write(f"Total number of opinions: {total_opinions}")
+        self.stdout.write(
+            f"The sample represents {sample_size / total_opinions:.3%} of the Caselaw"
+        )
+        self.stdout.write(
+            f"Total number of tokens in caselaw: {intword(total_token_in_caselaw)}"
+        )
+
+    def _compute_recap_token_count(
+        self, percentage: float, db_connection: str
+    ):
+        """
+        Computes and reports token counts for RECAP Documents.
+        """
+        rd_queryset = get_recap_random_dataset(percentage, db_connection)
 
         token_count = []
         tokens_per_page = []
@@ -148,7 +221,8 @@ class Command(VerboseCommand):
             "Counting the total number of documents in the Archive."
         )
         total_recap_documents = (
-            RECAPDocument.objects.filter(is_available=True)
+            RECAPDocument.objects.using(db_connection)
+            .filter(is_available=True)
             .exclude(plain_text__exact="")
             .all()
             .count()
@@ -170,39 +244,17 @@ class Command(VerboseCommand):
             f"Total number of tokens in the recap archive: {intword(total_token_in_recap)}"
         )
 
-        opinion_queryset = get_opinions_random_dataset(percentage)
-        self.stdout.write("Starting to retrieve the random Opinion dataset.")
-        token_count = []
-        words_per_opinion = []
-        for opinion in opinion_queryset.iterator():
-            text = get_clean_opinion_text(opinion)
-            count = get_token_count_from_string(text)
-            words_per_opinion.append(len(text.split()))
-            token_count.append(count)
+    def handle(self, *args, **options):
+        percentage = options["percentage"]
+        db_connection = options["database"]
+        dataset_type = options["type"]
 
-        self.stdout.write("Computing averages.")
-        sample_size = len(token_count)
-        avg_tokens_per_opinion = compute_avg_from_list(token_count)
-        avg_words_per_opinion = compute_avg_from_list(words_per_opinion)
-
-        self.stdout.write(
-            "Counting the total number of Opinions in the Archive."
-        )
-        total_opinions = Opinion.objects.all().count()
-        total_token_in_caselaw = avg_tokens_per_opinion * total_opinions
-
-        self.stdout.write(f"Size of the dataset: {len(token_count)}")
-        self.stdout.write(
-            f"Average tokens per opinion: {avg_tokens_per_opinion}"
-        )
-        self.stdout.write(
-            f"Average words per opinion: {avg_words_per_opinion}"
-        )
-        self.stdout.write("-" * 20)
-        self.stdout.write(f"Total number of opinions: {total_opinions}")
-        self.stdout.write(
-            f"The sample represents {sample_size / total_opinions:.3%} of the Caselaw"
-        )
-        self.stdout.write(
-            f"Total number of tokens in caselaw: {intword(total_token_in_caselaw)}"
-        )
+        match dataset_type:
+            case SEARCH_TYPES.RECAP_DOCUMENT:
+                self._compute_recap_token_count(percentage, db_connection)
+            case SEARCH_TYPES.OPINION:
+                self._compute_case_law_token_count(percentage, db_connection)
+            case _:
+                raise NotImplementedError(
+                    f"Type '{dataset_type}' is not supported."
+                )

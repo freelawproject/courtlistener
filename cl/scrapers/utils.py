@@ -1,23 +1,19 @@
 import json
-import os
+import re
 from datetime import date, datetime
 from urllib.parse import urljoin
 
 import httpx
-import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.db.models import Q
 from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
-from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from reporters_db import REPORTERS
-from requests import Response, Session
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.utils import winnow_case_name
@@ -25,12 +21,13 @@ from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.recap.mergers import find_docket_object
-from cl.scrapers.exceptions import (
-    EmptyFileError,
-    NoDownloadUrlError,
-    UnexpectedContentTypeError,
+from cl.search.models import (
+    Citation,
+    Court,
+    Docket,
+    OpinionCluster,
+    OriginatingCourtInformation,
 )
-from cl.search.models import Citation, Court, Docket, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -159,27 +156,20 @@ def get_child_court(child_court_name: str, court_id: str) -> Court | None:
     return child_court
 
 
-@retry(
-    (
-        httpx.NetworkError,
-        httpx.TimeoutException,
-    ),
-    tries=3,
-    delay=5,
-    backoff=2,
-    logger=logger,
-)
-def test_for_meta_redirections(r: Response) -> tuple[bool, str | None]:
+async def test_for_meta_redirections(
+    r: httpx.Response,
+) -> tuple[bool, str | None]:
     """Test for meta data redirections
 
     :param r: A response object
     :return:  A boolean and value
     """
-    extension = async_to_sync(microservice)(
+    response = await microservice(
         service="buffer-extension",
         file=r.content,
         params={"mime": True},
-    ).text
+    )
+    extension = response.text
 
     if extension == ".html":
         html_tree = html.fromstring(r.text)
@@ -201,15 +191,17 @@ def test_for_meta_redirections(r: Response) -> tuple[bool, str | None]:
     return False, None
 
 
-def follow_redirections(r: Response, s: Session) -> Response:
+async def follow_redirections(
+    r: httpx.Response, s: httpx.AsyncClient
+) -> httpx.Response:
     """
     Parse and recursively follow meta refresh redirections if they exist until
     there are no more.
     """
-    redirected, url = test_for_meta_redirections(r)
+    redirected, url = await test_for_meta_redirections(r)
     if redirected:
         logger.info(f"Following a meta redirection to: {url.encode()}")
-        r = follow_redirections(s.get(url), s)
+        r = await follow_redirections(await s.get(url), s)
     return r
 
 
@@ -229,82 +221,6 @@ def get_extension(content: bytes) -> str:
         service="buffer-extension",
         file=content,
     ).text
-
-
-def get_binary_content(
-    download_url: str,
-    site: AbstractSite,
-) -> bytes | str:
-    """Downloads the file, covering a few special cases such as invalid SSL
-    certificates and empty file errors.
-
-    :param download_url: The URL for the item you wish to download.
-    :param site: Site object used to download data
-
-    :return: The downloaded and cleaned content
-    :raises: NoDownloadUrlError, UnexpectedContentTypeError, EmptyFileError
-    """
-    if not download_url:
-        raise NoDownloadUrlError(download_url)
-
-    # noinspection PyBroadException
-    if site.method == "LOCAL":
-        # "LOCAL" is the method when testing
-        url = os.path.join(settings.MEDIA_ROOT, download_url)
-        mr = MockRequest(url=url)
-        r = mr.get()
-        s = requests.Session()
-    else:
-        # some sites require a custom ssl_context, contained in the Site's
-        # session. However, we can't send a request with both a
-        # custom ssl_context and `verify = False`
-        has_cipher = hasattr(site, "cipher")
-        s = site.request["session"] if has_cipher else requests.session()
-
-        if site.needs_special_headers:
-            headers = site.request["headers"]
-        else:
-            headers = {"User-Agent": "CourtListener"}
-
-        # Note that we do a GET even if site.method is POST. This is
-        # deliberate.
-        r = s.get(
-            download_url,
-            verify=has_cipher,  # WA has a certificate we don't understand
-            headers=headers,
-            cookies=site.cookies,
-            timeout=300,
-        )
-
-        # test for empty files (thank you CA1)
-        if len(r.content) == 0:
-            raise EmptyFileError(f"EmptyFileError: '{download_url}'")
-
-        # test for expected content type (thanks mont for nil)
-        if site.expected_content_types:
-            # Clean up content types like "application/pdf;charset=utf-8"
-            # and 'application/octet-stream; charset=UTF-8'
-            content_type = (
-                r.headers.get("Content-Type").lower().split(";")[0].strip()
-            )
-            m = any(
-                content_type in mime.lower()
-                for mime in site.expected_content_types
-            )
-
-            if not m:
-                court_str = site.court_id.split(".")[-1].split("_")[0]
-                fingerprint = [f"{court_str}-unexpected-content-type"]
-                msg = f"'{download_url}' '{content_type}' not in {site.expected_content_types}"
-                raise UnexpectedContentTypeError(msg, fingerprint=fingerprint)
-
-        # test for and follow meta redirects
-        r = follow_redirections(r, s)
-        r.raise_for_status()
-
-    content = site.cleanup_content(r.content)
-
-    return content
 
 
 def signal_handler(signal, frame):
@@ -349,8 +265,8 @@ def get_existing_docket(
     # with juriscraper string formatting
     # https://github.com/freelawproject/juriscraper/pull/1166
     lookup = Q(court_id=court_id) & (
-        Q(docket_number=docket_number.replace(";", ""))
-        | Q(docket_number=docket_number)
+        Q(docket_number_raw=docket_number.replace(";", ""))
+        | Q(docket_number_raw=docket_number)
     )
 
     # Special case where docket numbers are the same and repeated
@@ -405,6 +321,7 @@ def update_or_create_docket(
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
     appeal_from_str: str = "",
+    appeal_from_id: str = "",
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
@@ -424,6 +341,7 @@ def update_or_create_docket(
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
     :param appeal_from_str: Name (not standardized id) of the lower level court.
+    :param appeal_from_id: Lower court id.
     :return: The docket.
     """
     docket_fields = {
@@ -433,9 +351,18 @@ def update_or_create_docket(
         "blocked": blocked,
         "ia_needs_upload": ia_needs_upload,
         "appeal_from_str": appeal_from_str,
+        "appeal_from_id": appeal_from_id,
         "date_blocked": date_blocked,
         "date_argued": date_argued,
     }
+    if not appeal_from_id:
+        docket_fields.pop("appeal_from_id", "")
+    elif not Court.objects.filter(id=appeal_from_id).exists():
+        docket_fields.pop("appeal_from_id", "")
+        logger.error(
+            "Docket.appeal_from_id has non existing Court.id '%s' as value",
+            appeal_from_id,
+        )
 
     court_id = court.pk
     uses_docket_number_core = court.jurisdiction in Court.FEDERAL_JURISDICTIONS
@@ -452,6 +379,7 @@ def update_or_create_docket(
             **docket_fields,
             source=source,
             docket_number=docket_number,
+            docket_number_raw=docket_number,
             court_id=court_id,
         )
 
@@ -555,3 +483,81 @@ def save_response(site: AbstractSite) -> None:
 
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
+
+
+def check_duplicate_ingestion(local_path_name: str) -> None:
+    """
+    Send an error log to Sentry if a filename has a high repetition count
+
+    S3 filenames / filepaths for opinions and oral arguments are created using
+    created via `cl.lib.storage.get_name_by_incrementing`. The name is composed
+    of the document's filed date or argued date, the case name and the file
+    extension. `get_name_by_incrementing` adds a counter if the name already
+    existed
+
+    For example, this file name means there are 2 documents for that case name,
+    date and extension combination
+    'pdf/2025/06/05/state_v._walsh_1.pdf'
+
+    Need to consider an acceptable repetition threshold, since we may get the
+    same file path for:
+    - a cluster of opinions, which are actually different documents for the
+        same date and case
+    - a common case name in the same date, for example, "State v. Doe"
+    - opinion versions
+
+    :param local_path_name: filepath of the file in S3
+    :return None
+    """
+    # Trigger error log for repetitions beyond this count
+    SUSPECT_DUPLICATES_THRESHOLD = 4
+
+    match = re.search(r"_(?P<repeated_count>\d+)\.\w+$", local_path_name or "")
+    if not match:
+        return
+
+    repeated_count = int(match.group("repeated_count"))
+    if repeated_count > SUSPECT_DUPLICATES_THRESHOLD:
+        base_file_name = f"{local_path_name[: match.start()]}.{local_path_name.split('.')[-1]}"
+        logger.error(
+            "Probable ongoing duplicate ingestion: %s files with name '%s'",
+            repeated_count,
+            base_file_name,
+        )
+
+
+def update_or_create_originating_court_information(
+    docket: Docket, lower_court_number: str, lower_court_judge: str
+) -> OriginatingCourtInformation | None:
+    """Update or create an OriginatingCourtInformation given the scraped values
+
+    :param docket: the docket to which the OCI will be linked
+    :param lower_court_number: will go into OCI.docket_number
+    :param lower_court_judge: will go into OCI.assigned_to_str
+    """
+    if not (lower_court_judge or lower_court_number):
+        return
+
+    if existing_oci := docket.originating_court_information:
+        update = False
+        if not existing_oci.docket_number and lower_court_number:
+            existing_oci.docket_number = lower_court_number
+            update = True
+        if not existing_oci.docket_number_raw and lower_court_number:
+            existing_oci.docket_number_raw = lower_court_number
+            update = True
+        if not existing_oci.assigned_to_str and lower_court_judge:
+            existing_oci.assigned_to_str = lower_court_judge
+            update = True
+
+        if update:
+            existing_oci.save()
+
+        # If the docket already had a OriginatingCourtInformation, just return
+        return
+
+    return OriginatingCourtInformation(
+        docket_number=lower_court_number or "",
+        docket_number_raw=lower_court_number or "",
+        assigned_to_str=lower_court_judge or "",
+    )

@@ -53,7 +53,10 @@ def delete_alert(request, pk):
         messages.SUCCESS,
         f"Your alert <strong>{alert.name}</strong> was deleted successfully.",
     )
-    return HttpResponseRedirect(reverse("profile_alerts"))
+    if request.POST.get("redirect_to_search_page", None):
+        return HttpResponseRedirect(f"{reverse('show_results')}?{alert.query}")
+    else:
+        return HttpResponseRedirect(reverse("profile_search_alerts"))
 
 
 @login_required
@@ -81,7 +84,7 @@ def one_click_disable_alert(request: HttpRequest, secret_key: str):
 @ratelimiter_unsafe_3_per_m
 def htmx_disable_alert(request: HttpRequest, secret_key: str):
     """Disables a specified alert within an HTMX-powered page."""
-    if not request.META.get("HTTP_HX_REQUEST"):
+    if not request.headers.get("hx-request"):
         return HttpResponseNotFound(
             "Your attempt to disable the alert was unsuccessful."
         )

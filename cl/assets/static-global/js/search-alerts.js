@@ -3,14 +3,17 @@ document.addEventListener('DOMContentLoaded', function () {
   const quotaWarning = document.getElementById('quota-warning');
   const saveBtn = document.getElementById('alertSave');
   const alertType = alertsContext.alertType;
+  const hasUnlimitedAlerts = alertsContext.hasUnlimitedAlerts;
   const FreeRTMsg = document.getElementById('msg-rt-free');
   const FreeQuotaMsg = document.getElementById('msg-quota-free');
   const MemberQuotaMsg = document.getElementById('msg-quota-member');
+  const NoMemberButton = document.getElementById('no-member-button');
+  const MemberButton = document.getElementById('member-button');
 
   // Opinions and OA alerts limits logic
   function otherAlerts() {
     const val = rateSelect.value;
-    if (val === 'rt' && !isMember) {
+    if (val === 'rt' && !(isMember || hasUnlimitedAlerts)) {
       quotaWarning.classList.remove('hidden');
       saveBtn.disabled = true;
     } else {
@@ -35,23 +38,28 @@ document.addEventListener('DOMContentLoaded', function () {
     quotaWarning.classList.add('hidden');
     FreeQuotaMsg.classList.add('hidden');
     MemberQuotaMsg.classList.add('hidden');
+    NoMemberButton.classList.add('hidden');
+    MemberButton.classList.add('hidden');
     FreeRTMsg.classList.add('hidden');
     saveBtn.disabled = false;
-    if (rateValue === 'rt' && !isMember) {
+    if (rateValue === 'rt' && !(isMember || hasUnlimitedAlerts)) {
       // Display the custom RT alert message for free users.
       quotaWarning.classList.remove('hidden');
       FreeRTMsg.classList.remove('hidden');
+      NoMemberButton.classList.remove('hidden');
       saveBtn.disabled = true;
       return;
     }
 
-    if (used >= allowed && !editAlert) {
+    if (!hasUnlimitedAlerts && used >= allowed && !editAlert) {
       if (isMember) {
         // Member has reached the quota for this rate group.
         MemberQuotaMsg.classList.remove('hidden');
+        MemberButton.classList.remove('hidden');
       } else {
         // Free user has reached their quota for other rates.
         FreeQuotaMsg.classList.remove('hidden');
+        NoMemberButton.classList.remove('hidden');
       }
       // Show the limit warning if the quota has been reached and the user is not editing their alerts.
       quotaWarning.classList.remove('hidden');

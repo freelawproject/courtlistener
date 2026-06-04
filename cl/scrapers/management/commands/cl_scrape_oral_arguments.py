@@ -1,16 +1,15 @@
 from datetime import date
 from typing import Any
 
-from asgiref.sync import async_to_sync
-from celery.canvas import chain
+from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from juriscraper.lib.string_utils import CaseNameTweaker
 
-from cl.alerts.models import RealTimeQueue
+from cl import settings
+from cl.audio.dispatch import dispatch_process_audio_file
 from cl.audio.models import Audio
-from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.import_lib import get_scotus_judges
@@ -18,13 +17,13 @@ from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
-from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
-    get_binary_content,
+    check_duplicate_ingestion,
     get_extension,
     update_or_create_docket,
 )
-from cl.search.models import SEARCH_TYPES, SOURCES, Court, Docket
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Court, Docket
 
 cnt = CaseNameTweaker()
 
@@ -49,10 +48,6 @@ def save_everything(
 
     for candidate in candidate_judges:
         af.panel.add(candidate)
-    if not backscrape:
-        RealTimeQueue.objects.create(
-            item_type=SEARCH_TYPES.ORAL_ARGUMENT, item_pk=af.pk
-        )
 
 
 @transaction.atomic
@@ -86,7 +81,7 @@ def make_objects(
 
     audio_file = Audio(
         judges=item.get("judges", ""),
-        source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
+        source=item.get("cluster_source") or ClusterSources.COURT_WEBSITE,
         case_name=item["case_names"],
         case_name_short=case_name_short,
         sha1=sha1_hash,
@@ -102,7 +97,7 @@ def make_objects(
     file_name = trunc(item["case_names"].lower(), 75) + extension
     audio_file.file_with_date = docket.date_argued
     audio_file.local_path_original_file.save(file_name, cf, save=False)
-
+    check_duplicate_ingestion(audio_file.local_path_original_file.name)
     return docket, audio_file
 
 
@@ -110,7 +105,7 @@ class Command(cl_scrape_opinions.Command):
     scrape_target_descr = "oral arguments"
     juriscraper_module_type = "oral_args"
 
-    def ingest_a_case(
+    async def ingest_a_case(
         self,
         item,
         next_case_date: date | None,
@@ -120,12 +115,14 @@ class Command(cl_scrape_opinions.Command):
         court: Court,
         backscrape: bool = False,
     ):
-        content = get_binary_content(item["download_urls"], site)
+        content = await site.download_content(
+            item["download_urls"], media_root=settings.MEDIA_ROOT
+        )
         # request.content is sometimes a str, sometimes unicode, so
         # force it all to be bytes, pleasing hashlib.
         sha1_hash = sha1(force_bytes(content))
 
-        dup_checker.press_on(
+        await sync_to_async(dup_checker.press_on)(
             Audio,
             item["case_dates"],
             next_case_date,
@@ -140,16 +137,20 @@ class Command(cl_scrape_opinions.Command):
         )
         dup_checker.reset()
 
-        docket, audio_file = make_objects(item, court, sha1_hash, content)
+        docket, audio_file = await sync_to_async(make_objects)(
+            item, court, sha1_hash, content
+        )
 
-        save_everything(
+        await sync_to_async(save_everything)(
             items={"docket": docket, "audio_file": audio_file},
             backscrape=backscrape,
         )
-        chain(
-            process_audio_file.si(audio_file.pk),
-            transcribe_from_open_ai_api.si(audio_file.pk),
-        ).apply_async()
+        # Kick off the audio standardization stage through the lock-protected
+        # dispatcher. Transcription is not chained from here — once the
+        # standardization task sets duration, reenqueue_pending_audio_tasks_
+        # daemon picks the audio up on a future cycle and paces the OpenAI
+        # call across the cluster.
+        await sync_to_async(dispatch_process_audio_file)(audio_file.pk)
 
         logger.info(
             "Successfully added audio file %s: %s",

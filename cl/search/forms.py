@@ -3,6 +3,7 @@ import re
 from collections import OrderedDict
 
 from django import forms
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField
 from django.utils.datastructures import MultiValueDictKeyError
@@ -10,6 +11,7 @@ from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.courts import get_active_court_from_cache
 from cl.lib.model_helpers import flatten_choices
+from cl.lib.utils import get_array_of_selected_fields
 from cl.people_db.models import PoliticalAffiliation, Position
 from cl.search.fields import (
     CeilingDateOrRelativeField,
@@ -296,6 +298,36 @@ class SearchForm(forms.Form):
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.PARENTHETICAL,
     ]
+    # RECAP specific fields
+    entry_date_filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Entry Filed After",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    entry_date_filed_after.as_str_types = [
+        SEARCH_TYPES.RECAP,
+    ]
+    entry_date_filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Entry Filed Before",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "MM/DD/YYYY",
+                "class": "external-input form-control datepicker",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    entry_date_filed_before.as_str_types = [
+        SEARCH_TYPES.RECAP,
+    ]
+
     citation = forms.CharField(
         required=False,
         label="Citation",
@@ -448,6 +480,15 @@ class SearchForm(forms.Form):
         ),
     )
 
+    semantic = forms.BooleanField(
+        label="Whether to enable semantic search in the Search API.",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "external-input form-control left"}
+        ),
+    )
+
     def get_date_field_names(self):
         return {
             f_name.split("_")[0]
@@ -457,6 +498,10 @@ class SearchForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         self.courts = kwargs.pop("courts", None)
+        self.request = kwargs.pop("request", None)
+        self.is_semantic_frontend_active = kwargs.pop(
+            "is_semantic_frontend_active", False
+        )
         super().__init__(*args, **kwargs)
 
         """
@@ -510,7 +555,7 @@ class SearchForm(forms.Form):
     #     Failure to do that will result in the query being processed correctly
     #     (search results are all good), but the form on the UI won't be
     #     cleaned up for the user, making things rather confusing.
-    #  3. We do some cleanup work in elasticsearch_utils.make_es_stats_variable().
+    #  3. We do some cleanup work in search_utils.fetch_facets().
     #     The work that's done there is used to check or un-check the boxes in
     #     the sidebar, so if you tweak how they work you'll need to tweak this
     #     function.
@@ -622,6 +667,14 @@ class SearchForm(forms.Form):
             for court_id in court_ids:
                 cleaned_data[f"court_{court_id}"] = True
 
+        # 2b. Build the court field from all court_xx fields that are
+        # True. This merges courts from both the court= hidden input
+        # (already converted to court_xx=True above) and any
+        # court_xx=on checkbox parameters
+        selected_courts = get_array_of_selected_fields(cleaned_data, "court_")
+        if selected_courts:
+            cleaned_data["court"] = " ".join(selected_courts)
+
         # 3. Make sure that the user has selected at least one facet for each
         #    taxonomy. Note that this logic must be paralleled in
         #    search_utils.make_facet_variable
@@ -645,13 +698,18 @@ class SearchForm(forms.Form):
             # ...except precedential
             cleaned_data[default_status] = True
 
-        cleaned_data["_court_count"] = len(court_bools)
-        cleaned_data["_stat_count"] = len(stat_bools)
-
         # 4. Strip any whitespace, otherwise it crashes.
         for k, v in cleaned_data.items():
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
+
+        # Disable semantic search if KNN is off globally, or if the
+        # request is from the frontend and the waffle flag is not active.
+        # API requests pass self.request and are only gated by KNN_SEARCH_ENABLED.
+        if not settings.KNN_SEARCH_ENABLED or (
+            not self.request and not self.is_semantic_frontend_active
+        ):
+            cleaned_data["semantic"] = False
 
         return cleaned_data
 
@@ -696,6 +754,399 @@ class SearchForm(forms.Form):
         for label, value in self.as_display_dict(court_count_human).items():
             crumbs.append(f"{label}: {value}")
         return " › ".join(crumbs)
+
+
+class CorpusSearchForm(forms.Form):
+    case_name = forms.CharField(
+        required=False,
+        label="Case Name",
+        label_suffix="",
+        initial="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    #
+    # Oral argument and Opinion shared fields
+    #
+    judge = forms.CharField(
+        required=False,
+        initial="",
+        label="Judge",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    judge.as_str_types = [SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT]
+
+    #
+    # Opinion fields
+    #
+    filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Filed After",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    filed_after.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
+    filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Filed Before",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    filed_before.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
+    docket_number = forms.CharField(
+        required=False,
+        label="Docket Number",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    docket_number.as_str_types = [
+        SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.ORAL_ARGUMENT,
+        SEARCH_TYPES.PARENTHETICAL,
+    ]
+
+    citation = forms.CharField(
+        required=False,
+        label="Citation",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    citation.as_str_types = [SEARCH_TYPES.OPINION]
+
+    description = forms.CharField(
+        required=False,
+        label="Document Description",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    description.as_str_types = [SEARCH_TYPES.RECAP]
+
+    document_number = forms.CharField(
+        required=False,
+        label="Document Number",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    document_number.as_str_types = [SEARCH_TYPES.RECAP]
+
+    attachment_number = forms.CharField(
+        required=False,
+        label="Attachment Number",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    attachment_number.as_str_types = [SEARCH_TYPES.RECAP]
+
+    assigned_to = forms.CharField(
+        required=False,
+        label="Assigned To Judge",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    assigned_to.as_str_types = [SEARCH_TYPES.RECAP]
+
+    referred_to = forms.CharField(
+        required=False,
+        label="Referred To Judge",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    referred_to.as_str_types = [SEARCH_TYPES.RECAP]
+
+    entry_date_filed_after = FloorDateOrRelativeField(
+        required=False,
+        label="Entry Date",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "After",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    entry_date_filed_after.as_str_types = [SEARCH_TYPES.RECAP]
+
+    entry_date_filed_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Entry Date",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Before",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    entry_date_filed_before.as_str_types = [SEARCH_TYPES.RECAP]
+
+    nature_of_suit = forms.CharField(
+        required=False,
+        label="Nature of Suit",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    nature_of_suit.as_str_types = [SEARCH_TYPES.RECAP]
+
+    party_name = forms.CharField(
+        required=False,
+        label="Party Name",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    party_name.as_str_types = [SEARCH_TYPES.RECAP]
+
+    atty_name = forms.CharField(
+        required=False,
+        label="Attorney Name",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    atty_name.as_str_types = [SEARCH_TYPES.RECAP]
+
+    #
+    # Judge fields
+    #
+    name = forms.CharField(
+        required=False,
+        label="Name",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    name.as_str_types = [SEARCH_TYPES.PEOPLE]
+    born_after = FloorDateOrRelativeField(
+        required=False,
+        label="Born After",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    born_after.as_str_types = [SEARCH_TYPES.PEOPLE]
+    born_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Born Before",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    born_before.as_str_types = [SEARCH_TYPES.PEOPLE]
+
+    dob_city = forms.CharField(
+        required=False,
+        label="Birth City",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    dob_city.as_str_types = [SEARCH_TYPES.PEOPLE]
+    dob_state = forms.ChoiceField(
+        choices=[("", "")] + list(STATE_CHOICES),
+        required=False,
+        label="Birth State",
+        label_suffix="",
+        widget=forms.Select(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full input-text"
+            }
+        ),
+    )
+    dob_state.as_str_types = [SEARCH_TYPES.PEOPLE]
+    school = forms.CharField(
+        required=False,
+        label="School Attended",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    school.as_str_types = [SEARCH_TYPES.PEOPLE]
+    appointer = forms.CharField(
+        required=False,
+        label="Appointed By",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    appointer.as_str_types = [SEARCH_TYPES.PEOPLE]
+    selection_method = forms.ChoiceField(
+        choices=[("", "")] + list(Position.SELECTION_METHODS),
+        required=False,
+        label="Selection Method",
+        label_suffix="",
+        initial="None",
+        widget=forms.Select(
+            attrs={"class": "focus:ring-0 focus:outline-none w-full"}
+        ),
+    )
+    selection_method.as_str_types = [SEARCH_TYPES.PEOPLE]
+    political_affiliation = forms.ChoiceField(
+        choices=[("", "")] + list(PoliticalAffiliation.POLITICAL_PARTIES),
+        required=False,
+        label="Political Affiliation",
+        label_suffix="",
+        initial="None",
+        widget=forms.Select(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full input-text"
+            }
+        ),
+    )
+    political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
+    argued_after = FloorDateOrRelativeField(
+        required=False,
+        label="Argued After",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    argued_after.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
+    argued_before = CeilingDateOrRelativeField(
+        required=False,
+        label="Argued Before",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "mm/dd/yyy",
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    argued_before.as_str_types = [SEARCH_TYPES.ORAL_ARGUMENT]
+    cause = forms.CharField(
+        required=False,
+        label="Cause",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "focus:ring-0 focus:outline-none w-full",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    cause.as_str_types = [SEARCH_TYPES.RECAP]
+
+    available_only = forms.BooleanField(
+        label="Only show results with PDFs",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(),
+    )
+    available_only.as_str_types = [SEARCH_TYPES.RECAP]
 
 
 def clean_up_date_formats(

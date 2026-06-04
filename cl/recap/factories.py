@@ -109,6 +109,7 @@ class RECAPEmailRecipientsDataFactory(DictFactory):
 
 
 class RECAPEmailNotificationDataFactory(DictFactory):
+    acms = False
     appellate = Faker("boolean")
     contains_attachments = Faker("boolean")
     court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")

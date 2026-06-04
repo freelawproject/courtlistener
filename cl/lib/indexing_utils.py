@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from datetime import datetime
 
 from cl.lib.redis_utils import get_redis_interface
+from cl.search.types import ESModelType
 
 
 def log_last_document_indexed(
@@ -37,3 +38,12 @@ def get_last_parent_document_id_processed(log_key: str) -> int:
     last_document_id = int(stored_values.get("last_document_id", 0))
 
     return last_document_id
+
+
+def compose_app_label(instance: ESModelType) -> str:
+    """Compose the app label and model class name for an ES model instance.
+
+    :param instance: The ES Model instance.
+    :return: A string combining the app label and the Model class name.
+    """
+    return f"{instance._meta.app_label}.{instance.__class__.__name__}"

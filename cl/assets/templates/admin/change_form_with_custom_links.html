@@ -1,0 +1,12 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {% for link in custom_links %}
+    <li>
+      <a class="historylink" href="{{ link.href }}">
+        {{ link.label }}
+      </a>
+    </li>
+  {% endfor %}
+  {{ block.super }}
+{% endblock object-tools-items %}

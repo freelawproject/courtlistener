@@ -3,18 +3,22 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
+from typing import NotRequired, TypedDict
+from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.urls import reverse
+from django.utils.http import urlencode
+from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.dsl import Q
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
-from elasticsearch_dsl import MultiSearch, Q
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -26,18 +30,444 @@ from cl.lib.elasticsearch_utils import (
     build_join_es_filters,
     build_more_like_this_query,
 )
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
+from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    BankruptcyInformation,
     Docket,
+    DocketEntry,
     OpinionCluster,
+    OriginatingCourtInformation,
 )
 
 logger = logging.getLogger(__name__)
+
+
+class MetadataItem(TypedDict):
+    """Shape of a single item in a metadata description list (see the
+    c-metadata-section cotton component)."""
+
+    label: str
+    value: str
+    url: NotRequired[str]
+    nofollow: NotRequired[bool]
+    is_external: NotRequired[bool]
+    aria_label: NotRequired[str]
+    suffix_text: NotRequired[str]
+    suffix_url: NotRequired[str]
+    suffix_nofollow: NotRequired[bool]
+    suffix_is_external: NotRequired[bool]
+    suffix_aria_label: NotRequired[str]
+
+
+def _person_item(
+    label: str,
+    person: Person | None,
+    person_str: str,
+    search_param: str = "assigned_to",
+) -> MetadataItem | None:
+    """Build a metadata item for a person field with both a FK and a string
+    fallback. Returns a linked item when the person FK is set, a nofollow
+    search-link item when only the string is set, or None when both are empty.
+    """
+    if person:
+        return {
+            "label": label,
+            "value": person.name_full,
+            "url": person.get_absolute_url(),
+        }
+    if person_str:
+        return {
+            "label": label,
+            "value": person_str,
+            "url": f"/?{urlencode({'type': 'r', search_param: f'"{person_str}"'})}",
+            "nofollow": True,
+        }
+    return None
+
+
+def build_citation_string(obj: Docket | DocketEntry) -> str:
+    """Build a Bluebook-style citation string for a docket or docket entry.
+
+    For dockets: name, docket_number, (court)
+    For docket entries: name, docket_number, (court date) ECF No. N
+    """
+    if isinstance(obj, Docket):
+        docket = obj
+        date_of_interest = None
+        ecf = ""
+    elif isinstance(obj, DocketEntry):
+        docket = obj.docket
+        date_of_interest = obj.date_filed
+        ecf = obj.entry_number
+    else:
+        raise NotImplementedError(f"Object not recognized in {__name__}")
+
+    result = f"{docket.case_name}, {docket.docket_number}, ("
+    result = result + docket.court.citation_string
+    if date_of_interest:
+        result = f"{result} {date_of_interest.strftime('%b %d, %Y')}"
+    result = f"{result})"
+    if ecf:
+        result = f"{result} ECF No. {ecf}"
+    return result
+
+
+def build_docket_metadata(
+    docket: Docket, timezone_str: str
+) -> list[MetadataItem]:
+    """Build metadata items for the docket page description list."""
+    items: list[MetadataItem] = []
+
+    if docket.source in docket.RECAP_SOURCES():
+        items.append(
+            {
+                "label": "Last Updated",
+                "value": str(
+                    localtime(docket.date_modified, ZoneInfo(timezone_str))
+                ),
+            }
+        )
+
+    if docket.panel_str:
+        items.append({"label": "Panel", "value": docket.panel_str})
+
+    if assigned := _person_item(
+        "Assigned To", docket.assigned_to, docket.assigned_to_str
+    ):
+        items.append(assigned)
+
+    if referred := _person_item(
+        "Referred To",
+        docket.referred_to,
+        docket.referred_to_str,
+        search_param="referred_to",
+    ):
+        items.append(referred)
+
+    if docket.date_cert_granted:
+        items.append(
+            {
+                "label": "Date Certiorari Granted",
+                "value": str(docket.date_cert_granted),
+            }
+        )
+
+    if docket.date_cert_denied:
+        items.append(
+            {
+                "label": "Date Certiorari Denied",
+                "value": str(docket.date_cert_denied),
+            }
+        )
+
+    if docket.date_argued:
+        items.append(
+            {"label": "Date Argued", "value": str(docket.date_argued)}
+        )
+
+    items.append({"label": "Citation", "value": build_citation_string(docket)})
+
+    if docket.date_reargued:
+        items.append(
+            {"label": "Date Reargued", "value": str(docket.date_reargued)}
+        )
+
+    if docket.date_reargument_denied:
+        items.append(
+            {
+                "label": "Date Reargument Denied",
+                "value": str(docket.date_reargument_denied),
+            }
+        )
+
+    if docket.date_filed:
+        items.append({"label": "Date Filed", "value": str(docket.date_filed)})
+
+    if docket.date_terminated:
+        items.append(
+            {
+                "label": "Date Terminated",
+                "value": str(docket.date_terminated),
+            }
+        )
+
+    if docket.date_last_filing:
+        items.append(
+            {
+                "label": "Date of Last Known Filing",
+                "value": str(docket.date_last_filing),
+            }
+        )
+
+    if docket.cause:
+        items.append(
+            {
+                "label": "Cause",
+                "value": docket.cause,
+                "url": f"/?{urlencode({'type': 'r', 'cause': f'"{docket.cause}"'})}",
+                "nofollow": True,
+            }
+        )
+
+    if docket.nature_of_suit:
+        items.append(
+            {
+                "label": "Nature of Suit",
+                "value": docket.nature_of_suit,
+                "url": f"/?{urlencode({'type': 'r', 'nature_of_suit': f'"{docket.nature_of_suit}"'})}",
+                "nofollow": True,
+            }
+        )
+
+    if docket.jury_demand:
+        items.append(
+            {
+                "label": "Jury Demand",
+                "value": docket.jury_demand,
+                "url": f"/?{urlencode({'type': 'r', 'q': f'juryDemand:"{docket.jury_demand}"'})}",
+                "nofollow": True,
+            }
+        )
+
+    if docket.jurisdiction_type:
+        items.append(
+            {"label": "Jurisdiction Type", "value": docket.jurisdiction_type}
+        )
+
+    if docket.mdl_status:
+        items.append({"label": "MDL Status", "value": docket.mdl_status})
+
+    if docket.appellate_fee_status:
+        items.append(
+            {"label": "Fee Status", "value": docket.appellate_fee_status}
+        )
+
+    if docket.appellate_case_type_information:
+        items.append(
+            {
+                "label": "Case Type Information",
+                "value": docket.appellate_case_type_information,
+            }
+        )
+
+    return items
+
+
+def build_bankruptcy_metadata(
+    bankr_info: BankruptcyInformation | None,
+) -> list[MetadataItem]:
+    """Build metadata items for the bankruptcy information section."""
+    if not bankr_info:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if bankr_info.date_converted:
+        items.append(
+            {
+                "label": "Date Converted",
+                "value": bankr_info.date_converted.strftime("%b. %d, %Y"),
+            }
+        )
+
+    if bankr_info.date_last_to_file_claims:
+        items.append(
+            {
+                "label": "Last Date to File Claims",
+                "value": bankr_info.date_last_to_file_claims.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.date_last_to_file_govt:
+        items.append(
+            {
+                "label": "Last Date to File Claims (Gov't)",
+                "value": bankr_info.date_last_to_file_govt.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.date_debtor_dismissed:
+        items.append(
+            {
+                "label": "Date Debtor Dismissed",
+                "value": bankr_info.date_debtor_dismissed.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.chapter:
+        items.append({"label": "Chapter", "value": bankr_info.chapter})
+
+    if bankr_info.trustee_str:
+        items.append({"label": "Trustee", "value": bankr_info.trustee_str})
+
+    return items
+
+
+def build_originating_court_metadata(
+    docket: Docket, og_info: OriginatingCourtInformation | None
+) -> list[MetadataItem]:
+    """Build metadata items for the originating court information section."""
+    if not og_info:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if docket.appeal_from or docket.appeal_from_str:
+        if docket.appeal_from:
+            appeal_value = docket.appeal_from.short_name
+        else:
+            appeal_value = docket.appeal_from_str
+
+        item: MetadataItem = {
+            "label": "Appealed From",
+            "value": appeal_value,
+        }
+        if og_info.docket_number:
+            item["suffix_text"] = og_info.docket_number
+            if docket.appeal_from:
+                item["suffix_url"] = (
+                    f"/?type=r&docket_number={og_info.docket_number}"
+                    f"&court={docket.appeal_from.pk}"
+                )
+                item["suffix_nofollow"] = True
+                item["suffix_aria_label"] = (
+                    f"Search the RECAP Archive for docket number "
+                    f"{og_info.docket_number}"
+                )
+            elif og_info.administrative_link:
+                item["suffix_url"] = og_info.administrative_link
+                item["suffix_is_external"] = True
+        items.append(item)
+
+    if og_info.court_reporter:
+        items.append(
+            {"label": "Court Reporter", "value": og_info.court_reporter}
+        )
+
+    if trial_judge := _person_item(
+        "Trial Judge", og_info.assigned_to, og_info.assigned_to_str
+    ):
+        items.append(trial_judge)
+
+    if ordering_judge := _person_item(
+        "Ordering Judge",
+        og_info.ordering_judge,
+        og_info.ordering_judge_str,
+    ):
+        items.append(ordering_judge)
+
+    if og_info.date_filed:
+        items.append({"label": "Date Filed", "value": str(og_info.date_filed)})
+
+    if og_info.date_judgment:
+        items.append(
+            {
+                "label": "Date Order/Judgment",
+                "value": str(og_info.date_judgment),
+            }
+        )
+
+    if og_info.date_judgment_eod:
+        items.append(
+            {
+                "label": "Date Order/Judgment EOD",
+                "value": str(og_info.date_judgment_eod),
+            }
+        )
+
+    if og_info.date_filed_noa:
+        items.append(
+            {"label": "Date NOA Filed", "value": str(og_info.date_filed_noa)}
+        )
+
+    if og_info.date_received_coa:
+        items.append(
+            {
+                "label": "Date Rec'd COA",
+                "value": str(og_info.date_received_coa),
+            }
+        )
+
+    return items
+
+
+def build_docket_tabs(
+    docket: Docket,
+    parties: bool,
+    has_idb_data: bool,
+    has_authorities: bool,
+) -> list[dict[str, str]]:
+    """Build the tab navigation items for the docket page.
+
+    Each item is a dict with 'label', 'url', and 'key'.
+    """
+    tabs = [
+        {
+            "label": "Docket Entries",
+            "url": docket.get_absolute_url(),
+            "key": "entries",
+        }
+    ]
+
+    if parties:
+        tabs.append(
+            {
+                "label": "Parties and Attorneys",
+                "url": reverse(
+                    "docket_parties",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "parties",
+            }
+        )
+
+    if has_idb_data:
+        tabs.append(
+            {
+                "label": "FJC Integrated Database",
+                "url": reverse(
+                    "docket_idb_data",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "idb",
+            }
+        )
+
+    if has_authorities:
+        tabs.append(
+            {
+                "label": "Authorities",
+                "url": reverse(
+                    "docket_authorities",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "authorities",
+            }
+        )
+
+    return tabs
 
 
 async def get_case_title(cluster: OpinionCluster) -> str:
@@ -252,8 +682,10 @@ async def es_get_related_clusters_with_cache(
     :param request:The user request
     :return:Related Cluster Data
     """
-    cache = caches["db_cache"]
-    mlt_cache_key = f"clusters-mlt-es:{cluster.pk}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    mlt_cache_key = await sync_to_async(make_s3_cache_key)(
+        f"clusters-mlt-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
     # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
     # attributes (since they're indexed in ES) instead of the NAMES values.
     search_params: CleanData = {}
@@ -280,6 +712,15 @@ async def es_get_related_clusters_with_cache(
 
     if is_bot(request) or not sub_opinion_pks:
         return related_cluster_result
+
+    if not await sync_to_async(waffle.flag_is_active)(
+        request, "citing_and_related_enabled"
+    ):
+        # Don't perform any queries if citing_and_related_enabled is disabled.
+        # Return True for timeout to display buttons for users to click.
+        return RelatedClusterResults(
+            url_search_params=url_search_params, timeout=True
+        )
 
     cached_related_clusters, timeout_related = (
         await cache.aget(mlt_cache_key) or (None, False)
@@ -350,8 +791,10 @@ async def es_get_cited_clusters_with_cache(
     :param request:The user request
     :return:The cited by data
     """
-    cache = caches["db_cache"]
-    cache_citing_key = f"clusters-cited-es:{cluster.pk}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_citing_key = await sync_to_async(make_s3_cache_key)(
+        f"clusters-cited-es:{cluster.pk}", settings.RELATED_CACHE_TIMEOUT
+    )
 
     sub_opinion_pks = [
         str(pk)
@@ -360,6 +803,18 @@ async def es_get_cited_clusters_with_cache(
     cluster_results = RelatedCitingResults()
     if is_bot(request) or not sub_opinion_pks:
         return cluster_results
+
+    if not await sync_to_async(waffle.flag_is_active)(
+        request, "citing_and_related_enabled"
+    ):
+        # Don't perform any queries if citing_and_related_enabled is disabled.
+        # Return True for timeout to display buttons for users to click.
+        url_search_params = {
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
+        }
+        return RelatedCitingResults(
+            url_search_params=url_search_params, timeout=True
+        )
 
     cached_citing_results, cached_citing_clusters_count, timeout_cited = (
         await cache.aget(cache_citing_key) or (None, False, False)
@@ -412,150 +867,6 @@ async def es_get_cited_clusters_with_cache(
     return cluster_results
 
 
-async def es_get_citing_and_related_clusters_with_cache(
-    cluster: OpinionCluster,
-    request: HttpRequest,
-) -> RelatedCitingResults:
-    """Use Elasticsearch to get clusters citing and related clusters to the
-    one we're looking at.
-
-    :param cluster: The cluster we're targeting
-    :param request: The HttpRequest object.
-    :return: A RelatedCitingResults object containing related_clusters,
-    sub_opinion_pks, url_search_params, citing_clusters, citing_cluster_count,
-    and a boolean indicating whether the query timed out.
-    """
-
-    cache = caches["db_cache"]
-    cache_citing_key = f"clusters-cited-es:{cluster.pk}"
-    mlt_cache_key = f"clusters-mlt-es:{cluster.pk}"
-    # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
-    # attributes (since they're indexed in ES) instead of the NAMES values.
-    search_params: CleanData = {}
-    url_search_params = {
-        f"stat_{v[0]}": "on" for v in PRECEDENTIAL_STATUS.NAMES
-    }
-    sub_opinion_pks = [
-        str(pk)
-        async for pk in cluster.sub_opinions.values_list("pk", flat=True)
-    ]
-    if settings.RELATED_FILTER_BY_STATUS:
-        # Filter results by status (e.g., Precedential)
-        # Update URL parameters accordingly
-        search_params[
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}"
-        ] = True
-        url_search_params = {
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
-        }
-
-    if is_bot(request) or not sub_opinion_pks:
-        return RelatedCitingResults(url_search_params=url_search_params)
-
-    if not await sync_to_async(waffle.flag_is_active)(
-        request, "citing_and_related_enabled"
-    ):
-        # Don't perform any queries if citing_and_related_enabled is disabled.
-        # Return True for timeout to display buttons for users to click.
-        return RelatedCitingResults(
-            url_search_params=url_search_params, timeout=True
-        )
-
-    (
-        cached_citing_results,
-        cached_citing_cluster_count,
-        timeout_cited,
-    ) = await cache.aget(cache_citing_key) or (None, 0, False)
-
-    cached_related_clusters, timeout_related = (
-        await cache.aget(mlt_cache_key) or (None, False)
-        if settings.RELATED_USE_CACHE
-        else (None, False)
-    )
-    # Prepare cited and related cluster queries if not cached results.
-    cluster_search = OpinionClusterDocument.search()
-    multi_search = MultiSearch()
-    responses = None
-    response_index = 0
-    related_index = citing_index = None
-    if cached_related_clusters is None:
-        related_query = await build_related_clusters_query(
-            cluster_search, sub_opinion_pks
-        )
-        related_query = related_query.extra(
-            size=settings.RELATED_COUNT,
-            track_total_hits=False,
-        )
-        multi_search = multi_search.add(related_query)
-        related_index = response_index
-        response_index += 1
-
-    if cached_citing_results is None:
-        cited_query = await build_cites_clusters_query(
-            cluster_search, sub_opinion_pks
-        )
-        multi_search = multi_search.add(cited_query)
-        citing_index = response_index
-    try:
-        # Execute the MultiSearch request as needed based on available
-        # cached results
-        multi_search.params(
-            timeout=f"{settings.ELASTICSEARCH_FAST_QUERIES_TIMEOUT}s"
-        )
-        responses = multi_search.execute() if multi_search._searches else []
-    except (ConnectionError, RequestError, ApiError) as e:
-        logger.warning("Error getting cited and related clusters: %s", e)
-        if settings.DEBUG is True:
-            traceback.print_exc()
-        return RelatedCitingResults(url_search_params=url_search_params)
-    except ConnectionTimeout as e:
-        logger.warning(
-            "ConnectionTimeout getting cited and related clusters: %s", e
-        )
-        timeout_related = timeout_cited = True
-
-    results = RelatedCitingResults(url_search_params=url_search_params)
-    results.related_clusters = (
-        list(responses[related_index])
-        if responses and related_index is not None
-        else cached_related_clusters or []
-    )
-    results.citing_clusters = (
-        list(responses[citing_index])
-        if responses and citing_index is not None
-        else cached_citing_results or []
-    )
-    results.citing_cluster_count = (
-        responses[citing_index].hits.total.value
-        if responses and citing_index is not None
-        else cached_citing_cluster_count or 0
-    )
-    timeout_related = False if results.related_clusters else timeout_related
-    timeout_cited = False if results.citing_clusters else timeout_cited
-
-    # Set cache for citing and mlt results.
-    if citing_index is not None:
-        await cache.aset(
-            cache_citing_key,
-            (
-                results.citing_clusters,
-                results.citing_cluster_count,
-                timeout_cited,
-            ),
-            settings.RELATED_CACHE_TIMEOUT,
-        )
-    if related_index is not None:
-        await cache.aset(
-            mlt_cache_key,
-            (results.related_clusters, timeout_related),
-            settings.RELATED_CACHE_TIMEOUT,
-        )
-
-    results.timeout = any([timeout_cited, timeout_related])
-    results.sub_opinion_pks = list(map(int, sub_opinion_pks))
-    return results
-
-
 async def es_cited_case_count(
     cluster_id: int, sub_opinion_pks: list[str]
 ) -> int:
@@ -565,8 +876,10 @@ async def es_cited_case_count(
     :param sub_opinion_pks: The subopinion ids of the cluster
     :return: Opinion Cited Count
     """
-    cache = caches["db_cache"]
-    cache_cited_by_key = f"cited-by-count-es:{cluster_id}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_cited_by_key = await sync_to_async(make_s3_cache_key)(
+        f"cited-by-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
+    )
     cached_cited_by_count = await cache.aget(cache_cited_by_key) or None
     if cached_cited_by_count is not None:
         return cached_cited_by_count
@@ -608,8 +921,10 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
         # Early abort if the cluster doesn't have sub opinions. e.g. cluster id: 3561702
         return 0
 
-    cache = caches["db_cache"]
-    cache_related_cases_key = f"related-cases-count-es:{cluster_id}"
+    cache = await sync_to_async(get_s3_cache)("db_cache")
+    cache_related_cases_key = await sync_to_async(make_s3_cache_key)(
+        f"related-cases-count-es:{cluster_id}", settings.RELATED_CACHE_TIMEOUT
+    )
     cached_related_cases_count = (
         await cache.aget(cache_related_cases_key) or None
     )

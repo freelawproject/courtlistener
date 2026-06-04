@@ -1,22 +1,29 @@
 import logging
+import time
+import warnings
 from collections import OrderedDict, defaultdict
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
 from typing import Any, TypedDict
 
 import eyecite
+from celery import chain as celery_chain
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.core.cache import cache as default_cache
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
-from django.db.models import F
+from django.db import transaction
+from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
+from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
@@ -24,7 +31,7 @@ from django_ratelimit.core import get_header
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
-from rest_framework.exceptions import Throttled
+from rest_framework.exceptions import Throttled, ValidationError
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
@@ -33,20 +40,43 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
+from waffle import switch_is_active
 
+from cl.api.constants import LEVEL_TO_RATES, SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
+    APIThrottle,
+    ThrottleType,
     Webhook,
     WebhookEvent,
+    WebhookEventType,
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
+from cl.donate.models import MembershipPaymentStatus, NeonMembership
+from cl.lib.decorators import clear_tiered_cache, tiered_cache
 from cl.lib.redis_utils import get_redis_interface
+from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
-from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
-from cl.users.tasks import notify_failing_webhook
+from cl.stats.utils import MILESTONES_FLAT, get_milestone_range, tally_stat
+from cl.users.tasks import (
+    create_or_update_zoho_account,
+    notify_failing_webhook,
+    tag_zoho_record,
+)
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+# Map WebhookEventType integer values to StatWebhookEventType string values
+# for Prometheus metric labeling.
+WEBHOOK_EVENT_TYPE_TO_STAT: dict[int, StatWebhookEventType] = {
+    WebhookEventType.DOCKET_ALERT: StatWebhookEventType.DOCKET_ALERT,
+    WebhookEventType.SEARCH_ALERT: StatWebhookEventType.SEARCH_ALERT,
+    WebhookEventType.RECAP_FETCH: StatWebhookEventType.RECAP_FETCH,
+    WebhookEventType.OLD_DOCKET_ALERTS_REPORT: StatWebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+    WebhookEventType.PRAY_AND_PAY: StatWebhookEventType.PRAY_AND_PAY,
+}
+
 BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
     "exact",
@@ -69,10 +99,7 @@ BASIC_TEXT_LOOKUPS = [
     "iexact",
     "startswith",
     "istartswith",
-    "endswith",
-    "iendswith",
 ]
-ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ["contains", "icontains"]
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +112,101 @@ class HyperlinkedModelSerializerWithId(serializers.HyperlinkedModelSerializer):
     id = serializers.ReadOnlyField()
 
 
+# Standard DRF/framework query parameters that are always valid
+VALID_FRAMEWORK_PARAMS: frozenset[str] = frozenset(
+    {
+        # Pagination
+        "page",
+        "page_size",
+        "cursor",
+        # Ordering
+        "order_by",
+        # Format
+        "format",
+        # Dynamic fields
+        "fields",
+        "omit",
+        # Counting (v4)
+        "count",
+    }
+)
+
+
+# Maximum allowed depth for nested filter validation to prevent DOS attacks
+# via circular filter references (e.g., clusters__docket__clusters__docket__...)
+MAX_FILTER_DEPTH = 4
+
+
+def is_valid_filter_param(
+    param: str,
+    filterset_class: type[FilterSet] | None,
+    depth: int = 0,
+) -> bool:
+    """Check if a parameter is valid for the given filterset.
+
+    Handles nested RelatedFilter lookups like 'cluster__docket__court' by
+    recursively traversing the RelatedFilter chain. Also handles negation
+    filters with '!' suffix (e.g., 'person!' means "not equal to").
+
+    :param param: The parameter name to validate.
+    :param filterset_class: The FilterSet class for validation.
+    :param depth: Current recursion depth (used internally to prevent DOS).
+    :return: True if the parameter is valid, False otherwise.
+    """
+    if filterset_class is None:
+        return False
+
+    # Prevent DOS via deeply nested circular filter references
+    if depth > MAX_FILTER_DEPTH:
+        return False
+
+    # Handle negation filter suffix (e.g., person! -> person)
+    if param.endswith("!"):
+        param = param[:-1]
+
+    base_filters = filterset_class.base_filters
+
+    # Direct match - parameter exists in base_filters
+    if param in base_filters:
+        return True
+
+    # Handle nested lookups (e.g., cluster__docket__court)
+    if LOOKUP_SEP not in param:
+        return False
+
+    # Split on first __ to get prefix and rest
+    prefix, rest = param.split(LOOKUP_SEP, 1)
+
+    # Check if prefix is a RelatedFilter
+    filter_instance = base_filters.get(prefix)
+    if not isinstance(filter_instance, RelatedFilter):
+        return False
+
+    # Recursively validate rest against the related filterset
+    related_filterset = filter_instance.filterset
+    return is_valid_filter_param(rest, related_filterset, depth + 1)
+
+
+def detect_unknown_filter_params(
+    query_params: dict[str, str],
+    filterset_class: type[FilterSet] | None,
+) -> set[str]:
+    """Detect unknown filter parameters in the request.
+
+    :param query_params: The query parameters from the request.
+    :param filterset_class: The FilterSet class for validation.
+    :return: Set of unknown parameter names.
+    """
+    unknown_params: set[str] = set()
+    for param in query_params:
+        if param in VALID_FRAMEWORK_PARAMS:
+            continue
+        if not is_valid_filter_param(param, filterset_class):
+            unknown_params.add(param)
+
+    return unknown_params
+
+
 class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     """Disable showing filters in the browsable API.
 
@@ -94,6 +216,51 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
     """
 
     def to_html(self, request, queryset, view):
+        return ""
+
+
+class UnknownFilterParamValidationBackend(RestFrameworkFilterBackend):
+    """Filter backend that validates query params against known filter fields.
+
+    Returns a 400 error for requests containing unknown filter parameters.
+    This prevents unfiltered queries caused by typos or invalid parameters.
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        """Validate query parameters without applying filters.
+
+        This backend only validates parameters and blocks unknown ones.
+        It does NOT apply filters itself - that's handled by
+        DisabledHTMLFilterBackend. Calling super().filter_queryset() would
+        apply filters twice, causing duplicate results from JOINs.
+
+        :param request: The DRF request object.
+        :param queryset: The queryset to filter.
+        :param view: The view instance.
+        :return: The queryset unchanged.
+        :raises ValidationError: If unknown parameters are found.
+        """
+        filterset_class = self.get_filterset_class(view, queryset)
+
+        # Skip validation for views without a filterset (e.g., search API views
+        # that use their own form-based validation)
+        if filterset_class is not None:
+            if unknown_params := detect_unknown_filter_params(
+                request.query_params, filterset_class
+            ):
+                raise ValidationError(
+                    {
+                        "detail": "Unknown filter parameters are not allowed.",
+                        "unknown_params": sorted(unknown_params),
+                    }
+                )
+
+        # Return queryset unchanged - actual filtering is done by
+        # DisabledHTMLFilterBackend
+        return queryset
+
+    def to_html(self, request, queryset, view):
+        """Return empty string to prevent template errors in browsable API."""
         return ""
 
 
@@ -254,38 +421,34 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         ) in view.filterset_class.base_filters.items():
             filter_parts = filter_name.split("__")
             filter_name = filter_parts[0]
-            attrs = OrderedDict()
+
+            if filter_name not in filters:
+                filters[filter_name] = OrderedDict(
+                    type=filter_type.__class__.__name__,
+                    lookup_types=[],
+                )
 
             # Type
-            attrs["type"] = filter_type.__class__.__name__
+            if len(filter_parts) == 1:
+                filters[filter_name]["type"] = filter_type.__class__.__name__
 
             # Lookup fields
             if len(filter_parts) > 1:
-                # Has a lookup type (__gt, __lt, etc.)
                 lookup_type = filter_parts[1]
-                if filters.get(filter_name) is not None:
-                    # We've done a filter with this name previously, just
-                    # append the value.
-                    attrs["lookup_types"] = filters[filter_name][
-                        "lookup_types"
-                    ]
-                    attrs["lookup_types"].append(lookup_type)
-                else:
-                    attrs["lookup_types"] = [lookup_type]
+                filters[filter_name]["lookup_types"].append(lookup_type)
             else:
-                # Exact match or RelatedFilter
                 if isinstance(filter_type, RelatedFilter):
                     model_name = filter_type.filterset.Meta.model._meta.verbose_name_plural.title()
-                    attrs["lookup_types"] = (
+                    filters[filter_name]["lookup_types"] = (
                         f"See available filters for '{model_name}'"
                     )
                 else:
-                    attrs["lookup_types"] = ["exact"]
+                    filters[filter_name]["lookup_types"].append("exact")
 
             # Do choices
             choices = filter_type.extra.get("choices", False)
             if choices:
-                attrs["choices"] = [
+                filters[filter_name]["choices"] = [
                     {
                         "value": choice_value,
                         "display_name": force_str(
@@ -294,9 +457,6 @@ class SimpleMetadataWithFilters(SimpleMetadata):
                     }
                     for choice_value, choice_name in choices
                 ]
-
-            # Wrap up.
-            filters[filter_name] = attrs
 
         metadata["filters"] = filters
 
@@ -435,12 +595,32 @@ class LoggingMixin:
             Event.objects.create(
                 description=f"API {api_version} has logged {total_count} total requests."
             )
-        if user.is_authenticated:
-            if user_count in self.milestones:
-                Event.objects.create(
-                    description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
-                    user=user,
-                )
+
+        # Skip user-specific logic if not authenticated or not at a milestone.
+        if not user.is_authenticated or user_count not in self.milestones:
+            return
+
+        Event.objects.create(
+            description=f"User '{user.username}' has placed their {intcomma(ordinal(user_count))} API {api_version} request.",
+            user=user,
+        )
+
+        # Only v4 triggers Zoho updates
+        if api_version != "v4":
+            return
+
+        membership = getattr(user, "membership", None)
+        is_active_member = membership and membership.is_active
+
+        if is_active_member:
+            celery_chain(
+                create_or_update_zoho_account.s(user.pk, int(user_count)),
+                tag_zoho_record.s(membership.level),
+            ).apply_async()
+        else:
+            create_or_update_zoho_account.si(
+                user.pk, int(user_count)
+            ).apply_async(ignore_result=True)
 
 
 class CacheListMixin:
@@ -491,6 +671,9 @@ class NoFilterCacheListMixin:
         has_pagination = request.query_params.get(
             "cursor"
         ) or request.query_params.get("page")
+        has_dynamic_fields = request.query_params.get(
+            "fields"
+        ) or request.query_params.get("omit")
         is_v3_request = request.version == "v3"
 
         # Determine the cache key prefix. Uses a custom key if provided,
@@ -513,7 +696,8 @@ class NoFilterCacheListMixin:
         should_cache_response = (
             not is_v3_request
             and not has_pagination
-            and (is_count_request or not has_filters)
+            and not has_dynamic_fields
+            and not has_filters
         )
         if should_cache_response:
             cached_data = cache.get(cache_key) or None
@@ -555,13 +739,203 @@ class NoFilterCacheListMixin:
         return response
 
 
-class ExceptionalUserRateThrottle(UserRateThrottle):
-    def allow_request(self, request, view):
-        """
-        Give special access to a few special accounts.
+@tiered_cache(timeout=300)  # 5 minute cache
+def get_all_throttle_overrides(
+    throttle_type: int,
+) -> dict[str, list[str]]:
+    """Get all throttle overrides of a given type, cached for 5 minutes.
 
-        Mirrors code in super class with minor tweaks.
-        """
+    Throttle rates are composed from two sources:
+
+    - MANUAL overrides always apply.
+    - MEMBERSHIP overrides apply only if the user's NeonMembership is active
+      (payment_status=SUCCEEDED and termination_date is null or in the future),
+      and no MANUAL overrides exist. If any MANUAL overrides are present, they
+      fully replace the MEMBERSHIP set.
+
+    :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
+    :return: Dictionary mapping username to a list of rate strings. A list
+        containing a '0/...' rate blocks the user, because the enforcement
+        loop rejects on `count >= 0`.
+    """
+    manual_throttles = APIThrottle.objects.filter(
+        throttle_type=throttle_type,
+        source=APIThrottle.Source.MANUAL,
+    ).values_list("user__username", "rate")
+
+    today = now().date()
+    active_member_ids = (
+        NeonMembership.objects.filter(
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+        )
+        .filter(
+            Q(termination_date__isnull=True)
+            | Q(termination_date__date__gte=today)
+        )
+        .values("user_id")
+    )
+    membership_throttles = APIThrottle.objects.filter(
+        throttle_type=throttle_type,
+        source=APIThrottle.Source.MEMBERSHIP,
+        user_id__in=active_member_ids,
+    ).values_list("user__username", "rate")
+
+    overrides: dict[str, list[str]] = {}
+    users_with_manual_throttle: set[str] = set()
+    for username, rate in manual_throttles:
+        if not rate:
+            continue
+        overrides.setdefault(username, []).append(rate)
+        users_with_manual_throttle.add(username)
+    for username, rate in membership_throttles:
+        if not rate:
+            continue
+        if username in users_with_manual_throttle:
+            # Any MANUAL throttle fully replaces the user's MEMBERSHIP set.
+            continue
+        overrides.setdefault(username, []).append(rate)
+    return overrides
+
+
+def apply_membership_throttles(
+    user: User, level: int, clear_cache: bool = False
+) -> bool:
+    """
+    Sync a user's MEMBERSHIP-based API throttles to match the given membership level.
+
+    This function replaces all existing MEMBERSHIP-source `APIThrottle` records for the user
+    with the rate limits defined for the provided `level`.
+
+    Important behavior:
+    - Only throttles with `source=MEMBERSHIP` are modified.
+    - MANUAL-source throttles are never modified and always take precedence over MEMBERSHIP
+      throttles in `get_all_throttle_overrides`.
+    - Existing MEMBERSHIP throttles are fully removed before new ones are created.
+
+    This function is a no-op when:
+    - The `SYNC_MEMBERSHIP_THROTTLES_SWITCH` feature flag is disabled
+    - The provided `level` does not exist in `LEVEL_TO_RATES`
+      (e.g., unsupported, legacy, or commercial levels)
+
+    Args:
+        user: The user whose throttles are being synced.
+        level: The Neon membership level to map to a set of rates.
+        clear_cache: When True, call ``clear_tiered_cache()`` after writing
+            the new throttle rows. Defaults to False, allowing batch callers
+            to defer cache clearing until after a loop and avoid repeated
+            invalidations on each iteration.
+
+    Returns:
+        bool: True if throttles were successfully applied, False if skipped.
+    """
+    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
+        return False
+
+    rates = LEVEL_TO_RATES.get(level)
+    if rates is None:
+        logger.info(
+            "No throttle mapping for membership level=%s (user=%s); skipping.",
+            level,
+            user.username,
+        )
+        return False
+
+    with transaction.atomic():
+        APIThrottle.objects.filter(
+            user=user,
+            throttle_type=ThrottleType.API,
+            source=APIThrottle.Source.MEMBERSHIP,
+        ).delete()
+        for rate in rates:
+            APIThrottle.objects.create(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+                notes=f"Set by Neon membership level={level}.",
+            )
+
+    if clear_cache:
+        clear_tiered_cache()
+    return True
+
+
+def clear_membership_throttles(user: User) -> None:
+    """Delete the user's MEMBERSHIP-source API throttle rows.
+
+    MANUAL rows are never touched. No-op when the
+    SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off.
+    """
+    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
+        return
+    deleted, _ = APIThrottle.objects.filter(
+        user=user,
+        throttle_type=ThrottleType.API,
+        source=APIThrottle.Source.MEMBERSHIP,
+    ).delete()
+    if deleted:
+        clear_tiered_cache()
+
+
+USE_NEW_THROTTLE_DEFAULTS_SWITCH = "use_new_throttle_defaults"
+LEGACY_USER_DEFAULT_RATE = "5000/hour"
+
+
+def get_recent_api_request_count(user: User, window_seconds: int) -> int:
+    """Count this user's authenticated API requests within the given window.
+
+    Reads the same in-memory timestamp history that ExceptionalUserRateThrottle
+    populates on every authenticated API hit, keyed as
+    ``throttle_user_<user_pk>``. The cache TTL equals the longest configured
+    throttle window (currently a day), so any ``window_seconds`` shorter than
+    that returns an accurate count.
+    """
+    key = UserRateThrottle.cache_format % {"scope": "user", "ident": user.pk}
+    history: list[float] = default_cache.get(key, [])
+    cutoff = time.time() - window_seconds
+    return sum(1 for ts in history if ts > cutoff)
+
+
+class TagRateThrottle(UserRateThrottle):
+    """Higher dedicated rate limit for the tag endpoints."""
+
+    scope = "tags"
+
+
+class ExceptionalUserRateThrottle(UserRateThrottle):
+    """User rate throttle that supports multiple simultaneous rate limits.
+
+    Reads per-user overrides from the APIThrottle table. Blocking is expressed
+    by a rate of '0/min' (or any '0/...') — the enforcement check
+    `count >= num_requests` with num_requests=0 is always true.
+    """
+
+    def __init__(self):
+        raw = self.THROTTLE_RATES.get(self.scope)
+        # Until we're ready to roll out the multi-rate user defaults
+        # configured in settings (issue #7196), keep the historical
+        # 5000/hour fallback for the "user" scope. Other scopes (e.g.
+        # the "citations" rate read separately by CitationCountRateThrottle
+        # in get_citations_rate) read settings as before.
+        if self.scope == "user" and not switch_is_active(
+            USE_NEW_THROTTLE_DEFAULTS_SWITCH
+        ):
+            raw = LEGACY_USER_DEFAULT_RATE
+        if raw is None:
+            self.rate = None
+            self.default_rates: list[str] = []
+        elif isinstance(raw, str):
+            self.rate = raw
+            self.default_rates = [raw]
+        else:
+            self.default_rates = list(raw)
+            # Set self.rate so DRF base-class attrs have valid defaults.
+            self.rate = self.default_rates[0]
+
+        if self.rate is not None:
+            self.num_requests, self.duration = self.parse_rate(self.rate)
+
+    def allow_request(self, request, view):
         if self.rate is None:
             return True
 
@@ -572,20 +946,97 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
 
-        # Adjust if user has special privileges.
-        override_rate = settings.REST_FRAMEWORK["OVERRIDE_THROTTLE_RATES"].get(
-            request.user.username, None
-        )
-        if override_rate is not None:
-            self.num_requests, self.duration = self.parse_rate(override_rate)
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        rates = overrides.get(request.user.username) or self.default_rates
+        return self._check_multi_rate(rates)
 
-        # Drop any requests from the history which have now passed the
-        # throttle duration
-        while self.history and self.history[-1] <= self.now - self.duration:
+    def _check_multi_rate(self, rates: list[str]) -> bool:
+        """Enforce multiple rate windows against one shared timestamp history.
+
+        All rates share a single in-cache list of request timestamps. The cache
+        TTL is the longest window so entries relevant to longer-window checks
+        are preserved.
+
+        :param rates: List of rate strings, e.g. ['5/min', '50/hour'].
+        :return: True if allowed, False if throttled.
+        """
+        parsed: list[tuple[int, int, str]] = []
+        for r in rates:
+            n, d = self.parse_rate(r)
+            if n is not None and d is not None:
+                parsed.append((n, d, r))
+        max_duration = max(d for _, d, _ in parsed)
+
+        # Drop entries older than the longest window.
+        while self.history and self.history[-1] <= self.now - max_duration:
             self.history.pop()
-        if len(self.history) >= self.num_requests:
-            return self.throttle_failure()
-        return self.throttle_success()
+
+        # Check tightest window first for fast rejection.
+        for num_requests, duration, rate in sorted(parsed, key=lambda p: p[1]):
+            cutoff = self.now - duration
+            count = sum(1 for ts in self.history if ts > cutoff)
+            if count >= num_requests:
+                # Set these so DRF's wait() → correct Retry-After.
+                self.num_requests = num_requests
+                self.duration = duration
+                self.failing_rate = rate
+                return self.throttle_failure()
+
+        self.history.insert(0, self.now)
+        self.cache.set(self.key, self.history, max_duration)
+        return True
+
+    def wait(self) -> float | None:
+        """Compute Retry-After using only timestamps in the failing window.
+
+        DRF's default wait() relies on len(self.history) and a division-based
+        calculation, which breaks in multi-rate scenarios:
+
+        1. Overlapping windows: entries from longer durations inflate history
+        size, causing available_requests <= 0 and returning None incorrectly.
+        2. Dynamic rate changes: if limits are tightened after history has built
+        up, the naive count-based approach underestimates pressure within the
+        active window.
+
+        Instead, we compute how many requests must expire before a new request fits,
+        then return the time until the most recent of those expiring requests leaves
+        the window.
+        """
+        if self.duration is None or self.num_requests is None:
+            return None
+
+        window_start = self.now - self.duration
+        window_requests = [ts for ts in self.history if ts > window_start]
+
+        # Number of requests that must expire for one new request to be allowed.
+        excess_requests = len(window_requests) - self.num_requests + 1
+        if excess_requests <= 0 or excess_requests > len(window_requests):
+            # <= 0: request is actually within limit (unexpected in throttle_failure context)
+            return None
+
+        # history is assumed newest-first
+        # The last element in window_requests is the oldest in the window
+        # The target is the newest request that must expire
+        expiry_time = window_requests[-excess_requests] + self.duration
+
+        return max(expiry_time - self.now, 0.0)
+
+    def throttle_failure(self) -> bool:
+        """Raise Throttled with a message tailored to the failing rate."""
+        wait = self.wait()
+        if self.num_requests == 0:
+            # A '0/...' rate is used to block a user; surface that
+            # explicitly rather than as a rate-limit message.
+            detail = (
+                "Request was throttled. Your account is currently "
+                "blocked from making API requests."
+            )
+        else:
+            detail = (
+                f"Request was throttled. Rate limit exceeded: "
+                f"{self.failing_rate}."
+            )
+        raise Throttled(wait=wait, detail=detail)
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
@@ -627,81 +1078,87 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             "ident": request.user.pk,
         }
 
-    def get_citations_rate(self, request):
+    def get_citations_rate(self, request) -> list[str]:
         """
-        Checks the settings for a custom citations API rate limit.
+        Check for a custom citations API rate limit from the database.
 
-        If the authenticated user has a custom rate limit set in the settings,
-        it returns that value. Otherwise, it returns the default rate limit.
+        If the authenticated user has a custom rate limit set in the database,
+        it returns that value. A rate of '0/min' (or any '0/...') blocks the
+        user. Otherwise, it returns the default rate limit.
 
-        Args:
-            request: The request object with the user's data.
+        :param request: The request object with the user's data.
+        :return: Rate string (e.g., '100/hour'), or None if user is blocked.
         """
-        default_rate = self.THROTTLE_RATES["citations"]
-        custom_rate = settings.REST_FRAMEWORK[
-            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
-        ].get(request.user.username, None)
-        return custom_rate or default_rate
+        default = self.THROTTLE_RATES["citations"]
+        if default is None:
+            default_rates: list[str] = []
+        elif isinstance(default, str):
+            default_rates = [default]
+        else:
+            default_rates = list(default)
+        overrides = get_all_throttle_overrides(ThrottleType.CITATION_LOOKUP)
+        return overrides.get(request.user.username) or default_rates
 
     def throttle_request_by_citation_count(self, request, view):
-        max_num_citations, _ = self.parse_rate(
-            self.get_citations_rate(request)
-        )
+        rates = self.get_citations_rate(request)
+        parsed: list[tuple[int, int]] = [
+            (n, d)
+            for r in rates
+            for n, d in [self.parse_rate(r)]
+            if n is not None and d is not None
+        ]
+        max_duration = max(d for _, d in parsed)
 
         self.key = self.get_cache_key_for_citations(request, view)
         self.history = self.cache.get(self.key, [])
         self.request_timestamp = self.timer()
 
-        # Drop any requests from the history which have now passed the
-        # throttle duration
-        while self.history and self.history[-1][-1] <= self.request_timestamp:
+        # History entries are [count, inserted_timestamp]. Drop entries older
+        # than the longest window, they don't contribute to any check.
+        cutoff_longest = self.request_timestamp - max_duration
+        while self.history and self.history[-1][1] <= cutoff_longest:
             self.history.pop()
 
-        citations_in_history = sum(
-            citation_count for citation_count, timestamps in self.history
-        )
+        # Check each rate window, tightest first for fast rejection.
+        for (num, duration), rate in sorted(
+            zip(parsed, rates, strict=True), key=lambda pair: pair[0][1]
+        ):
+            window_cutoff = self.request_timestamp - duration
+            citations_in_window = sum(
+                count for count, ts in self.history if ts > window_cutoff
+            )
+            if citations_in_window >= num:
+                self.throttle_request(num, duration, rate)
 
-        if citations_in_history >= max_num_citations:
-            self.throttle_request(request)
+        self.save_citation_count(request, view, max_duration)
 
-        self.save_citation_count(request, view)
+    def save_citation_count(self, request, view, max_duration: float):
+        """Insert [count, inserted_timestamp] into cache history.
 
-    def save_citation_count(self, request, view):
-        """
-        Inserts the number of citations and the expiration time along with
-        the key into the cache.
+        History TTL is the longest rate window; entries are filtered per-rate
+        at check time in throttle_request_by_citation_count.
         """
         citation_count = self.get_citation_count_from_request(request, view)
         if not citation_count:
             return
 
-        max_num_citations, duration = self.parse_rate(
-            self.get_citations_rate(request)
-        )
-        expiration = (
-            citation_count * (duration / max_num_citations)
-            if citation_count > max_num_citations
-            else duration
-        )
-        self.history.insert(
-            0,
-            [
-                citation_count,
-                self.request_timestamp + expiration,
-            ],
-        )
-
-        self.cache.set(self.key, self.history, expiration)
+        self.history.insert(0, [citation_count, self.request_timestamp])
+        self.cache.set(self.key, self.history, max_duration)
 
     def allow_request(self, request, view):
         self.throttle_request_by_citation_count(request, view)
         return super().allow_request(request, view)
 
-    def throttle_request(self, request):
-        """
-        This helper iterates through the request history in reverse
-        chronological order to calculate the soonest time a new request can be
-        made and raises the `Throttled` exception with the details.
+    def throttle_request(
+        self, max_num_citations: int, duration: float, rate: str
+    ):
+        """Raise Throttled for a specific rate window that was exceeded.
+
+        Computes wait_until as the timestamp at which the oldest entry
+        contributing to the overrun drops out of the rate's window. An
+        oversized single request (count > max_num_citations) is treated as
+        occupying proportionally more of the window — e.g., a 60-citation
+        request against a 20/min rate reports a 3-minute wait.
 
         The exception includes details about the throttling:
 
@@ -709,22 +1166,23 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         - `wait_until`: An ISO 8601 formatted string representing the soonest
                     time the next request can be made without throttling.
 
-        Args:
-            request: The request object to be throttled.
-
         Raises:
             Throttled: The exception includes details about the throttling.
         """
-        rate = self.get_citations_rate(request)
-        max_num_citations, _ = self.parse_rate(rate)
+        window_cutoff = self.request_timestamp - duration
+        relevant = [
+            (count, ts) for count, ts in self.history if ts > window_cutoff
+        ]
         soonest_time = None
-        for idx in reversed(range(len(self.history))):
-            remaining_citation = sum(
-                citation_count for citation_count, _ in self.history[:idx]
-            )
-            if remaining_citation < max_num_citations or not idx:
+        for idx in reversed(range(len(relevant))):
+            remaining = sum(count for count, _ in relevant[:idx])
+            if remaining < max_num_citations or not idx:
+                count, ts = relevant[idx]
+                effective_duration = (
+                    max(count / max_num_citations, 1) * duration
+                )
                 datetime_obj = datetime.fromtimestamp(
-                    self.history[idx][-1], UTC
+                    ts + effective_duration, UTC
                 )
                 soonest_time = datetime_obj.isoformat()
                 break
@@ -762,20 +1220,19 @@ class RECAPUploaders(DjangoModelPermissions):
     """
 
     perms_map = {
-        "GET": ["%(app_label)s.has_recap_upload_access"],
+        "GET": ["%(app_label)s.view_%(model_name)s"],
         "OPTIONS": ["%(app_label)s.has_recap_upload_access"],
         "HEAD": ["%(app_label)s.has_recap_upload_access"],
         "POST": ["%(app_label)s.has_recap_upload_access"],
-        "PUT": ["%(app_label)s.has_recap_upload_access"],
-        "PATCH": ["%(app_label)s.has_recap_upload_access"],
-        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
 
 
-class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
+class EmailProcessingQueueAPIUsersWithView(DjangoModelPermissions):
     perms_map = {
-        "POST": ["%(app_label)s.has_recap_upload_access"],
-        "GET": ["%(app_label)s.has_recap_upload_access"],
+        "POST": ["%(app_label)s.has_recap_email_upload_access"],
+        "GET": ["%(app_label)s.view_%(model_name)s"],
+        "HEAD": ["%(app_label)s.view_%(model_name)s"],
+        "OPTIONS": ["%(app_label)s.view_%(model_name)s"],
     }
 
 
@@ -1109,6 +1566,14 @@ def update_webhook_event_after_request(
             # Only log successful webhook events and not debug.
             results = log_webhook_event(webhook_event.webhook.user.pk)
             handle_webhook_events(results, webhook_event.webhook.user)
+            event_type_label = WEBHOOK_EVENT_TYPE_TO_STAT.get(
+                webhook_event.webhook.event_type
+            )
+            if event_type_label:
+                tally_stat(
+                    StatMetric.WEBHOOKS_SENT,
+                    labels={"event_type": event_type_label},
+                )
     webhook_event.save()
 
 
@@ -1214,3 +1679,465 @@ def handle_webhook_events(results: list[int | float], user: User) -> None:
             f"{intcomma(ordinal(user_count))} webhook event.",
             user=user,
         )
+
+
+class DynamicFieldsMixin:
+    """
+    A serializer mixin that takes an additional `fields` argument that controls
+    which fields should be displayed.
+    """
+
+    @property
+    def prevent_nested_processing(self) -> bool:
+        """True when this serializer is not the root nor a root’s list-child."""
+        return not (
+            self is self.root  # type: ignore[attr-defined]
+            or (
+                self.parent is self.root  # type: ignore[attr-defined]
+                and getattr(self.parent, "many", False)  # type: ignore[attr-defined]
+            )
+        )
+
+    @cached_property
+    def fields(self):
+        """
+        Filters the fields according to the `fields` query parameter.
+
+        A blank `fields` parameter (?fields) will remove all fields. Not
+        passing `fields` will pass all fields individual fields are comma
+        separated (?fields=id,name,url,email).
+
+        """
+        fields = super(DynamicFieldsMixin, self).fields
+
+        if not hasattr(self, "_context"):
+            # We are being called before a request cycle
+            return fields
+
+        if self.prevent_nested_processing:
+            return fields
+
+        try:
+            request = getattr(self, "context", {})["request"]
+        except KeyError:
+            conf = getattr(settings, "DRF_DYNAMIC_FIELDS", {})
+            if conf.get("SUPPRESS_CONTEXT_WARNING", False) is not True:
+                warnings.warn(
+                    "Context does not have access to request. "
+                    "See README for more information."
+                )
+            return fields
+
+        params = request.GET
+        source = get_source_path(self)
+        level = compute_level(self)
+
+        filter_fields = self.get_filter_fields(
+            params.get("fields", None), level, source
+        )
+        omit_fields = self.get_omit_fields(
+            params.get("omit", None), level, source
+        )
+
+        # Drop any fields that are not specified in the `fields` argument.
+        existing = set(fields.keys())
+        if filter_fields is None:
+            # no fields param given, don't filter.
+            allowed = existing
+        else:
+            allowed = set(filter(None, filter_fields))
+
+        # omit fields in the `omit` argument.
+        omitted = set(filter(None, omit_fields))
+
+        for field in existing:
+            if field not in allowed:
+                fields.pop(field, None)
+
+            if field in omitted:
+                fields.pop(field, None)
+
+        return fields
+
+    def get_filter_fields(
+        self, params, level, source, default=None, include_parent=True
+    ):
+        try:
+            return params.split(",")
+        except AttributeError:
+            return default
+
+    def get_omit_fields(self, params, level, source):
+        return self.get_filter_fields(
+            params, level, source, default=[], include_parent=False
+        )
+
+
+class NestedDynamicFieldsMixin(DynamicFieldsMixin):
+    """A serializer mixin that extends DynamicFieldsMixin to allow nested serializers
+    to filter their fields based on the original `fields` query parameter.
+
+    Unlike the base mixin—which only applies filtering at the root serializer,
+    this subclass:
+
+    - Disables the `prevent_nested_processing` guard, allowing each level of nested
+    serializer to apply field filtering independently.
+    - Overrides `get_filter_fields` to slice the raw `fields` string
+    down to exactly those names relevant at this serializer’s
+    current nesting depth (using get_fields_for_level_and_prefix).
+    - `get_filter_fields` first delegates to the super method for splitting
+      the comma‐separated string, then calls a helper that:
+        • Selects only the fields that are nested under this serializer's path in
+          the hierarchy
+        • Returns direct children at depth `level + 1`
+    """
+
+    @property
+    def prevent_nested_processing(self):
+        return False
+
+    def get_filter_fields(
+        self, params, level, source, default=None, include_parent=True
+    ):
+        """
+        Parse the raw `fields` parameter and return the subset of fields
+        that apply at this serializer’s nesting level under the given
+        source prefix.
+        """
+        fields = super().get_filter_fields(
+            params, level, source, default, include_parent
+        )
+        return get_fields_for_level_and_prefix(
+            fields,
+            level,
+            source,
+            default=default,
+            include_parent=include_parent,
+        )
+
+
+def get_source_path(serializer) -> str:
+    """Recursively walks up the serializer tree to build the nested field path."""
+    parent = getattr(serializer, "parent", None)
+    if not parent:
+        return ""
+    parent_path = get_source_path(parent)
+    name = getattr(serializer, "field_name", None)
+    if not name:
+        return parent_path
+    return f"{parent_path}__{name}" if parent_path else name
+
+
+def get_fields_for_level_and_prefix(
+    fields_list, level, source, include_parent, default
+):
+    """Extract the field names relevant to a specific nesting depth
+    from a list of double‑underscore lookup strings.
+    """
+    if not fields_list:
+        return default
+
+    prefix = source.split("__") if source else []
+    allowed = set()
+    for f in fields_list:
+        parts = f.split("__")
+
+        if parts[:level] != prefix:
+            continue
+
+        if len(parts) <= level + 1:
+            allowed.add(parts[-1])
+            continue
+
+        if len(parts) > level + 1 and include_parent:
+            # include parent field to ensure nesting proceeds
+            allowed.add(parts[level])
+            continue
+
+    # If the only allowed fields are exactly the prefix itself,
+    # fall back to default
+    if allowed == set(prefix):
+        return default
+
+    return allowed
+
+
+def compute_level(serializer) -> int:
+    """Recursively count how many ancestors of `serializer` are not
+    ListSerializer instances. Stops when parent is None.
+    """
+    parent = getattr(serializer, "parent", None)
+    if parent is None:
+        # base case, reached the top
+        return 0
+
+    # if this immediate parent is a ListSerializer, don’t count it, otherwise 1
+    this_level = 0 if isinstance(parent, serializers.ListSerializer) else 1
+
+    # recurse on the parent itself
+    return this_level + compute_level(parent)
+
+
+class RetrieveFilteredFieldsMixin:
+    @staticmethod
+    def _get_concrete_fields_for_model(model: type[Model]) -> list[str]:
+        return [
+            f.name
+            for f in model._meta.get_fields()
+            if getattr(f, "concrete", False)
+        ]
+
+    def _filter_top_level_fields_to_defer(
+        self, field_list: set[str] | None, keep_if: Callable
+    ) -> list[str]:
+        """Method to retrieve the top-level fields to defer, given a list of
+        field names (allow or omit) and a condition that determines which
+        fields to defer.
+
+        :param field_list: A list of field names to filter by.
+        :param keep_if: A function that takes a field name and returns a
+         boolean indicating whether to defer the field.
+        :return: A list of top field names to defer
+        """
+        meta = getattr(self, "Meta", None)
+        model = getattr(meta, "model", None)
+        if not field_list or model is None:
+            return []
+
+        all_fields = self._get_concrete_fields_for_model(model)
+        return [name for name in all_fields if keep_if(name, field_list)]
+
+    def _get_disallowed_top_level_fields_to_defer(self) -> list[str]:
+        """Determine which top-level model fields should be deferred when an
+        explicit fields filter is in use.
+        Other model fields not explicitly included in 'fields' are deferred.
+
+        :return: A list of disallowed top field names to defer
+        """
+        allow = getattr(self, "_flat_allow", None)
+        return self._filter_top_level_fields_to_defer(
+            allow, keep_if=lambda name, allow: name not in allow
+        )
+
+    def _get_omit_top_level_fields_to_defer(self) -> list[str]:
+        """
+        Determine which top-level model fields should be deferred when an
+        explicit omit filter is in use. Valid database fields in the omit list
+        will be deferred.
+        :return: A list of omit top field names to defer
+        """
+        omit = getattr(self, "_flat_omit", None)
+        return self._filter_top_level_fields_to_defer(
+            omit, keep_if=lambda name, omit: name in omit
+        )
+
+    def _get_nested_level_fields_to_defer(
+        self,
+        nested_mapping: defaultdict[str, list[str]] | dict,
+        should_defer: Callable,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
+        """Method to retrieve nested fields to defer based on a mapping and a
+        defer condition.
+
+        :param nested_mapping: A nested mapping from fields to defer
+        :param should_defer: A function that takes a field name and returns a
+         boolean indicating whether to defer the field.
+        :return: A dict containing the mapping of nested fields to defer.
+        """
+
+        nested_defer_map: dict[str, tuple[type[Model], list[str]]] = {}
+        for parent, items in nested_mapping.items():
+            field = getattr(self, "fields", {}).get(parent)
+            if not field:
+                continue
+
+            child_serializer = getattr(field, "child", field)
+            meta = getattr(child_serializer, "Meta", None)
+            nested_model = (
+                getattr(meta, "model", None) if meta is not None else None
+            )
+            if nested_model is None:
+                continue
+
+            child_names: list[str] = []
+            # Filter out nested fields that have a database column associated
+            # with them.
+            field_names = self._get_concrete_fields_for_model(nested_model)
+            # Determine which nested fields to defer
+            for name in field_names:
+                if should_defer(name, items):
+                    child_names.append(name)
+
+            if child_names:
+                nested_defer_map[parent] = (nested_model, child_names)
+
+        return nested_defer_map
+
+    def _get_disallowed_nested_level_fields_to_defer(
+        self,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
+        """Determine which top-level model fields should be deferred when an
+         explicit fields filter is in use.
+        Other model fields not explicitly included in 'fields' are deferred.
+
+        :return: A dict containing the mapping of nested fields to defer.
+        """
+        allow_map = getattr(self, "_nested_allow", {})
+        return self._get_nested_level_fields_to_defer(
+            allow_map,
+            should_defer=lambda name, allow_list: name not in allow_list,
+        )
+
+    def _get_omit_nested_level_fields_to_defer(
+        self,
+    ) -> dict[str, tuple[type[Model], list[str]]]:
+        """
+        Determine which nested-model fields should be deferred for each nested
+        serializer when an explicit omit filter is in use.
+
+        :return: A dict containing the mapping of nested fields to defer.
+        """
+        omit_map = getattr(self, "_nested_omit", {})
+        return self._get_nested_level_fields_to_defer(
+            omit_map, should_defer=lambda name, omit_list: name in omit_list
+        )
+
+    def get_deferred_model_fields(
+        self,
+    ) -> tuple[list[str], dict[str, tuple[type[Model], list[str]]]]:
+        """
+        Returns a flat list of omitted model-fields; top-level and nested.
+        Ensures that parsing of "fields"/"omit" has run by accessing ".fields".
+
+        :return: A two tuple of top fields names to defer and a dict containing
+         the mapping of nested fields to defer.
+        """
+
+        self._flat_allow = set()
+        self._flat_omit = set()
+        self._nested_allow = defaultdict(list)
+        self._nested_omit = defaultdict(list)
+        try:
+            request = getattr(self, "context", {})["request"]
+        except KeyError:
+            logger.error("Serializer context does not have access to request.")
+            return [], {}
+
+        params = request.GET
+        try:
+            filter_fields = params.get("fields", None).split(",")
+        except AttributeError:
+            filter_fields = []
+
+        try:
+            omit_fields = params.get("omit", None).split(",")
+        except AttributeError:
+            omit_fields = []
+
+        # store top-level and nested fields specified in the `fields` argument.
+        for filtered_field in filter_fields:
+            if "__" in filtered_field:
+                parent, child = filtered_field.split("__", 1)
+                self._nested_allow[parent].append(child)
+                # If a nested field is allowed the related parent level field
+                # must also be allowed
+                self._flat_allow.add(parent)
+            else:
+                self._flat_allow.add(filtered_field)
+
+        # store top-level and nested fields in the `omit` argument.
+        for omitted_field in omit_fields:
+            if "__" in omitted_field:
+                parent, child = omitted_field.split("__", 1)
+                self._nested_omit[parent].append(child)
+            else:
+                self._flat_omit.add(omitted_field)
+
+        # Top‑level fields to defer
+        omit_top = self._get_omit_top_level_fields_to_defer()
+        disallowed_top = self._get_disallowed_top_level_fields_to_defer()
+        top_fields = list(set(omit_top + disallowed_top))
+
+        # Nested specs to defer
+        defer_omit = self._get_omit_nested_level_fields_to_defer()
+        defer_disallowed = self._get_disallowed_nested_level_fields_to_defer()
+
+        # Merge child lists under each parent
+        nested_to_defer: dict[str, tuple[type[Model], list[str]]] = {}
+        for parent in defer_omit.keys() | defer_disallowed.keys():
+            if parent in defer_omit:
+                model, omit_names = defer_omit[parent]
+            else:
+                model, omit_names = defer_disallowed[parent]
+
+            disallowed_names = (
+                defer_disallowed[parent][1]
+                if parent in defer_disallowed
+                else []
+            )
+            combined = set(omit_names) | set(disallowed_names)
+            nested_to_defer[parent] = (model, list(combined))
+
+        return top_fields, nested_to_defer
+
+
+class DeferredFieldsMixin:
+    """ViewSet Mixin that:
+    - defers top‐level model columns based on omit/fields
+    - omit deferring select related fields
+    - builds a Prefetch for each nested relation to defer its columns,
+    merging cleanly with any existing prefetches in the right order.
+    """
+
+    def get_queryset(self) -> QuerySet:
+        qs = super().get_queryset()  # type: ignore[misc]
+        # Skip for queries that uses values() or annotate()
+        if qs.query.values_select or qs.query.annotations:
+            return qs
+
+        existing_select_related = set(qs.query.select_related or ())
+        original_fields_defer_only, is_defer = qs.query.deferred_loading
+        original_deferred_fields = (
+            set(original_fields_defer_only) if is_defer else set()
+        )
+        serializer = self.get_serializer_class()(  # type: ignore[attr-defined]
+            context=self.get_serializer_context()  # type: ignore[attr-defined]
+        )
+
+        parent_fields, nested_map = serializer.get_deferred_model_fields()
+        # Remove select_related fields from the top-level deferred fields.
+        # Add the original deferred fields.
+        parent_defer_to_keep = (
+            set(parent_fields) - existing_select_related
+        ) | original_deferred_fields
+        qs = qs.defer(*parent_defer_to_keep)
+
+        # Prepare to rebuild prefetch_related in correct order
+        nested_prefetches = []
+        existing_simple_lookups = list(qs._prefetch_related_lookups)
+        parent_model = serializer.Meta.model
+        for parent_field, (child_model, child_fields) in nested_map.items():
+            # Look for FKs in the child serializer linked to the parent model.
+            # f.many_to_one is True for ForeignKey fields
+            # and f.remote_field.model is the parent model.
+            fk_names = {
+                f.name
+                for f in child_model._meta.get_fields()
+                if getattr(f, "many_to_one", False)
+                and getattr(f.remote_field, "model", None) == parent_model
+            }
+            child_fields = [f for f in child_fields if f not in fk_names]
+            if child_fields:
+                nested_prefetches.append(
+                    Prefetch(
+                        parent_field,
+                        queryset=child_model.objects.defer(*child_fields),  # type: ignore[attr-defined]
+                    )
+                )
+
+        new_qs = qs._clone()
+        # Apply prefetches in the correct order to prevent conflicts.
+        new_qs._prefetch_related_lookups = (
+            nested_prefetches + existing_simple_lookups
+        )
+        return new_qs

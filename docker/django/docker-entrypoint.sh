@@ -22,6 +22,8 @@ case "$1" in
     # Tips:
     # 1. Set high number of --workers. Docs recommend 2-4× core count
     # 2. Set --limit-request-line to high value to allow long search queries
+    # 3. --max-requests is per worker, so if you see log lines about things
+    #    being reset for this reason, that doesn't mean the pod is unavailable.
     exec gunicorn cl.asgi:application \
         --chdir /opt/courtlistener/ \
         --user www-data \
@@ -29,9 +31,9 @@ case "$1" in
         --workers ${NUM_WORKERS:-48} \
         --worker-class cl.workers.UvicornWorker \
         --limit-request-line 6000 \
-        --timeout 0 \
-        --max-requests 500 \
-        --max-requests-jitter 50 \
+        --timeout 180 \
+        --max-requests ${MAX_REQUESTS:-2500} \
+        --max-requests-jitter 100 \
         --bind 0.0.0.0:8000
     ;;
 'rss-scraper')
@@ -45,6 +47,18 @@ case "$1" in
     ;;
 'probe-iquery-pages-daemon')
     exec ./manage.py probe_iquery_pages_daemon
+    ;;
+'probe-scotus-dockets-daemon')
+    exec ./manage.py probe_scotus_dockets_daemon
+    ;;
+'tames-scraper-daemon')
+    exec ./manage.py tames_poller
+    ;;
+'llm-clean-docket-number-daemon')
+    exec ./manage.py llm_clean_docket_number_daemon
+    ;;
+'reenqueue-pending-audio-tasks-daemon')
+    exec ./manage.py reenqueue_pending_audio_tasks_daemon
     ;;
 'cl-send-rt-percolator-alerts')
     exec ./manage.py cl_send_rt_percolator_alerts

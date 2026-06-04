@@ -11,19 +11,27 @@ Usage:
 ```
 */
 
+const createFocus = () => ({
+  focusPrevious() {
+    this.$focus.wrap().previous();
+  },
+  focusNext() {
+    this.$focus.wrap().next();
+  },
+  focusFirst() {
+    this.$focus.wrap().first();
+  },
+  focusLast() {
+    this.$focus.wrap().last();
+  },
+  /** Checks if an element with the id provided exists, and if it does, moves focus to it */
+  moveFocus(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    this.$focus.focus(el);
+  },
+});
+
 document.addEventListener('alpine:init', () => {
-  Alpine.data('focus', () => ({
-    focusPrevious() {
-      this.$focus.wrap().previous();
-    },
-    focusNext() {
-      this.$focus.wrap().next();
-    },
-    focusFirst() {
-      this.$focus.wrap().first();
-    },
-    focusLast() {
-      this.$focus.wrap().last();
-    },
-  }));
+  Alpine.data('focus', createFocus);
 });

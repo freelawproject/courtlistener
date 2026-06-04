@@ -10,18 +10,21 @@ import requests
 from asgiref.sync import async_to_sync
 from celery import Task
 from dateparser import parse
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 from pytz import timezone
+from redis import Redis
 from requests import HTTPError
 
 from cl.alerts.tasks import enqueue_docket_alert
 from cl.celery_init import app
 from cl.lib.crypto import sha256
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.types import EmailType
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.mergers import (
@@ -161,8 +164,14 @@ def abort_task(task: Task, feed_status: RssFeedStatus):
     return
 
 
-@app.task(bind=True, max_retries=0)
-def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
+@app.task(
+    bind=True,
+    max_retries=0,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def check_if_feed_changed(
+    self: Task, court_pk: str, feed_status_pk: int, date_last_built: datetime
+):
     """Check if the feed changed
 
     For now, we do this in a very simple way, by using the lastBuildDate field
@@ -286,6 +295,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
     return rss_feed.data
 
 
+# TODO Remove after scheduled merge_rss_feed_contents have been processed
 def hash_item(item):
     """Hash an RSS item. Item should be a dict at this stage"""
     # Stringify, normalizing dates to strings.
@@ -294,12 +304,14 @@ def hash_item(item):
     return item_hash
 
 
-async def is_cached(item_hash):
+# TODO Remove after scheduled merge_rss_feed_contents have been processed
+async def is_cached(item_hash: str) -> bool:
     """Check if a hash is in the RSS Item Cache"""
     return await RssItemCache.objects.filter(hash=item_hash).aexists()
 
 
-async def cache_hash(item_hash):
+# TODO Remove after scheduled merge_rss_feed_contents have been processed
+async def cache_hash(item_hash: str) -> bool:
     """Add a new hash to the RSS Item Cache
 
     :param item_hash: A SHA1 hash you wish to cache.
@@ -315,7 +327,32 @@ async def cache_hash(item_hash):
         return True
 
 
-@app.task(bind=True, max_retries=1)
+def rss_cache_prefix() -> str:
+    return "rss_hash"
+
+
+def get_rss_cache_key(item_hash: str) -> str:
+    return f"{rss_cache_prefix()}:{item_hash}"
+
+
+def claim_item_hash(r: Redis, item_hash: str) -> bool:
+    """Attempt to claim an RSS item by its hash atomically.
+
+    :param r: Redis client instance.
+    :param item_hash: A SHA1 hash you wish to cache.
+    :return: True if this call claimed it, False if it was already claimed.
+    """
+    # Set expiration time to 2 days.
+    return bool(
+        r.set(get_rss_cache_key(item_hash), "", nx=True, ex=2 * 24 * 60 * 60)
+    )
+
+
+@app.task(
+    bind=True,
+    max_retries=1,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
 def merge_rss_feed_contents(
     self, feed_data, court_pk, metadata_only=False
 ) -> list[tuple[int, datetime]]:
@@ -333,17 +370,14 @@ def merge_rss_feed_contents(
     # RSS feeds are a list of normal Juriscraper docket objects.
     all_rds_created = []
     d_pks_to_alert = []
+    r = get_redis_interface("CACHE")
     for docket in feed_data:
         item_hash = hash_item(docket)
-        if async_to_sync(is_cached)(item_hash):
+        if not claim_item_hash(r, item_hash):
+            # Omit the item. It's already in the cache (already seen).
             continue
 
         with transaction.atomic():
-            cached_ok = async_to_sync(cache_hash)(item_hash)
-            if not cached_ok:
-                # The item is already in the cache, ergo it's getting processed
-                # in another thread/process and we had a race condition.
-                continue
             d = async_to_sync(find_docket_object)(
                 court_pk,
                 docket["pacer_case_id"],
@@ -392,15 +426,24 @@ def merge_rss_feed_contents(
     return d_pks_to_alert
 
 
-@app.task
-def mark_status_successful(feed_status_pk):
+@app.task(
+    bind=True,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def mark_status_successful(self: Task, feed_status_pk: int) -> None:
     feed_status = RssFeedStatus.objects.get(pk=feed_status_pk)
     logger.info("Marking %s as a success.", feed_status.court_id)
     mark_status(feed_status, RssFeedStatus.PROCESSING_SUCCESSFUL)
 
 
-@app.task
-def trim_rss_data(cache_days=2, status_days=14):
+# TODO Remove after scheduled merge_rss_feed_contents have been processed
+@app.task(
+    bind=True,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def trim_rss_data(
+    self: Task, cache_days: int = 2, status_days: int = 14
+) -> None:
     """Trim the various tracking objects used during RSS parsing
 
     :param cache_days: RssItemCache objects older than this number of days will
@@ -412,6 +455,22 @@ def trim_rss_data(cache_days=2, status_days=14):
     RssItemCache.objects.filter(
         date_created__lt=now() - timedelta(days=cache_days)
     ).delete()
+    RssFeedStatus.objects.filter(
+        date_created__lt=now() - timedelta(days=status_days)
+    ).delete()
+
+
+@app.task(
+    bind=True,
+    queue=settings.CELERY_FEEDS_QUEUE,
+)
+def trim_rss_feed_status(self: Task, status_days: int = 14) -> None:
+    """Trim the RSSFeedStatus tracking objects used during RSS parsing
+
+    :param status_days: RssFeedStatus objects older than this number of days
+    will be deleted.
+    """
+    logger.info("Trimming RSS tracking items.")
     RssFeedStatus.objects.filter(
         date_created__lt=now() - timedelta(days=status_days)
     ).delete()

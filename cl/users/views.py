@@ -3,7 +3,6 @@ from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
 
-from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
@@ -13,16 +12,16 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
 from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import validate_email
-from django.db.models import Count, F
+from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseRedirect,
     QueryDict,
 )
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.template.defaultfilters import urlencode
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -34,10 +33,25 @@ from django.views.decorators.debug import (
     sensitive_variables,
 )
 from django.views.decorators.http import require_http_methods
+from rest_framework.authtoken.models import Token
 from rest_framework.renderers import JSONRenderer
+from waffle import switch_is_active
 
 from cl.alerts.models import DocketAlert
-from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
+from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    ThrottleType,
+    WebhookEvent,
+    WebhookEventType,
+)
+from cl.api.utils import (
+    LEGACY_USER_DEFAULT_RATE,
+    USE_NEW_THROTTLE_DEFAULTS_SWITCH,
+    get_all_throttle_overrides,
+    get_recent_api_request_count,
+)
+from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
 from cl.favorites.forms import NoteForm
 from cl.lib.crypto import sha1_activation_key
@@ -48,13 +62,13 @@ from cl.lib.ratelimiter import (
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
-from cl.stats.utils import tally_stat
+from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
-    AccountDeleteForm,
     CustomPasswordChangeForm,
     CustomPasswordResetForm,
     EmailConfirmationForm,
     OptInConsentForm,
+    PasswordConfirmForm,
     ProfileForm,
     UserCreationFormExtended,
     UserForm,
@@ -67,9 +81,21 @@ from cl.users.utils import (
     emails,
     message_dict,
 )
-from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+@never_cache
+def view_alerts(request: HttpRequest) -> HttpResponse:
+    if (
+        not request.user.alerts.exists()
+        and request.user.docket_alerts.filter(
+            alert_type=DocketAlert.SUBSCRIPTION
+        ).exists()
+    ):
+        return redirect("profile_docket_alerts")
+    return redirect("profile_search_alerts")
 
 
 @login_required
@@ -94,19 +120,26 @@ def view_search_alerts(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_docket_alerts(request: HttpRequest) -> HttpResponse:
-    order_by = request.GET.get("order_by", "date_created")
-    if order_by.startswith("-"):
+def view_docket_alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
+    order_by_param = request.GET.get("order_by", "")
+    if order_by_param.startswith("-"):
         direction = "-"
-        order_by = order_by.lstrip("-")
+        order_name = order_by_param.lstrip("-")
     else:
         direction = ""
+        order_name = order_by_param
     name_map = {
         "name": "docket__case_name",
         "court": "docket__court__short_name",
         "hit": "date_last_hit",
+        "date_filed": "docket__date_filed",
+        "docket_number": "docket__docket_number",
     }
-    order_by = name_map.get(order_by, "date_created")
+    if not (order_by := name_map.get(order_name)):
+        # Set default order
+        direction = "-"
+        order_name = "hit"
+        order_by = name_map[order_name]
     docket_alerts = request.user.docket_alerts.filter(
         alert_type=DocketAlert.SUBSCRIPTION
     )
@@ -122,6 +155,16 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
     else:
         docket_alerts = docket_alerts.order_by(f"{direction}{order_by}")
 
+    sorting_fields = {
+        col: {
+            "url_param": f"{'-' if order_name == col and direction == '' else ''}{col}",
+            "direction": "down"
+            if (order_name == col and direction == "-")
+            else "up",
+        }
+        for col in name_map
+    }
+
     return TemplateResponse(
         request,
         "profile/alerts.html",
@@ -130,6 +173,7 @@ def view_docket_alerts(request: HttpRequest) -> HttpResponse:
             "page": "docket_alerts",
             "private": True,
             "page_title": "Docket Alerts",
+            "sorting_fields": sorting_fields,
         },
     )
 
@@ -209,66 +253,6 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 @never_cache
-def view_visualizations(request: AuthenticatedHttpRequest) -> HttpResponse:
-    visualizations = (
-        SCOTUSMap.objects.filter(user=request.user, deleted=False)
-        .annotate(Count("clusters"))
-        .order_by("-date_created")
-    )
-    paginator = Paginator(visualizations, 20, orphans=2)
-    page = request.GET.get("page", 1)
-    try:
-        paged_vizes = paginator.page(page)
-    except PageNotAnInteger:
-        paged_vizes = paginator.page(1)
-    except EmptyPage:
-        paged_vizes = paginator.page(paginator.num_pages)
-    return TemplateResponse(
-        request,
-        "profile/visualizations.html",
-        {
-            "results": paged_vizes,
-            "page": "visualizations_active",
-            "private": True,
-        },
-    )
-
-
-@login_required
-@never_cache
-def view_deleted_visualizations(
-    request: AuthenticatedHttpRequest,
-) -> HttpResponse:
-    thirty_days_ago = now() - timedelta(days=30)
-    visualizations = (
-        SCOTUSMap.objects.filter(
-            user=request.user, deleted=True, date_deleted__gte=thirty_days_ago
-        )
-        .annotate(Count("clusters"))
-        .order_by("-date_created")
-    )
-    paginator = Paginator(visualizations, 20, orphans=2)
-    page = request.GET.get("page", 1)
-    try:
-        paged_vizes = paginator.page(page)
-    except PageNotAnInteger:
-        paged_vizes = paginator.page(1)
-    except EmptyPage:
-        paged_vizes = paginator.page(paginator.num_pages)
-
-    return TemplateResponse(
-        request,
-        "profile/visualizations_deleted.html",
-        {
-            "results": paged_vizes,
-            "page": "visualizations_trash",
-            "private": True,
-        },
-    )
-
-
-@login_required
-@never_cache
 def view_api(request: AuthenticatedHttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
@@ -291,13 +275,82 @@ def view_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+@sensitive_post_parameters("password")
+@login_required
+@never_cache
+@ratelimiter_unsafe_10_per_m
+@ratelimiter_unsafe_2000_per_h
+def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        reset_form = PasswordConfirmForm(request, request.POST)
+        if reset_form.is_valid():
+            with transaction.atomic():
+                Token.objects.filter(user=request.user).delete()
+                Token.objects.create(user=request.user)
+            messages.success(
+                request,
+                "Your API token has been reset. Update any scripts or "
+                "services that use the old token.",
+            )
+            return HttpResponseRedirect(reverse("view_api_token"))
+    else:
+        reset_form = PasswordConfirmForm(request=request)
+    return TemplateResponse(
+        request,
+        "profile/api_token_reset.html",
+        {
+            "reset_form": reset_form,
+            "recent_api_count": get_recent_api_request_count(
+                request.user, window_seconds=5 * 60
+            ),
+            "page": "api_token",
+            "page_title": "Reset API Token",
+            "private": True,
+        },
+    )
+
+
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
+    show_membership_features = switch_is_active(
+        SYNC_MEMBERSHIP_THROTTLES_SWITCH
+    )
+
+    throttle_rates: list[tuple[int, str]] = []
+    if show_membership_features:
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        user_rates = overrides.get(request.user.username) or []
+        if not user_rates:
+            if switch_is_active(USE_NEW_THROTTLE_DEFAULTS_SWITCH):
+                raw_default = settings.REST_FRAMEWORK[
+                    "DEFAULT_THROTTLE_RATES"
+                ]["user"]
+                user_rates = (
+                    [raw_default]
+                    if isinstance(raw_default, str)
+                    else list(raw_default)
+                )
+            else:
+                user_rates = [LEGACY_USER_DEFAULT_RATE]
+        # Drop "0/..." rates — those mean blocked, not a throughput limit.
+        throttle_rates = [
+            parsed
+            for r in user_rates
+            if not r.startswith("0/")
+            and (parsed := parse_throttle_rate_for_template(r)) is not None
+        ]
+
     return TemplateResponse(
         request,
         "profile/api.html",
-        {"private": True, "page": "api_usage", "page_title": "API Usage"},
+        {
+            "private": True,
+            "page": "api_usage",
+            "page_title": "API Usage",
+            "show_membership_features": show_membership_features,
+            "throttle_rates": throttle_rates,
+        },
     )
 
 
@@ -374,6 +427,16 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     )
 
 
+@login_required
+def view_user_id(request: AuthenticatedHttpRequest) -> HttpResponse:
+    user = request.user
+    return TemplateResponse(
+        request,
+        "profile/cl_id.html",
+        {"user_id": user.pk, "private": True},
+    )
+
+
 @sensitive_post_parameters("password")
 @login_required
 @ratelimiter_unsafe_10_per_m
@@ -383,7 +446,7 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
         deleted=False
     ).count()
     if request.method == "POST":
-        delete_form = AccountDeleteForm(request, request.POST)
+        delete_form = PasswordConfirmForm(request, request.POST)
         if delete_form.is_valid():
             email: EmailType = emails["account_deleted"]
             send_mail(
@@ -394,12 +457,13 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             )
             delete_user_assets(request.user)
             user = convert_to_stub_account(request.user)
+            accounts_deleted_total.inc()
             update_session_auth_hash(request, user)
             logout(request)
             return HttpResponseRedirect(reverse("delete_profile_done"))
 
     else:
-        delete_form = AccountDeleteForm(request=request)
+        delete_form = PasswordConfirmForm(request=request)
     return TemplateResponse(
         request,
         "profile/delete.html",
@@ -477,33 +541,66 @@ def register(request: HttpRequest) -> HttpResponse:
             consent_form = OptInConsentForm(request.POST)
             if form.is_valid() and consent_form.is_valid():
                 cd = form.cleaned_data
-                if not stub_account:
-                    # make a new user that is active, but has not confirmed
-                    # their email address
-                    user = User.objects.create_user(
-                        cd["username"], cd["email"], cd["password1"]
-                    )
-                    up = UserProfile(user=user)
-                else:
-                    # Upgrade the stub account to make it a regular account.
-                    user = stub_account
-                    user.set_password(cd["password1"])
-                    user.username = cd["username"]
-                    user.is_active = True
-                    up = stub_account.profile
-                    up.stub_account = False
+                try:
+                    if not stub_account:
+                        # make a new user that is active, but has not confirmed
+                        # their email address
+                        user = User.objects.create_user(
+                            cd["username"], cd["email"], cd["password1"]
+                        )
+                        up = UserProfile(user=user)
+                    else:
+                        # Upgrade the stub account to make it a regular account.
+                        user = stub_account
+                        user.set_password(cd["password1"])
+                        user.username = cd["username"]
+                        user.is_active = True
+                        up = stub_account.profile
+                        up.stub_account = False
 
-                if cd["first_name"]:
-                    user.first_name = cd["first_name"]
-                if cd["last_name"]:
-                    user.last_name = cd["last_name"]
-                user.save()
+                    if cd["first_name"]:
+                        user.first_name = cd["first_name"]
+                    if cd["last_name"]:
+                        user.last_name = cd["last_name"]
+                    user.save()
 
-                # Build and assign the activation key
-                up.activation_key = sha1_activation_key(user.username)
-                up.key_expires = now() + timedelta(days=5)
-                up.save()
+                    # Build and assign the activation key
+                    up.activation_key = sha1_activation_key(user.username)
+                    up.key_expires = now() + timedelta(days=5)
+                    up.save()
 
+                except IntegrityError as e:
+                    # Redirect to success if user already exists
+                    try:
+                        user = User.objects.get(username=cd["username"])
+                        get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
+                        return HttpResponseRedirect(
+                            reverse("register_success") + get_str
+                        )
+
+                    # Else, display generic error message and rerender form
+                    except User.DoesNotExist:
+                        logger.error(
+                            "Unexpected IntegrityError during registration: user does not exist after IntegrityError. Original error: %s",
+                            str(e),
+                            exc_info=True,
+                        )
+
+                        form.add_error(
+                            "username",
+                            "An error occurred during registration. Please try again.",
+                        )
+                        return TemplateResponse(
+                            request,
+                            "register/register.html",
+                            {
+                                "form": form,
+                                "consent_form": consent_form,
+                                "private": False,
+                            },
+                        )
+
+                # Only reached if user creation succeeded
                 email: EmailType = emails["confirm_your_new_account"]
                 send_mail(
                     email["subject"],
@@ -522,7 +619,6 @@ def register(request: HttpRequest) -> HttpResponse:
                     email["from_email"],
                     email["to"],
                 )
-                async_to_sync(tally_stat)("user.created")
                 get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
                 return HttpResponseRedirect(
                     reverse("register_success") + get_str

@@ -30,6 +30,19 @@
 {% block footer-scripts %}
 	{% include "includes/date_picker.html" %}
 	<script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+        document.getElementById('court-upload-form').addEventListener('submit', function (e) {
+            const form = this;
+            const submitButton = this.querySelector('button[type="submit"]');
+            if (form.dataset.submitting === 'true') {
+                e.preventDefault();
+                return;
+            }
+            form.dataset.submitting = 'true';
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i>&nbsp;Processing...';
+        });
+    </script>
 {% endblock %}
 
 {% block content %}
@@ -71,7 +84,7 @@
 				<br>
 				<form method="post" action=""
 					  enctype="multipart/form-data"
-					  class="form-horizontal">
+					  class="form-horizontal" id="court-upload-form">
 					{% csrf_token %}
 					{% for field in form.hidden_fields %}
                         {{ field }}

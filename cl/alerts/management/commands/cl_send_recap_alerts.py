@@ -6,16 +6,15 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import pytz
-from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
 from elasticsearch import Elasticsearch
+from elasticsearch.dsl import connections
+from elasticsearch.dsl.response import Hit, Response
+from elasticsearch.dsl.utils import AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
-from elasticsearch_dsl import connections
-from elasticsearch_dsl.response import Hit, Response
-from elasticsearch_dsl.utils import AttrList
 from redis import Redis
 
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
@@ -50,6 +49,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.models import SEARCH_TYPES, Docket
+from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -89,7 +89,7 @@ def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
         ConnectionError,
         RequestError,
     ) as e:
-        logger.error("Error getting sweep alert index task status: %s", e)
+        logger.warning("Error getting sweep alert index task status: %s", e)
         return {}
 
 
@@ -643,7 +643,10 @@ def query_and_send_alerts(
     total_alerts_sent_count = 0
     sent_time = datetime.datetime.now() if not custom_date else query_date
     for user in alert_users:
-        if rate == Alert.REAL_TIME and not user.profile.is_member:
+        if (
+            rate == Alert.REAL_TIME
+            and not user.profile.is_eligible_for_rt_search_alerts
+        ):
             continue
         alerts = user.alerts.filter(
             rate=rate,
@@ -715,8 +718,10 @@ def query_and_send_alerts(
         )
 
     # Log and tally the total alerts sent
-    async_to_sync(tally_stat)(
-        f"alerts.sent.{rate}", inc=total_alerts_sent_count
+    tally_stat(
+        StatMetric.ALERTS_SENT,
+        inc=total_alerts_sent_count,
+        labels={"alert_type": StatAlertType.RECAP},
     )
     logger.info(f"Sent {total_alerts_sent_count} {rate} email alerts.")
 

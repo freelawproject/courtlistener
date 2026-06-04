@@ -1,39 +1,35 @@
 import re
 from datetime import datetime
 from typing import cast
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
 from django import test
+from django.apps import apps
 from django.contrib.staticfiles import testing
-from django.core.management import call_command
+from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
+from django.utils.timezone import localtime, now
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from lxml.html import HtmlElement
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase as DRFTestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     get_cut_off_date,
 )
+from cl.alerts.models import Alert
+from cl.alerts.utils import (
+    build_plain_percolator_query,
+    percolate_es_document,
+    prepare_percolator_content,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
-
-
-class OneDatabaseMixin:
-    """Only use one DB during tests
-
-    If you have more than one DB in your settings, which we sometimes do,
-    Django creates transactions for each DB and each test. This takes time.
-
-    Since we don't have multi-DB features/tests, simply ensure that all our
-    tests use only one DB, the default one.
-    """
-
-    databases = {"default"}
 
 
 class RestartRateLimitMixin:
@@ -54,6 +50,29 @@ class RestartRateLimitMixin:
         super().tearDownClass()
 
 
+class MockTallyStatMixin:
+    """Mock ``tally_stat`` so tests never read/write shared Redis stat keys.
+
+    Tests assert on ``self.mock_tally_stat`` (a standard ``MagicMock``)
+    instead of querying Redis.  All known command-level import sites are
+    patched to the *same* mock, so ``call_count`` and ``call_args_list``
+    reflect every invocation regardless of which command triggered it.
+    """
+
+    tally_stat_module_paths: list[str] = [
+        "cl.alerts.management.commands.cl_send_scheduled_alerts.tally_stat",
+        "cl.alerts.management.commands.cl_send_recap_alerts.tally_stat",
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.mock_tally_stat = mock.MagicMock()
+        for path in self.tally_stat_module_paths:
+            patcher = mock.patch(path, self.mock_tally_stat)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+
 class RestartSentEmailQuotaMixin:
     """Restart sent email quota in redis."""
 
@@ -70,15 +89,7 @@ class RestartSentEmailQuotaMixin:
         super().tearDown()
 
 
-class SimpleTestCase(
-    OneDatabaseMixin,
-    test.SimpleTestCase,
-):
-    pass
-
-
 class TestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TestCase,
 ):
@@ -86,7 +97,6 @@ class TestCase(
 
 
 class TransactionTestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.TransactionTestCase,
 ):
@@ -94,7 +104,6 @@ class TransactionTestCase(
 
 
 class LiveServerTestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     test.LiveServerTestCase,
 ):
@@ -102,7 +111,6 @@ class LiveServerTestCase(
 
 
 class StaticLiveServerTestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
     testing.StaticLiveServerTestCase,
 ):
@@ -110,9 +118,8 @@ class StaticLiveServerTestCase(
 
 
 class APITestCase(
-    OneDatabaseMixin,
     RestartRateLimitMixin,
-    APITestCase,
+    DRFTestCase,
 ):
     pass
 
@@ -137,20 +144,63 @@ class ESIndexTestCase(SimpleTestCase):
             index._name = index._name.split("-")[0]
         super().tearDownClass()
 
+    @staticmethod
+    def _get_model_classes(model):
+        models = model if isinstance(model, list) else [model]
+        model_classes = [apps.get_model(m) for m in models]
+        return model_classes
+
+    @staticmethod
+    def _get_indices(model):
+        return registry.get_indices(
+            models=ESIndexTestCase._get_model_classes(model)
+        )
+
+    @staticmethod
+    def _get_documents(model):
+        return registry.get_documents(
+            models=ESIndexTestCase._get_model_classes(model)
+        )
+
     @classmethod
     def rebuild_index(cls, model):
-        """Create and populate the Elasticsearch index and mapping"""
-        call_command("search_index", "--rebuild", "-f", "--models", model)
+        """Delete, recreate, and populate the Elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        for index in ESIndexTestCase._get_indices(model):
+            index.delete(ignore=[404, 400])
+            index.create()
+        for doc in ESIndexTestCase._get_documents(model):
+            qs = doc().get_indexing_queryset()
+            doc().update(qs)
 
     @classmethod
     def create_index(cls, model):
-        """Create the elasticsearch index."""
-        call_command("search_index", "--create", "-f", "--models", model)
+        """Create the elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        for index in ESIndexTestCase._get_indices(model):
+            index.create(ignore=[400])
 
     @classmethod
     def delete_index(cls, model):
-        """Delete the elasticsearch index."""
-        call_command("search_index", "--delete", "-f", "--models", model)
+        """Delete the elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        for index in ESIndexTestCase._get_indices(model):
+            index.delete(ignore=[404, 400])
 
     @classmethod
     def restart_celery_throttle_key(cls):
@@ -538,6 +588,10 @@ class SearchAlertsAssertions:
                         f"Expected: {expected_child_hits} - Got: {child_hit_count}\n\n",
                     )
                     break
+            else:
+                self.fail(
+                    f"Case title '{case_title}' was not found in the alert."
+                )
 
     def _assert_child_hits_content(
         self,
@@ -624,7 +678,8 @@ class SearchAlertsAssertions:
         alert_title,
         expected_hits,
         expected_child_hits,
-        expected_child_descriptions,
+        expected_child_ids,
+        nested_field="recap_documents",
     ):
         """Confirm the following assertions for the percolator search alert
         webhook:
@@ -650,9 +705,9 @@ class SearchAlertsAssertions:
                     ),
                 )
                 alert_child_hits = alert_child_hits + len(
-                    webhook["payload"]["results"][0]["recap_documents"]
+                    webhook["payload"]["results"][0][nested_field]
                 )
-                for rd in webhook["payload"]["results"][0]["recap_documents"]:
+                for rd in webhook["payload"]["results"][0][nested_field]:
                     alert_child_ids.add(rd["id"])
 
         self.assertEqual(
@@ -665,10 +720,10 @@ class SearchAlertsAssertions:
             expected_child_hits,
             msg=f"Did not get the right number of child hits for alert {alert_title}. ",
         )
-        if expected_child_descriptions:
+        if expected_child_ids:
             self.assertEqual(
                 alert_child_ids,
-                set(expected_child_descriptions),
+                set(expected_child_ids),
                 msg=f"Did not get the right child hits IDs for alert {alert_title}. ",
             )
 
@@ -732,13 +787,16 @@ class SearchAlertsAssertions:
     def _assert_date_updated(self, date_to_compare, html_content, txt_content):
         """Confirm that date_updated is properly set in the alert email."""
 
+        # Use localtime() to normalize DST, matching the email template which
+        # applies |localtime before |date formatting.
+        localized_date = localtime(date_to_compare)
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             html_content,
         )
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             txt_content,
         )
 
@@ -753,3 +811,40 @@ class SearchAlertsAssertions:
 
         snippet_text = snippet_content[0].text_content().strip()
         return snippet_text.replace("…", "").replace("&hellip;", "")
+
+    @staticmethod
+    def confirm_query_matched(response, query_id) -> bool:
+        """Confirm if a percolator query matched."""
+
+        matched = False
+        for hit in response:
+            if hit.meta.id == query_id:
+                matched = True
+        return matched
+
+    @staticmethod
+    def save_percolator_query(cd, es_document):
+        query = build_plain_percolator_query(cd)
+        query_dict = query.to_dict()
+        percolator_query = es_document(
+            percolator_query=query_dict,
+            rate=Alert.REAL_TIME,
+            date_created=now(),
+        )
+        percolator_query.save(refresh=True)
+
+        return percolator_query.meta.id
+
+    @staticmethod
+    def prepare_and_percolate_document(app_label, document_id):
+        percolator_index, es_document_index, documents_to_percolate = (
+            prepare_percolator_content(app_label, document_id)
+        )
+        responses = percolate_es_document(
+            str(document_id),
+            percolator_index,
+            es_document_index,
+            documents_to_percolate,
+            app_label=app_label,
+        )
+        return responses

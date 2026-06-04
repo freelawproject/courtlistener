@@ -5,28 +5,36 @@ from collections.abc import Callable
 from typing import Any, TypedDict
 from urllib.parse import parse_qs, urlencode
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import EmptyPage, Page, PageNotAnInteger
+from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.dsl import A
+from elasticsearch.dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
+from waffle import flag_is_active
 
 from cl.citations.match_citations_queries import es_get_query_citation
 from cl.citations.utils import get_citation_depth_between_clusters
+from cl.lib.bot_detector import is_bot
 from cl.lib.crypto import sha256
 from cl.lib.elasticsearch_utils import (
+    build_es_base_query,
     build_es_main_query,
     compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
-    get_facet_dict_for_search_query,
+    get_query_embedding,
+    has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
+    merge_semantic_relevant_chunks,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
     simplify_estimated_count,
@@ -50,6 +58,7 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -59,19 +68,27 @@ from cl.search.models import (
     SEARCH_TYPES,
     Court,
     OpinionCluster,
-    RECAPDocument,
     SearchQuery,
 )
+from cl.stats.constants import StatMethod, StatMetric, StatQueryType
+from cl.stats.utils import tally_stat
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 logger = logging.getLogger(__name__)
 
 
-def check_pagination_depth(page_number):
-    """Check if the pagination is too deep (indicating a crawler)"""
+def check_pagination_depth(
+    page_number: int,
+    max_depth: int = settings.MAX_SEARCH_PAGINATION_DEPTH,
+) -> None:
+    """Check if the pagination is too deep (indicating a crawler)
 
-    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
+    :param page_number: The requested page number.
+    :param max_depth: Maximum allowed pagination depth.
+    :raises PermissionDenied: If page_number exceeds max_depth.
+    """
+    if page_number > max_depth:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -101,7 +118,7 @@ def make_get_string(
 
 
 def merge_form_with_courts(
-    courts: dict,
+    courts: QuerySet[Court],
     search_form: SearchForm,
 ) -> tuple[dict[str, list], str, str]:
     """Merges the courts dict with the values from the search form.
@@ -251,24 +268,6 @@ async def add_depth_counts(
         return None
 
 
-async def clean_up_recap_document_file(item: RECAPDocument) -> None:
-    """Clean up the RecapDocument file-related fields after detecting the file
-    doesn't exist in the storage.
-
-    :param item: The RECAPDocument to work on.
-    :return: None
-    """
-
-    if isinstance(item, RECAPDocument):
-        await sync_to_async(item.filepath_local.delete)()
-        item.sha1 = ""
-        item.date_upload = None
-        item.file_size = None
-        item.page_count = None
-        item.is_available = False
-        await item.asave()
-
-
 def store_search_query(request: HttpRequest, search_results: dict) -> None:
     """Saves an user's search query in a SearchQuery model
 
@@ -276,7 +275,14 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     :param search_results: the dict returned by `do_es_search` function
     :return None
     """
+    if not flag_is_active(request, "store-search-queries"):
+        # Do not store search queries
+        return
+
+    if is_bot(request):
+        return
     is_error = search_results.get("error")
+    is_semantic = has_semantic_params(request.GET)
     search_query = SearchQuery(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -285,6 +291,9 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         hit_cache=False,
         source=SearchQuery.WEBSITE,
         engine=SearchQuery.ELASTICSEARCH,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
     if is_error:
         # Leave `query_time_ms` as None if there is an error
@@ -310,6 +319,25 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
+    if is_bot(request):
+        return
+
+    is_semantic = has_semantic_params(request.GET)
+    query_type = (
+        StatQueryType.SEMANTIC if is_semantic else StatQueryType.KEYWORD
+    )
+    tally_stat(
+        StatMetric.SEARCH_RESULTS,
+        labels={
+            "query_type": query_type,
+            "method": StatMethod.API,
+        },
+    )
+
+    if not flag_is_active(request, "store-search-api-queries"):
+        # Do not store search queries in the DB
+        return
+
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -318,35 +346,37 @@ def store_search_api_query(
         hit_cache=False,
         source=SearchQuery.API,
         engine=engine,
+        query_mode=SearchQuery.SEMANTIC
+        if is_semantic
+        else SearchQuery.KEYWORD,
     )
 
 
 class CachedESSearchResults(TypedDict):
-    results: Page | list
-    main_total: int | None
-    child_total: int | None
+    es_results_items: Response | list
+    main_query_hits: int | None
+    cardinality_count_response: Response | int | None
+    child_cardinality_count_response: Response | int | None
+
+
+def get_micro_cache_key(key_prefix: str = "search_results_cache:") -> str:
+    """Just a small wrapper useful for testing."""
+    return key_prefix
 
 
 def retrieve_cached_search_results(
-    get_params: QueryDict,
+    clean_params: dict, key_prefix: str
 ) -> tuple[CachedESSearchResults | None, str]:
     """
     Retrieve cached search results based on the GET parameters.
 
-    :param get_params: The GET parameters provided by the user.
+    :param clean_params: The cleaned search parameters provided by the user.
+    :param key_prefix: The key prefix used to generate the cache key.
     :return: A two-tuple containing either the cached search results and the
-    cache key based ona prefix and the get parameters, or None and the cache key
+    cache key based on a prefix and the get parameters, or None and the cache key
     if no cached results were found.
     """
-
-    params = get_params.copy()
-    # If no page is present in the parameters, set it to 1 to generate the same
-    # hash for page 1, regardless of whether the page parameter is included.
-    # Apply the same to the q parameter when it is not present in params.
-    params.setdefault("page", "1")
-    params.setdefault("q", "")
-    sorted_params = dict(sorted(params.items()))
-    key_prefix = "search_results_cache:"
+    sorted_params = dict(sorted(clean_params.items()))
     params_hash = sha256(pickle.dumps(sorted_params))
     cache_key = f"{key_prefix}{params_hash}"
     cached_results = cache.get(cache_key)
@@ -355,8 +385,105 @@ def retrieve_cached_search_results(
     return None, cache_key
 
 
+def fetch_facets(
+    search_query: Search,
+    cd: CleanData,
+    search_form: SearchForm,
+    error: bool,
+) -> list:
+    """Fetch status facet counts, using the micro-cache when possible.
+
+    Builds a cache key that excludes stat_* params so toggling status
+    checkboxes reuses cached facet counts (the counts are the same even if the
+    facets are checked or unchecked).
+
+    :param search_query: The base Elasticsearch search query.
+    :param cd: Cleaned search parameters.
+    :param search_form: The search form to attach counts to.
+    :param error: Whether the search query had validation errors.
+    :return: A list of BoundField objects with count attributes set.
+    """
+    facet_cd = cd if not error else {"type": cd["type"]}
+    facet_cache_params = {
+        k: v for k, v in facet_cd.items() if not str(k).startswith("stat_")
+    }
+    facet_key_prefix = get_micro_cache_key("facet_counts_cache:")
+    cached_facets, facet_cache_key = retrieve_cached_search_results(
+        facet_cache_params, facet_key_prefix
+    )
+    facet_values: dict[str, int] = {}
+    if cached_facets and settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
+        facet_values = cached_facets  # type: ignore[assignment]
+    else:
+        facet_cd["just_facets_query"] = True
+        es_queries = build_es_base_query(search_query, facet_cd)
+        facet_query = es_queries.search_query
+        facet_query.aggs.bucket("status", A("terms", field="status.raw"))
+        facet_query = facet_query.extra(size=0)
+        response = facet_query.execute()
+        try:
+            buckets = response.aggregations.status.buckets
+            facet_values = {
+                group["key"]: group["doc_count"] for group in buckets
+            }
+        except (KeyError, AttributeError):
+            facet_values = {}
+        if settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
+            cache.set(
+                facet_cache_key,
+                pickle.dumps(facet_values),
+                settings.SEARCH_RESULTS_MICRO_CACHE,
+            )
+
+    facet_fields = []
+    for field in search_form:
+        if not field.html_name.startswith("stat_"):
+            continue
+        try:
+            count = facet_values[field.html_name.replace("stat_", "")]
+        except KeyError:
+            count = 0
+        field.count = count
+        facet_fields.append(field)
+    return facet_fields
+
+
+def get_results_from_paginator(
+    paginator: Paginator, page_num: int = 1
+) -> Page:
+    """Get results Page from Paginator
+
+    :param paginator: The paginator to get results from
+    :param page_num: Page number to request
+    :return: Page object
+    """
+    try:
+        results = paginator.page(page_num)
+    except PageNotAnInteger:
+        results = paginator.page(1)
+    except EmptyPage:
+        results = paginator.page(paginator.num_pages)
+
+    return results
+
+
+def enrich_search_results(results: Page, search_type: str, get_params: dict):
+    """Enrich dataset before returning to user
+
+    :param results: A ESPaginator page object
+    :param search_type: The search type
+    :param get_params: A dictionary of parameters sent in request
+    :return: None
+    """
+    convert_str_date_fields_to_date_objects(results, search_type)
+    merge_courts_from_db(results, search_type)
+    limit_inner_hits(get_params, results, search_type)
+    set_results_highlights(results, search_type)
+    merge_unavailable_fields_on_parent_document(results, search_type)
+
+
 def fetch_and_paginate_results(
-    get_params: QueryDict,
+    clean_params: dict,
     search_query: Search,
     child_docs_count_query: Search | None,
     rows_per_page: int = settings.SEARCH_PAGE_SIZE,
@@ -364,7 +491,7 @@ def fetch_and_paginate_results(
 ) -> tuple[Page | list, int, bool, int | None, int | None]:
     """Fetch and paginate elasticsearch results.
 
-    :param get_params: The user get params.
+    :param clean_params: The user’s cleaned search parameters.
     :param search_query: Elasticsearch DSL Search object
     :param child_docs_count_query: The ES DSL Query to perform the count for
     child documents if required, otherwise None.
@@ -375,66 +502,110 @@ def fetch_and_paginate_results(
     the total number of hits for the child document.
     """
 
-    # Run the query and set up pagination
+    search_type = clean_params["type"]
+    page = int(clean_params["page"])
+
+    # Check cache for displaying insights on the Home Page.
     if cache_key is not None:
-        # Check cache for displaying insights on the Home Page.
-        results = cache.get(cache_key)
-        if results is not None:
+        cache_data = cache.get(cache_key)
+        if cache_data is not None:
+            cached_data = pickle.loads(cache_data)
+            # TODO: hits and main_total are deprecated.
+            #  Remove after the current micro-cache has expired.
+            use_es_items = "es_results_items" in cached_data
+            hits = (
+                cached_data["es_results_items"]
+                if use_es_items
+                else cached_data["hits"]
+            )
+            total = (
+                cached_data["cardinality_count_response"]
+                if use_es_items
+                else cached_data["main_total"]
+            )
+            # Create ESPaginator that contains the total results count.
+            paginator = ESPaginator(
+                total,
+                hits,
+                rows_per_page,
+            )
+
+            results = get_results_from_paginator(paginator, page)
+            enrich_search_results(results, search_type, clean_params)
             return results, 0, False, None, None
 
     # Check micro-cache for all other search requests.
-    results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
+    key_prefix = get_micro_cache_key("search_results_cache:")
+    results_dict, micro_cache_key = retrieve_cached_search_results(
+        clean_params, key_prefix
+    )
     if results_dict:
-        # Return results and counts. Set query time to 1ms.
-        return (
-            results_dict["results"],
-            1,
-            False,
-            results_dict["main_total"],
-            results_dict["child_total"],
+        # TODO: hits, main_total and child_total are deprecated.
+        #  Remove after the current micro-cache has expired.
+        use_es_items = "es_results_items" in results_dict
+        hits = (
+            results_dict["es_results_items"]
+            if use_es_items
+            else results_dict["hits"]  # type: ignore[typeddict-item]
+        )
+        main_total = (
+            results_dict["cardinality_count_response"]
+            if use_es_items
+            else results_dict["main_total"]  # type: ignore[typeddict-item]
+        )
+        child_total = (
+            results_dict["child_cardinality_count_response"]
+            if use_es_items
+            else results_dict["child_total"]  # type: ignore[typeddict-item]
         )
 
-    try:
-        page = int(get_params.get("page", 1))
-    except ValueError:
-        page = 1
+        # Create paginator from ES hits
+        paginator = ESPaginator(main_total, hits, rows_per_page)
+        # Get appropriate page
+        results = get_results_from_paginator(paginator, page)
+        # Enrich results
+        enrich_search_results(results, search_type, clean_params)
+
+        return results, 1, False, main_total, child_total
 
     # Check pagination depth
-    check_pagination_depth(page)
+    query_string = clean_params.get("q", "")
+    is_related_query = bool(RELATED_PATTERN.search(query_string))
+    max_pagination_depth = (
+        settings.MAX_RELATED_SEARCH_PAGINATION_DEPTH
+        if is_related_query
+        else settings.MAX_SEARCH_PAGINATION_DEPTH
+    )
+    check_pagination_depth(page, max_pagination_depth)
 
     # Fetch results from ES
     hits, query_time, error, main_total, child_total = fetch_es_results(
-        get_params, search_query, child_docs_count_query, page, rows_per_page
+        clean_params, search_query, child_docs_count_query, page, rows_per_page
     )
-
     if error:
         return [], query_time, error, main_total, child_total
+
+    # Create paginator from ES hits
     paginator = ESPaginator(main_total, hits, rows_per_page)
-    try:
-        results = paginator.page(page)
-    except PageNotAnInteger:
-        results = paginator.page(1)
-    except EmptyPage:
-        results = paginator.page(paginator.num_pages)
 
-    search_type = get_params.get("type", SEARCH_TYPES.OPINION)
-    # Set highlights in results.
-    convert_str_date_fields_to_date_objects(results, search_type)
-    merge_courts_from_db(results, search_type)
-    limit_inner_hits(get_params, results, search_type)
-    set_results_highlights(results, search_type)
-    merge_unavailable_fields_on_parent_document(results, search_type)
+    # Get appropriate page
+    results = get_results_from_paginator(paginator, page)
 
+    # Enrich results
+    enrich_search_results(results, search_type, clean_params)
+
+    results_dict = {
+        "es_results_items": hits,
+        "main_query_hits": None,
+        "cardinality_count_response": main_total,
+        "child_cardinality_count_response": child_total,
+    }
     if cache_key is not None:
-        # Cache only Page results for displaying insights on the Home Page.
-        cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
+        # Cache only ES hits for displaying insights on the Home Page.
+        serialized_data = pickle.dumps(results_dict)
+        cache.set(cache_key, serialized_data, settings.QUERY_RESULTS_CACHE)
     elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
-        # Cache Page results and counts for all other search requests.
-        results_dict = {
-            "results": results,
-            "main_total": main_total,
-            "child_total": child_total,
-        }
+        # Cache ES hits and counts for all other search requests.
         serialized_data = pickle.dumps(results_dict)
         cache.set(
             micro_cache_key,
@@ -475,6 +646,8 @@ def do_es_search(
     facet: bool = True,
     cache_key: str | None = None,
     is_csv_export: bool = False,
+    courts: QuerySet[Court] | None = None,
+    is_semantic_frontend_active: bool = False,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -487,11 +660,13 @@ def do_es_search(
     is set or used. Results are saved for six hours.
     :param is_csv_export: Indicates if the data being processed is intended for
     an export process.
+    :param courts: QuerySet of courts used in the jurisdiction picker.
     :return: A big dict of variables for use in the search results, homepage, or
     other location.
     """
+    if courts is None:
+        courts = Court.objects.filter(in_use=True)
     paged_results = None
-    courts = Court.objects.filter(in_use=True)
     query_time: int | None = 0
     total_query_results: int | None = 0
     top_hits_limit: int | None = 5
@@ -506,7 +681,11 @@ def do_es_search(
     missing_citations_str: list[str] = []
     error = True
 
-    search_form = SearchForm(get_params, courts=courts)
+    search_form = SearchForm(
+        get_params,
+        courts=courts,
+        is_semantic_frontend_active=is_semantic_frontend_active,
+    )
     match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
@@ -536,18 +715,37 @@ def do_es_search(
                 SEARCH_TYPES.DOCKETS,
             ]:
                 query_citation, missing_citations = es_get_query_citation(cd)
-                if cd["type"] in [
-                    SEARCH_TYPES.OPINION,
-                ]:
+                if cd["type"] == SEARCH_TYPES.OPINION:
                     missing_citations_str, suggested_query = (
                         remove_missing_citations(missing_citations, cd)
                     )
                     cd["q"] = suggested_query if suggested_query else cd["q"]
+
+            # For semantic searches, generate the embedding once so both
+            # the main query and the facets query reuse it instead of
+            # making duplicate calls to the inception microservice.
+            if has_semantic_params(cd) and not cd.get("embedding"):
+                cd["embedding"] = get_query_embedding(cd["q"])
+
             (
                 s,
                 child_docs_count_query,
                 top_hits_limit,
             ) = build_es_main_query(search_query, cd)
+
+            # Set the default page value if the page parameter is missing or
+            # invalid. Set it to 1 to generate the same hash for page 1,
+            # regardless of whether the page parameter is included.
+            try:
+                page = int(get_params.get("page", 1))
+            except ValueError:
+                page = 1
+            cleaned_params = search_form.cleaned_data.copy()
+            cleaned_params["page"] = page
+            # Use a smaller page size for semantic results so the longer
+            # chunk previews are less overwhelming to scan.
+            if has_semantic_params(cd):
+                rows = settings.SEMANTIC_SEARCH_PAGE_SIZE
             (
                 paged_results,
                 query_time,
@@ -555,12 +753,14 @@ def do_es_search(
                 total_query_results,
                 total_child_results,
             ) = fetch_and_paginate_results(
-                get_params,
+                cleaned_params,
                 s,
                 child_docs_count_query,
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
+            if has_semantic_params(cd):
+                merge_semantic_relevant_chunks(paged_results)
             cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
@@ -596,23 +796,20 @@ def do_es_search(
         except InvalidRelativeDateSyntax:
             error = True
             error_message = "invalid_relative_date_syntax"
+        except InputTooLongError:
+            error = True
+            error_message = "input_too_long_error"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(
                 get_params, search_form.cleaned_data, courts
             )
-            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
-                # If the search query is valid, pass the cleaned data to filter and
-                # retrieve the correct number of opinions per status. Otherwise (if
-                # the query has errors), just provide a dictionary containing the
-                # search type to get the total number of opinions per status
-                facet_fields = get_facet_dict_for_search_query(
-                    search_query,
-                    cd if not error else {"type": cd["type"]},
-                    search_form,
+            if cd["type"] == SEARCH_TYPES.OPINION and facet:
+                facet_fields = fetch_facets(
+                    search_query, cd, search_form, error
                 )
 
-    courts, court_count_human, court_count = merge_form_with_courts(
+    courts_dict, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
     )
     search_summary_str = search_form.as_text(court_count_human)
@@ -631,7 +828,7 @@ def do_es_search(
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
         "error": error,
-        "courts": courts,
+        "courts": courts_dict,
         "court_count_human": court_count_human,
         "court_count": court_count,
         "query_citation": query_citation,

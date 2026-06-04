@@ -1,9 +1,11 @@
-from drf_dynamic_fields import DynamicFieldsMixin
-from judge_pics.search import ImageSizes, portrait
 from rest_framework import serializers
 
-from cl.api.utils import HyperlinkedModelSerializerWithId
-from cl.disclosures.utils import make_disclosure_year_range
+from cl.api.utils import (
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+    NestedDynamicFieldsMixin,
+    RetrieveFilteredFieldsMixin,
+)
 from cl.people_db.models import (
     ABARating,
     Attorney,
@@ -23,7 +25,11 @@ from cl.people_db.models import (
 from cl.search.api_serializers import CourtSerializer
 
 
-class SchoolSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class SchoolSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     is_alias_of = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="school-detail",
@@ -37,7 +43,9 @@ class SchoolSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class EducationSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     school = SchoolSerializer(many=False, read_only=True)
     person = serializers.HyperlinkedRelatedField(
@@ -53,7 +61,9 @@ class EducationSerializer(
 
 
 class PoliticalAffiliationSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     person = serializers.HyperlinkedRelatedField(
         many=False,
@@ -67,7 +77,11 @@ class PoliticalAffiliationSerializer(
         fields = "__all__"
 
 
-class SourceSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class SourceSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     person = serializers.HyperlinkedRelatedField(
         many=False,
         view_name="person-detail",
@@ -81,7 +95,9 @@ class SourceSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class ABARatingSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     person = serializers.HyperlinkedRelatedField(
         many=False,
@@ -95,48 +111,11 @@ class ABARatingSerializer(
         fields = "__all__"
 
 
-class PersonDisclosureSerializer(
-    DynamicFieldsMixin,
+class PersonSerializer(
+    RetrieveFilteredFieldsMixin,
+    NestedDynamicFieldsMixin,
     HyperlinkedModelSerializerWithId,
 ):
-    position_str = serializers.SerializerMethodField()
-    name_full = serializers.CharField()
-    disclosure_years = serializers.SerializerMethodField()
-    thumbnail_path = serializers.SerializerMethodField()
-    newest_disclosure_url = serializers.SerializerMethodField()
-
-    def get_position_str(self, obj: Person) -> str:
-        """Make a simple string of a judge's most recent position
-
-        Assumes you have the judge's position prefetched in the `positions`
-        attr.
-        """
-        if len(obj.court_positions) > 0:
-            return obj.court_positions[0].court.short_name
-        return ""
-
-    def get_disclosure_years(self, obj: Person) -> str:
-        return make_disclosure_year_range(obj)
-
-    def get_thumbnail_path(self, obj: Person) -> str:
-        return portrait(obj.id, ImageSizes.SMALL)
-
-    def get_newest_disclosure_url(self, obj: Person) -> str:
-        """Get the URL of the"""
-        return obj.disclosures[0].get_absolute_url()
-
-    class Meta:
-        model = Person
-        fields = (
-            "position_str",
-            "name_full",
-            "disclosure_years",
-            "thumbnail_path",
-            "newest_disclosure_url",
-        )
-
-
-class PersonSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     race = serializers.StringRelatedField(many=True)
     sources = SourceSerializer(many=True, read_only=True)
     aba_ratings = ABARatingSerializer(many=True, read_only=True)
@@ -163,7 +142,9 @@ class PersonSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class RetentionEventSerializer(
-    DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
 ):
     position = serializers.HyperlinkedRelatedField(
         many=False,
@@ -177,7 +158,11 @@ class RetentionEventSerializer(
         fields = "__all__"
 
 
-class PositionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
+class PositionSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
     retention_events = RetentionEventSerializer(many=True, read_only=True)
     person = PersonSerializer(many=False, read_only=True)
     supervisor = PersonSerializer(many=False, read_only=True)

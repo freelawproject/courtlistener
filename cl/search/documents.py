@@ -7,9 +7,11 @@ from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
-from elasticsearch_dsl import Document as DSLDocument
+from elasticsearch.dsl import DenseVector
+from elasticsearch.dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
+from cl.audio.audio_sources import AudioSources
 from cl.audio.models import Audio
 from cl.corpus_importer.utils import is_bankruptcy_court
 from cl.custom_filters.templatetags.extras import render_string_or_list
@@ -35,7 +37,9 @@ from cl.people_db.models import (
     AttorneyOrganization,
     Person,
     Position,
+    Role,
 )
+from cl.search.cluster_sources import ClusterSources
 from cl.search.constants import (
     PEOPLE_ES_HL_FIELDS,
     PEOPLE_ES_HL_KEYWORD_FIELDS,
@@ -57,7 +61,6 @@ from cl.search.es_indices import (
 from cl.search.forms import SearchForm
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
-    SOURCES,
     BankruptcyInformation,
     Citation,
     Docket,
@@ -66,6 +69,31 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
+
+
+class PreparePercolatorQueryMixin:
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        from cl.alerts.utils import build_plain_percolator_query
+
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        # For RECAP/Opinions percolator queries, we use
+        # build_plain_percolator_query to build the query. It does not add a
+        # custom function_score, so there is no need to remove the
+        # order_by sorting key as it is ignored.
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                "invalid and was not indexed."
+            )
+            return None
+
+        cd = search_form.cleaned_data
+        query = build_plain_percolator_query(cd)
+        return query.to_dict() if query else None
 
 
 @parenthetical_group_index.document
@@ -395,7 +423,8 @@ class AudioDocument(CSVSerializableDocumentMixin, AudioDocumentBase):
         transformations["local_path"] = lambda x: (
             f"https://storage.courtlistener.com/{x}" if x else ""
         )
-        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        _audio_names = dict(AudioSources.NAMES)
+        transformations["source"] = lambda x: _audio_names.get(x, x)
         return transformations
 
     def prepare_absolute_url(self, instance):
@@ -726,11 +755,9 @@ class PositionDocument(PersonBaseDocument):
         fields={"raw": fields.KeywordField()},
     )
     appointer = fields.TextField(
-        attr="appointer.person.name_full_reverse",
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="appointer.person.name_full_reverse",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
             ),
@@ -806,6 +833,18 @@ class PositionDocument(PersonBaseDocument):
     class Django:
         model = Position
         ignore_signals = True
+
+    def prepare_appointer(self, instance):
+        if instance.appointer:
+            return instance.appointer.person.name_full_reverse
+
+    def prepare_predecessor(self, instance):
+        if instance.predecessor:
+            return instance.predecessor.name_full_reverse
+
+    def prepare_supervisor(self, instance):
+        if instance.supervisor:
+            return instance.supervisor.name_full_reverse
 
     def prepare_position_type(self, instance):
         return instance.get_position_type_display()
@@ -892,9 +931,7 @@ class PositionDocument(PersonBaseDocument):
 
 @people_db_index.document
 class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
-    name_reverse = fields.KeywordField(
-        attr="name_full_reverse",
-    )
+    name_reverse = fields.KeywordField()
     date_granularity_dob = fields.KeywordField(attr="date_granularity_dob")
     date_granularity_dod = fields.KeywordField(attr="date_granularity_dod")
     absolute_url = fields.KeywordField()
@@ -963,6 +1000,9 @@ class PersonDocument(CSVSerializableDocumentMixin, PersonBaseDocument):
             DATE_GRANULARITIES
         ).get(x, x)
         return transformations
+
+    def prepare_name_reverse(self, instance):
+        return instance.name_full_reverse
 
     def prepare_person_child(self, instance):
         return "person"
@@ -1590,6 +1630,27 @@ class DocketDocument(
         return data
 
 
+class DocketDocumentPlain(DocketDocument):
+    """This class is used for Docket document percolation. Here, we can
+    control whether to include parties based on
+    the MAX_ATTORNEYS_TO_PERCOLATE setting."""
+
+    def prepare_parties(self, instance: Docket) -> dict[str, set]:
+        out = {
+            "party_id": set(),
+            "party": set(),
+            "attorney_id": set(),
+            "attorney": set(),
+            "firm_id": set(),
+            "firm": set(),
+        }
+        atty_count = Role.objects.filter(docket=instance).distinct().count()
+        if atty_count > settings.MAX_ATTORNEYS_TO_PERCOLATE:
+            return out
+
+        return super().prepare_parties(instance)
+
+
 # Opinions
 class OpinionBaseDocument(Document):
     absolute_url = fields.KeywordField(index=False)
@@ -1664,6 +1725,7 @@ class OpinionBaseDocument(Document):
         search_analyzer="search_analyzer",
         term_vector="with_positions_offsets",
     )
+    court_jurisdiction = fields.KeywordField()
     judge = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
@@ -1805,6 +1867,9 @@ class OpinionBaseDocument(Document):
     def prepare_court_citation_string(self, instance):
         return instance.docket.court.citation_string
 
+    def prepare_court_jurisdiction(self, instance):
+        return instance.docket.court.jurisdiction
+
     def prepare_judge(self, instance):
         return instance.judges
 
@@ -1936,6 +2001,33 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
         fields.IntegerField(multi=True),
     )
     ordering_key = fields.IntegerField(attr="ordering_key")
+    embeddings = fields.Nested(
+        properties={
+            "chunk_number": fields.IntegerField(),
+            "chunk": fields.TextField(
+                analyzer="text_en_splitting_cl",
+                term_vector="with_positions_offsets",
+                fields={
+                    "exact": fields.TextField(
+                        analyzer="english_exact",
+                        search_analyzer="search_analyzer_exact",
+                        term_vector="with_positions_offsets",
+                    ),
+                },
+                search_analyzer="search_analyzer",
+            ),
+            "embedding": DenseVector(
+                dims=settings.EMBEDDING_DIMENSIONS,
+                index=True,
+                similarity="dot_product",
+                # Explicitly set to `int8_hnsw` to match the index type used when
+                # this field was originally created under Elasticsearch 9.0, where
+                # `int8_hnsw` was the default for all float vectors regardless of
+                # dimensions.
+                index_options={"type": "int8_hnsw"},
+            ),
+        }
+    )
 
     class Django:
         model = Opinion
@@ -2119,6 +2211,9 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
     def prepare_court_citation_string(self, instance):
         return instance.cluster.docket.court.citation_string
 
+    def prepare_court_jurisdiction(self, instance):
+        return instance.cluster.docket.court.jurisdiction
+
     def prepare_judge(self, instance):
         return instance.cluster.judges
 
@@ -2222,7 +2317,7 @@ class OpinionClusterDocument(
         )
 
         # Add a transformation to compute Human-readable values
-        transformations["source"] = lambda x: dict(SOURCES.NAMES).get(x, x)
+        transformations["source"] = ClusterSources.get_display_name
         transformations["status"] = lambda x: dict(
             PRECEDENTIAL_STATUS.NAMES
         ).get(x, x)
@@ -2316,17 +2411,20 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
             "firm": set(),
         }
 
+        docket = instance.docket_entry.docket
+        atty_count = Role.objects.filter(docket=docket).count()
+        if atty_count > settings.MAX_ATTORNEYS_TO_PERCOLATE:
+            return out
+
         # Extract only required parties values.
-        party_values = instance.docket_entry.docket.parties.values_list(
-            "pk", "name"
-        )
+        party_values = docket.parties.values_list("pk", "name")
         for pk, name in party_values.iterator():
             out["party_id"].add(pk)
             out["party"].add(name)
 
         # Extract only required attorney values.
         atty_values = (
-            Attorney.objects.filter(roles__docket=instance.docket_entry.docket)
+            Attorney.objects.filter(roles__docket=docket)
             .distinct()
             .values_list("pk", "name")
         )
@@ -2337,7 +2435,7 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         # Extract only required firm values.
         firms_values = (
             AttorneyOrganization.objects.filter(
-                attorney_organization_associations__docket=instance.docket_entry.docket
+                attorney_organization_associations__docket=docket
             )
             .distinct()
             .values_list("pk", "name")
@@ -2345,7 +2443,6 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         for pk, name in firms_values.iterator():
             out["firm_id"].add(pk)
             out["firm"].add(name)
-
         return out
 
     def prepare_docket_absolute_url(self, instance):
@@ -2363,7 +2460,9 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
         return data
 
 
-class RECAPPercolator(DocketDocument, ESRECAPDocument):
+class RECAPPercolator(
+    DocketDocument, ESRECAPDocument, PreparePercolatorQueryMixin
+):
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
 
@@ -2375,24 +2474,38 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
             "analysis": settings.ELASTICSEARCH_DSL["analysis"],
         }
 
-    def prepare_timestamp(self, instance):
-        return datetime.utcnow()
 
-    def prepare_percolator_query(self, instance):
-        from cl.alerts.utils import build_plain_percolator_query
+class OpinionPercolator(
+    OpinionClusterDocument, OpinionDocument, PreparePercolatorQueryMixin
+):
+    """Opinions Percolator index"""
 
-        qd = QueryDict(instance.query.encode(), mutable=True)
-        # For RECAP percolator queries, we use build_plain_percolator_query to
-        # build the query. It does not add a custom function_score, so there is
-        # no need to remove the order_by sorting key as it is ignored.
-        search_form = SearchForm(qd)
-        if not search_form.is_valid():
-            logger.warning(
-                f"The query {qd} associated with Alert ID {instance.pk} is "
-                "invalid and was not indexed."
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = PercolatorField()
+
+    class Index:
+        name = "opinions_percolator_index"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_OPINIONS_ALERTS_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_OPINIONS_ALERTS_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+
+class ESOpinionDocumentPlain(OpinionClusterDocument, OpinionDocument):
+    """Document class for preparing Opinions to be percolated into the
+    OpinionPercolator index.
+    """
+
+    def prepare_non_participating_judge_ids(self, instance):
+        return list(
+            instance.cluster.non_participating_judges.all().values_list(
+                "id", flat=True
             )
-            return None
+        )
 
-        cd = search_form.cleaned_data
-        query = build_plain_percolator_query(cd)
-        return query.to_dict() if query else None
+    def prepare_source(self, instance):
+        return instance.cluster.source
+
+    def prepare_court_exact(self, instance):
+        return instance.cluster.docket.court_id

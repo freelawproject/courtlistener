@@ -1,7 +1,7 @@
 import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import time_machine
 from asgiref.sync import sync_to_async
@@ -17,15 +17,21 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.custom_filters.templatetags.pacer import price
-from cl.donate.models import NeonMembership
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import (
     DocketTag,
+    GenericCount,
     Note,
     Prayer,
     PrayerAvailability,
     UserTag,
 )
+from cl.favorites.selectors import prayer_eligible
 from cl.favorites.tasks import check_prayer_pacer
 from cl.favorites.utils import (
     compute_prayer_total_cost,
@@ -37,7 +43,6 @@ from cl.favorites.utils import (
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
-    prayer_eligible,
     prayer_unavailable,
 )
 from cl.lib.test_helpers import (
@@ -45,8 +50,14 @@ from cl.lib.test_helpers import (
     PrayAndPayTestCase,
     SimpleUserDataMixin,
 )
-from cl.search.factories import RECAPDocumentFactory
-from cl.search.views import get_homepage_stats
+from cl.search.factories import (
+    DocketFactory,
+    OpinionClusterWithParentsFactory,
+    OpinionFactory,
+    RECAPDocumentFactory,
+)
+from cl.search.models import PRECEDENTIAL_STATUS
+from cl.search.utils import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
 from cl.tests.fakes import FakeAvailableConfirmationPage, FakeConfirmationPage
@@ -54,22 +65,32 @@ from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
-    fixtures = [
-        "test_court.json",
-        "test_objects_search.json",
-        "judge_judy.json",
-    ]
-
-    def setUp(self) -> None:
+class NoteTest(SimpleUserDataMixin, AudioTestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.docket_1 = DocketFactory(id=1)
+        cls.docket_2 = DocketFactory(id=2)
+        cls.docket_3 = DocketFactory(id=3)
+        super().setUpTestData()
+        cls.opinion_cluster = OpinionClusterWithParentsFactory(
+            docket=cls.docket_1,
+            case_name="case name cluster 3",
+            case_name_full="Reference to Lissner v. Saad",
+            slug="case-name-cluster",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionFactory(
+            cluster=cls.opinion_cluster,
+            plain_text="Reference to Lissner v. Saad",
+        )
         # Set up some handy variables
-        self.note_cluster_params = {
-            "cluster_id": 1,
+        cls.note_cluster_params = {
+            "cluster_id": cls.opinion_cluster.pk,
             "name": "foo",
             "notes": "testing notes",
         }
-        self.note_audio_params = {
-            "audio_id": self.audio_1.pk,
+        cls.note_audio_params = {
+            "audio_id": cls.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
@@ -107,19 +128,24 @@ class UserNotesTest(BaseSeleniumTest):
     including CRUD related operations of a user's notes.
     """
 
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
     def setUp(self) -> None:
+        self.opinion_cluster = OpinionClusterWithParentsFactory(
+            case_name="Lissner v. Saad",
+            case_name_full="Reference to Lissner v. Saad",
+            slug="lissner-v-saad",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            syllabus="some rando syllabus",
+        )
+        OpinionFactory(
+            cluster=self.opinion_cluster,
+            plain_text="Reference to Lissner v. Saad",
+        )
+        super().setUp()
         get_homepage_stats.invalidate()
         self.f = NoteFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
@@ -416,13 +442,11 @@ class FavoritesTest(TestCase):
 class APITests(APITestCase):
     """Check that tags are created correctly and blocked correctly via APIs"""
 
-    fixtures = [
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
     @classmethod
     def setUpTestData(cls) -> None:
+        super().setUpTestData()
+        cls.docket_1 = DocketFactory(id=1)
+        cls.docket_2 = DocketFactory(id=2)
         cls.pandora = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -434,14 +458,16 @@ class APITests(APITestCase):
         )
 
     def setUp(self) -> None:
+        super().setUp()
         self.tag_path = reverse("UserTag-list", kwargs={"version": "v3"})
         self.docket_path = reverse("DocketTag-list", kwargs={"version": "v3"})
         self.client = make_client(self.pandora.user.pk)
         self.client2 = make_client(self.unconfirmed.user.pk)
 
-    def tearDown(cls):
+    def tearDown(self):
         UserTag.objects.all().delete()
         DocketTag.objects.all().delete()
+        super().tearDown()
 
     async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {
@@ -463,7 +489,7 @@ class APITests(APITestCase):
 
         # Link it to the docket
         tag_id = response.json()["id"]
-        docket_to_tag_id = 1
+        docket_to_tag_id = self.docket_1.pk
         response = await self.tag_a_docket(
             self.client, docket_to_tag_id, tag_id
         )
@@ -552,7 +578,7 @@ class APITests(APITestCase):
         # self.client makes a tag. self.client2 tries to use it
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        docket_to_tag_id = 1
+        docket_to_tag_id = self.docket_1.pk
         response = await self.tag_a_docket(
             self.client, docket_to_tag_id, tag_id
         )
@@ -576,20 +602,30 @@ class APITests(APITestCase):
         # create a tag and use it for docket #1 and #2
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 1, tag_id)
-        response = await self.tag_a_docket(self.client, 2, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_1.pk, tag_id
+        )
+        response = await self.tag_a_docket(
+            self.client, self.docket_2.pk, tag_id
+        )
 
         # create another tag for docket #2
         response = await self.make_a_good_tag(self.client, tag_name="foo-2")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 2, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_2.pk, tag_id
+        )
 
         # filter the associations using the docket id
-        response = await self.client.get(self.docket_path, {"docket": 1})
+        response = await self.client.get(
+            self.docket_path, {"docket": self.docket_1.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
 
-        response = await self.client.get(self.docket_path, {"docket": 2})
+        response = await self.client.get(
+            self.docket_path, {"docket": self.docket_2.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
@@ -599,27 +635,37 @@ class APITests(APITestCase):
         # create a two tags using client 1 and use them in docket #1
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_1.pk, tag_id
+        )
         response = await self.make_a_good_tag(self.client, tag_name="foo-c1")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_1.pk, tag_id
+        )
 
         await UserTag.objects.filter(name="foo").aupdate(published=True)
 
         # create another tag using client 2 and use it in docket #1
         response = await self.make_a_good_tag(self.client2, tag_name="foo-c2")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client2, 1, tag_id)
+        response = await self.tag_a_docket(
+            self.client2, self.docket_1.pk, tag_id
+        )
 
         await UserTag.objects.filter(name="foo-c2").aupdate(published=True)
 
         # query the associations(own + public) for docket #1 using client 1
-        response = await self.client.get(self.docket_path, {"docket": 1})
+        response = await self.client.get(
+            self.docket_path, {"docket": self.docket_1.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 3)
 
         # query the associations(own + public) for docket #1 using client 2
-        response = await self.client2.get(self.docket_path, {"docket": 1})
+        response = await self.client2.get(
+            self.docket_path, {"docket": self.docket_1.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
@@ -641,7 +687,7 @@ class APITests(APITestCase):
         # Make a tag, and tag a docket with it
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        docket_to_tag_id = 1
+        docket_to_tag_id = self.docket_1.pk
         await self.tag_a_docket(self.client, docket_to_tag_id, tag_id)
 
         # Check that client2 can't see that association
@@ -658,13 +704,16 @@ class APITests(APITestCase):
         self.assertEqual(response.json()["count"], 1)
 
 
+@patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
 class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method work properly?"""
         # Create a membership for one of the users
         await sync_to_async(NeonMembership.objects.create)(
-            level=NeonMembership.LEGACY, user=self.user_2
+            level=NeonMembershipLevel.LEGACY,
+            user=self.user_2,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
         )
         current_time = now()
         with time_machine.travel(current_time, tick=False):
@@ -782,13 +831,15 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
         """Does the get_top_prayers method work properly?"""
 
         # Test top documents based on docket views.
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 12
-        self.rd_4.docket_entry.docket.view_count = 6
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=12
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
 
         await create_prayer(self.user, self.rd_4)
         await create_prayer(self.user, self.rd_2)
@@ -808,17 +859,19 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
     async def test_get_top_prayers_by_number_and_views(self) -> None:
         """Does the get_top_prayers method work properly?"""
 
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 1
-        self.rd_4.docket_entry.docket.view_count = 6
-        self.rd_5.docket_entry.docket.view_count = 8
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
-        await self.rd_5.docket_entry.docket.asave()
-
         # Create prayers with different counts and views
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=1
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_5.docket_entry.docket_id}:view", value=8
+        )
 
         await create_prayer(self.user, self.rd_5)
         await create_prayer(self.user, self.rd_2)
@@ -924,17 +977,21 @@ class RECAPPrayAndPay(SimpleUserDataMixin, PrayAndPayTestCase):
             recap_document=self.rd_4, last_checked=dt_3
         )
 
-        self.rd_2.docket_entry.docket.view_count = 4
-        self.rd_3.docket_entry.docket.view_count = 1
-        self.rd_4.docket_entry.docket.view_count = 6
-        self.rd_5.docket_entry.docket.view_count = 8
-        self.rd_6.docket_entry.docket.view_count = 15
-
-        await self.rd_2.docket_entry.docket.asave()
-        await self.rd_3.docket_entry.docket.asave()
-        await self.rd_4.docket_entry.docket.asave()
-        await self.rd_5.docket_entry.docket.asave()
-        await self.rd_6.docket_entry.docket.asave()
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_2.docket_entry.docket_id}:view", value=4
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_3.docket_entry.docket_id}:view", value=1
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_4.docket_entry.docket_id}:view", value=6
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_5.docket_entry.docket_id}:view", value=8
+        )
+        await GenericCount.objects.acreate(
+            label=f"d.{self.rd_6.docket_entry.docket_id}:view", value=15
+        )
 
         await create_prayer(self.user, self.rd_3)
         await create_prayer(self.user, self.rd_2)
@@ -1697,10 +1754,12 @@ class PrayAndPayCheckAvailabilityTaskTests(PrayAndPayTestCase):
         mock_check_prayer_pacer.delay.assert_called_once()
 
 
+@patch("cl.favorites.signals.check_prayer_pacer.delay", new=MagicMock)
 class PrayerAPITests(PrayAndPayTestCase):
     """Check that Prayer API operations work as expected."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
         self.client = make_client(self.user.pk)
         self.client_2 = make_client(self.user_2.pk)

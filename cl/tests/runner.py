@@ -3,13 +3,13 @@ import sys
 import warnings
 from unittest import TestLoader
 
+from django.test import SimpleTestCase
 from django.test.runner import DiscoverRunner
 from override_storage import override_storage
 
 from cl.tests.cases import (
     APITestCase,
     LiveServerTestCase,
-    SimpleTestCase,
     StaticLiveServerTestCase,
     TestCase,
     TransactionTestCase,
@@ -65,7 +65,9 @@ class TestRunner(DiscoverRunner):
         parallel_action.default = parallel_action.const
 
         # Default buffering on, to hide output
-        parser.set_defaults(buffer=True)
+        # This is disabled due to Django bug #36491.
+        # See PR #5888 for more details.
+        # parser.set_defaults(buffer=True)
 
     def setup_databases(self, **kwargs):
         # Force to always delete the database if it exists

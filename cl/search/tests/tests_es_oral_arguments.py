@@ -9,7 +9,7 @@ from django.core.cache import cache
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import connections
+from elasticsearch.dsl import connections
 from lxml import html
 
 from cl.alerts.models import Alert
@@ -1305,7 +1305,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         """Confirm the timestamp fielded filter works properly"""
 
         mock_date = now().replace(
-            day=29, hour=0, minute=0, second=0, microsecond=0
+            day=28, hour=0, minute=0, second=0, microsecond=0
         )
         with (
             time_machine.travel(mock_date, tick=False),

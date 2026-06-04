@@ -1,67 +1,65 @@
-<div class="form-group date-filter-mode">
-  <div>
-    <label>Date Filed:</label>
-    <label class="radio-inline">
-      <input type="radio" name="date-mode" value="calendar"
-        {% if not request.GET.filed_after or "/" in request.GET.filed_after %}
-          checked
-        {% endif %}
-      > Calendar
-    </label>
-    <label class="radio-inline">
-      <input type="radio" name="date-mode" value="relative"
-        {% if request.GET.filed_after and not "/" in request.GET.filed_after %}
-          checked
-        {% endif %}
-      > Relative
-    </label>
+{% load extras %}
+
+<div class="form-group date-filter-mode" data-field-prefix="{{ field_prefix }}">
+  <div class="flex{% if sidebar %} flex-sm-column flex-lg-row{% endif %}">
+    <div class="flex justify-content-start">
+      <label>{{ label|default:"Docket Date" }}</label>
+    </div>
+    <div style="margin-bottom: 5px;">
+      <label class="radio-inline">
+        <input type="radio" name="{{ field_prefix }}-date-mode" value="calendar"
+          {% get_request_value request.GET after_field as after_value %}
+          {% if not after_value or "/" in after_value %} checked {% endif %}>
+        Calendar
+      </label>
+      <label class="radio-inline">
+        <input type="radio" name="{{ field_prefix }}-date-mode" value="relative"
+          {% if after_value and not "/" in after_value %} checked {% endif %}>
+        Relative
+      </label>
+    </div>
   </div>
 
-  <div class="date-calendar-fields
-    {% if request.GET.filed_after and not "/" in request.GET.filed_after %}
-      hidden
-    {% endif %}">
+  <div class="date-calendar-fields {% if after_value and not "/" in after_value %} hidden {% endif %}">
     <div class="row">
       <div class="col-md-6">
-        <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
+        <div class="form-group">
           <input
               type="text"
-              name="filed_after"
-              value="{% if '/' in request.GET.filed_after %}{{ request.GET.filed_after }}{% else %}{% endif %}"
+              name="{{ after_field }}"
+              value="{% if '/' in after_value %}{{ after_value }}{% endif %}"
               placeholder="Filed After"
               class="external-input form-control datepicker"
               autocomplete="off"
-              id="id_filed_after">
+              id="id_{{ after_field }}">
         </div>
       </div>
       <div class="col-md-6">
-        <div class="form-group{% if search_form.filed_before.errors %} has-error{% endif %}">
+        <div class="form-group">
+          {% get_request_value request.GET before_field as before_value %}
           <input
               type="text"
-              name="filed_before"
-              value="{% if '/' in request.GET.filed_before %}{{ request.GET.filed_before }}{% else %}{% endif %}"
+              name="{{ before_field }}"
+              value="{% if '/' in before_value %}{{ before_value }}{% endif %}"
               placeholder="Filed Before"
               class="external-input form-control datepicker"
               autocomplete="off"
-              id="id_filed_before">
+              id="id_{{ before_field }}">
         </div>
       </div>
     </div>
   </div>
 
-  <div class="date-relative-fields
-    {% if not request.GET.filed_after or "/" in request.GET.filed_after %}
-     hidden
-    {% endif %}">
-    <div class="form-group{% if search_form.filed_after.errors %} has-error{% endif %}">
+  <div class="date-relative-fields {% if not after_value or "/" in after_value %} hidden {% endif %}">
+    <div class="form-group">
       <div class="relative-select">
         <input
           type="text"
-          id="id_filed_after_relative"
+          id="id_{{ after_field }}_relative"
           name=""
           class="external-input form-control"
           placeholder="------------"
-          value="{% if not '/' in request.GET.filed_after %}{{ request.GET.filed_after }}{% else %}{% endif %}"
+          value="{% if not '/' in after_value %}{{ after_value }}{% endif %}"
           autocomplete="off">
         <button
           type="button"
@@ -73,10 +71,10 @@
           <li data-value="1d ago">Past Day</li>
           <li data-value="7d ago">Past Week</li>
           <li data-value="14d ago">Past 2 Weeks</li>
-          <li data-value="-1m ago">Past Month</li>
-          <li data-value="-3m ago">Past 3 Months</li>
-          <li data-value="-6m ago">Past 6 Months</li>
-          <li data-value="-1y ago">Past Year</li>
+          <li data-value="1m ago">Past Month</li>
+          <li data-value="3m ago">Past 3 Months</li>
+          <li data-value="6m ago">Past 6 Months</li>
+          <li data-value="1y ago">Past Year</li>
         </ul>
       </div>
       <p class="text-right"><a href="{% url "relative_dates" %}">Help</a></p>

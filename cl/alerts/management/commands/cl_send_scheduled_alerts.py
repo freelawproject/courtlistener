@@ -3,7 +3,6 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 import pytz
-from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.utils.timezone import get_default_timezone, make_aware
 
@@ -17,6 +16,7 @@ from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESDictDocument
+from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 
 DAYS_TO_DELETE = 90
@@ -144,6 +144,8 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                     main_doc_id = doc_content.get("docket_id")
                 case SEARCH_TYPES.ORAL_ARGUMENT:
                     main_doc_id = doc_content.get("id")
+                case SEARCH_TYPES.OPINION:
+                    main_doc_id = doc_content.get("cluster_id")
                 case _:
                     # Not supported alert type.
                     continue
@@ -169,7 +171,7 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                 if alert.alert_type == SEARCH_TYPES.DOCKETS
                 else alert.alert_type
             )
-            # Override query n in the 'View Full Results' URL to
+            # Override query in the 'View Full Results' URL to
             # include a filter by timestamp.
             cut_off_date = get_cut_off_date(rate, now_time)
             qd = override_alert_query(alert, cut_off_date)
@@ -197,7 +199,11 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             f"Removed {scheduled_alerts_deleted} Scheduled Alert Hits."
         )
 
-    async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
+    tally_stat(
+        StatMetric.ALERTS_SENT,
+        inc=alerts_sent_count,
+        labels={"alert_type": StatAlertType.SCHEDULED},
+    )
     logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
 
