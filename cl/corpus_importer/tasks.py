@@ -421,7 +421,12 @@ def download_recap_item(
     soft_time_limit=240,
 )
 def get_and_save_free_document_report(
-    self: Task, court_id: str, start: date, end: date, log_id: int = 0
+    self: Task,
+    court_id: str,
+    start: date,
+    end: date,
+    log_id: int = 0,
+    day_span: int = 1,
 ) -> tuple[int, int]:
     """Download the Free document report and save it to the DB.
 
@@ -430,6 +435,9 @@ def get_and_save_free_document_report(
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
     :param log_id: a PACERFreeDocumentLog object id
+    :param day_span: how many days each PACER sub-query should cover. Smaller
+    values produce more, smaller requests, which is friendlier to proxy
+    read timeouts.
     :return: The status code of the scrape
     """
     session_data = get_or_cache_pacer_cookies(
@@ -446,7 +454,7 @@ def get_and_save_free_document_report(
     report = FreeOpinionReport(court_id, s)
     msg = ""
     try:
-        report.query(start, end, sort="case_number")
+        report.query(start, end, sort="case_number", day_span=day_span)
     except (
         TypeError,
         RequestException,
