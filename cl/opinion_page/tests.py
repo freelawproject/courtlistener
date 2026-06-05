@@ -2762,10 +2762,6 @@ class DocketPageV2TemplateTest(TestCase):
             )
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        # Required: the v2 template was actually used. Strings like
-        # "Docket Entries" / "28:1331" / "Contract" appear in v1 too,
-        # so without this assertion the test passes against either
-        # template — masking a broken `use_new_design` flag override.
         self.assertTemplateUsed(r, "v2_docket.html")
         content = r.content.decode()
         self.assertIn("28:1331", content)
@@ -2779,9 +2775,6 @@ class DocketPageV2TemplateTest(TestCase):
                 args=[self.docket.pk, self.docket.slug],
             )
         )
-        # `metadata` and `tabs` are set unconditionally in view_docket,
-        # so context-key assertions alone don't prove v2 rendered.
-        # Pin the template too.
         self.assertTemplateUsed(r, "v2_docket.html")
         self.assertIn("metadata", r.context)
         self.assertIn("tabs", r.context)
@@ -3039,14 +3032,6 @@ class DocketFilterPaginationWiringTest(TestCase):
     params actually narrow the queryset, the bottom pagination nav appears
     when there are multiple pages, and pagination links carry filter
     params forward so users don't lose state when paging.
-
-    `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
-    namespace from parallel test workers. Without it, the shared Redis
-    cache key gets `CACHE_EMPTY` poisoned by any worker that calls
-    `flag_is_active("use_new_design")` against a DB where this test
-    class didn't enable the flag — flipping our renders to v1.
-    The setting must precede `@override_flag` so the override's own
-    flush/save go through the prefixed key.
     """
 
     @classmethod
@@ -3073,13 +3058,6 @@ class DocketFilterPaginationWiringTest(TestCase):
     ) -> HttpResponse:
         """Fetch the docket page, assert that v2 actually rendered, and
         return the response.
-
-        v2 rendering depends on two steps: the @override_flag decorator
-        writes everyone=True for use_new_design, and the middleware reads
-        that flag to swap docket.html → v2_docket.html. If either step
-        silently fails, v1 renders, and downstream content assertions
-        fail with a confusing 'string not found' against a multi-KB HTML
-        dump. The two assertions here surface the actual cause directly.
         """
         flag = await sync_to_async(Flag.objects.get)(name="use_new_design")
         self.assertTrue(
@@ -3126,8 +3104,6 @@ class DocketFilterPaginationWiringTest(TestCase):
         `page_obj.has_other_pages` is truthy. Create enough entries to
         spill onto a second page and assert the nav landmark and a
         page=2 link both appear."""
-        # View paginates at 200 per page with orphans=10, so 211 entries
-        # guarantees two pages.
         await sync_to_async(DocketEntry.objects.bulk_create)(
             [
                 DocketEntry(
