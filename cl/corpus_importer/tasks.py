@@ -3189,6 +3189,20 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
     :param recap_document_id: RECAPDocument id
     """
 
+    # The case-name LLM call requires a funded OpenAI key. In local
+    # development the dev key has no quota, so skip the call and leave the
+    # scraped case name untouched. Tests (TESTING=True) still run the real
+    # code path with call_llm mocked, and production (DEVELOPMENT=False) is
+    # unaffected.
+    if settings.DEVELOPMENT and not settings.TESTING:
+        logger.info(
+            "Skipping LLM case name classification in development "
+            "(cluster_id=%s, recap_document_id=%s)",
+            cluster_pk,
+            recap_document_id,
+        )
+        return
+
     OPENAI_CASE_LAW_INFERENCE_KEY = env(
         "OPENAI_CASE_LAW_INFERENCE_KEY", default=None
     )
