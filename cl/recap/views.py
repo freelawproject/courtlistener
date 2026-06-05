@@ -5,7 +5,6 @@ from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import (
     DjangoModelPermissions,
-    DjangoModelPermissionsOrAnonReadOnly,
     IsAuthenticatedOrReadOnly,
 )
 from rest_framework.viewsets import ModelViewSet
@@ -188,7 +187,7 @@ class FjcIntegratedDatabaseViewSet(
     serializer_class = FjcIntegratedDatabaseSerializer
     filterset_class = FjcIntegratedDatabaseFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     ordering_fields = (

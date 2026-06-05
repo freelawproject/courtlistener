@@ -1,0 +1,194 @@
+{% load pacer tz component_tags svg_tags %}
+
+<c-vars
+  docket_entries=""
+  class=""
+/>
+
+<div class="{{ class }}">
+{% if docket_entries %}
+  {# Column headers — desktop only #}
+  <div class="hidden md:flex border-b border-greyscale-200 bg-greyscale-100 rounded-lg px-4 py-2 text-sm font-medium text-greyscale-700">
+    <div class="w-28 shrink-0">Document Number</div>
+    <div class="w-32 shrink-0">Date Filed</div>
+    <div class="flex-1">Description</div>
+  </div>
+
+  <ol role="list" class="list-none p-0 m-0" aria-label="Docket entries">
+    {% for de in docket_entries %}
+      <li id="{% if de.entry_number %}entry-{{ de.entry_number }}{% else %}minute-entry-{{ de.pk }}{% endif %}"
+          class="border-b border-greyscale-200 px-4 py-4">
+        {# Entry header #}
+        <div class="flex gap-2">
+          <dl class="flex-1 flex flex-wrap items-start md:flex-nowrap text-sm m-0">
+            <div class="md:w-28 md:shrink-0">
+              <dt class="sr-only">Document Number</dt>
+              <dd class="font-medium md:font-normal text-greyscale-900">
+                {{ de.entry_number|default_if_none:"" }}
+              </dd>
+            </div>
+            <div class="ml-auto md:ml-0 md:w-32 md:shrink-0 text-greyscale-700">
+              <dt class="sr-only">Date Filed</dt>
+              <dd>
+                {% if de.datetime_filed %}
+                  <time datetime="{{ de.datetime_filed|date:'c' }}" aria-label="{{ de.datetime_filed|timezone:timezone }}">{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}</time>
+                {% elif de.date_filed %}
+                  <time datetime="{{ de.date_filed|date:'c' }}">{{ de.date_filed|date:"M j, Y" }}</time>
+                {% endif %}
+              </dd>
+            </div>
+            <div class="basis-full mt-1 md:basis-auto md:mt-0 md:flex-1 text-greyscale-900">
+              <dt class="sr-only">Description</dt>
+              <dd>{% if de.description %}<p>{{ de.description }}</p>{% endif %}</dd>
+            </div>
+          </dl>
+
+          {# Direct link anchor #}
+          {% if de.entry_number %}
+            <a
+              href="#entry-{{ de.entry_number }}"
+              class="flex items-start text-greyscale-400 hover:text-greyscale-600 focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:outline-none rounded shrink-0 pt-0.5"
+              aria-label="Direct link to entry {{ de.entry_number }}"
+              title="Direct link to this entry"
+            >
+              {% svg "forward" class="w-4 h-4" aria_hidden="true" %}
+            </a>
+          {% endif %}
+        </div>
+
+        {# RECAP documents #}
+        {% with documents=de.recap_documents.all %}
+          {% if documents %}
+            <ul role="list" class="list-none p-0 m-0" aria-label="Documents for this entry">
+              {% for rd in documents %}
+                <li class="mt-3 md:ml-28">
+                  <div class="flex flex-wrap items-start gap-2">
+                    {# Type badge — fixed width to align with date column #}
+                    <div class="w-32 shrink-0">
+                      {% if rd.document_type == rd.ATTACHMENT %}
+                        {% if rd.filepath_local %}
+                          <a href="{{ rd.get_absolute_url }}" rel="nofollow" class="links text-sm font-medium">
+                            Attachment {{ rd.attachment_number }}
+                          </a>
+                        {% else %}
+                          <span class="text-greyscale-900 text-sm font-medium">Attachment {{ rd.attachment_number }}</span>
+                        {% endif %}
+                      {% else %}
+                        {% if rd.filepath_local %}
+                          <a href="{{ rd.get_absolute_url }}" rel="nofollow" class="links text-sm font-medium">
+                            Main Document
+                          </a>
+                        {% else %}
+                          <span class="text-greyscale-900 text-sm font-medium">Main Document</span>
+                        {% endif %}
+                      {% endif %}
+                      {# Mobile: description below badge #}
+                      {% if rd.description %}
+                        <p class="md:hidden text-sm text-greyscale-900 mt-0.5">{{ rd.description }}</p>
+                      {% endif %}
+                    </div>
+
+                    {# Desktop: description in its own column (or empty spacer to preserve flex layout) #}
+                    {% if rd.description %}
+                      <p class="hidden md:block flex-1 text-sm text-greyscale-900 min-w-48">{{ rd.description }}</p>
+                    {% else %}
+                      <div class="hidden md:block flex-1"></div>
+                    {% endif %}
+
+                    {# Action buttons #}
+                    {% if rd.document_number %}
+                      <div class="shrink-0 flex flex-wrap items-center gap-2">
+                        {% if rd.filepath_local %}
+                          {# State 1: Has PDF — download dropdown #}
+                          <c-menu-button
+                            button_variant="dark"
+                            button_class="text-sm px-3 py-1.5"
+                            menu_class="z-20 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+                            position="bottom-end"
+                            widget_aria_label="Download options for document {{ rd.document_number }}"
+                            trigger_aria_label="Download PDF"
+                            menu_aria_label="Download sources"
+                          >
+                            <c-slot name="button_content">
+                              Download PDF
+                              {% svg "chevron" class="w-3 h-3 text-white ml-1" aria_hidden="true" %}
+                            </c-slot>
+                            <c-slot name="menu_content">
+                              <c-menu-button.item
+                                href="{{ rd.filepath_local.url }}"
+                                rel="nofollow"
+                              >
+                                From CourtListener
+                              </c-menu-button.item>
+                              {% if rd.filepath_ia %}
+                                <c-menu-button.item
+                                  href="{{ rd.filepath_ia }}"
+                                  rel="nofollow"
+                                >
+                                  From Internet Archive
+                                </c-menu-button.item>
+                              {% endif %}
+                              {% if rd.pacer_url %}
+                                <c-menu-button.divider />
+                                <c-menu-button.item
+                                  href="{{ rd.pacer_url }}"
+                                  target="_blank"
+                                  rel="nofollow noreferrer noopener"
+                                  aria_label="{% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if rd.page_count %} (${{ rd|price }}){% endif %} (opens in new tab)"
+                                >
+                                  {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if rd.page_count %} (${{ rd|price }}){% endif %}
+                                </c-menu-button.item>
+                              {% endif %}
+                            </c-slot>
+                          </c-menu-button>
+                        {% elif rd.is_sealed %}
+                          {# State 2: Sealed #}
+                          <c-button variant="outline" disabled aria-disabled="true" class="text-sm px-3 py-1.5">
+                            Unavailable
+                          </c-button>
+                          {% if rd.pacer_url %}
+                            <c-button
+                              variant="ghost"
+                              href="{{ rd.pacer_url }}"
+                              target="_blank"
+                              rel="nofollow noreferrer noopener"
+                              class="text-sm px-3 py-1.5"
+                              aria-label="Check availability on PACER (opens in new tab)"
+                            >
+                              {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+                            </c-button>
+                          {% endif %}
+                          {# Pray-and-pay for sealed docs #}
+                          <c-pray-button :document_id="rd.id" :count="rd.prayer_count" :prayer_exists="rd.prayer_exists" />
+                        {% elif rd.pacer_url %}
+                          {# State 3: PACER-only #}
+                          <c-button
+                            variant="outline"
+                            href="{{ rd.pacer_url }}"
+                            target="_blank"
+                            rel="nofollow noreferrer noopener"
+                            class="text-sm px-3 py-1.5"
+                            aria-label="Buy on PACER{% if rd.page_count %} (${{ rd|price }}){% endif %} (opens in new tab)"
+                          >
+                            Buy on PACER{% if rd.page_count %} (${{ rd|price }}){% endif %}
+                          </c-button>
+                          {# Pray-and-pay for PACER-only docs #}
+                          <c-pray-button :document_id="rd.id" :count="rd.prayer_count" :prayer_exists="rd.prayer_exists" />
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+      </li>
+    {% endfor %}
+  </ol>
+{% else %}
+  <div class="px-4 py-8 text-center text-sm text-greyscale-700">
+    <p>No docket entries match your filters.</p>
+  </div>
+{% endif %}
+</div>
