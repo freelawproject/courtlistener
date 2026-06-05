@@ -43,6 +43,7 @@ from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     Court,
     OpinionCluster,
+    RECAPDocument,
 )
 from cl.search.selectors import get_available_documents_estimate_count
 from cl.search.utils import get_redis_stat_sum

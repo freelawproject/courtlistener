@@ -33,6 +33,7 @@
         class="flex items-center text-red-600"
         role="alert"
         aria-label="You have reached your daily request limit."
+        title="You have reached your daily request limit."
       >
         {% svg "circle_question_mark" class="w-4 h-4" aria_hidden="true" %}
       </span>
@@ -41,7 +42,7 @@
 {% else %}
   <c-button
     variant="outline"
-    href="{% url 'sign-in' %}?next={{ request.path }}"
+    href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
     class="text-sm px-2 py-1 {{ class }}"
     aria-label="Pray-and-pay: sign in to request this document. {{ count }} requests so far."
   >

@@ -2727,7 +2727,6 @@ class BuildDocketTabsTest(SimpleTestCase):
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 @override_flag("use_new_design", active=True)
-@override_settings(WAFFLE_CACHE_PREFIX="test_docket_page_v2_waffle")
 class DocketPageV2TemplateTest(TestCase):
     """Test that the v2 docket page renders correctly.
 
@@ -2800,10 +2799,19 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertTrue(len(r.context["tabs"]) > 0)
 
 
-@override_flag("use_new_design", active=True)
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_entry_rows_v2_waffle")
+@override_flag("use_new_design", active=True)
 class DocketEntryRowsV2Test(TestCase):
-    """Test that v2 docket entry rows render correctly for all states."""
+    """Test that v2 docket entry rows render correctly for all states.
+
+    `WAFFLE_CACHE_PREFIX` isolates this class's `use_new_design` cache
+    namespace from parallel test workers. Without it, the shared Redis
+    cache key gets `CACHE_EMPTY` poisoned by any worker that calls
+    `flag_is_active("use_new_design")` against a DB where this test
+    class didn't enable the flag — flipping our renders to v1.
+    The setting must precede `@override_flag` so the override's own
+    flush/save go through the prefixed key.
+    """
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2835,6 +2843,7 @@ class DocketEntryRowsV2Test(TestCase):
         cls.rd_pacer_only = RECAPAttachmentFactory(
             docket_entry=cls.entry_with_docs,
             document_number="1",
+            attachment_number=1,
             pacer_doc_id="12346",
             page_count=4,
         )
@@ -2842,6 +2851,7 @@ class DocketEntryRowsV2Test(TestCase):
         cls.rd_sealed = RECAPAttachmentFactory(
             docket_entry=cls.entry_with_docs,
             document_number="1",
+            attachment_number=2,
             is_sealed=True,
             pacer_doc_id="12347",
         )
@@ -2870,6 +2880,9 @@ class DocketEntryRowsV2Test(TestCase):
         content = await self._get_docket_page()
         self.assertIn("Apr 21, 2024", content)
         self.assertIn('id="entry-1"', content)
+        # Date is wrapped in <time datetime="..."> for semantic markup
+        # and accessible exposure of the full date value. WCAG 1.3.1.
+        self.assertIn('<time datetime="2024-04-21"', content)
 
     async def test_main_document_label(self) -> None:
         """Main Document label should appear for PACER_DOCUMENT type."""
@@ -2879,7 +2892,9 @@ class DocketEntryRowsV2Test(TestCase):
     async def test_attachment_label(self) -> None:
         """Attachment N label should appear for ATTACHMENT type."""
         content = await self._get_docket_page()
-        self.assertIn("Attachment", content)
+        for label in ("Attachment 1", "Attachment 2"):
+            with self.subTest(label=label):
+                self.assertIn(label, content)
 
     async def test_download_pdf_for_available_docs(self) -> None:
         """Download PDF button should appear for docs with filepath_local."""
@@ -2935,6 +2950,10 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn('<dt class="sr-only">Date Filed</dt>', content)
         self.assertIn('<dt class="sr-only">Description</dt>', content)
         self.assertIn('aria-label="Documents for this entry"', content)
+        # Both lists carry an explicit role="list" so Safari + VoiceOver
+        # don't strip list semantics when list-style: none is applied.
+        self.assertIn('<ol role="list"', content)
+        self.assertIn('<ul role="list"', content)
 
 
 class DocketFilterDrawerAttrPropagationTest(TestCase):
