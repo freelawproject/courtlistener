@@ -528,6 +528,23 @@ def add_document_hit_to_alert_set(
     r.sadd(alert_key, document_id)
 
 
+def remove_alert_hits_set(r: Redis, alert_id: int) -> None:
+    """Remove every Redis SET storing document hits for a given alert ID.
+
+    A separate SET is created per document type (e.g. "alert_hits:5.d",
+    "alert_hits:5.r"). When an Alert is deleted these sets are no longer used
+    and would otherwise leak Redis memory, so we scan and delete all of them.
+
+    :param r: Redis client instance.
+    :param alert_id: The alert identifier.
+    :return: None
+    """
+    match_pattern = f"{get_alerts_set_prefix()}:{alert_id}.*"
+    keys = list(r.scan_iter(match=match_pattern))
+    if keys:
+        r.delete(*keys)
+
+
 def has_document_alert_hit_been_triggered(
     r: Redis, alert_id: int, document_type: str, document_id: int
 ) -> bool:
