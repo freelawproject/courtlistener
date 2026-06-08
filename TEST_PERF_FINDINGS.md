@@ -661,3 +661,98 @@ opinion_page, scrapers, corpus_importer, disclosures, people_db`. Raw logs in
 `LiveServerTestCase` / selenium classes (~365s)**; the rest of the suite is already fast,
 and the PART 1 micro-optimizations are not worth pursuing for speed. Execute the
 "Revised, measured action plan" above.
+
+---
+
+# PART 3 — `captureOnCommitCallbacks` conversion: VALIDATED (proof-of-concept)
+
+**Hypothesis:** the heavy `TransactionTestCase` ES classes can become `TestCase` +
+`captureOnCommitCallbacks(execute=True)`, removing the ~5s/test table-truncation tax
+while preserving behavior — *because* CL's ES indexing is gated on
+`transaction.on_commit(...)` (verified: `cl/lib/es_signal_processor.py` uses it ~25×).
+
+**PoC target:** `search…OralArgumentIndexingTest` (`tests_es_oral_arguments.py:2887`) —
+the canonical OA ES-indexing-on-commit pattern, 2 tests.
+
+**Result (measured, `--keepdb --parallel 1`, same machine state):**
+
+| | Base class | Tests | Wall-clock | Per-test | Outcome |
+|---|---|---|---|---|---|
+| BEFORE | `TransactionTestCase` | 2 | **12.43s** | ~6.2s | OK |
+| AFTER | `TestCase` + `captureOnCommitCallbacks` | 2 | **2.14s** | ~1.07s | OK ✅ |
+
+**~5.8× faster; ~10.3s reclaimed on 2 tests.** All assertions pass, including the
+exact ES task-count checks (`reset_and_assert_task_count`) — the hardest part to
+preserve. The residual ~1s/test is the real ES indexing work itself (now the floor).
+
+### Conversion mechanics (the transferable recipe)
+
+1. Base class `TransactionTestCase` → `TestCase` (ruff then auto-removes the now-unused
+   import — confirms it was the file's only `TransactionTestCase` user).
+2. Wrap every **index-triggering** op (`*.create()`, `.save()`, `.delete()`,
+   `m2m.add()`) in `with self.captureOnCommitCallbacks(execute=True):` so the on-commit
+   indexing fires before the following ES assertion.
+3. For **task-count** tests that `mock.patch` the `.si` signature: the on-commit lambda
+   calls `.si()` at *commit* time, so the capture must sit **inside** the mock —
+   `with (mock.patch(...), self.captureOnCommitCallbacks(execute=True)):` (context
+   managers exit inner-first, so `.si` is invoked while the mock is still active and is
+   counted). `expected=0` blocks (no field change / processing-incomplete) register no
+   callback, so they need no wrapping.
+4. `delete()` paths that use `.delay()` directly (not `on_commit`) don't strictly need
+   wrapping, but wrapping is harmless.
+
+### Extrapolation to the other `TransactionTestCase` classes (est. at ~1s/test floor)
+
+| Class | Now | Tests | Est. after | Est. saved |
+|---|---|---|---|---|
+| `search.EsOpinionsIndexingTest` | 51.8s | 9 | ~9s | ~43s |
+| `scrapers.OpinionVersionTest` | 49.9s | 9 | ~9s | ~41s |
+| `search.PeopleIndexingTest` | 30.4s | 5 | ~5s | ~25s |
+| `citations.UnmatchedCitationTest` | 20.5s | 4 | ~4s | ~16s |
+| `citations.ReindexESCiteFieldsTest` | 12.7s | 2 | ~2s | ~11s |
+| `search.OralArgumentIndexingTest` | 12.4s | 2 | **2.1s (done)** | **10.3s ✅** |
+| `people_db.TestPersonWithChildrenFactory` | 5.0s | 1 | ~0.5s | ~4.5s (likely needs NO capture — no ES) |
+
+**Projected total from the 7 `TransactionTestCase` conversions: ~150s.** Per-test cost
+collapses from ~5-6s to ~1s. The PoC confirms the mechanism is sound; each remaining
+class needs the same per-op wrapping, verified individually (esp. the task-count and
+`UnmatchedCitationTest` post_save-signal assertions).
+
+**Status:** the `OralArgumentIndexingTest` conversion is applied in the working tree
+(passing, ruff-clean) but **not committed**.
+
+---
+
+# PART 4 — All 7 `TransactionTestCase`/`LiveServer` ES conversions APPLIED & VERIFIED
+
+Every conversion below is applied in the working tree, passes (`--keepdb --parallel 1`),
+is ruff-clean, and was verified to change **no assertion or expected value** (mechanical
+diff sweep: only base-class swap + `captureOnCommitCallbacks` wrappers / `use_streaming_bulk`).
+
+| Class | File | Tests | Before | After | Pattern |
+|---|---|---|---|---|---|
+| `OralArgumentIndexingTest` | search/tests_es_oral_arguments.py | 2 | 12.4s | **2.1s** | capture-wrap (incl. nested-in-mock) |
+| `EsOpinionsIndexingTest` | search/tests_es_opinion.py | 9 | 51.8s | **4.7s** | capture-wrap ×41 (6 nested-in-mock) |
+| `PeopleIndexingTest` | search/tests_es_person.py | 5 | 30.4s | **4.5s** | capture-wrap ×43 (incl. setUp) |
+| `OpinionVersionTest` | scrapers/tests.py | 9 | 49.9s | **3.5s** | capture-wrap ×2 (8 tests were pure-logic, paying the tax for nothing) |
+| `UnmatchedCitationTest` | citations/tests.py | 4 | 20.5s | **0.2s** | plain swap — signal is synchronous, no ES; `setUpClass`→`setUpTestData` |
+| `ReindexESCiteFieldsTest` | citations/tests.py | 2 | 12.7s | **2.0s** | `use_streaming_bulk=True` on direct `index_parent_and_child_docs` (parallel_bulk is TestCase-incompatible) |
+| `TestPersonWithChildrenFactory` | people_db/tests.py | 1 | 5.0s | **0.01s** | plain swap — gratuitous `TransactionTestCase`, no ES |
+| **TOTAL** | | **32** | **~183s** | **~17s** | **~166s reclaimed** |
+
+Combined single invocation of all 7 classes: **32 tests in 14.8s** (was ~183s).
+Sibling-regression checks passed: full `citations` (69 tests OK), full `people_db` (3 OK).
+
+### Three conversion patterns (decision guide for any remaining `TransactionTestCase`)
+
+1. **Signal-driven ES indexing** (most ES classes): wrap each index-triggering op
+   (`create`/`save`/`delete`/m2m `add`) in `with self.captureOnCommitCallbacks(execute=True):`;
+   assertions stay outside. For exact-task-count tests, nest the capture **inside** the
+   `mock.patch(...)` so the mocked `.si` (called in the on-commit lambda) is still counted.
+2. **Explicit indexing** via `index_parent_and_child_docs(...)`: add `use_streaming_bulk=True`
+   (its default `parallel_bulk` can't see uncommitted data from worker threads under `TestCase`).
+3. **No ES / synchronous signal / gratuitous `TransactionTestCase`**: just swap the base
+   class (and prefer `setUpTestData` over a fragile `setUpClass`); no capture needed.
+
+The `TransactionTestCase`/`LiveServerTestCase` import is auto-removed by ruff once a file's
+last user is converted. **Status:** applied, not committed.
