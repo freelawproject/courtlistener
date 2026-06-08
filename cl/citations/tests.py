@@ -97,7 +97,6 @@ from cl.search.tasks import index_parent_and_child_docs
 from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
 )
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -3158,7 +3157,7 @@ class CitationLookUpApiTest(
         )
 
 
-class UnmatchedCitationTest(TransactionTestCase):
+class UnmatchedCitationTest(TestCase):
     """Test UnmatchedCitation model and related logic"""
 
     # this will produce 6 citations: 5 FullCase and 1 Id
@@ -3182,7 +3181,7 @@ class UnmatchedCitationTest(TransactionTestCase):
     opinion: Opinion
 
     @classmethod
-    def setUpClass(cls):
+    def setUpTestData(cls):
         cls.cluster = OpinionClusterWithChildrenAndParentsFactory()
         cls.opinion = cls.cluster.sub_opinions.first()
         UnmatchedCitation.objects.all().delete()
@@ -3513,7 +3512,7 @@ class CountCitationsTest(TestCase):
         self.assertEqual(self.cluster3.citation_count, 3, "Count should be 3")
 
 
-class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
+class ReindexESCiteFieldsTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -3525,7 +3524,9 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         cluster = OpinionClusterWithChildrenAndParentsFactory.create(
             citation_count=cite_count
         )
-        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+        index_parent_and_child_docs(
+            [cluster.id], SEARCH_TYPES.OPINION, use_streaming_bulk=True
+        )
         doc = OpinionClusterDocument.get(id=cluster.id)
         self.assertEqual(doc.citeCount, cite_count)
 
@@ -3548,7 +3549,9 @@ class ReindexESCiteFieldsTest(ESIndexTestCase, TransactionTestCase):
         """Can we update the OpinionDocument.cites field?"""
         cluster = OpinionClusterWithChildrenAndParentsFactory.create()
         opinion = cluster.sub_opinions.first()
-        index_parent_and_child_docs([cluster.id], SEARCH_TYPES.OPINION)
+        index_parent_and_child_docs(
+            [cluster.id], SEARCH_TYPES.OPINION, use_streaming_bulk=True
+        )
 
         another_cluster = OpinionClusterWithChildrenAndParentsFactory.create()
         another_opinion = another_cluster.sub_opinions.first()

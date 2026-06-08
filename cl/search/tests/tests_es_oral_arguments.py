@@ -36,7 +36,6 @@ from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
     V4SearchAPIAssertions,
 )
 
@@ -2885,7 +2884,7 @@ class OralArgumentsSearchDecayRelevancyTest(
 
 
 class OralArgumentIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+    CountESTasksTestCase, ESIndexTestCase, TestCase
 ):
     def setUp(self):
         self.court_1 = CourtFactory(
@@ -2910,20 +2909,21 @@ class OralArgumentIndexingTest(
     def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
         """Test Audio documents are updated when related objects change."""
 
-        docket_5 = DocketFactory.create(
-            docket_number="1:22-bk-12345",
-            court_id=self.court_1.pk,
-            date_argued=datetime.date(2015, 8, 16),
-            source=Docket.SCRAPER,
-        )
-        audio_6 = AudioFactory.create(
-            case_name="Lorem Ipsum Dolor vs. USA",
-            docket_id=docket_5.pk,
-        )
-        audio_7 = AudioFactory.create(
-            case_name="Lorem Ipsum Dolor vs. IRS",
-            docket_id=docket_5.pk,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_5 = DocketFactory.create(
+                docket_number="1:22-bk-12345",
+                court_id=self.court_1.pk,
+                date_argued=datetime.date(2015, 8, 16),
+                source=Docket.SCRAPER,
+            )
+            audio_6 = AudioFactory.create(
+                case_name="Lorem Ipsum Dolor vs. USA",
+                docket_id=docket_5.pk,
+            )
+            audio_7 = AudioFactory.create(
+                case_name="Lorem Ipsum Dolor vs. IRS",
+                docket_id=docket_5.pk,
+            )
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "q": "Lorem Ipsum Dolor vs. USA",
@@ -2939,11 +2939,12 @@ class OralArgumentIndexingTest(
         self.assertEqual(results[0].date_created, audio_6.date_created)
 
         # Update docket number and dateArgued
-        docket_5.docket_number = "23-98765"
-        docket_5.date_argued = datetime.date(2023, 5, 15)
-        docket_5.date_reargued = datetime.date(2022, 5, 15)
-        docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
-        docket_5.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_5.docket_number = "23-98765"
+            docket_5.date_argued = datetime.date(2023, 5, 15)
+            docket_5.date_reargued = datetime.date(2022, 5, 15)
+            docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
+            docket_5.save()
         # Confirm docket number and dateArgued are updated in the index.
         s, *_ = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
@@ -2958,9 +2959,10 @@ class OralArgumentIndexingTest(
         )
 
         # Trigger a ManyToMany insert.
-        audio_7.refresh_from_db()
-        author = PersonFactory.create()
-        audio_7.panel.add(author)
+        with self.captureOnCommitCallbacks(execute=True):
+            audio_7.refresh_from_db()
+            author = PersonFactory.create()
+            audio_7.panel.add(author)
         # Confirm ManyToMany field is updated in the index.
         cd["q"] = "Lorem Ipsum Dolor vs. IRS"
         s, *_ = build_es_main_query(search_query, cd)
@@ -2970,8 +2972,9 @@ class OralArgumentIndexingTest(
         self.assertEqual(results[0].panel_ids, [author.pk])
 
         # Confirm duration is updated in the index after Audio is updated.
-        audio_7.duration = 322
-        audio_7.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            audio_7.duration = 322
+            audio_7.save()
         audio_7.refresh_from_db()
         s, *_ = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
@@ -2980,7 +2983,8 @@ class OralArgumentIndexingTest(
         self.assertEqual(results[0].duration, audio_7.duration)
 
         # Delete parent docket.
-        docket_5.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_5.delete()
         # Confirm that docket-related audio objects are removed from the
         # index.
         cd["q"] = "Lorem Ipsum Dolor"
@@ -3010,11 +3014,14 @@ class OralArgumentIndexingTest(
         self.assertFalse(AudioDocument.exists(id=audio.pk))
 
         # Index the document for first time when file processing is completed.
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             audio.save(
                 update_fields=[
@@ -3037,11 +3044,14 @@ class OralArgumentIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Update an Audio tracked field.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             audio.case_name = "Bank vs America"
             audio.save()
@@ -3050,11 +3060,14 @@ class OralArgumentIndexingTest(
         a_doc = AudioDocument.get(id=audio.pk)
         self.assertEqual(a_doc.caseName, "Bank vs America")
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             audio.docket = self.docket_2
             audio.save()
@@ -3070,11 +3083,14 @@ class OralArgumentIndexingTest(
 
         self.assertFalse(AudioDocument.exists(id=audio.pk))
         # Audio creation on update.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             audio.case_name = "Lorem Ipsum"
             audio.save()

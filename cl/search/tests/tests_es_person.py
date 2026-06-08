@@ -39,7 +39,6 @@ from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
     V4SearchAPIAssertions,
 )
 
@@ -2056,9 +2055,7 @@ class IndexJudgesPositionsCommandTest(
         self.assertEqual(s.count(), 1)
 
 
-class PeopleIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class PeopleIndexingTest(CountESTasksTestCase, ESIndexTestCase, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -2086,98 +2083,100 @@ class PeopleIndexingTest(
             b_query.first() if b_query.exists() else RaceFactory(race="b")
         )
 
-        self.person_1 = PersonFactory.create(
-            gender="m",
-            name_first="Bill",
-            name_last="Clinton",
-        )
-        self.person_1.race.add(self.w_race)
-        self.position_1 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(1993, 1, 20),
-            date_retirement=datetime.date(2001, 1, 20),
-            termination_reason="retire_mand",
-            position_type="pres",
-            person=self.person_1,
-            how_selected="e_part",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            self.person_1 = PersonFactory.create(
+                gender="m",
+                name_first="Bill",
+                name_last="Clinton",
+            )
+            self.person_1.race.add(self.w_race)
+            self.position_1 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(1993, 1, 20),
+                date_retirement=datetime.date(2001, 1, 20),
+                termination_reason="retire_mand",
+                position_type="pres",
+                person=self.person_1,
+                how_selected="e_part",
+            )
 
-        self.person_2 = PersonFactory.create(
-            gender="f",
-            name_first="Judith",
-            name_last="Sheindlin",
-            date_dob=datetime.date(1942, 10, 21),
-            date_dod=datetime.date(2020, 11, 25),
-            date_granularity_dob="%Y-%m-%d",
-            date_granularity_dod="%Y-%m-%d",
-            name_middle="Susan",
-            dob_city="Brookyln",
-            dob_state="NY",
-        )
-        self.person_2.race.add(self.w_race)
-        self.person_2.race.add(self.b_race)
+            self.person_2 = PersonFactory.create(
+                gender="f",
+                name_first="Judith",
+                name_last="Sheindlin",
+                date_dob=datetime.date(1942, 10, 21),
+                date_dod=datetime.date(2020, 11, 25),
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                name_middle="Susan",
+                dob_city="Brookyln",
+                dob_state="NY",
+            )
+            self.person_2.race.add(self.w_race)
+            self.person_2.race.add(self.b_race)
 
-        self.person_3 = PersonFactory.create(
-            gender="f",
-            name_first="Sheindlin",
-            name_last="Judith",
-            date_dob=datetime.date(1945, 11, 20),
-            date_granularity_dob="%Y-%m-%d",
-            name_middle="Olivia",
-            dob_city="Queens",
-            dob_state="NY",
-        )
-        self.person_3.race.add(self.w_race)
-        PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_2,
-            date_start=datetime.date(2020, 12, 14),
-            predecessor=self.person_3,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=self.person_3,
-            how_selected="a_legis",
-            nomination_process="fed_senate",
-        )
-        self.school_1 = SchoolFactory(name="New York Law School")
-        self.education_3 = EducationFactory(
-            degree_level="ba",
-            person=self.person_3,
-            school=self.school_1,
-        )
-        self.political_affiliation_3 = PoliticalAffiliationFactory.create(
-            political_party="i",
-            source="b",
-            date_start=datetime.date(2015, 12, 14),
-            person=self.person_3,
-            date_granularity_start="%Y-%m-%d",
-        )
+            self.person_3 = PersonFactory.create(
+                gender="f",
+                name_first="Sheindlin",
+                name_last="Judith",
+                date_dob=datetime.date(1945, 11, 20),
+                date_granularity_dob="%Y-%m-%d",
+                name_middle="Olivia",
+                dob_city="Queens",
+                dob_state="NY",
+            )
+            self.person_3.race.add(self.w_race)
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_2,
+                date_start=datetime.date(2020, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=self.person_3,
+                how_selected="a_legis",
+                nomination_process="fed_senate",
+            )
+            self.school_1 = SchoolFactory(name="New York Law School")
+            self.education_3 = EducationFactory(
+                degree_level="ba",
+                person=self.person_3,
+                school=self.school_1,
+            )
+            self.political_affiliation_3 = PoliticalAffiliationFactory.create(
+                political_party="i",
+                source="b",
+                date_start=datetime.date(2015, 12, 14),
+                person=self.person_3,
+                date_granularity_start="%Y-%m-%d",
+            )
 
     def test_index_all_person_positions(self) -> None:
         """Confirm we can index all the person positions in ES after a
         judiciary position is created for the person.
         """
 
-        person = PersonFactory.create(
-            gender="f",
-            name_first="Ava",
-            name_last="Wilson",
-            date_dob=datetime.date(1942, 10, 21),
-            date_dod=datetime.date(2020, 11, 25),
-            date_granularity_dob="%Y-%m-%d",
-            date_granularity_dod="%Y-%m-%d",
-        )
-        person_id = person.pk
-        no_jud_position = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            organization_name="Pants, Inc.",
-            job_title="Corporate Lawyer",
-            position_type=None,
-            person=person,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(
+                gender="f",
+                name_first="Ava",
+                name_last="Wilson",
+                date_dob=datetime.date(1942, 10, 21),
+                date_dod=datetime.date(2020, 11, 25),
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+            )
+            person_id = person.pk
+            no_jud_position = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(2015, 12, 14),
+                organization_name="Pants, Inc.",
+                job_title="Corporate Lawyer",
+                position_type=None,
+                person=person,
+            )
 
         # At this point there is no judiciary position for person, so the
         # person and no_jud_position are not indexed yet.
@@ -2187,17 +2186,18 @@ class PeopleIndexingTest(
         )
 
         # Add a judiciary position:
-        jud_position = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-            date_elected=datetime.date(2015, 11, 12),
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            jud_position = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(2015, 12, 14),
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+                date_elected=datetime.date(2015, 11, 12),
+            )
         jud_position_id = jud_position.pk
 
         # Confirm now the Person is indexed in ES.
@@ -2214,14 +2214,15 @@ class PeopleIndexingTest(
         )
 
         # Upcoming non-judiciary and judiciary positions should be indexed.
-        no_jud_position_2 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            organization_name="Pants, Inc.",
-            job_title="Corporate Lawyer",
-            position_type=None,
-            person=person,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            no_jud_position_2 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(2015, 12, 14),
+                organization_name="Pants, Inc.",
+                job_title="Corporate Lawyer",
+                position_type=None,
+                person=person,
+            )
         no_jud_position_2_id = no_jud_position_2.pk
         self.assertTrue(
             PositionDocument.exists(
@@ -2229,17 +2230,18 @@ class PeopleIndexingTest(
             )
         )
 
-        jud_position_2 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(2015, 12, 14),
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-            date_elected=datetime.date(2015, 11, 12),
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            jud_position_2 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(2015, 12, 14),
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+                date_elected=datetime.date(2015, 11, 12),
+            )
         jud_position_2_id = jud_position_2.pk
         self.assertTrue(
             PositionDocument.exists(id=ES_CHILD_ID(jud_position_2_id).POSITION)
@@ -2248,8 +2250,9 @@ class PeopleIndexingTest(
         # If Judge Positions are removed and the Person is not a Judge anymore,
         # remove it from the index with all the other positions.
 
-        jud_position.delete()
-        jud_position_2.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            jud_position.delete()
+            jud_position_2.delete()
         self.assertFalse(
             PositionDocument.exists(id=ES_CHILD_ID(jud_position_id).POSITION)
         )
@@ -2268,14 +2271,16 @@ class PeopleIndexingTest(
 
         # Avoid indexing Person if a reverse related for a non-judge Person
         # is added or updated.
-        aba_rating = ABARatingFactory(
-            rating="nq",
-            person=person,
-            year_rated="2015",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            aba_rating = ABARatingFactory(
+                rating="nq",
+                person=person,
+                year_rated="2015",
+            )
         self.assertFalse(PersonDocument.exists(id=person_id))
-        aba_rating.year_rated = "2023"
-        aba_rating.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            aba_rating.year_rated = "2023"
+            aba_rating.save()
         self.assertFalse(PersonDocument.exists(id=person_id))
 
         person.delete()
@@ -2284,18 +2289,19 @@ class PeopleIndexingTest(
         """Confirm join child objects are removed from the index when the
         parent objects is deleted.
         """
-        person = PersonFactory.create(name_first="John Deer")
-        pos_1 = PositionFactory.create(
-            person=person,
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(1993, 1, 20),
-            date_retirement=datetime.date(2001, 1, 20),
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
-        PoliticalAffiliationFactory.create(person=person)
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(name_first="John Deer")
+            pos_1 = PositionFactory.create(
+                person=person,
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(1993, 1, 20),
+                date_retirement=datetime.date(2001, 1, 20),
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+            PoliticalAffiliationFactory.create(person=person)
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
@@ -2307,12 +2313,13 @@ class PeopleIndexingTest(
         )
 
         # Confirm documents can be updated in the ES index.
-        person.name_first = "John Debbas"
-        person.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            person.name_first = "John Debbas"
+            person.save()
 
-        court = CourtFactory()
-        pos_1.court = court
-        pos_1.save()
+            court = CourtFactory()
+            pos_1.court = court
+            pos_1.save()
 
         person_doc = PersonDocument.get(id=person.pk)
         self.assertIn("Debbas", person_doc.name)
@@ -2322,7 +2329,8 @@ class PeopleIndexingTest(
 
         # Delete person instance; it should be removed from the index along
         # with its child documents.
-        person.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            person.delete()
 
         # Person document should be removed.
         self.assertFalse(PersonDocument.exists(id=person_pk))
@@ -2336,24 +2344,25 @@ class PeopleIndexingTest(
         deleted independently of their parent object
         """
 
-        person = PersonFactory.create(name_first="John Deer")
-        pos_1 = PositionFactory.create(
-            person=person,
-            date_granularity_start="%Y-%m-%d",
-            date_start=datetime.date(1993, 1, 20),
-            date_retirement=datetime.date(2001, 1, 20),
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
-        PositionFactory.create(
-            person=person,
-            position_type="c-jud",
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
-        PoliticalAffiliationFactory.create(person=person)
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(name_first="John Deer")
+            pos_1 = PositionFactory.create(
+                person=person,
+                date_granularity_start="%Y-%m-%d",
+                date_start=datetime.date(1993, 1, 20),
+                date_retirement=datetime.date(2001, 1, 20),
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+            PositionFactory.create(
+                person=person,
+                position_type="c-jud",
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+            PoliticalAffiliationFactory.create(person=person)
 
         person_pk = person.pk
         pos_1_pk = pos_1.pk
@@ -2365,7 +2374,8 @@ class PeopleIndexingTest(
         )
 
         # Delete pos_1 and education, keep the parent person instance.
-        pos_1.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            pos_1.delete()
 
         # Person instance still exists.
         self.assertTrue(PersonDocument.exists(id=person_pk))
@@ -2377,65 +2387,66 @@ class PeopleIndexingTest(
         person.delete()
 
     def test_update_related_documents(self):
-        person = PersonFactory.create(
-            name_first="John American",
-            date_granularity_dob="%Y-%m-%d",
-            date_granularity_dod="%Y-%m-%d",
-            date_dob=datetime.date(1940, 10, 21),
-            date_dod=datetime.date(2021, 11, 25),
-        )
-        person.race.add(self.w_race)
-        po_af = PoliticalAffiliationFactory.create(
-            political_party="i",
-            source="b",
-            date_start=datetime.date(2015, 12, 14),
-            person=person,
-            date_granularity_start="%Y-%m-%d",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(
+                name_first="John American",
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                date_dob=datetime.date(1940, 10, 21),
+                date_dod=datetime.date(2021, 11, 25),
+            )
+            person.race.add(self.w_race)
+            po_af = PoliticalAffiliationFactory.create(
+                political_party="i",
+                source="b",
+                date_start=datetime.date(2015, 12, 14),
+                person=person,
+                date_granularity_start="%Y-%m-%d",
+            )
 
-        person_2 = PersonFactory.create(name_first="Barack Obama")
-        position_5 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_2,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
+            person_2 = PersonFactory.create(name_first="Barack Obama")
+            position_5 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_2,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
 
-        position_5_1 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_2,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person_2,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
+            position_5_1 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_2,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person_2,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
 
-        position_6 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_2,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="clerk",
-            person=self.person_3,
-            supervisor=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
+            position_6 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_2,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="clerk",
+                person=self.person_3,
+                supervisor=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
 
         # Confirm initial values are properly indexed.
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
@@ -2469,10 +2480,12 @@ class PeopleIndexingTest(
         self.assertEqual(["i"], pos_5_doc.political_affiliation_id)
 
         # Remove political affiliation:
-        po_af.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            po_af.delete()
 
         # Add a new race and compare person and position fields.
-        person.race.add(self.b_race)
+        with self.captureOnCommitCallbacks(execute=True):
+            person.race.add(self.b_race)
         person_doc = PersonDocument.get(id=person.pk)
         self.assertEqual(
             Counter(
@@ -2501,9 +2514,10 @@ class PeopleIndexingTest(
         self.assertEqual([], pos_5_doc.political_affiliation_id)
 
         # Update dob and dod:
-        person.date_dob = datetime.date(1940, 10, 25)
-        person.date_dod = datetime.date(2021, 11, 25)
-        person.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            person.date_dob = datetime.date(1940, 10, 25)
+            person.date_dod = datetime.date(2021, 11, 25)
+            person.save()
 
         person_doc = PersonDocument.get(id=person.pk)
         pos_5_doc = PositionDocument.get(
@@ -2515,24 +2529,27 @@ class PeopleIndexingTest(
         self.assertEqual(person.date_dod, pos_5_doc.dod.date())
 
         # Update supervisor
-        position_6.supervisor = person_2
-        position_6.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            position_6.supervisor = person_2
+            position_6.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.supervisor)
 
         # Update predecessor
-        position_6.predecessor = person_2
-        position_6.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            position_6.predecessor = person_2
+            position_6.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
         self.assertEqual(name_full_reverse, pos_doc.predecessor)
 
         # Update appointer
-        position_6.appointer = position_5_1
-        position_6.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            position_6.appointer = position_5_1
+            position_6.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
 
@@ -2540,8 +2557,9 @@ class PeopleIndexingTest(
         self.assertEqual(name_full_reverse, pos_doc.appointer)
 
         # Update appointer (position_5_1) person name, it should be updated.
-        person_2.name_first = "Sarah Miller"
-        person_2.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            person_2.name_first = "Sarah Miller"
+            person_2.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         name_full_reverse = person_2.name_full_reverse
@@ -2551,44 +2569,50 @@ class PeopleIndexingTest(
 
         # The following changes should update the child document.
         # Update dob_city field in the parent record.
-        self.person_3.name_first = "William"
-        self.person_3.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.person_3.name_first = "William"
+            self.person_3.save()
         name_full = self.person_3.name_full
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual(name_full, pos_doc.name)
 
-        self.person_3.dob_city = "Brookyln"
-        self.person_3.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.person_3.dob_city = "Brookyln"
+            self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Brookyln", pos_doc.dob_city)
 
         # Update the dob_state field in the parent record.
-        self.person_3.dob_state = "AL"
-        self.person_3.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.person_3.dob_state = "AL"
+            self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Alabama", pos_doc.dob_state)
         self.assertEqual("AL", pos_doc.dob_state_id)
 
         # Update the gender field in the parent record.
-        self.person_3.gender = "m"
-        self.person_3.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.person_3.gender = "m"
+            self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("Male", pos_doc.gender)
 
         # Update the religion field in the parent record
-        self.person_3.religion = "je"
-        self.person_3.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.person_3.religion = "je"
+            self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("je", pos_doc.religion)
 
         # Update the fjc_id field in the parent record
-        self.person_3.fjc_id = 39
-        self.person_3.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.person_3.fjc_id = 39
+            self.person_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual("39", pos_doc.fjc_id)
@@ -2596,11 +2620,12 @@ class PeopleIndexingTest(
         school_2 = SchoolFactory(name="American University")
 
         # Add education to the parent object
-        ed_obj = EducationFactory(
-            degree_level="ba",
-            person=self.person_3,
-            school=school_2,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            ed_obj = EducationFactory(
+                degree_level="ba",
+                person=self.person_3,
+                school=school_2,
+            )
         ed_obj_school_name = ed_obj.school.name
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
@@ -2608,14 +2633,16 @@ class PeopleIndexingTest(
             self.assertIn(education.school.name, pos_doc.school)
 
         # Update existing education record in the parent object
-        self.school_1.name = "New school updated"
-        self.school_1.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.school_1.name = "New school updated"
+            self.school_1.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertIn("New school updated", pos_doc.school)
 
         # Remove Education.
-        ed_obj.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            ed_obj.delete()
         # Confirm School is removed from the parent and child document.
         person_3_doc = PersonDocument.get(self.person_3.pk)
         self.assertNotIn(ed_obj_school_name, person_3_doc.school)
@@ -2623,13 +2650,14 @@ class PeopleIndexingTest(
         self.assertNotIn(ed_obj_school_name, pos_doc.school)
 
         # Add political affiliation to the parent object
-        PoliticalAffiliationFactory(
-            political_party="d",
-            source="b",
-            date_start=datetime.date(2015, 12, 14),
-            person=self.person_3,
-            date_granularity_start="%Y-%m-%d",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            PoliticalAffiliationFactory(
+                political_party="d",
+                source="b",
+                date_start=datetime.date(2015, 12, 14),
+                person=self.person_3,
+                date_granularity_start="%Y-%m-%d",
+            )
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         for affiliation in self.person_3.political_affiliations.all():
@@ -2639,30 +2667,34 @@ class PeopleIndexingTest(
             )
 
         # Update existing political affiliation in the parent document
-        self.political_affiliation_3.political_party = "f"
-        self.political_affiliation_3.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.political_affiliation_3.political_party = "f"
+            self.political_affiliation_3.save()
 
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertIn("Federalist", pos_doc.political_affiliation)
 
         # Add aba_rating to the parent object
-        rating = ABARatingFactory(
-            rating="nq",
-            person=self.person_3,
-            year_rated="2015",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            rating = ABARatingFactory(
+                rating="nq",
+                person=self.person_3,
+                year_rated="2015",
+            )
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         for r in self.person_3.aba_ratings.all():
             self.assertIn(r.get_rating_display(), pos_doc.aba_rating)
 
         # Update existing rating in the parent object
-        rating.rating = "ewq"
-        rating.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            rating.rating = "ewq"
+            rating.save()
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertIn("Exceptionally Well Qualified", pos_doc.aba_rating)
 
         # Remove aba_rating and confirm it's removed from parent and child docs
-        rating.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rating.delete()
         person_3_doc = PersonDocument.get(self.person_3.pk)
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual([], person_3_doc.aba_rating)
@@ -2679,14 +2711,15 @@ class PeopleIndexingTest(
                 es_save_document, True, *args, **kwargs
             ),
         ):
-            person = PersonFactory.create(
-                name_first="Bill Clinton",
-                date_granularity_dob="%Y-%m-%d",
-                date_granularity_dod="%Y-%m-%d",
-                religion="ca",
-                date_dob=datetime.date(1941, 10, 21),
-                date_dod=datetime.date(2022, 11, 25),
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                person = PersonFactory.create(
+                    name_first="Bill Clinton",
+                    date_granularity_dob="%Y-%m-%d",
+                    date_granularity_dod="%Y-%m-%d",
+                    religion="ca",
+                    date_dob=datetime.date(1941, 10, 21),
+                    date_dod=datetime.date(2022, 11, 25),
+                )
         # 0 es_save_document task calls for Person creation since it's not a
         # Judge.
         self.reset_and_assert_task_count(expected=0)
@@ -2700,19 +2733,20 @@ class PeopleIndexingTest(
                 es_save_document, True, *args, **kwargs
             ),
         ):
-            position = PositionFactory.create(
-                date_granularity_start="%Y-%m-%d",
-                court=self.court_2,
-                date_start=datetime.date(2020, 12, 14),
-                predecessor=self.person_3,
-                appointer=self.position_1,
-                judicial_committee_action="no_rep",
-                termination_reason="retire_mand",
-                position_type="c-jud",
-                person=person,
-                how_selected="a_legis",
-                nomination_process="fed_senate",
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                position = PositionFactory.create(
+                    date_granularity_start="%Y-%m-%d",
+                    court=self.court_2,
+                    date_start=datetime.date(2020, 12, 14),
+                    predecessor=self.person_3,
+                    appointer=self.position_1,
+                    judicial_committee_action="no_rep",
+                    termination_reason="retire_mand",
+                    position_type="c-jud",
+                    person=person,
+                    how_selected="a_legis",
+                    nomination_process="fed_senate",
+                )
         # 1 es_save_document task calls for Position creation.
         self.reset_and_assert_task_count(expected=1)
         # The Person and the Position are now indexed.
@@ -2728,7 +2762,8 @@ class PeopleIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            person.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                person.save()
         # update_es_document task shouldn't be called on save() without changes
         self.reset_and_assert_task_count(expected=0)
 
@@ -2739,7 +2774,8 @@ class PeopleIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            position.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                position.save()
         # update_es_document task shouldn't be called on save() without changes
         self.reset_and_assert_task_count(expected=0)
 
@@ -2750,8 +2786,9 @@ class PeopleIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            person.name_first = "Barack"
-            person.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                person.name_first = "Barack"
+                person.save()
         # update_es_document task should be called 1 on tracked fields updates
         self.reset_and_assert_task_count(expected=1)
         p_doc = PersonDocument.get(id=person.pk)
@@ -2774,8 +2811,9 @@ class PeopleIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            person.religion = "pr"
-            person.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                person.religion = "pr"
+                person.save()
 
         # update_es_document task should be called 1 on tracked fields update
         self.reset_and_assert_task_count(expected=1)
@@ -2789,8 +2827,9 @@ class PeopleIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            position.nomination_process = "state_senate"
-            position.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                position.nomination_process = "state_senate"
+                position.save()
 
         # update_es_document task should be called 1 on tracked fields update
         self.reset_and_assert_task_count(expected=1)
@@ -2804,8 +2843,9 @@ class PeopleIndexingTest(
                 update_es_document, True, *args, **kwargs
             ),
         ):
-            position.predecessor = self.person_2
-            position.save()
+            with self.captureOnCommitCallbacks(execute=True):
+                position.predecessor = self.person_2
+                position.save()
 
         # update_es_document task should be called 1 on tracked fields update
         self.reset_and_assert_task_count(expected=1)
