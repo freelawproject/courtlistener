@@ -49,6 +49,12 @@ class BaseSeleniumTest(
 
     host = "0.0.0.0"
 
+    # Whether to (re)build the Opinion and Audio Elasticsearch indexes before
+    # every test. This is expensive (a full per-test reindex) and only matters
+    # for tests that exercise opinion/audio search. Subclasses whose tests never
+    # query those indexes should set this to False to skip the work.
+    rebuild_search_indexes = True
+
     @staticmethod
     def _create_browser() -> webdriver.Chrome:
         return create_selenium_driver()
@@ -68,10 +74,11 @@ class BaseSeleniumTest(
     def setUp(self) -> None:
         super().setUp()
         self.reset_browser()
-        self.rebuild_index("audio.Audio")
-        self.delete_index("search.OpinionCluster")
-        self.create_index("search.OpinionCluster")
-        self._update_index()
+        if self.rebuild_search_indexes:
+            self.rebuild_index("audio.Audio")
+            self.delete_index("search.OpinionCluster")
+            self.create_index("search.OpinionCluster")
+            self._update_index()
 
     def reset_browser(self) -> None:
         self.browser.delete_all_cookies()

@@ -2689,6 +2689,19 @@ class RECAPAlertsPercolatorTest(
     """
 
     @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Create the percolator index once per class instead of dropping and
+        # recreating it before every test (see setUp).
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+
+    @classmethod
+    def tearDownClass(cls):
+        RECAPPercolator._index.delete(ignore=404)
+        super().tearDownClass()
+
+    @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
@@ -2795,8 +2808,9 @@ class RECAPAlertsPercolatorTest(
             self.r.delete(*keys)
 
     def setUp(self):
-        RECAPPercolator._index.delete(ignore=404)
-        RECAPPercolator.init()
+        # Clear percolator queries between tests without recreating the index.
+        RECAPPercolator.search().query("match_all").delete()
+        RECAPPercolator._index.refresh()
 
         self._clean_alert_hits()
 
