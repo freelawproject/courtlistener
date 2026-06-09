@@ -756,3 +756,197 @@ Sibling-regression checks passed: full `citations` (69 tests OK), full `people_d
 
 The `TransactionTestCase`/`LiveServerTestCase` import is auto-removed by ruff once a file's
 last user is converted. **Status:** applied, not committed.
+
+---
+
+# PART 5 — `LiveServerTestCase` conversion (users) APPLIED & VERIFIED
+
+`LiveServerTestCase` subclasses `TransactionTestCase` AND spins a live server thread,
+yet `UserTest`/`UserDataTest` only use `self.async_client` (no browser). Converted both
+to `TestCase`; the 4 `self.live_server_url` URL-prefixes were dropped (the test client
+takes a path and ignores host — the assertions check `?next=`/`email` sanitization, not
+host).
+
+| Class | Tests | Before | After |
+|---|---|---|---|
+| `users.UserTest` + `users.UserDataTest` | 10 | ~52.5s | **0.48s** |
+
+Full `users` module regression: **84.1s → 18.0s** (120 tests, OK). ruff removed the
+now-unused `LiveServerTestCase` import. Assertion-safety sweep: no assertion/expected
+value changed — only the base-class swap and host-prefix removal.
+
+Remaining selenium tier (not yet done): `BaseSeleniumTest` ES-rebuild opt-in (suite-wide,
+~affects 29 selenium tests) and consolidating no-JS selenium tests
+(`search.OpinionSearchFunctionalTest` ~52s, `disclosures.DisclosurePageTest` ~16s,
+`users.LiveUserTest` ~12s, `alerts.AlertSeleniumTest` ~8s, `favorites.UserNotesTest`).
+These involve coverage judgment (does an HTTP test already cover it?) and need browser-based
+verification — recommend doing them with explicit review rather than mechanically.
+
+---
+
+# PART 6 — Selenium tier: `BaseSeleniumTest` ES-rebuild opt-out (implemented, but measured LOW value)
+
+Implemented `BaseSeleniumTest.rebuild_search_indexes` (default **True**, fully
+behavior-preserving) so selenium classes that don't query opinion/audio search can skip
+the per-test reindex (`cl/tests/base.py`). Opted out `AlertSeleniumTest` (verified OK).
+
+**Measured reality — this lever is small:**
+- `AlertSeleniumTest`: 8.2s → 8.2s (test body 8.198s → 7.642s, i.e. **~0.5s saved**). The
+  per-test reindex is cheap when the class has little data; the cost is **browser boot**
+  (`setUpClass`, once per class) which the flag can't touch.
+- `LiveUserTest` and `DisclosurePageTest` **already skip the rebuild** — their `setUp`
+  overrides don't call `super().setUp()` (a latent bug: they also skip `reset_browser()`
+  cookie-clearing). So the flag does nothing for them; their cost is pure browser boot.
+- The classes that pay a *large* reindex (`OpinionSearchFunctionalTest` ~52s/6 tests,
+  `FeedsFunctionalTest`, the audio `issue412` tests) genuinely **need** the index — can't opt out.
+- `UserNotesTest` (multi-test) likely needs the opinion index (its flow searches then opens
+  an opinion) — left at default True, unverified.
+
+**Conclusion:** the earlier assumption that the per-test ES rebuild was a selenium
+"force multiplier" is **not supported by measurement**. Selenium cost ≈ browser boot
+(~5-8s/class, once) + the real search reindex where it's actually needed. The only
+material selenium lever is **reducing the number of selenium tests/classes** — i.e.
+converting genuinely no-JS selenium tests to fast HTTP-client tests, or deleting selenium
+tests whose coverage is already provided by HTTP tests. That is **coverage-judgment work**
+(does an existing HTTP test truly cover it?) and should be done with explicit review, not
+mechanically. Candidates (from PART 1): `users.LiveUserTest` (2 no-JS password-reset
+tests, ~12s — fully reproducible via `async_client`), `disclosures.DisclosurePageTest`
+(`test_disclosure_homepage` is a subset of `test_disclosure_search`), the `issue412`
+Opinion/Docket blocked-badge tests (template+auth, likely not JS-gated).
+
+The `base.py` flag + `AlertSeleniumTest` opt-out are harmless and correct, but reclaim
+~0s in practice — keep or drop at your discretion.
+
+---
+
+# PART 7 — CONSOLIDATED IMPACT (the full measured effect)
+
+All numbers from the real Django runner (`--keepdb --parallel 1`, Django 6.0), same machine.
+
+## Per-class before → after (the changes that actually moved the needle)
+
+| Module | Class | Tests | Before | After | Saved |
+|---|---|---|---|---|---|
+| search | `EsOpinionsIndexingTest` | 9 | 51.8s | 4.7s | 47.1s |
+| scrapers | `OpinionVersionTest` | 9 | 49.9s | 3.5s | 46.4s |
+| search | `PeopleIndexingTest` | 5 | 30.4s | 4.5s | 25.9s |
+| users | `UserTest`+`UserDataTest` | 10 | 52.5s | 0.5s | 52.0s |
+| citations | `UnmatchedCitationTest` | 4 | 20.5s | 0.2s | 20.3s |
+| citations | `ReindexESCiteFieldsTest` | 2 | 12.7s | 2.0s | 10.7s |
+| search | `OralArgumentIndexingTest` | 2 | 12.4s | 2.1s | 10.3s |
+| people_db | `TestPersonWithChildrenFactory` | 1 | 5.0s | 0.01s | 5.0s |
+| **TOTAL** | **8 classes** | **42** | **~235s** | **~17s** | **~218s** |
+
+Combined single run of all 42 tests: **14.9s** (vs ~235s). **~93% faster** on the
+optimized classes; **~218s of serial test time reclaimed.**
+
+## Module-level confirmation (full module, before → after)
+
+| Module | Before | After | Notes |
+|---|---|---|---|
+| `users` | 84.1s | **18.0s** | 120 tests, all pass |
+| `people_db` | 5.2s | **0.26s** | 3 tests, all pass |
+| `citations` | — | 23.2s (after) | 69 tests pass; class deltas above |
+
+## What did the work
+
+- **`TransactionTestCase` → `TestCase` + `captureOnCommitCallbacks`** (or `use_streaming_bulk`
+  for direct `index_parent_and_child_docs`): the ~5-6s/test full-schema truncation tax is
+  the dominant suite cost; removing it is where ~all the savings came from.
+- **`LiveServerTestCase` → `TestCase`** for async-HTTP tests (users).
+- Verified: **no assertions or expected values changed** in any conversion.
+
+## NOT pursued (measured low/zero value — deliberately skipped)
+
+- The entire PART 1 long tail of `setUp`→`setUpTestData` / `SimpleTestCase` / fixture-trim
+  ideas in the small modules (donate, ai, audio, oauth, visualizations, stats, lib,
+  opinion_page, recap, api): those modules already run in <3s each; the changes reclaim ~0s.
+- Selenium ES-rebuild opt-out (PART 6): browser boot dominates, not the reindex → ~0s.
+
+## Remaining non-selenium opportunity (NOT yet applied)
+
+- **alerts percolator per-test index reset** (`RECAPAlertsPercolatorTest` ~10.5s/16 tests,
+  `OpinionAlertsPercolatorTest` ~9.7s/9 tests): `setUp` does a full percolator index
+  `delete()+init()` every test. Moving index creation to `setUpClass` + a per-test
+  delete-by-query doc-clear should reclaim a chunk of the ~20s. This is the last material
+  non-selenium lever; ~estimate 10-15s.
+
+---
+
+# PART 8 — Percolator attempt (REVERTED) + last TransactionTestCase + new-improvement hunt
+
+## alerts percolator: APPLIED (initial "counterproductive" reading was a contention artifact)
+
+Moved the per-test `*Percolator._index.delete()+init()` to a once-per-class `setUpClass`
+create + per-test `search().query("match_all").delete()` doc-clear (with `tearDownClass`
+cleanup).
+
+A first measurement showed it *slower* (9.7s → 18.0s) and it was reverted — but that run
+was contended by a concurrent full-suite run. **Re-measured under quiet conditions** (each
+value stable across two back-to-back runs):
+
+| Class | Tests | Before | After | Saved |
+|---|---|---|---|---|
+| `OpinionAlertsPercolatorTest` | 9 | 8.93s | **7.49s** | ~1.4s |
+| `RECAPAlertsPercolatorTest` | 16 | 9.30s | **6.78s** | ~2.5s |
+| **Total** | 25 | 18.2s | **14.3s** | **~3.9s** |
+
+Both pass; no assertions changed; ruff-clean. **Kept.** Lesson: validate perf numbers under
+quiet conditions — a concurrent suite run inflated the original "after" by ~2×.
+
+## `search.LLMCleanDocketNumberTests`: TransactionTestCase → TestCase (the last one)
+
+The final `TransactionTestCase` in the codebase. Runs a daemon command (eager Celery)
+that dispatches work via `transaction.on_commit`, so the `call_command(...)` needed
+wrapping in `captureOnCommitCallbacks(execute=True)` (nested inside the existing
+`mock.patch`).
+
+| | Before | After |
+|---|---|---|
+| `LLMCleanDocketNumberTests` | 5.26s | **0.19s** |
+
+Verified: no assertions changed. **There are now zero `TransactionTestCase` and zero
+non-selenium `LiveServerTestCase` classes left in the codebase** (all converted).
+
+## New-improvement hunt (in progress)
+
+Measuring full `recap`, `corpus_importer`, `scrapers`, `opinion_page`, `api` modules
+(previously only spot-measured) to surface any hidden slow classes worth optimizing.
+
+## New-improvement hunt — results
+
+Measured full `recap, corpus_importer, scrapers, opinion_page, api` modules (`--keepdb
+--parallel 1 --durations`).
+
+| Module | Tests | Total | Notes |
+|---|---|---|---|
+| recap | 185 | 4.5s | fast |
+| corpus_importer | 154 | 20.5s | **one 15.4s outlier (below)** |
+| scrapers | 82 | 17.5s | a few 1-2.5s ingestion tests; nothing TransactionTestCase-shaped left |
+| opinion_page | 81 | 6.7s | fast |
+| api | 198 | 9.0s | fast |
+
+**Outlier: `corpus_importer…ScotusDaemonIntegrationTest.test_probe_creates_docket_and_metadata` = 15.4s.**
+Investigated: NOT the seeded `high=20000` watermark (reducing it changed nothing), NOT a
+mockable `time.sleep` (the daemon's sleep is already mocked). The time is real work inside
+the `merge_scotus_docket` production pipeline that the integration test deliberately
+exercises (object creation + likely one-time eyecite/ES warmup amortized in a full suite
+run). **No safe test-only speedup** without changing coverage or production code — left as-is.
+
+**Pre-existing fragility found (NOT introduced here, NOT fixed):** several tests assume a
+`Court(pk="test")` / `recap-email` `User` created by *other* tests/fixtures and fail in
+isolation (`DupcheckerPressOnTest`, `api.CoverageTests`, `opinion_page.CitationRedirectorTest`
+fixture FK, recap email tests). This is a cross-test data-dependency smell exposed by
+isolated/`--keepdb` runs; the normal parallel full-suite run masks it. Worth a separate
+cleanup pass (give each class its own `setUpTestData`), but it's risky coverage work,
+out of scope here.
+
+## Session end state
+
+- **Committed & pushed** (branch `morgan/test-perf`): 7 `TransactionTestCase` ES conversions + audit report.
+- **Uncommitted (for review):** `users` `LiveServerTestCase`→`TestCase`; `search.LLMCleanDocketNumberTests`
+  `TransactionTestCase`→`TestCase`; alerts percolator setUpClass+doc-clear rewrite
+  (`OpinionAlertsPercolatorTest`, `RECAPAlertsPercolatorTest`, ~3.9s); `base.py` selenium
+  ES-rebuild opt-in flag + `AlertSeleniumTest` opt-out (low value); this report.
+- **Zero `TransactionTestCase` / non-selenium `LiveServerTestCase` classes remain.**
+- **Total measured reclaim: ~228s** (the 8 ES `TransactionTestCase`/`LiveServer` conversions, 43 tests).
