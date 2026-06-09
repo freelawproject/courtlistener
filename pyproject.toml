@@ -68,7 +68,7 @@ dependencies = [
   "pyyaml>=6.0.3",
   "redis>=7.1.0",
   "requests>=2.32.5",
-  "simplejson>=3.20.2",
+  "simplejson>=4.1.1",
   "timeout-decorator",
   "unidecode",
   "usaddress>=0.5.16",
