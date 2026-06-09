@@ -950,3 +950,47 @@ out of scope here.
   ES-rebuild opt-in flag + `AlertSeleniumTest` opt-out (low value); this report.
 - **Zero `TransactionTestCase` / non-selenium `LiveServerTestCase` classes remain.**
 - **Total measured reclaim: ~228s** (the 8 ES `TransactionTestCase`/`LiveServer` conversions, 43 tests).
+
+---
+
+# PART 9 — Three MISSED `TransactionTestCase` ES classes (the "zero remain" claim was wrong)
+
+The PART 8 "zero `TransactionTestCase` remain" conclusion was **incorrect**. A re-sweep found
+three more `TransactionTestCase` ES classes (the audit had examined `tests_es_recap.py` only
+for `RECAPSearchTest`/filter tests, and never reached the indexing classes near the end of the
+9.4k-line file). All three are the same proven patterns and were converted + verified
+(`--keepdb --parallel 1`); **no assertion or expected value changed** (diff-audited).
+
+| Class | File | Tests | Before | After | Pattern |
+|---|---|---|---|---|---|
+| `RECAPIndexingTest` | search/tests_es_recap.py | 13 | 91.2s | **5.7s** | signal capture-wrap ×65 (incl. nested-in-mock for the two task-count tests) |
+| `IndexDocketRECAPDocumentsCommandTest` | search/tests_es_recap.py | 6 | 36.7s | **5.0s** | command tests → `testing_mode=True` (streaming bulk) on every `call_command` |
+| `ParentheticalESSignalProcessorTest` | search/tests_es_parenthetical.py | 5 | 30.2s | **4.3s** | signal capture-wrap (incl. nested-in-mock + version/task-count asserts) |
+| **TOTAL** | | **24** | **~158s** | **~15s** | **~143s reclaimed** |
+
+Combined single run of all 24 tests: **13.4s** (vs ~158s). **~91% faster.**
+
+### Notes
+- `ParentheticalESSignalProcessorTest` / `RECAPIndexingTest`: pure signal-driven indexing — each
+  index-triggering op wrapped in `captureOnCommitCallbacks(execute=True)`, ES reads/asserts left
+  outside; for the exact-task-count tests the capture is nested **inside** the `mock.patch(...).si`
+  so the on-commit `.si` is still counted. `test_prepare_parties` and
+  `test_search_pagination_results_limit` needed **no** change (no real indexed-ES reads).
+- `IndexDocketRECAPDocumentsCommandTest`: the command does explicit bulk indexing, not signals.
+  The default `index_parent_and_child_docs` path already hardcodes `use_streaming_bulk=True`, but
+  the `document_type`-filtered path is gated on the command's `--testing-mode` flag — so every
+  `cl_index_parent_and_child_docs` call got `testing_mode=True` (transport-only; assertion-neutral).
+- **One small production change** (flagged): `ready_mix_cases_project` had no `--testing-mode`
+  passthrough, so its `parallel_bulk` path is incompatible with `TestCase`
+  (`test_index_dockets_in_bulk_task`). Added a `--testing-mode` arg that forwards
+  `testing_mode` to `index_dockets_in_bulk.si(...)` — matches the established PR #3324 convention,
+  default `False`, behavior-neutral for the only other callers (which use `task=set-latest-case-ids`,
+  a different code path).
+
+**Revised grand total reclaim across the whole effort: ~228s (PART 7) + ~143s (here) ≈ ~371s.**
+**There are now genuinely zero `TransactionTestCase` / non-selenium `LiveServerTestCase` classes
+left** (re-grepped: the only remaining `TransactionTestCase` references are the base-class
+definition in `cl/tests/cases.py`, the test-runner infra in `cl/tests/runner.py`, and a comment
+in `cl/search/tasks.py` — none are test classes).
+
+**Status:** applied in the working tree, ruff-clean, pre-commit passes. Not committed.
