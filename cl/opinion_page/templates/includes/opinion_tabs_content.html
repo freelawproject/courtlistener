@@ -352,7 +352,7 @@
                     {% endif %}
                 {% endif %}
 
-                {% for sub_opinion in cluster.ordered_opinions %}
+                {% for sub_opinion in cluster.ordered_opinions.with_best_text %}
                     <h3 class="opinion-section-title jump-link" id="o{{ forloop.counter }}">
                         {{ sub_opinion.get_type_display }}
                         {% if sub_opinion.author %}
@@ -376,32 +376,22 @@
                     {% endif %}
 
                     <div class="subopinion-content">
-                        {% if sub_opinion.xml_harvard and sub_opinion.html_with_citations %}
-                          <div class="serif-text harvard">{{ sub_opinion.html_with_citations|safe }}</div>
-                         {% elif sub_opinion.xml_harvard  %}
-                              <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
-                        {% elif sub_opinion.html_with_citations %}
-                          {% if cluster.source == "C" %}
-                        {# It's a PDF with no HTML enrichment#}
-                              {% if sub_opinion.html %}
-                                  {# for scrpaed HTML eg. Colo, Okla we do not want to insert line breaks #}
-                                  <div class="serif-text scraped-html">{{ sub_opinion.html_with_citations|safe }}</div>
-                              {% else %}
-                                  <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
-                              {% endif %}
-                          {% else %}
-                            <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
-                          {% endif %}
-                        {% elif sub_opinion.html_columbia %}
-                          <div class="serif-text">{{ sub_opinion.html_columbia|safe }}</div>
-                        {% elif sub_opinion.html_lawbox %}
-                          <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
-                        {% elif sub_opinion.html_anon_2020 %}
-                          <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
-                        {% elif sub_opinion.html %}
-                          <div class="serif-text">{{sub_opinion.html|safe}}</div>
+                        {% if sub_opinion.best_text_source == 'plain_text' %}
+                          <pre>{{ sub_opinion.best_text }}</pre>
                         {% else %}
-                          <pre>{{sub_opinion.plain_text}}</pre>
+                          {% if cluster.source == "C" and sub_opinion.best_text_source == 'html_with_citations' %}
+                            <div class="{% if sub_opinion.html %}serif-text scraped-html{% else %}plaintext{% endif %}">
+                                {% if not sub_opinion.html %}
+                                     {{ sub_opinion.best_text|safe|linebreaksbr }}
+                                {% else %}
+                                     {{ sub_opinion.best_text|safe }}
+                                {% endif %}
+                            </div>
+                          {% else %}
+                            <div class="serif-text {% if sub_opinion.original_text_source == 'xml_harvard' %}harvard{% endif %}">
+                              {{ sub_opinion.best_text|safe }}
+                            </div>
+                          {% endif %}
                         {% endif %}
                     </div>
 
