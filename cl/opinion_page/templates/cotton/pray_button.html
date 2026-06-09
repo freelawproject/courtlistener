@@ -1,0 +1,51 @@
+{% load component_tags svg_tags %}
+
+<c-vars
+  document_id=""
+  count="0"
+  prayer_exists=""
+  daily_limit_reached=""
+  class=""
+/>
+
+{% if request.user.is_authenticated %}
+  <form
+    id="pray_{{ document_id }}"
+    {% if prayer_exists %}
+      hx-post="{% url 'delete_prayer' document_id %}"
+    {% else %}
+      hx-post="{% url 'create_prayer' document_id %}"
+    {% endif %}
+    hx-swap="none"
+    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+    class="inline-flex items-center gap-1 {{ class }}"
+  >
+    <c-button
+      type="submit"
+      variant="{% if prayer_exists %}primary{% else %}outline{% endif %}"
+      class="text-sm px-2 py-1"
+      aria-label="{% if prayer_exists %}Pray-and-pay: remove your request for this document.{% else %}Pray-and-pay: request this document. {{ count }} requests so far.{% endif %}"
+    >
+      <span id="counter_{{ document_id }}" aria-live="polite">{{ count }}</span> <span aria-hidden="true">🙏</span>
+    </c-button>
+    {% if daily_limit_reached %}
+      <span
+        class="flex items-center text-red-600"
+        role="alert"
+        aria-label="You have reached your daily request limit."
+        title="You have reached your daily request limit."
+      >
+        {% svg "circle_question_mark" class="w-4 h-4" aria_hidden="true" %}
+      </span>
+    {% endif %}
+  </form>
+{% else %}
+  <c-button
+    variant="outline"
+    href="{% url 'sign-in' %}?next={{ request.get_full_path|urlencode }}"
+    class="text-sm px-2 py-1 {{ class }}"
+    aria-label="Pray-and-pay: sign in to request this document. {{ count }} requests so far."
+  >
+    {{ count }} <span aria-hidden="true">🙏</span>
+  </c-button>
+{% endif %}
