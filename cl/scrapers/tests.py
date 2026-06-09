@@ -734,6 +734,7 @@ class DupcheckerTest(TestCase):
 class DupcheckerPressOnTest(TestCase):
     def setUp(self) -> None:
         super().setUp()
+        CourtFactory(id="test")
         self.court = Court.objects.get(pk="test")
 
         self.dc_full_crawl = DupChecker(self.court, True, 2)

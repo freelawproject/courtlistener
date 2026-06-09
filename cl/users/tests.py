@@ -404,17 +404,22 @@ class UserDataTest(TestCase):
         """
 
         # Create a new user.
-        UserProfileWithParentsFactory.create(email_confirmed=False)
+        new_profile = UserProfileWithParentsFactory.create(
+            email_confirmed=False
+        )
         time_now = datetime.now()
-        # Get last 24 hours signed-up users.
+        # Get last 24 hours signed-up users. Other recently-created accounts
+        # (e.g. the migration-seeded system users, whose date_joined falls in
+        # the window on a freshly-built test DB) may also be present, so assert
+        # the new user is included rather than asserting an absolute count —
+        # the latter makes the test depend on execution order.
         recipients = get_welcome_recipients(time_now)
-        # The newly created user should be returned.
-        self.assertEqual(len(recipients), 1)
+        self.assertIn(new_profile.user.pk, [user.pk for user in recipients])
 
         # Simulate getting recipients for tomorrow.
         tomorrow = time_now + timedelta(days=1)
         recipients = get_welcome_recipients(tomorrow)
-        # No recipients should be returned.
+        # No recipients should be returned (all signups are >24h old).
         self.assertEqual(len(recipients), 0)
 
 
