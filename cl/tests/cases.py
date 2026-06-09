@@ -40,7 +40,13 @@ class RestartRateLimitMixin:
     @classmethod
     def restart_rate_limit(cls):
         r = get_redis_interface("CACHE")
-        keys = r.keys(":1:rl:*")
+        # Clear both django-ratelimit ("rl:") and DRF throttle ("throttle_*")
+        # counters. The DRF throttle keys otherwise accumulate in a reused
+        # (--keepdb) Redis across test classes and runs until a daily limit
+        # (e.g. 5000/day) is hit, after which later tests start failing with
+        # HTTP 429 depending on how many requests earlier tests happened to
+        # make — an order/state dependency.
+        keys = r.keys(":1:rl:*") + r.keys(":1:throttle*")
         if keys:
             r.delete(*keys)
 
