@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Find merged PR by merge_commit_sha
         id: find_pr
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
