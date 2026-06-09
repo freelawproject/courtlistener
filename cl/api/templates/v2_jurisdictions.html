@@ -1,0 +1,62 @@
+{% extends "new_base.html" %}
+{% load text_filters humanize %}
+{% load extras %}
+
+{% block title %}Available Jurisdictions – CourtListener.com{% endblock %}
+{% block og_title %}Available Jurisdictions – CourtListener.com{% endblock %}
+{% block description %} A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
+{% block og_description %}A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
+
+{% block content %}
+<c-layout-without-navigation>
+  <c-layout-without-navigation.section id="jurisdictions">
+    <h2>Available Jurisdictions</h2>
+
+    <p>
+        We currently have <span id="jurisdiction-count">{{ courts.count|intcomma }}</span> jurisdictions available on CourtListener. These jurisdictions are available via
+        our API or can be used in our bulk data queries.
+    </p>
+
+    <p>
+        Some data below is incomplete, missing dates or other information. If you are a legal researcher
+        interested in helping us research this or other data, please get in touch via our <a class="underline" href="{% url "contact" %}">contact
+        form</a>. We welcome your contribution.
+    </p>
+
+    <div class="overflow-x-auto">
+        <c-data-table
+        safe
+        caption="A list of all courts in the database and their metadata."
+        :columns="[
+          {'label': 'Name', 'field': 'name'},
+          {'label': 'Count', 'field': 'count'},
+          {'label': 'Jurisdiction', 'field': 'jurisdiction'},
+          {'label': 'Homepage', 'field': 'homepage'},
+          {'label': 'Abbreviation', 'field': 'abbreviation'},
+          {'label': 'Citation Abbreviation', 'field': 'citation'},
+          {'label': 'Start Date', 'field': 'start_date'},
+          {'label': 'End Date', 'field': 'end_date'},
+          {'label': 'In Use', 'field': 'in_use'},
+          {'label': 'Modified', 'field': 'modified'}
+        ]"
+        :rows="[
+          {% for court in courts %}
+            {
+              'name': '{{ court.full_name|escapejs }}',
+              'count': '{{ court.count|intcomma }}',
+              'jurisdiction': '{{ court.get_jurisdiction_display|nbsp }}',
+              'homepage': '<a href=\'{{ court.url }}\' target=\'_blank\' class=\'underline\'>{{ court.url|slice:"20" }}{% if court.url|length > 20 %}&hellip;{% endif %}</a>',
+              'abbreviation': '<a href=\'/?q=&court_{{ court.pk }}=on&order_by=score+desc\' rel=\'nofollow\' class=\'underline\'>{{ court.pk }}</a>',
+              'citation': '{{ court.citation_string|escapejs }}',
+              'start_date': '{{ court.start_date|date:"Y-m-d"|default:"Unknown" }}',
+              'end_date': '{{ court.end_date|date:"Y-m-d"|default:"Unknown" }}',
+              'in_use': '{{ court.in_use|yesno|title }}',
+              'modified': '{{ court.date_modified|date:"c"|slice:"16"|default:"None yet" }}'
+            }{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        ]"
+      ></c-data-table>
+    </div>
+  </c-layout-without-navigation.section>
+</c-layout-without-navigation>
+{% endblock %}
