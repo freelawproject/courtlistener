@@ -334,22 +334,23 @@
             </li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
-            <li
-              class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-              <a href="https://free.law/membership/"
-                 tabindex="600"
-                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Join FLP</a>
-            </li>
             <li class="hidden-xs">
               <a href="#"
                  id="dark-mode-toggle"
-                 class="dark-mode-toggle"
+                 class="dark-mode-toggle dark-mode-toggle--desktop"
                  data-theme-toggle
                  role="button"
-                 tabindex="601"
+                 tabindex="600"
+                 aria-label="Toggle dark mode"
                  aria-pressed="false">
-                <i class="fa fa-moon-o" aria-hidden="true"></i>&nbsp;<span class="dark-mode-toggle__label">Dark Mode</span>
+                <i class="fa fa-moon-o" aria-hidden="true"></i>
               </a>
+            </li>
+            <li
+              class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
+              <a href="https://free.law/membership/"
+                 tabindex="601"
+                 class="donate"><i class="fa fa-heart-o"></i>&nbsp;Join FLP</a>
             </li>
           </ul>
         </div>

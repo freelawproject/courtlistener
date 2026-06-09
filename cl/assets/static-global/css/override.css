@@ -140,6 +140,13 @@ header {
   transition: transform 0.2s ease;
 }
 
+.dark-mode-toggle--desktop {
+  min-width: 42px;
+  padding-left: 12px;
+  padding-right: 12px;
+  text-align: center;
+}
+
 .dark-mode-toggle:hover,
 .dark-mode-toggle:focus {
   text-decoration: none;
