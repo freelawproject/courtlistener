@@ -99,7 +99,6 @@ from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
     V4SearchAPIAssertions,
 )
 
@@ -6981,9 +6980,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertGreater(len(entries), 0, msg="Feed should contain entries")
 
 
-class IndexDocketRECAPDocumentsCommandTest(
-    ESIndexTestCase, TransactionTestCase
-):
+class IndexDocketRECAPDocumentsCommandTest(ESIndexTestCase, TestCase):
     """cl_index_parent_and_child_docs command tests for Elasticsearch"""
 
     def setUp(self):
@@ -7053,6 +7050,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             search_type=SEARCH_TYPES.RECAP,
             queue="celery",
             pk_offset=0,
+            testing_mode=True,
         )
 
         s = DocketDocument.search()
@@ -7155,6 +7153,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             task="re-index-dockets",
             court_type="bankruptcy",
             queue="celery",
+            testing_mode=True,
         )
 
         s = DocketDocument.search().query("match_all")
@@ -7178,6 +7177,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             queue="celery",
             pk_offset=0,
             document_type="parent",
+            testing_mode=True,
         )
         # Two dockets should be indexed.
         s = DocketDocument.search()
@@ -7196,6 +7196,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             queue="celery",
             pk_offset=0,
             document_type="child",
+            testing_mode=True,
         )
         s = DocketDocument.search()
         # 3 RECAPDocuments should be indexed.
@@ -7241,6 +7242,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             queue="celery",
             pk_offset=0,
             document_type="child",
+            testing_mode=True,
         )
 
         # Dockets are not indexed yet.
@@ -7284,6 +7286,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             queue="celery",
             pk_offset=0,
             document_type="parent",
+            testing_mode=True,
         )
 
         # Confirm parent-child relation.
@@ -7333,6 +7336,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             queue="celery",
             pk_offset=0,
             document_type="child",
+            testing_mode=True,
         )
 
         # RECAPDocuments should be indexed.
@@ -7389,9 +7393,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(es_rd_2.filepath_local, rd_2.filepath_local)
 
 
-class RECAPIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class RECAPIndexingTest(CountESTasksTestCase, ESIndexTestCase, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -7441,19 +7443,20 @@ class RECAPIndexingTest(
     def test_minute_entry_indexing(self) -> None:
         """Confirm a minute entry can be properly indexed."""
 
-        de_1 = DocketEntryFactory(
-            docket=DocketFactory(court=self.court, source=Docket.RECAP),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-            entry_number=None,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="",
-            is_available=True,
-            page_count=5,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1 = DocketEntryFactory(
+                docket=DocketFactory(court=self.court, source=Docket.RECAP),
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+                entry_number=None,
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Leave to File",
+                document_number="",
+                is_available=True,
+                page_count=5,
+            )
 
         self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
         de_1.docket.delete()
@@ -7462,19 +7465,20 @@ class RECAPIndexingTest(
         """Confirm an unnumbered entry which uses the pacer_doc_id as number
         can be properly indexed."""
 
-        de_1 = DocketEntryFactory(
-            docket=DocketFactory(court=self.court, source=Docket.RECAP),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-            entry_number=3010113237867,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="3010113237867",
-            is_available=True,
-            page_count=5,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1 = DocketEntryFactory(
+                docket=DocketFactory(court=self.court, source=Docket.RECAP),
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+                entry_number=3010113237867,
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Leave to File",
+                document_number="3010113237867",
+                is_available=True,
+                page_count=5,
+            )
 
         self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
         de_1.docket.delete()
@@ -7482,19 +7486,8 @@ class RECAPIndexingTest(
     def test_index_recap_parent_and_child_objects(self) -> None:
         """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
 
-        non_recap_docket = DocketFactory(
-            court=self.court,
-            case_name="SUBPOENAS SERVED ON",
-            case_name_full="Jackson & Sons Holdings vs. Bank",
-            date_filed=datetime.date(2015, 8, 16),
-            date_argued=datetime.date(2013, 5, 20),
-            docket_number="1:21-bk-1234",
-            nature_of_suit="440",
-            source=Docket.HARVARD,
-        )
-
-        docket_entry_1 = DocketEntryFactory(
-            docket=DocketFactory(
+        with self.captureOnCommitCallbacks(execute=True):
+            non_recap_docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED ON",
                 case_name_full="Jackson & Sons Holdings vs. Bank",
@@ -7502,55 +7495,67 @@ class RECAPIndexingTest(
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:21-bk-1234",
                 nature_of_suit="440",
-                source=Docket.RECAP,
-            ),
-            entry_number=1,
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-        )
+                source=Docket.HARVARD,
+            )
 
-        rd = RECAPDocumentFactory(
-            docket_entry=docket_entry_1,
-            description="Leave to File",
-            document_number="1",
-            is_available=True,
-            page_count=5,
-            pacer_doc_id="018036652435",
-        )
+            docket_entry_1 = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="SUBPOENAS SERVED ON",
+                    case_name_full="Jackson & Sons Holdings vs. Bank",
+                    date_filed=datetime.date(2015, 8, 16),
+                    date_argued=datetime.date(2013, 5, 20),
+                    docket_number="1:21-bk-1234",
+                    nature_of_suit="440",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
 
-        rd_att = RECAPDocumentFactory(
-            docket_entry=docket_entry_1,
-            description="Document attachment",
-            document_type=RECAPDocument.ATTACHMENT,
-            document_number="1",
-            attachment_number=2,
-            is_available=False,
-            page_count=7,
-            pacer_doc_id="018036652436",
-        )
+            rd = RECAPDocumentFactory(
+                docket_entry=docket_entry_1,
+                description="Leave to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652435",
+            )
 
-        docket_entry_2 = DocketEntryFactory(
-            docket=DocketFactory(
-                docket_number="12-1235",
-                court=self.court,
-                case_name="SUBPOENAS SERVED OFF",
-                case_name_full="The State of Franklin v. Solutions LLC",
-                date_filed=datetime.date(2016, 8, 16),
-                date_argued=datetime.date(2012, 6, 23),
-                source=Docket.HARVARD_AND_RECAP,
-            ),
-            entry_number=3,
-            date_filed=datetime.date(2014, 7, 19),
-            description="MOTION for Leave to File Amicus Discharging Debtor",
-        )
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=docket_entry_2,
-            description="Leave to File",
-            document_number="3",
-            page_count=10,
-            plain_text="Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer varius sapien arcu, quis laoreet lacus consequat vel.",
-            pacer_doc_id="016156723121",
-        )
+            rd_att = RECAPDocumentFactory(
+                docket_entry=docket_entry_1,
+                description="Document attachment",
+                document_type=RECAPDocument.ATTACHMENT,
+                document_number="1",
+                attachment_number=2,
+                is_available=False,
+                page_count=7,
+                pacer_doc_id="018036652436",
+            )
+
+            docket_entry_2 = DocketEntryFactory(
+                docket=DocketFactory(
+                    docket_number="12-1235",
+                    court=self.court,
+                    case_name="SUBPOENAS SERVED OFF",
+                    case_name_full="The State of Franklin v. Solutions LLC",
+                    date_filed=datetime.date(2016, 8, 16),
+                    date_argued=datetime.date(2012, 6, 23),
+                    source=Docket.HARVARD_AND_RECAP,
+                ),
+                entry_number=3,
+                date_filed=datetime.date(2014, 7, 19),
+                description="MOTION for Leave to File Amicus Discharging Debtor",
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=docket_entry_2,
+                description="Leave to File",
+                document_number="3",
+                page_count=10,
+                plain_text="Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer varius sapien arcu, quis laoreet lacus consequat vel.",
+                pacer_doc_id="016156723121",
+            )
 
         # The non-recap docket shouldn't be indexed.
         self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
@@ -7571,58 +7576,60 @@ class RECAPIndexingTest(
     def test_update_and_remove_parent_child_objects_in_es(self) -> None:
         """Confirm child documents can be updated and removed properly."""
 
-        non_recap_docket = DocketFactory(
-            court=self.court,
-            date_filed=datetime.date(2013, 8, 16),
-            date_argued=datetime.date(2010, 5, 20),
-            docket_number="1:21-bk-0000",
-            nature_of_suit="440",
-            source=Docket.HARVARD,
-        )
-        de_1 = DocketEntryFactory(
-            docket=DocketFactory(
+        with self.captureOnCommitCallbacks(execute=True):
+            non_recap_docket = DocketFactory(
                 court=self.court,
-                case_name="Lorem Ipsum",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
-                date_filed=datetime.date(2015, 8, 16),
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=None,
-                referred_to=None,
+                date_filed=datetime.date(2013, 8, 16),
+                date_argued=datetime.date(2010, 5, 20),
+                docket_number="1:21-bk-0000",
                 nature_of_suit="440",
-                source=Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
-                pacer_case_id="973390",
-            ),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-        )
+                source=Docket.HARVARD,
+            )
+            de_1 = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Lorem Ipsum",
+                    case_name_full="Jackson & Sons Holdings vs. Bank",
+                    date_filed=datetime.date(2015, 8, 16),
+                    date_argued=datetime.date(2013, 5, 20),
+                    docket_number="1:21-bk-1234",
+                    assigned_to=None,
+                    referred_to=None,
+                    nature_of_suit="440",
+                    source=Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
+                    pacer_case_id="973390",
+                ),
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+            )
         # The Docket is not indexed yet here because it doesn't belong to RECAP
         self.assertFalse(DocketDocument.exists(id=de_1.docket.pk))
 
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="1",
-            is_available=True,
-            page_count=5,
-        )
-        firm = AttorneyOrganizationFactory(
-            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck19087",
-            name="Law Firm LLP",
-        )
-        attorney = AttorneyFactory(
-            name="Emily Green",
-            organizations=[firm],
-            docket=de_1.docket,
-        )
-        party_type = PartyTypeFactory.create(
-            party=PartyFactory(
-                name="Mary Williams Corp.",
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Leave to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+            )
+            firm = AttorneyOrganizationFactory(
+                lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck19087",
+                name="Law Firm LLP",
+            )
+            attorney = AttorneyFactory(
+                name="Emily Green",
+                organizations=[firm],
                 docket=de_1.docket,
-                attorneys=[attorney],
-            ),
-            docket=de_1.docket,
-        )
+            )
+            party_type = PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Mary Williams Corp.",
+                    docket=de_1.docket,
+                    attorneys=[attorney],
+                ),
+                docket=de_1.docket,
+            )
 
         docket_pk = de_1.docket.pk
         rd_pk = rd_1.pk
@@ -7673,7 +7680,8 @@ class RECAPIndexingTest(
         de_1.docket.date_terminated = datetime.date(2023, 8, 19)
         de_1.docket.pacer_case_id = "288700"
 
-        de_1.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1.docket.save()
 
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertIn(de_1.docket.case_name, docket_doc.caseName)
@@ -7698,13 +7706,15 @@ class RECAPIndexingTest(
         # Track source changes in a non-recap Docket.
         # First update to a different non-recap source.
         non_recap_docket.source = Docket.COLUMBIA
-        non_recap_docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            non_recap_docket.save()
         # The non-recap Docket shouldn't be indexed yet.
         self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
 
         # Update it to a RECAP Source.
         non_recap_docket.source = Docket.COLUMBIA_AND_RECAP
-        non_recap_docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            non_recap_docket.save()
         # The non-recap Docket is now indexed.
         self.assertTrue(DocketDocument.exists(id=non_recap_docket.pk))
 
@@ -7712,13 +7722,15 @@ class RECAPIndexingTest(
         de_1.docket.case_name = ""
         de_1.docket.case_name_full = ""
         de_1.docket.case_name_short = "USA vs Bank Short"
-        de_1.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1.docket.save()
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertEqual(de_1.docket.case_name_short, docket_doc.caseName)
 
         de_1.docket.case_name = ""
         de_1.docket.case_name_full = "USA vs Bank Full"
-        de_1.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1.docket.save()
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertEqual(de_1.docket.case_name_full, docket_doc.caseName)
         self.assertEqual(de_1.docket.case_name_full, docket_doc.case_name_full)
@@ -7730,11 +7742,12 @@ class RECAPIndexingTest(
         # Update judges name.
         judge.name_first = "William"
         judge.name_last = "Anderson"
-        judge.save()
 
         judge_2.name_first = "Emily"
         judge_2.name_last = "Clark"
-        judge_2.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            judge.save()
+            judge_2.save()
 
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertIn(judge.name_full, docket_doc.assignedTo)
@@ -7743,7 +7756,8 @@ class RECAPIndexingTest(
         # Update docket entry field:
         de_1.description = "Notification to File Ipsum"
         de_1.entry_number = 99
-        de_1.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1.save()
 
         rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
         self.assertEqual("Notification to File Ipsum", rd_doc.description)
@@ -7761,7 +7775,8 @@ class RECAPIndexingTest(
         rd_1.is_available = True
         rd_1.page_count = 5
         rd_1.filepath_local = f
-        rd_1.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_1.save()
         rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
         self.assertEqual(rd_1.description, rd_doc.short_description)
         self.assertEqual(
@@ -7796,17 +7811,19 @@ class RECAPIndexingTest(
         self.assertEqual(judge_2.pk, rd_doc.referred_to_id)
 
         # Update docket entry ID.
-        de_2 = DocketEntryFactory(
-            docket=de_1.docket,
-            description="Notification docket entry 2",
-        )
-        rd_1.docket_entry = de_2
-        rd_1.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            de_2 = DocketEntryFactory(
+                docket=de_1.docket,
+                description="Notification docket entry 2",
+            )
+            rd_1.docket_entry = de_2
+            rd_1.save()
         rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
         self.assertEqual(de_2.description, rd_doc.description)
 
         # Add a Bankruptcy document.
-        bank = BankruptcyInformationFactory(docket=de_1.docket)
+        with self.captureOnCommitCallbacks(execute=True):
+            bank = BankruptcyInformationFactory(docket=de_1.docket)
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertEqual(str(bank.chapter), docket_doc.chapter)
         self.assertEqual(str(bank.trustee_str), docket_doc.trustee_str)
@@ -7814,36 +7831,41 @@ class RECAPIndexingTest(
         # Update Bankruptcy document.
         bank.chapter = "98"
         bank.trustee_str = "Victoria, Sherline"
-        bank.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            bank.save()
 
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertEqual("98", docket_doc.chapter)
         self.assertEqual("Victoria, Sherline", docket_doc.trustee_str)
 
         # Remove Bankruptcy document and confirm it gets removed from Docket.
-        bank.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            bank.delete()
         docket_doc = DocketDocument.get(id=docket_pk)
         self.assertEqual(None, docket_doc.chapter)
         self.assertEqual(None, docket_doc.trustee_str)
 
         # Add another RD:
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Notification to File",
-            document_number="2",
-            is_available=True,
-            page_count=2,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Notification to File",
+                document_number="2",
+                is_available=True,
+                page_count=2,
+            )
 
         rd_2_pk = rd_2.pk
         self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
-        rd_2.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_2.delete()
         self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_2_pk).RECAP))
 
         self.assertTrue(DocketDocument.exists(id=docket_pk))
         self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
 
-        de_1.docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1.docket.delete()
         self.assertFalse(DocketDocument.exists(id=docket_pk))
         self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
 
@@ -7856,33 +7878,34 @@ class RECAPIndexingTest(
         judge_2 = PersonFactory.create(
             name_first="Persephone", name_last="Sinclair"
         )
-        de = DocketEntryFactory(
-            docket=DocketFactory(
-                court=self.court,
-                case_name="USA vs Bank Lorem",
-                case_name_full="Jackson & Sons Holdings vs. Bank",
-                date_filed=datetime.date(2015, 8, 16),
-                date_argued=datetime.date(2013, 5, 20),
-                docket_number="1:21-bk-1234",
-                assigned_to=judge,
-                nature_of_suit="440",
-                source=Docket.RECAP,
-            ),
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-        )
-
         # Create two RECAPDocuments within the same case.
         rd_created_pks = []
-        for i in range(2):
-            rd = RECAPDocumentFactory(
-                docket_entry=de,
-                description=f"Leave to File {i}",
-                document_number=f"{i}",
-                is_available=True,
-                page_count=5,
+        with self.captureOnCommitCallbacks(execute=True):
+            de = DocketEntryFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="USA vs Bank Lorem",
+                    case_name_full="Jackson & Sons Holdings vs. Bank",
+                    date_filed=datetime.date(2015, 8, 16),
+                    date_argued=datetime.date(2013, 5, 20),
+                    docket_number="1:21-bk-1234",
+                    assigned_to=judge,
+                    nature_of_suit="440",
+                    source=Docket.RECAP,
+                ),
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
             )
-            rd_created_pks.append(rd.pk)
+
+            for i in range(2):
+                rd = RECAPDocumentFactory(
+                    docket_entry=de,
+                    description=f"Leave to File {i}",
+                    document_number=f"{i}",
+                    is_available=True,
+                    page_count=5,
+                )
+                rd_created_pks.append(rd.pk)
 
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -7901,7 +7924,8 @@ class RECAPIndexingTest(
             )
 
         # Add BankruptcyInformation and confirm is indexed with the right content
-        bank_data = BankruptcyInformationFactory(docket=de.docket)
+        with self.captureOnCommitCallbacks(execute=True):
+            bank_data = BankruptcyInformationFactory(docket=de.docket)
 
         response = self._test_main_es_query(params, 1, "q")
         for i in range(2):
@@ -7930,7 +7954,8 @@ class RECAPIndexingTest(
         de.docket.assigned_to = judge_2
         de.docket.referred_to = judge
         de.docket.pacer_case_id = "3456783"
-        de.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            de.docket.save()
 
         # Query the parent docket by its updated name.
         params = {
@@ -8017,11 +8042,12 @@ class RECAPIndexingTest(
         # Update judge name.
         judge.name_first = "William"
         judge.name_last = "Anderson"
-        judge.save()
 
         judge_2.name_first = "Emily"
         judge_2.name_last = "Clark"
-        judge_2.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            judge.save()
+            judge_2.save()
 
         response = self._test_main_es_query(params, 1, "q")
         # Confirm all docket fields in the RDs were updated.
@@ -8035,7 +8061,8 @@ class RECAPIndexingTest(
 
         bank_data.chapter = "15"
         bank_data.trustee_str = "Jessica Taylor"
-        bank_data.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            bank_data.save()
 
         response = self._test_main_es_query(params, 1, "q")
         # Confirm all docket fields in the RDs were updated.
@@ -8046,7 +8073,8 @@ class RECAPIndexingTest(
             )
 
         # Remove BankruptcyInformation and confirm it's removed from RDs.
-        bank_data.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            bank_data.delete()
         response = self._test_main_es_query(params, 1, "q")
         # Confirm all docket fields in the RDs were updated.
         for i in range(2):
@@ -8061,7 +8089,8 @@ class RECAPIndexingTest(
         de.docket.referred_to = None
         de.docket.assigned_to_str = "Sarah Williams"
         de.docket.referred_to_str = "Laura Davis"
-        de.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            de.docket.save()
 
         response = self._test_main_es_query(params, 1, "q")
         for i in range(2):
@@ -8078,7 +8107,8 @@ class RECAPIndexingTest(
                 response, 0, i, None, "assigned_to_id"
             )
 
-        de.docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            de.docket.delete()
         # After the docket is removed all the RECAPDocuments are also removed
         # from ES.
         for rd_pk in rd_created_pks:
@@ -8092,11 +8122,14 @@ class RECAPIndexingTest(
         """
 
         # Avoid calling es_save_document for a non-recap docket.
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             non_recap_docket = DocketFactory(
                 court=self.court,
@@ -8111,11 +8144,14 @@ class RECAPIndexingTest(
         self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
 
         # Update a non-recap docket to a different non-recap source
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             non_recap_docket.source = Docket.HARVARD
             non_recap_docket.save()
@@ -8124,11 +8160,14 @@ class RECAPIndexingTest(
         self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
 
         # Update a non-recap docket to a recap source
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             non_recap_docket.source = Docket.RECAP_AND_IDB_AND_HARVARD
             non_recap_docket.save()
@@ -8138,11 +8177,14 @@ class RECAPIndexingTest(
         self.assertTrue(DocketDocument.exists(id=non_recap_docket.pk))
 
         # Index docket on creation.
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket = DocketFactory(
                 court=self.court,
@@ -8157,11 +8199,14 @@ class RECAPIndexingTest(
         self.assertTrue(DocketDocument.exists(id=docket.pk))
 
         # Restart task counter.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket_2 = DocketFactory(
                 court=self.court,
@@ -8175,22 +8220,28 @@ class RECAPIndexingTest(
         self.assertTrue(DocketDocument.exists(id=docket_2.pk))
 
         # Update a Docket without changes.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.save()
 
         # update_es_document task shouldn't be called on save() without changes
         self.reset_and_assert_task_count(expected=0)
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.save()
 
@@ -8198,11 +8249,14 @@ class RECAPIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Update a Docket untracked field.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.blocked = True
             docket.save()
@@ -8211,11 +8265,14 @@ class RECAPIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Update a Docket tracked field.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.docket_number = "21-43434"
             docket.case_name = "Vargas v. Lorem"
@@ -8231,11 +8288,14 @@ class RECAPIndexingTest(
         self.delete_index("search.Docket")
         self.create_index("search.Docket")
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             docket.docket_number = "21-43435"
             docket.save()
@@ -8254,20 +8314,24 @@ class RECAPIndexingTest(
         number of indexing tasks.
         """
 
-        docket = DocketFactory(
-            court=self.court,
-            pacer_case_id="asdf",
-            docket_number="12-cv-02354",
-            case_name="Vargas v. Wilkins",
-            source=Docket.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                pacer_case_id="asdf",
+                docket_number="12-cv-02354",
+                case_name="Vargas v. Wilkins",
+                source=Docket.RECAP,
+            )
 
         # RECAP Document creation:
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             de_1 = DocketEntryFactory(
                 docket=docket,
@@ -8288,11 +8352,14 @@ class RECAPIndexingTest(
 
         self.assertEqual(r_doc.docket_child["parent"], docket.pk)
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             de_2 = DocketEntryFactory(
                 docket=docket,
@@ -8305,22 +8372,28 @@ class RECAPIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Update a RECAPDocument without changes.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             rd_1.save()
         # update_es_document task shouldn't be called on save() without changes
         self.reset_and_assert_task_count(expected=0)
 
         # Update a RECAPDocument untracked field.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             rd_1.is_sealed = True
             rd_1.save()
@@ -8329,11 +8402,14 @@ class RECAPIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Update a RECAPDocument tracked field.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             rd_1.description = "Lorem Ipsum"
             rd_1.page_count = 5
@@ -8345,11 +8421,14 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.short_description, "Lorem Ipsum")
         self.assertEqual(r_doc.page_count, 5)
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             rd_1.page_count = 6
             rd_1.save()
@@ -8358,21 +8437,25 @@ class RECAPIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Create a new Docket and DocketEntry.
-        docket_2 = DocketFactory(
-            court=self.court, docket_number="21-0000", source=Docket.RECAP
-        )
-        de_2 = DocketEntryFactory(
-            docket=docket_2,
-            date_filed=datetime.date(2016, 8, 19),
-            description="Notification for Lorem Ipsum",
-            entry_number=2,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_2 = DocketFactory(
+                court=self.court, docket_number="21-0000", source=Docket.RECAP
+            )
+            de_2 = DocketEntryFactory(
+                docket=docket_2,
+                date_filed=datetime.date(2016, 8, 19),
+                description="Notification for Lorem Ipsum",
+                entry_number=2,
+            )
         # Update the RECAPDocument docket_entry.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             rd_1.docket_entry = de_2
             rd_1.save()
@@ -8392,15 +8475,19 @@ class RECAPIndexingTest(
 
         # Index Docket
         docket_2.docket_number = "21-43436"
-        docket_2.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_2.save()
 
         self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
         # RECAP Document creation on update.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             rd_1.pacer_doc_id = "99999999"
             rd_1.save()
@@ -8412,12 +8499,16 @@ class RECAPIndexingTest(
         self.assertEqual(r_doc.docket_child["parent"], docket_2.pk)
 
         # Add cites to RECAPDocument.
-        opinion = OpinionWithParentsFactory()
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion = OpinionWithParentsFactory()
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             OpinionsCitedByRECAPDocument.objects.bulk_create(
                 [
@@ -8440,11 +8531,14 @@ class RECAPIndexingTest(
         self.assertIn(opinion.pk, r_doc.cites)
 
         # Confirm OpinionsCitedByRECAPDocument delete doesn't trigger a update.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             OpinionsCitedByRECAPDocument.objects.filter(
                 citing_document=rd_1.pk
@@ -8454,14 +8548,18 @@ class RECAPIndexingTest(
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertIn(opinion.pk, r_doc.cites)
 
-        opinion = OpinionWithParentsFactory()
-        opinion_2 = OpinionWithParentsFactory()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion = OpinionWithParentsFactory()
+            opinion_2 = OpinionWithParentsFactory()
         # Update cites to RECAPDocument.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             o_cited = OpinionsCitedByRECAPDocument(
                 citing_document=rd_1,
@@ -8561,17 +8659,18 @@ class RECAPIndexingTest(
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
 
-        de_1 = DocketEntryFactory(
-            docket=DocketFactory(court=self.court, source=Docket.RECAP),
-            date_filed=datetime.date(2024, 8, 19),
-            entry_number=1,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            description="Leave to File",
-            document_number="1",
-            plain_text="Lorem ipsum control chars \x07\x08\x0b.",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            de_1 = DocketEntryFactory(
+                docket=DocketFactory(court=self.court, source=Docket.RECAP),
+                date_filed=datetime.date(2024, 8, 19),
+                entry_number=1,
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                description="Leave to File",
+                document_number="1",
+                plain_text="Lorem ipsum control chars \x07\x08\x0b.",
+            )
 
         r_doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.plain_text, "Lorem ipsum control chars .")
@@ -8670,12 +8769,13 @@ class RECAPIndexingTest(
         """Confirm that the party field is populated by splitting the case_name
         of a bankruptcy case when a valid separator is present.
         """
-        docket_with_no_parties = DocketFactory(
-            court=self.court,
-            case_name="Lorem v. Dolor",
-            docket_number="1:21-bk-4444",
-            source=Docket.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_with_no_parties = DocketFactory(
+                court=self.court,
+                case_name="Lorem v. Dolor",
+                docket_number="1:21-bk-4444",
+                source=Docket.RECAP,
+            )
         docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
         # Assert party on initial indexing.
         self.assertEqual(docket_doc_no_parties.party, ["Lorem", "Dolor"])
@@ -8684,7 +8784,8 @@ class RECAPIndexingTest(
         # Modify the docket case_name. Assert that parties are updated if the
         # docket does not contain normalized parties.
         docket_with_no_parties.case_name = "America v. Smith"
-        docket_with_no_parties.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_with_no_parties.save()
         docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
         self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
         mock_party_parser_task.assert_called_once()
@@ -8705,38 +8806,40 @@ class RECAPIndexingTest(
         """Confirm that the party field is populated by splitting the case_name
         when a valid separator is present.
         """
-        district_court = CourtFactory(id="akd", jurisdiction="FD")
-        docket_with_parties = DocketFactory(
-            court=district_court,
-            case_name="Lorem v. Dolor",
-            docket_number="1:21-bk-4444",
-            source=Docket.RECAP,
-        )
-        firm = AttorneyOrganizationFactory(
-            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck1536",
-            name="Law Firm LLP",
-        )
-        attorney = AttorneyFactory(
-            name="Emily Green",
-            organizations=[firm],
-            docket=docket_with_parties,
-        )
-        party_type = PartyTypeFactory.create(
-            party=PartyFactory(
-                name="Mary Williams Corp.",
+        with self.captureOnCommitCallbacks(execute=True):
+            district_court = CourtFactory(id="akd", jurisdiction="FD")
+            docket_with_parties = DocketFactory(
+                court=district_court,
+                case_name="Lorem v. Dolor",
+                docket_number="1:21-bk-4444",
+                source=Docket.RECAP,
+            )
+            firm = AttorneyOrganizationFactory(
+                lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck1536",
+                name="Law Firm LLP",
+            )
+            attorney = AttorneyFactory(
+                name="Emily Green",
+                organizations=[firm],
                 docket=docket_with_parties,
-                attorneys=[attorney],
-            ),
-            docket=docket_with_parties,
-        )
+            )
+            party_type = PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Mary Williams Corp.",
+                    docket=docket_with_parties,
+                    attorneys=[attorney],
+                ),
+                docket=docket_with_parties,
+            )
         index_docket_parties_in_es.delay(docket_with_parties.pk)
         mock_party_parser_document.reset_mock()
-        docket_with_no_parties = DocketFactory(
-            court=district_court,
-            case_name="Bank v. Smith",
-            docket_number="1:21-bk-4445",
-            source=Docket.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_with_no_parties = DocketFactory(
+                court=district_court,
+                case_name="Bank v. Smith",
+                docket_number="1:21-bk-4445",
+                source=Docket.RECAP,
+            )
 
         docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
         docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
@@ -8750,7 +8853,8 @@ class RECAPIndexingTest(
         # in a docket with normalized parties and also check the helper to
         # parse parties is not called.
         docket_with_parties.case_name = "Lorem v. Ipsum"
-        docket_with_parties.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_with_parties.save()
         docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
         self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
         mock_party_parser_task.assert_not_called()
@@ -8758,38 +8862,41 @@ class RECAPIndexingTest(
         # Modify the docket case_name. Assert that parties are updated if the
         # docket does not contain normalized parties.
         docket_with_no_parties.case_name = "America v. Smith"
-        docket_with_no_parties.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_with_no_parties.save()
         docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
         self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
         mock_party_parser_task.assert_called_once()
 
         # Test that parties are not extracted from the case_name if the case
         # originates from a district court and lacks a valid separator.
-        docket_with_no_parties_no_separator = DocketFactory(
-            court=district_court,
-            case_name="In re: Bank Smith",
-            docket_number="1:21-bk-4446",
-            source=Docket.RECAP,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_with_no_parties_no_separator = DocketFactory(
+                court=district_court,
+                case_name="In re: Bank Smith",
+                docket_number="1:21-bk-4446",
+                source=Docket.RECAP,
+            )
         docket_with_no_parties_no_separator = DocketDocument.get(
             docket_with_no_parties_no_separator.pk
         )
         self.assertEqual(docket_with_no_parties_no_separator.party, [])
 
         # Confirm that normalized parties can overwrite the case_name parties.
-        attorney_2 = AttorneyFactory(
-            name="John Green",
-            organizations=[firm],
-            docket=docket_with_no_parties,
-        )
-        PartyTypeFactory.create(
-            party=PartyFactory(
-                name="Bank Corp.",
+        with self.captureOnCommitCallbacks(execute=True):
+            attorney_2 = AttorneyFactory(
+                name="John Green",
+                organizations=[firm],
                 docket=docket_with_no_parties,
-                attorneys=[attorney_2],
-            ),
-            docket=docket_with_no_parties,
-        )
+            )
+            PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Bank Corp.",
+                    docket=docket_with_no_parties,
+                    attorneys=[attorney_2],
+                ),
+                docket=docket_with_no_parties,
+            )
         index_docket_parties_in_es.delay(docket_with_no_parties.pk)
         docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
         self.assertEqual(docket_doc_no_parties.party, ["Bank Corp."])
@@ -8805,35 +8912,36 @@ class RECAPIndexingTest(
     ):
         """Confirm that seal_documents admin action updates related RDs in ES"""
 
-        docket = DocketFactory(
-            court=self.court,
-            pacer_case_id="asdf",
-            docket_number="12-cv-02354",
-            case_name="Vargas v. Wilkins",
-            source=Docket.RECAP,
-        )
-        de_1 = DocketEntryFactory(
-            docket=docket,
-            date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
-            entry_number=None,
-        )
-        rd_1 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            document_number="1",
-            is_available=True,
-            page_count=5,
-            filepath_local="test.pdf",
-            plain_text="Lorem ipsum dolor text.",
-        )
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=de_1,
-            document_number="2",
-            is_available=True,
-            page_count=10,
-            filepath_local="test.pdf",
-            plain_text="Lorem ipsum dolor text 2.",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                pacer_case_id="asdf",
+                docket_number="12-cv-02354",
+                case_name="Vargas v. Wilkins",
+                source=Docket.RECAP,
+            )
+            de_1 = DocketEntryFactory(
+                docket=docket,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem",
+                entry_number=None,
+            )
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                filepath_local="test.pdf",
+                plain_text="Lorem ipsum dolor text.",
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                document_number="2",
+                is_available=True,
+                page_count=10,
+                filepath_local="test.pdf",
+                plain_text="Lorem ipsum dolor text 2.",
+            )
 
         # Confirm initial indexing:
         rd_1_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
@@ -8855,7 +8963,8 @@ class RECAPIndexingTest(
         request = self.factory.post(url)
 
         queryset = RECAPDocument.objects.filter(pk__in=[rd_1.pk, rd_2.pk])
-        recap_admin.seal_documents(request, queryset)
+        with self.captureOnCommitCallbacks(execute=True):
+            recap_admin.seal_documents(request, queryset)
 
         recap_admin.message_user.assert_called_once_with(
             request,

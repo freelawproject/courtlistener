@@ -35,7 +35,6 @@ from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
 )
 
 
@@ -512,61 +511,64 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
 
 class ParentheticalESSignalProcessorTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+    CountESTasksTestCase, ESIndexTestCase, TestCase
 ):
     """Parenthetical ES indexing related tests"""
 
     def setUp(self):
         super().setUp()
-        self.c1 = CourtFactory(id="canb", jurisdiction="I")
-        self.c2 = CourtFactory(id="ca1", jurisdiction="F")
-        self.cluster_1 = OpinionClusterFactory(
-            case_name="Lorem Ipsum",
-            case_name_short="Ipsum",
-            judges="Lorem 2",
-            scdb_id="0000",
-            nature_of_suit="410",
-            docket=DocketFactory(
-                court=self.c1,
-                docket_number="1:95-cr-11111",
-                date_reargued=date(1986, 1, 30),
-                date_reargument_denied=date(1986, 5, 30),
-            ),
-            date_filed=date(1976, 3, 10),
-            source="H",
-            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-        )
-        self.cluster_2 = OpinionClusterFactory(
-            docket=DocketFactory(
-                court=self.c1,
-                docket_number="1:25-cr-1111",
-                date_reargued=date(1986, 1, 30),
-                date_reargument_denied=date(1986, 5, 30),
-            ),
-            date_filed=date(1976, 3, 10),
-            source="H",
-            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-        )
-        self.o = OpinionWithParentsFactory(
-            cluster=self.cluster_1,
-            type="Plurality Opinion",
-            extracted_by_ocr=True,
-        )
-        self.o_2 = OpinionWithParentsFactory(
-            cluster=self.cluster_2,
-        )
-        self.p5 = ParentheticalFactory(
-            describing_opinion=self.o_2,
-            described_opinion=self.o_2,
-            group=None,
-            text="Lorem Ipsum Dolor.",
-            score=0.4218,
-        )
-        self.pg_test = ParentheticalGroupFactory(
-            opinion=self.o, representative=self.p5, score=0.3236, size=1
-        )
-        self.p5.group = self.pg_test
-        self.p5.save()
+        # Wrap creation so the transaction.on_commit ES-indexing callbacks
+        # fire (TestCase rolls back, so on_commit needs explicit execution).
+        with self.captureOnCommitCallbacks(execute=True):
+            self.c1 = CourtFactory(id="canb", jurisdiction="I")
+            self.c2 = CourtFactory(id="ca1", jurisdiction="F")
+            self.cluster_1 = OpinionClusterFactory(
+                case_name="Lorem Ipsum",
+                case_name_short="Ipsum",
+                judges="Lorem 2",
+                scdb_id="0000",
+                nature_of_suit="410",
+                docket=DocketFactory(
+                    court=self.c1,
+                    docket_number="1:95-cr-11111",
+                    date_reargued=date(1986, 1, 30),
+                    date_reargument_denied=date(1986, 5, 30),
+                ),
+                date_filed=date(1976, 3, 10),
+                source="H",
+                precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+            )
+            self.cluster_2 = OpinionClusterFactory(
+                docket=DocketFactory(
+                    court=self.c1,
+                    docket_number="1:25-cr-1111",
+                    date_reargued=date(1986, 1, 30),
+                    date_reargument_denied=date(1986, 5, 30),
+                ),
+                date_filed=date(1976, 3, 10),
+                source="H",
+                precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+            )
+            self.o = OpinionWithParentsFactory(
+                cluster=self.cluster_1,
+                type="Plurality Opinion",
+                extracted_by_ocr=True,
+            )
+            self.o_2 = OpinionWithParentsFactory(
+                cluster=self.cluster_2,
+            )
+            self.p5 = ParentheticalFactory(
+                describing_opinion=self.o_2,
+                described_opinion=self.o_2,
+                group=None,
+                text="Lorem Ipsum Dolor.",
+                score=0.4218,
+            )
+            self.pg_test = ParentheticalGroupFactory(
+                opinion=self.o, representative=self.p5, score=0.3236, size=1
+            )
+            self.p5.group = self.pg_test
+            self.p5.save()
 
     def test_keep_in_sync_related_pa_objects_on_save(self) -> None:
         """Test PA documents are updated in ES when related objects change."""
@@ -576,7 +578,8 @@ class ParentheticalESSignalProcessorTest(
         self.assertEqual(self.cluster_1.docket.docket_number, doc.docketNumber)
         # Update docket number and confirm it's updated in ES.
         self.cluster_1.docket.docket_number = "1:98-cr-0000"
-        self.cluster_1.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.cluster_1.docket.save()
         self.cluster_1.refresh_from_db()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual("1:98-cr-0000", doc.docketNumber)
@@ -589,7 +592,8 @@ class ParentheticalESSignalProcessorTest(
         # Update a related object field which is not including in the document
         # mapping.
         self.cluster_1.docket.view_count = 5
-        self.cluster_1.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.cluster_1.docket.save()
         self.cluster_1.refresh_from_db()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         # Document version remains the same since document was not updated.
@@ -597,17 +601,19 @@ class ParentheticalESSignalProcessorTest(
 
         # Confirm court_id is updated in ES.
         self.cluster_1.docket.court = self.c2
-        self.cluster_1.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.cluster_1.docket.save()
         self.cluster_1.refresh_from_db()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual(self.c2.pk, doc.court_id)
 
         # Confirm opinion related fields are updated in ES.
-        author_1 = PersonFactory(name_first="John")
         self.o.extracted_by_ocr = False
         self.o.cluster = self.cluster_1
-        self.o.author = author_1
-        self.o.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            author_1 = PersonFactory(name_first="John")
+            self.o.author = author_1
+            self.o.save()
         self.cluster_1.refresh_from_db()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual(False, doc.opinion_extracted_by_ocr)
@@ -615,19 +621,18 @@ class ParentheticalESSignalProcessorTest(
         self.assertEqual(author_1.pk, doc.author_id)
 
         # Confirm opinion cluster related fields are updated in ES.
-        docket_1 = DocketFactory()
         self.cluster_1.case_name = "USA vs IPSUM"
         self.cluster_1.citation_count = 10
         self.cluster_1.date_filed = datetime.datetime(2023, 3, 10)
-        self.cluster_1.docket = docket_1
         self.cluster_1.judges = "Bill Clinton"
         self.cluster_1.nature_of_suit = "110"
-        self.cluster_1.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_1 = DocketFactory()
+            self.cluster_1.docket = docket_1
+            self.cluster_1.save()
+            self.pg_test.representative.describing_opinion.cluster.case_name = "California vs Doe"
+            self.pg_test.representative.describing_opinion.cluster.save()
         self.cluster_1.refresh_from_db()
-        self.pg_test.representative.describing_opinion.cluster.case_name = (
-            "California vs Doe"
-        )
-        self.pg_test.representative.describing_opinion.cluster.save()
         self.pg_test.representative.describing_opinion.cluster.refresh_from_db()
 
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
@@ -645,8 +650,9 @@ class ParentheticalESSignalProcessorTest(
         # Confirm representative Parenthetical fields are updated in ES.
         self.p5.text = "New text"
         self.p5.score = 0.70
-        self.p5.save()
-        self.p5.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.p5.save()
+            self.p5.save()
 
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual("New text", doc.representative_text)
@@ -655,10 +661,12 @@ class ParentheticalESSignalProcessorTest(
         # Confirm related object fields using display value are properly indexed.
         self.assertEqual("Unpublished", doc.status)
         self.cluster_1.precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
-        self.cluster_1.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.cluster_1.save()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual("Published", doc.status)
-        self.pg_test.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.pg_test.delete()
 
     def test_keep_in_sync_related_pa_objects_on_m2m_change(self) -> None:
         # Confirm m2m related fields are updated in ES.
@@ -668,21 +676,24 @@ class ParentheticalESSignalProcessorTest(
         self.assertEqual([], doc.panel_ids)
         self.assertEqual([], doc.cites)
         # Add m2m relation.
-        self.cluster_1.panel.add(author_1)
-        self.o.opinions_cited.add(self.o_2)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.cluster_1.panel.add(author_1)
+            self.o.opinions_cited.add(self.o_2)
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         # m2m fields are properly updated in ES.
         self.assertEqual([author_1.pk], doc.panel_ids)
         self.assertEqual([self.o_2.pk], doc.cites)
 
         # Confirm m2m fields are cleaned in ES when the relation is removed.
-        self.cluster_1.panel.remove(author_1)
-        self.o.opinions_cited.remove(self.o_2)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.cluster_1.panel.remove(author_1)
+            self.o.opinions_cited.remove(self.o_2)
 
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual([], doc.cites)
         self.assertEqual([], doc.panel_ids)
-        self.pg_test.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.pg_test.delete()
 
     def test_keep_in_sync_related_pa_objects_on_reverse_relation(self) -> None:
         # Confirm reverse related fields are updated in ES.
@@ -692,15 +703,16 @@ class ParentheticalESSignalProcessorTest(
         # explicitly because Citation.unique_together is (cluster, volume,
         # reporter, page) — type is not part of it, so the factory's random
         # volume/page can collide across these three citations.
-        citation = CitationWithParentsFactory(
-            cluster=self.cluster_1, volume=4, page=4
-        )
-        citation_lexis = CitationWithParentsFactory(
-            cluster=self.cluster_1, type=Citation.LEXIS, volume=5, page=5
-        )
-        citation_neutral = CitationWithParentsFactory(
-            cluster=self.cluster_1, type=Citation.NEUTRAL, volume=6, page=6
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            citation = CitationWithParentsFactory(
+                cluster=self.cluster_1, volume=4, page=4
+            )
+            citation_lexis = CitationWithParentsFactory(
+                cluster=self.cluster_1, type=Citation.LEXIS, volume=5, page=5
+            )
+            citation_neutral = CitationWithParentsFactory(
+                cluster=self.cluster_1, type=Citation.NEUTRAL, volume=6, page=6
+            )
         # Reverse related object fields are updated in ES.
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual(
@@ -712,20 +724,23 @@ class ParentheticalESSignalProcessorTest(
 
         # Confirm reverse related object fields are cleaned in ES when the
         # object is removed.
-        citation.delete()
-        citation_lexis.delete()
-        citation_neutral.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            citation.delete()
+            citation_lexis.delete()
+            citation_neutral.delete()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual([], doc.citation)
         self.assertEqual(None, doc.lexisCite)
         self.assertEqual(None, doc.neutralCite)
-        self.pg_test.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.pg_test.delete()
 
     def test_keep_in_sync_related_pa_objects_on_delete(self) -> None:
         # Confirm document is removed from ES, when the ParentheticalGroup is
         # removed from DB.
         pg_id = self.pg_test.pk
-        self.pg_test.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.pg_test.delete()
         self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_id))
 
     def test_parenthetical_indexing_and_tasks_count(self) -> None:
@@ -734,11 +749,14 @@ class ParentheticalESSignalProcessorTest(
         """
 
         # Index ParentheticalGroup on creation.
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             cluster_1 = OpinionClusterFactory(
                 docket=self.cluster_1.docket, case_name="Salt & Pepper"
@@ -773,22 +791,28 @@ class ParentheticalESSignalProcessorTest(
         self.assertTrue(ParentheticalGroupDocument.exists(id=pg_test.pk))
 
         # Update a ParentheticalGroup without changes.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             pg_test.save()
         # update_es_document task shouldn't be called on save() without changes
         self.reset_and_assert_task_count(expected=0)
 
         # Update a ParentheticalGroup tracked field.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             p6 = ParentheticalFactory(
                 describing_opinion=o,
@@ -815,11 +839,14 @@ class ParentheticalESSignalProcessorTest(
 
         self.assertFalse(ParentheticalGroupDocument.exists(id=pg_test.pk))
         # ParentheticalGroup creation on update.
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             pg_test.opinion = o
             pg_test.save()
