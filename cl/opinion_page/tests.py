@@ -3026,12 +3026,8 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
 @override_settings(WAFFLE_CACHE_PREFIX="test_docket_filter_pagination_waffle")
 @override_flag("use_new_design", active=True)
 class DocketFilterPaginationWiringTest(TestCase):
-    """v2_docket.html wraps the entries placeholder with <c-docket-filter>
-    above and <c-pagination> below. Lock in the four contracts PR 2 will
-    rely on: the filter form's named inputs render, filter querystring
-    params actually narrow the queryset, the bottom pagination nav appears
-    when there are multiple pages, and pagination links carry filter
-    params forward so users don't lose state when paging.
+    """Tests to ensure filter and pagination components appear as intended and
+    that filters are connected to queryset.
     """
 
     @classmethod
@@ -3077,7 +3073,7 @@ class DocketFilterPaginationWiringTest(TestCase):
 
     async def test_filter_form_fields_render(self) -> None:
         """Every named filter input must be in the rendered page so users
-        and form submissions both find it. PR 2 will depend on these names.
+        and form submissions both find it.
         """
         r = await self._get_docket_and_verify_v2()
         content = r.content.decode()
@@ -3122,8 +3118,7 @@ class DocketFilterPaginationWiringTest(TestCase):
 
     async def test_pagination_links_preserve_filter_params(self) -> None:
         """Paging to page 2 must keep the user's filter params — otherwise
-        page 2 would reset to the unfiltered set. {% querystring %} in
-        <c-pagination> is what carries them; this test catches regressions
+        page 2 would reset to the unfiltered set. This test catches regressions
         where the tag stops seeing request.GET (e.g. wrong context)."""
         await sync_to_async(DocketEntry.objects.bulk_create)(
             [
