@@ -163,8 +163,37 @@ def _get_full_tag(
 # ---------------------------------------------------------------------------
 
 
+# href values whose first non-whitespace token proves the link is
+# same-origin (or non-navigable), so target="_blank" carries no
+# tab-nabbing risk:
+#   {% url ... %}     Django reverse — always local
+#   {% static ... %}  CL serves static from same origin (STATIC_URL = "static/")
+#   /path             absolute path on this origin (but not //, protocol-relative)
+#   #fragment         in-page anchor
+#   ?query            query-only, same document
+#   mailto: tel:      non-navigable schemes (no opener handoff)
+#   javascript: data: non-navigable in this context
+_safe_href_re = re.compile(
+    r"""href\s*=\s*["']\s*(?:
+        \{%\s*(?:url|static)\b
+        | /(?!/)
+        | \#
+        | \?
+        | mailto:
+        | tel:
+        | javascript:
+        | data:
+    )""",
+    re.VERBOSE,
+)
+
+
 def check_tabnabbing(lines: list[str]) -> list[tuple[int, str]]:
-    """target="_blank" must have rel with noopener or noreferrer."""
+    """target="_blank" must have rel with noopener or noreferrer.
+
+    Skipped for hrefs we can prove are same-origin or non-navigable —
+    tab-nabbing requires a cross-origin window handoff.
+    """
     results = []
     target_blank_re = re.compile(r'target\s*=\s*["\']_blank["\']')
     rel_safe_re = re.compile(
@@ -172,17 +201,24 @@ def check_tabnabbing(lines: list[str]) -> list[tuple[int, str]]:
     )
 
     for i, line in enumerate(lines, 1):
-        if target_blank_re.search(line):
-            full_tag = _get_full_tag(lines, i - 1)
-            if not rel_safe_re.search(full_tag):
-                results.append(
-                    (
-                        i,
-                        'target="_blank" without rel containing "noopener" or '
-                        '"noreferrer" — tabnabbing risk '
-                        "(https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/noopener)",
-                    )
-                )
+        m = target_blank_re.search(line)
+        if not m:
+            continue
+        # Anchor to the column of target="_blank" so we don't pick up
+        # rel/href attributes from a sibling tag on the same line.
+        full_tag = _get_full_tag(lines, i - 1, col=m.start())
+        if rel_safe_re.search(full_tag):
+            continue
+        if _safe_href_re.search(full_tag):
+            continue
+        results.append(
+            (
+                i,
+                'target="_blank" without rel containing "noopener" or '
+                '"noreferrer" — tabnabbing risk '
+                "(https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/rel/noopener)",
+            )
+        )
     return results
 
 
