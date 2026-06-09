@@ -44,7 +44,9 @@ from cl.alerts.tasks import (
 )
 from cl.alerts.utils import (
     InvalidDateError,
+    add_document_hit_to_alert_set,
     build_alert_email_subject,
+    has_document_alert_hit_been_triggered,
     is_match_all_query,
     percolate_es_document,
 )
@@ -67,6 +69,7 @@ from cl.donate.models import (
 from cl.favorites.factories import NoteFactory, PrayerFactory, UserTagFactory
 from cl.favorites.models import Prayer
 from cl.lib.decorators import clear_tiered_cache
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import (
@@ -832,6 +835,90 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         await alert_to_edit.arefresh_from_db()
         self.assertEqual(alert_to_edit.alert_type, SEARCH_TYPES.DOCKETS)
         await self.async_client.alogout()
+
+
+@mock.patch(
+    "cl.alerts.utils.get_alerts_set_prefix",
+    return_value="alert_hits_cleanup_test",
+)
+@override_settings(ELASTICSEARCH_DISABLED=True)
+class AlertHitsSetCleanupTest(TestCase):
+    """Are the Redis sets storing an alert's document hits removed when the
+    Alert is deleted?"""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.r = get_redis_interface("CACHE")
+        self._clean_redis()
+        self.addCleanup(self._clean_redis)
+
+    def _clean_redis(self) -> None:
+        keys = self.r.keys("alert_hits_cleanup_test:*")
+        if keys:
+            self.r.delete(*keys)
+
+    def test_remove_alert_hits_set_on_alert_deletion(
+        self, mock_prefix
+    ) -> None:
+        """Deleting an Alert should remove every per-document-type Redis set
+        that stored its hits."""
+
+        alert = AlertFactory(
+            rate=Alert.REAL_TIME,
+            name="Test RECAP Alert cleanup",
+            query="docket_number=1:21-bk-1234&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+
+        # Simulate hits stored across several document-type sets for this alert.
+        add_document_hit_to_alert_set(self.r, alert.pk, "d", 1)
+        add_document_hit_to_alert_set(self.r, alert.pk, "co", 1)
+        add_document_hit_to_alert_set(self.r, alert.pk, "r", 5)
+
+        # Confirm the sets exist before deletion.
+        self.assertTrue(
+            has_document_alert_hit_been_triggered(self.r, alert.pk, "d", 1)
+        )
+        self.assertTrue(
+            has_document_alert_hit_been_triggered(self.r, alert.pk, "co", 1)
+        )
+        self.assertTrue(
+            has_document_alert_hit_been_triggered(self.r, alert.pk, "r", 5)
+        )
+
+        # Create a set for a different alert to ensure it is not affected.
+        other_alert = AlertFactory(
+            rate=Alert.REAL_TIME,
+            name="Other RECAP Alert",
+            query="docket_number=1:21-bk-9999&type=r",
+            alert_type=SEARCH_TYPES.RECAP,
+        )
+        add_document_hit_to_alert_set(self.r, other_alert.pk, "d", 1)
+
+        alert_pk = alert.pk
+        alert.delete()
+
+        # All sets for the deleted alert should be gone.
+        self.assertEqual(
+            self.r.keys(f"alert_hits_cleanup_test:{alert_pk}.*"),
+            [],
+        )
+        self.assertFalse(
+            has_document_alert_hit_been_triggered(self.r, alert_pk, "d", 1)
+        )
+        self.assertFalse(
+            has_document_alert_hit_been_triggered(self.r, alert_pk, "co", 1)
+        )
+        self.assertFalse(
+            has_document_alert_hit_been_triggered(self.r, alert_pk, "r", 5)
+        )
+
+        # The unrelated alert's set must remain untouched.
+        self.assertTrue(
+            has_document_alert_hit_been_triggered(
+                self.r, other_alert.pk, "d", 1
+            )
+        )
 
 
 class DocketAlertTest(TestCase):
