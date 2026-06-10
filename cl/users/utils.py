@@ -77,7 +77,7 @@ def convert_to_stub_account(user: User) -> User:
     profile.zip_code = None
     profile.save()
 
-    profile.barmembership.all().delete()
+    profile.barmembership.clear()
 
     return user
 
