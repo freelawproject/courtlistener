@@ -301,6 +301,8 @@ async def find_and_disaggregate_docket_object(
     aggregate_court_id: str,
     docket_number: str,
     docket_source: int = Docket.RECAP,
+    pacer_case_id: str | None = None,
+    allow_create: bool = True,
 ) -> tuple[Docket | None, bool]:
     """Find or create a docket object and if necessary, move it from an aggregate
     court to a specific court.
@@ -317,11 +319,12 @@ async def find_and_disaggregate_docket_object(
     :param aggregate_court_id: The backup court to look in and disaggregate from.
     :param docket_number: The docket number to lookup.
     :param docket_source: The source to set when creating a new docket.
+    :param allow_create: Whether to create a new docket if one is not found.
     :return: The docket found or created and a boolean indicating whether the
         docket's court was changed."""
     docket = await find_docket_object(
         court_id=aggregate_court_id,
-        pacer_case_id=None,
+        pacer_case_id=pacer_case_id,
         docket_number=docket_number,
         federal_defendant_number=None,
         federal_dn_judge_initials_assigned=None,
@@ -331,20 +334,23 @@ async def find_and_disaggregate_docket_object(
     )
     if docket is not None:
         logger.info(
-            f"Disaggregating docket {docket.pk} from {aggregate_court_id} to {court_id}"
+            "Disaggregating docket %s from %s to %s",
+            docket.pk,
+            aggregate_court_id,
+            court_id,
         )
         docket.court = await Court.objects.aget(pk=court_id)
         _ = await docket.asave()
         return docket, True
     return await find_docket_object(
         court_id=court_id,
-        pacer_case_id=None,
+        pacer_case_id=pacer_case_id,
         docket_number=docket_number,
         federal_defendant_number=None,
         federal_dn_judge_initials_assigned=None,
         federal_dn_judge_initials_referred=None,
         docket_source=docket_source,
-        allow_create=True,
+        allow_create=allow_create,
     ), False
 
 

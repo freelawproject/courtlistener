@@ -60,8 +60,8 @@ def _date_last_filing(docket_data: FloridaCase) -> date | None:
 
 
 def _originating_case_number(docket_data: FloridaCase) -> str:
-     if len(docket_data.originating_cases) > 1:
-         return None
+    if len(docket_data.originating_cases) > 1:
+        return None
     return docket_data.originating_cases[0].case_number
 
 
@@ -172,6 +172,8 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     appeal_from_str: str | None = AttributeMerger(
         InputMap(_appeal_from_str), strategy=OverwriteExisting()
     )
+    # See https://github.com/freelawproject/courtlistener/issues/7361#issuecomment-4566459292
+    pacer_case_id: str = AttributeMerger(InputField("case_uuid"))
     originating_court_information: OriginatingCourtInformation = RelatedMerger[
         FloridaCase, OriginatingCourtInformation
     ](
@@ -189,9 +191,9 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
             FloridaCourtID.SUPREME_COURT.value
         ]
         if docket.court_id == supreme_court_id:
-            found = async_to_sync(find_docket_object)(
+            return async_to_sync(find_docket_object)(
                 court_id=docket.court_id,
-                pacer_case_id=None,
+                pacer_case_id=docket.pacer_case_id,
                 docket_number=docket.docket_number,
                 federal_defendant_number=None,
                 federal_dn_judge_initials_assigned=None,
@@ -199,19 +201,17 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
                 docket_source=Docket.SCRAPER,
                 allow_create=False,
             )
-        else:
-            found, changed = async_to_sync(
-                find_and_disaggregate_docket_object
-            )(
-                court_id=docket.court_id,
-                aggregate_court_id=FL_APPELLATE_COURT_ID,
-                docket_number=docket.docket_number,
-                docket_source=Docket.SCRAPER,
+        found, changed = async_to_sync(find_and_disaggregate_docket_object)(
+            court_id=docket.court_id,
+            aggregate_court_id=FL_APPELLATE_COURT_ID,
+            docket_number=docket.docket_number,
+            docket_source=Docket.SCRAPER,
+            allow_create=False,
+        )
+        if changed:
+            logger.info(
+                "Disaggregated Florida docket: %s", docket.docket_number
             )
-            if changed:
-                logger.info(
-                    "Disaggregated Florida docket: %s", docket.docket_number
-                )
         return found
 
 

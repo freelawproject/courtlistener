@@ -75,6 +75,8 @@ def make_docket_number_core(
     if len(matches) > 1:
         logger.warning(
             "Found multiple Florida DNs for court %s in string %s. Using %s",
+            court_id,
+            docket_number,
             matches[0],
         )
     return matches[0]
