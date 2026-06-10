@@ -4850,7 +4850,7 @@ def merge_texas_docket(
             )
             if changed:
                 logger.info(
-                    f"Disaggregated Texas appellate docket {docket_number}"
+                    "Disaggregated Texas appellate docket %s", docket_number
                 )
         else:
             docket = async_to_sync(find_docket_object)(

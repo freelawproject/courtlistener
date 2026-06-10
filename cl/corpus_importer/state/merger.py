@@ -89,7 +89,7 @@ class Parameter[T](InputMap[Any, T]):
     def map(
         self, i: Any, *args: Any, value: T | None = None, **kwargs: Any
     ) -> T | None:
-        if value:
+        if value is not None:
             return self.transform(value)
         return self.default
 

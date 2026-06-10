@@ -60,6 +60,8 @@ def _date_last_filing(docket_data: FloridaCase) -> date | None:
 
 
 def _originating_case_number(docket_data: FloridaCase) -> str:
+     if len(docket_data.originating_cases) > 1:
+         return None
     return docket_data.originating_cases[0].case_number
 
 

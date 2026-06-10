@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 # Non-comprehensive list of court IDs that can be handled by Florida make_docket_number_core
 FLORIDA_COURT_IDS: set[str] = {
-    "fl",
+    "fla",
     "fladistctapp",
     "fladistctapp1",
     "fladistctapp2",
