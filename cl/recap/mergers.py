@@ -65,6 +65,7 @@ from cl.recap.models import (
     PacerHtmlFiles,
     ProcessingQueue,
 )
+from cl.recap.types import RECAPAttorneyDict, RECAPPartyDict
 from cl.search.models import (
     BankruptcyInformation,
     Claim,
@@ -354,7 +355,7 @@ async def find_and_disaggregate_docket_object(
     ), False
 
 
-def add_attorney(atty, p, d):
+def add_attorney(atty: RECAPAttorneyDict, p, d):
     """Add/update an attorney.
 
     Given an attorney node, and a party and a docket object, add the attorney
@@ -1266,7 +1267,7 @@ def get_terminated_entities(d):
     return terminated_party_ids, terminated_attorney_ids
 
 
-def normalize_attorney_roles(parties):
+def normalize_attorney_roles(parties: list[RECAPPartyDict]):
     """Clean up the attorney roles for all parties.
 
     We do this fairly early in the process because we need to know if
@@ -1377,7 +1378,7 @@ def disassociate_extraneous_entities(
 
 def normalize_scotus_parties(
     parties: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
+) -> list[RECAPPartyDict]:
     """Transform SCOTUS court party data to PACER-like format.
 
     This allows reuse of the existing add_parties_and_attorneys() method
@@ -1390,10 +1391,9 @@ def normalize_scotus_parties(
     normalized = []
 
     for party in parties:
-        normalized_party = {
+        normalized_party: RECAPPartyDict = {
             "name": party.get("name", ""),
             "type": party.get("type", "Unknown"),
-            "date_terminated": None,
             "extra_info": "",
             "attorneys": [],
         }
@@ -1448,7 +1448,7 @@ def normalize_scotus_parties(
 @transaction.atomic
 # Retry on transaction deadlocks; see #814.
 @retry(OperationalError, tries=2, delay=1, backoff=1, logger=logger)
-def add_parties_and_attorneys(d, parties):
+def add_parties_and_attorneys(d: Docket, parties: list[RECAPPartyDict]):
     """Add parties and attorneys from the docket data to the docket.
 
     :param d: The docket to update

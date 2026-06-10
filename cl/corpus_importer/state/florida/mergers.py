@@ -3,7 +3,7 @@ from datetime import date
 from typing import override
 
 from asgiref.sync import async_to_sync
-from juriscraper.state.florida import FloridaCase
+from juriscraper.state.florida import FloridaCase, FloridaParty
 from juriscraper.state.florida.cases import FloridaCourtID
 
 from cl.corpus_importer.state.florida.utils import (
@@ -23,6 +23,7 @@ from cl.corpus_importer.state.merger import (
     Relationship,
 )
 from cl.corpus_importer.state.utils import MergeResult
+from cl.people_db.models import Person
 from cl.recap.mergers import (
     find_and_disaggregate_docket_object,
     find_docket_object,
@@ -32,6 +33,9 @@ from cl.search.models import Docket, OriginatingCourtInformation
 logger = logging.getLogger(__name__)
 
 FL_APPELLATE_COURT_ID: str = "fladistctapp"
+
+
+class FloridaPartyMerger(Merger[FloridaParty, Person]): ...
 
 
 class AddScraperSource(MergeStrategy[int]):
