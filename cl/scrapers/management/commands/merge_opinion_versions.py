@@ -4,7 +4,8 @@ from collections import defaultdict
 from difflib import Differ, SequenceMatcher
 
 from django.db import transaction
-from django.db.models import Count, F, Q, QuerySet
+from django.db.models import Count, F, Q, QuerySet, Value
+from django.db.models.functions import Greatest
 from eyecite import clean_text
 
 from cl.alerts.models import DocketAlert
@@ -629,7 +630,7 @@ def delete_version_related_objects(version: Opinion) -> None:
     )
     if cited_clusters:
         OpinionCluster.objects.filter(id__in=list(cited_clusters)).update(
-            citation_count=F("citation_count") - 1
+            citation_count=Greatest(F("citation_count") - 1, Value(0))
         )
 
     OpinionsCited.objects.filter(

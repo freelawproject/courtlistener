@@ -3,7 +3,7 @@ import random
 
 import requests
 from django.conf import settings
-from elasticsearch_dsl.response import Response
+from elasticsearch.dsl.response import Response
 from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import (

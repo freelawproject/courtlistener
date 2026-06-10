@@ -63,3 +63,15 @@ SCOTUS_FIXED_SWEEP = env.int("SCOTUS_FIXED_SWEEP", default=100)
 SCOTUS_MAX_PROBE = env.int("SCOTUS_MAX_PROBE", default=16)
 
 OPENAI_TRANSCRIPTION_KEY = env("OPENAI_TRANSCRIPTION_KEY", default=None)
+
+# Audio re-enqueue daemon. Acts as the rate limiter for OpenAI Whisper
+# calls — process_audio_file no longer hands off to dispatch_transcribe,
+# so this daemon is the only path that enqueues transcription tasks.
+# Throughput cap = AUDIO_REENQUEUE_MAX_PER_SWEEP / AUDIO_REENQUEUE_WAIT.
+AUDIO_REENQUEUE_DAEMON_ENABLED = env.bool(
+    "AUDIO_REENQUEUE_DAEMON_ENABLED", default=False
+)
+AUDIO_REENQUEUE_WAIT = env.int("AUDIO_REENQUEUE_WAIT", default=60)
+AUDIO_REENQUEUE_MAX_PER_SWEEP = env.int(
+    "AUDIO_REENQUEUE_MAX_PER_SWEEP", default=5
+)

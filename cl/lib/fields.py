@@ -1,6 +1,6 @@
 from django.db import models
 from django_elasticsearch_dsl import fields
-from elasticsearch_dsl import Join, Percolator
+from elasticsearch.dsl import Join, Percolator
 
 
 class CharNullField(models.CharField):
