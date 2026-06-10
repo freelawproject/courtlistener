@@ -14,6 +14,7 @@ from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
+from redis import ConnectionError as RedisConnectionError
 from waffle import switch_is_active
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
@@ -26,6 +27,7 @@ from cl.alerts.utils import (
     override_alert_query,
     percolate_es_document,
     prepare_percolator_content,
+    remove_alert_hits_set,
     scheduled_alert_hits_limit_reached,
     transform_percolator_child_document,
 )
@@ -920,3 +922,24 @@ def es_save_alert_document(
     )
     if doc_indexed not in ["created", "updated"]:
         logger.warning("Error indexing Alert ID %s:", alert.pk)
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(RedisConnectionError,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def remove_alert_hits_set_task(self: Task, alert_id: int) -> None:
+    """Remove every Redis SET storing document hits for a deleted alert.
+
+    This runs the cleanup in a worker so it doesn't block the request that
+    deleted the Alert, and so a transient Redis ``ConnectionError`` is retried.
+
+    :param self: The celery task.
+    :param alert_id: The ID of the deleted Alert whose hit sets to remove.
+    :return: None
+    """
+    r = get_redis_interface("CACHE")
+    remove_alert_hits_set(r, alert_id)

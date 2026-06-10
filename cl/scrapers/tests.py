@@ -60,6 +60,7 @@ from cl.scrapers.management.commands import (
     update_from_text,
 )
 from cl.scrapers.management.commands.merge_opinion_versions import (
+    delete_version_related_objects,
     merge_judge_names,
     merge_versions_by_download_url,
     passes_length_ratio_check,
@@ -2062,6 +2063,30 @@ class LengthRatioCheckTest(SimpleTestCase):
                 passes, ratio = passes_length_ratio_check(text1, text2)
                 self.assertFalse(passes)
                 self.assertEqual(ratio, 0.0)
+
+
+class DeleteVersionRelatedObjectsTest(TestCase):
+    """Tests for the delete_version_related_objects helper."""
+
+    def test_decrement_clamps_at_zero(self):
+        """citation_count must not go negative when a version is deleted
+        from a cluster whose count is already 0. See #7393
+        """
+        cited_cluster = OpinionClusterWithParentsFactory.create(
+            citation_count=0
+        )
+        cited_opinion = OpinionFactory.create(cluster=cited_cluster)
+        version = OpinionFactory.create(
+            cluster=OpinionClusterWithParentsFactory.create()
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=version, cited_opinion=cited_opinion
+        )
+
+        delete_version_related_objects(version)
+
+        cited_cluster.refresh_from_db()
+        self.assertEqual(cited_cluster.citation_count, 0)
 
 
 class DeleteDuplicatesTest(TestCase):
