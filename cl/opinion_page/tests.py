@@ -17,6 +17,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
+from django.http import HttpResponse
 from django.template import engines
 from django.test import (
     AsyncRequestFactory,
@@ -30,6 +31,7 @@ from django.urls import reverse
 from django_cotton.compiler_regex import CottonCompiler
 from factory import RelatedFactory
 from lxml.html import fromstring
+from waffle.models import Flag
 from waffle.testutils import override_flag
 
 from cl.citations.utils import slugify_reporter
@@ -3019,3 +3021,128 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
 
         self.assertIsNotNone(drawer)
         self.assertNotIn("data-has-errors", drawer.attrib)
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="test_docket_filter_pagination_waffle")
+@override_flag("use_new_design", active=True)
+class DocketFilterPaginationWiringTest(TestCase):
+    """Tests to ensure filter and pagination components appear as intended and
+    that filters are connected to queryset.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.docket = DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+        )
+        # Five entries numbered 1–5 for filter assertions.
+        DocketEntry.objects.bulk_create(
+            [
+                DocketEntry(
+                    docket=cls.docket,  # type: ignore[misc]
+                    entry_number=n,
+                    date_filed=date(2024, 1, n),
+                )
+                for n in range(1, 6)
+            ]
+        )
+
+    async def _get_docket_and_verify_v2(
+        self, data: dict | None = None
+    ) -> HttpResponse:
+        """Fetch the docket page, assert that v2 actually rendered, and
+        return the response.
+        """
+        flag = await sync_to_async(Flag.objects.get)(name="use_new_design")
+        self.assertTrue(
+            flag.everyone,
+            f"use_new_design flag is not everyone=True; got {flag.everyone!r}",
+        )
+        r = await self.async_client.get(
+            reverse(
+                "view_docket",
+                args=[self.docket.pk, self.docket.slug],
+            ),
+            data,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "v2_docket.html")
+        return r  # type: ignore[return-value]
+
+    async def test_filter_form_fields_render(self) -> None:
+        """Every named filter input must be in the rendered page so users
+        and form submissions both find it.
+        """
+        r = await self._get_docket_and_verify_v2()
+        content = r.content.decode()
+        for field in (
+            'name="filed_after"',
+            'name="filed_before"',
+            'name="entry_gte"',
+            'name="entry_lte"',
+            'name="order_by"',
+        ):
+            with self.subTest(field=field):
+                self.assertIn(field, content, f"filter field {field} missing")
+
+    async def test_filter_params_narrow_queryset(self) -> None:
+        """`?entry_gte=3` must drop entries 1 and 2 from the page's
+        `docket_entries` queryset — proves the filter form is actually
+        wired to the view, not just rendered."""
+        r = await self._get_docket_and_verify_v2(data={"entry_gte": "3"})
+        numbers = sorted(e.entry_number for e in r.context["docket_entries"])
+        self.assertEqual(numbers, [3, 4, 5])
+
+    async def test_pagination_nav_renders_with_multiple_pages(self) -> None:
+        """The bottom <c-pagination> only renders its <nav> when
+        `page_obj.has_other_pages` is truthy. Create enough entries to
+        spill onto a second page and assert the nav landmark and a
+        page=2 link both appear."""
+        await sync_to_async(DocketEntry.objects.bulk_create)(
+            [
+                DocketEntry(
+                    docket=self.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 6, 1),
+                    description=f"bulk entry {n}",
+                )
+                for n in range(100, 311)
+            ]
+        )
+        r = await self._get_docket_and_verify_v2()
+        content = r.content.decode()
+        self.assertIn('aria-label="Pagination"', content)
+        self.assertIn("page=2", content)
+
+    async def test_pagination_links_preserve_filter_params(self) -> None:
+        """Paging to page 2 must keep the user's filter params — otherwise
+        page 2 would reset to the unfiltered set. This test catches regressions
+        where the tag stops seeing request.GET (e.g. wrong context)."""
+        await sync_to_async(DocketEntry.objects.bulk_create)(
+            [
+                DocketEntry(
+                    docket=self.docket,
+                    entry_number=n,
+                    date_filed=date(2024, 6, 1),
+                    description=f"bulk entry {n}",
+                )
+                for n in range(100, 311)
+            ]
+        )
+        r = await self._get_docket_and_verify_v2(data={"entry_gte": "1"})
+        content = r.content.decode()
+        # Find every pagination href and check at least one points at
+        # page 2 while also carrying entry_gte=1.
+        tree = fromstring(content)
+        nav = tree.find('.//nav[@aria-label="Pagination"]')
+        assert nav is not None, "pagination nav missing"
+        hrefs = [a.get("href", "") for a in nav.findall(".//a")]
+        page_two_with_filter = [
+            h for h in hrefs if "page=2" in h and "entry_gte=1" in h
+        ]
+        self.assertTrue(
+            page_two_with_filter,
+            f"no pagination link carries entry_gte forward; hrefs={hrefs}",
+        )

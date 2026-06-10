@@ -34,8 +34,25 @@
         </div>
       {% endif %}
 
+      <c-docket-filter
+        :docket="docket"
+        :form="form"
+        :page_obj="docket_entries"
+        :sort_order_asc="sort_order_asc"
+        class="mb-4"
+      />
+
       {# Docket entry rows #}
       <c-docket-entry-rows :docket_entries="docket_entries" />
+
+      <c-pagination
+        :page_obj="docket_entries"
+        show_first
+        show_previous
+        show_page_indicator
+        show_next
+        show_last
+      />
     </c-docket-page>
   </div>
 </div>
