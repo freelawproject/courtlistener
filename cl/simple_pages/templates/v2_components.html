@@ -1345,9 +1345,9 @@ Sample code here.
     <h4 class="mt-3">Demo</h4>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4">
       <p class="text-sm text-greyscale-600 mb-2">Full pagination (all buttons):</p>
-      <c-pagination :page_obj="demo_page_obj" show_first="True" show_previous="True" show_page_indicator="True" show_next="True" show_last="True" />
+      <c-pagination :page_obj="demo_page_obj" show_first show_previous show_page_indicator show_next show_last />
       <p class="text-sm text-greyscale-600 mb-2 mt-4">Prev/Next only:</p>
-      <c-pagination :page_obj="demo_page_obj" show_previous="True" show_next="True" />
+      <c-pagination :page_obj="demo_page_obj" show_previous show_next />
     </div>
 
     <c-library.list title="Props" only>
@@ -1390,18 +1390,18 @@ Sample code here.
 &lt;!-- Full pagination (bottom of entries) --&gt;
 &lt;c-pagination
   :page_obj="docket_entries"
-  show_first="True"
-  show_previous="True"
-  show_page_indicator="True"
-  show_next="True"
-  show_last="True"
+  show_first
+  show_previous
+  show_page_indicator
+  show_next
+  show_last
 /&gt;
 
 &lt;!-- Prev/Next only (in toolbar) --&gt;
 &lt;c-pagination
   :page_obj="docket_entries"
-  show_previous="True"
-  show_next="True"
+  show_previous
+  show_next
 /&gt;
       </c-code>
     </c-expansion-panel>
