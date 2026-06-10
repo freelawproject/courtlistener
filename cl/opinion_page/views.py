@@ -916,7 +916,7 @@ async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
         download_file_path = cluster.filepath_pdf_harvard.url
         embeddable_pdfs.append(
             {
-                "label": "Harvard PDF",
+                "label": "Case Law Access Project Scan",
                 "url": cluster.filepath_pdf_harvard.url,
                 "id": "harvard",
             }

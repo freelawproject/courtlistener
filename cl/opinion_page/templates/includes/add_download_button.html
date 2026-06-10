@@ -12,7 +12,7 @@
         <li>
             <a href="{{ cluster.filepath_pdf_harvard.url }}"
                rel="nofollow">
-                Download Case Law Scan
+                Download Case Law Access Project Scan
             </a>
           </li>
         {% endif %}
@@ -43,7 +43,7 @@
         {% endfor %}
     {% if cluster.opinions_versions %}
         <li role="separator" class="divider"></li>
-        <li><a href="#"><b>Versions</b></a></li>
+        <li class="dropdown-header">Versions</li>
         {% for sub_opinion in cluster.opinions_versions %}
             {% if sub_opinion.local_path %}
                 <li><a href="{{ sub_opinion.local_path.url }}" rel="nofollow">{{ sub_opinion.get_type_display }} · {{ sub_opinion.date_created|date:"M j, Y H:i" }}</a></li>

@@ -2814,8 +2814,16 @@ class OpinionCluster(AbstractDateTimeModel):
         return sub_opinions
 
     @cached_property
-    def opinion_main_version(self):
-        # Fetch opinion main version of the cluster
+    def opinion_main_version(self) -> QuerySet["Opinion"]:
+        """Fetch the main (non-versioned) sub-opinions of the cluster.
+
+        Despite the singular name, a cluster can have several main-version
+        opinions (e.g. Lead Opinion, Concurrence, Dissent), so this returns
+        a queryset that may contain many opinions.
+
+        :return: A queryset of the cluster's main-version sub-opinions.
+        :rtype: QuerySet[Opinion]
+        """
         return self.sub_opinions.filter(main_version__isnull=True)
 
     @cached_property
