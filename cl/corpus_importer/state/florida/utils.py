@@ -1,21 +1,24 @@
 import logging
 import re
 
+from juriscraper.state.florida.courts import FloridaCourtID
+
 from cl.lib.string_utils import normalize_dashes
 
 logger = logging.getLogger(__name__)
 
-# Non-comprehensive list of court IDs that can be handled by Florida make_docket_number_core
-FLORIDA_COURT_IDS: set[str] = {
-    "fla",
-    "fladistctapp",
-    "fladistctapp1",
-    "fladistctapp2",
-    "fladistctapp3",
-    "fladistctapp4",
-    "fladistctapp5",
-    "fladistctapp6",
+FLORIDA_COURT_ID_MAP: dict[str, str] = {
+    FloridaCourtID.SUPREME_COURT.value: "fla",
+    FloridaCourtID.FIRST_COA.value: "fladistctapp1",
+    FloridaCourtID.SECOND_COA.value: "fladistctapp2",
+    FloridaCourtID.THIRD_COA.value: "fladistctapp3",
+    FloridaCourtID.FOURTH_COA.value: "fladistctapp4",
+    FloridaCourtID.FIFTH_COA.value: "fladistctapp5",
+    FloridaCourtID.SIXTH_COA.value: "fladistctapp6",
 }
+
+# Non-comprehensive list of court IDs that can be handled by Florida make_docket_number_core
+FLORIDA_COURT_IDS: set[str] = set(FLORIDA_COURT_ID_MAP.values())
 
 
 def is_florida_court(court_id: str) -> bool:

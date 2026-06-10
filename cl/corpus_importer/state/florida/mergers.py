@@ -4,9 +4,12 @@ from typing import override
 
 from asgiref.sync import async_to_sync
 from juriscraper.state.florida import FloridaCase
-from juriscraper.state.florida.courts import FloridaCourtID
+from juriscraper.state.florida.cases import FloridaCourtID
 
-from cl.corpus_importer.state.florida.utils import make_docket_number_core
+from cl.corpus_importer.state.florida.utils import (
+    FLORIDA_COURT_ID_MAP,
+    make_docket_number_core,
+)
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
     Constant,
@@ -29,16 +32,6 @@ from cl.search.models import Docket, OriginatingCourtInformation
 logger = logging.getLogger(__name__)
 
 FL_APPELLATE_COURT_ID: str = "fladistctapp"
-
-FLORIDA_COURT_ID_MAP: dict[str, str] = {
-    FloridaCourtID.SUPREME_COURT.value: "fla",
-    FloridaCourtID.FIRST_COA.value: "fladistctapp1",
-    FloridaCourtID.SECOND_COA.value: "fladistctapp2",
-    FloridaCourtID.THIRD_COA.value: "fladistctapp3",
-    FloridaCourtID.FOURTH_COA.value: "fladistctapp4",
-    FloridaCourtID.FIFTH_COA.value: "fladistctapp5",
-    FloridaCourtID.SIXTH_COA.value: "fladistctapp6",
-}
 
 
 class AddScraperSource(MergeStrategy[int]):
