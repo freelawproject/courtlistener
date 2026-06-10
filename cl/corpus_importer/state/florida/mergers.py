@@ -59,14 +59,15 @@ def _date_last_filing(docket_data: FloridaCase) -> date | None:
     return filing_dates[-1] if filing_dates else docket_data.date_filed
 
 
-def _originating_case_number(docket_data: FloridaCase) -> str:
-    if len(docket_data.originating_cases) > 1:
+def _originating_case_number(docket_data: FloridaCase) -> str | None:
+    if not docket_data.originating_cases:
         return None
     return docket_data.originating_cases[0].case_number
 
 
 def _appeal_from_id(docket_data: FloridaCase) -> str | None:
-    if len(docket_data.originating_cases) > 1:
+    # Multiple originating cases are ambiguous, so leave the field unset.
+    if len(docket_data.originating_cases) != 1:
         return None
     return FLORIDA_COURT_ID_MAP.get(
         docket_data.originating_cases[0].court_id.value, None
@@ -74,7 +75,8 @@ def _appeal_from_id(docket_data: FloridaCase) -> str | None:
 
 
 def _appeal_from_str(docket_data: FloridaCase) -> str | None:
-    if len(docket_data.originating_cases) > 1:
+    # Multiple originating cases are ambiguous, so leave the field unset.
+    if len(docket_data.originating_cases) != 1:
         return None
     return docket_data.originating_cases[0].court_name
 
@@ -112,7 +114,10 @@ def merge_oci(docket: Docket, docket_data: FloridaCase) -> MergeResult:
     :param docket: The docket to merge the OCI for.
     :param docket_data: The scraped Florida docket information.
     :return: The result of the attempted merge operation."""
-    if docket_data.court_id != FloridaCourtID.SUPREME_COURT.value:
+    if (
+        docket_data.court_id != FloridaCourtID.SUPREME_COURT.value
+        or not docket_data.originating_cases
+    ):
         logger.info(
             "Skipping unnecessary OCI merge for Florida docket %s in court %s",
             docket_data.docket_number,
@@ -181,6 +186,7 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
         PassAll(),
         gate=lambda docket_data: (
             docket_data.court_id == FloridaCourtID.SUPREME_COURT.value
+            and bool(docket_data.originating_cases)
         ),
         relationship=Relationship.OneToOne,
     )

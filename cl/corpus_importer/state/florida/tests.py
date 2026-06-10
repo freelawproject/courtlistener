@@ -106,6 +106,23 @@ class FloridaMergerTest(TestCase):
         assert existing_oci.docket_number == "UPDATED-001"
         assert existing_oci.docket_number_raw == "UPDATED-001"
 
+    def test_merge_oci_no_originating_cases_skips(self):
+        """Does merge_oci skip OCI merging when there are no originating
+        cases?"""
+        self.docket_sc.originating_court_information = None
+        self.docket_sc.save()
+
+        docket_data = FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            originating_cases=[],
+        )
+
+        result = merge_oci(self.docket_sc, docket_data)
+
+        assert result.success is True
+        assert result.create is False
+        assert result.update is False
+
     def test_merge_oci_multiple_originating_cases_uses_first(self):
         """Does merge_oci pick the first originating case when several exist?"""
         self.docket_sc.originating_court_information = None
