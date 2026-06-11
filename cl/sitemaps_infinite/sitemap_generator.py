@@ -82,18 +82,24 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
     # count the number of files generated, stop when we reach the limit
     num_files: int = 0
-    current_page: int = cursor_data.get("last_page")
-    # logger.debug(f"Current page: {current_page}")
     forced_exit = False
 
-    # Iterate over the sitemap sections, find the place where we left off, and continue from there
-    for section, sitemapClass in pregenerated_sitemaps.items():
-        # Get from the cache the cursor value for the sitemap section, processed last time
-        cursor_section: str | None = cursor_data.get("section")
+    resuming_section: str | None = cursor_data.get("section")
+    resuming = resuming_section is not None and resuming_section in pregenerated_sitemaps
 
-        if cursor_section is not None and section != cursor_section:
-            # the `section` was already processed before, moving to the next section
-            continue
+    for section, sitemapClass in pregenerated_sitemaps.items():
+        if resuming:
+            if section != resuming_section:
+                # Skip this section because we haven't reached the resuming section yet
+                continue
+            else:
+                # We reached the resuming section! Use the resumed page count.
+                current_page = int(cursor_data.get("last_page", 1))
+                # Turn off resuming mode so subsequent sections are processed starting at page 1
+                resuming = False
+        else:
+            # We are not in resuming mode. Start this section fresh at page 1.
+            current_page = 1
 
         try:
             sitemapObject: InfinitePaginatorSitemap = sitemapClass()
@@ -267,9 +273,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 num_files += 1
 
         # save the updated cursor data to the cache
+        sanitized_cursor_data = {k: v for k, v in cursor_data.items() if v is not None}
         redis_db.hset(
             HASH_NAME,
-            mapping=cursor_data,
+            mapping=sanitized_cursor_data,
         )
 
     if not forced_exit:
@@ -301,10 +308,11 @@ def make_cache_key(
     scheme = sitemapObject.get_protocol()
     host = sitemapObject.get_domain()
 
-    uri = f"{scheme}://{host}{reverse('sitemaps-pregenerated', kwargs={'section': section})}?p={page}"
+    uri = f"{scheme}://{host}{reverse('sitemaps', kwargs={'section': section})}?p={page}"
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
 
-    return f"sitemap.{section}.{url.hexdigest()}"
+    key = f"sitemap.{section}.{url.hexdigest()}"
+    return key
 
 
 def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:

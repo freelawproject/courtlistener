@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Integration Proposal: U.S. Code Link Service</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #24292f;
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background-color: #ffffff;
+        }
+        h1, h2, h3, h4 {
+            color: #1f2328;
+            font-weight: 600;
+            margin-top: 24px;
+            margin-bottom: 16px;
+            line-height: 1.25;
+        }
+        h1 { font-size: 2em; border-bottom: 1px solid #d0d7de; padding-bottom: .3em; }
+        h2 { font-size: 1.5em; border-bottom: 1px solid #d0d7de; padding-bottom: .3em; }
+        h3 { font-size: 1.25em; }
+        h4 { font-size: 1em; }
+        p, ul, ol, table, pre {
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        a {
+            color: #0969da;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        ul, ol {
+            padding-left: 2em;
+        }
+        li {
+            margin-top: 0.25em;
+        }
+        code {
+            padding: .2em .4em;
+            margin: 0;
+            font-size: 85%;
+            white-space: break-spaces;
+            background-color: rgba(175,184,193,0.2);
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        pre {
+            padding: 16px;
+            overflow: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            font-size: 100%;
+        }
+        table {
+            border-spacing: 0;
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        table th, table td {
+            padding: 6px 13px;
+            border: 1px solid #d0d7de;
+        }
+        table tr {
+            background-color: #ffffff;
+            border-top: 1px solid #hsla(210,18%,87%,1);
+        }
+        table tr:nth-child(even) {
+            background-color: #f6f8fa;
+        }
+        table th {
+            font-weight: 600;
+            background-color: #f0f2f5;
+        }
+        hr {
+            height: .25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: #d0d7de;
+            border: 0;
+        }
+        .alert {
+            padding: 16px;
+            margin-bottom: 16px;
+            border-left: .25em solid;
+            border-radius: 6px;
+        }
+        .alert-important {
+            background-color: #fcf8e3;
+            border-color: #f0ad4e;
+            color: #8a6d3b;
+        }
+        .alert p {
+            margin: 0;
+        }
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({startOnLoad:true, theme: 'neutral'});</script>
+</head>
+<body>
+    <h1>Integration Proposal: U.S. Code Citation Hyperlinking &amp; Link Service</h1>
+<p>This proposal outlines the integration of a local/hosted <strong>U.S. Code Link Service</strong> into <strong>CourtListener</strong> to hyper-link statutory references in case opinions, display them in an interactive side-drawer panel, include them in the Table of Authorities, and render quick-answer rich cards for search results.</p>
+<hr>
+<h2>1. Architectural Overview</h2>
+<p>The integration connects CourtListener&#x27;s django server and front-end interface with a dedicated, lightweight U.S. Code Link Service API. This service ingests official XML schemas from the Office of the Law Revision Counsel (OLRC) and granular XML/HTML structures from GPO GovInfo, resolving and serving clean HTML segments of U.S. Code sections.</p>
+<h3>Request Flow</h3>
+<p>The diagram below illustrates how both front-end (browser) and back-end (CourtListener server) communicate with the U.S. Code Link Service:</p>
+<div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User as User Browser
+    participant CL as CourtListener Server
+    participant US as U.S. Code Link Service
+
+    Note over User, CL: 1. Table of Authorities & Search Card (Server-side)
+    CL->>US: GET /link/uscode/{title}/{section}?link-type=content
+    US-->>CL: Return Section Metadata & HTML Segment
+    CL-->>User: Render Page (e.g. Search Result Card / Table of Authorities)
+
+    Note over User, US: 2. Interactive Side-Drawer Overlay (Client-side)
+    User->>User: Click highlighted "17 U.S.C. § 101" link in opinion
+    User->>US: AJAX: GET /link/uscode/{title}/{section}?link-type=content
+    US-->>User: Return clean HTML segment (no layout wrapper)
+    User->>User: Inject HTML & slide open side drawer panel overlay
+</div>
+<hr>
+<h2>2. Key Features</h2>
+<p>1. <strong>Inline Hyperlinking in Opinions</strong>:</p>
+<ul>
+  <li>Extracts U.S. Code references using <code>eyecite</code> in <code>annotate_citations.py</code>.</li>
+  <li>Unmatched citations corresponding to <code>U.S.C.</code> are wrapped in a <code>&lt;span class=&quot;citation us-code-citation&quot;&gt;</code> with <code>data-title</code> and <code>data-section</code> attributes.</li>
+  <li>Fallback hyperlink redirects to the U.S. Code Service&#x27;s public HTML view for the section.</li>
+</ul>
+<p>2. <strong>Interactive Side-Drawer Panel (Overlay)</strong>:</p>
+<ul>
+  <li>Clicking a U.S. Code hyperlink intercepts the navigation and fetches the section text asynchronously via AJAX from the U.S. Code Service.</li>
+  <li>Content is displayed in a sliding drawer overlay panel without taking the user away from the opinion they are reading.</li>
+</ul>
+<p>3. <strong>Statutory Table of Authorities</strong>:</p>
+<ul>
+  <li>Scans the pre-annotated opinion HTML to extract cited U.S. Code sections.</li>
+  <li>Renders a dedicated <strong>Statutory Authorities (U.S. Code)</strong> list under the Table of Authorities tab, sorted numerically by title and section.</li>
+</ul>
+<p>4. <strong>Search Rich Cards</strong>:</p>
+<ul>
+  <li>Detects U.S. Code queries in searches (e.g., searching for <code>17 U.S.C. 101</code>).</li>
+  <li>Fetches the corresponding section text and displays a <strong>Statutory Authority Quick Answer</strong> card above case search results.</li>
+</ul>
+<hr>
+<h2>3. Changes Introduced to CourtListener</h2>
+<p>The integration touches a few key components in the CourtListener codebase:</p>
+<table>
+  <thead>
+    <tr>
+      <th>Component / File</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/citations/annotate_citations.py"><code>cl/citations/annotate_citations.py</code></a></strong></td>
+      <td>Identifies unmatched <code>FullLawCitation</code> records with reporter <code>U.S.C.</code> and wraps them in custom span markup.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/settings/django.py"><code>cl/settings/django.py</code></a></strong></td>
+      <td>Adds <code>USCODE_API_URL</code> environment setting to route server-side requests.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/settings/project/security.py"><code>cl/settings/project/security.py</code></a></strong></td>
+      <td>Whitelists localhost/wildcard port 8000 in development mode inside the Content Security Policy <code>connect-src</code> list.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/assets/static-global/js/opinions.js"><code>cl/assets/static-global/js/opinions.js</code></a></strong></td>
+      <td>Intercepts citation clicks, calls the AJAX API endpoint dynamically based on the current hostname, and opens the side drawer.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/opinion_page/templates/opinions.html"><code>cl/opinion_page/templates/opinions.html</code></a></strong></td>
+      <td>Incorporates the HTML structure of the dismissible side-drawer panel overlay.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/assets/static-global/css/opinions.css"><code>cl/assets/static-global/css/opinions.css</code></a></strong></td>
+      <td>Adds styles for the side-drawer panel, scroll container, and formats USLM/XML tag indentations (<code>subsection</code>, <code>paragraph</code>, etc.).</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/opinion_page/views.py"><code>cl/opinion_page/views.py</code></a></strong></td>
+      <td>Parses opinion HTML for U.S. Code spans to populate the Table of Authorities context.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/opinion_page/templates/includes/opinion_tabs_content.html"><code>cl/opinion_page/templates/includes/opinion_tabs_content.html</code></a></strong></td>
+      <td>Renders the statutory list in the Table of Authorities tab.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/search/views.py"><code>cl/search/views.py</code></a></strong></td>
+      <td>Resolves search query citations to U.S. Code and requests section previews.</td>
+    </tr>
+    <tr>
+      <td><strong><a href="file:///home/brian/.gemini/antigravity/scratch/courtlistener/cl/search/templates/search.html"><code>cl/search/templates/search.html</code></a></strong></td>
+      <td>Renders the rich quick-answer card for search results.</td>
+    </tr>
+  </tbody>
+</table>
+<hr>
+<h2>4. Current Scope &amp; Limitations</h2>
+<div class="alert alert-important"><div class="alert-title">IMPORTANT</div><p><strong>Title 17 (Copyrights) Only</strong> During this initial phase, the U.S. Code Link Service is restricted to indexing <strong>Title 17</strong> (Copyrights) for the year 2023. This limitation was introduced to keep the local test database lightweight and minimize storage/bandwidth requirements during development and evaluation. <strong>Future Scalability</strong> The parser and celery ingestion tasks in the service are fully generic. Adding support for all titles in the U.S. Code requires no code modifications—only running the ingestion command with the corresponding title numbers.</p></div>
+<hr>
+<h2>5. Local Evaluation &amp; Testing</h2>
+<p>You can spin up a fully functioning local test environment containing the integration:</p>
+<p>1. <strong>Start the environment</strong>:</p>
+<pre><code class="language-bash">   docker compose up -d</code></pre>
+<p>2. <strong>Seed the database</strong> (creates a test SCOTUS docket <code>26-9999</code> with Title 17 references):</p>
+<pre><code class="language-bash">   docker exec -i cl-django python manage.py shell &lt; create_test_data.py</code></pre>
+<p>3. <strong>Verify Interactive Drawer</strong>:</p>
+<ul>
+  <li>Navigate to the test opinion at <code>http://localhost:8080/opinion/3/acme-corp-v-beta-inc/</code>.</li>
+  <li>Click on <strong><code>17 U.S.C. § 101</code></strong> and verify the side drawer opens with the statute text.</li>
+</ul>
+<p>4. <strong>Verify Table of Authorities</strong>:</p>
+<ul>
+  <li>Go to <code>http://localhost:8080/opinion/3/acme-corp-v-beta-inc/authorities/</code>.</li>
+  <li>Verify the <strong>Statutory Authorities (U.S. Code)</strong> list is rendered and sorted.</li>
+</ul>
+</body>
+</html>

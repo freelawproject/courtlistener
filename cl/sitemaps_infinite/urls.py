@@ -4,7 +4,8 @@ from django.contrib.sitemaps import views as sitemaps_views
 from django.urls import path
 from django.views.decorators.cache import cache_page
 
-from cl.opinion_page.sitemap import DocketSitemap
+from cl.audio.sitemap import AudioSitemap
+from cl.opinion_page.sitemap import DocketSitemap, OpinionSitemap
 from cl.search.models import SEARCH_TYPES
 from cl.sitemap import cached_sitemap
 
@@ -12,6 +13,8 @@ from cl.sitemap import cached_sitemap
 pregenerated_sitemaps = OrderedDict(
     {
         SEARCH_TYPES.RECAP: DocketSitemap,
+        SEARCH_TYPES.OPINION: OpinionSitemap,
+        SEARCH_TYPES.ORAL_ARGUMENT: AudioSitemap,
     }
 )
 
