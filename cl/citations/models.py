@@ -10,8 +10,8 @@ from cl.search.models import BaseCitation, Citation, Opinion, RECAPDocument
 
 class BaseUnmatchedCitation(BaseCitation):
     """
-    Track citations that couldn't be resolved to a RecapDocument or
-    OpinionCluster
+    Track citations found in a citing Opinion or RECAPDocument that
+    couldn't be resolved to a cluster
     """
 
     NO_CITATION = 1
@@ -172,9 +172,17 @@ class UnmatchedCitationFromRECAPDocument(BaseUnmatchedCitation):
                 fields=["volume", "reporter", "page"],
             )
         ]
-        unique_together = (
-            ("citing_recapdocument", "volume", "reporter", "page"),
-        )
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "citing_recapdocument",
+                    "volume",
+                    "reporter",
+                    "page",
+                ],
+                name="unique_unmatchedcitationfromrecap_cite",
+            )
+        ]
 
     @classmethod
     def create_from_eyecite(

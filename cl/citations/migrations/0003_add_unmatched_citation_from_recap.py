@@ -33,7 +33,10 @@ class Migration(migrations.Migration):
             ],
             options={
                 'indexes': [models.Index(fields=['volume', 'reporter', 'page'], name='citations_u_volume_7a3087_idx')],
-                'unique_together': {('citing_recapdocument', 'volume', 'reporter', 'page')},
             },
+        ),
+        migrations.AddConstraint(
+            model_name='unmatchedcitationfromrecapdocument',
+            constraint=models.UniqueConstraint(fields=('citing_recapdocument', 'volume', 'reporter', 'page'), name='unique_unmatchedcitationfromrecap_cite'),
         ),
     ]

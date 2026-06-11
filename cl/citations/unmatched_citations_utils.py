@@ -77,6 +77,7 @@ def update_unmatched_citations_status(
         ]
     ]
 
+    citations_to_update = []
     for found in found_citations:
         if found.citation_string in resolved_citations:
             found.status = BaseUnmatchedCitation.RESOLVED
@@ -87,7 +88,15 @@ def update_unmatched_citations_status(
             ]:
                 continue
             found.status = BaseUnmatchedCitation.FAILED
-        found.save()
+        citations_to_update.append(found)
+
+    if citations_to_update:
+        # All citations in a call share the same concrete model, so we can
+        # update them in a single query. No post_save signals are attached
+        # to these models, so bulk_update bypasses nothing.
+        type(citations_to_update[0]).objects.bulk_update(
+            citations_to_update, ["status"]
+        )
 
 
 def store_unmatched_citations(
