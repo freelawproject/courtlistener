@@ -126,6 +126,95 @@ class DocketEntryFilterForm(forms.Form):
         return data
 
 
+class DocketEntryFilterFormV2(forms.Form):
+    """V2 docket page filter form, parallel to DocketEntryFilterForm with Tailwind-tuned widgets."""
+
+    ASCENDING = "asc"
+    DESCENDING = "desc"
+    DOCKET_ORDER_BY_CHOICES = (
+        (ASCENDING, "Ascending"),
+        (DESCENDING, "Descending"),
+    )
+
+    entry_gte = forms.IntegerField(
+        required=False,
+        min_value=0,
+        label="Document # from",
+        label_suffix="",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "input-text w-full md:w-20",
+                "placeholder": "From",
+                "min": "0",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    entry_lte = forms.IntegerField(
+        required=False,
+        min_value=0,
+        label="Document # to",
+        label_suffix="",
+        widget=forms.NumberInput(
+            attrs={
+                "class": "input-text w-full md:w-20",
+                "placeholder": "To",
+                "min": "0",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    filed_after = FloorDateField(
+        required=False,
+        label="Filed after",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "input-text w-full md:w-32",
+                "placeholder": "MM/DD/YYYY",
+                "data-flatpickr-after": "",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    filed_before = CeilingDateField(
+        required=False,
+        label="Filed before",
+        label_suffix="",
+        widget=forms.TextInput(
+            attrs={
+                "class": "input-text w-full md:w-32",
+                "placeholder": "MM/DD/YYYY",
+                "data-flatpickr-before": "",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    order_by = forms.ChoiceField(
+        choices=DOCKET_ORDER_BY_CHOICES,
+        required=False,
+        label="Sort order",
+        label_suffix="",
+        initial=ASCENDING,
+        widget=forms.RadioSelect(),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop("request", None)
+        super().__init__(*args, **kwargs)
+
+    def clean_order_by(self):
+        data = self.cleaned_data["order_by"]
+        if data:
+            return data
+        if not self.request.user.is_authenticated:
+            return data
+        user: UserProfile.user = self.request.user
+        if user.profile.docket_default_order_desc:
+            return DocketEntryFilterFormV2.DESCENDING
+        return data
+
+
 class BaseCourtUploadForm(forms.Form):
     """Base form to be used with court uploads
 

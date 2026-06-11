@@ -47,7 +47,7 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.forms import (
-    DocketEntryFilterForm,
+    DocketEntryFilterFormV2,
     MeCourtUploadForm,
     MissCourtUploadForm,
     MoCourtUploadForm,
@@ -2971,7 +2971,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
         cls.docket = DocketFactory(court=cls.court, source=Docket.RECAP)
         cls.empty_page = Paginator([], 200).get_page(1)
 
-    def _render(self, form: DocketEntryFilterForm) -> str:
+    def _render(self, form: DocketEntryFilterFormV2) -> str:
         # Render via a wrapper template that invokes <c-docket-filter> as a
         # child component, instead of rendering cotton/docket_filter.html
         # directly — the latter declares `form` and `docket` as c-vars, which
@@ -3011,7 +3011,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
     def test_data_has_errors_lands_on_drawer_when_form_invalid(self) -> None:
         request = RequestFactory().get("/?entry_gte=abc")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = DocketEntryFilterFormV2(request.GET, request=request)
         self.assertFalse(form.is_valid())
 
         drawer = self._find_drawer(self._render(form))
@@ -3031,7 +3031,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
     def test_no_data_has_errors_when_form_is_clean(self) -> None:
         request = RequestFactory().get("/")
         request.user = AnonymousUser()
-        form = DocketEntryFilterForm(request.GET, request=request)
+        form = DocketEntryFilterFormV2(request.GET, request=request)
         self.assertTrue(form.is_valid())
 
         drawer = self._find_drawer(self._render(form))

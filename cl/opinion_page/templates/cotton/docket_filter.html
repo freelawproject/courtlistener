@@ -1,4 +1,4 @@
-{% load component_tags svg_tags %}
+{% load component_tags extras svg_tags %}
 {% require_script "js/alpine/components/docket_filter.js" %}
 {% require_script "js/third_party/flatpickr/flatpickr@4.6.13" %}
 {# frontend-checks-skip: check_hardcoded_ids #}
@@ -54,56 +54,24 @@
         {# Date range #}
         <div class="flex items-end gap-2">
           <div>
-            <label for="filed-after-desktop" class="text-sm font-medium text-greyscale-700">Filed after</label>
-            <input
-              type="text"
-              name="filed_after"
-              id="filed-after-desktop"
-              data-flatpickr-after
-              value="{{ form.filed_after.value|default_if_none:'' }}"
-              class="input-text w-32"
-              placeholder="MM/DD/YYYY"
-            />
+            <label for="id_filed_after_desktop" class="text-sm font-medium text-greyscale-700">{{ form.filed_after.label }}</label>
+            {% render_field_with_id form.filed_after "id_filed_after_desktop" %}
           </div>
           <div>
-            <label for="filed-before-desktop" class="text-sm font-medium text-greyscale-700">Filed before</label>
-            <input
-              type="text"
-              name="filed_before"
-              id="filed-before-desktop"
-              data-flatpickr-before
-              value="{{ form.filed_before.value|default_if_none:'' }}"
-              class="input-text w-32"
-              placeholder="MM/DD/YYYY"
-            />
+            <label for="id_filed_before_desktop" class="text-sm font-medium text-greyscale-700">{{ form.filed_before.label }}</label>
+            {% render_field_with_id form.filed_before "id_filed_before_desktop" %}
           </div>
         </div>
 
         {# Document number range #}
         <div class="flex items-end gap-2">
           <div>
-            <label for="entry-gte-desktop" class="text-sm font-medium text-greyscale-700">Document # from</label>
-            <input
-              type="number"
-              name="entry_gte"
-              id="entry-gte-desktop"
-              value="{{ form.entry_gte.value|default_if_none:'' }}"
-              min="0"
-              class="input-text w-20"
-              placeholder="From"
-            />
+            <label for="id_entry_gte_desktop" class="text-sm font-medium text-greyscale-700">{{ form.entry_gte.label }}</label>
+            {% render_field_with_id form.entry_gte "id_entry_gte_desktop" %}
           </div>
           <div>
-            <label for="entry-lte-desktop" class="text-sm font-medium text-greyscale-700">Document # to</label>
-            <input
-              type="number"
-              name="entry_lte"
-              id="entry-lte-desktop"
-              value="{{ form.entry_lte.value|default_if_none:'' }}"
-              min="0"
-              class="input-text w-20"
-              placeholder="To"
-            />
+            <label for="id_entry_lte_desktop" class="text-sm font-medium text-greyscale-700">{{ form.entry_lte.label }}</label>
+            {% render_field_with_id form.entry_lte "id_entry_lte_desktop" %}
           </div>
         </div>
 
@@ -176,54 +144,22 @@
         <div class="flex flex-col gap-4">
           {# Date range #}
           <div>
-            <label for="filed-after-mobile" class="text-sm font-medium text-greyscale-700">Filed after</label>
-            <input
-              type="text"
-              name="filed_after"
-              id="filed-after-mobile"
-              data-flatpickr-after
-              value="{{ form.filed_after.value|default_if_none:'' }}"
-              class="input-text w-full mt-1"
-              placeholder="MM/DD/YYYY"
-            />
+            <label for="id_filed_after_mobile" class="text-sm font-medium text-greyscale-700">{{ form.filed_after.label }}</label>
+            {% render_field_with_id form.filed_after "id_filed_after_mobile" %}
           </div>
           <div>
-            <label for="filed-before-mobile" class="text-sm font-medium text-greyscale-700">Filed before</label>
-            <input
-              type="text"
-              name="filed_before"
-              id="filed-before-mobile"
-              data-flatpickr-before
-              value="{{ form.filed_before.value|default_if_none:'' }}"
-              class="input-text w-full mt-1"
-              placeholder="MM/DD/YYYY"
-            />
+            <label for="id_filed_before_mobile" class="text-sm font-medium text-greyscale-700">{{ form.filed_before.label }}</label>
+            {% render_field_with_id form.filed_before "id_filed_before_mobile" %}
           </div>
 
           {# Document number range #}
           <div>
-            <label for="entry-gte-mobile" class="text-sm font-medium text-greyscale-700">Document # from</label>
-            <input
-              type="number"
-              name="entry_gte"
-              id="entry-gte-mobile"
-              value="{{ form.entry_gte.value|default_if_none:'' }}"
-              min="0"
-              class="input-text w-full mt-1"
-              placeholder="From"
-            />
+            <label for="id_entry_gte_mobile" class="text-sm font-medium text-greyscale-700">{{ form.entry_gte.label }}</label>
+            {% render_field_with_id form.entry_gte "id_entry_gte_mobile" %}
           </div>
           <div>
-            <label for="entry-lte-mobile" class="text-sm font-medium text-greyscale-700">Document # to</label>
-            <input
-              type="number"
-              name="entry_lte"
-              id="entry-lte-mobile"
-              value="{{ form.entry_lte.value|default_if_none:'' }}"
-              min="0"
-              class="input-text w-full mt-1"
-              placeholder="To"
-            />
+            <label for="id_entry_lte_mobile" class="text-sm font-medium text-greyscale-700">{{ form.entry_lte.label }}</label>
+            {% render_field_with_id form.entry_lte "id_entry_lte_mobile" %}
           </div>
 
           {# Sort order #}

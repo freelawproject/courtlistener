@@ -38,6 +38,7 @@ from cl.disclosures.models import (
 )
 from cl.favorites.models import Prayer
 from cl.favorites.utils import get_lifetime_prayer_stats
+from cl.opinion_page.forms import DocketEntryFilterFormV2
 from cl.people_db.models import Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
@@ -671,16 +672,6 @@ async def components(request: HttpRequest) -> HttpResponse:
         def next_page_number(self) -> int:
             return self.number + 1
 
-    class MockFieldValue:
-        value = None
-
-    class MockDocketFilterForm:
-        errors: dict[str, list[str]] = {}
-        filed_after = MockFieldValue()
-        filed_before = MockFieldValue()
-        entry_gte = MockFieldValue()
-        entry_lte = MockFieldValue()
-
     class MockDocket:
         pk = 12345
 
@@ -692,7 +683,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             "demo_docket_entries": Page(demo_entries, 3, MockPaginator()),
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
-            "demo_filter_form": MockDocketFilterForm(),
+            "demo_filter_form": DocketEntryFilterFormV2(request=request),
         },
     )
 

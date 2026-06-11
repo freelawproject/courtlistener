@@ -73,6 +73,7 @@ from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
     DocketEntryFilterForm,
+    DocketEntryFilterFormV2,
     MeCourtUploadForm,
     MissCourtUploadForm,
     MoCourtUploadForm,
@@ -351,7 +352,14 @@ async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     sort_order_asc = True
-    form = DocketEntryFilterForm(request.GET, request=request)
+    use_new_design = await sync_to_async(waffle.flag_is_active)(
+        request, "use_new_design"
+    )
+    form: DocketEntryFilterForm | DocketEntryFilterFormV2
+    if use_new_design:
+        form = DocketEntryFilterFormV2(request.GET, request=request)
+    else:
+        form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
     de_list = await fetch_docket_entries(docket)
