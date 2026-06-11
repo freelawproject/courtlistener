@@ -37,7 +37,6 @@ class AudioSitemap(InfinitePaginatorSitemap):
         return latest_modified.date_modified if latest_modified else None
 
 
-
 class BlockedAudioSitemap(sitemaps.Sitemap):
     changefreq = "daily"
     limit = 50_000

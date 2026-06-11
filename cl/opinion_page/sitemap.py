@@ -48,28 +48,9 @@ class OpinionSitemap(InfinitePaginatorSitemap):
         return latest_modified.date_modified if latest_modified else None
 
     def priority(self, obj: OpinionCluster) -> float:
-        # Priority gradient based on popularity/precedent
-        try:
-            cites = obj.citation_count
-        except AttributeError:
-            cites = 0
-
-        try:
-            status = obj.precedential_status
-        except AttributeError:
-            status = PRECEDENTIAL_STATUS.PUBLISHED
-
-        # Precedential/Highly Cited
-        if status == PRECEDENTIAL_STATUS.PUBLISHED:
-            if cites >= 10:
-                return 0.8
-            return 0.6
-        
-        # Non-precedential / Unpublished or other
-        if cites >= 1:
-            return 0.5
-        return 0.4
-
+        if obj.precedential_status == PRECEDENTIAL_STATUS.PUBLISHED:
+            return 0.8 if obj.citation_count >= 10 else 0.6
+        return 0.5 if obj.citation_count >= 1 else 0.4
 
 
 class BlockedOpinionSitemap(sitemaps.Sitemap):

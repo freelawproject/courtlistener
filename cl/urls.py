@@ -72,8 +72,6 @@ urlpatterns = [
         {"sitemaps": sitemaps},
         name="sitemaps",
     ),
-    # Pregenerated sitemaps
-    path("", include("cl.sitemaps_infinite.urls")),
     # Redirects
     path(
         "donate/",
