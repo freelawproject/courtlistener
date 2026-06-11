@@ -10,6 +10,15 @@ document.addEventListener("alpine:init", () => {
         }
       });
     },
+    // Mirror the legacy base.js search behavior: append user-typed text to a
+    // pre-baked docket-scoped search URL and navigate. Guards against empty
+    // input (no trailing space when user typed nothing).
+    submitDocketSearch(refName, docketPk) {
+      const input = this.$refs[refName];
+      const userText = (input?.value || "").trim();
+      const base = `/?type=r&q=docket_id:${docketPk}`;
+      window.location = userText ? `${base} ${userText}` : base;
+    },
     submitForm(event) {
       const form = event.target.closest("form");
       if (form) form.requestSubmit();

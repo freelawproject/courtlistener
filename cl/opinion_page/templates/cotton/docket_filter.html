@@ -18,25 +18,25 @@
     {% endif %}
 
     <div class="flex flex-wrap items-end gap-3">
-      {# Search — sibling form so Enter submits search, not filters #}
-      <form action="/" method="get" class="flex-1 max-w-xs">
-        <input type="hidden" name="type" value="r" />
+      {# Search — standalone (not in a form). JS appends user-typed text to the docket-scoped query. #}
+      <div class="flex-1 max-w-xs">
         <label for="de-search-desktop" class="sr-only">Search this docket</label>
         <div class="flex">
           <input
             class="input-text rounded-r-none flex-1"
             id="de-search-desktop"
-            name="q"
-            value="docket_id:{{ docket.pk }}"
+            x-ref="deSearchDesktop"
             autocomplete="off"
             type="text"
             placeholder="Search this docket"
+            x-on:keydown.enter="submitDocketSearch('deSearchDesktop', {{ docket.pk }})"
           />
-          <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search" aria-label="Search">
+          {# href is the JS-disabled fallback (navigates to docket-scoped search without typed terms). #}
+          <c-button variant="primary" type="button" class="rounded-l-none px-3" title="Search" aria-label="Search" href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" x-on:click.prevent="submitDocketSearch('deSearchDesktop', {{ docket.pk }})">
             {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
           </c-button>
         </div>
-      </form>
+      </div>
 
       {# Filter form — uses `contents` so children join the parent flex layout #}
       <form
@@ -78,12 +78,16 @@
         <fieldset class="flex items-end">
           <legend class="sr-only">Sort order</legend>
           <div class="flex rounded-lg border border-greyscale-300 overflow-hidden">
+            {# visual radio button #}
             <label class="flex items-center gap-1 px-3 py-2 text-sm cursor-pointer {% if sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
+              {# SR radio button #}
               <input type="radio" name="order_by" value="asc" {% if sort_order_asc %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
               {% svg "chevron" class="w-4 h-4 rotate-180" aria_hidden="true" %}
               <span class="hidden lg:inline">Asc</span>
             </label>
+            {# visual radio button #}
             <label class="flex items-center gap-1 px-3 py-2 text-sm cursor-pointer border-l border-greyscale-300 {% if not sort_order_asc %}bg-greyscale-100 font-medium{% else %}bg-white text-greyscale-600{% endif %}">
+              {# SR radio button #}
               <input type="radio" name="order_by" value="desc" {% if not sort_order_asc %}checked{% endif %} class="sr-only" x-on:change="submitForm($event)" />
               {% svg "chevron" class="w-4 h-4" aria_hidden="true" %}
               <span class="hidden lg:inline">Desc</span>
@@ -101,25 +105,25 @@
   {# MOBILE — search + filter drawer #}
   <div class="md:hidden">
     <div class="flex items-end gap-3">
-      {# Search — own form so Enter submits search, not filters #}
-      <form action="/" method="get" class="flex-1">
-        <input type="hidden" name="type" value="r" />
+      {# Search — standalone (not in a form). JS appends user-typed text to the docket-scoped query. #}
+      <div class="flex-1">
         <label for="de-search-mobile" class="sr-only">Search this docket</label>
         <div class="flex">
           <input
             class="input-text rounded-r-none flex-1"
             id="de-search-mobile"
-            name="q"
-            value="docket_id:{{ docket.pk }}"
+            x-ref="deSearchMobile"
             autocomplete="off"
             type="text"
             placeholder="Search this docket"
+            x-on:keydown.enter="submitDocketSearch('deSearchMobile', {{ docket.pk }})"
           />
-          <c-button variant="primary" type="submit" class="rounded-l-none px-3" title="Search" aria-label="Search">
+          {# href is the JS-disabled fallback (navigates to docket-scoped search without typed terms). #}
+          <c-button variant="primary" type="button" class="rounded-l-none px-3" title="Search" aria-label="Search" href="/?type=r&amp;q=docket_id%3A{{ docket.pk }}" x-on:click.prevent="submitDocketSearch('deSearchMobile', {{ docket.pk }})">
             {% svg "magnifier" class="w-4 h-4" aria_hidden="true" %}
           </c-button>
         </div>
-      </form>
+      </div>
       {{ slot }}
     </div>
 
