@@ -85,7 +85,10 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
     forced_exit = False
 
     resuming_section: str | None = cursor_data.get("section")
-    resuming = resuming_section is not None and resuming_section in pregenerated_sitemaps
+    resuming = (
+        resuming_section is not None
+        and resuming_section in pregenerated_sitemaps
+    )
 
     for section, sitemapClass in pregenerated_sitemaps.items():
         if resuming:
@@ -273,7 +276,9 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 num_files += 1
 
         # save the updated cursor data to the cache
-        sanitized_cursor_data = {k: v for k, v in cursor_data.items() if v is not None}
+        sanitized_cursor_data = {
+            k: v for k, v in cursor_data.items() if v is not None
+        }
         redis_db.hset(
             HASH_NAME,
             mapping=sanitized_cursor_data,

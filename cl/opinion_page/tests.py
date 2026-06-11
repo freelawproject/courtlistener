@@ -106,7 +106,10 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
-from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk, reset_sitemaps_cursor
+from cl.sitemaps_infinite.sitemap_generator import (
+    generate_urls_chunk,
+    reset_sitemaps_cursor,
+)
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import (

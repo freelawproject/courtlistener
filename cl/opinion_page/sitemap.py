@@ -35,9 +35,12 @@ class OpinionSitemap(InfinitePaginatorSitemap):
 
     def items(self) -> QuerySet:
         # Relaxed: All unblocked opinions (precedential and non-precedential/unpublished, etc.)
-        return (
-            OpinionCluster.objects.filter(blocked=False)
-            .only("date_modified", "pk", "slug", "citation_count", "precedential_status")
+        return OpinionCluster.objects.filter(blocked=False).only(
+            "date_modified",
+            "pk",
+            "slug",
+            "citation_count",
+            "precedential_status",
         )
 
     def lastmod(self, obj: OpinionCluster) -> datetime:

@@ -15,7 +15,6 @@ from django.utils.http import http_date
 from cl.lib.ratelimiter import ratelimit_deny_list
 
 
-
 def make_cache_key(
     request: HttpRequest, section: str, force_page: bool = False
 ) -> str:
