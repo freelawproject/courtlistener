@@ -172,7 +172,6 @@ class DocketEntryFilterFormV2(forms.Form):
             attrs={
                 "class": "input-text w-full md:w-32",
                 "placeholder": "MM/DD/YYYY",
-                "data-flatpickr-after": "",
                 "autocomplete": "off",
             }
         ),
@@ -185,7 +184,6 @@ class DocketEntryFilterFormV2(forms.Form):
             attrs={
                 "class": "input-text w-full md:w-32",
                 "placeholder": "MM/DD/YYYY",
-                "data-flatpickr-before": "",
                 "autocomplete": "off",
             }
         ),
