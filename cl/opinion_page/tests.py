@@ -156,8 +156,8 @@ class GetDownloadsContextTest(TestCase):
         """Does get_downloads_context return the main version PDF?"""
         context = await get_downloads_context(self.cluster)
         self.assertTrue(context["has_downloads"])
-        self.assertIn("new_version", context["pdf_path"])
-        self.assertNotIn("old_version", context["pdf_path"])
+        self.assertIn("new_version", context["download_file_path"])
+        self.assertNotIn("old_version", context["download_file_path"])
 
 
 class SimpleLoadTest(TestCase):
