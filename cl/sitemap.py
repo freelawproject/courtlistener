@@ -5,7 +5,6 @@ from datetime import datetime
 from django.contrib.sitemaps import Sitemap
 from django.contrib.sitemaps.views import x_robots_tag
 from django.contrib.sites.shortcuts import get_current_site
-from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.core.paginator import EmptyPage, InvalidPage, PageNotAnInteger
 from django.http import Http404, HttpRequest, HttpResponse
@@ -17,6 +16,7 @@ from django_ratelimit.exceptions import Ratelimited
 
 from cl.lib.ratelimiter import get_ip_for_ratelimiter, is_allowlisted
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
+
 
 def make_cache_key(
     request: HttpRequest, section: str, force_page: bool = False
@@ -89,7 +89,9 @@ def cached_sitemap(
             increment=True,
         ):
             if not is_allowlisted(request):
-                raise Ratelimited("Rate limit exceeded on sitemap cache misses")
+                raise Ratelimited(
+                    "Rate limit exceeded on sitemap cache misses"
+                )
 
         # No cache for this page, otherwise cache exists and it could be the empty list
         try:
@@ -111,7 +113,9 @@ def cached_sitemap(
         else:
             # Partial sitemap. Short cache.
             cache_length = 60 * 60 * 24
-        cache.set(make_s3_cache_key(cache_key, cache_length), urls, cache_length)
+        cache.set(
+            make_s3_cache_key(cache_key, cache_length), urls, cache_length
+        )
 
     lastmod = None
     all_sites_lastmod = True

@@ -3,7 +3,6 @@ import logging
 from datetime import UTC, datetime
 
 from django.conf import settings
-from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db import transaction
 from django.urls import reverse
