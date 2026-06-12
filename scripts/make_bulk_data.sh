@@ -295,9 +295,10 @@ disclosures_debt_fields='(
 	   )'
 disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
 
-# citations_unmatchedcitations
-unmatchedcitations_fields='(id, volume, reporter, page, type, citing_opinion_id, status,
-			citation_string, court_id, year
+# citations_unmatchedcitation
+unmatchedcitations_fields='(
+	       id, volume, reporter, page, type, status, citation_string,
+	       court_id, year, citing_opinion_id
 	   )'
 unmatchedcitations_csv_filename="unmatched-citations-$(date -I).csv"
 
@@ -342,7 +343,7 @@ declare -a t_30=("disclosures_reimbursement" "$disclosures_reimbursement_fields"
 declare -a t_31=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
 declare -a t_32=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
 
-declare -a t_33=("citations_unmatchedcitations" "$unmatchedcitations_fields" "$unmatchedcitations_csv_filename")
+declare -a t_33=("citations_unmatchedcitation" "$unmatchedcitations_fields" "$unmatchedcitations_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists
@@ -379,7 +380,7 @@ pg_dump \
     --table 'audio_*' \
 	--table 'recap_*' \
 	--table 'disclosures_*' \
-	--table 'citations_unmatchedcitations' \
+	--table 'citations_unmatchedcitation' \
     --no-privileges \
     --no-publications \
     --no-subscriptions courtlistener | \
