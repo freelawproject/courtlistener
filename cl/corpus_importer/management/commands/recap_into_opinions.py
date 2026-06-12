@@ -5,7 +5,8 @@ from django.db.models import Q
 from cl.corpus_importer.tasks import recap_document_into_opinions
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.search.models import SOURCES, Court, OpinionCluster, RECAPDocument
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Court, OpinionCluster, RECAPDocument
 
 
 def import_opinions_from_recap(
@@ -58,7 +59,7 @@ def import_opinions_from_recap(
         latest_date_filed = (
             OpinionCluster.objects.using(db_connection)
             .filter(docket__court=court)
-            .exclude(source=SOURCES.RECAP)
+            .exclude(source=ClusterSources.RECAP)
             .order_by("-date_filed")
             .values_list("date_filed", flat=True)
             .first()

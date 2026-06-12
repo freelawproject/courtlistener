@@ -30,6 +30,14 @@ _memory_cache: dict[str, tuple[float, Any]] = {}
 T = TypeVar("T")
 
 
+def get_tiered_cache_prefix() -> str:
+    """Return the Redis key prefix for tiered_cache.
+
+    Useful for avoiding test collisions when overridden via mock.
+    """
+    return "tiered"
+
+
 def tiered_cache(
     timeout: int,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
@@ -63,7 +71,7 @@ def tiered_cache(
             key_parts = [func.__module__, func.__name__]
             key_parts.extend(str(arg) for arg in args)
             key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
-            cache_key = f"tiered:{':'.join(key_parts)}"
+            cache_key = f"{get_tiered_cache_prefix()}:{':'.join(key_parts)}"
 
             current_time = time.time()
 
@@ -106,7 +114,7 @@ def clear_tiered_cache() -> None:
     _memory_cache.clear()
     # Clear Redis tier (all keys with tiered: prefix)
     r = get_redis_interface("CACHE")
-    keys = list(r.scan_iter(match=":1:tiered:*"))
+    keys = list(r.scan_iter(match=f":1:{get_tiered_cache_prefix()}:*"))
     if keys:
         r.delete(*keys)
 
@@ -259,6 +267,7 @@ FIELD_DOCSTRING_EXTRACTION_RE = re.compile(
     r":(?:var|ivar|cvar)\s+([a-z_][a-z0-9_]*):([^:]+)",
     re.IGNORECASE | re.MULTILINE,
 )
+_SPACES_RE = re.compile(r"\s+")
 
 
 def document_model(model: type[models.Model]) -> type[models.Model]:
@@ -278,7 +287,10 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
     ]
     field_docs = dict(
         [
-            (field_name, docstring.replace("\n", " "))
+            (
+                field_name,
+                _SPACES_RE.sub(" ", docstring).strip(),
+            )
             for field_name, docstring in ivar_docs
             if field_name in model_fields
         ]
@@ -295,3 +307,20 @@ def document_model(model: type[models.Model]) -> type[models.Model]:
             field.db_comment = doc
 
     return model
+
+
+def time_call(fn_logger: logging.Logger) -> Callable:
+    def decorator(f: Callable) -> Callable:
+        @wraps(f)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter_ns()
+            result = f(*args, **kwargs)
+            elapsed = time.perf_counter_ns() - start
+            fn_logger.debug(
+                "Ran %s in %d.3 ms", f.__qualname__, elapsed / 1_000_000
+            )
+            return result
+
+        return wrapper
+
+    return decorator

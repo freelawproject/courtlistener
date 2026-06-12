@@ -31,7 +31,8 @@ from cl.lib.string_utils import trunc
 from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
-from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Court, Docket, Opinion, OpinionCluster
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -506,11 +507,14 @@ def add_new_case(
                 docket.save()
         except OperationalError as e:
             if "exceeds maximum" in str(e):
+                # need to populate the docket number for tests to pass until we
+                # activate the docket_number_raw cleaning flag
                 docket.docket_number = (
                     "{}, See Corrections for full Docket Number".format(
                         trunc(docket_string, length=5000, ellipsis="...")
                     )
                 )
+                docket.docket_number_raw = data["docket_number"]
                 docket.save()
                 long_data["correction"] = (
                     f"{data['docket_number']} <br> {long_data['correction']}"
@@ -522,7 +526,7 @@ def add_new_case(
             case_name_full=case_name_full,
             precedential_status="Published",
             docket_id=docket.id,
-            source=SOURCES.HARVARD_CASELAW,
+            source=ClusterSources.HARVARD_CASELAW,
             date_filed=date_filed,
             date_filed_is_approximate=is_approximate,
             attorneys=short_data["attorneys"],

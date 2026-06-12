@@ -1,17 +1,18 @@
 import re
 from datetime import datetime
 from typing import cast
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import sync_to_async
 from django import test
+from django.apps import apps
 from django.contrib.staticfiles import testing
-from django.core.management import call_command
 from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils.dateformat import format
 from django.utils.html import strip_tags
-from django.utils.timezone import now
+from django.utils.timezone import localtime, now
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree, html
 from lxml.html import HtmlElement
@@ -47,6 +48,29 @@ class RestartRateLimitMixin:
     def tearDownClass(cls):
         cls.restart_rate_limit()
         super().tearDownClass()
+
+
+class MockTallyStatMixin:
+    """Mock ``tally_stat`` so tests never read/write shared Redis stat keys.
+
+    Tests assert on ``self.mock_tally_stat`` (a standard ``MagicMock``)
+    instead of querying Redis.  All known command-level import sites are
+    patched to the *same* mock, so ``call_count`` and ``call_args_list``
+    reflect every invocation regardless of which command triggered it.
+    """
+
+    tally_stat_module_paths: list[str] = [
+        "cl.alerts.management.commands.cl_send_scheduled_alerts.tally_stat",
+        "cl.alerts.management.commands.cl_send_recap_alerts.tally_stat",
+    ]
+
+    def setUp(self):
+        super().setUp()
+        self.mock_tally_stat = mock.MagicMock()
+        for path in self.tally_stat_module_paths:
+            patcher = mock.patch(path, self.mock_tally_stat)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
 
 class RestartSentEmailQuotaMixin:
@@ -120,20 +144,63 @@ class ESIndexTestCase(SimpleTestCase):
             index._name = index._name.split("-")[0]
         super().tearDownClass()
 
+    @staticmethod
+    def _get_model_classes(model):
+        models = model if isinstance(model, list) else [model]
+        model_classes = [apps.get_model(m) for m in models]
+        return model_classes
+
+    @staticmethod
+    def _get_indices(model):
+        return registry.get_indices(
+            models=ESIndexTestCase._get_model_classes(model)
+        )
+
+    @staticmethod
+    def _get_documents(model):
+        return registry.get_documents(
+            models=ESIndexTestCase._get_model_classes(model)
+        )
+
     @classmethod
     def rebuild_index(cls, model):
-        """Create and populate the Elasticsearch index and mapping"""
-        call_command("search_index", "--rebuild", "-f", "--models", model)
+        """Delete, recreate, and populate the Elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        for index in ESIndexTestCase._get_indices(model):
+            index.delete(ignore=[404, 400])
+            index.create()
+        for doc in ESIndexTestCase._get_documents(model):
+            qs = doc().get_indexing_queryset()
+            doc().update(qs)
 
     @classmethod
     def create_index(cls, model):
-        """Create the elasticsearch index."""
-        call_command("search_index", "--create", "-f", "--models", model)
+        """Create the elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        for index in ESIndexTestCase._get_indices(model):
+            index.create(ignore=[400])
 
     @classmethod
     def delete_index(cls, model):
-        """Delete the elasticsearch index."""
-        call_command("search_index", "--delete", "-f", "--models", model)
+        """Delete the elasticsearch index.
+
+        Uses the registry API directly instead of the search_index
+        management command to avoid its get_alias() call which queries
+        ALL ES indices and fails if any other test's index was already
+        deleted.
+        """
+        for index in ESIndexTestCase._get_indices(model):
+            index.delete(ignore=[404, 400])
 
     @classmethod
     def restart_celery_throttle_key(cls):
@@ -720,13 +787,16 @@ class SearchAlertsAssertions:
     def _assert_date_updated(self, date_to_compare, html_content, txt_content):
         """Confirm that date_updated is properly set in the alert email."""
 
+        # Use localtime() to normalize DST, matching the email template which
+        # applies |localtime before |date formatting.
+        localized_date = localtime(date_to_compare)
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             html_content,
         )
 
         self.assertIn(
-            f"Date Updated: {format(date_to_compare, 'F jS, Y h:i a T')}",
+            f"Date Updated: {format(localized_date, 'F jS, Y h:i a T')}",
             txt_content,
         )
 

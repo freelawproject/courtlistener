@@ -11,6 +11,7 @@ from localflavor.us.us_states import STATE_CHOICES
 
 from cl.lib.courts import get_active_court_from_cache
 from cl.lib.model_helpers import flatten_choices
+from cl.lib.utils import get_array_of_selected_fields
 from cl.people_db.models import PoliticalAffiliation, Position
 from cl.search.fields import (
     CeilingDateOrRelativeField,
@@ -498,6 +499,9 @@ class SearchForm(forms.Form):
     def __init__(self, *args, **kwargs):
         self.courts = kwargs.pop("courts", None)
         self.request = kwargs.pop("request", None)
+        self.is_semantic_frontend_active = kwargs.pop(
+            "is_semantic_frontend_active", False
+        )
         super().__init__(*args, **kwargs)
 
         """
@@ -663,6 +667,14 @@ class SearchForm(forms.Form):
             for court_id in court_ids:
                 cleaned_data[f"court_{court_id}"] = True
 
+        # 2b. Build the court field from all court_xx fields that are
+        # True. This merges courts from both the court= hidden input
+        # (already converted to court_xx=True above) and any
+        # court_xx=on checkbox parameters
+        selected_courts = get_array_of_selected_fields(cleaned_data, "court_")
+        if selected_courts:
+            cleaned_data["court"] = " ".join(selected_courts)
+
         # 3. Make sure that the user has selected at least one facet for each
         #    taxonomy. Note that this logic must be paralleled in
         #    search_utils.make_facet_variable
@@ -691,10 +703,12 @@ class SearchForm(forms.Form):
             if isinstance(v, str):
                 cleaned_data[k] = v.strip()
 
-        should_disable_knn_search = (
-            not settings.KNN_SEARCH_ENABLED or not self.request
-        )
-        if should_disable_knn_search:
+        # Disable semantic search if KNN is off globally, or if the
+        # request is from the frontend and the waffle flag is not active.
+        # API requests pass self.request and are only gated by KNN_SEARCH_ENABLED.
+        if not settings.KNN_SEARCH_ENABLED or (
+            not self.request and not self.is_semantic_frontend_active
+        ):
             cleaned_data["semantic"] = False
 
         return cleaned_data

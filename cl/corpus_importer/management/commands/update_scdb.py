@@ -214,7 +214,7 @@ class Command(VerboseCommand):
                 "scdb_decision_direction",
                 scdb_info["decisionDirection"],
             ),
-            (cluster.docket, "docket_number", scdb_info["docket"]),
+            (cluster.docket, "docket_number_raw", scdb_info["docket"]),
         ]
         for attribute_tuple in attribute_tuples:
             self.set_if_falsy(*attribute_tuple)

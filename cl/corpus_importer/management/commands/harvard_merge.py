@@ -14,7 +14,6 @@ from cl.corpus_importer.management.commands.harvard_opinions import (
 )
 from cl.corpus_importer.utils import (
     AuthorException,
-    ClusterSourceException,
     DocketSourceException,
     EmptyOpinionException,
     JudgeException,
@@ -27,7 +26,8 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import find_all_judges, find_just_name
-from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
+from cl.search.cluster_sources import ClusterSources
+from cl.search.models import Docket, Opinion, OpinionCluster
 
 
 class HarvardConversionUtil:
@@ -290,25 +290,10 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
     :param cluster: cluster object
     :return: None
     """
-    new_cluster_source = cluster.source + SOURCES.HARVARD_CASELAW
-
-    if new_cluster_source in [
-        SOURCES.COURT_M_HARVARD,
-        SOURCES.ANON_2020_M_HARVARD,
-        SOURCES.COURT_M_RESOURCE_M_HARVARD,
-        SOURCES.DIRECT_COURT_INPUT_M_HARVARD,
-        SOURCES.LAWBOX_M_HARVARD,
-        SOURCES.LAWBOX_M_COURT_M_HARVARD,
-        SOURCES.LAWBOX_M_RESOURCE_M_HARVARD,
-        SOURCES.LAWBOX_M_COURT_RESOURCE_M_HARVARD,
-        SOURCES.MANUAL_INPUT_M_HARVARD,
-        SOURCES.PUBLIC_RESOURCE_M_HARVARD,
-        SOURCES.COLUMBIA_ARCHIVE_M_HARVARD,
-    ]:
-        cluster.source = new_cluster_source
-        cluster.save()
-    else:
-        raise ClusterSourceException("Unexpected cluster source")
+    cluster.source = ClusterSources.merge_sources(
+        cluster.source, ClusterSources.HARVARD_CASELAW
+    )
+    cluster.save()
 
 
 def save_headmatter(harvard_data: dict[str, Any]) -> dict[str, Any]:
@@ -376,7 +361,9 @@ def merge_opinion_clusters(
                 opinion_cluster, harvard_data["docket_number"]
             )
             if updated_docket_number:
-                opinion_cluster.docket.docket_number = updated_docket_number
+                opinion_cluster.docket.docket_number_raw = (
+                    updated_docket_number
+                )
                 opinion_cluster.docket.save()
 
             case_names_to_update = merge_case_names(
@@ -450,10 +437,6 @@ def merge_opinion_clusters(
     except DocketSourceException:
         logger.warning(
             msg=f"Docket source exception related to cluster id: {cluster_id}"
-        )
-    except ClusterSourceException:
-        logger.warning(
-            msg=f"Cluster source exception for cluster id: {cluster_id}"
         )
     except OpinionTypeException:
         logger.warning(
@@ -714,14 +697,14 @@ class Command(VerboseCommand):
                     OpinionCluster.objects.exclude(filepath_json_harvard="")
                     .filter(id__gt=options["offset"])
                     .order_by("id")
-                    .exclude(source__contains=SOURCES.HARVARD_CASELAW)
+                    .exclude(source__contains=ClusterSources.HARVARD_CASELAW)
                     .values_list("id", "filepath_json_harvard")
                 )
             else:
                 cluster_ids = (
                     OpinionCluster.objects.exclude(filepath_json_harvard="")
                     .order_by("id")
-                    .exclude(source__contains=SOURCES.HARVARD_CASELAW)
+                    .exclude(source__contains=ClusterSources.HARVARD_CASELAW)
                     .values_list("id", "filepath_json_harvard")
                 )
             if options["limit"]:
@@ -737,7 +720,7 @@ class Command(VerboseCommand):
 
             if cluster_ids:
                 if (
-                    SOURCES.HARVARD_CASELAW
+                    ClusterSources.HARVARD_CASELAW
                     in OpinionCluster.objects.get(id=cluster_ids[0][0]).source
                 ):
                     logger.info(

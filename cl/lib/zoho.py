@@ -1,5 +1,6 @@
 from typing import Any, Literal, Protocol
 
+import requests
 from django.conf import settings
 from django.core.cache import cache
 from zohocrmsdk.src.com.zoho.api.authenticator import OAuthToken
@@ -17,6 +18,13 @@ from zohocrmsdk.src.com.zoho.crm.api.record import (
     RecordOperations,
     ResponseWrapper,
     SearchRecordsParam,
+    SuccessResponse,
+)
+from zohocrmsdk.src.com.zoho.crm.api.tags import (
+    NewTagRequestWrapper,
+    RecordActionWrapper,
+    Tag,
+    TagsOperations,
 )
 
 from cl.lib.command_utils import logger
@@ -94,7 +102,13 @@ def build_zoho_payload_from_user(
     return payload
 
 
-class ZohoModule:
+class ZohoBase:
+    """Base class for all Zoho API clients.
+
+    Handles OAuth initialization via the Zoho CRM SDK. Subclasses must
+    set ``module_name`` to a non-empty string.
+    """
+
     module_name: str = ""
 
     def __init__(self):
@@ -124,6 +138,24 @@ class ZohoModule:
             resource_path=settings.ZOHO_RESOURCE_PATH,
         )
 
+
+class ZohoModule(ZohoBase):
+    """Base class for Zoho CRM module clients.
+
+    Adds CRM SDK helpers (response handling, record building) on top
+    of the OAuth initialization provided by ``ZohoBase``.
+    """
+
+    @staticmethod
+    def _format_api_exception(exc: APIException) -> str:
+        """Format a Zoho APIException into a single-line error message."""
+        status = exc.get_status().get_value()
+        code = exc.get_code().get_value()
+        message = exc.get_message().get_value()
+        details = exc.get_details() or {}
+        detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
+        return f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
+
     @staticmethod
     def handle_api_response(response):
         """
@@ -146,21 +178,32 @@ class ZohoModule:
         if response_object is None:
             raise Exception("Zoho API returned an empty response object.")
 
-        if isinstance(response_object, ResponseWrapper | ActionWrapper):
+        if isinstance(
+            response_object,
+            ResponseWrapper | ActionWrapper | RecordActionWrapper,
+        ):
             return response_object.get_data()
 
         if isinstance(response_object, APIException):
-            status = response_object.get_status().get_value()
-            code = response_object.get_code().get_value()
-            message = response_object.get_message().get_value()
-            details = response_object.get_details()
-
-            detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
-            raise Exception(
-                f"Zoho API Exception [{code}] {status}: {message} | Details: {detail_str}"
-            )
+            raise Exception(ZohoModule._format_api_exception(response_object))
 
         raise Exception("Unexpected response type received from the Zoho API.")
+
+    @staticmethod
+    def get_action_record_id(
+        action_result: SuccessResponse | APIException,
+    ) -> int:
+        """Return the new/updated record id from a single action result.
+
+        Zoho's wrapper responses return a list of items where each item is
+        either a SuccessResponse or an APIException (per-record
+        success/failure). This helper surfaces a per-record APIException with
+        the same formatting `handle_api_response` uses, instead of letting a
+        downstream `KeyError("id")` swallow it.
+        """
+        if isinstance(action_result, APIException):
+            raise Exception(ZohoModule._format_api_exception(action_result))
+        return int(action_result.get_details()["id"])
 
     @staticmethod
     def _build_record(
@@ -184,8 +227,8 @@ class ZohoModule:
     @staticmethod
     def _build_body_wrapper(
         records: list[Record],
-        triggers: list[str] | None = None,
         process: list[str] | None = None,
+        triggers: list[str] | None = None,
     ) -> BodyWrapper:
         """
         Wrap one or more Record instances in a BodyWrapper with optional process and trigger.
@@ -196,6 +239,78 @@ class ZohoModule:
         if process:
             wrapper.set_process(process)
         return wrapper
+
+
+class ZohoDeskClient(ZohoBase):
+    """Thin wrapper around the Zoho Desk REST API v1.
+
+    Authentication is handled by the Zoho CRM SDK, the same OAuth app
+    and refresh token are shared across CRM and Desk, so we just call
+    ``Initializer.get_initializer().token.get_token()`` to obtain a
+    valid access token (the SDK refreshes it automatically when needed).
+    """
+
+    BASE_URL = "https://desk.zoho.com/api/v1"
+    module_name = "Desk"
+
+    def _get_access_token(self) -> str:
+        """Return a valid access token from the Zoho CRM SDK.
+
+        ``OAuthToken.get_token()`` checks expiry, refreshes via the
+        Zoho accounts API if needed, persists the new token to the
+        ``FileStore``, and returns the access token string.
+        """
+        return Initializer.get_initializer().token.get_token()
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Zoho-oauthtoken {self._get_access_token()}",
+            "orgId": settings.ZOHO_DESK_ORG_ID,
+            "Content-Type": "application/json",
+        }
+
+    def create_ticket(
+        self,
+        *,
+        subject: str,
+        email: str,
+        contact_name: str,
+        description: str,
+        request_type: str,
+        assignee_id: str = "",
+    ) -> dict:
+        """Create a new Zoho Desk ticket.
+
+        :param subject: Ticket subject line.
+        :param email: Submitter's email (used to link/create a Desk contact).
+        :param contact_name: Submitter's full name.
+        :param description: Full ticket body (plain text).
+        :param request_type: Request type label (e.g. "General Support").
+        :param assignee_id: Zoho Desk agent ID. Empty = unassigned.
+        :return: Parsed JSON response from the Desk API.
+        """
+        payload: dict = {
+            "subject": subject,
+            "email": email,
+            "departmentId": settings.ZOHO_DESK_DEPARTMENT_ID,
+            "description": description,
+            "cf": {
+                "cf_request_type": request_type,
+            },
+            "contact": {"lastName": contact_name, "email": email},
+        }
+
+        if assignee_id:
+            payload["assigneeId"] = assignee_id
+
+        response = requests.post(
+            f"{self.BASE_URL}/tickets",
+            json=payload,
+            headers=self._headers(),
+            timeout=60,
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 class SearchRecordMixin:
@@ -252,6 +367,32 @@ class SearchRecordMixin:
         return ZohoModule.handle_api_response(response)
 
 
+class AddTagsMixin:
+    def add_tags(self: HasModuleName, record_id: int, tag_names: list[str]):
+        """
+        Add one or more tags to a Zoho CRM record.
+
+        :param record_id: The Zoho CRM record ID to tag.
+        :param tag_names: List of tag names to add. Tag matching is exact;
+            tags that don't already exist in Zoho will be auto-created.
+        :return: The Zoho API response data, parsed and validated by
+            `ZohoModule.handle_api_response`.
+        """
+        tags = []
+        for name in tag_names:
+            tag = Tag()
+            tag.set_name(name)
+            tags.append(tag)
+
+        wrapper = NewTagRequestWrapper()
+        wrapper.set_tags(tags)
+
+        response = TagsOperations().add_tags(
+            self.module_name, record_id, wrapper
+        )
+        return ZohoModule.handle_api_response(response)
+
+
 class CreateRecordMixin:
     def create_record(self: HasModuleName, fields: dict[str | Field, Any]):
         """
@@ -300,12 +441,20 @@ class UpdateRecordMixin:
 
 
 class LeadsModule(
-    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+    CreateRecordMixin,
+    UpdateRecordMixin,
+    SearchRecordMixin,
+    AddTagsMixin,
+    ZohoModule,
 ):
     module_name = "Leads"
 
 
 class ContactsModule(
-    CreateRecordMixin, UpdateRecordMixin, SearchRecordMixin, ZohoModule
+    CreateRecordMixin,
+    UpdateRecordMixin,
+    SearchRecordMixin,
+    AddTagsMixin,
+    ZohoModule,
 ):
     module_name = "Contacts"

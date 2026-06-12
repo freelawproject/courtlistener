@@ -30,6 +30,7 @@ from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court
 from cl.search.tasks import email_search_results
 from cl.search.utils import get_homepage_stats, get_v2_homepage_stats
+from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
 
 
@@ -90,6 +91,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         "get_string_sans_alert": get_string_sans_alert,
     }
 
+    is_semantic_active = flag_is_active(request, "semantic_search_frontend")
     edit_alert = "edit_alert" in request.GET
     # Build the context for the limitations of RECAP alerts.
     user = request.user
@@ -246,8 +248,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
         # Just a regular search
         if not is_bot(request):
             tally_stat(
-                "search.results",
-                prometheus_handler_key="search.queries.keyword.web",
+                StatMetric.SEARCH_RESULTS,
+                labels={
+                    "query_type": StatQueryType.KEYWORD,
+                    "method": StatMethod.WEB,
+                },
             )
 
         # Create bare-bones alert form.
@@ -268,7 +273,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
             request.GET.copy(), courts=Court.federal_courts.all_pacer_courts()
         )
     else:
-        search_results = do_es_search(request.GET.copy())
+        search_results = do_es_search(
+            request.GET.copy(),
+            is_semantic_frontend_active=is_semantic_active,
+        )
 
     render_dict.update(search_results)
     store_search_query(request, search_results)

@@ -1,4 +1,5 @@
 {% extends "base.html" %}{% load static text_filters %}
+{# frontend-checks-skip: check_new_stack_leakage #}
 
 {% block title %}Contact Free Law Project – CourtListener.com{% endblock %}
 
@@ -7,6 +8,7 @@
 {% block head %}
   {# Fetch issue types and terms URL #}
   {{ form.TECH_ISSUE_TYPES|uniq|json_script:"tech-types" }}
+  {{ form.DOCUMENTATION_CHECK_TYPES|uniq|json_script:"requires-check-types" }}
   {% url "terms" as terms_url %}
   {{ terms_url|add:"#removal"|json_script:"terms-url" }}
 
@@ -29,9 +31,9 @@
 {% block footer-scripts %}
   <script src="{% static 'js/alpine/components/contact_form.js' %}" nonce="{{ request.csp_nonce }}"></script>
   {% if DEBUG %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% else %}
-  <script src="{% static 'js/alpine/alpinejscsp@3.14.8.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
+  <script src="{% static 'js/alpine/alpinejscsp.min.js' %}" defer nonce="{{ request.csp_nonce }}"></script>
   {% endif %}
 {% endblock %}
 
@@ -76,7 +78,10 @@
           {% endif %}
         </div>
 
-        {#   EMAIL   #}
+        {#   EMAIL — only collected from anonymous users; logged-in users  #}
+        {#   are served by their account email so support staff aren't    #}
+        {#   asked to verify a freely-typed address.                      #}
+        {% if not user.is_authenticated %}
         <div class="form-group">
           {{ form.email.label_tag }}
           {{ form.email }}
@@ -88,6 +93,7 @@
             </p>
           {% endif %}
         </div>
+        {% endif %}
 
         {#   SUBJECT   #}
         {# We use the phone_number field as the subject field to defeat spam #}
@@ -230,6 +236,22 @@
           {% if form.message.errors %}
             <p class="help-block">
               {% for error in form.message.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
+
+        <div class="form-group" x-show="issue.requiresDocCheck" x-cloak>
+          <div class="checkbox">
+            <label>
+              {{ form.checked_documentation }}
+              {{ form.checked_documentation.label }}
+            </label>
+          </div>
+          {% if form.checked_documentation.errors %}
+            <p class="help-block">
+              {% for error in form.checked_documentation.errors %}
                 {{ error|escape }}
               {% endfor %}
             </p>

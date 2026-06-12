@@ -1,3 +1,5 @@
+import sys
+
 import environ
 
 env = environ.FileAwareEnv()
@@ -23,14 +25,16 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
-        "user": "5000/hour",
+        "user": ["5/min", "50/hour", "125/day"],
         "citations": "60/min",
+        "tags": "1000/hour",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.BasicAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+        "cl.api.authentication.ReplicaRoutingOAuth2Authentication",
+        "cl.api.authentication.ReplicaRoutingBasicAuthentication",
+        "cl.api.authentication.ReplicaRoutingTokenAuthentication",
+        "cl.api.authentication.ReplicaRoutingSessionAuthentication",
     ),
     # Rendering and Parsing
     "DEFAULT_PARSER_CLASSES": (
@@ -65,9 +69,7 @@ REST_FRAMEWORK = {
 if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
 
-BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)
+if "test" in sys.argv:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["user"] = "5000/day"  # type: ignore
 
-# Controls whether unknown API filter parameters should be blocked (400 error)
-# or just logged. Set to True to block invalid filter parameters.
-# Phase 1: False (log only), Phase 2: True (block requests)
-BLOCK_UNKNOWN_FILTERS = env.bool("BLOCK_UNKNOWN_FILTERS", default=False)
+BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)

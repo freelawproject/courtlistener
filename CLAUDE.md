@@ -14,15 +14,18 @@ Rules and guidance on our wiki is written with flexibility for humans, but MUST 
 
 ```
 cl/                     # Main Django project
-├── assets/            # Static files, templates, React components
-│   ├── templates/     # Django templates (base.html, etc.)
-│   ├── react/         # React/TypeScript components
+├── assets/            # Static files, templates, components
+│   ├── templates/     # Django templates
 │   └── static-global/ # Global CSS/JS
 ├── lib/               # Shared utilities
 ├── tests/             # Test utilities and base classes
 └── [app]/             # Individual Django apps (search, alerts, etc.)
 ```
 
+
+## Frontend
+
+CourtListener has two frontend stacks (legacy Bootstrap/jQuery and new Tailwind/Alpine/Cotton). Before writing any frontend code, MUST determine which stack you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not mix stacks.
 
 ## Coding Rules
 

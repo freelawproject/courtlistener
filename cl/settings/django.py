@@ -43,8 +43,28 @@ if env("DB_REPLICA_HOST", default=""):
         },
     }
 
+if env("DB_READ_REPLICA_HOST", default=""):
+    DATABASES["read-replica"] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_READ_REPLICA_NAME", default="courtlistener"),
+        "USER": env("DB_READ_REPLICA_USER", default="postgres"),
+        "PASSWORD": env("DB_READ_REPLICA_PASSWORD", default="postgres"),
+        "HOST": env("DB_READ_REPLICA_HOST", default=""),
+        "PORT": "",
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": {
+            "sslmode": env("DB_READ_REPLICA_SSL_MODE", default="prefer"),
+        },
+    }
+
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
-API_READ_DATABASES: list[str] = env("API_READ_DATABASES", default="replica")
+SLACK_REPLICATION_WEBHOOK_URL = env(
+    "SLACK_REPLICATION_WEBHOOK_URL", default=""
+)
+API_READ_DATABASES: list[str] | None = env.list(
+    "API_READ_DATABASES", default=None
+)
+DATABASE_ROUTERS: list[str] = ["cl.api.routers.ReplicaRouter"]
 
 ####################
 # Cache & Sessions #
@@ -112,6 +132,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.template.context_processors.request",
                 "django.template.context_processors.static",
+                "django.template.context_processors.csrf",
                 "cl.lib.context_processors.inject_settings",
                 "cl.lib.context_processors.inject_random_tip",
                 "cl.lib.context_processors.inject_email_ban_status",
@@ -134,6 +155,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django_ratelimit.middleware.RatelimitMiddleware",
     "waffle.middleware.WaffleMiddleware",
+    "cl.api.middleware.ReplicaRoutingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "cl.lib.middleware.IncrementalNewTemplateMiddleware",
@@ -164,6 +186,7 @@ INSTALLED_APPS = [
     "mathfilters",
     "rest_framework",
     "rest_framework.authtoken",
+    "oauth2_provider",
     "django_filters",
     "django_prometheus",
     "storages",
@@ -173,6 +196,7 @@ INSTALLED_APPS = [
     "pghistory",
     "pgtrigger",
     # CourtListener Apps
+    "cl.ai",
     "cl.alerts",
     "cl.audio",
     "cl.api",
@@ -185,6 +209,7 @@ INSTALLED_APPS = [
     "cl.people_db",
     "cl.lasc",
     "cl.lib",
+    "cl.oauth",
     "cl.opinion_page",
     "cl.recap",
     "cl.recap_rss",

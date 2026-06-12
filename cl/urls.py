@@ -55,6 +55,7 @@ urlpatterns = [
     path("", include("cl.api.urls")),
     path("", include("cl.visualizations.urls")),
     path("", include("cl.stats.urls")),
+    path("", include("cl.oauth.urls")),
     # Sitemaps
     path(
         "sitemap.xml",
@@ -95,7 +96,7 @@ urlpatterns = [
     path(
         "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
         RedirectView.as_view(
-            url="/help/api/rest/visualizations/#deprecation-notice",
+            url=f"{settings.WIKI_API_BASE_URL}/rest/v4/visualizations#deprecation-notice",
             permanent=True,
         ),
         name="cluster_visualizations",

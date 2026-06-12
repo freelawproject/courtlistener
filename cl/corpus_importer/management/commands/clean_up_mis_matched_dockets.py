@@ -58,6 +58,7 @@ def add_docket(
         case_name_short=case_name_short,
         case_name_full=case_name_full,
         docket_number=docket_number,
+        docket_number_raw=docket_number,
         court_id=court_id,
         source=Docket.HARVARD,
         ia_needs_upload=False,
@@ -67,11 +68,14 @@ def add_docket(
         docket.save()
     except OperationalError as e:
         if "exceeds maximum" in str(e):
+            # need to populate the docket number for tests to pass until we
+            # activate the docket_number_raw cleaning flag
             docket.docket_number = (
                 "{}, See Corrections for full Docket Number".format(
                     trunc(docket_number, length=5000, ellipsis="...")
                 )
             )
+            docket.docket_number_raw = docket_number
             docket.save()
 
     return docket

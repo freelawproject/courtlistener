@@ -48,9 +48,23 @@ recap_index.settings(
 
 # Define people elasticsearch index
 # Define opinion elasticsearch index
-opinion_index = Index("opinion_index")
+opinion_index = Index("case_law_index")
 opinion_index.settings(
     number_of_shards=settings.ELASTICSEARCH_OPINION_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS,
     analysis=settings.ELASTICSEARCH_DSL["analysis"],
 )
+if settings.TESTING:
+    # Elasticsearch 9.2 changed the default behavior for `dense_vector` fields:
+    # they are now excluded from `_source` in search/get responses to reduce
+    # response size and improve performance. Additionally, when vectors are
+    # rehydrated from internal storage, they are restored at float precision,
+    # meaning higher-precision values (e.g., double) lose precision.
+    #
+    # We have tests that assert embeddings are indexed correctly by comparing
+    # the stored array of floats against the input. Setting
+    # `exclude_source_vectors: false` restores the pre-9.2 behavior in tests,
+    # keeping vectors in `_source` at their original precision. This avoids
+    # having to explicitly request the `dense_vector` field in every test query
+    # and working around the precision loss that comes with rehydration.
+    opinion_index.settings(mapping={"exclude_source_vectors": False})

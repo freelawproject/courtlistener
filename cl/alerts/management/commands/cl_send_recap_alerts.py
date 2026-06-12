@@ -11,10 +11,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
 from elasticsearch import Elasticsearch
+from elasticsearch.dsl import connections
+from elasticsearch.dsl.response import Hit, Response
+from elasticsearch.dsl.utils import AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
-from elasticsearch_dsl import connections
-from elasticsearch_dsl.response import Hit, Response
-from elasticsearch_dsl.utils import AttrList
 from redis import Redis
 
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
@@ -49,6 +49,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.models import SEARCH_TYPES, Docket
+from cl.stats.constants import StatAlertType, StatMetric
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
@@ -717,7 +718,11 @@ def query_and_send_alerts(
         )
 
     # Log and tally the total alerts sent
-    tally_stat("alerts.sent", inc=total_alerts_sent_count)
+    tally_stat(
+        StatMetric.ALERTS_SENT,
+        inc=total_alerts_sent_count,
+        labels={"alert_type": StatAlertType.RECAP},
+    )
     logger.info(f"Sent {total_alerts_sent_count} {rate} email alerts.")
 
 

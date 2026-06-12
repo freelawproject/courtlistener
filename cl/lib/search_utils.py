@@ -14,8 +14,8 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl import A
-from elasticsearch_dsl.response import Response
+from elasticsearch.dsl import A
+from elasticsearch.dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from waffle import flag_is_active
@@ -30,9 +30,11 @@ from cl.lib.elasticsearch_utils import (
     compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
+    get_query_embedding,
     has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
+    merge_semantic_relevant_chunks,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
     simplify_estimated_count,
@@ -56,6 +58,7 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -67,17 +70,25 @@ from cl.search.models import (
     OpinionCluster,
     SearchQuery,
 )
-from cl.stats.metrics import record_prometheus_metric
+from cl.stats.constants import StatMethod, StatMetric, StatQueryType
+from cl.stats.utils import tally_stat
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 logger = logging.getLogger(__name__)
 
 
-def check_pagination_depth(page_number):
-    """Check if the pagination is too deep (indicating a crawler)"""
+def check_pagination_depth(
+    page_number: int,
+    max_depth: int = settings.MAX_SEARCH_PAGINATION_DEPTH,
+) -> None:
+    """Check if the pagination is too deep (indicating a crawler)
 
-    if page_number > settings.MAX_SEARCH_PAGINATION_DEPTH:
+    :param page_number: The requested page number.
+    :param max_depth: Maximum allowed pagination depth.
+    :raises PermissionDenied: If page_number exceeds max_depth.
+    """
+    if page_number > max_depth:
         logger.warning(
             "Query depth of %s denied access (probably a crawler)",
             page_number,
@@ -308,13 +319,25 @@ def store_search_api_query(
     :param engine: The search engine used to execute the query.
     :return: None
     """
-    if not flag_is_active(request, "store-search-api-queries"):
-        # Do not store search queries
-        return
-
     if is_bot(request):
         return
+
     is_semantic = has_semantic_params(request.GET)
+    query_type = (
+        StatQueryType.SEMANTIC if is_semantic else StatQueryType.KEYWORD
+    )
+    tally_stat(
+        StatMetric.SEARCH_RESULTS,
+        labels={
+            "query_type": query_type,
+            "method": StatMethod.API,
+        },
+    )
+
+    if not flag_is_active(request, "store-search-api-queries"):
+        # Do not store search queries in the DB
+        return
+
     SearchQuery.objects.create(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -327,10 +350,6 @@ def store_search_api_query(
         if is_semantic
         else SearchQuery.KEYWORD,
     )
-    prometheus_key = (
-        f"search.queries.{'semantic' if is_semantic else 'keyword'}.api"
-    )
-    record_prometheus_metric(prometheus_key, 1)
 
 
 class CachedESSearchResults(TypedDict):
@@ -550,7 +569,14 @@ def fetch_and_paginate_results(
         return results, 1, False, main_total, child_total
 
     # Check pagination depth
-    check_pagination_depth(page)
+    query_string = clean_params.get("q", "")
+    is_related_query = bool(RELATED_PATTERN.search(query_string))
+    max_pagination_depth = (
+        settings.MAX_RELATED_SEARCH_PAGINATION_DEPTH
+        if is_related_query
+        else settings.MAX_SEARCH_PAGINATION_DEPTH
+    )
+    check_pagination_depth(page, max_pagination_depth)
 
     # Fetch results from ES
     hits, query_time, error, main_total, child_total = fetch_es_results(
@@ -621,6 +647,7 @@ def do_es_search(
     cache_key: str | None = None,
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
+    is_semantic_frontend_active: bool = False,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -654,7 +681,11 @@ def do_es_search(
     missing_citations_str: list[str] = []
     error = True
 
-    search_form = SearchForm(get_params, courts=courts)
+    search_form = SearchForm(
+        get_params,
+        courts=courts,
+        is_semantic_frontend_active=is_semantic_frontend_active,
+    )
     match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
@@ -689,6 +720,13 @@ def do_es_search(
                         remove_missing_citations(missing_citations, cd)
                     )
                     cd["q"] = suggested_query if suggested_query else cd["q"]
+
+            # For semantic searches, generate the embedding once so both
+            # the main query and the facets query reuse it instead of
+            # making duplicate calls to the inception microservice.
+            if has_semantic_params(cd) and not cd.get("embedding"):
+                cd["embedding"] = get_query_embedding(cd["q"])
+
             (
                 s,
                 child_docs_count_query,
@@ -704,6 +742,10 @@ def do_es_search(
                 page = 1
             cleaned_params = search_form.cleaned_data.copy()
             cleaned_params["page"] = page
+            # Use a smaller page size for semantic results so the longer
+            # chunk previews are less overwhelming to scan.
+            if has_semantic_params(cd):
+                rows = settings.SEMANTIC_SEARCH_PAGE_SIZE
             (
                 paged_results,
                 query_time,
@@ -717,6 +759,8 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
+            if has_semantic_params(cd):
+                merge_semantic_relevant_chunks(paged_results)
             cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
@@ -752,6 +796,9 @@ def do_es_search(
         except InvalidRelativeDateSyntax:
             error = True
             error_message = "invalid_relative_date_syntax"
+        except InputTooLongError:
+            error = True
+            error_message = "input_too_long_error"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(

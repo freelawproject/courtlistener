@@ -211,6 +211,7 @@ class NeonMembershipLevel:
     TIER_2 = 4
     TIER_3 = 5
     TIER_4 = 6
+    LSO_1 = 7
     EDU = 9
 
     # Old group memberships
@@ -262,6 +263,7 @@ class NeonMembershipLevel:
         (TIER_2, "CL Membership - Tier 2"),
         (TIER_3, "CL Membership - Tier 3"),
         (TIER_4, "CL Membership - Tier 4"),
+        (LSO_1, "LSO 1"),
         (EDU, "EDU Membership"),
         (GROUP_SMALLEST, "Group Membership - Smallest"),
         (GROUP_SMALL, "Group Membership - Small"),

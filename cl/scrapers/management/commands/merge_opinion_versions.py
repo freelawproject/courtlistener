@@ -4,7 +4,8 @@ from collections import defaultdict
 from difflib import Differ, SequenceMatcher
 
 from django.db import transaction
-from django.db.models import Count, F, Q, QuerySet
+from django.db.models import Count, F, Q, QuerySet, Value
+from django.db.models.functions import Greatest
 from eyecite import clean_text
 
 from cl.alerts.models import DocketAlert
@@ -20,9 +21,9 @@ from cl.people_db.models import (
 from cl.recap.models import PacerFetchQueue, ProcessingQueue
 from cl.scrapers.exceptions import MergingError
 from cl.scrapers.models import PACERMobilePageData
+from cl.search.cluster_sources import ClusterSources
 from cl.search.documents import ES_CHILD_ID, OpinionDocument
 from cl.search.models import (
-    SOURCES,
     BankruptcyInformation,
     Citation,
     Claim,
@@ -43,6 +44,11 @@ from cl.search.tasks import remove_document_from_es_index
 
 MIN_SEQUENCE_SIMILARITY_STRICT = 0.9
 MIN_SEQUENCE_SIMILARITY_LOOSE = 0.7
+
+# Length ratio threshold to prevent merging texts with vastly different lengths
+# A ratio of 0.7 means the shorter text must be at least 70% of the longer
+MIN_LENGTH_RATIO = 0.7
+
 DRY_RUN = False
 
 
@@ -278,7 +284,7 @@ cluster_fields_to_merge = [
     "scdb_decision_direction",
     "scdb_votes_majority",
     "scdb_votes_minority",
-    ("source", SOURCES.merge_sources),
+    ("source", ClusterSources.merge_sources),
     "procedural_history",
     "attorneys",
     "nature_of_suit",
@@ -368,7 +374,7 @@ def get_same_url_opinions(
     )
     return (
         Opinion.objects.filter(download_url_query)
-        .filter(cluster__source=SOURCES.COURT_WEBSITE)
+        .filter(cluster__source=ClusterSources.COURT_WEBSITE)
         .select_related("cluster", "cluster__docket")
         .order_by("-date_created")
     )
@@ -386,7 +392,29 @@ def clean_opinion_text(opinion: Opinion) -> str:
     return re.sub(r"\s+", " ", opinion.plain_text)
 
 
-def get_text_similarity(text1: str, text2: str) -> tuple[bool, float, float]:
+def passes_length_ratio_check(
+    text1: str, text2: str, min_ratio: float = MIN_LENGTH_RATIO
+) -> tuple[bool, float]:
+    """Check if two texts have comparable lengths before comparing similarity.
+
+    :param text1: first text to compare
+    :param text2: second text to compare
+    :param min_ratio: minimum acceptable ratio of shorter to longer text.
+        Default 0.7 means the shorter text must be at least 70% of the longer.
+    :return: tuple of (passes_check, length_ratio)
+    """
+    len1, len2 = len(text1), len(text2)
+
+    if len1 == 0 or len2 == 0:
+        return False, 0.0
+
+    ratio = min(len1, len2) / max(len1, len2)
+    return ratio >= min_ratio, ratio
+
+
+def get_text_similarity(
+    text1: str, text2: str
+) -> tuple[bool, bool, float, float]:
     """Check if the text from both opinions is the same or very similar
 
     A single character difference yields a 0.999 ratio
@@ -602,7 +630,7 @@ def delete_version_related_objects(version: Opinion) -> None:
     )
     if cited_clusters:
         OpinionCluster.objects.filter(id__in=list(cited_clusters)).update(
-            citation_count=F("citation_count") - 1
+            citation_count=Greatest(F("citation_count") - 1, Value(0))
         )
 
     OpinionsCited.objects.filter(
@@ -725,7 +753,7 @@ def merge_versions_by_download_url(
     else:
         query = Q()
 
-    query = query & Q(cluster__source=SOURCES.COURT_WEBSITE)
+    query = query & Q(cluster__source=ClusterSources.COURT_WEBSITE)
     qs = group_opinions_by_url(query)
 
     # The groups queryset will look like
@@ -780,13 +808,13 @@ def comparable_dockets(docket: Docket, version_docket: Docket) -> bool:
     # Special case for NY courts: allow versioning without matching docket numbers
     # when at least one docket number is empty.
     if docket.court_id.startswith("ny") and (
-        not docket.docket_number or not version_docket.docket_number
+        not docket.docket_number_raw or not version_docket.docket_number_raw
     ):
         return True
 
-    if docket.docket_number != version_docket.docket_number:
+    if docket.docket_number_raw != version_docket.docket_number_raw:
         logger.error(
-            log_template, "docket_number", docket.id, version_docket.id
+            log_template, "docket_number_raw", docket.id, version_docket.id
         )
         return False
 
@@ -820,6 +848,24 @@ def merge_versions_by_text_similarity(
             continue
 
         version_text = clean_opinion_text(version)
+
+        # Check length ratio before expensive similarity calculation
+        passes_length_check, length_ratio = passes_length_ratio_check(
+            main_text, version_text
+        )
+        if not passes_length_check:
+            stats["failed length ratio check"] += 1
+            logger.warning(
+                "Data quality issue: opinions %s and %s have vastly different "
+                "text lengths (ratio: %.3f, lengths: %d/%d). Skipping merge.",
+                main_opinion.id,
+                version.id,
+                length_ratio,
+                len(main_text),
+                len(version_text),
+            )
+            continue
+
         text_is_strictly_similar, text_is_loosely_similar, ratio1, ratio2 = (
             get_text_similarity(main_text, version_text)
         )

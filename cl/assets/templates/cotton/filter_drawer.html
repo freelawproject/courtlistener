@@ -1,0 +1,94 @@
+{% load component_tags svg_tags %}
+{% require_script "js/alpine/composables/utils.js" %}
+{% require_script "js/alpine/composables/dialog.js" %}
+{% require_script "js/alpine/plugins/focus" defer=True %}
+{% require_script "js/alpine/plugins/ui" defer=True %}
+
+<c-vars
+  title="Filters"
+  has_errors=""
+  class=""
+/>
+
+<div
+  x-data="dialog"
+  x-id="dialogIdGroup"
+  x-on:open-filter-drawer="open"
+  class="md:hidden {{ class }}"
+  {% if has_errors %}data-has-errors{% endif %}
+  {{ attrs }}
+>
+  {# Trigger button #}
+  <c-button
+    variant="outline"
+    x-on:click="open"
+    x-bind:aria-controls="dialogId"
+    x-bind:aria-expanded="isOpen"
+    aria-haspopup="dialog"
+  >
+    {% svg "funnel" class="w-4 h-4" aria_hidden="true" %}
+    {{ title }}
+  </c-button>
+
+  {# Drawer panel #}
+  <div
+    x-dialog
+    x-bind:open="isOpen"
+    x-bind:id="dialogId"
+    role="dialog"
+    aria-modal="true"
+    x-on:keyup.esc.stop.prevent="close"
+    x-cloak
+    class="fixed inset-0 z-40 overflow-hidden"
+  >
+    {# Overlay — fades in/out #}
+    <div
+      x-dialog:overlay
+      x-show="isOpen"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0"
+      x-transition:enter-end="opacity-100"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100"
+      x-transition:leave-end="opacity-0"
+      x-on:click.stop.prevent="close"
+      class="fixed inset-0 bg-greyscale-600/40"
+    ></div>
+
+    {# Panel — slides in/out from right #}
+    <div
+      x-dialog:panel
+      x-show="isOpen"
+      x-transition:enter="transition ease-out duration-200 transform"
+      x-transition:enter-start="translate-x-full"
+      x-transition:enter-end="translate-x-0"
+      x-transition:leave="transition ease-in duration-150 transform"
+      x-transition:leave-start="translate-x-0"
+      x-transition:leave-end="translate-x-full"
+      class="fixed inset-y-0 right-0 z-50 flex flex-col w-80 max-w-full bg-white shadow-lg"
+    >
+      {# Header #}
+      <div class="flex items-center justify-between px-4 py-3 border-b border-greyscale-200">
+        <h2 x-dialog:title class="text-lg font-semibold text-greyscale-900">{{ title }}</h2>
+        <c-button
+          variant="ghost"
+          x-on:click="close"
+          class="p-1"
+          aria-label="Close filters"
+        >
+          {% svg "cross" class="w-5 h-5" aria_hidden="true" %}
+        </c-button>
+      </div>
+
+      {# Content — filter fields projected via slot #}
+      <div class="flex-1 overflow-y-auto px-4 py-4">
+        {{ slot }}
+      </div>
+
+      {# Footer with Apply button #}
+      <div class="px-4 py-3 border-t border-greyscale-200">
+        {{ footer }}
+      </div>
+    </div>
+  </div>
+</div>

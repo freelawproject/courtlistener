@@ -50,7 +50,13 @@ from cl.lib.test_helpers import (
     PrayAndPayTestCase,
     SimpleUserDataMixin,
 )
-from cl.search.factories import RECAPDocumentFactory
+from cl.search.factories import (
+    DocketFactory,
+    OpinionClusterWithParentsFactory,
+    OpinionFactory,
+    RECAPDocumentFactory,
+)
+from cl.search.models import PRECEDENTIAL_STATUS
 from cl.search.utils import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
@@ -60,18 +66,26 @@ from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
 class NoteTest(SimpleUserDataMixin, AudioTestCase):
-    fixtures = [
-        "test_court.json",
-        "test_objects_search.json",
-        "judge_judy.json",
-    ]
-
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.docket_1 = DocketFactory(id=1)
+        cls.docket_2 = DocketFactory(id=2)
+        cls.docket_3 = DocketFactory(id=3)
         super().setUpTestData()
+        cls.opinion_cluster = OpinionClusterWithParentsFactory(
+            docket=cls.docket_1,
+            case_name="case name cluster 3",
+            case_name_full="Reference to Lissner v. Saad",
+            slug="case-name-cluster",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+        OpinionFactory(
+            cluster=cls.opinion_cluster,
+            plain_text="Reference to Lissner v. Saad",
+        )
         # Set up some handy variables
         cls.note_cluster_params = {
-            "cluster_id": 1,
+            "cluster_id": cls.opinion_cluster.pk,
             "name": "foo",
             "notes": "testing notes",
         }
@@ -114,13 +128,18 @@ class UserNotesTest(BaseSeleniumTest):
     including CRUD related operations of a user's notes.
     """
 
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
     def setUp(self) -> None:
+        self.opinion_cluster = OpinionClusterWithParentsFactory(
+            case_name="Lissner v. Saad",
+            case_name_full="Reference to Lissner v. Saad",
+            slug="lissner-v-saad",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            syllabus="some rando syllabus",
+        )
+        OpinionFactory(
+            cluster=self.opinion_cluster,
+            plain_text="Reference to Lissner v. Saad",
+        )
         super().setUp()
         get_homepage_stats.invalidate()
         self.f = NoteFactory.create(
@@ -423,14 +442,11 @@ class FavoritesTest(TestCase):
 class APITests(APITestCase):
     """Check that tags are created correctly and blocked correctly via APIs"""
 
-    fixtures = [
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
+        cls.docket_1 = DocketFactory(id=1)
+        cls.docket_2 = DocketFactory(id=2)
         cls.pandora = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
@@ -473,7 +489,7 @@ class APITests(APITestCase):
 
         # Link it to the docket
         tag_id = response.json()["id"]
-        docket_to_tag_id = 1
+        docket_to_tag_id = self.docket_1.pk
         response = await self.tag_a_docket(
             self.client, docket_to_tag_id, tag_id
         )
@@ -562,7 +578,7 @@ class APITests(APITestCase):
         # self.client makes a tag. self.client2 tries to use it
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        docket_to_tag_id = 1
+        docket_to_tag_id = self.docket_1.pk
         response = await self.tag_a_docket(
             self.client, docket_to_tag_id, tag_id
         )
@@ -586,20 +602,30 @@ class APITests(APITestCase):
         # create a tag and use it for docket #1 and #2
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 1, tag_id)
-        response = await self.tag_a_docket(self.client, 2, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_1.pk, tag_id
+        )
+        response = await self.tag_a_docket(
+            self.client, self.docket_2.pk, tag_id
+        )
 
         # create another tag for docket #2
         response = await self.make_a_good_tag(self.client, tag_name="foo-2")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 2, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_2.pk, tag_id
+        )
 
         # filter the associations using the docket id
-        response = await self.client.get(self.docket_path, {"docket": 1})
+        response = await self.client.get(
+            self.docket_path, {"docket": self.docket_1.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
 
-        response = await self.client.get(self.docket_path, {"docket": 2})
+        response = await self.client.get(
+            self.docket_path, {"docket": self.docket_2.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
@@ -609,27 +635,37 @@ class APITests(APITestCase):
         # create a two tags using client 1 and use them in docket #1
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_1.pk, tag_id
+        )
         response = await self.make_a_good_tag(self.client, tag_name="foo-c1")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.tag_a_docket(
+            self.client, self.docket_1.pk, tag_id
+        )
 
         await UserTag.objects.filter(name="foo").aupdate(published=True)
 
         # create another tag using client 2 and use it in docket #1
         response = await self.make_a_good_tag(self.client2, tag_name="foo-c2")
         tag_id = response.json()["id"]
-        response = await self.tag_a_docket(self.client2, 1, tag_id)
+        response = await self.tag_a_docket(
+            self.client2, self.docket_1.pk, tag_id
+        )
 
         await UserTag.objects.filter(name="foo-c2").aupdate(published=True)
 
         # query the associations(own + public) for docket #1 using client 1
-        response = await self.client.get(self.docket_path, {"docket": 1})
+        response = await self.client.get(
+            self.docket_path, {"docket": self.docket_1.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 3)
 
         # query the associations(own + public) for docket #1 using client 2
-        response = await self.client2.get(self.docket_path, {"docket": 1})
+        response = await self.client2.get(
+            self.docket_path, {"docket": self.docket_1.pk}
+        )
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
@@ -651,7 +687,7 @@ class APITests(APITestCase):
         # Make a tag, and tag a docket with it
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
-        docket_to_tag_id = 1
+        docket_to_tag_id = self.docket_1.pk
         await self.tag_a_docket(self.client, docket_to_tag_id, tag_id)
 
         # Check that client2 can't see that association

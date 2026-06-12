@@ -1,24 +1,30 @@
 import copy
 from dataclasses import dataclass
 from datetime import date, datetime
+from enum import Enum, auto
 from typing import Any
 from urllib.parse import parse_qs
 
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
-from elasticsearch_dsl import MultiSearch, Q, Search
-from elasticsearch_dsl.query import Query
-from elasticsearch_dsl.response import Hit
+from elasticsearch.dsl import MultiSearch, Q, Search
+from elasticsearch.dsl.query import Query
+from elasticsearch.dsl.response import Hit
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from redis import Redis
 
+from cl.alerts.constants import RECAP_ALERT_QUOTAS
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
     Alert,
     DocketAlert,
     ScheduledAlertHit,
 )
+from cl.api.models import ThrottleType
+from cl.api.utils import has_throttle_override
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import (
     add_es_highlighting,
@@ -27,6 +33,7 @@ from cl.lib.elasticsearch_utils import (
     build_has_child_filters,
     build_highlights_dict,
     build_join_es_filters,
+    do_es_alert_estimation_query,
     merge_highlights_into_result,
 )
 from cl.lib.string_utils import trunc
@@ -47,12 +54,25 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    DocketDocumentPlain,
     ESOpinionDocumentPlain,
     ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
+    OpinionClusterDocument,
     OpinionPercolator,
     RECAPPercolator,
 )
+from cl.search.exception import (
+    BadProximityQuery,
+    DisallowedWildcardPattern,
+    ElasticBadRequestError,
+    ElasticServerError,
+    InputTooLongError,
+    InvalidRelativeDateSyntax,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
+from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import (
     ESDictDocument,
@@ -508,6 +528,23 @@ def add_document_hit_to_alert_set(
     r.sadd(alert_key, document_id)
 
 
+def remove_alert_hits_set(r: Redis, alert_id: int) -> None:
+    """Remove every Redis SET storing document hits for a given alert ID.
+
+    A separate SET is created per document type (e.g. "alert_hits:5.d",
+    "alert_hits:5.r"). When an Alert is deleted these sets are no longer used
+    and would otherwise leak Redis memory, so we scan and delete all of them.
+
+    :param r: Redis client instance.
+    :param alert_id: The alert identifier.
+    :return: None
+    """
+    match_pattern = f"{get_alerts_set_prefix()}:{alert_id}.*"
+    keys = list(r.scan_iter(match=match_pattern))
+    if keys:
+        r.delete(*keys)
+
+
 def has_document_alert_hit_been_triggered(
     r: Redis, alert_id: int, document_type: str, document_id: int
 ) -> bool:
@@ -708,7 +745,15 @@ def prepare_percolator_content(
             es_document_index = AudioDocument._index._name
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
-            es_document_index = DocketDocument._index._name
+            model = apps.get_model(app_label)
+            docket = model.objects.get(pk=document_id)
+            document_content_plain = DocketDocumentPlain().prepare(docket)
+            del document_content_plain["docket_child"]
+            documents_to_percolate = (
+                document_content_plain,
+                None,
+                None,
+            )
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
             model = apps.get_model(app_label)
@@ -771,17 +816,52 @@ def set_skip_percolation_if_bankruptcy_data(
         d.skip_percolator_request = True
 
 
+def _exceeds_attorney_limit(
+    parties_data: list[dict[str, Any]], limit: int
+) -> bool:
+    """Check if total attorneys in parties data exceeds the given limit.
+
+    Stops counting early once the limit is exceeded for efficiency, since
+    parties data can be very large.
+
+    :param parties_data: A list of dicts containing the parties data.
+    :param limit: The maximum number of attorneys allowed.
+    :return: True if the total number of attorneys exceeds the limit.
+    """
+    count = 0
+    for party in parties_data:
+        count += len(party.get("attorneys", []))
+        if count > limit:
+            return True
+    return False
+
+
 def set_skip_percolation_if_parties_data(
     parties_data: list[dict[str, Any]], d: Docket
-) -> None:
+) -> bool:
     """Set skip percolation flag if parties data is present.
+
+    If parties data is available and the attorney count does not exceed the
+    limit, percolation is skipped during docket save(), since percolation
+    will be scheduled after merging and indexing parties.
 
     :param parties_data: A list of dicts containing the parties data.
     :param d: The docket to be saved.
-    :return: None
+    :return: True if the docket should be percolated after merging parties,
+    False otherwise.
     """
-    if parties_data:
-        d.skip_percolator_request = True
+    if not parties_data:
+        return False
+
+    if _exceeds_attorney_limit(
+        parties_data, settings.MAX_ATTORNEYS_TO_PERCOLATE
+    ):
+        # Party limit exceeded. Do not skip percolation. The docket will be
+        # percolated without considering parties via the ES signal processor.
+        return False
+
+    d.skip_percolator_request = True
+    return True
 
 
 def build_alert_email_subject(hits: list[SearchAlertHitType]) -> str:
@@ -820,3 +900,176 @@ def is_match_all_query(qs: str) -> bool:
 
     # If any remaining value is not empty, it is not a match-all query.
     return not any(val.strip() for vals in parsed.values() for val in vals)
+
+
+class AlertLimitViolation(Enum):
+    """The reason a user can't create or edit an alert with a given rate."""
+
+    # The user isn't eligible to create Real-Time alerts.
+    REAL_TIME_NOT_ALLOWED = auto()
+    # A member has used all the RECAP/DOCKETS alerts included with their plan.
+    MEMBER_QUOTA_EXCEEDED = auto()
+    # A free user has reached the free RECAP/DOCKETS alert quota.
+    FREE_QUOTA_EXCEEDED = auto()
+
+
+@dataclass
+class AlertLimitResult:
+    """Outcome of evaluating an alert against the user's membership limits."""
+
+    # The violation found, or None when the alert is within limits.
+    violation: AlertLimitViolation | None
+    # The free-tier quota for the alert's rate, for building the user message.
+    free_quota: int
+
+
+def check_alert_limits(
+    user: User,
+    rate: str,
+    alert_type: str | None,
+    *,
+    exclude_alert_pk: int | None = None,
+) -> AlertLimitResult:
+    """Evaluate whether creating or editing an alert would exceed the user's
+    membership-based alert limits.
+
+    This holds the business logic shared by the alert creation form
+    (``CreateAlertForm.clean_rate``) and the API serializer
+    (``SearchAlertSerializer``). Each caller is responsible for turning the
+    returned violation into an appropriate error message and exception type.
+
+    :param user: The alert owner.
+    :param rate: The alert rate (``Alert.REAL_TIME``, ``Alert.DAILY``, etc.).
+    :param alert_type: The resolved alert_type (e.g. RECAP, DOCKETS, OPINION).
+    :param exclude_alert_pk: When editing an existing alert, its pk, so it's
+    excluded from the quota count. None when creating a new alert.
+    :return: An ``AlertLimitResult`` with the violation found (or None when
+    within limits) and the free-tier quota for the rate.
+    """
+    profile = user.profile  # type: ignore[attr-defined]
+    quotas = RECAP_ALERT_QUOTAS[
+        Alert.REAL_TIME if rate == Alert.REAL_TIME else "other_rates"
+    ]
+    free_quota = quotas.get("free", 0)
+
+    # Users with a commercial agreement (an APIThrottle of type ALERTS) bypass
+    # the membership/non-member alert limits entirely. Their alert creation is
+    # governed by the AlertThrottle rate instead.
+    if has_throttle_override(user, ThrottleType.ALERTS):
+        return AlertLimitResult(None, free_quota)
+
+    # Don't enforce limits when disabling an existing alert.
+    if exclude_alert_pk is not None and rate == Alert.OFF:
+        return AlertLimitResult(None, free_quota)
+
+    # Only members or users with the unlimited alerts flag can create RT
+    # alerts, regardless of the alert type.
+    if (
+        rate == Alert.REAL_TIME
+        and not profile.is_eligible_for_rt_search_alerts
+    ):
+        return AlertLimitResult(
+            AlertLimitViolation.REAL_TIME_NOT_ALLOWED, free_quota
+        )
+
+    # Quotas only apply to RECAP/DOCKETS alerts for users that don't have the
+    # unlimited alerts flag.
+    if profile.unlimited_docket_alerts or alert_type not in {
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    }:
+        return AlertLimitResult(None, free_quota)
+
+    level_key = (
+        user.membership.level  # type: ignore[attr-defined]
+        if profile.is_member
+        else "free"
+    )
+    allowed = quotas.get(level_key, free_quota)
+
+    query_params: dict[str, Any] = {"user": user}
+    if rate == Alert.REAL_TIME:
+        query_params["rate"] = Alert.REAL_TIME
+    else:
+        query_params["rate__in"] = [Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]
+    alerts = Alert.objects.filter(
+        **query_params,
+        alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+    )
+    if exclude_alert_pk is not None:
+        # Exclude the alert being edited from the count.
+        alerts = alerts.exclude(pk=exclude_alert_pk)
+
+    if alerts.count() + 1 > allowed:
+        violation = (
+            AlertLimitViolation.MEMBER_QUOTA_EXCEEDED
+            if profile.is_member
+            else AlertLimitViolation.FREE_QUOTA_EXCEEDED
+        )
+        return AlertLimitResult(violation, free_quota)
+    return AlertLimitResult(None, free_quota)
+
+
+def get_alert_estimation_count(
+    query_data: QueryDict, day_count: int
+) -> tuple[int, int] | None:
+    """Estimate the number of alert hits a query would have produced over the
+    last ``day_count`` days.
+
+    This is the request-independent core of ``cl.api.views.get_result_count``,
+    so it can be reused to estimate an alert's frequency from a stored alert
+    query instead of an HTTP request.
+
+    :param query_data: A QueryDict holding the alert's search query parameters.
+    :param day_count: The number of days to average the estimation across.
+    :return: A two-tuple ``(total_hits, case_only_hits)`` where
+    ``case_only_hits`` is 0 for non-RECAP search types, or None if the query
+    can't be validated by SearchForm.
+    :raises ElasticBadRequestError: If the query can't be built (e.g.
+    unbalanced parentheses/quotes, disallowed wildcards) or Elasticsearch
+    can't parse it.
+    :raises ElasticServerError: If the Elasticsearch request fails for any
+    other reason (e.g. a transport or connection error).
+    """
+    search_form = SearchForm(query_data)
+    if not search_form.is_valid():
+        return None
+
+    cd = search_form.cleaned_data
+    total_case_only_query_results = 0
+    try:
+        match cd["type"]:
+            case SEARCH_TYPES.ORAL_ARGUMENT:
+                search_query = AudioDocument.search()
+                total_query_results, _ = do_es_alert_estimation_query(
+                    search_query, cd, day_count
+                )
+            case SEARCH_TYPES.OPINION:
+                search_query = OpinionClusterDocument.search()
+                total_query_results, _ = do_es_alert_estimation_query(
+                    search_query, cd, day_count
+                )
+            case SEARCH_TYPES.RECAP:
+                search_query = DocketDocument.search()
+                (
+                    total_query_results,
+                    total_case_only_query_results,
+                ) = do_es_alert_estimation_query(search_query, cd, day_count)
+            case _:
+                total_query_results = 0
+    except (
+        UnbalancedParenthesesQuery,
+        UnbalancedQuotesQuery,
+        BadProximityQuery,
+        DisallowedWildcardPattern,
+        InvalidRelativeDateSyntax,
+        InputTooLongError,
+    ) as e:
+        raise ElasticBadRequestError(detail=e.message)
+    except (TransportError, ConnectionError, RequestError):
+        raise ElasticServerError()
+    except ApiError as e:
+        if "Failed to parse query" in str(e):
+            raise ElasticBadRequestError()
+        raise ElasticServerError()
+    return total_query_results, total_case_only_query_results
