@@ -12,6 +12,7 @@ from django.utils.timezone import now as tz_now
 from redis import Redis
 
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.sitemaps_infinite.base_sitemap import (
     CacheableList,
     InfinitePaginatorSitemap,
@@ -63,7 +64,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
     redis_db: Redis = get_redis_interface(REDIS_DB)
 
-    db_cache: BaseCache = caches["db_cache"]
+    db_cache: BaseCache = get_s3_cache("db_cache")
 
     cursor_data: TaskCursorData = cursor_data_default.copy()
 
@@ -139,7 +140,13 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
             cache_key = make_cache_key(sitemapObject, section, current_page)
 
             # read the last existing page from the cache
-            cached_urls: CacheableList | None = db_cache.get(cache_key)
+            cached_urls: CacheableList | None = db_cache.get(
+                make_s3_cache_key(cache_key, long_cache_timeout)
+            )
+            if cached_urls is None:
+                cached_urls = db_cache.get(
+                    make_s3_cache_key(cache_key, short_cache_timeout)
+                )
 
             if (
                 current_cursor is None
@@ -220,7 +227,11 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                     )
                     cursor_data["has_next"] = 0
                     if current_page == 1:
-                        db_cache.set(cache_key, [], short_cache_timeout)
+                        db_cache.set(
+                            make_s3_cache_key(cache_key, short_cache_timeout),
+                            [],
+                            short_cache_timeout,
+                        )
                     else:
                         continue
 
@@ -237,7 +248,11 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 )
 
                 # Save the sitemap page data to the cache
-                db_cache.set(cache_key, urls, cache_timeout)
+                db_cache.set(
+                    make_s3_cache_key(cache_key, cache_timeout),
+                    urls,
+                    cache_timeout,
+                )
 
                 logger.info(
                     "Generated sitemap cache for section: %s, page: %d and cursor: %s.",
