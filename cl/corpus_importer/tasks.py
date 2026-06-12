@@ -1007,15 +1007,27 @@ def upload_to_ia(
 
 
 @app.task
-def mark_court_done_on_date(log_id: int, status: int) -> int | None:
+def mark_court_done_on_date(
+    log_id: int, status: int, document_count: int | None = None
+) -> int | None:
+    """Update a free-opinion scrape log row with its final outcome.
+
+    :param log_id: the PACERFreeDocumentLog primary key
+    :param status: the final scrape status
+    :param document_count: the number of results the report returned, or None
+    when unknown (e.g. the scrape failed)
+    :returns: the status that was saved, or None if the log row is gone
+    :rtype: int | None
+    """
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
         return None
-    else:
-        doc_log.status = status
-        doc_log.date_completed = now()
-        doc_log.save()
+
+    doc_log.status = status
+    doc_log.date_completed = now()
+    doc_log.document_count = document_count
+    doc_log.save()
 
     return status
 
