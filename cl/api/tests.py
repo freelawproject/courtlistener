@@ -240,6 +240,9 @@ class CoverageTests(ESIndexTestCase, TestCase):
         cls.rebuild_index("search.OpinionCluster")
         cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
+        # test_coverage_data_view_provides_court_data queries "ca1"; create it
+        # here so the test doesn't depend on another test creating that court.
+        cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
 
         cls.c_scotus_1 = OpinionClusterWithChildrenAndParentsFactory(
             case_name="Strickland v. Lorem.",

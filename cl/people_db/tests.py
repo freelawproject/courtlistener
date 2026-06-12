@@ -2,10 +2,10 @@ from django.urls import reverse
 
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.people_db.models import Person, Position
-from cl.tests.cases import TestCase, TransactionTestCase
+from cl.tests.cases import TestCase
 
 
-class TestPersonWithChildrenFactory(TransactionTestCase):
+class TestPersonWithChildrenFactory(TestCase):
     def test_positions_connected_to_person(self):
         new_person_with_position = PersonWithChildrenFactory()
 

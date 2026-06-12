@@ -36,6 +36,7 @@ def confirm_es_indexing(options):
     queue = options["queue"]
     chunk_size = options["chunk_size"]
     pk_offset = options["pk_offset"]
+    testing_mode = options.get("testing_mode", False)
     chunk = []
     processed_count = 0
     court_ids = get_bankruptcy_courts(["all"])
@@ -58,6 +59,7 @@ def confirm_es_indexing(options):
             throttle.maybe_wait()
             index_dockets_in_bulk.si(
                 chunk,
+                testing_mode=testing_mode,
             ).set(queue=queue).apply_async()
             chunk = []
             logger.info(
@@ -465,6 +467,13 @@ class Command(VerboseCommand):
             type=str,
             default="default",
             help="Let the user decide which DB name to use",
+        )
+        parser.add_argument(
+            "--testing-mode",
+            action="store_true",
+            default=False,
+            help="Use streaming_bulk for indexing, required by TestCase-based "
+            "tests since parallel_bulk is incompatible with them.",
         )
 
     def handle(self, *args, **options):

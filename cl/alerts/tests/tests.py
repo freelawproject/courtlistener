@@ -1118,6 +1118,9 @@ class UnlimitedAlertsTest(TestCase):
 
 class AlertSeleniumTest(BaseSeleniumTest):
     fixtures = ["test_court.json"]
+    # This test edits a search alert via the UI; it never queries the opinion
+    # or audio search indexes, so skip the expensive per-test reindex.
+    rebuild_search_indexes = False
 
     def setUp(self) -> None:
         # Set up some handy variables

@@ -86,7 +86,6 @@ from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
     V4SearchAPIAssertions,
 )
 from cl.users.factories import UserProfileWithParentsFactory
@@ -3676,9 +3675,7 @@ class IndexOpinionDocumentsCommandTest(
 
 
 @override_settings(ENABLE_EMBEDDING_COMPUTATION=True)
-class EsOpinionsIndexingTest(
-    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
-):
+class EsOpinionsIndexingTest(CountESTasksTestCase, ESIndexTestCase, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -3731,29 +3728,30 @@ class EsOpinionsIndexingTest(
         """Confirm join child objects are removed from the index when the
         parent objects is deleted.
         """
-        cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket,
-        )
-        opinion_1 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person,
-            plain_text="my plain text",
-            cluster=cluster,
-            local_path="test/search/opinion_doc1.doc",
-            per_curiam=False,
-            type=Opinion.COMBINED,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory.create(
+                case_name_full="Paul Debbas v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=self.docket,
+            )
+            opinion_1 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                plain_text="my plain text",
+                cluster=cluster,
+                local_path="test/search/opinion_doc1.doc",
+                per_curiam=False,
+                type=Opinion.COMBINED,
+            )
 
         cluster_pk = cluster.pk
         opinion_pk = opinion_1.pk
@@ -3766,7 +3764,8 @@ class EsOpinionsIndexingTest(
 
         # Delete Cluster instance; it should be removed from the index along
         # with its child documents.
-        cluster.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster.delete()
 
         # Cluster document should be removed.
         self.assertFalse(OpinionClusterDocument.exists(id=cluster_pk))
@@ -3779,35 +3778,37 @@ class EsOpinionsIndexingTest(
         """Confirm that child objects are removed from the index when they are
         deleted independently of their parent object
         """
-        cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket,
-        )
-        opinion_1 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person,
-            plain_text="my plain text",
-            cluster=cluster,
-            local_path="test/search/opinion_doc1.doc",
-            per_curiam=False,
-            type=Opinion.COMBINED,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory.create(
+                case_name_full="Paul Debbas v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=self.docket,
+            )
+            opinion_1 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                plain_text="my plain text",
+                cluster=cluster,
+                local_path="test/search/opinion_doc1.doc",
+                per_curiam=False,
+                type=Opinion.COMBINED,
+            )
 
         cluster_pk = cluster.pk
         opinion_pk = opinion_1.pk
 
         # Delete pos_1 and education, keep the parent person instance.
-        opinion_1.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_1.delete()
 
         # Opinion cluster instance still exists.
         self.assertTrue(OpinionClusterDocument.exists(id=cluster_pk))
@@ -3816,16 +3817,20 @@ class EsOpinionsIndexingTest(
         self.assertFalse(
             OpinionDocument.exists(id=ES_CHILD_ID(opinion_pk).OPINION)
         )
-        cluster.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster.delete()
 
     def test_child_document_update_properly(self) -> None:
         """Confirm that child fields are properly update when changing DB records"""
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.es_save_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.es_save_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    es_save_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             opinion_cluster = OpinionClusterFactory.create(
                 case_name_full="Paul Debbas v. Franklin",
@@ -3860,11 +3865,14 @@ class EsOpinionsIndexingTest(
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.ordering_key, opinion.ordering_key)
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             # Update the author field in the opinion record.
             opinion.author = self.person_2
@@ -3872,11 +3880,14 @@ class EsOpinionsIndexingTest(
         # One update_es_document task should be called on tracked field update.
         self.reset_and_assert_task_count(expected=1)
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             # Update the ordering_key field in the opinion record.
             opinion.ordering_key = None
@@ -3905,23 +3916,26 @@ class EsOpinionsIndexingTest(
         self.assertEqual(es_doc.author_id, self.person_2.pk)
 
         # Update the type field in the opinion record.
-        opinion.type = Opinion.COMBINED
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.type = Opinion.COMBINED
+            opinion.save()
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.type, o_type_index_map.get(Opinion.COMBINED))
         self.assertEqual(es_doc.type_text, "Combined Opinion")
 
         # Update the per_curiam field in the opinion record.
-        opinion.per_curiam = True
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.per_curiam = True
+            opinion.save()
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.per_curiam, True)
 
         # Update the text field in the opinion record.
-        opinion.plain_text = "This is a test"
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.plain_text = "This is a test"
+            opinion.save()
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.text, "This is a test")
@@ -3939,36 +3953,40 @@ class EsOpinionsIndexingTest(
             dob_city="Brookyln",
             dob_state="NY",
         )
-        opinion_2 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=person_2,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            local_path="test/search/opinion_wpd.wpd",
-            per_curiam=False,
-            type=Opinion.COMBINED,
-        )
-        opinion_cluster_2 = OpinionClusterFactory.create(
-            precedential_status="Errata",
-            citation_count=5,
-            docket=self.docket,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=person_2,
+                plain_text="my plain text secret word for queries",
+                cluster=opinion_cluster,
+                local_path="test/search/opinion_wpd.wpd",
+                per_curiam=False,
+                type=Opinion.COMBINED,
+            )
+            opinion_cluster_2 = OpinionClusterFactory.create(
+                precedential_status="Errata",
+                citation_count=5,
+                docket=self.docket,
+            )
 
-        opinion_3 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=person_2,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster_2,
-            local_path="test/search/opinion_wpd.wpd",
-            per_curiam=False,
-            type=Opinion.COMBINED,
-        )
+            opinion_3 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=person_2,
+                plain_text="my plain text secret word for queries",
+                cluster=opinion_cluster_2,
+                local_path="test/search/opinion_wpd.wpd",
+                per_curiam=False,
+                type=Opinion.COMBINED,
+            )
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.si",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, True, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.si",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, True, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             # Add OpinionsCited using save() as in add_manual_citations command
             cite = OpinionsCited(
@@ -4041,37 +4059,45 @@ class EsOpinionsIndexingTest(
             dob_city="Queens",
             dob_state="NY",
         )
-        opinion.joined_by.add(person_3)
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.joined_by.add(person_3)
 
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         for judge in opinion.joined_by.all():
             self.assertIn(judge.pk, es_doc.joined_by_ids)
 
-        opinion.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.delete()
 
     def test_parent_document_update_fields_properly(self) -> None:
         """Confirm that parent fields are properly update when changing DB records"""
-        docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
-        opinion_cluster = OpinionClusterFactory.create(
-            case_name_full="Paul test v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=docket,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court_id=self.court_2.pk, source=Docket.HARVARD
+            )
+            opinion_cluster = OpinionClusterFactory.create(
+                case_name_full="Paul test v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=docket,
+            )
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, False, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, False, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             # Update the court field in the docket record.
             docket.court = self.court_1
@@ -4096,8 +4122,9 @@ class EsOpinionsIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Update the absolute_url field in the cluster record.
-        opinion_cluster.case_name = "Debbas v. test"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.case_name = "Debbas v. test"
+            opinion_cluster.save()
 
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertEqual(
@@ -4116,53 +4143,62 @@ class EsOpinionsIndexingTest(
             dob_city="Queens",
             dob_state="NY",
         )
-        opinion_cluster.non_participating_judges.add(person_3)
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.non_participating_judges.add(person_3)
 
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertIn(person_3.pk, es_doc.non_participating_judge_ids)
 
         # Update the source field in the cluster record.
-        opinion_cluster.source = "ZLCR"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.source = "ZLCR"
+            opinion_cluster.save()
 
         es_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         self.assertEqual(es_doc.source, "ZLCR")
 
-        docket.delete()
-        opinion_cluster.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+            opinion_cluster.delete()
 
     def test_update_shared_fields_related_documents(self) -> None:
         """Confirm that related document are properly update using bulk approach"""
-        docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
-        opinion_cluster = OpinionClusterFactory.create(
-            case_name_full="Paul test v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=docket,
-        )
-        opinion = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            local_path="test/search/opinion_doc.doc",
-            per_curiam=False,
-            type="020lead",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court_id=self.court_2.pk, source=Docket.HARVARD
+            )
+            opinion_cluster = OpinionClusterFactory.create(
+                case_name_full="Paul test v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=docket,
+            )
+            opinion = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                plain_text="my plain text secret word for queries",
+                cluster=opinion_cluster,
+                local_path="test/search/opinion_doc.doc",
+                per_curiam=False,
+                type="020lead",
+            )
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, False, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_es_document.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_es_document, False, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             # update docket number in parent document
             docket.docket_number = "005"
@@ -4181,11 +4217,14 @@ class EsOpinionsIndexingTest(
         )
         self.assertEqual(opinion_doc.date_created, opinion.date_created)
 
-        with mock.patch(
-            "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
-            side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_children_docs_by_query, False, *args, **kwargs
+        with (
+            mock.patch(
+                "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
+                side_effect=lambda *args, **kwargs: self.count_task_calls(
+                    update_children_docs_by_query, False, *args, **kwargs
+                ),
             ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             # update docket number in parent document
             docket.docket_number = "006"
@@ -4200,8 +4239,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.docketNumber, "006")
 
         # update the case name in the opinion cluster record
-        opinion_cluster.case_name = "Debbas v. Franklin2"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.case_name = "Debbas v. Franklin2"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4216,10 +4256,11 @@ class EsOpinionsIndexingTest(
             opinion_cluster.get_absolute_url(),
         )
 
-        opinion_cluster.case_name = ""
-        opinion_cluster.case_name_full = "Franklin v. Debbas"
-        opinion_cluster.case_name_short = "Franklin"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.case_name = ""
+            opinion_cluster.case_name_full = "Franklin v. Debbas"
+            opinion_cluster.case_name_short = "Franklin"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4228,9 +4269,10 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.caseName, "Franklin v. Debbas")
         self.assertEqual(opinion_doc.caseNameFull, "Franklin v. Debbas")
 
-        opinion_cluster.case_name_full = ""
-        opinion_cluster.case_name_short = "Franklin50"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.case_name_full = ""
+            opinion_cluster.case_name_short = "Franklin50"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4238,8 +4280,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.caseName, "Franklin50")
 
         # update the attorneys field in the cluster record
-        opinion_cluster.judges = "first judge, second judge"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.judges = "first judge, second judge"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4247,8 +4290,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.judge, "first judge, second judge")
 
         # update the attorneys field in the cluster record
-        opinion_cluster.attorneys = "first attorney, second attorney"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.attorneys = "first attorney, second attorney"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4260,8 +4304,9 @@ class EsOpinionsIndexingTest(
         )
 
         # update the nature_of_suit field in the cluster record
-        opinion_cluster.nature_of_suit = "test nature"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.nature_of_suit = "test nature"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4269,8 +4314,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.suitNature, "test nature")
 
         # update the precedential_status field in the cluster record
-        opinion_cluster.precedential_status = "Separate"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.precedential_status = "Separate"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4278,8 +4324,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.status, "Separate")
 
         # update the procedural_history field in the cluster record
-        opinion_cluster.procedural_history = "random history"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.procedural_history = "random history"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4287,8 +4334,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.procedural_history, "random history")
 
         # update the posture in the opinion cluster record
-        opinion_cluster.posture = "random procedural posture"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.posture = "random procedural posture"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4296,8 +4344,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.posture, "random procedural posture")
 
         # update the syllabus in the opinion cluster record
-        opinion_cluster.syllabus = "random text for test"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.syllabus = "random text for test"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4305,8 +4354,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.syllabus, "random text for test")
 
         # Update the scdb_id field in the cluster record.
-        opinion_cluster.scdb_id = "test"
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.scdb_id = "test"
+            opinion_cluster.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4314,7 +4364,8 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.scdb_id, "test")
 
         # Add a new judge to the cluster record.
-        opinion_cluster.panel.add(self.person)
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.panel.add(self.person)
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4322,12 +4373,13 @@ class EsOpinionsIndexingTest(
         self.assertIn(self.person.pk, opinion_doc.panel_ids)
 
         # Add a new opinion to the cluster record.
-        opinion_1 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            type="020lead",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_1 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                plain_text="my plain text secret word for queries",
+                cluster=opinion_cluster,
+                type="020lead",
+            )
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4338,13 +4390,14 @@ class EsOpinionsIndexingTest(
         self.assertIn(opinion_1.pk, opinion_1_doc.sibling_ids)
         self.assertIn(opinion.pk, opinion_1_doc.sibling_ids)
 
-        opinion_2 = OpinionFactory.create(
-            extracted_by_ocr=False,
-            plain_text="my plain text secret word for queries",
-            cluster=opinion_cluster,
-            type=Opinion.COMBINED,
-        )
-        opinion_2.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_2 = OpinionFactory.create(
+                extracted_by_ocr=False,
+                plain_text="my plain text secret word for queries",
+                cluster=opinion_cluster,
+                type=Opinion.COMBINED,
+            )
+            opinion_2.save()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4352,13 +4405,14 @@ class EsOpinionsIndexingTest(
         self.assertIn(opinion_2.pk, opinion_doc.sibling_ids)
 
         # Add lexis citation to the cluster
-        lexis_citation = CitationWithParentsFactory.create(
-            volume="10",
-            reporter="Yeates",
-            page="4",
-            type=6,
-            cluster=opinion_cluster,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            lexis_citation = CitationWithParentsFactory.create(
+                volume="10",
+                reporter="Yeates",
+                page="4",
+                type=6,
+                cluster=opinion_cluster,
+            )
 
         lexis_citation_str = str(lexis_citation)
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
@@ -4367,7 +4421,8 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.lexisCite, lexis_citation_str)
 
         # Remove lexis citation from the db
-        lexis_citation.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            lexis_citation.delete()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4375,13 +4430,14 @@ class EsOpinionsIndexingTest(
         self.assertNotEqual(opinion_doc.lexisCite, lexis_citation_str)
 
         # Add neutral citation to the cluster
-        neutral_citation = CitationWithParentsFactory.create(
-            volume="16",
-            reporter="Yeates",
-            page="58",
-            type=8,
-            cluster=opinion_cluster,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            neutral_citation = CitationWithParentsFactory.create(
+                volume="16",
+                reporter="Yeates",
+                page="58",
+                type=8,
+                cluster=opinion_cluster,
+            )
 
         neutral_citation_str = str(neutral_citation)
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
@@ -4390,7 +4446,8 @@ class EsOpinionsIndexingTest(
         self.assertEqual(opinion_doc.neutralCite, neutral_citation_str)
 
         # Remove neutral citation from the db
-        neutral_citation.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            neutral_citation.delete()
 
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
@@ -4423,15 +4480,17 @@ class EsOpinionsIndexingTest(
         self.create_index("search.OpinionCluster")
 
         # Index OpinionCluster
-        opinion_cluster.citation_count = 5
-        opinion_cluster.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion_cluster.citation_count = 5
+            opinion_cluster.save()
 
         self.assertFalse(
             OpinionClusterDocument.exists(id=ES_CHILD_ID(opinion.pk).OPINION)
         )
         # Opinion Document creation on update.
-        opinion.plain_text = "Lorem ipsum dolor."
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.plain_text = "Lorem ipsum dolor."
+            opinion.save()
 
         opinion_doc = OpinionClusterDocument.get(
             id=ES_CHILD_ID(opinion.pk).OPINION
@@ -4441,37 +4500,40 @@ class EsOpinionsIndexingTest(
             opinion_doc.cluster_child["parent"], opinion_cluster.pk
         )
 
-        docket.delete()
-        opinion_cluster.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+            opinion_cluster.delete()
 
     def test_remove_control_chars_on_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
 
-        o_c = OpinionClusterFactory.create(
-            case_name_full="Testing v. Cluster",
-            date_filed=datetime.date(2034, 8, 14),
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            docket=self.docket,
-        )
-        o = OpinionFactory.create(
-            author=self.person,
-            plain_text="Lorem ipsum control chars \x07\x08\x0b.",
-            cluster=o_c,
-            type="020lead",
-        )
-        o_2 = OpinionFactory.create(
-            author=self.person,
-            html="<p>Lorem html ipsum control chars \x07\x08\x0b.</p>",
-            cluster=o_c,
-            type="020lead",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            o_c = OpinionClusterFactory.create(
+                case_name_full="Testing v. Cluster",
+                date_filed=datetime.date(2034, 8, 14),
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                docket=self.docket,
+            )
+            o = OpinionFactory.create(
+                author=self.person,
+                plain_text="Lorem ipsum control chars \x07\x08\x0b.",
+                cluster=o_c,
+                type="020lead",
+            )
+            o_2 = OpinionFactory.create(
+                author=self.person,
+                html="<p>Lorem html ipsum control chars \x07\x08\x0b.</p>",
+                cluster=o_c,
+                type="020lead",
+            )
 
         o_doc = OpinionDocument.get(id=ES_CHILD_ID(o.pk).OPINION)
         self.assertEqual(o_doc.text, "Lorem ipsum control chars .")
         o_2_doc = OpinionDocument.get(id=ES_CHILD_ID(o_2.pk).OPINION)
         self.assertEqual(o_2_doc.text, "Lorem html ipsum control chars .")
-        o_c.docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            o_c.docket.delete()
 
     def _get_mock_for_inception(self, vectors: dict[str, Any] | None = None):
         """Return a mocked Inception response with the given vectors."""
@@ -4487,29 +4549,30 @@ class EsOpinionsIndexingTest(
         self, inception_mock, mock_aws_media_storage, mock_download_embeddings
     ) -> None:
         """Confirm updates to text field trigger embeddings generation."""
-        cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket,
-        )
-        opinion = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person,
-            plain_text="my plain text secret word for queries",
-            cluster=cluster,
-            local_path="test/search/opinion_doc.doc",
-            per_curiam=False,
-            type="020lead",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory.create(
+                case_name_full="Paul Debbas v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=self.docket,
+            )
+            opinion = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                plain_text="my plain text secret word for queries",
+                cluster=cluster,
+                local_path="test/search/opinion_doc.doc",
+                per_curiam=False,
+                type="020lead",
+            )
 
         # Mock the response from the microservice
         test_dir = (
@@ -4536,8 +4599,9 @@ class EsOpinionsIndexingTest(
 
         # Updating a non-text field (type and per_curiam) should not call
         # the microservice
-        opinion.type = Opinion.COMBINED
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.type = Opinion.COMBINED
+            opinion.save()
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.type, o_type_index_map.get(Opinion.COMBINED))
         self.assertEqual(es_doc.type_text, "Combined Opinion")
@@ -4545,8 +4609,9 @@ class EsOpinionsIndexingTest(
         mock_aws_media_storage.assert_not_called()
         mock_download_embeddings.assert_not_called()
 
-        opinion.per_curiam = True
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.per_curiam = True
+            opinion.save()
         es_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(es_doc.per_curiam, True)
         inception_mock.assert_not_called()
@@ -4554,8 +4619,9 @@ class EsOpinionsIndexingTest(
         mock_download_embeddings.assert_not_called()
 
         # Updating `html_with_citations` should trigger embeddings generation
-        opinion.html_with_citations = "HTML with citations content" * 100
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.html_with_citations = "HTML with citations content" * 100
+            opinion.save()
 
         inception_mock.assert_called_once_with(
             service="inception-text", data=opinion.clean_text
@@ -4573,29 +4639,30 @@ class EsOpinionsIndexingTest(
     def test_missing_embeddings_log_error(
         self, inception_mock, download_mock, logger_mock
     ):
-        cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket,
-        )
-        opinion = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person,
-            plain_text="my plain text secret word for queries",
-            cluster=cluster,
-            local_path="test/search/opinion_doc.doc",
-            per_curiam=False,
-            type="020lead",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory.create(
+                case_name_full="Paul Debbas v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=self.docket,
+            )
+            opinion = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                plain_text="my plain text secret word for queries",
+                cluster=cluster,
+                local_path="test/search/opinion_doc.doc",
+                per_curiam=False,
+                type="020lead",
+            )
 
         # Mock the response from the microservice
         inception_response_mock = MagicMock
@@ -4606,9 +4673,10 @@ class EsOpinionsIndexingTest(
         download_mock.return_value = None
 
         # Updating `html_with_citations` should trigger embeddings generation
-        opinion.html_with_citations = "HTML with citations content" * 100
-        opinion.per_curiam = True
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.html_with_citations = "HTML with citations content" * 100
+            opinion.per_curiam = True
+            opinion.save()
 
         # Verify the microservice was called with the cleaned opinion text
         inception_mock.assert_called_once_with(
@@ -4632,37 +4700,39 @@ class EsOpinionsIndexingTest(
         self, inception_mock, download_mock
     ):
         """Check embeddings are not computed for opinions that fall below the token threshold."""
-        cluster = OpinionClusterFactory.create(
-            case_name_full="Paul Debbas v. Franklin",
-            case_name_short="Debbas",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 8, 14),
-            procedural_history="some rando history",
-            source="C",
-            case_name="Debbas v. Franklin",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status="Errata",
-            citation_count=4,
-            docket=self.docket,
-        )
-        opinion = OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=self.person,
-            plain_text="my plain text secret word for queries",
-            cluster=cluster,
-            local_path="test/search/opinion_doc.doc",
-            per_curiam=False,
-            type="020lead",
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory.create(
+                case_name_full="Paul Debbas v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Errata",
+                citation_count=4,
+                docket=self.docket,
+            )
+            opinion = OpinionFactory.create(
+                extracted_by_ocr=False,
+                author=self.person,
+                plain_text="my plain text secret word for queries",
+                cluster=cluster,
+                local_path="test/search/opinion_doc.doc",
+                per_curiam=False,
+                type="020lead",
+            )
 
         # Simulate missing embeddings
         download_mock.return_value = None
 
         # Saving the opinion should not trigger embedding generation
-        opinion.html_with_citations = "<div></div>"
-        opinion.per_curiam = True
-        opinion.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            opinion.html_with_citations = "<div></div>"
+            opinion.per_curiam = True
+            opinion.save()
 
         # Verify the embedding microservice was not called
         inception_mock.assert_not_called()

@@ -79,7 +79,6 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
-    LiveServerTestCase,
     RestartSentEmailQuotaMixin,
     SimpleTestCase,
     TestCase,
@@ -116,7 +115,7 @@ from cl.users.models import (
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
 
 
-class UserTest(LiveServerTestCase):
+class UserTest(TestCase):
     async def test_simple_auth_urls_GET(self) -> None:
         """Can we at least GET all the basic auth URLs?"""
         reverse_names = [
@@ -151,7 +150,7 @@ class UserTest(LiveServerTestCase):
             "consent": True,
         }
         response = await self.async_client.post(
-            f"{self.live_server_url}{reverse('register')}",
+            reverse("register"),
             params,
             follow=True,
         )
@@ -184,8 +183,7 @@ class UserTest(LiveServerTestCase):
             ),
         ]
         for next_param, is_evil in next_params:
-            bad_url = "{host}{path}?next={next}".format(
-                host=self.live_server_url,
+            bad_url = "{path}?next={next}".format(
                 path=reverse("register_success"),
                 next=next_param,
             )
@@ -219,8 +217,7 @@ class UserTest(LiveServerTestCase):
         ]
 
         for next_param, email, is_evil in url_params:
-            url = "{host}{path}?next={next}&email={email}".format(
-                host=self.live_server_url,
+            url = "{path}?next={next}&email={email}".format(
                 path=reverse("register_success"),
                 next=next_param,
                 email=email,
@@ -269,8 +266,7 @@ class UserTest(LiveServerTestCase):
             ),
         ]
         for next_param, is_not_safe in next_params:
-            bad_url = "{host}{path}?next={next}".format(
-                host=self.live_server_url,
+            bad_url = "{path}?next={next}".format(
                 path=reverse("sign-in"),
                 next=next_param,
             )
@@ -292,7 +288,7 @@ class UserTest(LiveServerTestCase):
                     )
 
 
-class UserDataTest(LiveServerTestCase):
+class UserDataTest(TestCase):
     async def test_signing_in(self) -> None:
         """Can we create a user on the backend then sign them in"""
         params = {"username": "pandora", "password": "password"}
@@ -408,17 +404,22 @@ class UserDataTest(LiveServerTestCase):
         """
 
         # Create a new user.
-        UserProfileWithParentsFactory.create(email_confirmed=False)
+        new_profile = UserProfileWithParentsFactory.create(
+            email_confirmed=False
+        )
         time_now = datetime.now()
-        # Get last 24 hours signed-up users.
+        # Get last 24 hours signed-up users. Other recently-created accounts
+        # (e.g. the migration-seeded system users, whose date_joined falls in
+        # the window on a freshly-built test DB) may also be present, so assert
+        # the new user is included rather than asserting an absolute count —
+        # the latter makes the test depend on execution order.
         recipients = get_welcome_recipients(time_now)
-        # The newly created user should be returned.
-        self.assertEqual(len(recipients), 1)
+        self.assertIn(new_profile.user.pk, [user.pk for user in recipients])
 
         # Simulate getting recipients for tomorrow.
         tomorrow = time_now + timedelta(days=1)
         recipients = get_welcome_recipients(tomorrow)
-        # No recipients should be returned.
+        # No recipients should be returned (all signups are >24h old).
         self.assertEqual(len(recipients), 0)
 
 

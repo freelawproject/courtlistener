@@ -103,7 +103,7 @@ from cl.search.models import (
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import ESIndexTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
@@ -3834,7 +3834,7 @@ class PopulateDocketNumberRawCommandTest(TestCase):
     return_value="docket_number_cleaning_daemon_test",
 )
 @override_settings(DOCKET_NUMBER_CLEANING_ENABLED=True)
-class LLMCleanDocketNumberTests(TransactionTestCase):
+class LLMCleanDocketNumberTests(TestCase):
     def setUp(self):
         self.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
         self.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
@@ -3909,7 +3909,10 @@ class LLMCleanDocketNumberTests(TransactionTestCase):
             self.model_response,  # Second mini model response
         ]
 
-        with mock.patch("cl.lib.decorators.time.sleep") as mock_sleep:
+        with (
+            mock.patch("cl.lib.decorators.time.sleep") as mock_sleep,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             call_command(
                 "llm_clean_docket_number_daemon",
                 testing_iterations=1,

@@ -73,6 +73,19 @@ class OpinionAlertsPercolatorTest(
     """
 
     @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Create the percolator index once per class instead of dropping and
+        # recreating it before every test (see setUp).
+        OpinionPercolator._index.delete(ignore=404)
+        OpinionPercolator.init()
+
+    @classmethod
+    def tearDownClass(cls):
+        OpinionPercolator._index.delete(ignore=404)
+        super().tearDownClass()
+
+    @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("alerts.Alert")
         cls.rebuild_index("search.OpinionCluster")
@@ -146,8 +159,9 @@ class OpinionAlertsPercolatorTest(
         percolate_document(OpinionDocument, opinion.pk, opinion)
 
     def setUp(self):
-        OpinionPercolator._index.delete(ignore=404)
-        OpinionPercolator.init()
+        # Clear percolator queries between tests without recreating the index.
+        OpinionPercolator.search().query("match_all").delete()
+        OpinionPercolator._index.refresh()
 
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys("alert_hits_percolator_opinions:*")

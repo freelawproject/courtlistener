@@ -477,7 +477,14 @@ class ViewRecapDocumentTest(TestCase):
 class CitationRedirectorTest(TestCase):
     """Tests to make sure that the basic citation redirector is working."""
 
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
+    # test_court.json (courts "test" and "ca1") must load first: the dockets in
+    # test_objects_search.json FK to those courts. Without it the fixture load
+    # fails unless another test happened to leave those courts in the DB.
+    fixtures = [
+        "test_court.json",
+        "test_objects_search.json",
+        "judge_judy.json",
+    ]
     citation = {"reporter": "F.2d", "volume": "56", "page": "9"}
 
     def assertStatus(self, r, status):

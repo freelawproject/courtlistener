@@ -126,7 +126,6 @@ from cl.settings import MEDIA_ROOT
 from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
-    TransactionTestCase,
 )
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.tests.utils import AsyncAPIClient
@@ -736,6 +735,7 @@ class DupcheckerTest(TestCase):
 class DupcheckerPressOnTest(TestCase):
     def setUp(self) -> None:
         super().setUp()
+        CourtFactory(id="test")
         self.court = Court.objects.get(pk="test")
 
         self.dc_full_crawl = DupChecker(self.court, True, 2)
@@ -1294,7 +1294,7 @@ class CommandInputTest(TestCase):
         )
 
 
-class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
+class OpinionVersionTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -1311,178 +1311,184 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         - Opinion.main_version population
         - ElasticSearch deletion
         """
-        court_id = "nev"
-        court = CourtFactory.create(id=court_id)
-        docket_number = "2020-11111"
-        appeal_from = "Some lower court"
-        main_docket = DocketFactory.create(
-            court=court, docket_number=docket_number, appeal_from_str=""
-        )
-        # Will help to see if we can match this docket and update its
-        # related objects
-        version_docket = DocketFactory.create(
-            court=court,
-            docket_number=docket_number,
-            appeal_from_str=appeal_from,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            court_id = "nev"
+            court = CourtFactory.create(id=court_id)
+            docket_number = "2020-11111"
+            appeal_from = "Some lower court"
+            main_docket = DocketFactory.create(
+                court=court, docket_number=docket_number, appeal_from_str=""
+            )
+            # Will help to see if we can match this docket and update its
+            # related objects
+            version_docket = DocketFactory.create(
+                court=court,
+                docket_number=docket_number,
+                appeal_from_str=appeal_from,
+            )
 
-        # Create related objects to the version docket so we can update their
-        # references on merging
-        version_docket_another_cluster = OpinionClusterFactory.create(
-            docket=version_docket, source=ClusterSources.COURT_WEBSITE
-        )
-        version_audio = AudioWithParentsFactory.create(docket=version_docket)
+            # Create related objects to the version docket so we can update their
+            # references on merging
+            version_docket_another_cluster = OpinionClusterFactory.create(
+                docket=version_docket, source=ClusterSources.COURT_WEBSITE
+            )
+            version_audio = AudioWithParentsFactory.create(
+                docket=version_docket
+            )
 
-        # Opinions will have the same URL, but it has a different docket number
-        not_comparable_docket = DocketFactory.create(
-            court=court, docket_number="2021-11111"
-        )
+            # Opinions will have the same URL, but it has a different docket number
+            not_comparable_docket = DocketFactory.create(
+                court=court, docket_number="2021-11111"
+            )
 
-        other_dates = "Argued on March 10 2025"
-        summary = "Something..."
-        main_cluster = OpinionClusterFactory.create(
-            docket=main_docket,
-            other_dates="",
-            summary="",
-            source=ClusterSources.COURT_WEBSITE,
-        )
-        cluster2 = OpinionClusterFactory.create(
-            docket=main_docket,
-            # other_dates should overwrite the empty field in the main cluster
-            other_dates=other_dates,
-            summary="",
-            source=ClusterSources.COURT_WEBSITE,
-        )
-        cluster2_id = cluster2.id
-        cluster3 = OpinionClusterFactory.create(
-            docket=version_docket,
-            other_dates="",
-            summary=summary,
-            source=ClusterSources.COURT_WEBSITE,
-        )
-        cluster4 = OpinionClusterFactory.create(
-            docket=DocketFactory.create(), source=ClusterSources.COURT_WEBSITE
-        )
-        cluster5 = OpinionClusterFactory.create(
-            docket=not_comparable_docket, source=ClusterSources.COURT_WEBSITE
-        )
+            other_dates = "Argued on March 10 2025"
+            summary = "Something..."
+            main_cluster = OpinionClusterFactory.create(
+                docket=main_docket,
+                other_dates="",
+                summary="",
+                source=ClusterSources.COURT_WEBSITE,
+            )
+            cluster2 = OpinionClusterFactory.create(
+                docket=main_docket,
+                # other_dates should overwrite the empty field in the main cluster
+                other_dates=other_dates,
+                summary="",
+                source=ClusterSources.COURT_WEBSITE,
+            )
+            cluster2_id = cluster2.id
+            cluster3 = OpinionClusterFactory.create(
+                docket=version_docket,
+                other_dates="",
+                summary=summary,
+                source=ClusterSources.COURT_WEBSITE,
+            )
+            cluster4 = OpinionClusterFactory.create(
+                docket=DocketFactory.create(),
+                source=ClusterSources.COURT_WEBSITE,
+            )
+            cluster5 = OpinionClusterFactory.create(
+                docket=not_comparable_docket,
+                source=ClusterSources.COURT_WEBSITE,
+            )
 
-        main_citation = CitationWithParentsFactory.create(
-            cluster=main_cluster, volume="10000", reporter="U.S.", page="1"
-        )
-        repeated_citation = CitationWithParentsFactory.create(
-            cluster=cluster2, volume="10000", reporter="U.S.", page="1"
-        )
-        new_citation = CitationWithParentsFactory.create(
-            cluster=cluster2,
-            volume="20",
-            reporter="Nev.",
-            page="20",
-            type=Citation.STATE,
-        )
+            main_citation = CitationWithParentsFactory.create(
+                cluster=main_cluster, volume="10000", reporter="U.S.", page="1"
+            )
+            repeated_citation = CitationWithParentsFactory.create(
+                cluster=cluster2, volume="10000", reporter="U.S.", page="1"
+            )
+            new_citation = CitationWithParentsFactory.create(
+                cluster=cluster2,
+                volume="20",
+                reporter="Nev.",
+                page="20",
+                type=Citation.STATE,
+            )
 
-        plain_text = (
-            """Lorem ipsum dolor sit amet, consectetur adipiscing
-        elit, sed do eiusmod tempor incididunt ut labore et dolore magna
-        aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco
-        laboris nisi ut aliquip ex ea commodo consequat.
-        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
-        dolore eu fugiat nulla pariatur...
-        """
-            * 3
-        )
-        # simulate an updated text
-        # Note that similarity(text1, text2) is around 0.6 for this test
-        # while similarity(text2, text1) is greater than 0.9
-        updated_plain_text = f"100 Nev 2\n{plain_text}\n"
-        download_url = "http://caseinfo.nvsupreme/111.pdf"
-        author_str = "A Judge"
+            plain_text = (
+                """Lorem ipsum dolor sit amet, consectetur adipiscing
+            elit, sed do eiusmod tempor incididunt ut labore et dolore magna
+            aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco
+            laboris nisi ut aliquip ex ea commodo consequat.
+            Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+            dolore eu fugiat nulla pariatur...
+            """
+                * 3
+            )
+            # simulate an updated text
+            # Note that similarity(text1, text2) is around 0.6 for this test
+            # while similarity(text2, text1) is greater than 0.9
+            updated_plain_text = f"100 Nev 2\n{plain_text}\n"
+            download_url = "http://caseinfo.nvsupreme/111.pdf"
+            author_str = "A Judge"
 
-        should_ignore_version = OpinionFactory.create(
-            cluster=OpinionClusterFactory.create(
-                docket=version_docket, source=ClusterSources.COURT_M_HARVARD
-            ),
-            download_url=download_url,
-            plain_text=plain_text,
-            main_version=None,
-            sha1="xxxx",
-            html="",
-        )
-        # Creation order matters, since we can't override date_created
-        # the opinion we intend to be the main version must be created last
-        version = OpinionFactory.create(
-            cluster=cluster2,
-            # see if we can pick up opinions with different protocols
-            download_url=download_url.replace("http", "https"),
-            plain_text=plain_text,
-            html="",
-            # This field should be updated
-            author_str=author_str,
-            sha1="22222",
-            html_with_citations="something...",
-        )
-        # the version cluster may have other opinions linked to it that are
-        # not versions. Ensure we migrate them to the main cluster after this
-        # version cluster is deleted
-        not_a_version_in_version_cluster = OpinionFactory.create(
-            cluster=cluster2,
-            sha1="123456",
-        )
-        version2 = OpinionFactory.create(
-            cluster=cluster3,
-            download_url=download_url,
-            plain_text=plain_text,
-            html="",
-            author_str="",
-            sha1="33333",
-        )
-        unrelated_opinion = OpinionFactory.create(
-            cluster=cluster4,
-            download_url=download_url.replace("111", "222"),
-            sha1="44444",
-        )
-        same_url_different_docket_number = OpinionFactory.create(
-            cluster=cluster5,
-            download_url=download_url,
-            plain_text=plain_text,
-            sha1="5555",
-        )
-        main_opinion = OpinionFactory.create(
-            cluster=main_cluster,
-            download_url=download_url,
-            plain_text=updated_plain_text,
-            html="",
-            author_str="",
-            sha1="11111",
-        )
+            should_ignore_version = OpinionFactory.create(
+                cluster=OpinionClusterFactory.create(
+                    docket=version_docket,
+                    source=ClusterSources.COURT_M_HARVARD,
+                ),
+                download_url=download_url,
+                plain_text=plain_text,
+                main_version=None,
+                sha1="xxxx",
+                html="",
+            )
+            # Creation order matters, since we can't override date_created
+            # the opinion we intend to be the main version must be created last
+            version = OpinionFactory.create(
+                cluster=cluster2,
+                # see if we can pick up opinions with different protocols
+                download_url=download_url.replace("http", "https"),
+                plain_text=plain_text,
+                html="",
+                # This field should be updated
+                author_str=author_str,
+                sha1="22222",
+                html_with_citations="something...",
+            )
+            # the version cluster may have other opinions linked to it that are
+            # not versions. Ensure we migrate them to the main cluster after this
+            # version cluster is deleted
+            not_a_version_in_version_cluster = OpinionFactory.create(
+                cluster=cluster2,
+                sha1="123456",
+            )
+            version2 = OpinionFactory.create(
+                cluster=cluster3,
+                download_url=download_url,
+                plain_text=plain_text,
+                html="",
+                author_str="",
+                sha1="33333",
+            )
+            unrelated_opinion = OpinionFactory.create(
+                cluster=cluster4,
+                download_url=download_url.replace("111", "222"),
+                sha1="44444",
+            )
+            same_url_different_docket_number = OpinionFactory.create(
+                cluster=cluster5,
+                download_url=download_url,
+                plain_text=plain_text,
+                sha1="5555",
+            )
+            main_opinion = OpinionFactory.create(
+                cluster=main_cluster,
+                download_url=download_url,
+                plain_text=updated_plain_text,
+                html="",
+                author_str="",
+                sha1="11111",
+            )
 
-        # test cleanup of objects related to citation annotation
-        version_parenthetical = ParentheticalFactory.create(
-            describing_opinion=version, described_opinion=unrelated_opinion
-        )
-        version_opinions_cited = OpinionsCitedWithParentsFactory.create(
-            citing_opinion=version, cited_opinion=unrelated_opinion
-        )
-        version_opinions_cited_cluster = unrelated_opinion.cluster
-        version_opinions_cited_cluster.citation_count = 10
-        version_opinions_cited_cluster.save()
-        version_unmatched_citation = UnmatchedCitation.objects.create(
-            citing_opinion=version,
-            status=1,
-            citation_string="",
-            court_id="",
-            volume="1",
-            reporter="Nev",
-            page="1",
-            type=1,
-        )
+            # test cleanup of objects related to citation annotation
+            version_parenthetical = ParentheticalFactory.create(
+                describing_opinion=version, described_opinion=unrelated_opinion
+            )
+            version_opinions_cited = OpinionsCitedWithParentsFactory.create(
+                citing_opinion=version, cited_opinion=unrelated_opinion
+            )
+            version_opinions_cited_cluster = unrelated_opinion.cluster
+            version_opinions_cited_cluster.citation_count = 10
+            version_opinions_cited_cluster.save()
+            version_unmatched_citation = UnmatchedCitation.objects.create(
+                citing_opinion=version,
+                status=1,
+                citation_string="",
+                court_id="",
+                volume="1",
+                reporter="Nev",
+                page="1",
+                type=1,
+            )
 
-        # Test Opinion.joined_by merging
-        person1 = PersonFactory()
-        person2 = PersonFactory()
-        main_opinion.joined_by.add(person1)
-        version.joined_by.add(person1)
-        version.joined_by.add(person2)
+            # Test Opinion.joined_by merging
+            person1 = PersonFactory()
+            person2 = PersonFactory()
+            main_opinion.joined_by.add(person1)
+            version.joined_by.add(person1)
+            version.joined_by.add(person2)
 
         # Check that elasticsearch docs exist before the merging
         self.assertTrue(
@@ -1495,7 +1501,8 @@ class OpinionVersionTest(ESIndexTestCase, TransactionTestCase):
         )
 
         # Function to test
-        merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
+        with self.captureOnCommitCallbacks(execute=True):
+            merge_versions_by_download_url(download_url.rsplit("/", 1)[0])
 
         # Check elasticsearch deletions
         self.assertFalse(
