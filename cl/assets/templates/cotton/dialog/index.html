@@ -17,7 +17,9 @@
 <div
   x-data="dialog"
   x-id="dialogIdGroup"
-  class="{% if not variant == 'drawer' %}flex justify-center {% endif %}{{ class }}">
+  class="{% if not variant == 'drawer' %}flex justify-center {% endif %}{{ class }}"
+  {{ attrs }}
+>
   <!-- Trigger -->
   {% if trigger_button %}
     {{ trigger_button }}

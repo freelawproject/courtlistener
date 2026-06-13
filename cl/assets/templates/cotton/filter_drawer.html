@@ -1,14 +1,15 @@
 {% load component_tags svg_tags %}
+
 <c-vars
-title="Filters"
-has_errors=""
-class=""
+  title="Filters"
+  has_errors=""
+  class=""
 />
 <c-dialog
   variant="drawer"
-  disable_transitions
   class="md:hidden {{ class }}"
-  {% if has_errors %}data-has-errors{% endif %}
+  x-on:open-filter-drawer="open"
+  :attrs="{% if has_errors %}{'data-has-errors': True}{% else %}{}{% endif %}"
 >
   <c-slot name="trigger_button">
     <c-button
