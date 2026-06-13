@@ -34,6 +34,7 @@ from cl.search.api_serializers import (
     OAESResultSerializer,
     OpinionClusterESResultSerializer,
     OpinionClusterSerializer,
+    OpinionsCitedByRECAPDocumentSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
@@ -60,6 +61,7 @@ from cl.search.filters import (
     DocketFilter,
     OpinionClusterFilter,
     OpinionFilter,
+    OpinionsCitedByRECAPDocumentFilter,
     OpinionsCitedFilter,
     RECAPDocumentFilter,
 )
@@ -74,6 +76,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     OriginatingCourtInformation,
     RECAPDocument,
     Tag,
@@ -391,6 +394,49 @@ class OpinionsCitedViewSet(
     # Additional cursor ordering fields
     cursor_ordering_fields = ["id"]
     queryset = OpinionsCited.objects.all().order_by("-id")
+
+
+class OpinionsCitedByRECAPDocumentViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
+    serializer_class = OpinionsCitedByRECAPDocumentSerializer
+    filterset_class = OpinionsCitedByRECAPDocumentFilter
+    permission_classes = [
+        DjangoModelPermissions,
+        V3APIPermission,
+    ]
+    # Excludes the derived cited_opinion_case_name and
+    # citing_document_description fields, whose dotted source paths
+    # DRF's OrderingFilter can't sort by
+    ordering_fields = ("id", "depth")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = ["id"]
+    queryset = (
+        OpinionsCitedByRECAPDocument.objects.select_related(
+            "cited_opinion__cluster", "citing_document"
+        )
+        # Avoid pulling large text/HTML columns from Opinion,
+        # OpinionCluster and RECAPDocument, only the fields the
+        # serializer actually uses are needed here
+        .only(
+            "id",
+            "depth",
+            "citing_document_id",
+            "citing_document__id",
+            "citing_document__description",
+            "cited_opinion_id",
+            "cited_opinion__id",
+            "cited_opinion__cluster_id",
+            "cited_opinion__cluster__id",
+            "cited_opinion__cluster__case_name",
+        )
+        .order_by("-id")
+    )
 
 
 class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
