@@ -18,6 +18,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     RECAPDocument,
     Tag,
 )
@@ -232,4 +233,20 @@ class RECAPDocumentFilter(NoEmptyFilterSet):
             "sha1": ["exact"],
             "ocr_status": INTEGER_LOOKUPS,
             "is_free_on_pacer": ["exact"],
+        }
+
+
+class OpinionsCitedByRECAPDocumentFilter(NoEmptyFilterSet):
+    citing_document = filters.RelatedFilter(
+        RECAPDocumentFilter, queryset=RECAPDocument.objects.all()
+    )
+    cited_opinion = filters.RelatedFilter(
+        OpinionFilter, queryset=Opinion.objects.all()
+    )
+
+    class Meta:
+        model = OpinionsCitedByRECAPDocument
+        fields = {
+            "id": INTEGER_LOOKUPS,
+            "depth": INTEGER_LOOKUPS,
         }
