@@ -19,12 +19,12 @@ from cl.audio.models import Audio, AudioTranscriptionMetadata
 from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.audio.utils import transcription_was_hallucinated
 from cl.lib.test_helpers import SitemapTest
+from cl.search.factories import CourtFactory, DocketFactory
+from cl.search.models import SEARCH_TYPES
 from cl.sitemaps_infinite.sitemap_generator import (
     generate_urls_chunk,
     reset_sitemaps_cursor,
 )
-from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.tests.utils import MockResponse
