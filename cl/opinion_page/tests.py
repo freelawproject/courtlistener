@@ -106,7 +106,10 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
-from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
+from cl.sitemaps_infinite.sitemap_generator import (
+    generate_urls_chunk,
+    reset_sitemaps_cursor,
+)
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import (
@@ -1331,7 +1334,7 @@ class OpinionSitemapTest(SitemapTest):
             citation_count=1,
             date_filed=datetime.date.today() - datetime.timedelta(365 * 15),
         )
-        # Excluded because no cites
+        # Included under relaxed filters (previously excluded because no cites)
         OpinionClusterWithParentsFactory.create(
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             citation_count=0,
@@ -1345,12 +1348,34 @@ class OpinionSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        self.setUpSiteDomain()
+        reset_sitemaps_cursor()
+
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.OPINION}
         )
-        self.expected_item_count = 2
+        self.expected_item_count = 3
+
+    def test_is_the_sitemap_generated_and_have_content(self) -> None:
+        """Is content generated and read properly from the cache into the sitemap?"""
+
+        with self.assertRaises(
+            NotImplementedError,
+            msg="Did not get a NotImplementedError exception before generating the sitemap.",
+        ):
+            _ = self.client.get(self.sitemap_url)
+
+        generate_urls_chunk()
+
+        response = self.client.get(self.sitemap_url)
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get a 200 OK status code after generating the sitemap.",
+        )
 
     def test_does_the_sitemap_have_content(self) -> None:
+        generate_urls_chunk()
         super().assert_sitemap_has_content()
 
 
@@ -1380,9 +1405,10 @@ class DocketSitemapTest(SitemapTest):
 
     def setUp(self) -> None:
         self.setUpSiteDomain()
+        reset_sitemaps_cursor()
 
         self.sitemap_url = reverse(
-            "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
+            "sitemaps", kwargs={"section": SEARCH_TYPES.RECAP}
         )
         self.expected_item_count = 2
 
@@ -1433,9 +1459,10 @@ class DocketEmptySitemapTest(SitemapTest):
 
     def setUp(self) -> None:
         self.setUpSiteDomain()
+        reset_sitemaps_cursor()
 
         self.sitemap_url = reverse(
-            "sitemaps-pregenerated", kwargs={"section": SEARCH_TYPES.RECAP}
+            "sitemaps", kwargs={"section": SEARCH_TYPES.RECAP}
         )
 
     def test_is_the_sitemap_generated_and_have_content(self) -> None:

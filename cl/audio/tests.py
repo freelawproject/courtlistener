@@ -21,6 +21,10 @@ from cl.audio.utils import transcription_was_hallucinated
 from cl.lib.test_helpers import SitemapTest
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import SEARCH_TYPES
+from cl.sitemaps_infinite.sitemap_generator import (
+    generate_urls_chunk,
+    reset_sitemaps_cursor,
+)
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
 from cl.tests.utils import MockResponse
@@ -349,12 +353,15 @@ class AudioSitemapTest(SitemapTest):
         )
 
     def setUp(self) -> None:
+        self.setUpSiteDomain()
+        reset_sitemaps_cursor()
         self.expected_item_count = 1
         self.sitemap_url = reverse(
             "sitemaps", kwargs={"section": SEARCH_TYPES.ORAL_ARGUMENT}
         )
 
     def test_does_the_sitemap_have_content(self) -> None:
+        generate_urls_chunk()
         super().assert_sitemap_has_content()
 
 

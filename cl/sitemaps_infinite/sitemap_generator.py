@@ -3,7 +3,6 @@ import logging
 from datetime import UTC, datetime
 
 from django.conf import settings
-from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db import transaction
 from django.urls import reverse
@@ -12,6 +11,7 @@ from django.utils.timezone import now as tz_now
 from redis import Redis
 
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.sitemaps_infinite.base_sitemap import (
     CacheableList,
     InfinitePaginatorSitemap,
@@ -63,7 +63,7 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
     redis_db: Redis = get_redis_interface(REDIS_DB)
 
-    db_cache: BaseCache = caches["db_cache"]
+    db_cache: BaseCache = get_s3_cache("db_cache")
 
     cursor_data: TaskCursorData = cursor_data_default.copy()
 
@@ -82,18 +82,27 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
 
     # count the number of files generated, stop when we reach the limit
     num_files: int = 0
-    current_page: int = cursor_data.get("last_page")
-    # logger.debug(f"Current page: {current_page}")
     forced_exit = False
 
-    # Iterate over the sitemap sections, find the place where we left off, and continue from there
-    for section, sitemapClass in pregenerated_sitemaps.items():
-        # Get from the cache the cursor value for the sitemap section, processed last time
-        cursor_section: str | None = cursor_data.get("section")
+    resuming_section: str | None = cursor_data.get("section")
+    resuming = (
+        resuming_section is not None
+        and resuming_section in pregenerated_sitemaps
+    )
 
-        if cursor_section is not None and section != cursor_section:
-            # the `section` was already processed before, moving to the next section
-            continue
+    for section, sitemapClass in pregenerated_sitemaps.items():
+        if resuming:
+            if section != resuming_section:
+                # Skip this section because we haven't reached the resuming section yet
+                continue
+            else:
+                # We reached the resuming section! Use the resumed page count.
+                current_page = int(cursor_data.get("last_page", 1))
+                # Turn off resuming mode so subsequent sections are processed starting at page 1
+                resuming = False
+        else:
+            # We are not in resuming mode. Start this section fresh at page 1.
+            current_page = 1
 
         try:
             sitemapObject: InfinitePaginatorSitemap = sitemapClass()
@@ -130,7 +139,13 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
             cache_key = make_cache_key(sitemapObject, section, current_page)
 
             # read the last existing page from the cache
-            cached_urls: CacheableList | None = db_cache.get(cache_key)
+            cached_urls: CacheableList | None = db_cache.get(
+                make_s3_cache_key(cache_key, long_cache_timeout)
+            )
+            if cached_urls is None:
+                cached_urls = db_cache.get(
+                    make_s3_cache_key(cache_key, short_cache_timeout)
+                )
 
             if (
                 current_cursor is None
@@ -211,7 +226,11 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                     )
                     cursor_data["has_next"] = 0
                     if current_page == 1:
-                        db_cache.set(cache_key, [], short_cache_timeout)
+                        db_cache.set(
+                            make_s3_cache_key(cache_key, short_cache_timeout),
+                            [],
+                            short_cache_timeout,
+                        )
                     else:
                         continue
 
@@ -228,7 +247,11 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 )
 
                 # Save the sitemap page data to the cache
-                db_cache.set(cache_key, urls, cache_timeout)
+                db_cache.set(
+                    make_s3_cache_key(cache_key, cache_timeout),
+                    urls,
+                    cache_timeout,
+                )
 
                 logger.info(
                     "Generated sitemap cache for section: %s, page: %d and cursor: %s.",
@@ -267,9 +290,12 @@ def generate_urls_chunk(force_regenerate: bool = False) -> None:
                 num_files += 1
 
         # save the updated cursor data to the cache
+        sanitized_cursor_data = {
+            k: v for k, v in cursor_data.items() if v is not None
+        }
         redis_db.hset(
             HASH_NAME,
-            mapping=cursor_data,
+            mapping=sanitized_cursor_data,
         )
 
     if not forced_exit:
@@ -301,10 +327,11 @@ def make_cache_key(
     scheme = sitemapObject.get_protocol()
     host = sitemapObject.get_domain()
 
-    uri = f"{scheme}://{host}{reverse('sitemaps-pregenerated', kwargs={'section': section})}?p={page}"
+    uri = f"{scheme}://{host}{reverse('sitemaps', kwargs={'section': section})}?p={page}"
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
 
-    return f"sitemap.{section}.{url.hexdigest()}"
+    key = f"sitemap.{section}.{url.hexdigest()}"
+    return key
 
 
 def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:

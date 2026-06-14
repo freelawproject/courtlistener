@@ -21,31 +21,39 @@ from cl.search.models import (
 from cl.sitemaps_infinite.base_sitemap import InfinitePaginatorSitemap
 
 
-class OpinionSitemap(sitemaps.Sitemap):
+class OpinionSitemap(InfinitePaginatorSitemap):
     changefreq = "yearly"
-    priority = 0.5
     limit = 50_000
 
+    @property
+    def section(self) -> str:
+        return SEARCH_TYPES.OPINION
+
+    @property
+    def ordering(self) -> tuple[str]:
+        return ("pk",)
+
     def items(self) -> QuerySet:
-        # Unblocked precedential cases that are published in the last 75 years
-        # and that have at least one citation, or that were published in the
-        # last ten years and not yet cited.
-        new_or_popular = Q(citation_count__gte=1) | Q(
-            date_filed__gt=datetime.today() - timedelta(days=365 * 10)
-        )
-        return (
-            OpinionCluster.objects.filter(
-                new_or_popular,
-                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                blocked=False,
-                date_filed__gt=datetime.today() - timedelta(days=365 * 75),
-            )
-            .only("date_modified", "pk", "slug")
-            .order_by("pk")
+        # Relaxed: All unblocked opinions (precedential and non-precedential/unpublished, etc.)
+        return OpinionCluster.objects.filter(blocked=False).only(
+            "date_modified",
+            "pk",
+            "slug",
+            "citation_count",
+            "precedential_status",
         )
 
     def lastmod(self, obj: OpinionCluster) -> datetime:
         return obj.date_modified
+
+    def get_latest_lastmod(self):
+        latest_modified = self.items().order_by("-date_modified").first()
+        return latest_modified.date_modified if latest_modified else None
+
+    def priority(self, obj: OpinionCluster) -> float:
+        if obj.precedential_status == PRECEDENTIAL_STATUS.PUBLISHED:
+            return 0.8 if obj.citation_count >= 10 else 0.6
+        return 0.5 if obj.citation_count >= 1 else 0.4
 
 
 class BlockedOpinionSitemap(sitemaps.Sitemap):
