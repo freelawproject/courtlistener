@@ -3,7 +3,14 @@ from http import HTTPStatus
 from django.db.models import Prefetch
 from django.http.response import Http404
 from django.urls import reverse
+from elasticsearch.exceptions import (
+    ApiError,
+    ConnectionError,
+    RequestError,
+    TransportError,
+)
 from rest_framework import pagination, permissions, response, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import (
@@ -51,9 +58,11 @@ from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    ESRECAPDocument,
     OpinionClusterDocument,
     PersonDocument,
 )
+from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -239,6 +248,50 @@ class RECAPDocumentViewSet(
         .prefetch_related("tags")
         .order_by("-id")
     )
+
+    @action(detail=True, methods=["get"])
+    def matches(self, request, pk=None, **kwargs):
+        q = request.query_params.get("q", "").strip()
+        if not q:
+            return Response(
+                {"detail": "Query parameter 'q' is required."},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+
+        try:
+            search_query = ESRECAPDocument.search()
+            search_query = search_query.filter("term", id=pk)
+
+            search_query = search_query.query("match", plain_text=q)
+
+            # Prevent returning the full document body source
+            search_query = search_query.source(False)
+
+            search_query = search_query.highlight(
+                "plain_text",
+                fragment_size=1500,
+                number_of_fragments=10,
+                order="score",
+                pre_tags=["<mark>"],
+                post_tags=["</mark>"],
+            )
+
+            results = search_query.execute()
+
+            fragments = []
+            for hit in results:
+                if (
+                    hasattr(hit.meta, "highlight")
+                    and "plain_text" in hit.meta.highlight
+                ):
+                    fragments.extend(hit.meta.highlight.plain_text)
+
+            return Response({"matches": fragments}, status=HTTPStatus.OK)
+
+        except (TransportError, ConnectionError, RequestError, ApiError) as e:
+            if isinstance(e, ApiError) and "Failed to parse query" in str(e):
+                raise ElasticBadRequestError()
+            raise ElasticServerError()
 
 
 class CourtViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
@@ -501,7 +554,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         cleaned_data["request_date"] = (
             paginator.initialize_context_from_request(request, search_type)
         )
-        highlighting_fields = {}
+        highlighting_fields: dict[str, int] = {}
         main_query, child_docs_query = do_es_api_query(
             search_query,
             cleaned_data,
