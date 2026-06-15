@@ -807,6 +807,12 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             MonthlyDonation.objects.get(donor=bystander.user).enabled
         )
 
+        # The original bug deleted the shared BarMembership lookup row itself
+        # on account deletion, wiping it for everyone. Guard the regression
+        # directly: the shared row and the bystander's link must both survive.
+        self.assertTrue(BarMembership.objects.filter(pk=bar.pk).exists())
+        self.assertTrue(bystander.barmembership.filter(pk=bar.pk).exists())
+
     async def test_redirect_to_search_alerts_if_no_alerts(self):
         """Tests redirection to search alerts when a user has no alerts"""
         # Create a user profile with no associated alerts
