@@ -1,14 +1,11 @@
 import logging
-import types
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import (
     Any,
     ClassVar,
     cast,
-    get_args,
-    get_origin,
     override,
 )
 
@@ -254,7 +251,7 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         db_obj = getattr(parent, self.name)
         if db_obj is None:
             result = self.merger.merge(merger_input)
-            model = self.merger.__model__
+            model = self.merger.model
             model_name = model.__name__
             if model_name in result.creates:
                 db_obj_pk = next(iter(result.creates[model_name]))
@@ -308,18 +305,8 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
                 return self._merge_child(parent, merger_input, parent_key)
 
 
-def get_ancestor_classes(cls: type) -> Generator[type]:
-    """Get all ancestor classes of a class, including the class itself
-
-    :param cls: The class to get ancestors for"""
-    for base in types.get_original_bases(cls):
-        if isinstance(base, type):
-            yield from get_ancestor_classes(base)
-        yield base
-
-
-class Merger[ScrapedData, DBModel: Model](ABC):
-    """Base class for a merger which takes in `ScrapedData` and merges it into `DBModel`. Subclasses should generally
+class Merger[ScrapedData, M: Model](ABC):
+    """Base class for a merger which takes in `ScrapedData` and merges it into `model`. Subclasses should generally
     not be instantiated; methods and attributes should be accessed directly from the class.
 
     :ivar atomic: Whether to wrap the entire merge operation -- the object's own attributes *and* all related/child
@@ -332,11 +319,11 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
     __attr_mergers__: dict[str, AttributeMerger[ScrapedData, Any]]
     __related_mergers__: ClassVar[dict[str, RelatedMerger]]
-    __model__: type[DBModel]
+    model: ClassVar[type[Model]]
     _uses_natural_key: ClassVar[bool] = True
     atomic: ClassVar[bool] = False
     # I'd like to make this a ClassVar for static type checking, but that's not allowed for some reason
-    existing: Iterable[str] | Callable[[DBModel], DBModel | None] = []
+    existing: Iterable[str] | Callable[[M], M | None] = []
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -358,33 +345,6 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             if isinstance(value, RelatedMerger)
         }
 
-        merger_bases = {
-            base
-            for base in get_ancestor_classes(cls)
-            if get_origin(base) is Merger
-        }
-        if len(merger_bases) > 1:
-            raise TypeError(
-                f"Merger must only be a subclass of one Merger (got {merger_bases})"
-            )
-        if not merger_bases:
-            raise TypeError(
-                "Merger must be a subclass of Merger (I don't know how you managed to do this tbh)."
-            )
-        merger_base = merger_bases.pop()
-        merger_type_args = get_args(merger_base)
-        if len(merger_type_args) != 2:
-            raise TypeError(
-                f"Merger must be a subclass of Merger[ScrapedData, DBModel] (got {merger_type_args})"
-            )
-        _, db_model_type = merger_type_args
-        if not issubclass(db_model_type, Model):
-            raise TypeError(
-                f"DBModel must be a subclass of Model (got {db_model_type})"
-            )
-
-        cls.__model__ = db_model_type
-
         for name, am in cls.__attr_mergers__.items():
             am.__attach_to_merger__(cls, name)
         for name, rm in cls.__related_mergers__.items():
@@ -400,7 +360,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         return True
 
     @staticmethod
-    def after(i: ScrapedData, m: DBModel | None, r: MergeResult[Any]) -> None:
+    def after(i: ScrapedData, m: M | None, r: MergeResult[Any]) -> None:
         """Run extra processes after the merge operation completes or fails.
 
         :param i: Input data to the merge
@@ -409,7 +369,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         ...
 
     @classmethod
-    def get_existing(cls, i: DBModel) -> DBModel | None:
+    def get_existing(cls, i: M) -> M | None:
         """Attempts to find an existing object in the DB to merge into based on either the natural key or a custom
         lookup function.
 
@@ -420,15 +380,18 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         if callable(cls.existing):
             return cls.existing(i)
         try:
-            return cls.__model__._default_manager.get(
-                **{k: getattr(i, k) for k in cls.existing}
+            return cast(
+                M,
+                cls.model._default_manager.get(
+                    **{k: getattr(i, k) for k in cls.existing}
+                ),
             )
-        except cls.__model__.DoesNotExist:
+        except cls.model.DoesNotExist:
             return None
 
     @classmethod
     def merge(
-        cls, i: ScrapedData, *, existing: DBModel | None = None, **kwargs: Any
+        cls, i: ScrapedData, *, existing: M | None = None, **kwargs: Any
     ) -> MergeResult[Any]:
         """Merge scraped data into the DB.
 
@@ -437,13 +400,16 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             relationships and should generally not be passed."""
         if not cls.validate(i):
             logger.error(f"Merger {cls.__name__} received invalid input.")
-            return MergeResult.failed(cls.__model__.__name__)
+            return MergeResult.failed(cls.model.__name__)
 
-        obj = cls.__model__(
-            **{
-                name: am.get_value(i, value=kwargs.get(name, None))
-                for name, am in cls.__attr_mergers__.items()
-            }
+        obj = cast(
+            M,
+            cls.model(
+                **{
+                    name: am.get_value(i, value=kwargs.get(name, None))
+                    for name, am in cls.__attr_mergers__.items()
+                }
+            ),
         )
 
         if cls.atomic:
@@ -456,7 +422,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
     @classmethod
     def _merge_tree(
-        cls, obj: DBModel, i: ScrapedData, *, existing: DBModel | None
+        cls, obj: M, i: ScrapedData, *, existing: M | None
     ) -> MergeResult[Any]:
         """Merge the object's own attributes and then all of its related/child
         mergers, returning the combined result.
@@ -473,27 +439,27 @@ class Merger[ScrapedData, DBModel: Model](ABC):
     @classmethod
     def _merge_object(
         cls,
-        scrape_obj: DBModel,
+        scrape_obj: M,
         *,
-        existing: DBModel | None = None,
-    ) -> tuple[MergeResult[Any], DBModel]:
+        existing: M | None = None,
+    ) -> tuple[MergeResult[Any], M]:
         if existing is None:
             try:
                 db_obj = cls.get_existing(scrape_obj)
-            except cls.__model__.MultipleObjectsReturned:
+            except cls.model.MultipleObjectsReturned:
                 logger.error(
                     "Merger %s found multiple objects for natural key %s; skipping merge.",
                     cls.__name__,
                     cls.existing,
                 )
-                return MergeResult.failed(cls.__model__.__name__), scrape_obj
+                return MergeResult.failed(cls.model.__name__), scrape_obj
         else:
             db_obj = existing
 
         if db_obj is None:
             scrape_obj.save()
             return MergeResult.created(
-                cls.__model__.__name__, scrape_obj.pk
+                cls.model.__name__, scrape_obj.pk
             ), scrape_obj
 
         update = False
@@ -507,7 +473,5 @@ class Merger[ScrapedData, DBModel: Model](ABC):
 
         if update:
             db_obj.save()
-            return MergeResult.updated(
-                cls.__model__.__name__, db_obj.pk
-            ), db_obj
+            return MergeResult.updated(cls.model.__name__, db_obj.pk), db_obj
         return MergeResult.unnecessary(), db_obj

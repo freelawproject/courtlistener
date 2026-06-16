@@ -1,8 +1,9 @@
 import logging
 from datetime import date
-from typing import override
+from typing import ClassVar, override
 
 from asgiref.sync import async_to_sync
+from django.db.models import Model
 from juriscraper.state.florida import FloridaCase
 from juriscraper.state.florida.cases import FloridaCourtID
 
@@ -76,6 +77,8 @@ def _appeal_from_str(docket_data: FloridaCase) -> str | None:
 class FloridaOriginatingCourtInformationMerger(
     Merger[FloridaCase, OriginatingCourtInformation]
 ):
+    model: ClassVar[type[Model]] = OriginatingCourtInformation
+
     docket_number: str = AttributeMerger(
         InputMap(_originating_case_number), strategy=OverwriteExisting()
     )
@@ -101,6 +104,8 @@ class FloridaOriginatingCourtInformationMerger(
 
 
 class FloridaDocketMerger(Merger[FloridaCase, Docket]):
+    model: ClassVar[type[Model]] = Docket
+
     atomic = True
 
     court_id: str = AttributeMerger[FloridaCase, str](

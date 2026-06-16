@@ -1,4 +1,6 @@
-from typing import Any, override
+from typing import Any, ClassVar, override
+
+from django.db.models import Model
 
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
@@ -30,6 +32,8 @@ class BaseMergerTest(TestCase):
         start_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], Docket]):
+            model: ClassVar[type[Model]] = Docket
+
             court: Court = AttributeMerger(Parameter(default=self.court))
             source: int = AttributeMerger(
                 Parameter(default=DocketSources.SCRAPER)
@@ -74,6 +78,8 @@ class BaseMergerTest(TestCase):
         start_docket_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], Docket]):
+            model: ClassVar[type[Model]] = Docket
+
             court: Court = AttributeMerger(Parameter(default=self.court))
             source: int = AttributeMerger(
                 Parameter(default=DocketSources.SCRAPER)
@@ -137,6 +143,8 @@ class BaseMergerTest(TestCase):
                 return dn
 
         class TestMerger(Merger[dict[str, str], Docket]):
+            model: ClassVar[type[Model]] = Docket
+
             court: Court = AttributeMerger(Parameter(default=self.court))
             source: int = AttributeMerger(
                 Parameter(default=DocketSources.SCRAPER)
@@ -156,6 +164,8 @@ class BaseMergerTest(TestCase):
         class TestRelatedMerger(
             Merger[dict[str, str], OriginatingCourtInformation]
         ):
+            model: ClassVar[type[Model]] = OriginatingCourtInformation
+
             docket_number: str = AttributeMerger(InputField("sr"))
 
             @staticmethod
@@ -165,6 +175,8 @@ class BaseMergerTest(TestCase):
                 return None
 
         class TestMerger(Merger[dict[str, Any], Docket]):
+            model: ClassVar[type[Model]] = Docket
+
             court: Court = AttributeMerger(Parameter(default=self.court))
             source: int = AttributeMerger(
                 Parameter(default=DocketSources.SCRAPER)
@@ -196,6 +208,8 @@ class BaseMergerTest(TestCase):
 
     def test_related_mergers_child(self) -> None:
         class TestRelatedMerger(Merger[dict[str, str], DocketEntry]):
+            model: ClassVar[type[Model]] = DocketEntry
+
             docket: Docket = AttributeMerger(Parameter())
             description: str = AttributeMerger(InputField("df"))
 
@@ -206,6 +220,8 @@ class BaseMergerTest(TestCase):
                 return None
 
         class TestMerger(Merger[dict[str, Any], Docket]):
+            model: ClassVar[type[Model]] = Docket
+
             court: Court = AttributeMerger(Parameter(default=self.court))
             source: int = AttributeMerger(
                 Parameter(default=DocketSources.SCRAPER)
@@ -250,6 +266,8 @@ class BaseMergerTest(TestCase):
 
     def test_merger_subclassing(self) -> None:
         class TestMerger(Merger[dict[str, str], Docket]):
+            model: ClassVar[type[Model]] = Docket
+
             court: Court = AttributeMerger(Parameter(default=self.court))
             source: int = AttributeMerger(
                 Parameter(default=DocketSources.SCRAPER)
