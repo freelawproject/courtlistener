@@ -45,10 +45,9 @@
       </div>
 
       {% if form.errors %}
-        <div class="alert alert-danger">
-          {{ form.errors }}
-          {{ form.non_field_errors }}
-        </div>
+        {% for error in form.non_field_errors %}
+          <p class="alert alert-danger">{{ error|escape }}</p>
+        {% endfor %}
       {% endif %}
 
       <form method="post" id="authorizationForm">{% csrf_token %}
