@@ -22,7 +22,6 @@ from cl.corpus_importer.state.merger import (
     RelatedMerger,
     Relationship,
 )
-from cl.corpus_importer.state.utils import MergeResult
 from cl.recap.mergers import (
     find_and_disaggregate_docket_object,
     find_docket_object,
@@ -70,7 +69,7 @@ def _appeal_from_id(docket_data: FloridaCase) -> str | None:
 def _appeal_from_str(docket_data: FloridaCase) -> str | None:
     # Multiple originating cases are ambiguous, so leave the field unset.
     if len(docket_data.originating_cases) != 1:
-        return None
+        return ""
     return docket_data.originating_cases[0].court_name
 
 
@@ -99,27 +98,6 @@ class FloridaOriginatingCourtInformationMerger(
         oci: OriginatingCourtInformation,
     ) -> OriginatingCourtInformation | None:
         return None
-
-
-def merge_oci(docket: Docket, docket_data: FloridaCase) -> MergeResult:
-    """Merge the originating court information for a Florida Supreme COurt docket.
-
-    :param docket: The docket to merge the OCI for.
-    :param docket_data: The scraped Florida docket information.
-    :return: The result of the attempted merge operation."""
-    if (
-        docket_data.court_id != FloridaCourtID.SUPREME_COURT.value
-        or not docket_data.originating_cases
-    ):
-        logger.info(
-            "Skipping unnecessary OCI merge for Florida docket %s in court %s",
-            docket_data.docket_number,
-            docket_data.court_id,
-        )
-        return MergeResult.unnecessary()
-    return FloridaOriginatingCourtInformationMerger.merge(
-        docket_data, existing=docket.originating_court_information
-    )
 
 
 class FloridaDocketMerger(Merger[FloridaCase, Docket]):
@@ -161,7 +139,11 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
         InputField("docket_number"), strategy=OverwriteExisting()
     )
     docket_number_core: str = AttributeMerger[FloridaCase, str](
-        InputField("docket_number", transform=make_docket_number_core),
+        InputMap(
+            lambda d: make_docket_number_core(
+                d.docket_number, court_id=FLORIDA_COURT_ID_MAP[d.court_id]
+            )
+        ),
         strategy=OverwriteExisting(),
     )
     appeal_from_id: str | None = AttributeMerger(
@@ -213,14 +195,9 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
             )
         return found
 
-
-def merge_docket(docket_data: FloridaCase) -> MergeResult:
-    """Merger for Florida docket data and originating court information.
-
-    :param docket_data: The scraped Florida docket information.
-    :return: The result of the attempted merge operation.
-    """
-    if docket_data.court_id not in FLORIDA_COURT_ID_MAP:
-        logger.error("Unknown court id: %s", docket_data.court_id)
-        return MergeResult.failed("Docket")
-    return FloridaDocketMerger.merge(docket_data)
+    @classmethod
+    def validate(cls, docket_data: FloridaCase) -> bool:
+        if docket_data.court_id not in FLORIDA_COURT_ID_MAP:
+            logger.error("Unknown court id: %s", docket_data.court_id)
+            return False
+        return True

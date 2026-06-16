@@ -437,7 +437,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
             relationships and should generally not be passed."""
         if not cls.validate(i):
             logger.error(f"Merger {cls.__name__} received invalid input.")
-            return MergeResult.failed(cls.__name__)
+            return MergeResult.failed(cls.__model__.__name__)
 
         obj = cls.__model__(
             **{
