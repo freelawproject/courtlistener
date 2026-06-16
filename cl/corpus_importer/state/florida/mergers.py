@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import ClassVar, override
+from typing import ClassVar
 
 from asgiref.sync import async_to_sync
 from django.db.models import Model
@@ -13,15 +13,10 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
-    Constant,
-    InputField,
-    InputMap,
     Merger,
-    MergeStrategy,
-    OverwriteExisting,
-    PassAll,
     RelatedMerger,
     Relationship,
+    overwrite,
 )
 from cl.recap.mergers import (
     find_and_disaggregate_docket_object,
@@ -34,15 +29,10 @@ logger = logging.getLogger(__name__)
 FL_APPELLATE_COURT_ID: str = "fladistctapp"
 
 
-class AddScraperSource(MergeStrategy[int]):
-    """Compound the scraper source onto a non-scraper docket source, matching
-    `Docket.add_scraper_source`."""
-
-    @override
-    def merge_values(self, scrape: int, db: int) -> int:
-        if db in Docket.NON_SCRAPER_SOURCES():
-            return db + Docket.SCRAPER
-        return db
+def add_scraper_source(scrape: int, db: int) -> int:
+    if db in Docket.NON_SCRAPER_SOURCES():
+        return db + Docket.SCRAPER
+    return db
 
 
 def _date_last_filing(docket_data: FloridaCase) -> date | None:
@@ -80,10 +70,10 @@ class FloridaOriginatingCourtInformationMerger(
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
     docket_number: str = AttributeMerger(
-        InputMap(_originating_case_number), strategy=OverwriteExisting()
+        _originating_case_number, strategy=overwrite
     )
     docket_number_raw: str = AttributeMerger(
-        InputMap(_originating_case_number), strategy=OverwriteExisting()
+        _originating_case_number, strategy=overwrite
     )
 
     @staticmethod
@@ -96,8 +86,9 @@ class FloridaOriginatingCourtInformationMerger(
             )
         return True
 
-    @staticmethod
-    def existing(
+    @classmethod
+    def get_existing(
+        cls,
         oci: OriginatingCourtInformation,
     ) -> OriginatingCourtInformation | None:
         return None
@@ -109,61 +100,59 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     atomic = True
 
     court_id: str = AttributeMerger[FloridaCase, str](
-        InputMap(
-            lambda docket_data: FLORIDA_COURT_ID_MAP[docket_data.court_id]
-        ),
-        strategy=OverwriteExisting(),
+        lambda docket_data: FLORIDA_COURT_ID_MAP[docket_data.court_id],
+        strategy=overwrite,
     )
     source: int = AttributeMerger(
-        Constant(Docket.SCRAPER),
-        strategy=AddScraperSource(),
+        lambda _: Docket.SCRAPER,
+        strategy=add_scraper_source,
     )
     date_filed: date | None = AttributeMerger[FloridaCase, date | None](
-        InputField("date_filed"),
-        strategy=OverwriteExisting(),
+        lambda d: d.date_filed,
+        strategy=overwrite,
     )
     date_last_filing: date | None = AttributeMerger(
-        InputMap(_date_last_filing),
-        strategy=OverwriteExisting(),
+        _date_last_filing,
+        strategy=overwrite,
     )
     case_name: str = AttributeMerger[FloridaCase, str](
-        InputField("case_name"), strategy=OverwriteExisting()
+        lambda d: d.case_name, strategy=overwrite
     )
     case_name_full: str = AttributeMerger[FloridaCase, str](
-        InputField("case_name_full"),
-        strategy=OverwriteExisting(),
+        lambda d: d.case_name_full,
+        strategy=overwrite,
     )
     case_name_short: str = AttributeMerger[FloridaCase, str](
-        InputField("case_name"), strategy=OverwriteExisting()
+        lambda d: d.case_name, strategy=overwrite
     )
     docket_number: str = AttributeMerger[FloridaCase, str](
-        InputField("docket_number"),
-        strategy=OverwriteExisting(),
+        lambda d: d.docket_number,
+        strategy=overwrite,
     )
     docket_number_raw: str = AttributeMerger[FloridaCase, str](
-        InputField("docket_number"), strategy=OverwriteExisting()
+        lambda d: d.docket_number, strategy=overwrite
     )
     docket_number_core: str = AttributeMerger[FloridaCase, str](
-        InputMap(
-            lambda d: make_docket_number_core(
-                d.docket_number, court_id=FLORIDA_COURT_ID_MAP[d.court_id]
-            )
+        lambda d: make_docket_number_core(
+            d.docket_number, court_id=FLORIDA_COURT_ID_MAP[d.court_id]
         ),
-        strategy=OverwriteExisting(),
+        strategy=overwrite,
     )
     appeal_from_id: str | None = AttributeMerger(
-        InputMap(_appeal_from_id), strategy=OverwriteExisting()
+        _appeal_from_id, strategy=overwrite
     )
     appeal_from_str: str | None = AttributeMerger(
-        InputMap(_appeal_from_str), strategy=OverwriteExisting()
+        _appeal_from_str, strategy=overwrite
     )
     # See https://github.com/freelawproject/courtlistener/issues/7361#issuecomment-4566459292
-    pacer_case_id: str = AttributeMerger(InputField("case_uuid"))
+    pacer_case_id: str = AttributeMerger(
+        lambda d: d.case_uuid, strategy=overwrite
+    )
     originating_court_information: OriginatingCourtInformation = RelatedMerger[
         FloridaCase, OriginatingCourtInformation
     ](
         FloridaOriginatingCourtInformationMerger,
-        PassAll(),
+        lambda d: d,
         gate=lambda docket_data: (
             docket_data.court_id == FloridaCourtID.SUPREME_COURT.value
             and bool(docket_data.originating_cases)
@@ -171,8 +160,8 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
         relationship=Relationship.OneToOne,
     )
 
-    @staticmethod
-    def existing(docket: Docket) -> Docket | None:
+    @classmethod
+    def get_existing(cls, docket: Docket) -> Docket | None:
         supreme_court_id = FLORIDA_COURT_ID_MAP[
             FloridaCourtID.SUPREME_COURT.value
         ]
@@ -200,8 +189,8 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
             )
         return found
 
-    @classmethod
-    def validate(cls, docket_data: FloridaCase) -> bool:
+    @staticmethod
+    def validate(docket_data: FloridaCase) -> bool:
         if docket_data.court_id not in FLORIDA_COURT_ID_MAP:
             logger.error("Unknown court id: %s", docket_data.court_id)
             return False
