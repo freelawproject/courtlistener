@@ -6,7 +6,6 @@ from cl.corpus_importer.state.merger import (
     AttributeMerger,
     Merger,
     RelatedMerger,
-    Relationship,
     parameter,
 )
 from cl.search.docket_sources import DocketSources
@@ -184,7 +183,6 @@ class BaseMergerTest(TestCase):
                 RelatedMerger(
                     TestRelatedMerger,
                     lambda d, *args, **kwargs: d["mctest"],
-                    relationship=Relationship.OneToOne,
                 )
             )
 
@@ -225,7 +223,6 @@ class BaseMergerTest(TestCase):
             docket_entries: list[DocketEntry] = RelatedMerger(
                 TestRelatedMerger,
                 lambda d: d["mctest"],
-                relationship=Relationship.Child,
             )
 
             @classmethod

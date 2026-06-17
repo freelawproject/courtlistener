@@ -89,37 +89,18 @@ class AttributeMerger[D, T](Any):
             self.transform = _wrap_value_kwarg(self.transform)
 
 
-class OneToOneRelationship: ...
-
-
-class ChildRelationship: ...
-
-
-# Pretend Python has sum types
-class Relationship:
-    OneToOne: OneToOneRelationship = OneToOneRelationship()
-    """One-to-one relationship. Parent objects have a foreign key to relatives."""
-    Child: ChildRelationship = ChildRelationship()
-    """Parent-child relationship. Child objects have a foreign key to the parent."""
-
-
-RelationshipType = OneToOneRelationship | ChildRelationship
-
-
 @dataclass(frozen=True, slots=True)
 class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
     """Class encapsulating logic for merging one or more related objects. Can be used to merge one-to-one relationships
     or parent-child relationships.
 
     :ivar merger: The `Merger` to use for the related object
-    :ivar transform: Defines how to get the input value for `merger.merge` using a subclass of `InputMap`
-    :ivar relationship: The type of relationship to merge"""
+    :ivar transform: Defines how to get the input value for `merger.merge` using a subclass of `InputMap`"""
 
     merger: "type[Merger[RelatedInput, RelatedModel]]"
     transform: Callable[[ScrapedData], RelatedInput] = lambda x: cast(
         RelatedInput, x
     )
-    relationship: RelationshipType = field(kw_only=True)
     gate: Callable[[ScrapedData], bool] = field(
         kw_only=True, default=lambda _: True
     )
@@ -127,8 +108,6 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
     def _merge_one_to_one(
         self, parent: Model, merger_input: RelatedInput, *, name: str
     ) -> MergeResult[Any]:
-        if merger_input is None:
-            return MergeResult.unnecessary()
         db_obj = getattr(parent, name)
         if db_obj is None:
             result = self.merger.merge(merger_input)
@@ -146,10 +125,6 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
     def _merge_related(
         self, parent: Model, merger_input: RelatedInput, *, name: str
     ) -> MergeResult[Any]:
-        # An absent optional collection is not an error; there is simply nothing
-        # to merge.
-        if merger_input is None:
-            return MergeResult.unnecessary()
         # A lone `str`/`bytes`/`Mapping` is iterable but is not a collection of
         # children -- iterating it would silently feed characters or keys to the
         # child merger. Reject those (and anything not iterable at all).
@@ -182,11 +157,15 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         if merger_input is None:
             return MergeResult.unnecessary()
 
-        match self.relationship:
-            case OneToOneRelationship():
-                return self._merge_one_to_one(parent, merger_input, name=name)
-            case ChildRelationship():
-                return self._merge_related(parent, merger_input, name=name)
+        f = parent._meta.get_field(name)
+
+        if f.one_to_one:
+            return self._merge_one_to_one(parent, merger_input, name=name)
+        elif f.one_to_many:
+            return self._merge_related(parent, merger_input, name=name)
+        elif f.many_to_many:
+            raise NotImplementedError
+        raise TypeError("Field %s is not a related field.", name)
 
 
 class Merger[D, M: Model](ABC):
@@ -203,7 +182,7 @@ class Merger[D, M: Model](ABC):
     atomic: ClassVar[bool] = False
     key: ClassVar[Iterable[str]] = []
     __attr_mergers__: ClassVar[dict[str, AttributeMerger[Any, Any]]] = {}
-    __related_mergers__: dict[str, RelatedMerger[Any, Any]] = {}
+    __related_mergers__: ClassVar[dict[str, RelatedMerger[Any, Any]]] = {}
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()

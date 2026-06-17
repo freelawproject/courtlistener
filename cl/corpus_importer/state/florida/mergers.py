@@ -15,7 +15,6 @@ from cl.corpus_importer.state.merger import (
     AttributeMerger,
     Merger,
     RelatedMerger,
-    Relationship,
     overwrite,
 )
 from cl.recap.mergers import (
@@ -158,7 +157,6 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
             docket_data.court_id == FloridaCourtID.SUPREME_COURT.value
             and bool(docket_data.originating_cases)
         ),
-        relationship=Relationship.OneToOne,
     )
 
     @classmethod
