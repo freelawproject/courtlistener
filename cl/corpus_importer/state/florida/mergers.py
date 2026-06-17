@@ -90,8 +90,7 @@ class FloridaOriginatingCourtInformationMerger(
 
     @classmethod
     def get_existing(
-        cls,
-        oci: OriginatingCourtInformation,
+        cls, oci: FloridaCase, _
     ) -> OriginatingCourtInformation | None:
         return None
 
@@ -102,7 +101,7 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     atomic = True
 
     court_id: str = AttributeMerger[FloridaCase, str](
-        lambda docket_data: FLORIDA_COURT_ID_MAP[docket_data.court_id],
+        lambda d: FLORIDA_COURT_ID_MAP[d.court_id],
         strategy=overwrite,
     )
     source: int = AttributeMerger(
@@ -163,14 +162,16 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     )
 
     @classmethod
-    def get_existing(cls, docket: Docket) -> Docket | None:
+    def get_existing(cls, docket: FloridaCase, _) -> Docket | None:
         supreme_court_id = FLORIDA_COURT_ID_MAP[
             FloridaCourtID.SUPREME_COURT.value
         ]
-        if docket.court_id == supreme_court_id:
+        court_id = FLORIDA_COURT_ID_MAP[docket.court_id]
+
+        if court_id == supreme_court_id:
             return async_to_sync(find_docket_object)(
-                court_id=docket.court_id,
-                pacer_case_id=docket.pacer_case_id,
+                court_id=court_id,
+                pacer_case_id=str(docket.case_uuid),
                 docket_number=docket.docket_number,
                 federal_defendant_number=None,
                 federal_dn_judge_initials_assigned=None,
@@ -179,7 +180,7 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
                 allow_create=False,
             )
         found, changed = async_to_sync(find_and_disaggregate_docket_object)(
-            court_id=docket.court_id,
+            court_id=court_id,
             aggregate_court_id=FL_APPELLATE_COURT_ID,
             docket_number=docket.docket_number,
             docket_source=Docket.SCRAPER,

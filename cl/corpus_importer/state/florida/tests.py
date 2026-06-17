@@ -201,6 +201,7 @@ class FloridaMergerTest(TestCase):
         result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
+        assert "Docket" in result.updates
         assert self.docket_sc.pk in result.updates["Docket"]
         assert self.docket_sc.pk not in result.creates.get("Docket", set())
         self.docket_sc.refresh_from_db()
