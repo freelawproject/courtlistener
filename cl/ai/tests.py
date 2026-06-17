@@ -81,22 +81,32 @@ class ValidateGeminiModelTest(SimpleTestCase):
         self.assertIn("does not have a shutdown date", warning_msg)
         self.assertIn("deprecations", warning_msg)
 
+    @patch.dict(
+        "cl.ai.llm_providers.google.SUPPORTED_GEMINI_MODELS",
+        {"test-model": date(2026, 1, 2)},
+    )
     @patch("cl.ai.llm_providers.google.date")
     def test_valid_model_before_shutdown_date(self, mock_date):
         """Test that a model before its shutdown date passes validation."""
+        # one day before shutdown
         mock_date.today.return_value = date(2026, 1, 1)
         mock_date.side_effect = lambda *args, **kw: date(*args, **kw)
-        GoogleGenAIBatchWrapper.validate_model("gemini-2.5-pro")
+        GoogleGenAIBatchWrapper.validate_model("test-model")
 
+    @patch.dict(
+        "cl.ai.llm_providers.google.SUPPORTED_GEMINI_MODELS",
+        {"test-model": date(2026, 1, 1)},
+    )
     @patch("cl.ai.llm_providers.google.date")
     def test_model_past_shutdown_date_raises_error(self, mock_date):
         """Test that a model past its shutdown date raises ValueError."""
-        mock_date.today.return_value = date(2026, 10, 16)
+        # one day past shutdown
+        mock_date.today.return_value = date(2026, 1, 2)
         mock_date.side_effect = lambda *args, **kw: date(*args, **kw)
         with self.assertRaises(ValueError) as context:
-            GoogleGenAIBatchWrapper.validate_model("gemini-2.5-pro")
+            GoogleGenAIBatchWrapper.validate_model("test-model")
         self.assertIn("shut down", str(context.exception))
-        self.assertIn("2026-10-16", str(context.exception))
+        self.assertIn("2026-01-01", str(context.exception))
 
     def test_unsupported_model_raises_error(self):
         """Test that an unsupported model raises ValueError."""
