@@ -56,7 +56,7 @@ def overwrite_if_present[T](scrape: T | None, db: T | None) -> T | None:
     return db if scrape is None else scrape
 
 
-def _wrap_value_kwarg[T, **P](f: Callable[P, T]) -> Callable[P, T]:
+def _wrap_value_kwarg[T, **P](f: Callable[P, T]) -> Any:
     def g(*args: Any, value: T, **kwargs: Any) -> T:
         return f(*args, **kwargs)
 
@@ -199,14 +199,11 @@ class Merger[D, M: Model](ABC):
     model: ClassVar[type[Model]]
     atomic: ClassVar[bool] = False
     key: ClassVar[Iterable[str]] = []
+    __attr_mergers__: ClassVar[dict[str, AttributeMerger[Any, Any]]] = {}
+    __related_mergers__: dict[str, RelatedMerger[Any, Any]] = {}
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
-
-        if not hasattr(cls, "__attr_mergers__"):
-            cls.__attr_mergers__ = {}
-        if not hasattr(cls, "__related_mergers__"):
-            cls.__related_mergers__ = {}
 
         cls_attrs = [
             (name, getattr(cls, name))
@@ -214,7 +211,7 @@ class Merger[D, M: Model](ABC):
             if not name.startswith("_")
         ]
 
-        cls.__attr_mergers__: dict[str, AttributeMerger[D, Any]] = (
+        cls.__attr_mergers__: dict[str, AttributeMerger[D, Any]] = (  # type: ignore[misc]
             cls.__attr_mergers__
             | {
                 name: cast(AttributeMerger[D, Any], value)
@@ -222,7 +219,7 @@ class Merger[D, M: Model](ABC):
                 if isinstance(value, AttributeMerger)
             }
         )
-        cls.__related_mergers__: dict[str, RelatedMerger[D, M]] = (
+        cls.__related_mergers__: dict[str, RelatedMerger[D, M]] = (  # type: ignore[misc]
             cls.__related_mergers__
             | {
                 name: cast(RelatedMerger[D, M], value)
@@ -265,7 +262,7 @@ class Merger[D, M: Model](ABC):
                     **{k: getattr(d, k) for k in cls.key}
                 ),
             )
-        except cls.model.DoesNotExist:
+        except cls.model.DoesNotExist:  # type: ignore[attr-defined]
             return None
 
     @classmethod
@@ -325,11 +322,11 @@ class Merger[D, M: Model](ABC):
         if existing is None:
             try:
                 db_obj = cls.get_existing(scrape_obj)
-            except cls.model.MultipleObjectsReturned:
+            except cls.model.MultipleObjectsReturned:  # type: ignore[attr-defined]
                 logger.error(
                     "Merger %s found multiple objects for natural key %s; skipping merge.",
                     cls.__name__,
-                    cls.existing,
+                    cls.key,
                 )
                 return MergeResult.failed(cls.model.__name__), scrape_obj
         else:

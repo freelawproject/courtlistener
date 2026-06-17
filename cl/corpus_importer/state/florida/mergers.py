@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 FL_APPELLATE_COURT_ID: str = "fladistctapp"
 
 
-def add_scraper_source(scrape: int, db: int) -> int:
+def add_scraper_source(scrape: int | None, db: int | None) -> int:
+    if not db:
+        db = 0
     if db in Docket.NON_SCRAPER_SOURCES():
         return db + Docket.SCRAPER
     return db
