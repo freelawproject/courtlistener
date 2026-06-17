@@ -12,7 +12,7 @@ from typing import (
 )
 
 from django.db import transaction
-from django.db.models import Model
+from django.db.models import ForeignKey, ManyToManyField, Model, OneToOneField
 from django.db.models.manager import Manager
 
 from cl.corpus_importer.state.utils import MergeResult
@@ -165,7 +165,7 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
             return self._merge_related(parent, merger_input, name=name)
         elif f.many_to_many:
             raise NotImplementedError
-        raise TypeError("Field %s is not a related field.", name)
+        raise TypeError(f"Field {name} is not a related field.")
 
 
 class Merger[D, M: Model](ABC):
@@ -186,6 +186,8 @@ class Merger[D, M: Model](ABC):
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
+
+        errors: list[str] = []
 
         cls_attrs = [
             (name, getattr(cls, name))
@@ -209,6 +211,46 @@ class Merger[D, M: Model](ABC):
                 if isinstance(value, RelatedMerger)
             }
         )
+
+        model_fields = cls.model._meta.get_fields()
+        fields = {field.name: field for field in model_fields}
+        derived_fields: set[str] = {
+            f.attname
+            for f in model_fields
+            if isinstance(f, ForeignKey | ManyToManyField | OneToOneField)
+        }
+
+        for name, _ in cls.__attr_mergers__.items():
+            if name not in fields and name not in derived_fields:
+                errors.append(
+                    f"Attribute {name} not found on {cls.model.__name__}"
+                )
+
+        for name, rm in cls.__related_mergers__.items():
+            if name not in fields:
+                errors.append(
+                    f"Related field {name} not found on {cls.model.__name__}"
+                )
+            if not fields[name].related_model:
+                errors.append(
+                    f"Field {name} on {cls.model.__name__} is not a related field"
+                )
+            if fields[name].related_model != rm.merger.model:
+                errors.append(
+                    f"Field {name} on {cls.model.__name__} is related to {rm.merger.model.__name__}, not {rm.merger.model.__name__}"
+                )
+            attname = getattr(fields[name], "attname", None)
+            if attname is not None and attname in cls.__attr_mergers__:
+                errors.append(
+                    f"Cannot merge both {name} and {attname} on {cls.model.__name__}"
+                )
+
+        if errors:
+            raise TypeError(
+                "Invalid merger configuration:\n{}".format(
+                    "\n".join(f"- {e}" for e in errors)
+                )
+            )
 
     @staticmethod
     def validate(d: D) -> bool:
