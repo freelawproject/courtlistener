@@ -80,7 +80,6 @@ class AttributeMerger[D, T](Any):
     strategy: Callable[Concatenate[T | None, T | None, ...], T | None] = field(
         kw_only=True, default=overwrite_if_present
     )
-    # Bound by `__set_name__` to the attribute name this merger is assigned to.
     name: str = field(init=False, default="")
 
     def __post_init__(self):
@@ -94,7 +93,7 @@ class AttributeMerger[D, T](Any):
         self.name = name
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
     """Class encapsulating logic for merging one or more related objects. Can be used to merge one-to-one relationships
     or parent-child relationships.
@@ -109,12 +108,10 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
     gate: Callable[[ScrapedData], bool] = field(
         kw_only=True, default=lambda _: True
     )
-    # Bound by `__set_name__` to the attribute name this merger is assigned to.
     name: str = field(init=False, default="")
 
     def __set_name__(self, owner: type, name: str) -> None:
-        # `RelatedMerger` is frozen, so go through `object.__setattr__`.
-        object.__setattr__(self, "name", name)
+        self.name = name
 
     def _merge_one_to_one(
         self, parent: Model, merger_input: RelatedInput
@@ -190,35 +187,25 @@ class Merger[D, M: Model](ABC):
     atomic: ClassVar[bool] = False
     key: ClassVar[Iterable[str]] = []
     __attr_mergers__: ClassVar[dict[str, AttributeMerger[Any, Any]]] = {}
-    __related_mergers__: ClassVar[dict[str, RelatedMerger[Any, Any]]] = {}
+    __related_mergers__: ClassVar[dict[str, RelatedMerger[Any, Model]]] = {}
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
         errors: list[str] = []
 
-        # Only this class's own namespace; mergers inherited from base classes
-        # are already present in the inherited `__attr_mergers__` /
-        # `__related_mergers__` dicts that we merge into below. Each merger knows
-        # its own attribute name via `__set_name__`, so we key off `value.name`.
-        own_attrs = list(vars(cls).values())
+        own_attrs = vars(cls).values()
 
-        cls.__attr_mergers__: dict[str, AttributeMerger[D, Any]] = (  # type: ignore[misc]
-            cls.__attr_mergers__
-            | {
-                value.name: cast(AttributeMerger[D, Any], value)
-                for value in own_attrs
-                if isinstance(value, AttributeMerger)
-            }
-        )
-        cls.__related_mergers__: dict[str, RelatedMerger[D, M]] = (  # type: ignore[misc]
-            cls.__related_mergers__
-            | {
-                value.name: cast(RelatedMerger[D, M], value)
-                for value in own_attrs
-                if isinstance(value, RelatedMerger)
-            }
-        )
+        cls.__attr_mergers__ = cls.__attr_mergers__ | {
+            value.name: cast(AttributeMerger[D, Any], value)
+            for value in own_attrs
+            if isinstance(value, AttributeMerger)
+        }
+        cls.__related_mergers__ = cls.__related_mergers__ | {
+            value.name: cast(RelatedMerger[D, M], value)
+            for value in own_attrs
+            if isinstance(value, RelatedMerger)
+        }
 
         model_fields = cls.model._meta.get_fields()
         fields = {field.name: field for field in model_fields}
