@@ -80,6 +80,8 @@ class AttributeMerger[D, T](Any):
     strategy: Callable[Concatenate[T | None, T | None, ...], T | None] = field(
         kw_only=True, default=overwrite_if_present
     )
+    # Bound by `__set_name__` to the attribute name this merger is assigned to.
+    name: str = field(init=False, default="")
 
     def __post_init__(self):
         # We use a value kwarg to pass parameters from the merger to attributes, so we need to make sure the transforms
@@ -87,6 +89,9 @@ class AttributeMerger[D, T](Any):
         sig = inspect.signature(self.transform)
         if "value" not in sig.parameters and "kwargs" not in sig.parameters:
             self.transform = _wrap_value_kwarg(self.transform)
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self.name = name
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,26 +109,32 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
     gate: Callable[[ScrapedData], bool] = field(
         kw_only=True, default=lambda _: True
     )
+    # Bound by `__set_name__` to the attribute name this merger is assigned to.
+    name: str = field(init=False, default="")
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        # `RelatedMerger` is frozen, so go through `object.__setattr__`.
+        object.__setattr__(self, "name", name)
 
     def _merge_one_to_one(
-        self, parent: Model, merger_input: RelatedInput, *, name: str
+        self, parent: Model, merger_input: RelatedInput
     ) -> MergeResult[Any]:
-        db_obj = getattr(parent, name)
+        db_obj = getattr(parent, self.name)
         if db_obj is None:
             result = self.merger.merge(merger_input)
             model = self.merger.model
             model_name = model.__name__
             if model_name in result.creates:
                 db_obj_pk = next(iter(result.creates[model_name]))
-                setattr(parent, f"{name}_id", db_obj_pk)
+                setattr(parent, f"{self.name}_id", db_obj_pk)
                 # The parent was already fully saved by `_merge_object`; only
                 # the freshly-set FK needs to be written back.
-                parent.save(update_fields=[f"{name}_id"])
+                parent.save(update_fields=[f"{self.name}_id"])
             return result
         return self.merger.merge(merger_input, existing=db_obj)
 
     def _merge_related(
-        self, parent: Model, merger_input: RelatedInput, *, name: str
+        self, parent: Model, merger_input: RelatedInput
     ) -> MergeResult[Any]:
         # A lone `str`/`bytes`/`Mapping` is iterable but is not a collection of
         # children -- iterating it would silently feed characters or keys to the
@@ -133,14 +144,12 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         ):
             return MergeResult.failed(self.merger.model.__name__)
         result = MergeResult.unnecessary()
-        related_manager: RelatedManager[Any] = getattr(parent, name)
+        related_manager: RelatedManager[Any] = getattr(parent, self.name)
         for child in cast(Iterable[Any], merger_input):
             result |= self.merger.merge(child, manager=related_manager)
         return result
 
-    def merge(
-        self, parent: Model, i: ScrapedData, *, name: str
-    ) -> MergeResult[Any]:
+    def merge(self, parent: Model, i: ScrapedData) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship.
 
         For one-to-one relationships, the input is transformed then passed directly to the related merger; a `None`
@@ -149,23 +158,22 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         parameter.
 
         :param parent: The parent of the object being merged. Must already exist in the DB when this method is called.
-        :param i: The input data for the object being merged.
-        :param name: The name of the attribute on the parent object."""
+        :param i: The input data for the object being merged."""
         if not self.gate(i):
             return MergeResult.unnecessary()
         merger_input = self.transform(i)
         if merger_input is None:
             return MergeResult.unnecessary()
 
-        f = parent._meta.get_field(name)
+        f = parent._meta.get_field(self.name)
 
         if f.one_to_one:
-            return self._merge_one_to_one(parent, merger_input, name=name)
+            return self._merge_one_to_one(parent, merger_input)
         elif f.one_to_many:
-            return self._merge_related(parent, merger_input, name=name)
+            return self._merge_related(parent, merger_input)
         elif f.many_to_many:
             raise NotImplementedError
-        raise TypeError(f"Field {name} is not a related field.")
+        raise TypeError(f"Field {self.name} is not a related field.")
 
 
 class Merger[D, M: Model](ABC):
@@ -189,25 +197,25 @@ class Merger[D, M: Model](ABC):
 
         errors: list[str] = []
 
-        cls_attrs = [
-            (name, getattr(cls, name))
-            for name in dir(cls)
-            if not name.startswith("_")
-        ]
+        # Only this class's own namespace; mergers inherited from base classes
+        # are already present in the inherited `__attr_mergers__` /
+        # `__related_mergers__` dicts that we merge into below. Each merger knows
+        # its own attribute name via `__set_name__`, so we key off `value.name`.
+        own_attrs = list(vars(cls).values())
 
         cls.__attr_mergers__: dict[str, AttributeMerger[D, Any]] = (  # type: ignore[misc]
             cls.__attr_mergers__
             | {
-                name: cast(AttributeMerger[D, Any], value)
-                for name, value in cls_attrs
+                value.name: cast(AttributeMerger[D, Any], value)
+                for value in own_attrs
                 if isinstance(value, AttributeMerger)
             }
         )
         cls.__related_mergers__: dict[str, RelatedMerger[D, M]] = (  # type: ignore[misc]
             cls.__related_mergers__
             | {
-                name: cast(RelatedMerger[D, M], value)
-                for name, value in cls_attrs
+                value.name: cast(RelatedMerger[D, M], value)
+                for value in own_attrs
                 if isinstance(value, RelatedMerger)
             }
         )
@@ -378,7 +386,7 @@ class Merger[D, M: Model](ABC):
                 db_obj.save()
                 result = MergeResult.updated(cls.model.__name__, db_obj.pk)
 
-        for name, rm in cls.__related_mergers__.items():
-            result |= rm.merge(db_obj, d, name=name)
+        for rm in cls.__related_mergers__.values():
+            result |= rm.merge(db_obj, d)
 
         return result, db_obj
