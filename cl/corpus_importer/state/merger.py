@@ -14,6 +14,7 @@ from typing import (
 
 from django.db import transaction
 from django.db.models import Model
+from django.db.models.fields.related_descriptors import RelatedManager
 
 from cl.corpus_importer.state.utils import MergeResult
 from cl.lib.utils import is_iter
@@ -201,20 +202,48 @@ class AttributeMerger[ScrapedData, T](Any):
 class OneToOneRelationship: ...
 
 
+class ChildRelationship: ...
+
+
 @dataclass
-class ChildRelationship:
-    parent: str
+class ManyToManyRelationship:
+    through: "Merger[ThroughInput[Any, Any], Any] | None" = None
+    """Optional merger for the through table. If not provided, merges will use whatever object Django creates for the
+    relationship."""
+    origin: str | None = None
+    """Key for the origin object on the through table. If not provided, will use Django's default."""
+    destination: str | None = None
+    """Key for the destination object on the through table. If not provided, will use Django's default."""
 
 
 # Pretend Python has sum types
 class Relationship:
     OneToOne: OneToOneRelationship = OneToOneRelationship()
     """One-to-one relationship. Parent objects have a foreign key to relatives."""
-    Child: type[ChildRelationship] = ChildRelationship
+    Child: ChildRelationship = ChildRelationship()
     """Parent-child relationship. Child objects have a foreign key to the parent."""
+    ManyToMany: type[ManyToManyRelationship] = ManyToManyRelationship
+    """Many-to-many relationship. May optionally define a merger for the through table. Related objects will be set
+    automatically on through tables; mergers should not attempt to manually set them. Objects in the through table will
+    be merged after objects on both ends have been merged, which may create orphans in non-atomic mergers. Input will
+    be passed to mergers on through tables as a :class:`ThroughInput` object with `origin` and `destination` set to the
+    inputs of the corresponding mergers."""
 
 
-RelationshipType = OneToOneRelationship | ChildRelationship
+@dataclass
+class ThroughInput[S, T]:
+    """Input for a :class:`ManyToManyRelationship` merger.
+
+    :ivar origin: Input for the origin object
+    :ivar destination: Input for the destination object"""
+
+    origin: S
+    destination: T
+
+
+RelationshipType = (
+    OneToOneRelationship | ChildRelationship | ManyToManyRelationship
+)
 
 
 class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
@@ -265,8 +294,8 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
             return result
         return self.merger.merge(merger_input, existing=db_obj)
 
-    def _merge_child(
-        self, parent: Model, merger_input: RelatedInput, parent_key: str
+    def _merge_related(
+        self, parent: Model, merger_input: RelatedInput
     ) -> MergeResult[Any]:
         # An absent optional collection is not an error; there is simply nothing
         # to merge.
@@ -280,10 +309,28 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         ):
             return MergeResult.failed(self.merger.__model__.__name__)
         result = MergeResult.unnecessary()
-        parent_kwargs: dict[str, Any] = {parent_key: parent}
+        related_manager = cast(RelatedManager[Any], getattr(parent, self.name))
+        children: list[Model] = []
         for child in cast(Iterable[Any], merger_input):
-            result |= self.merger.merge(child, **parent_kwargs)
+            child_result, child_obj = self.merger._merge(child)
+            result |= child_result
+            children.append(cast(Model, child_obj))
+        related_manager.add(*children)
         return result
+
+    def _merge_many_to_many(
+        self,
+        through_merger: "Merger[ThroughInput[Any, Any], Any] | None",
+        origin: str | None,
+        destination: str | None,
+        parent: Model,
+        merger_input: RelatedInput,
+    ) -> MergeResult[Any]:
+        if through_merger is None:
+            # Yay easy yippee
+            return self._merge_related(parent, merger_input)
+        # TODO
+        raise NotImplementedError
 
     def merge(self, parent: Model, i: ScrapedData) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship.
@@ -304,8 +351,14 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         match self.relationship:
             case OneToOneRelationship():
                 return self._merge_one_to_one(parent, merger_input)
-            case ChildRelationship(parent=parent_key):
-                return self._merge_child(parent, merger_input, parent_key)
+            case ChildRelationship():
+                return self._merge_related(parent, merger_input)
+            case ManyToManyRelationship(
+                through=through_merger, origin=origin, destination=destination
+            ):
+                return self._merge_many_to_many(
+                    through_merger, origin, destination, parent, merger_input
+                )
 
 
 def get_ancestor_classes(cls: type) -> Generator[type]:
@@ -435,9 +488,18 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         :param i: The input data to merge
         :param existing: An existing object to merge into, skipping lookup. Primarily useful for merging one-to-one
             relationships and should generally not be passed."""
+        result, _ = cls._merge(i, existing=existing, **kwargs)
+        return result
+
+    @classmethod
+    def _merge(
+        cls, i: ScrapedData, *, existing: DBModel | None = None, **kwargs: Any
+    ) -> tuple[MergeResult[Any], DBModel | None]:
+        """Internal method for merging scraped data into the DB that returns the merged object alongside results for
+        better performance in certain operations."""
         if not cls.validate(i):
             logger.error(f"Merger {cls.__name__} received invalid input.")
-            return MergeResult.failed(cls.__name__)
+            return MergeResult.failed(cls.__name__), None
 
         obj = cls.__model__(
             **{
@@ -452,7 +514,7 @@ class Merger[ScrapedData, DBModel: Model](ABC):
         else:
             result = cls._merge_tree(obj, i, existing=existing)
         cls.after(i, obj, result)
-        return result
+        return result, obj
 
     @classmethod
     def _merge_tree(
