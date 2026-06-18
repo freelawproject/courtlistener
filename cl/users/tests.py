@@ -85,7 +85,7 @@ from cl.tests.cases import (
     TestCase,
 )
 from cl.tests.utils import MockResponse as MockPostResponse
-from cl.tests.utils import make_client
+from cl.tests.utils import make_session_client
 from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
@@ -3553,8 +3553,8 @@ class WebhooksHTMXTests(APITestCase):
 
     def setUp(self) -> None:
         self.webhook_path = reverse("webhooks-list")
-        self.client = make_client(self.user_1.pk)
-        self.client_2 = make_client(self.user_2.pk)
+        self.client = make_session_client(self.user_1.pk)
+        self.client_2 = make_session_client(self.user_2.pk)
 
     def tearDown(cls):
         Webhook.objects.all().delete()
