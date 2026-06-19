@@ -352,6 +352,7 @@ dependencies = [
     { name = "disposable-email-domains" },
     { name = "django" },
     { name = "django-admin-cursor-paginator" },
+    { name = "django-cache-memoize" },
     { name = "django-cors-headers" },
     { name = "django-cotton" },
     { name = "django-csp" },
@@ -467,9 +468,9 @@ requires-dist = [
     { name = "datasketch", specifier = ">=1.8.0" },
     { name = "dateparser", specifier = "==1.2.2" },
     { name = "disposable-email-domains" },
-    { name = "django", specifier = ">=6.0,<6.1" },
     { name = "django", specifier = ">=6.0.5,<6.1" },
     { name = "django-admin-cursor-paginator", specifier = ">=0.1.7" },
+    { name = "django-cache-memoize" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
     { name = "django-cotton", specifier = ">=2.6.0" },
     { name = "django-csp", specifier = ">=4.0" },
@@ -840,6 +841,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/79/ef/ab407c1a2f14e13c75a6419a2d124954aa0364f62580ad95a3d31dc6c73d/django_browser_reload-1.21.0.tar.gz", hash = "sha256:3335ad3d107eb657f623d1a8e680dfbcab8a83ae1f94df1895e069dddf5604ba", size = 15800, upload-time = "2025-09-22T17:00:35.199Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/61/1b4a8c589652859995bcab87682286443eb9fdf2d7fd584975b9ffc1db33/django_browser_reload-1.21.0-py3-none-any.whl", hash = "sha256:0b2a86ab460774fa9bb142a121c70e75a72f18109f51a4f6de409cd633d3a70d", size = 12852, upload-time = "2025-09-22T17:00:33.479Z" },
+]
+
+[[package]]
+name = "django-cache-memoize"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/81/8e07e815118a5afbb9a10e766d9338751cc11ca462dea7f8a509a8fa22c5/django_cache_memoize-0.2.1.tar.gz", hash = "sha256:025ff5d941420247b83452bb183bde172dde7def95501fca829adf8ea01b2b7b", size = 21865, upload-time = "2024-12-18T18:08:52.929Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/b4/81550fd4e8ae9e2dd017b761d73fa4aa22dccab13076622ea5a3ec76e7d4/django_cache_memoize-0.2.1-py3-none-any.whl", hash = "sha256:07929d063a03557013875d453a13edc8e3359d3ba8a568b64ac3288578ed8be3", size = 14797, upload-time = "2024-12-18T18:08:51.199Z" },
 ]
 
 [[package]]
