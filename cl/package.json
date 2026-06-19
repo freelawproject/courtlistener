@@ -44,7 +44,7 @@
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-prettier": "^3.1.4",
     "eslint-plugin-react": "^7.20.6",
-    "js-cookie": "^2.2.1",
+    "js-cookie": "^3.0.7",
     "postcss": "^8.4.49",
     "prettier": "^2.0.5",
     "react": "^16.13.1",
