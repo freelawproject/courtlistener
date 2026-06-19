@@ -71,5 +71,8 @@
     "react-markdown-editor-lite": "^1.2.4",
     "react-showdown": "^2.3.0",
     "style-loader": "^2.0.0"
+  },
+  "overrides": {
+    "js-yaml": "^4.2.0"
   }
 }
