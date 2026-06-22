@@ -1,6 +1,7 @@
 import json
 import time
 from datetime import datetime, timedelta
+from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
@@ -57,7 +58,9 @@ from cl.api.models import (
 )
 from cl.api.utils import clear_tiered_cache
 from cl.donate.models import (
+    PROVIDERS,
     MembershipPaymentStatus,
+    MonthlyDonation,
     NeonMembership,
     NeonMembershipLevel,
 )
@@ -75,6 +78,7 @@ from cl.lib.test_helpers import (
     UserProfileWithParentsFactory,
 )
 from cl.search.factories import DocketFactory
+from cl.search.models import SearchQuery
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -108,12 +112,18 @@ from cl.users.models import (
     EMAIL_NOTIFICATIONS,
     FLAG_TYPES,
     STATUS_TYPES,
+    BarMembership,
     EmailFlag,
     EmailSent,
     FailedEmail,
     UserProfile,
+    UserProfileBarMembershipEvent,
+    UserProfileEvent,
+    UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
+from cl.visualizations.factories import VisualizationFactory
+from cl.visualizations.models import SCOTUSMap
 
 
 class UserTest(LiveServerTestCase):
@@ -687,6 +697,121 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    def test_purges_user_data_and_history_on_account_deletion(self) -> None:
+        """Deleting an account hard-deletes the user's logged data and the
+        PII left behind in the pghistory event tables, keeps (but disables)
+        donation records, and leaves a second user's data untouched.
+        """
+        victim = UserProfileWithParentsFactory()
+        bystander = UserProfileWithParentsFactory()
+
+        # Edit tracked fields to generate UserProfile/UserProxy history, and
+        # associate a bar membership to generate barmembership history.
+        bar = BarMembership.objects.create(barMembership="CA")
+        for profile in (victim, bystander):
+            profile.user.first_name = "Real Name"
+            profile.user.save()
+            profile.employer = "Real Employer"
+            profile.save()
+            profile.barmembership.add(bar)
+
+            # Usage logs and assets tied to each user.
+            SearchQuery.objects.create(
+                user=profile.user,
+                source=SearchQuery.WEBSITE,
+                engine=SearchQuery.ELASTICSEARCH,
+                get_params="q=something+private",
+                hit_cache=False,
+                failed=False,
+            )
+            EmailSentFactory(user=profile.user)
+            VisualizationFactory(user=profile.user)
+            MonthlyDonation.objects.create(
+                donor=profile.user,
+                enabled=True,
+                payment_provider=PROVIDERS.CREDIT_CARD,
+                monthly_donation_amount=Decimal("10.00"),
+                monthly_donation_day=1,
+                stripe_customer_id="cus_test",
+            )
+
+        # Sanity check: the victim's history and assets exist before deletion.
+        self.assertTrue(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Delete the victim's account.
+        self.assertTrue(
+            self.client.login(
+                username=victim.user.username, password="password"
+            )
+        )
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
+
+        # The victim's logged data and assets are hard-deleted.
+        self.assertFalse(SearchQuery.objects.filter(user=victim.user).exists())
+        self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
+        self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
+
+        # The PII left behind in the event tables is purged.
+        self.assertFalse(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Donations are financial records: kept, but disabled.
+        victim_donations = MonthlyDonation.objects.filter(donor=victim.user)
+        self.assertEqual(victim_donations.count(), 1)
+        self.assertFalse(victim_donations.get().enabled)
+
+        # The bystander is completely untouched.
+        self.assertTrue(
+            SearchQuery.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(EmailSent.objects.filter(user=bystander.user).exists())
+        self.assertTrue(SCOTUSMap.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProxyEvent.objects.filter(
+                pgh_obj_id=bystander.user.pk
+            ).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=bystander.pk
+            ).exists()
+        )
+        self.assertTrue(
+            MonthlyDonation.objects.get(donor=bystander.user).enabled
+        )
+
+        # The original bug deleted the shared BarMembership lookup row itself
+        # on account deletion, wiping it for everyone. Guard the regression
+        # directly: the shared row and the bystander's link must both survive.
+        self.assertTrue(BarMembership.objects.filter(pk=bar.pk).exists())
+        self.assertTrue(bystander.barmembership.filter(pk=bar.pk).exists())
 
     async def test_redirect_to_search_alerts_if_no_alerts(self):
         """Tests redirection to search alerts when a user has no alerts"""
