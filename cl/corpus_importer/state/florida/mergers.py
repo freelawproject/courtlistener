@@ -4,7 +4,7 @@ from typing import ClassVar
 
 from asgiref.sync import async_to_sync
 from django.db.models import Model
-from juriscraper.state.florida import FloridaCase
+from juriscraper.state.florida import FloridaCase, FloridaOriginatingCase
 from juriscraper.state.florida.cases import FloridaCourtID
 
 from cl.corpus_importer.state.florida.utils import (
@@ -43,12 +43,6 @@ def _date_last_filing(docket_data: FloridaCase) -> date | None:
     return filing_dates[-1] if filing_dates else docket_data.date_filed
 
 
-def _originating_case_number(docket_data: FloridaCase) -> str | None:
-    if not docket_data.originating_cases:
-        return None
-    return docket_data.originating_cases[0].case_number
-
-
 def _appeal_from_id(docket_data: FloridaCase) -> str | None:
     # Multiple originating cases are ambiguous, so leave the field unset.
     if len(docket_data.originating_cases) != 1:
@@ -66,32 +60,38 @@ def _appeal_from_str(docket_data: FloridaCase) -> str | None:
 
 
 class FloridaOriginatingCourtInformationMerger(
-    Merger[FloridaCase, OriginatingCourtInformation]
+    Merger[FloridaOriginatingCase, OriginatingCourtInformation]
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-    docket_number: str = AttributeMerger(
-        _originating_case_number, strategy=overwrite
+    docket_number: str = AttributeMerger[FloridaOriginatingCase, str](
+        lambda oc: oc.case_number, strategy=overwrite
     )
-    docket_number_raw: str = AttributeMerger(
-        _originating_case_number, strategy=overwrite
+    docket_number_raw: str = AttributeMerger[FloridaOriginatingCase, str](
+        lambda oc: oc.case_number, strategy=overwrite
     )
-
-    @staticmethod
-    def validate(docket_data: FloridaCase) -> bool:
-        if len(docket_data.originating_cases) > 1:
-            logger.warning(
-                "Florida docket %s in court %s has multiple originating cases. Using the first one.",
-                docket_data.docket_number,
-                docket_data.court_id,
-            )
-        return True
 
     @classmethod
     def get_existing(
         cls, oci: FloridaCase, _
     ) -> OriginatingCourtInformation | None:
         return None
+
+
+def _originating_case(
+    docket_data: FloridaCase,
+) -> FloridaOriginatingCase | None:
+    if docket_data.court_id != FloridaCourtID.SUPREME_COURT.value:
+        return None
+    if not docket_data.originating_cases:
+        return None
+    if len(docket_data.originating_cases) > 1:
+        logger.warning(
+            "Florida docket %s in court %s has multiple originating cases. Using the first one.",
+            docket_data.docket_number,
+            docket_data.court_id,
+        )
+    return docket_data.originating_cases[0]
 
 
 class FloridaDocketMerger(Merger[FloridaCase, Docket]):
@@ -149,14 +149,12 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
         lambda d: d.case_uuid, strategy=overwrite
     )
     originating_court_information: OriginatingCourtInformation = RelatedMerger[
-        FloridaCase, OriginatingCourtInformation
+        FloridaCase,
+        FloridaOriginatingCase,
+        OriginatingCourtInformation,
     ](
         FloridaOriginatingCourtInformationMerger,
-        lambda d: d,
-        gate=lambda docket_data: (
-            docket_data.court_id == FloridaCourtID.SUPREME_COURT.value
-            and bool(docket_data.originating_cases)
-        ),
+        _originating_case,
     )
 
     @classmethod

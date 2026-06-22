@@ -1,14 +1,13 @@
-import inspect
 import logging
 import typing
 from abc import ABC
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
 from typing import (
     Any,
     ClassVar,
     Concatenate,
     cast,
+    override,
 )
 
 from django.db import transaction
@@ -22,23 +21,6 @@ if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
 
 logger = logging.getLogger(__name__)
-
-
-def parameter[D, T](
-    default: T | None = None,
-) -> Callable[Concatenate[D, ...], T | None]:
-    """Gets value from merger parameters
-
-    Probably needs to be replaced eventually.
-
-    :param default: Default value to use if the parameter is not present"""
-
-    def f(d: D, value: T | None = default) -> T | None:
-        if value is None:
-            value = default
-        return value
-
-    return f
 
 
 def overwrite[T](scrape: T | None, db: T | None) -> T | None:
@@ -61,60 +43,105 @@ def overwrite_if_present[T](scrape: T | None, db: T | None) -> T | None:
     return db if scrape is None else scrape
 
 
-def _wrap_value_kwarg[T, **P](f: Callable[P, T]) -> Any:
-    def g(*args: Any, value: T, **kwargs: Any) -> T:
-        return f(*args, **kwargs)
-
-    return g
+def _default_transform[D, T](d: D, value: T | None = None) -> T | None:
+    return value
 
 
-@dataclass(slots=True)
-class AttributeMerger[D, T](Any):
+class MergerSpecification[D, T]:
+    __slots__ = "name", "_transform", "default", "param"
+
+    def __init__(
+        self,
+        transform: Callable[Concatenate[D, ...], T | None] | None = None,
+        param: bool = False,
+        default: T | None = None,
+    ):
+        # We use a value kwarg to pass parameters from the merger to attributes, so we need to make sure the transforms
+        # can accept it. Should probably come up with a better way of handling this
+        if transform is None:
+            transform = cast(
+                Callable[Concatenate[D, ...], T | None], _default_transform
+            )
+        self._transform: Callable[Concatenate[D, ...], T | None] = transform
+        self.default: T | None = default
+        self.param: bool = param
+        self.name: str = ""
+
+    def __set_name__(self, owner: type, name: str):
+        self.name = name
+
+    def transform(self, d: D, value: T | None = None) -> T | None:
+        if self.param:
+            v = self._transform(d, value=value)
+        else:
+            v = self._transform(d)
+
+        if v is None:
+            return self.default
+        return v
+
+
+class AttributeMerger[D, T](MergerSpecification[D, T], Any):
     """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
 
     :param transform: Defines how to get the DB value from the scrape data
     :param strategy: How to behave when data is present in the scrape and DB. Defaults to overwriting the DB value
         only when the scraped value is present (not `None`), so a partial scrape won't overwrite existing data."""
 
-    transform: Callable[Concatenate[D, ...], T]
-    strategy: Callable[Concatenate[T | None, T | None, ...], T | None] = field(
-        kw_only=True, default=overwrite_if_present
-    )
-    name: str = field(init=False, default="")
+    __slots__ = "strategy"
 
-    def __post_init__(self):
-        # We use a value kwarg to pass parameters from the merger to attributes, so we need to make sure the transforms
-        # can accept it. Should probably come up with a better way of handling this
-        sig = inspect.signature(self.transform)
-        if "value" not in sig.parameters and "kwargs" not in sig.parameters:
-            self.transform = _wrap_value_kwarg(self.transform)
+    def __init__(
+        self,
+        transform: Any
+        | None = None,  # Generic callables confuse mypy; should be Callable[Concatenate[D, ...], T | None] | None
+        strategy: Callable[
+            Concatenate[T | None, T | None, ...], T | None
+        ] = overwrite_if_present,
+        param: bool = False,
+        default: T | None = None,
+    ):
+        super().__init__(transform, param, default)
+        self.strategy: Callable[
+            Concatenate[T | None, T | None, ...], T | None
+        ] = strategy
 
-    def __set_name__(self, owner: type, name: str) -> None:
-        self.name = name
+
+class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
+    __slots__ = "merger"
+
+    def __init__(
+        self,
+        merger: "type[Merger[T, RM]]",
+        transform: Callable[Concatenate[D, ...], T | None] | None = None,
+        param: bool = False,
+        default: T | None = None,
+    ):
+        super().__init__(transform, param, default)
+        self.merger: type[Merger[T, RM]] = merger
+
+    def merge(self, parent: RM, i: D) -> MergeResult[Any]:
+        raise NotImplementedError
 
 
-@dataclass(slots=True)
-class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
+class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
     """Class encapsulating logic for merging one or more related objects. Can be used to merge one-to-one relationships
     or parent-child relationships.
 
-    :ivar merger: The `Merger` to use for the related object
-    :ivar transform: Defines how to get the input value for `merger.merge` using a subclass of `InputMap`"""
+    :ivar merger: The `Merger` to use for the related object"""
 
-    merger: "type[Merger[RelatedInput, RelatedModel]]"
-    transform: Callable[[ScrapedData], RelatedInput] = lambda x: cast(
-        RelatedInput, x
-    )
-    gate: Callable[[ScrapedData], bool] = field(
-        kw_only=True, default=lambda _: True
-    )
-    name: str = field(init=False, default="")
-
-    def __set_name__(self, owner: type, name: str) -> None:
-        self.name = name
+    def __init__(
+        self,
+        merger: "type[Merger[T, RM]]",
+        transform: Any
+        | None = None,  # Generic callables confuse mypy; should be Callable[Concatenate[D, ...], T | None] | None
+        param: bool = False,
+        default: T | None = None,
+    ):
+        super().__init__(merger, transform, param, default)
+        self.merger: type[Merger[T, RM]] = merger
 
     def _merge_one_to_one(
-        self, parent: Model, merger_input: RelatedInput
+        self, parent: Model, merger_input: T
     ) -> MergeResult[Any]:
         db_obj = getattr(parent, self.name)
         if db_obj is None:
@@ -131,7 +158,7 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
         return self.merger.merge(merger_input, existing=db_obj)
 
     def _merge_related(
-        self, parent: Model, merger_input: RelatedInput
+        self, parent: Model, merger_input: T
     ) -> MergeResult[Any]:
         # A lone `str`/`bytes`/`Mapping` is iterable but is not a collection of
         # children -- iterating it would silently feed characters or keys to the
@@ -146,7 +173,8 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
             result |= self.merger.merge(child, manager=related_manager)
         return result
 
-    def merge(self, parent: Model, i: ScrapedData) -> MergeResult[Any]:
+    @override
+    def merge(self, parent: RM, i: D) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship.
 
         For one-to-one relationships, the input is transformed then passed directly to the related merger; a `None`
@@ -156,14 +184,14 @@ class RelatedMerger[ScrapedData, RelatedModel: Model, RelatedInput = Any](Any):
 
         :param parent: The parent of the object being merged. Must already exist in the DB when this method is called.
         :param i: The input data for the object being merged."""
-        if not self.gate(i):
-            return MergeResult.unnecessary()
-        merger_input = self.transform(i)
+        merger_input = self.transform(i, None)
         if merger_input is None:
             return MergeResult.unnecessary()
 
         f = parent._meta.get_field(self.name)
 
+        # These should be initialization-time checks on subclasses of SubMerger, but for now this will do.
+        # Party merger PR will handle the subclasses
         if f.one_to_one:
             return self._merge_one_to_one(parent, merger_input)
         elif f.one_to_many:
@@ -187,7 +215,9 @@ class Merger[D, M: Model](ABC):
     atomic: ClassVar[bool] = False
     key: ClassVar[Iterable[str]] = []
     __attr_mergers__: ClassVar[dict[str, AttributeMerger[Any, Any]]] = {}
-    __related_mergers__: ClassVar[dict[str, RelatedMerger[Any, Model]]] = {}
+    __related_mergers__: ClassVar[
+        dict[str, RelatedMerger[Any, Any, Model]]
+    ] = {}
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -202,7 +232,7 @@ class Merger[D, M: Model](ABC):
             if isinstance(value, AttributeMerger)
         }
         cls.__related_mergers__ = cls.__related_mergers__ | {
-            value.name: cast(RelatedMerger[D, M], value)
+            value.name: cast(RelatedMerger[D, Any, M], value)
             for value in own_attrs
             if isinstance(value, RelatedMerger)
         }
