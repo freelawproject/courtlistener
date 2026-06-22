@@ -1,5 +1,7 @@
 import json
+import time
 from datetime import datetime, timedelta
+from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
@@ -14,6 +16,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.cache import cache as django_cache
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -21,11 +24,14 @@ from django.core.mail import (
     send_mail,
 )
 from django.test import AsyncClient
+from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from rest_framework.authtoken.models import Token
+from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
@@ -43,6 +49,7 @@ from cl.api.factories import (
     WebhookFactory,
 )
 from cl.api.models import (
+    APIThrottle,
     ThrottleType,
     Webhook,
     WebhookEvent,
@@ -50,7 +57,13 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.api.utils import clear_tiered_cache
-from cl.donate.models import NeonMembershipLevel
+from cl.donate.models import (
+    PROVIDERS,
+    MembershipPaymentStatus,
+    MonthlyDonation,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -60,8 +73,12 @@ from cl.favorites.models import (
 )
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    SimpleUserDataMixin,
+    UserProfileWithParentsFactory,
+)
 from cl.search.factories import DocketFactory
+from cl.search.models import SearchQuery
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -72,7 +89,7 @@ from cl.tests.cases import (
     TestCase,
 )
 from cl.tests.utils import MockResponse as MockPostResponse
-from cl.tests.utils import make_client
+from cl.tests.utils import make_session_client
 from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
@@ -95,12 +112,18 @@ from cl.users.models import (
     EMAIL_NOTIFICATIONS,
     FLAG_TYPES,
     STATUS_TYPES,
+    BarMembership,
     EmailFlag,
     EmailSent,
     FailedEmail,
     UserProfile,
+    UserProfileBarMembershipEvent,
+    UserProfileEvent,
+    UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
+from cl.visualizations.factories import VisualizationFactory
+from cl.visualizations.models import SCOTUSMap
 
 
 class UserTest(LiveServerTestCase):
@@ -448,6 +471,104 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             reverse("delete_profile_done"),
         )
 
+    async def test_reset_api_token_get_renders_confirmation(self) -> None:
+        """The reset page renders a password-confirmation form."""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Reset My API Token")
+        self.assertContains(r, "csrfmiddlewaretoken")
+
+    async def test_reset_api_token_shows_recent_usage_count(self) -> None:
+        """The confirmation page surfaces the recent API request count."""
+        # Prime the throttle cache the same way ExceptionalUserRateThrottle
+        # does: a list of unix timestamps keyed by user pk. We seed three
+        # recent timestamps and one outside the 5-minute window.
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        now_ts = time.time()
+        cache_key = UserRateThrottle.cache_format % {
+            "scope": "user",
+            "ident": user.pk,
+        }
+        django_cache.set(
+            cache_key,
+            [now_ts - 1, now_ts - 60, now_ts - 290, now_ts - 600],
+        )
+        self.addCleanup(django_cache.delete, cache_key)
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "<strong>3</strong>")
+        self.assertContains(r, "fa-exclamation-triangle")
+        self.assertContains(r, "alert-warning")
+
+    async def test_reset_api_token_rotates_with_valid_password(self) -> None:
+        """Posting the correct password swaps the token for a new one."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("view_api_token"))
+
+        # Exactly one token still exists for the user, and the key changed.
+        tokens = Token.objects.filter(user=user)
+        self.assertEqual(await tokens.acount(), 1)
+        new_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertNotEqual(new_key, old_key)
+
+    async def test_reset_api_token_rejects_wrong_password(self) -> None:
+        """A wrong password leaves the existing token untouched."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "not-the-password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Your password was invalid")
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
+
+    async def test_reset_api_token_requires_login(self) -> None:
+        """Anonymous POSTs are redirected to login, no token is changed."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r.headers.get("Location", ""))
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
+
     def test_generate_recap_dot_email_addresses(self) -> None:
         # Test simple username
         u = User.objects.get(username="pandora")
@@ -576,6 +697,121 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    def test_purges_user_data_and_history_on_account_deletion(self) -> None:
+        """Deleting an account hard-deletes the user's logged data and the
+        PII left behind in the pghistory event tables, keeps (but disables)
+        donation records, and leaves a second user's data untouched.
+        """
+        victim = UserProfileWithParentsFactory()
+        bystander = UserProfileWithParentsFactory()
+
+        # Edit tracked fields to generate UserProfile/UserProxy history, and
+        # associate a bar membership to generate barmembership history.
+        bar = BarMembership.objects.create(barMembership="CA")
+        for profile in (victim, bystander):
+            profile.user.first_name = "Real Name"
+            profile.user.save()
+            profile.employer = "Real Employer"
+            profile.save()
+            profile.barmembership.add(bar)
+
+            # Usage logs and assets tied to each user.
+            SearchQuery.objects.create(
+                user=profile.user,
+                source=SearchQuery.WEBSITE,
+                engine=SearchQuery.ELASTICSEARCH,
+                get_params="q=something+private",
+                hit_cache=False,
+                failed=False,
+            )
+            EmailSentFactory(user=profile.user)
+            VisualizationFactory(user=profile.user)
+            MonthlyDonation.objects.create(
+                donor=profile.user,
+                enabled=True,
+                payment_provider=PROVIDERS.CREDIT_CARD,
+                monthly_donation_amount=Decimal("10.00"),
+                monthly_donation_day=1,
+                stripe_customer_id="cus_test",
+            )
+
+        # Sanity check: the victim's history and assets exist before deletion.
+        self.assertTrue(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Delete the victim's account.
+        self.assertTrue(
+            self.client.login(
+                username=victim.user.username, password="password"
+            )
+        )
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
+
+        # The victim's logged data and assets are hard-deleted.
+        self.assertFalse(SearchQuery.objects.filter(user=victim.user).exists())
+        self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
+        self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
+
+        # The PII left behind in the event tables is purged.
+        self.assertFalse(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Donations are financial records: kept, but disabled.
+        victim_donations = MonthlyDonation.objects.filter(donor=victim.user)
+        self.assertEqual(victim_donations.count(), 1)
+        self.assertFalse(victim_donations.get().enabled)
+
+        # The bystander is completely untouched.
+        self.assertTrue(
+            SearchQuery.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(EmailSent.objects.filter(user=bystander.user).exists())
+        self.assertTrue(SCOTUSMap.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProxyEvent.objects.filter(
+                pgh_obj_id=bystander.user.pk
+            ).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=bystander.pk
+            ).exists()
+        )
+        self.assertTrue(
+            MonthlyDonation.objects.get(donor=bystander.user).enabled
+        )
+
+        # The original bug deleted the shared BarMembership lookup row itself
+        # on account deletion, wiping it for everyone. Guard the regression
+        # directly: the shared row and the bystander's link must both survive.
+        self.assertTrue(BarMembership.objects.filter(pk=bar.pk).exists())
+        self.assertTrue(bystander.barmembership.filter(pk=bar.pk).exists())
 
     async def test_redirect_to_search_alerts_if_no_alerts(self):
         """Tests redirection to search alerts when a user has no alerts"""
@@ -3442,8 +3678,8 @@ class WebhooksHTMXTests(APITestCase):
 
     def setUp(self) -> None:
         self.webhook_path = reverse("webhooks-list")
-        self.client = make_client(self.user_1.pk)
-        self.client_2 = make_client(self.user_2.pk)
+        self.client = make_session_client(self.user_1.pk)
+        self.client_2 = make_session_client(self.user_2.pk)
 
     def tearDown(cls):
         Webhook.objects.all().delete()
@@ -4314,3 +4550,93 @@ class TagZohoRecordTest(SimpleTestCase):
 
         mock_leads.add_tags.assert_not_called()
         mock_contacts.add_tags.assert_not_called()
+
+
+@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+class RefreshAPIThrottlesAdminTest(TestCase):
+    def setUp(self):
+        self.staff = UserFactory(is_staff=True, is_superuser=True)
+        self.target = UserProfileWithParentsFactory().user
+        self.client = Client()
+        self.client.force_login(self.staff)
+        self.changelist_url = reverse("admin:auth_user_changelist")
+
+    def _run_action(self, *user_pks):
+        return self.client.post(
+            self.changelist_url,
+            {
+                "action": "refresh_api_throttles",
+                "_selected_action": [str(pk) for pk in user_pks],
+            },
+            follow=True,
+        )
+
+    def test_action_refreshes_throttles_for_active_member(self):
+        """The action installs Tier 1 rates for an active Tier 1 member."""
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="t1",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(self.target.pk)
+
+        rates = sorted(
+            APIThrottle.objects.filter(
+                user=self.target,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(rates, sorted(["10/min", "75/hour", "300/day"]))
+
+    def test_action_skips_user_without_active_membership(self):
+        """Users with no active membership are skipped with a warning."""
+        r = self._run_action(self.target.pk)
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no active Neon membership" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+    def test_action_warns_when_level_has_no_mapping(self):
+        """An active membership whose level isn't in LEVEL_TO_RATES is reported."""
+        # BASIC has no entry in LEVEL_TO_RATES, so apply_membership_throttles
+        # returns False even though the membership is active.
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="basic",
+            level=NeonMembershipLevel.BASIC,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        r = self._run_action(self.target.pk)
+
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no matching membership level" in m for m in msgs))
+        # No success message should appear, and no rows should be written.
+        self.assertFalse(any("Refreshed API throttles" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+    def test_action_handles_mixed_queryset(self):
+        """Action refreshes active members and skips inactive ones in one run."""
+        active = UserProfileWithParentsFactory().user
+        NeonMembership.objects.create(
+            user=active,
+            neon_id="t2",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(active.pk, self.target.pk)
+
+        # Active user got rates
+        self.assertTrue(
+            APIThrottle.objects.filter(
+                user=active,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).exists()
+        )
+        # Inactive user got nothing
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())

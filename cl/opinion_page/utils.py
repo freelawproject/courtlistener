@@ -17,8 +17,8 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.dsl import Q
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
-from elasticsearch_dsl import Q
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name

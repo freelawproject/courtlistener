@@ -113,7 +113,10 @@ from cl.people_db.factories import (
     RoleFactory,
 )
 from cl.people_db.models import Attorney
-from cl.recap.factories import ProcessingQueueFactory
+from cl.recap.factories import (
+    FjcIntegratedDatabaseFactory,
+    ProcessingQueueFactory,
+)
 from cl.recap.views import (
     EmailProcessingQueueViewSet,
     FjcIntegratedDatabaseViewSet,
@@ -215,12 +218,14 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         expected_keys = {
             "court_count",
             "citation_count",
+            "alerts_sent_count",
             "citation_lookup",
             "financial_disclosures",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
         self.assertIsInstance(data["citation_count"], int)
+        self.assertIsInstance(data["alerts_sent_count"], int)
         citation = data["citation_lookup"]
         self.assertIn("throttle_count", citation)
         self.assertIn("throttle_period", citation)
@@ -1121,8 +1126,8 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         self.q = {"short_name__iexact": "Cc1"}
         count = await self.qs.filter(short_name__iexact="Cc1").acount()
         await self.assertCountInResults(count)
-        self.q = {"short_name__icontains": "cc"}
-        count = await self.qs.filter(short_name__icontains="cc").acount()
+        self.q = {"short_name__istartswith": "cc"}
+        count = await self.qs.filter(short_name__istartswith="cc").acount()
         await self.assertCountInResults(count)
 
     async def test_full_name_filter(self):
@@ -1130,17 +1135,16 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         self.q = {"full_name__istartswith": "Child"}
         count = await self.qs.filter(full_name__istartswith="Child").acount()
         await self.assertCountInResults(count)
-        self.q = {"full_name__iendswith": "Court"}
-        count = await self.qs.filter(full_name__iendswith="Court").acount()
-        await self.assertCountInResults(count)
 
     async def test_citation_string_filter(self):
         """Can we filter courts by citation_string with text lookups?"""
         self.q = {"citation_string": "OC"}
         count = await self.qs.filter(citation_string="OC").acount()
         await self.assertCountInResults(count)
-        self.q = {"citation_string__icontains": "2"}
-        count = await self.qs.filter(citation_string__icontains="2").acount()
+        self.q = {"citation_string__istartswith": "CC"}
+        count = await self.qs.filter(
+            citation_string__istartswith="CC"
+        ).acount()
         await self.assertCountInResults(count)
 
     async def test_jurisdiction_filter(self):
@@ -1246,9 +1250,9 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)
 
         # Moving on to careers. Bad value, then good.
-        self.q["positions__job_title__icontains"] = "XXX"
+        self.q["positions__job_title__istartswith"] = "XXX"
         await self.assertCountInResults(0)
-        self.q["positions__job_title__icontains"] = "lawyer"
+        self.q["positions__job_title__istartswith"] = "Corporate"
         await self.assertCountInResults(1)
 
         # Moving on to titles...bad value, then good.
@@ -1344,9 +1348,9 @@ class DRFJudgeApiFilterTests(
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
         # Traverse person, position
-        self.q["person__positions__job_title__icontains"] = "xxx"
+        self.q["person__positions__job_title__istartswith"] = "xxx"
         await self.assertCountInResults(0)
-        self.q["person__positions__job_title__icontains"] = "lawyer"
+        self.q["person__positions__job_title__istartswith"] = "Corporate"
         await self.assertCountInResults(2)
 
         # Just traverse to the judge table
@@ -1517,9 +1521,9 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
         await self.assertCountInResults(1)
         self.q = {"parties_represented__id": 9999}
         await self.assertCountInResults(0)
-        self.q = {"parties_represented__name__contains": "Honker"}
+        self.q = {"parties_represented__name__startswith": "Honker"}
         await self.assertCountInResults(1)
-        self.q = {"parties_represented__name__contains": "Honker-Nope"}
+        self.q = {"parties_represented__name__startswith": "Honker-Nope"}
         await self.assertCountInResults(0)
 
         # Adds extra role to the existing attorney
@@ -1634,15 +1638,15 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
 
         self.q = {"name": "Honker"}
         await self.assertCountInResults(1)
-        self.q = {"name__icontains": "Honk"}
+        self.q = {"name__istartswith": "Honk"}
         await self.assertCountInResults(1)
 
         self.q = {"name": "Cardinal Bonds"}
         await self.assertCountInResults(0)
 
-        self.q = {"attorney__name__icontains": "Juneau"}
+        self.q = {"attorney__name__istartswith": "Juneau"}
         await self.assertCountInResults(1)
-        self.q = {"attorney__name__icontains": "Juno"}
+        self.q = {"attorney__name__istartswith": "Juno"}
         await self.assertCountInResults(0)
 
         # Add another attorney to the party record but linked to another docket
@@ -1783,12 +1787,16 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
         # Create two parties with matching names on the same docket
         attorney_1 = await Attorney.objects.aget(pk=self.attorney.pk)
         party1 = await sync_to_async(PartyFactory)(
-            name="First Corp LLC", attorneys=[attorney_1], docket=self.docket
+            name="Corp Alpha Plaintiff LLC",
+            attorneys=[attorney_1],
+            docket=self.docket,
         )
 
         attorney_2 = await Attorney.objects.aget(pk=self.attorney_2.pk)
         party2 = await sync_to_async(PartyFactory)(
-            name="Second Corp Inc", attorneys=[attorney_2], docket=self.docket
+            name="Corp Beta Defendant Inc",
+            attorneys=[attorney_2],
+            docket=self.docket,
         )
         await sync_to_async(PartyTypeFactory.create)(
             docket=self.docket, party=party1, name="Plaintiff"
@@ -1799,7 +1807,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
 
         self.q = {
             "id": self.docket.id,
-            "parties__name__icontains": "Corp",
+            "parties__name__istartswith": "Corp",
         }
         # Should return exactly 1 result, not 2 duplicates
         await self.assertCountInResults(1)
@@ -2046,12 +2054,15 @@ class V4DRFPaginationTest(TestCase):
             user__username="recap-user",
             user__password=make_password("password"),
         )
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        ps_upload = Permission.objects.filter(
-            codename="has_recap_upload_access"
+        ps = Permission.objects.filter(
+            codename__in=[
+                "has_recap_api_access",
+                "has_recap_upload_access",
+                "view_processingqueue",
+                "view_emailprocessingqueue",
+            ]
         )
         cls.user_1.user.user_permissions.add(*ps)
-        cls.user_1.user.user_permissions.add(*ps_upload)
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         for i in range(10):
             DocketFactory(
@@ -4507,6 +4518,23 @@ class UnknownFilterParameterBlockingTests(TestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
+    def test_fjc_class_action_in_lookup_returns_400(self) -> None:
+        """`class_action__in` on the FJC endpoint is no longer a valid filter
+        (it produced a 500 when combined with a BooleanField in
+        django-filter), so it should be rejected as an unknown param."""
+        FjcIntegratedDatabaseFactory(class_action=True)
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("fjcintegrateddatabase-list", kwargs={"version": "v4"}),
+            {"class_action__in": "True"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        data = response.json()
+        self.assertEqual(
+            data["detail"], "Unknown filter parameters are not allowed."
+        )
+        self.assertEqual(data["unknown_params"], ["class_action__in"])
+
 
 class UnknownFilterParameterUtilsTests(SimpleTestCase):
     """Unit tests for unknown filter parameter utility functions."""
@@ -5167,7 +5195,7 @@ class MembershipThrottleSyncTest(TestCase):
         for level, rates in LEVEL_TO_RATES.items():
             with self.subTest(level=level):
                 user = UserFactory()
-                apply_membership_throttles(user, level)
+                self.assertTrue(apply_membership_throttles(user, level))
                 got = list(
                     APIThrottle.objects.filter(
                         user=user,
@@ -5239,9 +5267,11 @@ class MembershipThrottleSyncTest(TestCase):
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
 
     def test_unknown_level_is_no_op(self) -> None:
-        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows."""
+        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows and return False."""
         user = UserFactory()
-        apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        self.assertFalse(
+            apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        )
         self.assertFalse(APIThrottle.objects.filter(user=user).exists())
 
     @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
@@ -5255,7 +5285,9 @@ class MembershipThrottleSyncTest(TestCase):
             source=APIThrottle.Source.MEMBERSHIP,
         )
 
-        apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+        self.assertFalse(
+            apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+        )
         rates_after_apply = list(
             APIThrottle.objects.filter(user=user).values_list(
                 "rate", flat=True
@@ -5266,11 +5298,20 @@ class MembershipThrottleSyncTest(TestCase):
         clear_membership_throttles(user)
         self.assertTrue(APIThrottle.objects.filter(user=user).exists())
 
-    def test_apply_clears_throttle_cache(self) -> None:
-        """apply_* invalidates the get_all_throttle_overrides cache."""
+    def test_apply_skips_cache_clear_by_default(self) -> None:
+        """apply_* does not invalidate the cache unless clear_cache=True."""
         user = UserFactory()
         with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
             apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+        mock_clear.assert_not_called()
+
+    def test_apply_clears_cache_when_requested(self) -> None:
+        """apply_* invalidates the cache when called with clear_cache=True."""
+        user = UserFactory()
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            apply_membership_throttles(
+                user, NeonMembershipLevel.TIER_1, clear_cache=True
+            )
         mock_clear.assert_called_once()
 
     def test_clear_clears_throttle_cache_when_rows_deleted(self) -> None:

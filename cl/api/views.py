@@ -12,20 +12,18 @@ from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 
+from cl.alerts.utils import get_alert_estimation_count
 from cl.lib.elasticsearch_utils import (
-    do_es_alert_estimation_query,
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
 )
-from cl.search.documents import (
-    AudioDocument,
-    DocketDocument,
-    OpinionClusterDocument,
-)
-from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
+from cl.search.documents import OpinionClusterDocument
+from cl.search.exception import ElasticBadRequestError, ElasticServerError
+from cl.search.models import Citation, Court, OpinionCluster
+from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
+from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
 
@@ -171,40 +169,27 @@ async def get_result_count(request, version, day_count):
     period.
     """
 
-    search_form = await sync_to_async(SearchForm)(request.GET.copy())
-    if not search_form.is_valid():
+    try:
+        estimation = await sync_to_async(get_alert_estimation_count)(
+            request.GET.copy(), int(day_count)
+        )
+    except (ElasticServerError, ElasticBadRequestError):
+        # The query couldn't be run against Elasticsearch.
+        return JsonResponse(
+            {
+                "error": "Internal server error when trying to get the "
+                "estimation count."
+            },
+            safe=True,
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+    if estimation is None:
         return JsonResponse(
             {"error": "Invalid SearchForm"},
             safe=True,
             status=HTTPStatus.BAD_REQUEST,
         )
-    cd = search_form.cleaned_data
-    search_type = cd["type"]
-    total_case_only_query_results = 0
-    match search_type:
-        case SEARCH_TYPES.ORAL_ARGUMENT:
-            # Elasticsearch version for OA
-            search_query = AudioDocument.search()
-            total_query_results, _ = await sync_to_async(
-                do_es_alert_estimation_query
-            )(search_query, cd, day_count)
-        case SEARCH_TYPES.OPINION:
-            # Elasticsearch version for O
-            search_query = OpinionClusterDocument.search()
-            total_query_results, _ = await sync_to_async(
-                do_es_alert_estimation_query
-            )(search_query, cd, day_count)
-        case SEARCH_TYPES.RECAP:
-            # Elasticsearch version for RECAP
-            search_query = DocketDocument.search()
-            (
-                total_query_results,
-                total_case_only_query_results,
-            ) = await sync_to_async(do_es_alert_estimation_query)(
-                search_query, cd, day_count
-            )
-        case _:
-            total_query_results = 0
+    total_query_results, total_case_only_query_results = estimation
     return JsonResponse(
         {
             "count": total_query_results,
@@ -269,10 +254,15 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
 
     fd_data = await get_coverage_data_fds()
+    # Yesterday's alert total; start=1 skips today's still-filling bucket.
+    alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
+        f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
+    )
 
     data = {
         "court_count": court_count,
         "citation_count": citation_count,
+        "alerts_sent_count": alerts_sent_count,
         "citation_lookup": {
             "throttle_count": count,
             "throttle_period": period,

@@ -1,4 +1,5 @@
 import logging
+import time
 import warnings
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -13,6 +14,7 @@ from dateutil.rrule import DAILY, rrule
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.core.cache import cache as default_cache
 from django.core.cache import caches
 from django.core.cache.backends.base import BaseCache
 from django.db import transaction
@@ -97,10 +99,7 @@ BASIC_TEXT_LOOKUPS = [
     "iexact",
     "startswith",
     "istartswith",
-    "endswith",
-    "iendswith",
 ]
-ALL_TEXT_LOOKUPS = BASIC_TEXT_LOOKUPS + ["contains", "icontains"]
 
 logger = logging.getLogger(__name__)
 
@@ -798,22 +797,39 @@ def get_all_throttle_overrides(
     return overrides
 
 
-def apply_membership_throttles(user: User, level: int) -> None:
-    """Replace the user's MEMBERSHIP-source API throttles with the rates
-    for ``level``.
+def apply_membership_throttles(
+    user: User, level: int, clear_cache: bool = False
+) -> bool:
+    """
+    Sync a user's MEMBERSHIP-based API throttles to match the given membership level.
 
-    MANUAL-source rows are left untouched. They take precedence over
-    MEMBERSHIP rows in get_all_throttle_overrides regardless of time
-    unit.
+    This function replaces all existing MEMBERSHIP-source `APIThrottle` records for the user
+    with the rate limits defined for the provided `level`.
 
-    No-op when:
+    Important behavior:
+    - Only throttles with `source=MEMBERSHIP` are modified.
+    - MANUAL-source throttles are never modified and always take precedence over MEMBERSHIP
+      throttles in `get_all_throttle_overrides`.
+    - Existing MEMBERSHIP throttles are fully removed before new ones are created.
 
-    - the SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off
-    - the level has no entry in LEVEL_TO_RATES (e.g. Commercial,
-      BASIC, old groups)
+    This function is a no-op when:
+    - The `SYNC_MEMBERSHIP_THROTTLES_SWITCH` feature flag is disabled
+    - The provided `level` does not exist in `LEVEL_TO_RATES`
+      (e.g., unsupported, legacy, or commercial levels)
+
+    Args:
+        user: The user whose throttles are being synced.
+        level: The Neon membership level to map to a set of rates.
+        clear_cache: When True, call ``clear_tiered_cache()`` after writing
+            the new throttle rows. Defaults to False, allowing batch callers
+            to defer cache clearing until after a loop and avoid repeated
+            invalidations on each iteration.
+
+    Returns:
+        bool: True if throttles were successfully applied, False if skipped.
     """
     if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
-        return
+        return False
 
     rates = LEVEL_TO_RATES.get(level)
     if rates is None:
@@ -822,7 +838,7 @@ def apply_membership_throttles(user: User, level: int) -> None:
             level,
             user.username,
         )
-        return
+        return False
 
     with transaction.atomic():
         APIThrottle.objects.filter(
@@ -838,7 +854,10 @@ def apply_membership_throttles(user: User, level: int) -> None:
                 source=APIThrottle.Source.MEMBERSHIP,
                 notes=f"Set by Neon membership level={level}.",
             )
-    clear_tiered_cache()
+
+    if clear_cache:
+        clear_tiered_cache()
+    return True
 
 
 def clear_membership_throttles(user: User) -> None:
@@ -862,6 +881,41 @@ USE_NEW_THROTTLE_DEFAULTS_SWITCH = "use_new_throttle_defaults"
 LEGACY_USER_DEFAULT_RATE = "5000/hour"
 
 
+def get_recent_api_request_count(user: User, window_seconds: int) -> int:
+    """Count this user's authenticated API requests within the given window.
+
+    Reads the same in-memory timestamp history that ExceptionalUserRateThrottle
+    populates on every authenticated API hit, keyed as
+    ``throttle_user_<user_pk>``. The cache TTL equals the longest configured
+    throttle window (currently a day), so any ``window_seconds`` shorter than
+    that returns an accurate count.
+    """
+    key = UserRateThrottle.cache_format % {"scope": "user", "ident": user.pk}
+    history: list[float] = default_cache.get(key, [])
+    cutoff = time.time() - window_seconds
+    return sum(1 for ts in history if ts > cutoff)
+
+
+class TagRateThrottle(UserRateThrottle):
+    """Higher dedicated rate limit for the tag endpoints."""
+
+    scope = "tags"
+
+
+def has_throttle_override(user: User, throttle_type: int) -> bool:
+    """Whether the user has an active throttle override of the given type.
+
+    Uses the same source of truth as the throttles themselves
+    (``get_all_throttle_overrides``), so MANUAL/MEMBERSHIP precedence and
+    membership expiry are honored.
+
+    :param user: The user to check.
+    :param throttle_type: The ThrottleType integer value.
+    :return: True if the user has an active override of that type.
+    """
+    return user.username in get_all_throttle_overrides(throttle_type)
+
+
 class ExceptionalUserRateThrottle(UserRateThrottle):
     """User rate throttle that supports multiple simultaneous rate limits.
 
@@ -869,6 +923,9 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
     by a rate of '0/min' (or any '0/...') — the enforcement check
     `count >= num_requests` with num_requests=0 is always true.
     """
+
+    # The APIThrottle type whose per-user overrides this throttle reads.
+    throttle_type = ThrottleType.API
 
     def __init__(self):
         raw = self.THROTTLE_RATES.get(self.scope)
@@ -906,7 +963,7 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
 
-        overrides = get_all_throttle_overrides(ThrottleType.API)
+        overrides = get_all_throttle_overrides(self.throttle_type)
         rates = overrides.get(request.user.username) or self.default_rates
         return self._check_multi_rate(rates)
 
@@ -997,6 +1054,46 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
                 f"{self.failing_rate}."
             )
         raise Throttled(wait=wait, detail=detail)
+
+
+class AlertThrottle(ExceptionalUserRateThrottle):
+    """Per-user throttle for the search alerts endpoint (scope 'alerts').
+
+    Unlike the global user throttle, this scope has no default rate, so it
+    never throttles regular users: members and non-members create alerts
+    bounded by their membership quota (see ``check_alert_limits``) and the
+    global user throttle. Only users with a commercial agreement, configured
+    via an ``APIThrottle`` row of type ALERTS, are throttled here at their
+    configured rate, and those same users bypass the membership quota.
+
+    ``SearchAlertViewSet.get_throttles`` wires this throttle in only for
+    commercial users' write requests (POST/PUT/PATCH), as the sole throttle
+    for those requests. That way commercial alert writes run at the configured
+    rate instead of being capped by the global per-user API throttle, while
+    their reads still fall back to that global throttle.
+    """
+
+    scope = "alerts"
+    throttle_type = ThrottleType.ALERTS
+
+    def allow_request(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return True
+
+        self.key = self.get_cache_key(request, view)
+        if self.key is None:
+            return True
+
+        overrides = get_all_throttle_overrides(self.throttle_type)
+        rates = overrides.get(request.user.username) or self.default_rates
+        if not rates:
+            # No commercial alert throttle configured for this user; their
+            # alert creation isn't rate-limited beyond the global throttle.
+            return True
+
+        self.history = self.cache.get(self.key, [])
+        self.now = self.timer()
+        return self._check_multi_rate(rates)
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
@@ -1180,28 +1277,19 @@ class RECAPUploaders(DjangoModelPermissions):
     """
 
     perms_map = {
-        "GET": ["%(app_label)s.has_recap_upload_access"],
+        "GET": ["%(app_label)s.view_%(model_name)s"],
         "OPTIONS": ["%(app_label)s.has_recap_upload_access"],
         "HEAD": ["%(app_label)s.has_recap_upload_access"],
         "POST": ["%(app_label)s.has_recap_upload_access"],
-        "PUT": ["%(app_label)s.has_recap_upload_access"],
-        "PATCH": ["%(app_label)s.has_recap_upload_access"],
-        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
     }
 
 
-class EmailProcessingQueueAPIUsers(DjangoModelPermissions):
+class EmailProcessingQueueAPIUsersWithView(DjangoModelPermissions):
     perms_map = {
-        "POST": ["%(app_label)s.has_recap_upload_access"],
-        "GET": ["%(app_label)s.has_recap_upload_access"],
-    }
-
-
-class DjangoModelPermissionsWithView(DjangoModelPermissions):
-    perms_map = {
-        **DjangoModelPermissions.perms_map,
+        "POST": ["%(app_label)s.has_recap_email_upload_access"],
         "GET": ["%(app_label)s.view_%(model_name)s"],
         "HEAD": ["%(app_label)s.view_%(model_name)s"],
+        "OPTIONS": ["%(app_label)s.view_%(model_name)s"],
     }
 
 
