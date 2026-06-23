@@ -31,7 +31,6 @@ async def view_audio_file(
     # cleanly. Hallucinated transcripts (and any other non-complete status)
     # still have rows saved, but the text does not match the audio, so we
     # must not display it. See cl.audio.tasks.transcribe.
-    transcript_hallucinated = af.stt_status == Audio.STT_HALLUCINATION
     if af.stt_status == Audio.STT_COMPLETE:
         # Get the latest metadata. There can be many metadata rows for a
         # single audio, if the transcription failed as hallucinated and was
@@ -77,6 +76,5 @@ async def view_audio_file(
             "get_string": get_string,
             "private": af.blocked,
             "transcript_segments_data": segments_list,
-            "transcript_hallucinated": transcript_hallucinated,
         },
     )
