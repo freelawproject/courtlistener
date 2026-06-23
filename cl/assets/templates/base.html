@@ -86,10 +86,6 @@
     {% flag "donate_banner" %}
       {% include 'includes/dismissible_nav_banner.html' with responsive=True cookie_sleep_duration=3 link="https://donate.free.law/forms/supportcl" cookie_name="2025_eoy_banner" button_text="Donate Today" text="Donate before December 31 and tell us how CourtListener helped you—your support and your story power the future of open law." title="You built today’s CourtListener. Help build what&nbsp;comes&nbsp;next." %}
     {% endflag %}
-    <!-- Semantic Search Banner -->
-    {% flag "semantic_search_banner" %}
-      {% include 'includes/dismissible_nav_banner.html' with request=request link="https://free.law/2026/05/04/semantic-search-on-courtlistener" cookie_name="semantic_search_banner" button_text="Learn more here!" text="📣 <strong>The Wait is Over!</strong> Semantic search is now available on CourtListener. Already live in our API, you can now <strong>search case law using natural language</strong> directly on the website. Click the <strong>&</strong> / <strong>?</strong> toggle to switch between keyword and natural language search." only %}
-    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
