@@ -62,6 +62,7 @@ from cl.lib.ratelimiter import (
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
+from cl.simple_pages.tasks import create_zoho_desk_ticket
 from cl.stats.metrics import accounts_deleted_total
 from cl.users.forms import (
     CustomPasswordChangeForm,
@@ -483,12 +484,22 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
 @login_required
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
-        email: EmailType = emails["take_out_requested"]
-        send_mail(
-            email["subject"],
-            email["body"] % (request.user, request.user.email),
-            email["from_email"],
-            email["to"],
+        user = request.user
+        description = (
+            "A user has requested an export of their data in accordance "
+            "with the GDPR/CCPA. Their account details are:<br><br>"
+            f"Username: {user.username}<br>"
+            f"Email: {user.email}"
+        )
+        create_zoho_desk_ticket.delay(
+            subject="User data export request",
+            name=user.get_full_name() or user.username,
+            email=user.email,
+            description=description,
+            request_type="Data Export Request",
+            assignee_id=settings.ZOHO_DESK_AGENT_ASSIGNMENTS.get(
+                "data_export", ""
+            ),
         )
 
         return HttpResponseRedirect(reverse("take_out_done"))
