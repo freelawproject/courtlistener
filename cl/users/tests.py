@@ -492,6 +492,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(call_kwargs["email"], user.email)
         self.assertEqual(call_kwargs["request_type"], "Data Export Request")
         self.assertIn(user.username, call_kwargs["description"])
+        self.assertIn("Email Confirmed:", call_kwargs["description"])
 
     async def test_reset_api_token_get_renders_confirmation(self) -> None:
         """The reset page renders a password-confirmation form."""

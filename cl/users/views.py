@@ -485,11 +485,12 @@ async def delete_profile_done(request: HttpRequest) -> HttpResponse:
 def take_out(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST":
         user = request.user
+        confirmed = "Yes" if user.profile.email_confirmed else "No"
         description = (
             "A user has requested an export of their data in accordance "
             "with the GDPR/CCPA. Their account details are:<br><br>"
-            f"Username: {user.username}<br>"
-            f"Email: {user.email}"
+            f"Logged In As: {user.username} ({user.email})<br>"
+            f"Email Confirmed: {confirmed}"
         )
         create_zoho_desk_ticket.delay(
             subject="User data export request",
