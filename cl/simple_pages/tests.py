@@ -251,6 +251,20 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
+    async def test_issue_type_prefilled_from_query_param(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Does ?issue_type=mcp preselect the MCP option on first load?"""
+        r = await self.async_client.get(
+            reverse("contact"), {"issue_type": "mcp"}
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        html = fromstring(r.content.decode())
+        selected = html.xpath(
+            "//select[@name='issue_type']/option[@selected]/@value"
+        )
+        self.assertEqual(selected, ["mcp"])
+
 
 class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
@@ -521,6 +535,30 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         mock_task.delay.assert_called_once()
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "General Support")
+
+    @patch("cl.simple_pages.views.create_zoho_desk_ticket")
+    async def test_mcp_request_creates_desk_ticket(
+        self, mock_task: MagicMock, mock_captcha: MagicMock
+    ) -> None:
+        msg = {
+            "name": "Dev User",
+            "phone_number": "MCP help",
+            "issue_type": "mcp",
+            "tech_description": "My MCP client cannot connect to the server",
+            "message": "",
+            "email": "dev@example.com",
+            "hcaptcha": "xxx",
+            "checked_documentation": True,
+        }
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["request_type"], "MCP Server")
+        self.assertIn(
+            "My MCP client cannot connect to the server",
+            call_kwargs["description"],
+        )
 
     @patch("cl.simple_pages.views.create_zoho_desk_ticket")
     async def test_partnership_creates_desk_ticket(
