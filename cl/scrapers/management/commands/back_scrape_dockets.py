@@ -7,7 +7,6 @@ multiple courts within a state, with rate limiting and retry support.
 import json
 import time
 from datetime import date, datetime
-from typing import Any
 
 import requests
 from django.core.files.base import ContentFile
@@ -246,7 +245,7 @@ class RateLimitedRequestManager:
 def save_docket_response(
     response: requests.Response,
     scraper_class_name: str,
-    case_meta: dict[str, Any],
+    case_meta: dict,
     court_id: str = "unknown_court",
     skip_meta: bool = False,
 ) -> tuple[str, str]:
@@ -458,8 +457,6 @@ class Command(StateBackScrapeCommand):
 
     def handle(
         self,
-        start_date: date,
-        end_date: date,
         *args,
         auto_resume: bool,
         **options,

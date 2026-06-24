@@ -1,6 +1,7 @@
 """Command to back-scrape Florida dockets"""
 
 import asyncio
+import hashlib
 import queue
 from dataclasses import dataclass
 from datetime import date
@@ -36,7 +37,9 @@ def make_s3_key(request: ScheduledRequest) -> str:
         [f"{k}={v}" for k, v in sorted(request.url.params.items())]
     )
     method = request.method.upper()
-    return hex(hash((method, url_path, url_params)))
+    return hashlib.sha1(
+        f"{method}|{url_path}|{url_params}".encode()
+    ).hexdigest()
 
 
 @dataclass
