@@ -53,24 +53,29 @@ class S3Cache(RequestHandler):
     save_queue: queue.Queue[tuple[str, bytes]]
 
     def load_from_s3(self, request: ScheduledRequest) -> Response | None:
-        storage = S3GlacierInstantRetrievalStorage(
-            naming_strategy=clobbering_get_name
-        )
+        logger.info("Attempting to get %s from S3", request.url.path.lower())
+        storage = S3GlacierInstantRetrievalStorage()
         key = f"{self.base}/{make_s3_key(request)}"
 
         if not storage.exists(key):
+            logger.info("Did not find %s in S3", request.url.path.lower())
             return None
+
+        logger.info("Loading %s from S3", request.url.path.lower())
 
         with storage.open(key, "rb") as f:
             return Response(200, content=f.read())
 
-    def save_to_s3(self, response: Response) -> None:
+    def save_to_s3(
+        self, request: ScheduledRequest, response: Response
+    ) -> None:
         storage = S3GlacierInstantRetrievalStorage()
-        key = f"{self.base}/{response.url.path}"
+        key = f"{self.base}/{make_s3_key(request)}"
         # Don't try to cache responses that we pulled from the cache
         if self.load and storage.exists(key):
             return
-        logger.info(f"Archiving {key}")
+        logger.info("Adding %s to archive queue", key)
+        # We want this to block so our scrape doesn't get too far ahead of the archive
         self.save_queue.put((key, response.content))
 
     async def before_send(
@@ -79,9 +84,8 @@ class S3Cache(RequestHandler):
         if not self.load:
             return
         loop = asyncio.get_running_loop()
-        if response := await loop.run_in_executor(
-            None, self.load_from_s3, request
-        ):
+        response = await loop.run_in_executor(None, self.load_from_s3, request)
+        if response:
             request.response.set_result(response)
 
     async def listen(self, manager: RequestManager, request: ScheduledRequest):
@@ -94,7 +98,7 @@ class S3Cache(RequestHandler):
             return
 
         loop = asyncio.get_running_loop()
-        _ = loop.run_in_executor(None, self.save_to_s3, response)
+        _ = loop.run_in_executor(None, self.save_to_s3, request, response)
 
 
 def _archive_loop(responses: queue.Queue[tuple[str, bytes]]) -> None:
@@ -108,11 +112,12 @@ def _archive_loop(responses: queue.Queue[tuple[str, bytes]]) -> None:
         except queue.ShutDown:
             break
 
+        logger.info("Archiving %s to %s", key, storage.bucket_name)
         with storage.open(key, "wb") as f:
             f.write(content)
 
         responses.task_done()
-        logger.info(f"Archived {key} to {storage.bucket_name}")
+        logger.info("Archived %s to %s", key, storage.bucket_name)
 
 
 _COURT_ID_MAP: dict[str, FloridaCourtID] = {
@@ -133,6 +138,7 @@ async def _backfill(
     scraper: FloridaScraper,
     save_queue: queue.Queue[tuple[str, bytes]],
 ):
+    logger.info("Starting Florida backfill...")
     archive_loop = asyncio.to_thread(_archive_loop, save_queue)
 
     for court_id, (start_date, end_date) in date_ranges.items():
@@ -145,11 +151,20 @@ async def _backfill(
             save_queue.put((key, content))
             i += 1
             if i % 100 == 0:
+                logger.info(
+                    "Updating checkpoint for %s to %s",
+                    court_id,
+                    case.date_filed,
+                )
                 checkpoint_trackers[court_id].set(case.date_filed)
 
+    logger.info(
+        "Florida backfill complete. Waiting for archiving to complete..."
+    )
     save_queue.join()
     save_queue.shutdown()
     await archive_loop
+    logger.info("Florida backfill and archive complete!")
 
 
 class Command(StateBackScrapeCommand):
@@ -229,7 +244,13 @@ class Command(StateBackScrapeCommand):
         courts: str,
         **options,
     ):
-        court_ids = [_COURT_ID_MAP[c.strip()] for c in courts.split(",")]
+        logger.info("Setting up Florida back-scrape...")
+        court_ids = [
+            _COURT_ID_MAP[c.strip()] for c in courts.split(",") if c.strip()
+        ]
+        if not court_ids:
+            logger.warning("No courts specified. Defaulting to all courts.")
+            court_ids = list(_COURT_ID_MAP.values())
         save_queue: queue.Queue[tuple[str, bytes]] = queue.Queue(maxsize=2048)
         scraper = FloridaScraper(
             rps=rps,
@@ -247,6 +268,7 @@ class Command(StateBackScrapeCommand):
         )
 
         if auto_resume:
+            logger.info("Auto resume enabled. Getting checkpoints...")
             checkpoints = {
                 cid: self.checkpoint_trackers[cid].get() for cid in court_ids
             }
@@ -257,6 +279,16 @@ class Command(StateBackScrapeCommand):
             cid: (checkpoints.get(cid) or backscrape_start, backscrape_end)
             for cid in court_ids
         }
+
+        logger.info(
+            "Date ranges to scrape are:\n%s",
+            "\n- ".join(
+                [
+                    f"{cid.value}: {start}..{end}"
+                    for cid, (start, end) in date_ranges.items()
+                ]
+            ),
+        )
 
         async_to_sync(_backfill)(
             date_ranges=date_ranges,
