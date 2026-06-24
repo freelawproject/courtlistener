@@ -26,6 +26,7 @@ from cl.scrapers.management.utils import (
     ScraperCheckpointTracker,
     StateBackScrapeCommand,
     _make_case_number_key,
+    _parse_date,
 )
 
 S3_BASE = "responses/dockets/florida"
@@ -242,12 +243,14 @@ class Command(StateBackScrapeCommand):
         full_scrape: bool,
         use_cache: bool,
         archive_responses: bool,
-        backscrape_start: date,
-        backscrape_end: date,
+        backscrape_start: str,
+        backscrape_end: str,
         courts: str,
         **options,
     ):
         logger.info("Setting up Florida back-scrape...")
+        start = _parse_date(backscrape_start)
+        end = _parse_date(backscrape_end)
         court_ids = [
             _COURT_ID_MAP[c.strip()] for c in courts.split(",") if c.strip()
         ]
@@ -279,8 +282,7 @@ class Command(StateBackScrapeCommand):
             checkpoints = {}
 
         date_ranges = {
-            cid: (checkpoints.get(cid) or backscrape_start, backscrape_end)
-            for cid in court_ids
+            cid: (checkpoints.get(cid) or start, end) for cid in court_ids
         }
 
         logger.info(
