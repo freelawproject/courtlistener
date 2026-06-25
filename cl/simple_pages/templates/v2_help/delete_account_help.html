@@ -1,0 +1,32 @@
+{% extends "new_base.html" %}
+
+{% block title %}Deleting Your Account – CourtListener.com{% endblock %}
+
+
+{% block content %}
+<div class="flex justify-center md:px-10 md:py-20 pt-2 md:pb-35">
+  <section class="max-w-[706px] flex flex-col gap-4">
+    <h1 class="text-display-xs">
+      Help with Deleting Your Account on CourtListener
+    </h1>
+    <div class="flex flex-col gap-4 text-base">
+      <p>It is very simple to delete your account on CourtListener.</p>
+      <p>
+        When you do, we will immediately delete or anonymize all of the
+        information associated with your account. This may include notes,
+        alerts, tags, and a variety of other data that you may have saved to
+        your account.
+      </p>
+      <p>
+        After you delete your account you will no longer be able to export
+        your data from your account or restore your account.
+      </p>
+    </div>
+    <div>
+      <a href="{% url "delete_account" %}" class="btn-primary">
+        Delete My Account
+      </a>
+    </div>
+  </section>
+</div>
+{% endblock %}
