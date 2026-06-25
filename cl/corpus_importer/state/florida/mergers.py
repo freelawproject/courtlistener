@@ -41,7 +41,8 @@ def add_scraper_source(scrape: int | None, db: int | None) -> int:
     return db
 
 
-class FloridaPartyMerger(Merger[FloridaParty, Person]): ...
+class FloridaPartyMerger(Merger[FloridaParty, Person]):
+    model: ClassVar[type[Model]] = Person
 
 
 def _date_last_filing(docket_data: FloridaCase) -> date | None:

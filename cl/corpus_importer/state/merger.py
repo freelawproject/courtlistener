@@ -1,18 +1,23 @@
 import logging
 import typing
-from abc import ABC
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from typing import (
     Any,
     ClassVar,
     Concatenate,
+    Self,
     cast,
     override,
 )
 
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.core.exceptions import FieldDoesNotExist
 from django.db import transaction
-from django.db.models import ForeignKey, ManyToManyField, Model, OneToOneField
-from django.db.models.fields.related_descriptors import RelatedManager
+from django.db.models import (
+    Field,
+    ForeignObjectRel,
+    Model,
+)
 from django.db.models.manager import Manager
 
 from cl.corpus_importer.state.utils import MergeResult
@@ -68,8 +73,34 @@ class MergerSpecification[D, T]:
         self.param: bool = param
         self.name: str = ""
 
+    def register(self, merger: "Merger[D, Any]"):
+        """Register this specification with the given merger.
+
+        :param merger: The merger to register this specification with."""
+        ...
+
+    def validate(
+        self, field: Field | ForeignObjectRel | GenericForeignKey
+    ) -> list[Exception]:
+        """Validate this specification for the given field.
+
+        :param field: The field to validate this specification for.
+
+        :return: A list of errors encountered during validation. These will be surfaced after the merger is fully
+        constructed and will prevent the `merge` method from being called."""
+        return []
+
     def __set_name__(self, owner: type, name: str):
+        if not issubclass(owner, Merger):
+            return
         self.name = name
+        self.register(cast(Merger[D, Any], owner))
+        try:
+            f = owner.model._meta.get_field(self.name)
+        except FieldDoesNotExist as e:
+            owner.errors.append(e)
+        else:
+            owner.errors += self.validate(f)
 
     def transform(self, d: D, value: T | None = None) -> T | None:
         if self.param:
@@ -106,6 +137,9 @@ class AttributeMerger[D, T](MergerSpecification[D, T], Any):
             Concatenate[T | None, T | None, ...], T | None
         ] = strategy
 
+    def register(self, merger: "Merger[D, Any]"):
+        merger.__registry__.attr[self.name] = self
+
 
 class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
     __slots__ = "merger"
@@ -119,6 +153,37 @@ class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
     ):
         super().__init__(transform, param, default)
         self.merger: type[Merger[T, RM]] = merger
+
+    def validate(
+        self, field: Field | ForeignObjectRel | GenericForeignKey
+    ) -> list[Exception]:
+        errors = super().validate(field)
+        if not field.related_model:
+            errors.append(
+                TypeError(f"Field {self.name} is not a related field")
+            )
+        if (
+            field.related_model is not None
+            and field.related_model != self.merger.model
+        ):
+            if field.related_model == "self":
+                errors.append(
+                    TypeError(
+                        f"{self.name}: Merging self references is not supported yet."
+                    )
+                )
+            else:
+                errors.append(
+                    TypeError(
+                        f"Field {self.name} is related to {field.related_model.__name__}, not {self.merger.model.__name__}"  # type: ignore[union-attr]
+                    )
+                )
+        return errors
+
+    def register(self, merger: "Merger[D, Any]"):
+        merger.__registry__.related[self.name] = cast(
+            SubMerger[Any, Any, Model], self
+        )
 
     def merge(self, parent: RM, i: D) -> MergeResult[Any]:
         raise NotImplementedError
@@ -221,79 +286,99 @@ class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
         raise TypeError(f"Field {self.name} is not a related field.")
 
 
-class Merger[D, M: Model](ABC):
+class MergerSpecRegistry:
+    def __init__(
+        self,
+        *,
+        related: dict[str, SubMerger[Any, Any, Model]] | None = None,
+        attr: dict[str, AttributeMerger[Any, Any]] | None = None,
+    ):
+        self.related: dict[str, SubMerger[Any, Any, Model]] = related or {}
+        self.attr: dict[str, AttributeMerger[Any, Any]] = attr or {}
+
+    def __copy__(self) -> Self:
+        return self.__class__(related=self.related, attr=self.attr)
+
+    def __or__(self, other: Self) -> Self:
+        return self.__class__(
+            related=self.related | other.related, attr=self.attr | other.attr
+        )
+
+    def update(self, other: Self):
+        self.related.update(other.related)
+        self.attr.update(other.attr)
+
+
+class MergerMeta(type):
+    @classmethod
+    def __prepare__(
+        cls, name: str, bases: tuple[type, ...], /, **kwargs
+    ) -> MutableMapping[str, object]:
+        # We need this so that merger subclassing works like you'd expect.
+        # Because we're efficient and don't check for specifications on every merge, we need to keep a cache. A
+        # dictionary would be a great cache! Unfortunately, when you subclass, that dictionary is not reinitialized
+        # so you need to copy it to avoid polluting your base class with your subclass' specs. We can't do this copy in
+        # Merger.__init_subclass__ since that runs after all MergerSpecification.__set_name__ calls, so we have to do it
+        # here.
+        # "Why not just register merger specs in __init_subclass__ then?" I hear you ask. I tried this, but it required
+        # filtering class attributes before registration, which felt messy, and it just made the __init_subclass__ body
+        # too big and confusing.
+        registry = MergerSpecRegistry()
+        for base in bases:
+            if hasattr(base, "__registry__") and isinstance(
+                base.__registry__, MergerSpecRegistry
+            ):
+                registry |= base.__registry__
+        return {
+            **type.__prepare__(name, bases, **kwargs),
+            "__registry__": registry,
+            "errors": [],
+        }
+
+
+class Merger[D, M: Model](metaclass=MergerMeta):
     """Base class for a merger which takes in `D` and merges it into `model`. Subclasses should generally not be
     instantiated; methods and attributes should be accessed directly from the class.
 
-    :ivar atomic: Whether to wrap the entire merge operation -- the object's own attributes *and* all related/child
+    :cvar model: The model this merger applies to.
+    :cvar atomic: Whether to wrap the entire merge operation -- the object's own attributes *and* all related/child
         mergers -- in a single `transaction.atomic()` block, so the whole tree commits together or rolls back together
         if an exception is raised. Nested mergers that set their own `atomic` value simply create savepoints within
         this block.
-    :ivar key: A natural key to use for looking up objects in the DB; used in the default `get_existing` implementation."""
+    :cvar key: A natural key to use for looking up objects in the DB; used in the default `get_existing` implementation.
+    :cvar errors: A list of errors encountered during validation of this merger. These will be surfaced after the merger
+        is fully constructed and will prevent the `merge` method from being called."""
 
     model: ClassVar[type[Model]]
     atomic: ClassVar[bool] = False
     key: ClassVar[Iterable[str]] = []
-    __attr_mergers__: ClassVar[dict[str, AttributeMerger[Any, Any]]] = {}
-    __related_mergers__: ClassVar[
-        dict[str, RelatedMerger[Any, Any, Model]]
-    ] = {}
+    errors: ClassVar[list[Exception]]
+    __registry__: ClassVar[MergerSpecRegistry]
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
 
-        errors: list[str] = []
-
-        own_attrs = vars(cls).values()
-
-        cls.__attr_mergers__ = cls.__attr_mergers__ | {
-            value.name: cast(AttributeMerger[D, Any], value)
-            for value in own_attrs
-            if isinstance(value, AttributeMerger)
-        }
-        cls.__related_mergers__ = cls.__related_mergers__ | {
-            value.name: cast(RelatedMerger[D, Any, M], value)
-            for value in own_attrs
-            if isinstance(value, RelatedMerger)
-        }
-
         model_fields = cls.model._meta.get_fields()
         fields = {field.name: field for field in model_fields}
-        derived_fields: set[str] = {
-            f.attname
-            for f in model_fields
-            if isinstance(f, ForeignKey | ManyToManyField | OneToOneField)
-        }
 
-        for name, _ in cls.__attr_mergers__.items():
-            if name not in fields and name not in derived_fields:
-                errors.append(
-                    f"Attribute {name} not found on {cls.model.__name__}"
-                )
-
-        for name, rm in cls.__related_mergers__.items():
-            if name not in fields:
-                errors.append(
-                    f"Related field {name} not found on {cls.model.__name__}"
-                )
-            if not fields[name].related_model:
-                errors.append(
-                    f"Field {name} on {cls.model.__name__} is not a related field"
-                )
-            if fields[name].related_model != rm.merger.model:
-                errors.append(
-                    f"Field {name} on {cls.model.__name__} is related to {rm.merger.model.__name__}, not {rm.merger.model.__name__}"
-                )
+        for name in cls.__registry__.related.keys():
             attname = getattr(fields[name], "attname", None)
-            if attname is not None and attname in cls.__attr_mergers__:
-                errors.append(
-                    f"Cannot merge both {name} and {attname} on {cls.model.__name__}"
+            if attname is not None and attname in cls.__registry__.attr:
+                cls.errors.append(
+                    TypeError(
+                        f"Cannot merge both {name} and {attname} on {cls.model.__name__}"
+                    )
                 )
 
-        if errors:
+        cls.guarantee_valid()
+
+    @classmethod
+    def guarantee_valid(cls):
+        if cls.errors:
             raise TypeError(
-                "Invalid merger configuration:\n{}".format(
-                    "\n".join(f"- {e}" for e in errors)
+                "Invalid merger configuration for {}:\n{}".format(
+                    cls.model.__name__,
+                    "\n".join(f"- {repr(e)}" for e in cls.errors),
                 )
             )
 
@@ -329,7 +414,7 @@ class Merger[D, M: Model](ABC):
                 M,
                 manager.get(
                     **{
-                        name: cls.__attr_mergers__[name].transform(d)
+                        name: cls.__registry__.attr[name].transform(d)
                         for name in cls.key
                     }
                 ),
@@ -353,6 +438,7 @@ class Merger[D, M: Model](ABC):
             relationships and should generally not be passed.
         :param manager: The manager to use for looking up the existing object. If not provided, the default manager for
             the model will be used. Primarily useful for related-object mergers."""
+        cls.guarantee_valid()
         if not cls.validate(d):
             logger.error(f"Merger {cls.__name__} received invalid input.")
             return MergeResult.failed(cls.model.__name__)
@@ -398,7 +484,7 @@ class Merger[D, M: Model](ABC):
         result = MergeResult.unnecessary()
         scrape_values = {
             name: am.transform(d, value=kwargs.get(name, None))
-            for name, am in cls.__attr_mergers__.items()
+            for name, am in cls.__registry__.attr.items()
         }
 
         if db_obj is None:
@@ -411,7 +497,7 @@ class Merger[D, M: Model](ABC):
             update = False
             for name, scrape_value in scrape_values.items():
                 db_value = getattr(db_obj, name)
-                merged_value = cls.__attr_mergers__[name].strategy(
+                merged_value = cls.__registry__.attr[name].strategy(
                     scrape_value,
                     db_value,
                 )
@@ -423,7 +509,7 @@ class Merger[D, M: Model](ABC):
                 db_obj.save()
                 result = MergeResult.updated(cls.model.__name__, db_obj.pk)
 
-        for rm in cls.__related_mergers__.values():
+        for rm in cls.__registry__.related.values():
             result |= rm.merge(db_obj, d)
 
         return result, db_obj
