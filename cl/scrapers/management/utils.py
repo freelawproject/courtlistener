@@ -45,10 +45,8 @@ def _make_case_number_key(case_number: str) -> str:
 
 class ScraperCheckpointTracker:
     def __init__(self, key: str, *, redis: Redis | None = None):
-        if not redis:
-            redis = get_redis_interface("CACHE")
         self.autoresume_key: str = f"scraper:{key}:end-date"
-        self.redis: Redis = redis
+        self.redis: Redis = redis or get_redis_interface("CACHE")
 
     def get(self) -> date | None:
         stored_values = self.redis.hgetall(self.autoresume_key)
@@ -63,13 +61,12 @@ class ScraperCheckpointTracker:
         ).date()
         return latest_checkpoint
 
-    def set(self, checkpoint: date, **kwargs: int | str) -> None:
+    def set(self, checkpoint: date) -> None:
         pipe = self.redis.pipeline()
         pipe.hgetall(self.autoresume_key)
         log_info: Mapping[str | bytes, int | str] = {
             "checkpoint": checkpoint.isoformat(),
             "checkpoint_time": datetime.now().isoformat(),
-            **kwargs,
         }
         pipe.hset(self.autoresume_key, mapping=log_info)
         pipe.expire(self.autoresume_key, 60 * 60 * 24 * 28)  # 4 weeks

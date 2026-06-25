@@ -458,7 +458,6 @@ class Command(StateBackScrapeCommand):
     def handle(
         self,
         *args,
-        auto_resume: bool,
         **options,
     ):
         scraper_module_path = options["scraper"]
