@@ -130,9 +130,7 @@ class AnthropicBatchWrapper:
             invalid.
         """
         if not api_key:
-            raise ValueError(
-                "API key is required for AnthropicBatchWrapper"
-            )
+            raise ValueError("API key is required for AnthropicBatchWrapper")
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model_name: str | None = None
         if model_name is not None:
@@ -267,9 +265,7 @@ class AnthropicBatchWrapper:
             params: dict[str, Any] = {
                 "model": self.model_name,
                 "max_tokens": max_tokens,
-                "messages": [
-                    {"role": "user", "content": req["content"]}
-                ],
+                "messages": [{"role": "user", "content": req["content"]}],
             }
             if system is not None:
                 params["system"] = system
