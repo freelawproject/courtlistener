@@ -512,7 +512,7 @@ requires-dist = [
     { name = "ipython", specifier = ">=9.9.0" },
     { name = "itypes", specifier = ">=1.1.0" },
     { name = "judge-pics", specifier = ">=2.0.5" },
-    { name = "juriscraper", specifier = ">=3.0.0" },
+    { name = "juriscraper", git = "https://github.com/freelawproject/juriscraper/?branch=morgan%2Fflorida-scraper" },
     { name = "kombu", specifier = ">=5.5.1" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "markdown2", specifier = ">=2.5.4" },
@@ -1865,7 +1865,7 @@ wheels = [
 [[package]]
 name = "juriscraper"
 version = "3.0.26"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/freelawproject/juriscraper/?branch=morgan%2Fflorida-scraper#77eb97c6798c25333a950472d86a6fb8d7c19008" }
 dependencies = [
     { name = "certifi" },
     { name = "chardet" },
@@ -1883,10 +1883,6 @@ dependencies = [
     { name = "requests" },
     { name = "selenium" },
     { name = "tldextract" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/35/b8/67837c37210533ff1f40392176c3ecd699a04e410dd70927ea09985742ed/juriscraper-3.0.26.tar.gz", hash = "sha256:c6606d167ab3772c1addd22ff94f5deb0a31a4dab162c10a6ef319a59b1fa046", size = 417314, upload-time = "2026-06-18T03:04:50.161Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/4d/d4c992c0f981614e103cc882164ccaf5086506e4b398f1913c6b0c0fcb0a/juriscraper-3.0.26-py3-none-any.whl", hash = "sha256:0afd1a2222bbfd3f3540a0f08bf97fafc9852f794a55fb19ad72a4b7abe0becb", size = 651700, upload-time = "2026-06-18T03:04:48.559Z" },
 ]
 
 [[package]]

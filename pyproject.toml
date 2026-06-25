@@ -177,3 +177,6 @@ lint.ignore = [
   "F841",
   "UP008",
 ]
+
+[tool.uv.sources]
+juriscraper = { git = "https://github.com/freelawproject/juriscraper/", branch = "morgan/florida-scraper" }
