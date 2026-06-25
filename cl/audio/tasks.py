@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from math import ceil
 
 from asgiref.sync import async_to_sync
@@ -137,16 +138,20 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     file_name = audio_file.name.split("/")[-1]
     size_mb = audio_file.size / 1_000_000
     # Check size and downsize file if necessary.
-    if size_mb >= 25:
-        audio_response: Response = downsize_audio_file(audio)
-        # Removes the ".mp3" extension from the filename
-        name = file_name.split(".")[0]
-        file = (f"{name}.ogg", audio_response.content, "ogg")
-    else:
-        file = (file_name, audio_file.read(), "mp3")
+    with ExitStack() as stack:
+        if size_mb >= 25:
+            audio_response: Response = downsize_audio_file(audio)
+            # Removes the ".mp3" extension from the filename
+            name = file_name.split(".")[0]
+            file = (f"{name}.ogg", audio_response.content, "ogg")
+        else:
+            # Stream from storage rather than loading the full file into
+            # memory; the httpx-backed openai client reads the handle lazily.
+            fh = stack.enter_context(audio_file.open("rb"))
+            file = (file_name, fh, "mp3")
 
-    # Prevent default openai client retrying
-    with OpenAI(max_retries=0) as client:
+        # Prevent default openai client retrying
+        client = stack.enter_context(OpenAI(max_retries=0))
         kwargs = {
             "file": file,
             "model": "whisper-1",
