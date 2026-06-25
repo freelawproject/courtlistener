@@ -37,7 +37,9 @@ FLORIDA_SUPREME_DN_RE = re.compile(r"SC\d{4}-\d{4}")
 
 
 def make_docket_number_core(
-    docket_number: str, /, court_id: str = "fl"
+    docket_number: str,
+    /,
+    court_id: str = FLORIDA_COURT_ID_MAP[FloridaCourtID.SUPREME_COURT.value],
 ) -> str:
     """Normalize Florida docket numbers.
 
@@ -56,7 +58,7 @@ def make_docket_number_core(
         return ""
     docket_number = normalize_dashes(docket_number)
 
-    if court_id == "fl":
+    if court_id == FLORIDA_COURT_ID_MAP[FloridaCourtID.SUPREME_COURT.value]:
         pattern = FLORIDA_SUPREME_DN_RE
     elif court_id.startswith("fladistctapp"):
         pattern = FLORIDA_APPELLATE_DN_RE

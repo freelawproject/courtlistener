@@ -1,13 +1,11 @@
-from typing import Any, override
+from typing import Any, ClassVar
+
+from django.db.models import Model
 
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
-    InputField,
-    InputMap,
     Merger,
-    Parameter,
     RelatedMerger,
-    Relationship,
 )
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import CourtFactory, DocketFactory
@@ -30,14 +28,16 @@ class BaseMergerTest(TestCase):
         start_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Court = AttributeMerger(Parameter(default=self.court))
-            source: int = AttributeMerger(
-                Parameter(default=DocketSources.SCRAPER)
-            )
-            docket_number: str = AttributeMerger(Parameter(default="ABCDEFG"))
+            model: ClassVar[type[Model]] = Docket
 
-            @staticmethod
-            def existing(i: Docket) -> Docket | None:
+            court: Court = AttributeMerger(param=True, default=self.court)
+            source: int = AttributeMerger(
+                param=True, default=DocketSources.SCRAPER
+            )
+            docket_number: str = AttributeMerger(param=True, default="ABCDEFG")
+
+            @classmethod
+            def get_existing(cls, i: Docket, _) -> Docket | None:
                 return None
 
         r = TestMerger.merge({})
@@ -74,14 +74,16 @@ class BaseMergerTest(TestCase):
         start_docket_count = Docket.objects.count()
 
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Court = AttributeMerger(Parameter(default=self.court))
-            source: int = AttributeMerger(
-                Parameter(default=DocketSources.SCRAPER)
-            )
-            docket_number: str = AttributeMerger(Parameter(default=new_dn))
+            model: ClassVar[type[Model]] = Docket
 
-            @staticmethod
-            def existing(i: Docket) -> Docket | None:
+            court: Court = AttributeMerger(param=True, default=self.court)
+            source: int = AttributeMerger(
+                param=True, default=DocketSources.SCRAPER
+            )
+            docket_number: str = AttributeMerger(param=True, default=new_dn)
+
+            @classmethod
+            def get_existing(cls, i: Docket, _) -> Docket | None:
                 return tc.docket
 
         r = TestMerger.merge({})
@@ -129,22 +131,22 @@ class BaseMergerTest(TestCase):
         map_calls = 0
         dn = "ABCDEFG"
 
-        class TestMapping(InputMap[dict[str, str], str]):
-            @override
-            def map(self, i: dict[str, str], *args: Any, **kwargs: Any) -> str:
-                nonlocal map_calls
-                map_calls += 1
-                return dn
+        def test_mapping(i: dict[str, str], *args: Any, **kwargs: Any) -> str:
+            nonlocal map_calls
+            map_calls += 1
+            return dn
 
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Court = AttributeMerger(Parameter(default=self.court))
-            source: int = AttributeMerger(
-                Parameter(default=DocketSources.SCRAPER)
-            )
-            docket_number: str = AttributeMerger(TestMapping())
+            model: ClassVar[type[Model]] = Docket
 
-            @staticmethod
-            def existing(i: Docket) -> Docket | None:
+            court: Court = AttributeMerger(param=True, default=self.court)
+            source: int = AttributeMerger(
+                param=True, default=DocketSources.SCRAPER
+            )
+            docket_number: str = AttributeMerger(test_mapping)
+
+            @classmethod
+            def get_existing(cls, i: Docket, _) -> Docket | None:
                 return None
 
         r = TestMerger.merge({})
@@ -156,32 +158,35 @@ class BaseMergerTest(TestCase):
         class TestRelatedMerger(
             Merger[dict[str, str], OriginatingCourtInformation]
         ):
-            docket_number: str = AttributeMerger(InputField("sr"))
+            model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-            @staticmethod
-            def existing(
-                i: OriginatingCourtInformation,
+            docket_number: str = AttributeMerger(lambda d: d["sr"])
+
+            @classmethod
+            def get_existing(
+                cls, i: OriginatingCourtInformation, _
             ) -> OriginatingCourtInformation | None:
                 return None
 
         class TestMerger(Merger[dict[str, Any], Docket]):
-            court: Court = AttributeMerger(Parameter(default=self.court))
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = AttributeMerger(param=True, default=self.court)
             source: int = AttributeMerger(
-                Parameter(default=DocketSources.SCRAPER)
+                param=True, default=DocketSources.SCRAPER
             )
             docket_number: str = AttributeMerger(
-                Parameter(default=self.docket.docket_number + "New")
+                param=True, default=self.docket.docket_number + "New"
             )
             originating_court_information: OriginatingCourtInformation = (
                 RelatedMerger(
                     TestRelatedMerger,
-                    InputField("mctest"),
-                    relationship=Relationship.OneToOne,
+                    lambda d, *args, **kwargs: d["mctest"],
                 )
             )
 
-            @staticmethod
-            def existing(i: Docket) -> Docket | None:
+            @classmethod
+            def get_existing(cls, i: Docket, _) -> Docket | None:
                 return None
 
         i = {"mctest": {"sr": "test"}}
@@ -196,33 +201,33 @@ class BaseMergerTest(TestCase):
 
     def test_related_mergers_child(self) -> None:
         class TestRelatedMerger(Merger[dict[str, str], DocketEntry]):
-            docket: Docket = AttributeMerger(Parameter())
-            description: str = AttributeMerger(InputField("df"))
+            model: ClassVar[type[Model]] = DocketEntry
 
-            @staticmethod
-            def existing(
-                i: DocketEntry,
-            ) -> DocketEntry | None:
+            description: str = AttributeMerger(lambda d: d["df"])
+
+            @classmethod
+            def get_existing(cls, i: DocketEntry, _) -> DocketEntry | None:
                 return None
 
         class TestMerger(Merger[dict[str, Any], Docket]):
-            court: Court = AttributeMerger(Parameter(default=self.court))
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = AttributeMerger(param=True, default=self.court)
             source: int = AttributeMerger(
-                Parameter(default=DocketSources.SCRAPER)
+                param=True, default=DocketSources.SCRAPER
             )
             docket_number: str = AttributeMerger(
-                Parameter(default=self.docket.docket_number + "New")
+                param=True, default=self.docket.docket_number + "New"
             )
-            originating_court_information: OriginatingCourtInformation = (
-                RelatedMerger(
-                    TestRelatedMerger,
-                    InputField("mctest"),
-                    relationship=Relationship.Child("docket"),
-                )
+            docket_entries: list[DocketEntry] = RelatedMerger[
+                dict[str, Any], dict[str, Any], DocketEntry
+            ](
+                TestRelatedMerger,
+                lambda d: d["mctest"],
             )
 
-            @staticmethod
-            def existing(i: Docket) -> Docket | None:
+            @classmethod
+            def get_existing(cls, i: Docket, _) -> Docket | None:
                 return None
 
         i = {
@@ -250,20 +255,24 @@ class BaseMergerTest(TestCase):
 
     def test_merger_subclassing(self) -> None:
         class TestMerger(Merger[dict[str, str], Docket]):
-            court: Court = AttributeMerger(Parameter(default=self.court))
-            source: int = AttributeMerger(
-                Parameter(default=DocketSources.SCRAPER)
-            )
-            docket_number: str = AttributeMerger(Parameter(default="ABCDEFG"))
+            model: ClassVar[type[Model]] = Docket
 
-            @staticmethod
-            def existing(i: Docket) -> Docket | None:
+            court: Court = AttributeMerger(param=True, default=self.court)
+            source: int = AttributeMerger(
+                param=True, default=DocketSources.SCRAPER
+            )
+            docket_number: str = AttributeMerger(param=True, default="ABCDEFG")
+
+            @classmethod
+            def get_existing(cls, i: Docket, _) -> Docket | None:
                 return None
 
         class TestMerger2(TestMerger):
-            court: Court = AttributeMerger(Parameter(default=self.court))
-            docket_number: str = AttributeMerger(Parameter(default="ABCDEFGH"))
-            assigned_to_str: str = AttributeMerger(Parameter())
+            court: Court = AttributeMerger(param=True, default=self.court)
+            docket_number: str = AttributeMerger(
+                param=True, default="ABCDEFGH"
+            )
+            assigned_to_str: str = AttributeMerger(param=True)
 
         ats = "test"
         result = TestMerger2.merge({}, assigned_to_str=ats)

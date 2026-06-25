@@ -898,29 +898,52 @@ def get_attachment_values(
 
 
 async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
-    """Generate the context for downloads
+    """Generate the context for downloads.
 
-    :param cluster: The opinion cluster
-    :return: a dict containing a boolean if the cluster has downloads and string gile path to the pdf file
+    Builds a list of embeddable PDFs for accordion display when multiple
+    PDFs exist (e.g. Lead Opinion, Concurrence, Dissent).
+
+    :param cluster: The opinion cluster.
+    :return: A dict with ``has_downloads``, ``download_file_path`` (first PDF URL),
+        and ``embeddable_pdfs`` (list of dicts with label/url/id).
     """
     has_downloads = False
-    pdf_path = None
+    download_file_path = None
+    embeddable_pdfs: list[dict[str, Any]] = []
+
     if cluster.filepath_pdf_harvard:
         has_downloads = True
-        pdf_path = cluster.filepath_pdf_harvard.url
-    else:
-        async for sub_opinion in cluster.sub_opinions.filter(
-            main_version__isnull=True
-        ):
-            if str(sub_opinion.local_path).endswith(".pdf"):
-                has_downloads = True
-                pdf_path = sub_opinion.local_path.url
-                break
-            elif sub_opinion.download_url:
-                has_downloads = True
-                pdf_path = None
+        download_file_path = cluster.filepath_pdf_harvard.url
+        embeddable_pdfs.append(
+            {
+                "label": "Case Law Access Project Scan",
+                "url": cluster.filepath_pdf_harvard.url,
+                "id": "harvard",
+            }
+        )
 
-    return {"has_downloads": has_downloads, "pdf_path": pdf_path}
+    async for sub_opinion in cluster.sub_opinions.filter(
+        main_version__isnull=True
+    ).order_by("ordering_key"):
+        if str(sub_opinion.local_path).endswith(".pdf"):
+            has_downloads = True
+            if not download_file_path:
+                download_file_path = sub_opinion.local_path.url
+            embeddable_pdfs.append(
+                {
+                    "label": sub_opinion.get_type_display(),
+                    "url": sub_opinion.local_path.url,
+                    "id": sub_opinion.pk,
+                }
+            )
+        elif sub_opinion.download_url:
+            has_downloads = True
+
+    return {
+        "has_downloads": has_downloads,
+        "download_file_path": download_file_path,
+        "embeddable_pdfs": embeddable_pdfs,
+    }
 
 
 async def setup_opinion_context(

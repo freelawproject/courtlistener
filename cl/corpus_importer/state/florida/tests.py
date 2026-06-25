@@ -1,6 +1,7 @@
 """Tests for Florida docket and originating-court-information merger."""
 
 from datetime import date, datetime
+from unittest import mock
 
 from juriscraper.state.florida.courts import FloridaCourtID
 
@@ -10,8 +11,7 @@ from cl.corpus_importer.state.florida.factories import (
     FloridaOriginatingCaseFactory,
 )
 from cl.corpus_importer.state.florida.mergers import (
-    merge_docket,
-    merge_oci,
+    FloridaDocketMerger,
 )
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket, OriginatingCourtInformation
@@ -44,20 +44,23 @@ class FloridaMergerTest(TestCase):
             source=Docket.SCRAPER,
         )
 
-    def test_merge_oci_skips_non_supreme_court(self):
-        """Does merge_oci skip OCI merging for non-supreme-court dockets?"""
+    @mock.patch(
+        "cl.corpus_importer.state.florida.mergers.FloridaOriginatingCourtInformationMerger.merge",
+        return_value=("failure", {"OriginatingCourtInformation": [1]}),
+    )
+    def test_merge_skips_non_sc_oci(self, mock_merge: mock.Mock):
+        """Does merge skip OCI merging for non-supreme-court dockets?"""
         docket_data = FloridaCaseFactory.create(
             court_id=FloridaCourtID.FIRST_COA.value,
         )
 
-        result = merge_oci(self.docket_coa1, docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
+        mock_merge.assert_not_called()
         assert result.success is True
-        assert result.create is False
-        assert result.update is False
 
-    def test_merge_oci_creates_new_oci(self):
-        """Does merge_oci create a new OCI when none exists?"""
+    def test_merge_creates_new_oci(self):
+        """Does merge create a new OCI when none exists?"""
         self.docket_sc.originating_court_information = None
         self.docket_sc.save()
 
@@ -69,7 +72,9 @@ class FloridaMergerTest(TestCase):
             originating_cases=[originating],
         )
 
-        result = merge_oci(self.docket_sc, docket_data)
+        result = FloridaDocketMerger.merge(
+            docket_data, existing=self.docket_sc
+        )
 
         assert result.success is True
         assert result.create is True
@@ -79,8 +84,8 @@ class FloridaMergerTest(TestCase):
         assert oci.docket_number == "ORIG-001"
         assert oci.docket_number_raw == "ORIG-001"
 
-    def test_merge_oci_updates_existing_oci(self):
-        """Does merge_oci update an existing OCI when one is already linked?"""
+    def test_merge_updates_existing_oci(self):
+        """Does merge update an existing OCI when one is already linked?"""
         existing_oci = OriginatingCourtInformation.objects.create(
             docket_number="OLD-NUMBER",
             docket_number_raw="OLD-NUMBER",
@@ -96,7 +101,9 @@ class FloridaMergerTest(TestCase):
             originating_cases=[originating],
         )
 
-        result = merge_oci(self.docket_sc, docket_data)
+        result = FloridaDocketMerger.merge(
+            docket_data, existing=self.docket_sc
+        )
 
         assert result.success is True
         assert result.update is True
@@ -106,9 +113,8 @@ class FloridaMergerTest(TestCase):
         assert existing_oci.docket_number == "UPDATED-001"
         assert existing_oci.docket_number_raw == "UPDATED-001"
 
-    def test_merge_oci_no_originating_cases_skips(self):
-        """Does merge_oci skip OCI merging when there are no originating
-        cases?"""
+    def test_merge_no_originating_cases_skips_oci(self):
+        """Does merge skip OCI merging when there are no originating cases?"""
         self.docket_sc.originating_court_information = None
         self.docket_sc.save()
 
@@ -117,14 +123,16 @@ class FloridaMergerTest(TestCase):
             originating_cases=[],
         )
 
-        result = merge_oci(self.docket_sc, docket_data)
+        result = FloridaDocketMerger.merge(
+            docket_data, existing=self.docket_sc
+        )
 
         assert result.success is True
         assert result.create is False
-        assert result.update is False
+        assert "OriginatingCourtInformation" not in result.updates
 
-    def test_merge_oci_multiple_originating_cases_uses_first(self):
-        """Does merge_oci pick the first originating case when several exist?"""
+    def test_merge_multiple_originating_cases_uses_first(self):
+        """Does merge pick the first originating case when several exist?"""
         self.docket_sc.originating_court_information = None
         self.docket_sc.save()
 
@@ -135,7 +143,9 @@ class FloridaMergerTest(TestCase):
             originating_cases=[first, second],
         )
 
-        result = merge_oci(self.docket_sc, docket_data)
+        result = FloridaDocketMerger.merge(
+            docket_data, existing=self.docket_sc
+        )
 
         assert result.success is True
         oci_pk = next(iter(result.creates["OriginatingCourtInformation"]))
@@ -148,7 +158,7 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
-        result = merge_docket(docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is False
         assert "Docket" in result.failures
@@ -162,7 +172,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = merge_docket(docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
         new_pks = (
@@ -188,9 +198,10 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = merge_docket(docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
+        assert "Docket" in result.updates
         assert self.docket_sc.pk in result.updates["Docket"]
         assert self.docket_sc.pk not in result.creates.get("Docket", set())
         self.docket_sc.refresh_from_db()
@@ -213,7 +224,7 @@ class FloridaMergerTest(TestCase):
             docket_number=agg_dn,
         )
 
-        result = merge_docket(docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
         assert agg_docket.pk in result.updates["Docket"]
@@ -230,7 +241,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = merge_docket(docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
         new_pks = (
@@ -257,7 +268,7 @@ class FloridaMergerTest(TestCase):
             entries=entries,
         )
 
-        result = merge_docket(docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
         self.docket_sc.refresh_from_db()
@@ -274,7 +285,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = merge_docket(docket_data)
+        result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
         self.docket_sc.refresh_from_db()
