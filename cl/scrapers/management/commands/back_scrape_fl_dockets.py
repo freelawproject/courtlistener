@@ -12,6 +12,7 @@ from httpx import Response
 from juriscraper.state.florida import FloridaScraper
 from juriscraper.state.florida.courts import FloridaCourtID
 from juriscraper.state.RequestManager import (
+    ExponentialBackoff,
     RequestHandler,
     RequestManager,
     ScheduledRequest,
@@ -260,9 +261,11 @@ class Command(StateBackScrapeCommand):
         save_queue: queue.Queue[tuple[str, bytes]] = queue.Queue(maxsize=2048)
         scraper = FloridaScraper(
             rps=rps,
-            max_retries=max_retries,
-            backoff=backoff,
-            backoff_growth=backoff_growth,
+            retry=ExponentialBackoff(
+                max_retries=max_retries,
+                backoff=backoff,
+                backoff_growth=backoff_growth,
+            ),
             handlers=[
                 S3Cache(
                     base=S3_BASE,
