@@ -2252,7 +2252,7 @@ def merge_unavailable_fields_on_parent_document(
                         doc.transcript,
                         length=settings.NO_MATCH_HL_SIZE,
                     )
-                    if doc.stt_status
+                    if doc.stt_status == Audio.STT_COMPLETE
                     else ""
                 )
                 for doc in oa_docs
