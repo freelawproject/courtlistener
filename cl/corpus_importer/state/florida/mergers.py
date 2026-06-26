@@ -2,8 +2,7 @@ import logging
 from datetime import date
 from typing import ClassVar
 
-from asgiref.sync import async_to_sync
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 from juriscraper.state.florida import (
     FloridaCase,
     FloridaOriginatingCase,
@@ -22,10 +21,6 @@ from cl.corpus_importer.state.merger import (
     overwrite,
 )
 from cl.people_db.models import Person
-from cl.recap.mergers import (
-    find_and_disaggregate_docket_object,
-    find_docket_object,
-)
 from cl.search.models import Docket, OriginatingCourtInformation
 
 logger = logging.getLogger(__name__)
@@ -168,36 +163,35 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
         )
     )
 
-    @classmethod
-    def get_existing(cls, docket: FloridaCase, _) -> Docket | None:
+    def query(self) -> QuerySet[Docket]:
         supreme_court_id = FLORIDA_COURT_ID_MAP[
             FloridaCourtID.SUPREME_COURT.value
         ]
-        court_id = FLORIDA_COURT_ID_MAP[docket.court_id]
+        court_id = FLORIDA_COURT_ID_MAP[self.scrape.court_id]
+        query = Docket.objects.filter(
+            docket_number_core=make_docket_number_core(
+                self.scrape.docket_number
+            )
+        )
+        query_narrow = query.filter(court_id=court_id)
+        query_narrow_with_uuid = query_narrow.filter(
+            pacer_case_id=str(self.scrape.case_uuid)
+        )
+
+        if query_narrow_with_uuid.exists():
+            return query_narrow_with_uuid
 
         if court_id == supreme_court_id:
-            return async_to_sync(find_docket_object)(
-                court_id=court_id,
-                pacer_case_id=str(docket.case_uuid),
-                docket_number=docket.docket_number,
-                federal_defendant_number=None,
-                federal_dn_judge_initials_assigned=None,
-                federal_dn_judge_initials_referred=None,
-                docket_source=Docket.SCRAPER,
-                allow_create=False,
-            )
-        found, changed = async_to_sync(find_and_disaggregate_docket_object)(
-            court_id=court_id,
-            aggregate_court_id=FL_APPELLATE_COURT_ID,
-            docket_number=docket.docket_number,
-            docket_source=Docket.SCRAPER,
-            allow_create=False,
+            return query_narrow
+
+        query_broad = query.filter(court_id=FL_APPELLATE_COURT_ID)
+        query_broad_with_uuid = query_broad.filter(
+            pacer_case_id=str(self.scrape.case_uuid)
         )
-        if changed:
-            logger.info(
-                "Disaggregated Florida docket: %s", docket.docket_number
-            )
-        return found
+        if query_broad_with_uuid.exists():
+            return query_broad_with_uuid
+
+        return query_broad
 
     @staticmethod
     def validate(docket_data: FloridaCase) -> bool:

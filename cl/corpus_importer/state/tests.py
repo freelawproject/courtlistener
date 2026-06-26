@@ -37,11 +37,10 @@ class BaseMergerTest(TestCase):
             )
             docket_number: str = AttributeMerger(param=True, default="ABCDEFG")
 
-            @classmethod
-            def get_existing(cls, i: Docket, _) -> Docket | None:
-                return None
+            def query(self):
+                return Docket.objects.none()
 
-        r = TestMerger.merge({})
+        r = TestMerger({}).merge()
 
         self.assertEqual(
             Docket.objects.count(),
@@ -83,11 +82,10 @@ class BaseMergerTest(TestCase):
             )
             docket_number: str = AttributeMerger(param=True, default=new_dn)
 
-            @classmethod
-            def get_existing(cls, i: Docket, _) -> Docket | None:
-                return tc.docket
+            def query(self):
+                return Docket.objects.filter(pk=tc.docket.pk)
 
-        r = TestMerger.merge({})
+        r = TestMerger({}).merge()
 
         self.assertEqual(
             Docket.objects.count(),
@@ -146,11 +144,10 @@ class BaseMergerTest(TestCase):
             )
             docket_number: str = AttributeMerger(test_mapping)
 
-            @classmethod
-            def get_existing(cls, i: Docket, _) -> Docket | None:
-                return None
+            def query(self):
+                return Docket.objects.none()
 
-        r = TestMerger.merge({})
+        r = TestMerger({}).merge()
         self.assertEqual(map_calls, 1)
         docket = Docket.objects.get(pk=r.creates["Docket"].pop())
         self.assertEqual(docket.docket_number, dn)
@@ -163,11 +160,8 @@ class BaseMergerTest(TestCase):
 
             docket_number: str = AttributeMerger(lambda d: d["sr"])
 
-            @classmethod
-            def get_existing(
-                cls, i: OriginatingCourtInformation, _
-            ) -> OriginatingCourtInformation | None:
-                return None
+            def query(self):
+                return OriginatingCourtInformation.objects.none()
 
         class TestMerger(Merger[dict[str, Any], Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -186,12 +180,11 @@ class BaseMergerTest(TestCase):
                 )
             )
 
-            @classmethod
-            def get_existing(cls, i: Docket, _) -> Docket | None:
-                return None
+            def query(self):
+                return Docket.objects.none()
 
         i = {"mctest": {"sr": "test"}}
-        result = TestMerger.merge(i)
+        result = TestMerger(i).merge()
 
         self.assertIn("OriginatingCourtInformation", result.creates)
         self.assertEqual(len(result.creates["OriginatingCourtInformation"]), 1)
@@ -206,9 +199,8 @@ class BaseMergerTest(TestCase):
 
             description: str = AttributeMerger(lambda d: d["df"])
 
-            @classmethod
-            def get_existing(cls, i: DocketEntry, _) -> DocketEntry | None:
-                return None
+            def query(self):
+                return DocketEntry.objects.none()
 
         class TestMerger(Merger[dict[str, Any], Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -227,9 +219,8 @@ class BaseMergerTest(TestCase):
                 lambda d: d["mctest"],
             )
 
-            @classmethod
-            def get_existing(cls, i: Docket, _) -> Docket | None:
-                return None
+            def query(self):
+                return Docket.objects.none()
 
         i = {
             "mctest": [
@@ -238,7 +229,7 @@ class BaseMergerTest(TestCase):
                 {"df": "test3"},
             ]
         }
-        result = TestMerger.merge(i)
+        result = TestMerger(i).merge()
 
         self.assertIn("DocketEntry", result.creates)
         self.assertEqual(len(result.creates["DocketEntry"]), 3)
@@ -264,9 +255,8 @@ class BaseMergerTest(TestCase):
             )
             docket_number: str = AttributeMerger(param=True, default="ABCDEFG")
 
-            @classmethod
-            def get_existing(cls, i: Docket, _) -> Docket | None:
-                return None
+            def query(self):
+                return Docket.objects.none()
 
         class TestMerger2(TestMerger):
             court: Court = AttributeMerger(param=True, default=self.court)
@@ -276,7 +266,7 @@ class BaseMergerTest(TestCase):
             assigned_to_str: str = AttributeMerger(param=True)
 
         ats = "test"
-        result = TestMerger2.merge({}, assigned_to_str=ats)
+        result = TestMerger2({}, assigned_to_str=ats).merge()
 
         self.assertIn("Docket", result.creates)
         self.assertEqual(len(result.creates["Docket"]), 1)
