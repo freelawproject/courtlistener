@@ -48,7 +48,7 @@ class S3Cache(RequestHandler):
     save_queue: queue.Queue[tuple[str, bytes]]
 
     def make_s3_key(self, request: ScheduledRequest) -> str:
-        url_path = Path(request.url.path.lower())
+        url_path = request.url.path.lower().strip("/")
         url_params = "&".join(
             [f"{k}={v}" for k, v in sorted(request.url.params.items())]
         )
@@ -59,7 +59,6 @@ class S3Cache(RequestHandler):
         return str(self.base / url_path / request_hash)
 
     def load_from_s3(self, request: ScheduledRequest) -> Response | None:
-        logger.info("Attempting to get %s from S3", request.url.path.lower())
         key = self.make_s3_key(request)
 
         try:
@@ -72,7 +71,7 @@ class S3Cache(RequestHandler):
 
             with storage.open(key, "rb") as f:
                 return Response(200, content=f.read())
-        except:
+        except Exception:
             logger.exception(
                 "Failed to load response from archive for %s",
                 request.url.path.lower(),
@@ -88,10 +87,9 @@ class S3Cache(RequestHandler):
             # Don't try to cache responses that we pulled from the cache
             if self.load and storage.exists(key):
                 return
-            logger.info("Queueing archive of response for %s", key)
             # We want this to block so our scrape doesn't get too far ahead of the archive
             self.save_queue.put((key, response.content))
-        except:
+        except Exception:
             logger.exception(
                 "Failed to queue archive response for %s", request.url
             )
@@ -112,7 +110,7 @@ class S3Cache(RequestHandler):
 
         try:
             response = await request.response
-        except:
+        except Exception:
             logger.exception(
                 "Cache listener failed to get response for %s", request.url
             )
@@ -131,14 +129,13 @@ def _archive_loop(responses: queue.Queue[tuple[str, bytes]]) -> None:
         try:
             key, content = responses.get()
         except queue.ShutDown:
-            logger.exception("Archive queue forcibly shut down.")
+            logger.info("Archive queue shut down.")
             break
 
-        logger.info("Archiving %s to %s", key, storage.bucket_name)
         try:
             with storage.open(key, "wb") as f:
                 f.write(content)
-        except:
+        except Exception:
             logger.exception(
                 "Failed to archive %s to %s", key, storage.bucket_name
             )
@@ -198,7 +195,7 @@ async def _backfill(
             "Florida backfill complete. Waiting for archiving to complete..."
         )
         save_queue.join()
-    except:
+    except Exception:
         logger.exception("Florida backfill failed.")
     else:
         logger.info("Florida backfill completed successfully!")
