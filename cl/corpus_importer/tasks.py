@@ -178,7 +178,6 @@ from cl.recap.mergers import (
     add_claims_to_docket,
     add_parties_and_attorneys,
     add_tags_to_objs,
-    find_and_disaggregate_docket_object,
     find_docket_object,
     make_recap_sequence_number,
     merge_pacer_docket_into_cl_docket,
@@ -4819,14 +4818,14 @@ def merge_texas_docket(
     :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation."""
-    court_pk = texas_js_court_id_to_court_id(docket_data["court_id"])
+    court_id = texas_js_court_id_to_court_id(docket_data["court_id"])
     docket_number = docket_data["docket_number"]
     logger.info("Merging Texas docket %s", docket_number)
 
     if docket_data["court_type"] == CourtType.UNKNOWN.value:
         logger.error("Texas docket %s has unknown court type", docket_number)
         return MergeResult.failed("Docket")
-    if court_pk is None:
+    if court_id is None:
         logger.error(
             "Could not determine Court pk for Texas docket %s with court ID %s",
             docket_number,
@@ -4840,21 +4839,24 @@ def merge_texas_docket(
             logger.info(
                 "Docket is appellate. Checking if disaggregation is necessary..."
             )
-            docket, changed = async_to_sync(
-                find_and_disaggregate_docket_object
-            )(
-                court_id=court_pk,
-                aggregate_court_id="texapp",
+            docket = async_to_sync(find_docket_object)(
+                court_id="texapp",
+                pacer_case_id=None,
                 docket_number=docket_number,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
                 docket_source=Docket.SCRAPER,
+                allow_create=False,
             )
-            if changed:
+            if docket is not None:
                 logger.info(
                     "Disaggregated Texas appellate docket %s", docket_number
                 )
-        else:
+                docket.court_id = court_id
+        if docket is None:
             docket = async_to_sync(find_docket_object)(
-                court_id=court_pk,
+                court_id=court_id,
                 pacer_case_id=None,
                 docket_number=docket_number,
                 federal_defendant_number=None,
@@ -4939,7 +4941,7 @@ def merge_texas_docket(
             "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Failures: %s",
             docket_number,
             docket.pk,
-            court_pk,
+            court_id,
             result.failures,
         )
 
