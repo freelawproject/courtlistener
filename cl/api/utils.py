@@ -917,11 +917,6 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
 
     def __init__(self):
         raw = self.THROTTLE_RATES.get(self.scope)
-        # Until we're ready to roll out the multi-rate user defaults
-        # configured in settings (issue #7196), keep the historical
-        # 5000/hour fallback for the "user" scope. Other scopes (e.g.
-        # the "citations" rate read separately by CitationCountRateThrottle
-        # in get_citations_rate) read settings as before.
         if raw is None:
             self.rate = None
             self.default_rates: list[str] = []
