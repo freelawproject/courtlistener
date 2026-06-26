@@ -13,6 +13,7 @@ from cl.corpus_importer.state.florida.factories import (
 from cl.corpus_importer.state.florida.mergers import (
     FloridaDocketMerger,
 )
+from cl.corpus_importer.state.florida.utils import make_docket_number_core
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket, OriginatingCourtInformation
 from cl.tests.cases import TestCase
@@ -227,6 +228,7 @@ class FloridaMergerTest(TestCase):
         result = FloridaDocketMerger.merge(docket_data)
 
         assert result.success is True
+        assert "Docket" in result.updates
         assert agg_docket.pk in result.updates["Docket"]
         agg_docket.refresh_from_db()
         assert agg_docket.court_id == "fladistctapp1"
@@ -291,3 +293,24 @@ class FloridaMergerTest(TestCase):
         self.docket_sc.refresh_from_db()
         assert self.docket_sc.date_filed == filed.date()
         assert self.docket_sc.date_last_filing == filed.date()
+
+    def test_uuid_matches(self):
+        """Does case_uuid correctly map as a lookup to pacer_case_id?"""
+        docket_data = FloridaCaseFactory(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            docket_number="SC2026-1337",
+        )
+        docket = DocketFactory.create(
+            court=CourtFactory.create(id="fla"),
+            docket_number=docket_data.docket_number,
+            docket_number_core=make_docket_number_core(
+                docket_data.docket_number
+            ),
+            pacer_case_id=str(docket_data.case_uuid),
+        )
+        result = FloridaDocketMerger.merge(docket_data)
+
+        assert result.success is True
+        assert result.update is True
+        assert "Docket" in result.updates
+        assert docket.pk in result.updates["Docket"]
