@@ -18,7 +18,7 @@ from cl.corpus_importer.state.florida.utils import (
 from cl.corpus_importer.state.merger import (
     AttributeMerger,
     Merger,
-    RelatedMerger,
+    OneToOneMerger,
     overwrite,
 )
 from cl.people_db.models import Person
@@ -157,13 +157,15 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     pacer_case_id: str = AttributeMerger(
         lambda d: d.case_uuid, strategy=overwrite
     )
-    originating_court_information: OriginatingCourtInformation = RelatedMerger[
-        FloridaCase,
-        FloridaOriginatingCase,
-        OriginatingCourtInformation,
-    ](
-        FloridaOriginatingCourtInformationMerger,
-        _originating_case,
+    originating_court_information: OriginatingCourtInformation = (
+        OneToOneMerger[
+            FloridaCase,
+            FloridaOriginatingCase,
+            OriginatingCourtInformation,
+        ](
+            FloridaOriginatingCourtInformationMerger,
+            _originating_case,
+        )
     )
 
     @classmethod

@@ -7,7 +7,6 @@ from typing import (
     Concatenate,
     Self,
     cast,
-    override,
 )
 
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -79,9 +78,7 @@ class MergerSpecification[D, T]:
         :param merger: The merger to register this specification with."""
         ...
 
-    def validate(
-        self, field: Field | ForeignObjectRel | GenericForeignKey
-    ) -> list[Exception]:
+    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         """Validate this specification for the given field.
 
         :param field: The field to validate this specification for.
@@ -99,8 +96,15 @@ class MergerSpecification[D, T]:
             f = owner.model._meta.get_field(self.name)
         except FieldDoesNotExist as e:
             owner.errors.append(e)
-        else:
-            owner.errors += self.validate(f)
+            return
+        if isinstance(f, GenericForeignKey):
+            owner.errors.append(
+                TypeError(
+                    f"{self.name}: Generic foreign keys are not supported yet."
+                )
+            )
+            return
+        owner.errors += self.validate(f)
 
     def transform(self, d: D, value: T | None = None) -> T | None:
         if self.param:
@@ -154,9 +158,7 @@ class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
         super().__init__(transform, param, default)
         self.merger: type[Merger[T, RM]] = merger
 
-    def validate(
-        self, field: Field | ForeignObjectRel | GenericForeignKey
-    ) -> list[Exception]:
+    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
         if not field.related_model:
             errors.append(
@@ -189,26 +191,23 @@ class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
         raise NotImplementedError
 
 
-class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
-    """Class encapsulating logic for merging one or more related objects. Can be used to merge one-to-one relationships
-    or parent-child relationships.
+class OneToOneMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
+    """Class encapsulating logic for merging a one-to-one relationship.
 
     :ivar merger: The `Merger` to use for the related object"""
 
-    def __init__(
-        self,
-        merger: "type[Merger[T, RM]]",
-        transform: Any
-        | None = None,  # Generic callables confuse mypy; should be Callable[Concatenate[D, ...], T | None] | None
-        param: bool = False,
-        default: T | None = None,
-    ):
-        super().__init__(merger, transform, param, default)
-        self.merger: type[Merger[T, RM]] = merger
+    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        errors = super().validate(field)
+        if not field.one_to_one:
+            errors.append(TypeError(f"{self.name}: Is not a one-to-one field"))
+        return errors
 
-    def _merge_one_to_one(
-        self, parent: Model, merger_input: T
-    ) -> MergeResult[Any]:
+    def merge(self, parent: RM, i: D) -> MergeResult[Any]:
+        """Run the merge method on the appropriate inputs for the given relationship."""
+        merger_input = self.transform(i, None)
+        if merger_input is None:
+            return MergeResult.unnecessary()
+
         db_obj = getattr(parent, self.name)
         if db_obj is None:
             result = self.merger.merge(merger_input)
@@ -216,16 +215,31 @@ class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
             model_name = model.__name__
             if model_name in result.creates:
                 db_obj_pk = next(iter(result.creates[model_name]))
-                setattr(parent, f"{self.name}_id", db_obj_pk)
-                # The parent was already fully saved by `_merge_object`; only
-                # the freshly-set FK needs to be written back.
-                parent.save(update_fields=[f"{self.name}_id"])
+                field = parent._meta.get_field(self.name)
+                attname = getattr(field, "attname", f"{self.name}_id")
+                setattr(parent, attname, db_obj_pk)
+                parent.save(update_fields=[attname])
             return result
         return self.merger.merge(merger_input, existing=db_obj)
 
-    def _merge_related(
-        self, parent: Model, merger_input: T
-    ) -> MergeResult[Any]:
+
+class OneToManyMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
+    """Class encapsulating logic for merging a one-to-many relationship."""
+
+    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        errors = super().validate(field)
+        if not field.one_to_many:
+            errors.append(
+                TypeError(f"{self.name}: Is not a one-to-many field")
+            )
+        return errors
+
+    def merge(self, parent: RM, i: D) -> MergeResult[Any]:
+        """Run the merge method on the appropriate inputs for the given relationship."""
+        merger_input = self.transform(i, None)
+        if merger_input is None:
+            return MergeResult.unnecessary()
+
         # A lone `str`/`bytes`/`Mapping` is iterable but is not a collection of
         # children -- iterating it would silently feed characters or keys to the
         # child merger. Reject those (and anything not iterable at all).
@@ -240,50 +254,6 @@ class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
         #     children.append(cast(Model, child_obj))
         # related_manager.add(*children)
         return result
-
-    # def _merge_many_to_many(
-    #     self,
-    #     through_merger: "Merger[ThroughInput[Any, Any], Any] | None",
-    #     origin: str | None,
-    #     destination: str | None,
-    #     parent: Model,
-    #     merger_input: RelatedInput,
-    # ) -> MergeResult[Any]:
-    #     if through_merger is None:
-    #         # Yay easy yippee
-    #         return self._merge_related(parent, merger_input)
-    #     # TODO
-    #     raise NotImplementedError
-
-    @override
-    def merge(self, parent: RM, i: D) -> MergeResult[Any]:
-        """Run the merge method on the appropriate inputs for the given relationship.
-
-        For one-to-one relationships, the input is transformed then passed directly to the related merger; a `None`
-        transform result means there is no relative to merge and is skipped. For parent-child relationships, we first
-        check if the input is iterable and then run the related merger for each item, passing the parent object as a
-        parameter.
-
-        :param parent: The parent of the object being merged. Must already exist in the DB when this method is called.
-        :param i: The input data for the object being merged."""
-        merger_input = self.transform(i, None)
-        if merger_input is None:
-            return MergeResult.unnecessary()
-
-        f = parent._meta.get_field(self.name)
-
-        # These should be initialization-time checks on subclasses of SubMerger, but for now this will do.
-        # Party merger PR will handle the subclasses
-        if f.one_to_one:
-            return self._merge_one_to_one(parent, merger_input)
-        elif f.one_to_many:
-            return self._merge_related(parent, merger_input)
-        elif f.many_to_many:
-            # return self._merge_many_to_many(
-            #     through_merger, origin, destination, parent, merger_input
-            # )
-            raise NotImplementedError
-        raise TypeError(f"Field {self.name} is not a related field.")
 
 
 class MergerSpecRegistry:
