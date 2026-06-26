@@ -9,8 +9,6 @@ the throttle machinery.
 
 from cl.donate.models import NeonMembershipLevel
 
-SYNC_MEMBERSHIP_THROTTLES_SWITCH = "sync_membership_throttles"
-
 # Rate sets per tier. The "size" dimension on group memberships
 # (Smallest/Small/Medium/Large/Unlimited) affects seat count, not
 # per-user throughput, so all sizes within a tier share the same

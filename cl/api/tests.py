@@ -33,15 +33,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework_xml.renderers import XMLRenderer
-from waffle.testutils import override_switch
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
-from cl.api.constants import (
-    LEVEL_TO_RATES,
-    SYNC_MEMBERSHIP_THROTTLES_SWITCH,
-    TIER_3_RATES,
-)
+from cl.api.constants import LEVEL_TO_RATES, TIER_3_RATES
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -5180,7 +5175,6 @@ class MultiRateThrottleTest(TestCase):
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="MembershipThrottleSyncTest")
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class MembershipThrottleSyncTest(TestCase):
     """Tests for apply_membership_throttles / clear_membership_throttles."""
 
@@ -5273,30 +5267,6 @@ class MembershipThrottleSyncTest(TestCase):
             apply_membership_throttles(user, NeonMembershipLevel.BASIC)
         )
         self.assertFalse(APIThrottle.objects.filter(user=user).exists())
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    def test_switch_off_is_no_op(self) -> None:
-        """With the switch off, neither helper writes nor deletes rows."""
-        user = UserFactory()
-        APIThrottleFactory(
-            user=user,
-            throttle_type=ThrottleType.API,
-            rate="10/min",
-            source=APIThrottle.Source.MEMBERSHIP,
-        )
-
-        self.assertFalse(
-            apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
-        )
-        rates_after_apply = list(
-            APIThrottle.objects.filter(user=user).values_list(
-                "rate", flat=True
-            )
-        )
-        self.assertEqual(rates_after_apply, ["10/min"])  # unchanged
-
-        clear_membership_throttles(user)
-        self.assertTrue(APIThrottle.objects.filter(user=user).exists())
 
     def test_apply_skips_cache_clear_by_default(self) -> None:
         """apply_* does not invalidate the cache unless clear_cache=True."""

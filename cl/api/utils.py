@@ -40,9 +40,8 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
-from waffle import switch_is_active
 
-from cl.api.constants import LEVEL_TO_RATES, SYNC_MEMBERSHIP_THROTTLES_SWITCH
+from cl.api.constants import LEVEL_TO_RATES
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
     APIThrottle,
@@ -813,7 +812,6 @@ def apply_membership_throttles(
     - Existing MEMBERSHIP throttles are fully removed before new ones are created.
 
     This function is a no-op when:
-    - The `SYNC_MEMBERSHIP_THROTTLES_SWITCH` feature flag is disabled
     - The provided `level` does not exist in `LEVEL_TO_RATES`
       (e.g., unsupported, legacy, or commercial levels)
 
@@ -828,9 +826,6 @@ def apply_membership_throttles(
     Returns:
         bool: True if throttles were successfully applied, False if skipped.
     """
-    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
-        return False
-
     rates = LEVEL_TO_RATES.get(level)
     if rates is None:
         logger.info(
@@ -863,11 +858,8 @@ def apply_membership_throttles(
 def clear_membership_throttles(user: User) -> None:
     """Delete the user's MEMBERSHIP-source API throttle rows.
 
-    MANUAL rows are never touched. No-op when the
-    SYNC_MEMBERSHIP_THROTTLES_SWITCH waffle switch is off.
+    MANUAL rows are never touched.
     """
-    if not switch_is_active(SYNC_MEMBERSHIP_THROTTLES_SWITCH):
-        return
     deleted, _ = APIThrottle.objects.filter(
         user=user,
         throttle_type=ThrottleType.API,
@@ -875,10 +867,6 @@ def clear_membership_throttles(user: User) -> None:
     ).delete()
     if deleted:
         clear_tiered_cache()
-
-
-USE_NEW_THROTTLE_DEFAULTS_SWITCH = "use_new_throttle_defaults"
-LEGACY_USER_DEFAULT_RATE = "5000/hour"
 
 
 def get_recent_api_request_count(user: User, window_seconds: int) -> int:
@@ -934,10 +922,6 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         # 5000/hour fallback for the "user" scope. Other scopes (e.g.
         # the "citations" rate read separately by CitationCountRateThrottle
         # in get_citations_rate) read settings as before.
-        if self.scope == "user" and not switch_is_active(
-            USE_NEW_THROTTLE_DEFAULTS_SWITCH
-        ):
-            raw = LEGACY_USER_DEFAULT_RATE
         if raw is None:
             self.rate = None
             self.default_rates: list[str] = []
