@@ -1,5 +1,5 @@
 {% extends "profile/nav.html" %}
-{% load humanize waffle_tags %}
+{% load humanize %}
 
 {% block title %} {{ page_title }} &ndash; CourtListener.com{% endblock %}
 
@@ -62,39 +62,37 @@
         {% endif %}
       {% endwith %}
 
-      {% switch "sync_membership_throttles" %}
-        {% if throttle_rates %}
-          <h3 class="v-offset-above-3" id="access-level">Your Access Level</h3>
-          <div class="row">
-            {% for num, period in throttle_rates %}
-              <div class="col-xs-{% widthratio 1 throttle_rates|length 12 %}">
-                <h2 class="bottom"><strong>{{ num|intcomma }}</strong></h2>
-                <p class="text-muted small">
-                  Request{{ num|pluralize }} per {{ period }}
-                </p>
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-
-        {% with total=user.profile.total_api_usage %}
-          <h3 class="v-offset-above-3" id="total">Your Total API Usage</h3>
-          {% if total %}
-            <div class="v-offset-above-2 flex justify-content-between align-items-center">
-              <p>
-                You've made <strong>{{ total|intcomma }}</strong>
-                API request{{ total|pluralize }} all-time.
+      {% if throttle_rates %}
+        <h3 class="v-offset-above-3" id="access-level">Your Access Level</h3>
+        <div class="row">
+          {% for num, period in throttle_rates %}
+            <div class="col-xs-{% widthratio 1 throttle_rates|length 12 %}">
+              <h2 class="bottom"><strong>{{ num|intcomma }}</strong></h2>
+              <p class="text-muted small">
+                Request{{ num|pluralize }} per {{ period }}
               </p>
-              <a href="https://donate.free.law/forms/supportflp"
-                class="btn btn-primary">
-                <i class="fa fa-heart"></i>&nbsp;Donate
-              </a>
             </div>
-          {% else %}
-            <p class="text-muted">No API usage yet.</p>
-          {% endif %}
-        {% endwith %}
-      {% endswitch %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% with total=user.profile.total_api_usage %}
+        <h3 class="v-offset-above-3" id="total">Your Total API Usage</h3>
+        {% if total %}
+          <div class="v-offset-above-2 flex justify-content-between align-items-center">
+            <p>
+              You've made <strong>{{ total|intcomma }}</strong>
+              API request{{ total|pluralize }} all-time.
+            </p>
+            <a href="https://donate.free.law/forms/supportflp"
+              class="btn btn-primary">
+              <i class="fa fa-heart"></i>&nbsp;Donate
+            </a>
+          </div>
+        {% else %}
+          <p class="text-muted">No API usage yet.</p>
+        {% endif %}
+      {% endwith %}
     {% endif %}
   </div>
   <div class="hidden-xs col-sm-1 col-md-3"></div>

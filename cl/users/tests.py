@@ -34,7 +34,6 @@ from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -42,7 +41,6 @@ from cl.alerts.factories import (
     DocketAlertWithParentsFactory,
 )
 from cl.alerts.models import DocketAlert, DocketAlertEvent
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -4345,7 +4343,6 @@ class UserProfileTotalApiUsageTest(TestCase):
         self.assertEqual(self.user.profile.total_api_usage, 0)
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsageTest")
 class ViewApiUsageTest(TestCase):
     """Tests for /profile/api-usage/."""
 
@@ -4363,17 +4360,7 @@ class ViewApiUsageTest(TestCase):
     def tearDown(self) -> None:
         clear_tiered_cache()
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    def test_switch_off_hides_new_sections(self) -> None:
-        """With the switch off, only the recent-usage section renders."""
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertNotContains(response, "Your Access Level")
-        self.assertNotContains(response, "Your Total API Usage")
-        self.assertContains(response, "Your API Recent Usage")
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
-    def test_switch_on_shows_default_throttle_rates(self) -> None:
+    def test_shows_default_throttle_rates(self) -> None:
         """Without overrides, access level falls back to settings defaults."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -4381,8 +4368,7 @@ class ViewApiUsageTest(TestCase):
         # Default rate exposed in DEFAULT_THROTTLE_RATES["user"].
         self.assertContains(response, "per day")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
-    def test_switch_on_shows_override_rates(self) -> None:
+    def test_shows_override_rates(self) -> None:
         """User APIThrottle overrides replace the defaults in the listing."""
         APIThrottleFactory(
             user=self.user,
@@ -4400,7 +4386,6 @@ class ViewApiUsageTest(TestCase):
         # Default "per hour" rate should NOT appear — overrides replace it.
         self.assertNotContains(response, "per hour")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
     def test_blocked_user_filters_zero_rates(self) -> None:
         """A 0/min row is dropped — we don't advertise blocked as a limit."""
         APIThrottleFactory(
@@ -4412,7 +4397,6 @@ class ViewApiUsageTest(TestCase):
         # Heading still renders, but no rate rows for the blocked user.
         self.assertNotContains(response, "per minute")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
     @patch("cl.users.models.get_redis_interface")
     def test_total_section_shows_count_and_donate(
         self, mock_get_redis: MagicMock
@@ -4552,7 +4536,6 @@ class TagZohoRecordTest(SimpleTestCase):
         mock_contacts.add_tags.assert_not_called()
 
 
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class RefreshAPIThrottlesAdminTest(TestCase):
     def setUp(self):
         self.staff = UserFactory(is_staff=True, is_superuser=True)

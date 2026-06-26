@@ -1,15 +1,12 @@
 """Constants for the API app.
 
-Currently scoped to membership-throttle rate tables and the waffle
-switch name that gates the Neon webhook → APIThrottle sync. Keeping
-these out of utils.py makes them trivially importable from
-management commands / scripts / tests without dragging in the rest of
-the throttle machinery.
+Currently scoped to membership-throttle rate tables. Keeping these
+out of utils.py makes them trivially importable from management
+commands / scripts / tests without dragging in the rest of the
+throttle machinery.
 """
 
 from cl.donate.models import NeonMembershipLevel
-
-SYNC_MEMBERSHIP_THROTTLES_SWITCH = "sync_membership_throttles"
 
 # Rate sets per tier. The "size" dimension on group memberships
 # (Smallest/Small/Medium/Large/Unlimited) affects seat count, not

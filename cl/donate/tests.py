@@ -10,9 +10,7 @@ from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
-from waffle.testutils import override_switch
 
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import APIThrottle, ThrottleType
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import NeonWebhookEventFactory
@@ -903,16 +901,8 @@ class ProfileMembershipTest(TestCase):
             )
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="MembershipWebhookThrottleSyncTest")
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class MembershipWebhookThrottleSyncTest(TestCase):
-    """End-to-end tests that Neon webhooks sync APIThrottle rows.
-
-    Existing webhook tests in MembershipWebhookTest run with the
-    sync_membership_throttles switch off (its default), so the wire-up
-    in MembershipWebhookViewSet is a no-op there. This class flips the
-    switch on at class scope to exercise the actual sync behavior.
-    """
+    """End-to-end tests that Neon webhooks sync APIThrottle rows."""
 
     def setUp(self) -> None:
         self.async_client = AsyncClient()
@@ -1087,32 +1077,3 @@ class MembershipWebhookThrottleSyncTest(TestCase):
             ).values_list("rate", "source")
         ]
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    @patch.object(
-        MembershipWebhookViewSet,
-        "_store_webhook_payload",
-        return_value=None,
-    )
-    def test_webhook_does_not_sync_when_switch_off(
-        self, mock_store_webhook
-    ) -> None:
-        """With the switch off, webhook handlers don't touch APIThrottle."""
-        self.data["eventTrigger"] = "createMembership"
-
-        client = Client()
-        r = client.post(
-            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
-            data=self.data,
-            content_type="application/json",
-        )
-
-        self.assertEqual(r.status_code, HTTPStatus.CREATED)
-        # NeonMembership row is still created (existing behavior),
-        # but no APIThrottle rows.
-        self.assertTrue(
-            NeonMembership.objects.filter(user=self.user_profile.user).exists()
-        )
-        self.assertFalse(
-            APIThrottle.objects.filter(user=self.user_profile.user).exists()
-        )
