@@ -5,6 +5,7 @@ import hashlib
 import queue
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 
 from asgiref.sync import async_to_sync
 from django.core.management import CommandParser
@@ -30,18 +31,7 @@ from cl.scrapers.management.utils import (
     _parse_date,
 )
 
-S3_BASE = "responses/dockets/florida"
-
-
-def make_s3_key(request: ScheduledRequest) -> str:
-    url_path = request.url.path.lower()
-    url_params = "&".join(
-        [f"{k}={v}" for k, v in sorted(request.url.params.items())]
-    )
-    method = request.method.upper()
-    return hashlib.sha1(
-        f"{method}|{url_path}|{url_params}".encode()
-    ).hexdigest()
+S3_BASE = Path("responses/dockets/florida")
 
 
 @dataclass
@@ -52,39 +42,62 @@ class S3Cache(RequestHandler):
     :ivar save: Whether to archive responses
     :ivar load: Whether to intercept requests and load responses from S3 if available"""
 
-    base: str
+    base: Path
     save: bool
     load: bool
     save_queue: queue.Queue[tuple[str, bytes]]
 
+    def make_s3_key(self, request: ScheduledRequest) -> str:
+        url_path = Path(request.url.path.lower())
+        url_params = "&".join(
+            [f"{k}={v}" for k, v in sorted(request.url.params.items())]
+        )
+        method = request.method.upper()
+        request_hash = hashlib.sha1(
+            f"{method}|{url_path}|{url_params}".encode()
+        ).hexdigest()
+        return str(self.base / url_path / request_hash)
+
     def load_from_s3(self, request: ScheduledRequest) -> Response | None:
         logger.info("Attempting to get %s from S3", request.url.path.lower())
-        storage = S3GlacierInstantRetrievalStorage()
-        key = f"{self.base}/{make_s3_key(request)}"
+        key = self.make_s3_key(request)
 
-        if not storage.exists(key):
-            logger.info("Did not find %s in S3", request.url.path.lower())
+        try:
+            storage = S3GlacierInstantRetrievalStorage()
+            if not storage.exists(key):
+                logger.info("Did not find %s in S3", request.url.path.lower())
+                return None
+
+            logger.info("Loading %s from S3", request.url.path.lower())
+
+            with storage.open(key, "rb") as f:
+                return Response(200, content=f.read())
+        except:
+            logger.exception(
+                "Failed to load response from archive for %s",
+                request.url.path.lower(),
+            )
             return None
-
-        logger.info("Loading %s from S3", request.url.path.lower())
-
-        with storage.open(key, "rb") as f:
-            return Response(200, content=f.read())
 
     def save_to_s3(
         self, request: ScheduledRequest, response: Response
     ) -> None:
-        storage = S3GlacierInstantRetrievalStorage()
-        key = f"{self.base}/{make_s3_key(request)}"
-        # Don't try to cache responses that we pulled from the cache
-        if self.load and storage.exists(key):
-            return
-        logger.info("Adding %s to archive queue", key)
-        # We want this to block so our scrape doesn't get too far ahead of the archive
-        self.save_queue.put((key, response.content))
+        key = self.make_s3_key(request)
+        try:
+            storage = S3GlacierInstantRetrievalStorage()
+            # Don't try to cache responses that we pulled from the cache
+            if self.load and storage.exists(key):
+                return
+            logger.info("Queueing archive of response for %s", key)
+            # We want this to block so our scrape doesn't get too far ahead of the archive
+            self.save_queue.put((key, response.content))
+        except:
+            logger.exception(
+                "Failed to queue archive response for %s", request.url
+            )
 
     async def before_send(
-        self, manager: RequestManager, request: ScheduledRequest
+        self, _: RequestManager, request: ScheduledRequest
     ) -> None:
         if not self.load:
             return
@@ -93,17 +106,20 @@ class S3Cache(RequestHandler):
         if response:
             request.response.set_result(response)
 
-    async def listen(self, manager: RequestManager, request: ScheduledRequest):
+    async def listen(self, _: RequestManager, request: ScheduledRequest):
         if not self.save:
             return
 
         try:
             response = await request.response
-        except Exception:
+        except:
+            logger.exception(
+                "Cache listener failed to get response for %s", request.url
+            )
             return
 
         loop = asyncio.get_running_loop()
-        _ = loop.run_in_executor(None, self.save_to_s3, request, response)
+        await loop.run_in_executor(None, self.save_to_s3, request, response)
 
 
 def _archive_loop(responses: queue.Queue[tuple[str, bytes]]) -> None:
@@ -115,14 +131,21 @@ def _archive_loop(responses: queue.Queue[tuple[str, bytes]]) -> None:
         try:
             key, content = responses.get()
         except queue.ShutDown:
+            logger.exception("Archive queue forcibly shut down.")
             break
 
         logger.info("Archiving %s to %s", key, storage.bucket_name)
-        with storage.open(key, "wb") as f:
-            f.write(content)
+        try:
+            with storage.open(key, "wb") as f:
+                f.write(content)
+        except:
+            logger.exception(
+                "Failed to archive %s to %s", key, storage.bucket_name
+            )
+        else:
+            logger.info("Archived %s to %s", key, storage.bucket_name)
 
         responses.task_done()
-        logger.info("Archived %s to %s", key, storage.bucket_name)
 
 
 _COURT_ID_MAP: dict[str, FloridaCourtID] = {
@@ -144,32 +167,46 @@ async def _backfill(
     save_queue: queue.Queue[tuple[str, bytes]],
 ):
     logger.info("Starting Florida backfill...")
-    archive_loop = asyncio.to_thread(_archive_loop, save_queue)
-
-    for court_id, (start_date, end_date) in date_ranges.items():
-        i = 0
-        async for case in scraper.backfill(
-            start_date, end_date, court_ids=[court_id], full_scrape=full_scrape
-        ):
-            key = f"{S3_BASE}/parsed/{_make_case_number_key(case.docket_number)}.json"
-            content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
-            save_queue.put((key, content))
-            i += 1
-            if i % 100 == 0:
-                logger.info(
-                    "Updating checkpoint for %s to %s",
-                    court_id,
-                    case.date_filed,
-                )
-                checkpoint_trackers[court_id].set(case.date_filed)
-
-    logger.info(
-        "Florida backfill complete. Waiting for archiving to complete..."
+    archive_task = asyncio.create_task(
+        asyncio.to_thread(_archive_loop, save_queue)
     )
-    save_queue.join()
-    save_queue.shutdown()
-    await archive_loop
-    logger.info("Florida backfill and archive complete!")
+
+    try:
+        for court_id, (start_date, end_date) in date_ranges.items():
+            i = 0
+            async for case in scraper.backfill(
+                start_date,
+                end_date,
+                court_ids=[court_id],
+                full_scrape=full_scrape,
+            ):
+                key = f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(case.docket_number)}.json"
+                content = case.model_dump_json(ensure_ascii=True).encode(
+                    "utf-8"
+                )
+                save_queue.put((key, content))
+                i += 1
+                if i % 100 == 0:
+                    logger.info(
+                        "Updating checkpoint for %s to %s",
+                        court_id,
+                        case.date_filed,
+                    )
+                    checkpoint_trackers[court_id].set(case.date_filed)
+
+        logger.info(
+            "Florida backfill complete. Waiting for archiving to complete..."
+        )
+        save_queue.join()
+    except:
+        logger.exception("Florida backfill failed.")
+    else:
+        logger.info("Florida backfill completed successfully!")
+    finally:
+        logger.info("Waiting for Florida archive loop to finish...")
+        save_queue.shutdown()
+        await archive_task
+        logger.info("Florida archive loop complete.")
 
 
 class Command(StateBackScrapeCommand):
