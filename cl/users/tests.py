@@ -4343,7 +4343,6 @@ class UserProfileTotalApiUsageTest(TestCase):
         self.assertEqual(self.user.profile.total_api_usage, 0)
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsageTest")
 class ViewApiUsageTest(TestCase):
     """Tests for /profile/api-usage/."""
 

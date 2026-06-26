@@ -901,7 +901,6 @@ class ProfileMembershipTest(TestCase):
             )
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="MembershipWebhookThrottleSyncTest")
 class MembershipWebhookThrottleSyncTest(TestCase):
     """End-to-end tests that Neon webhooks sync APIThrottle rows."""
 
