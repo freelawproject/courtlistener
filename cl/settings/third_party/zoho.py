@@ -40,4 +40,5 @@ ZOHO_DESK_AGENT_ASSIGNMENTS: dict[str, str] = {
     "support": env("ZOHO_DESK_AGENT_SUPPORT", default=""),
     "volunteering": env("ZOHO_DESK_AGENT_VOLUNTEERING", default=""),
     "partnerships": env("ZOHO_DESK_AGENT_PARTNERSHIPS", default=""),
+    "data_export": env("ZOHO_DESK_AGENT_DATA_EXPORT", default=""),
 }
