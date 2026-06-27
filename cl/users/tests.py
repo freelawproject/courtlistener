@@ -34,6 +34,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -54,7 +55,8 @@ from cl.api.models import (
     WebhookEventType,
     WebhookVersions,
 )
-from cl.api.utils import clear_tiered_cache
+from cl.api.utils import DOUBLE_API_THROTTLES_SWITCH, clear_tiered_cache
+from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
     PROVIDERS,
     MembershipPaymentStatus,
@@ -430,6 +432,8 @@ class UserDataTest(LiveServerTestCase):
         self.assertEqual(len(recipients), 0)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
@@ -4421,6 +4425,89 @@ class ViewApiUsageTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertIn("/sign-in/", response["Location"])
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsagePromoTest")
+class ViewApiUsagePromoTest(TestCase):
+    """API-usage page reflects the x2 promo per membership type."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Isolate this class's tiered_cache namespace so cached overrides /
+        # exclusion sets don't leak across classes. Start in setUpClass so the
+        # patched prefix is active during setUp/tearDown clear_tiered_cache().
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_view_api_usage_promo_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def _add_membership(self, level: int, rate: str) -> None:
+        """Give the test user an active membership with one MEMBERSHIP rate."""
+        NeonMembershipFactory(user=self.user, level=level)
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate=rate,
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_non_member_default_doubled(self) -> None:
+        """Non-member: the displayed default rate is doubled during the promo."""
+        response = self.client.get(self.url)
+        # Test settings default is 5000/day; promo shows 10,000.
+        self.assertContains(response, "<strong>10,000</strong>")
+        self.assertContains(response, "per day")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
+    def test_non_member_default_not_doubled_when_off(self) -> None:
+        """Non-member: base default rate shown when the promo is off."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>5,000</strong>")
+        self.assertNotContains(response, "<strong>10,000</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_paid_member_doubled(self) -> None:
+        """Paid member: 10/min is shown as 20/min during the promo."""
+        self._add_membership(NeonMembershipLevel.TIER_2, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_lso_member_not_doubled(self) -> None:
+        """LSO member: rate shown unchanged during the promo."""
+        self._add_membership(NeonMembershipLevel.LSO_1, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>10</strong>")
+        self.assertNotContains(response, "<strong>20</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_edu_member_not_doubled(self) -> None:
+        """EDU member: rate shown unchanged during the promo."""
+        self._add_membership(NeonMembershipLevel.EDU, "20/hour")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per hour")
+        self.assertNotContains(response, "<strong>40</strong>")
 
 
 class TagZohoRecordForMembershipTest(TestCase):

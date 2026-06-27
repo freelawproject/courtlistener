@@ -44,8 +44,10 @@ from cl.api.models import (
     WebhookEventType,
 )
 from cl.api.utils import (
+    double_rate,
     get_all_throttle_overrides,
     get_recent_api_request_count,
+    promo_doubling_applies,
 )
 from cl.api.views import parse_throttle_rate_for_template
 from cl.custom_filters.decorators import check_honeypot
@@ -318,6 +320,10 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
             if isinstance(raw_default, str)
             else list(raw_default)
         )
+    # Reflect the membership-promotion x2 boost so the displayed limits match
+    # what the throttle actually enforces.
+    if promo_doubling_applies(request.user):
+        user_rates = [double_rate(r) for r in user_rates]
     # Drop "0/..." rates — those mean blocked, not a throughput limit.
     throttle_rates = [
         parsed

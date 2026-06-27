@@ -40,6 +40,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 from rest_framework_filters.filterset import related
+from waffle import switch_is_active
 
 from cl.api.constants import LEVEL_TO_RATES
 from cl.api.models import (
@@ -52,7 +53,11 @@ from cl.api.models import (
     WebhookVersions,
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
-from cl.donate.models import MembershipPaymentStatus, NeonMembership
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+)
 from cl.lib.decorators import clear_tiered_cache, tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.constants import StatMetric, StatWebhookEventType
@@ -796,6 +801,62 @@ def get_all_throttle_overrides(
     return overrides
 
 
+# Temporary: membership-promotion x2 API boost. Remove this
+# block and its call sites when the promo ends.
+DOUBLE_API_THROTTLES_SWITCH = "double_api_throttles"
+
+
+def double_rate(rate: str) -> str:
+    """Return a DRF rate string with its request count doubled.
+
+    Example:
+        "10/min" -> "20/min"
+    """
+    num, _, period = rate.partition("/")
+    return f"{int(num) * 2}/{period}"
+
+
+@tiered_cache(timeout=300)  # 5 minute cache
+def get_promo_excluded_usernames() -> set[str]:
+    """Return usernames excluded from the x2 API promotion.
+
+    Excluded users:
+    - Users with a manual/commercial API throttle override.
+    - Active LSO and EDU members.
+
+    All other authenticated users receive doubled API limits while the
+    promotion switch is enabled.
+    """
+    manual_users = set(
+        APIThrottle.objects.filter(
+            throttle_type=ThrottleType.API,
+            source=APIThrottle.Source.MANUAL,
+        ).values_list("user__username", flat=True)
+    )
+    today = now().date()
+    lso_edu_members = set(
+        NeonMembership.objects.filter(
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            level__in=(NeonMembershipLevel.LSO_1, NeonMembershipLevel.EDU),
+        )
+        .filter(
+            Q(termination_date__isnull=True)
+            | Q(termination_date__date__gte=today)
+        )
+        .values_list("user__username", flat=True)
+    )
+    return manual_users | lso_edu_members
+
+
+def promo_doubling_applies(user: User) -> bool:
+    """Return whether the x2 API promotion applies to this user."""
+    if not switch_is_active(DOUBLE_API_THROTTLES_SWITCH):
+        return False
+    if not user.is_authenticated:
+        return False
+    return user.username not in get_promo_excluded_usernames()
+
+
 def apply_membership_throttles(
     user: User, level: int, clear_cache: bool = False
 ) -> bool:
@@ -879,6 +940,8 @@ def get_recent_api_request_count(user: User, window_seconds: int) -> int:
     that returns an accurate count.
     """
     key = UserRateThrottle.cache_format % {"scope": "user", "ident": user.pk}
+    if promo_doubling_applies(user):
+        key = f"{key}_promo2x"
     history: list[float] = default_cache.get(key, [])
     cutoff = time.time() - window_seconds
     return sum(1 for ts in history if ts > cutoff)
@@ -931,6 +994,16 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         if self.rate is not None:
             self.num_requests, self.duration = self.parse_rate(self.rate)
 
+    def get_cache_key(self, request, view):
+        key = super().get_cache_key(request, view)
+        if key is None:
+            return None
+        # Promo: isolate doubled-quota usage so reverting to base rates at
+        # promo end doesn't count it against the smaller window.
+        if self.scope == "user" and promo_doubling_applies(request.user):
+            return f"{key}_promo2x"
+        return key
+
     def allow_request(self, request, view):
         if self.rate is None:
             return True
@@ -944,6 +1017,8 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
 
         overrides = get_all_throttle_overrides(self.throttle_type)
         rates = overrides.get(request.user.username) or self.default_rates
+        if promo_doubling_applies(request.user):
+            rates = [double_rate(r) for r in rates]
         return self._check_multi_rate(rates)
 
     def _check_multi_rate(self, rates: list[str]) -> bool:
