@@ -35,10 +35,8 @@ from django.views.decorators.debug import (
 from django.views.decorators.http import require_http_methods
 from rest_framework.authtoken.models import Token
 from rest_framework.renderers import JSONRenderer
-from waffle import switch_is_active
 
 from cl.alerts.models import DocketAlert
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
     ThrottleType,
@@ -46,8 +44,6 @@ from cl.api.models import (
     WebhookEventType,
 )
 from cl.api.utils import (
-    LEGACY_USER_DEFAULT_RATE,
-    USE_NEW_THROTTLE_DEFAULTS_SWITCH,
     get_all_throttle_overrides,
     get_recent_api_request_count,
 )
@@ -314,33 +310,22 @@ def reset_api_token(request: AuthenticatedHttpRequest) -> HttpResponse:
 @login_required
 @never_cache
 def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
-    show_membership_features = switch_is_active(
-        SYNC_MEMBERSHIP_THROTTLES_SWITCH
-    )
-
-    throttle_rates: list[tuple[int, str]] = []
-    if show_membership_features:
-        overrides = get_all_throttle_overrides(ThrottleType.API)
-        user_rates = overrides.get(request.user.username) or []
-        if not user_rates:
-            if switch_is_active(USE_NEW_THROTTLE_DEFAULTS_SWITCH):
-                raw_default = settings.REST_FRAMEWORK[
-                    "DEFAULT_THROTTLE_RATES"
-                ]["user"]
-                user_rates = (
-                    [raw_default]
-                    if isinstance(raw_default, str)
-                    else list(raw_default)
-                )
-            else:
-                user_rates = [LEGACY_USER_DEFAULT_RATE]
-        # Drop "0/..." rates — those mean blocked, not a throughput limit.
-        throttle_rates = [
-            parsed
-            for r in user_rates
-            if not r.startswith("0/")
-            and (parsed := parse_throttle_rate_for_template(r)) is not None
-        ]
+    overrides = get_all_throttle_overrides(ThrottleType.API)
+    user_rates = overrides.get(request.user.username) or []
+    if not user_rates:
+        raw_default = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["user"]
+        user_rates = (
+            [raw_default]
+            if isinstance(raw_default, str)
+            else list(raw_default)
+        )
+    # Drop "0/..." rates — those mean blocked, not a throughput limit.
+    throttle_rates = [
+        parsed
+        for r in user_rates
+        if not r.startswith("0/")
+        and (parsed := parse_throttle_rate_for_template(r)) is not None
+    ]
 
     return TemplateResponse(
         request,
@@ -349,7 +334,6 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
             "private": True,
             "page": "api_usage",
             "page_title": "API Usage",
-            "show_membership_features": show_membership_features,
             "throttle_rates": throttle_rates,
         },
     )

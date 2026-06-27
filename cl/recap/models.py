@@ -91,6 +91,17 @@ class PacerHtmlFiles(AbstractFile, AbstractDateTimeModel):
         choices=UPLOAD_TYPE.NAMES,
     )
 
+    class Meta:
+        indexes = [
+            # The GenericForeignKey (content_type, object_id) is queried as a
+            # pair on every cascade delete of the related object (e.g. Docket,
+            # DocketEntry). See GenericForeignKey indexing docs.
+            models.Index(
+                fields=["content_type", "object_id"],
+                name="recap_pacerhtmlfiles_ct_obj_idx",
+            ),
+        ]
+
 
 class PROCESSING_STATUS:
     ENQUEUED = 1
