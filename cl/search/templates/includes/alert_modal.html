@@ -115,6 +115,10 @@
                   You've used all of the alerts included with your membership.
                   To create this alert, upgrade your membership or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
                 </p>
+                <p id="msg-quota-member-legacy" class="hidden">
+                  You've used all of the alerts included with your legacy membership.
+                  Legacy memberships can't be upgraded online, but <a href="{{ alerts_context.legacyHelpUrl }}" target="_blank">here's how to get more features</a>, or <a href="{% url 'profile_alerts' %}">disable a RECAP alert</a>.
+                </p>
               {% endif %}
 
               <p class="bottom">
@@ -124,6 +128,10 @@
                 <a href="https://donate.free.law/constituent/memberships/upgrade/{{ alerts_context.neon_id }}"
                    id="member-button" class="hidden btn btn-danger"
                    target="_blank" rel="noopener noreferrer">Upgrade Membership</a>
+                   target="_blank">Upgrade Membership</a>
+                <a href="{{ alerts_context.legacyHelpUrl }}"
+                   id="member-legacy-button" class="hidden btn btn-danger"
+                   target="_blank">Get More Features</a>
               </p>
             </div>
             {% if request.GET.edit_alert %}
