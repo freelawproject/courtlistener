@@ -2,7 +2,6 @@
 
 import asyncio
 import hashlib
-import queue
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -19,17 +18,16 @@ from juriscraper.state.RequestManager import (
     ScheduledRequest,
 )
 
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.lib.storage import (
-    S3GlacierInstantRetrievalStorage,
-    clobbering_get_name,
-)
+from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.scrapers.management.utils import (
     ScraperCheckpointTracker,
     StateBackScrapeCommand,
     _make_case_number_key,
     _parse_date,
 )
+from cl.scrapers.tasks import save_response_to_s3
 
 S3_BASE = Path("responses/dockets/florida")
 
@@ -45,7 +43,7 @@ class S3Cache(RequestHandler):
     base: Path
     save: bool
     load: bool
-    save_queue: queue.Queue[tuple[str, bytes]]
+    queue_name: str
 
     def make_s3_key(self, request: ScheduledRequest) -> str:
         url_path = request.url.path.lower().strip("/")
@@ -87,8 +85,9 @@ class S3Cache(RequestHandler):
             # Don't try to cache responses that we pulled from the cache
             if self.load and storage.exists(key):
                 return
-            # We want this to block so our scrape doesn't get too far ahead of the archive
-            self.save_queue.put((key, response.content))
+            save_response_to_s3.si(key, response.content).set(
+                queue=self.queue_name
+            ).apply_async()
         except Exception:
             logger.exception(
                 "Failed to queue archive response for %s", request.url
@@ -120,31 +119,6 @@ class S3Cache(RequestHandler):
         await loop.run_in_executor(None, self.save_to_s3, request, response)
 
 
-def _archive_loop(responses: queue.Queue[tuple[str, bytes]]) -> None:
-    storage = S3GlacierInstantRetrievalStorage(
-        naming_strategy=clobbering_get_name
-    )
-
-    while True:
-        try:
-            key, content = responses.get()
-        except queue.ShutDown:
-            logger.info("Archive queue shut down.")
-            break
-
-        try:
-            with storage.open(key, "wb") as f:
-                f.write(content)
-        except Exception:
-            logger.exception(
-                "Failed to archive %s to %s", key, storage.bucket_name
-            )
-        else:
-            logger.info("Archived %s to %s", key, storage.bucket_name)
-
-        responses.task_done()
-
-
 _COURT_ID_MAP: dict[str, FloridaCourtID] = {
     "fla": FloridaCourtID.SUPREME_COURT,
     "fladistctapp1": FloridaCourtID.FIRST_COA,
@@ -161,13 +135,11 @@ async def _backfill(
     full_scrape: bool,
     checkpoint_trackers: dict[FloridaCourtID, ScraperCheckpointTracker],
     scraper: FloridaScraper,
-    save_queue: queue.Queue[tuple[str, bytes]],
+    throttle: CeleryThrottle,
+    queue_name: str,
 ):
     logger.info("Starting Florida backfill...")
-    archive_task = asyncio.create_task(
-        asyncio.to_thread(_archive_loop, save_queue)
-    )
-
+    loop = asyncio.get_running_loop()
     try:
         for court_id, (start_date, end_date) in date_ranges.items():
             i = 0
@@ -181,7 +153,14 @@ async def _backfill(
                 content = case.model_dump_json(ensure_ascii=True).encode(
                     "utf-8"
                 )
-                save_queue.put((key, content))
+                # Throttle dispatch so we don't flood the broker / get too far
+                # ahead of the workers. Runs in an executor so the scraper's
+                # in-flight requests on this event loop aren't frozen while we
+                # wait on the queue length.
+                await loop.run_in_executor(None, throttle.maybe_wait)
+                save_response_to_s3.si(key, content).set(
+                    queue=queue_name
+                ).apply_async()
                 i += 1
                 if i % 100 == 0:
                     logger.info(
@@ -190,20 +169,10 @@ async def _backfill(
                         case.date_filed,
                     )
                     checkpoint_trackers[court_id].set(case.date_filed)
-
-        logger.info(
-            "Florida backfill complete. Waiting for archiving to complete..."
-        )
-        save_queue.join()
     except Exception:
         logger.exception("Florida backfill failed.")
     else:
         logger.info("Florida backfill completed successfully!")
-    finally:
-        logger.info("Waiting for Florida archive loop to finish...")
-        save_queue.shutdown()
-        await archive_task
-        logger.info("Florida archive loop complete.")
 
 
 class Command(StateBackScrapeCommand):
@@ -266,6 +235,19 @@ class Command(StateBackScrapeCommand):
             default=False,
             help="If set the scraper will archive responses to S3.",
         )
+        parser.add_argument(
+            "--queue",
+            default="batch1",
+            help="The celery queue to dispatch S3 archive tasks to.",
+        )
+        parser.add_argument(
+            "--throttle-min-items",
+            dest="throttle_min_items",
+            type=int,
+            default=50,
+            help="CeleryThrottle min queue depth; the throttle keeps the "
+            "queue between this and 2x this value.",
+        )
 
     def handle(
         self,
@@ -278,6 +260,8 @@ class Command(StateBackScrapeCommand):
         full_scrape: bool,
         use_cache: bool,
         archive_responses: bool,
+        queue: str,
+        throttle_min_items: int,
         backscrape_start: str,
         backscrape_end: str,
         courts: str,
@@ -292,7 +276,6 @@ class Command(StateBackScrapeCommand):
         if not court_ids:
             logger.warning("No courts specified. Defaulting to all courts.")
             court_ids = list(_COURT_ID_MAP.values())
-        save_queue: queue.Queue[tuple[str, bytes]] = queue.Queue(maxsize=2048)
         scraper = FloridaScraper(
             rps=rps,
             retry=ExponentialBackoff(
@@ -305,7 +288,7 @@ class Command(StateBackScrapeCommand):
                     base=S3_BASE,
                     save=archive_responses,
                     load=use_cache,
-                    save_queue=save_queue,
+                    queue_name=queue,
                 )
             ],
         )
@@ -332,10 +315,15 @@ class Command(StateBackScrapeCommand):
             ),
         )
 
+        throttle = CeleryThrottle(
+            queue_name=queue, min_items=throttle_min_items
+        )
+
         async_to_sync(_backfill)(
             date_ranges=date_ranges,
             full_scrape=full_scrape,
             checkpoint_trackers=self.checkpoint_trackers,
             scraper=scraper,
-            save_queue=save_queue,
+            throttle=throttle,
+            queue_name=queue,
         )
