@@ -213,10 +213,10 @@ class BaseMergerTest(TestCase):
                 param=True, default=self.docket.docket_number + "New"
             )
             docket_entries: list[DocketEntry] = OneToManyMerger[
-                dict[str, Any], dict[str, Any], DocketEntry
+                dict[str, list[dict[str, str]]], dict[str, str], DocketEntry
             ](
                 TestRelatedMerger,
-                lambda d: d["mctest"],
+                lambda d: d["mctest"],  # type: ignore[misc]
             )
 
             def query(self):

@@ -1,6 +1,11 @@
 import logging
 import typing
-from collections.abc import Callable, Iterable, Mapping, MutableMapping
+from collections.abc import (
+    Callable,
+    Iterable,
+    MutableMapping,
+    Sequence,
+)
 from typing import (
     Any,
     ClassVar,
@@ -21,7 +26,6 @@ from django.db.models import (
 from django.db.models.manager import Manager
 
 from cl.corpus_importer.state.utils import MergeResult
-from cl.lib.utils import is_iter
 
 if typing.TYPE_CHECKING:
     from django.db.models.fields.related_descriptors import RelatedManager
@@ -53,27 +57,31 @@ def _default_transform[D, T](d: D, value: T | None = None) -> T | None:
     return value
 
 
-class MergerSpecification[D, T]:
+class MergerSpecification[ScrapeType, TransformType, MergeType]:
     __slots__ = "name", "_transform", "default", "param"
 
     def __init__(
         self,
-        transform: Callable[Concatenate[D, ...], T | None] | None = None,
+        transform: Callable[Concatenate[ScrapeType, ...], TransformType]
+        | None = None,
         param: bool = False,
-        default: T | None = None,
+        default: TransformType | None = None,
     ):
         # We use a value kwarg to pass parameters from the merger to attributes, so we need to make sure the transforms
         # can accept it. Should probably come up with a better way of handling this
         if transform is None:
             transform = cast(
-                Callable[Concatenate[D, ...], T | None], _default_transform
+                Callable[Concatenate[ScrapeType, ...], TransformType],
+                _default_transform,
             )
-        self._transform: Callable[Concatenate[D, ...], T | None] = transform
-        self.default: T | None = default
+        self._transform: Callable[
+            Concatenate[ScrapeType, ...], TransformType
+        ] = transform
+        self.default: TransformType | None = default
         self.param: bool = param
         self.name: str = ""
 
-    def register(self, merger: "Merger[D, Any]"):
+    def register(self, merger: "Merger[MergeType, Any]"):
         """Register this specification with the given merger.
 
         :param merger: The merger to register this specification with."""
@@ -92,7 +100,7 @@ class MergerSpecification[D, T]:
         if not issubclass(owner, Merger):
             return
         self.name = name
-        self.register(cast(Merger[D, Any], owner))
+        self.register(cast(Merger[MergeType, Any], owner))
         try:
             f = owner.model._meta.get_field(self.name)
         except FieldDoesNotExist as e:
@@ -107,7 +115,9 @@ class MergerSpecification[D, T]:
             return
         owner.errors += self.validate(f)
 
-    def transform(self, d: D, value: T | None = None) -> T | None:
+    def transform(
+        self, d: ScrapeType, value: TransformType | None = None
+    ) -> TransformType | None:
         if self.param:
             v = self._transform(d, value=value)
         else:
@@ -118,7 +128,7 @@ class MergerSpecification[D, T]:
         return v
 
 
-class AttributeMerger[D, T](MergerSpecification[D, T], Any):
+class AttributeMerger[D, T](MergerSpecification[D, T, D], Any):
     """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
 
     :param transform: Defines how to get the DB value from the scrape data
@@ -146,18 +156,24 @@ class AttributeMerger[D, T](MergerSpecification[D, T], Any):
         merger.__registry__.attr[self.name] = self
 
 
-class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
+class SubMerger[
+    ScrapeType,
+    TransformType,
+    RM: Model,
+    MergeType,
+](MergerSpecification[ScrapeType, TransformType, MergeType]):
     __slots__ = "merger"
 
     def __init__(
         self,
-        merger: "type[Merger[T, RM]]",
-        transform: Callable[Concatenate[D, ...], T | None] | None = None,
+        merger: "type[Merger[MergeType, RM]]",
+        transform: Callable[Concatenate[ScrapeType, ...], TransformType]
+        | None = None,
         param: bool = False,
-        default: T | None = None,
+        default: TransformType | None = None,
     ):
         super().__init__(transform, param, default)
-        self.merger: type[Merger[T, RM]] = merger
+        self.merger: type[Merger[MergeType, RM]] = merger
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
@@ -183,16 +199,16 @@ class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
                 )
         return errors
 
-    def register(self, merger: "Merger[D, Any]"):
+    def register(self, merger: "Merger[MergeType, Any]"):
         merger.__registry__.related[self.name] = cast(
-            SubMerger[Any, Any, Model], self
+            SubMerger[Any, Any, Model, Any], self
         )
 
-    def merge(self, parent: RM, i: D) -> MergeResult[Any]:
+    def merge(self, parent: RM, i: ScrapeType) -> MergeResult[Any]:
         raise NotImplementedError
 
 
-class OneToOneMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
+class OneToOneMerger[D, T, RM: Model](SubMerger[D, T | None, RM, T], Any):
     """Class encapsulating logic for merging a one-to-one relationship."""
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
@@ -221,7 +237,27 @@ class OneToOneMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
         return result
 
 
-class OneToManyMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
+class NToManyMerger[ScrapeType, TransformType, RM: Model](
+    SubMerger[ScrapeType, Sequence[TransformType], RM, TransformType]
+):
+    """Class encapsulating logic for merging an N-to-many relationship."""
+
+    def __init__(
+        self,
+        merger: "type[Merger[TransformType, RM]]",
+        transform: Callable[
+            Concatenate[ScrapeType, ...], Sequence[TransformType]
+        ]
+        | None = None,
+        param: bool = False,
+        default: Sequence[TransformType] | None = None,
+    ):
+        if default is None:
+            default = []
+        super().__init__(merger, transform, param, default)
+
+
+class OneToManyMerger[D, T, RM: Model](NToManyMerger[D, T, RM], Any):
     """Class encapsulating logic for merging a one-to-many relationship. More precisely: defines how to merge a
     collection of `B` models which have foreign keys pointing to a single `A` model (i.e. `DocketEntry` -> `Docket`)."""
 
@@ -239,12 +275,10 @@ class OneToManyMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
         if merger_input is None:
             return MergeResult.unnecessary()
 
-        # A lone `str`/`bytes`/`Mapping` is iterable but is not a collection of
-        # children -- iterating it would silently feed characters or keys to the
-        # child merger. Reject those (and anything not iterable at all).
-        if isinstance(merger_input, (str, bytes, Mapping)) or not is_iter(
-            merger_input
-        ):
+        # A lone `str`/`bytes` is iterable but is not a collection of
+        # children -- iterating it would silently feed characters to the
+        # child merger.
+        if isinstance(merger_input, (str, bytes)):
             return MergeResult.failed(self.merger.model.__name__)
         result = MergeResult.unnecessary()
         related_manager: RelatedManager[Any] = getattr(parent, self.name)
@@ -256,7 +290,7 @@ class OneToManyMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
 
 
 class ManyToManyMerger[D, T, ThruM: Model, RM: Model](
-    SubMerger[D, T, RM], Any
+    NToManyMerger[D, T, RM], Any
 ):
     """Class encapsulating logic for merging a many-to-many relationship."""
 
@@ -266,9 +300,9 @@ class ManyToManyMerger[D, T, ThruM: Model, RM: Model](
         self,
         merger: "type[Merger[T, RM]]",
         through: "type[Merger[T, ThruM]]",
-        transform: Callable[Concatenate[D, ...], T | None] | None = None,
+        transform: Callable[Concatenate[D, ...], Sequence[T]] | None = None,
         param: bool = False,
-        default: T | None = None,
+        default: Sequence[T] | None = None,
     ):
         super().__init__(merger, transform, param, default)
         self.through: type[Merger[T, ThruM]] = through
@@ -290,15 +324,18 @@ class ManyToManyMerger[D, T, ThruM: Model, RM: Model](
         raise NotImplementedError
 
 
-class MergerSpecRegistry:
+class MergerSpecRegistry[ScrapeType]:
     def __init__(
         self,
         *,
-        related: dict[str, SubMerger[Any, Any, Model]] | None = None,
-        attr: dict[str, AttributeMerger[Any, Any]] | None = None,
+        related: dict[str, SubMerger[ScrapeType, Any, Model, Any]]
+        | None = None,
+        attr: dict[str, AttributeMerger[ScrapeType, Any]] | None = None,
     ):
-        self.related: dict[str, SubMerger[Any, Any, Model]] = related or {}
-        self.attr: dict[str, AttributeMerger[Any, Any]] = attr or {}
+        self.related: dict[str, SubMerger[ScrapeType, Any, Model, Any]] = (
+            related or {}
+        )
+        self.attr: dict[str, AttributeMerger[ScrapeType, Any]] = attr or {}
 
     def __copy__(self) -> Self:
         return self.__class__(related=self.related, attr=self.attr)
@@ -327,7 +364,7 @@ class MergerMeta(type):
         # "Why not just register merger specs in __init_subclass__ then?" I hear you ask. I tried this, but it required
         # filtering class attributes before registration, which felt messy, and it just made the __init_subclass__ body
         # too big and confusing.
-        registry = MergerSpecRegistry()
+        registry: MergerSpecRegistry[Any] = MergerSpecRegistry()
         for base in bases:
             if hasattr(base, "__registry__") and isinstance(
                 base.__registry__, MergerSpecRegistry
@@ -357,7 +394,7 @@ class Merger[D, M: Model](metaclass=MergerMeta):
     atomic: ClassVar[bool] = False
     key: ClassVar[Iterable[str]] = []
     errors: ClassVar[list[Exception]]
-    __registry__: ClassVar[MergerSpecRegistry]
+    __registry__: ClassVar[MergerSpecRegistry[Any]]
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -466,14 +503,14 @@ class Merger[D, M: Model](metaclass=MergerMeta):
         if self.existing is None:
             try:
                 self.existing = self.query().get()
-            except self.model.MultipleObjectsReturned:
+            except self.model.MultipleObjectsReturned:  # type: ignore[attr-defined]
                 logger.error(
                     "Merger %s found multiple objects; skipping merge.",
                     self.__class__.__name__,
                 )
                 self.result = MergeResult.failed(self.model.__name__)
                 return self.result
-            except self.model.DoesNotExist:
+            except self.model.DoesNotExist:  # type: ignore[attr-defined]
                 self.existing = None
 
         if self.atomic:
