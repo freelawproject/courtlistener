@@ -194,8 +194,8 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
         return query_broad
 
     @staticmethod
-    def validate(docket_data: FloridaCase) -> bool:
-        if docket_data.court_id not in FLORIDA_COURT_ID_MAP:
-            logger.error("Unknown court id: %s", docket_data.court_id)
+    def validate(scrape: FloridaCase) -> bool:
+        if scrape.court_id not in FLORIDA_COURT_ID_MAP:
+            logger.error("Unknown court id: %s", scrape.court_id)
             return False
         return True

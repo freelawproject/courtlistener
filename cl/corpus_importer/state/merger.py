@@ -1,5 +1,6 @@
 import logging
 import typing
+from abc import ABC, abstractmethod
 from collections.abc import (
     Callable,
     Iterable,
@@ -57,8 +58,8 @@ def _default_transform[D, T](d: D, value: T | None = None) -> T | None:
     return value
 
 
-class MergerSpecification[ScrapeType, TransformType, MergeType]:
-    __slots__ = "name", "_transform", "default", "param"
+class MergerSpecification[ScrapeType, TransformType, MergeType](ABC):
+    __slots__: tuple[str, ...] = "name", "_transform", "default", "param"
 
     def __init__(
         self,
@@ -81,6 +82,7 @@ class MergerSpecification[ScrapeType, TransformType, MergeType]:
         self.param: bool = param
         self.name: str = ""
 
+    @abstractmethod
     def register(self, merger: "Merger[MergeType, Any]"):
         """Register this specification with the given merger.
 
@@ -135,7 +137,7 @@ class AttributeMerger[D, T](MergerSpecification[D, T, D], Any):
     :param strategy: How to behave when data is present in the scrape and DB. Defaults to overwriting the DB value
         only when the scraped value is present (not `None`), so a partial scrape won't overwrite existing data."""
 
-    __slots__ = "strategy"
+    __slots__: tuple[str, ...] = ("strategy",)
 
     def __init__(
         self,
@@ -223,7 +225,7 @@ class OneToOneMerger[D, T, RM: Model](SubMerger[D, T | None, RM, T], Any):
         if merger_input is None:
             return MergeResult.unnecessary()
 
-        db_obj = getattr(parent, self.name)
+        db_obj = cast(RM | None, getattr(parent, self.name))
         result = self.merger(merger_input, existing=db_obj).merge()
         if db_obj is None:
             model = self.merger.model
@@ -424,10 +426,10 @@ class Merger[D, M: Model](metaclass=MergerMeta):
             )
 
     @staticmethod
-    def validate(d: D) -> bool:
+    def validate(scrape: D) -> bool:
         """Validate the input data before attempting a merge operation
 
-        :param d: Input data to the merge
+        :param scrape: Input data to the merge
         :return: True if the input is valid and the merge operation can proceed. False if the merge operation should be
             canceled."""
         return True
