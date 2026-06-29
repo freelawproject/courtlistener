@@ -138,17 +138,6 @@ emails: dict[str, EmailType] = {
         "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },
-    "take_out_requested": {
-        "subject": "User wants their data. Need to send it to them.",
-        "body": "A user has requested their data in accordance with GDPR. "
-        "This means that if they're a EU citizen, you have to provide "
-        "them with their data. Their username and email are:\n\n"
-        " - %s\n"
-        " - %s\n\n"
-        "Good luck getting this taken care of.",
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.MANAGERS],
-    },
     "email_changed_successfully": {
         "subject": "Email changed successfully on CourtListener",
         "body": "Hello %s,\n\n"
