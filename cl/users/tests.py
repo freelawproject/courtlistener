@@ -473,6 +473,29 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             reverse("delete_profile_done"),
         )
 
+    @patch("cl.users.views.create_zoho_desk_ticket")
+    async def test_take_out_creates_zoho_desk_ticket(
+        self, mock_task: MagicMock
+    ) -> None:
+        """Does requesting a data export create a Zoho Desk ticket?"""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("take_out"),
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("take_out_done"))
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["email"], user.email)
+        self.assertEqual(call_kwargs["request_type"], "Data Export Request")
+        self.assertIn(user.username, call_kwargs["description"])
+        self.assertIn("Email Confirmed:", call_kwargs["description"])
+
     async def test_reset_api_token_get_renders_confirmation(self) -> None:
         """The reset page renders a password-confirmation form."""
         self.assertTrue(
