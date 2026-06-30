@@ -1,6 +1,6 @@
 from typing import Any, ClassVar
 
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 
 from cl.corpus_importer.state.merger import (
     Attribute,
@@ -35,13 +35,10 @@ class BaseMergerTest(TestCase):
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default="ABCDEFG")
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> Docket | None:
-                return None
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.none()
 
-        r = TestMerger.merge({}, params=None)
+        r = TestMerger({}, params=None).merge()
 
         self.assertEqual(
             Docket.objects.count(),
@@ -81,13 +78,10 @@ class BaseMergerTest(TestCase):
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default=new_dn)
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> Docket | None:
-                return tc.docket
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
 
-        r = TestMerger.merge({}, params=None)
+        r = TestMerger({}, params=None).merge()
 
         self.assertEqual(
             Docket.objects.count(),
@@ -132,7 +126,7 @@ class BaseMergerTest(TestCase):
         map_calls = 0
         dn = "ABCDEFG"
 
-        def test_mapping(i: dict[str, str], *args: Any, **kwargs: Any) -> str:
+        def test_mapping(i: dict[str, str], params) -> str:
             nonlocal map_calls
             map_calls += 1
             return dn
@@ -144,13 +138,10 @@ class BaseMergerTest(TestCase):
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(test_mapping)
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> Docket | None:
-                return None
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.none()
 
-        r = TestMerger.merge({}, params=None)
+        r = TestMerger({}, params=None).merge()
         self.assertEqual(map_calls, 1)
         docket = Docket.objects.get(pk=r.creates["Docket"].pop())
         self.assertEqual(docket.docket_number, dn)
@@ -184,14 +175,11 @@ class BaseMergerTest(TestCase):
                 )
             )
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> Docket | None:
-                return None
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.none()
 
         i = {"mctest": {"sr": "test"}}
-        result = TestMerger.merge(i, params=None)
+        result = TestMerger(i, params=None).merge()
 
         self.assertIn("OriginatingCourtInformation", result.creates)
         self.assertEqual(len(result.creates["OriginatingCourtInformation"]), 1)
@@ -206,11 +194,8 @@ class BaseMergerTest(TestCase):
 
             description: str = Attribute(lambda d, params: d["df"])
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> DocketEntry | None:
-                return None
+            def query(self) -> QuerySet[DocketEntry]:
+                return DocketEntry.objects.none()
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
@@ -225,11 +210,8 @@ class BaseMergerTest(TestCase):
                 lambda d, params: d["mctest"],
             )
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: None
-            ) -> Docket | None:
-                return None
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.none()
 
         i = {
             "mctest": [
@@ -238,7 +220,7 @@ class BaseMergerTest(TestCase):
                 {"df": "test3"},
             ]
         }
-        result = TestMerger.merge(i, params=None)
+        result = TestMerger(i, params=None).merge()
 
         self.assertIn("DocketEntry", result.creates)
         self.assertEqual(len(result.creates["DocketEntry"]), 3)
@@ -262,11 +244,8 @@ class BaseMergerTest(TestCase):
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default="ABCDEFG")
 
-            @classmethod
-            def get_existing(
-                cls, d: dict[str, str], manager, params: dict[str, Any]
-            ) -> Docket | None:
-                return None
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.none()
 
         class TestMerger2(TestMerger):
             court: Court = Attribute(default=self.court)
@@ -276,7 +255,7 @@ class BaseMergerTest(TestCase):
             )
 
         ats = "test"
-        result = TestMerger2.merge({}, params={"assigned_to_str": ats})
+        result = TestMerger2({}, params={"assigned_to_str": ats}).merge()
 
         self.assertIn("Docket", result.creates)
         self.assertEqual(len(result.creates["Docket"]), 1)

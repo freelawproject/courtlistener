@@ -17,7 +17,7 @@ from typing import (
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.exceptions import FieldDoesNotExist
 from django.db import transaction
-from django.db.models import Field, ForeignObjectRel, Model
+from django.db.models import Field, ForeignObjectRel, Model, QuerySet
 from django.db.models.manager import Manager
 
 from cl.corpus_importer.state.utils import MergeResult
@@ -215,9 +215,9 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
             return MergeResult.unnecessary()
 
         db_obj = cast(RM | None, getattr(parent, self.name))
-        result = self.merger.merge(
+        result = self.merger(
             merger_input, existing=db_obj, params=params
-        )
+        ).merge()
         if db_obj is None:
             model = self.merger.model
             model_name = model.__name__
@@ -282,9 +282,9 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         result = MergeResult.unnecessary()
         related_manager: RelatedManager[Any] = getattr(parent, self.name)
         for child in cast(Iterable[Any], merger_input):
-            result |= self.merger.merge(
+            result |= self.merger(
                 child, manager=related_manager, params=params
-            )
+            ).merge()
         #     children.append(cast(Model, child_obj))
         # related_manager.add(*children)
         return result
@@ -364,7 +364,7 @@ class MergerMeta(type):
         }
 
 
-class Merger[D, ParamType, M: Model](metaclass=MergerMeta):
+class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     """Base class for a merger which takes in `D` and merges it into `model`. Subclasses should generally not be
     instantiated; methods and attributes should be accessed directly from the class.
 
@@ -411,92 +411,137 @@ class Merger[D, ParamType, M: Model](metaclass=MergerMeta):
             )
 
     @staticmethod
-    def validate(d: D) -> bool:
+    def validate(scrape: ScrapeType) -> bool:
         """Validate the input data before attempting a merge operation
 
-        :param d: Input data to the merge
+        :param scrape: Input data to the merge
         :return: True if the input is valid and the merge operation can proceed. False if the merge operation should be
             canceled."""
         return True
 
-    @staticmethod
-    def after(d: D, m: M | None, r: MergeResult[Any]) -> None:
-        """Run extra processes after the merge operation completes or fails.
-
-        :param d: Input data to the merge
-        :param m: Merged object or None if the merge failed at this level
-        :param r: Result of the merge operation"""
-        ...
-
-    @classmethod
-    def get_existing(
-        cls, d: D, manager: Manager[Model], params: ParamType
-    ) -> M | None:
-        """Attempts to find an existing object in the DB to merge into based on the natural key
-
-        Raises `MultipleObjectsReturned` if the natural key matches more than one
-        object; callers are responsible for turning that into a merge failure.
-
-        :param d: The scraped data to look up
-        :param manager: The manager to use for lookups"""
-        try:
-            return cast(
-                M,
-                manager.get(
-                    **{
-                        name: cls.__registry__.attr[name].transform(d, params)
-                        for name in cls.key
-                    }
-                ),
-            )
-        except cls.model.DoesNotExist:  # type: ignore[attr-defined]
-            return None
-
-    @classmethod
-    def merge(
-        cls,
-        d: D,
+    def __init__(
+        self,
+        scrape: ScrapeType,
         *,
-        existing: M | None = None,
-        manager: Manager[Model] | None = None,
         params: ParamType,
-    ) -> MergeResult[Any]:
-        """Merge scraped data into the DB.
+        existing: M | None = None,
+        manager: Manager[M] | None = None,
+    ):
+        """Create an object to track the merge operation on the specified data.
 
-        :param d: The input data to merge
-        :param existing: An existing object to merge into, skipping lookup. Primarily useful for merging one-to-one
-            relationships and should generally not be passed.
-        :param manager: The manager to use for looking up the existing object. If not provided, the default manager for
-            the model will be used. Primarily useful for related-object mergers."""
-        if not cls.validate(d):
-            logger.error(f"Merger {cls.__name__} received invalid input.")
-            return MergeResult.failed(cls.model.__name__)
+        :param scrape: The scraped data to transform. Parameter values are passed as kwargs.
+        :param existing: Optional existing object to override the lookup in `get_existing`.
+        :param manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager."""
+        self.guarantee_valid()
+        result = None
+        valid = self.validate(scrape)
+        if not valid:
+            logger.error(
+                f"Merger {self.__class__.__name__} received invalid input."
+            )
+            result = MergeResult.failed(self.model.__name__)
+
+        self.scrape: ScrapeType = scrape
+        self.params: ParamType = params
+        self.result: MergeResult[Any] | None = result
+        self.out: M | None = None
+
+        self.transformed: dict[str, Any] = (
+            {
+                name: spec.transform(scrape, params)
+                for name, spec in self.__registry__.attr.items()
+            }
+            | {
+                name: spec.transform(scrape, params)
+                for name, spec in self.__registry__.related.items()
+            }
+            if valid
+            else {}
+        )
 
         if manager is None:
-            manager = cls.model._default_manager
+            manager = cast(Manager[M], self.model._default_manager)
+        self.manager: Manager[M] = manager
 
-        if existing is None:
+        self.existing: M | None = existing
+
+    def after(self) -> None:
+        """Run extra processes after the merge operation completes or fails."""
+        ...
+
+    def query(self) -> QuerySet[M]:
+        """Constructs a queryset to find an existing object in the DB, using the natural key defined by `cls.key`.
+
+        :return: The queryset to find the object."""
+        return self.manager.filter(
+            **{name: self.transformed[name] for name in self.key}
+        )
+
+    def merge(self) -> MergeResult[Any]:
+        """Merge scraped data into the DB."""
+        if self.result is not None:
+            raise RuntimeError(
+                f"Merger {self.__class__.__name__} already merged; cannot merge again."
+            )
+        if self.existing is None:
             try:
-                existing = cls.get_existing(d, manager, params)
-            except cls.model.MultipleObjectsReturned:  # type: ignore[attr-defined]
+                self.existing = self.query().get()
+            except self.model.MultipleObjectsReturned:  # type: ignore[attr-defined]
                 logger.error(
                     "Merger %s found multiple objects; skipping merge.",
-                    cls.__name__,
+                    self.__class__.__name__,
                 )
-                return MergeResult.failed(cls.model.__name__)
+                self.result = MergeResult.failed(self.model.__name__)
+                return self.result
+            except self.model.DoesNotExist:  # type: ignore[attr-defined]
+                self.existing = None
 
-        if cls.atomic:
+        if self.atomic:
             with transaction.atomic():
-                result, out_obj = cls._merge_tree(d, existing, manager, params)
+                result, out_obj = self.merge_one()
         else:
-            result, out_obj = cls._merge_tree(d, existing, manager, params)
-        cls.after(d, out_obj, result)
+            result, out_obj = self.merge_one()
+        self.result = result
+        self.out = out_obj
+        self.after()
         return result
 
-    @classmethod
-    def _merge_tree(
-        cls, d: D, db_obj: M | None, manager: Manager[Model], params: ParamType
-    ) -> tuple[MergeResult[Any], M | None]:
+    def build_object(self) -> M:
+        """Build the object to be merged into the DB based on `self.transformed`"""
+        return cast(
+            M,
+            self.model(
+                **{
+                    name: self.transformed[name]
+                    for name in self.__registry__.attr.keys()
+                }
+            ),
+        )
+
+    def update_existing(self, obj: M) -> list[str]:
+        """Merge `obj` into `self.existing` in-place and return the names of the updated fields. Does not execute
+        related mergers."""
+
+        if self.existing is None:
+            raise ValueError("Cannot merge object into None")
+        updated: list[str] = []
+        for name, spec in self.__registry__.attr.items():
+            obj_v = getattr(obj, name)
+            db_v = getattr(self.existing, name)
+            merged = spec.strategy(obj_v, db_v)
+            if merged != db_v:
+                setattr(
+                    self.existing,
+                    name,
+                    merged,
+                )
+                updated.append(name)
+        if updated:
+            self.existing.save(update_fields=updated)
+
+        return updated
+
+    def merge_one(self) -> tuple[MergeResult[Any], M | None]:
         """Merge the object's own attributes and then all of its related/child
         mergers, returning the combined result.
 
@@ -504,39 +549,26 @@ class Merger[D, ParamType, M: Model](metaclass=MergerMeta):
         `transaction.atomic()` block, so the object and its whole related tree
         commit or roll back together.
 
-        :param d: The input data to merge
-        :param db_obj: The object in the DB to merge into, if it exists
-
-        :return: The result of the merge operation and the (possibly unsaved) object"""
+        :return: The result of the merge operation and the merged object"""
         result = MergeResult.unnecessary()
-        scrape_values = {
-            name: am.transform(d, params)
-            for name, am in cls.__registry__.attr.items()
-        }
 
-        if db_obj is None:
-            db_obj = cast(
-                M,
-                manager.create(**scrape_values),
+        if self.existing is None:
+            db_obj = self.manager.create(
+                **{
+                    name: self.transformed[name]
+                    for name in self.__registry__.attr.keys()
+                }
             )
-            result = MergeResult.created(cls.model.__name__, db_obj.pk)
+            result = MergeResult.created(self.model.__name__, db_obj.pk)
         else:
-            update = False
-            for name, scrape_value in scrape_values.items():
-                db_value = getattr(db_obj, name)
-                merged_value = cls.__registry__.attr[name].strategy(
-                    scrape_value,
-                    db_value,
+            obj = self.build_object()
+            if self.update_existing(obj):
+                result = MergeResult.updated(
+                    self.model.__name__, self.existing.pk
                 )
-                if merged_value != db_value:
-                    setattr(db_obj, name, merged_value)
-                    update = True
+            db_obj = self.existing
 
-            if update:
-                db_obj.save()
-                result = MergeResult.updated(cls.model.__name__, db_obj.pk)
-
-        for rm in cls.__registry__.related.values():
-            result |= rm.merge(db_obj, d, params)
+        for rm in self.__registry__.related.values():
+            result |= rm.merge(db_obj, self.scrape, self.params)
 
         return result, db_obj

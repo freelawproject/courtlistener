@@ -55,7 +55,7 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.FIRST_COA.value,
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         mock_merge.assert_not_called()
         assert result.success is True
@@ -73,9 +73,9 @@ class FloridaMergerTest(TestCase):
             originating_cases=[originating],
         )
 
-        result = FloridaDocketMerger.merge(
+        result = FloridaDocketMerger(
             docket_data, existing=self.docket_sc, params=None
-        )
+        ).merge()
 
         assert result.success is True
         assert result.create is True
@@ -102,9 +102,9 @@ class FloridaMergerTest(TestCase):
             originating_cases=[originating],
         )
 
-        result = FloridaDocketMerger.merge(
+        result = FloridaDocketMerger(
             docket_data, existing=self.docket_sc, params=None
-        )
+        ).merge()
 
         assert result.success is True
         assert result.update is True
@@ -124,9 +124,9 @@ class FloridaMergerTest(TestCase):
             originating_cases=[],
         )
 
-        result = FloridaDocketMerger.merge(
+        result = FloridaDocketMerger(
             docket_data, existing=self.docket_sc, params=None
-        )
+        ).merge()
 
         assert result.success is True
         assert result.create is False
@@ -144,9 +144,9 @@ class FloridaMergerTest(TestCase):
             originating_cases=[first, second],
         )
 
-        result = FloridaDocketMerger.merge(
+        result = FloridaDocketMerger(
             docket_data, existing=self.docket_sc, params=None
-        )
+        ).merge()
 
         assert result.success is True
         oci_pk = next(iter(result.creates["OriginatingCourtInformation"]))
@@ -159,10 +159,8 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
-
-        assert result.success is False
-        assert "Docket" in result.failures
+        with self.assertRaises(RuntimeError):
+            FloridaDocketMerger(docket_data, params=None).merge()
 
     def test_merge_docket_supreme_court_creates_new(self):
         """Does merge_docket create a new supreme-court docket?"""
@@ -173,7 +171,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         new_pks = (
@@ -199,7 +197,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         assert "Docket" in result.updates
@@ -225,7 +223,7 @@ class FloridaMergerTest(TestCase):
             docket_number=agg_dn,
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         assert "Docket" in result.updates
@@ -243,7 +241,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         new_pks = (
@@ -270,7 +268,7 @@ class FloridaMergerTest(TestCase):
             entries=entries,
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         self.docket_sc.refresh_from_db()
@@ -287,7 +285,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         self.docket_sc.refresh_from_db()
@@ -308,7 +306,7 @@ class FloridaMergerTest(TestCase):
             ),
             pacer_case_id=str(docket_data.case_uuid),
         )
-        result = FloridaDocketMerger.merge(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         assert result.update is True
