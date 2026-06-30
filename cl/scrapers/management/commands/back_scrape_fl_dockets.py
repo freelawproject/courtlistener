@@ -2,10 +2,12 @@
 
 import asyncio
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 
+import botocore.exceptions
 from asgiref.sync import async_to_sync
 from django.core.management import CommandParser
 from httpx import Response
@@ -20,6 +22,7 @@ from juriscraper.state.RequestManager import (
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.scrapers.management.utils import (
     ScraperCheckpointTracker,
@@ -38,12 +41,35 @@ class S3Cache(RequestHandler):
 
     :ivar base: The prefix where cached values are stored
     :ivar save: Whether to archive responses
-    :ivar load: Whether to intercept requests and load responses from S3 if available"""
+    :ivar load: Whether to intercept requests and load responses from S3 if available
+    :ivar throttle: The celery throttle to use when adding responses to the queue
+    :ivar queue_name: The celery queue to dispatch archive tasks to
+    :ivar storage: The S3 storage backend to use for archiving and retrieval"""
 
     base: Path
     save: bool
     load: bool
+    throttle: CeleryThrottle
     queue_name: str
+    storage: S3GlacierInstantRetrievalStorage = field(
+        default_factory=S3GlacierInstantRetrievalStorage
+    )
+
+    @retry(
+        (
+            botocore.exceptions.HTTPClientError,
+            botocore.exceptions.ConnectionError,
+        ),
+        delay=1,
+        backoff=2,
+    )
+    @lru_cache(512)
+    def s3_key_exists(self, key: str) -> bool:
+        """Cached check for whether a key exists in S3 with retries. Allows us to avoid an extra `storage.exists` call
+        when `save` and `load` are both enabled."""
+        if self.storage.exists(key):
+            return True
+        return False
 
     def make_s3_key(self, request: ScheduledRequest) -> str:
         url_path = request.url.path.lower().strip("/")
@@ -60,14 +86,13 @@ class S3Cache(RequestHandler):
         key = self.make_s3_key(request)
 
         try:
-            storage = S3GlacierInstantRetrievalStorage()
-            if not storage.exists(key):
+            if not self.s3_key_exists(key):
                 logger.info("Did not find %s in S3", request.url.path.lower())
                 return None
 
             logger.info("Loading %s from S3", request.url.path.lower())
 
-            with storage.open(key, "rb") as f:
+            with self.storage.open(key, "rb") as f:
                 return Response(200, content=f.read())
         except Exception:
             logger.exception(
@@ -81,10 +106,10 @@ class S3Cache(RequestHandler):
     ) -> None:
         key = self.make_s3_key(request)
         try:
-            storage = S3GlacierInstantRetrievalStorage()
             # Don't try to cache responses that we pulled from the cache
-            if self.load and storage.exists(key):
+            if self.load and self.s3_key_exists(key):
                 return
+            self.throttle.maybe_wait()
             save_response_to_s3.si(key, response.content).set(
                 queue=self.queue_name
             ).apply_async()
@@ -94,7 +119,7 @@ class S3Cache(RequestHandler):
             )
 
     async def before_send(
-        self, _: RequestManager, request: ScheduledRequest
+        self, manager: RequestManager, request: ScheduledRequest
     ) -> None:
         if not self.load:
             return
@@ -103,7 +128,7 @@ class S3Cache(RequestHandler):
         if response:
             request.response.set_result(response)
 
-    async def listen(self, _: RequestManager, request: ScheduledRequest):
+    async def listen(self, manager: RequestManager, request: ScheduledRequest):
         if not self.save:
             return
 
@@ -176,9 +201,9 @@ async def _backfill(
 
 
 class Command(StateBackScrapeCommand):
-    help = "Back-scrape Florida dockets"
+    help: str = "Back-scrape Florida dockets"
 
-    checkpoint_trackers = {
+    checkpoint_trackers: dict[FloridaCourtID, ScraperCheckpointTracker] = {
         FloridaCourtID.SUPREME_COURT: ScraperCheckpointTracker("acisflsc"),
         FloridaCourtID.FIRST_COA: ScraperCheckpointTracker("acisfl1ac"),
         FloridaCourtID.SECOND_COA: ScraperCheckpointTracker("acisfl2ac"),
@@ -276,6 +301,11 @@ class Command(StateBackScrapeCommand):
         if not court_ids:
             logger.warning("No courts specified. Defaulting to all courts.")
             court_ids = list(_COURT_ID_MAP.values())
+
+        throttle = CeleryThrottle(
+            queue_name=queue, min_items=throttle_min_items
+        )
+
         scraper = FloridaScraper(
             rps=rps,
             retry=ExponentialBackoff(
@@ -288,6 +318,7 @@ class Command(StateBackScrapeCommand):
                     base=S3_BASE,
                     save=archive_responses,
                     load=use_cache,
+                    throttle=throttle,
                     queue_name=queue,
                 )
             ],
@@ -313,10 +344,6 @@ class Command(StateBackScrapeCommand):
                     for cid, (start, end) in date_ranges.items()
                 ]
             ),
-        )
-
-        throttle = CeleryThrottle(
-            queue_name=queue, min_items=throttle_min_items
         )
 
         async_to_sync(_backfill)(
