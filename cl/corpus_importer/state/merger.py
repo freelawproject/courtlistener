@@ -10,7 +10,6 @@ from collections.abc import (
 from typing import (
     Any,
     ClassVar,
-    Concatenate,
     Self,
     cast,
 )
@@ -118,7 +117,7 @@ class AttributeMerger[ScrapeType, ParamType, TransformType](
         transform: Callable[[ScrapeType, ParamType], TransformType]
         | None = None,
         strategy: Callable[
-            Concatenate[TransformType | None, TransformType | None, ...],
+            [TransformType | None, TransformType | None],
             TransformType | None,
         ] = overwrite_if_present,
         *,
@@ -126,23 +125,19 @@ class AttributeMerger[ScrapeType, ParamType, TransformType](
     ):
         super().__init__(transform=transform, default=default)
         self.strategy: Callable[
-            Concatenate[TransformType | None, TransformType | None, ...],
+            [TransformType | None, TransformType | None],
             TransformType | None,
         ] = strategy
 
 
 def Attribute[TransformType](
-    transform: Callable[..., TransformType] | None = None,
-    strategy: Callable[..., Any] = overwrite_if_present,
+    transform: Callable[[Any, Any], TransformType] | None = None,
+    strategy: Callable[
+        [Any, Any], TransformType | None
+    ] = overwrite_if_present,
     *,
     default: TransformType | None = None,
 ) -> Any:
-    # `transform`/`strategy` are intentionally loosely typed: callers pass bare
-    # `lambda d, params: ...`, whose param types can't be inferred (they'd bind
-    # to a type var appearing only in input position). Spelling the params as
-    # `...` lets the lambda body type-check while still inferring `TransformType`
-    # from the return, so `default` is checked against it. A generic `strategy`
-    # would re-poison that inference, so it stays `Any`.
     return AttributeMerger(transform, strategy, default=default)
 
 
