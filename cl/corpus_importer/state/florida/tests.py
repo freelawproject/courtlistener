@@ -55,7 +55,7 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.FIRST_COA.value,
         )
 
-        result = FloridaDocketMerger(docket_data).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         mock_merge.assert_not_called()
         assert result.success is True
@@ -74,7 +74,7 @@ class FloridaMergerTest(TestCase):
         )
 
         result = FloridaDocketMerger(
-            docket_data, existing=self.docket_sc
+            docket_data, existing=self.docket_sc, params=None
         ).merge()
 
         assert result.success is True
@@ -103,7 +103,7 @@ class FloridaMergerTest(TestCase):
         )
 
         result = FloridaDocketMerger(
-            docket_data, existing=self.docket_sc
+            docket_data, existing=self.docket_sc, params=None
         ).merge()
 
         assert result.success is True
@@ -125,7 +125,7 @@ class FloridaMergerTest(TestCase):
         )
 
         result = FloridaDocketMerger(
-            docket_data, existing=self.docket_sc
+            docket_data, existing=self.docket_sc, params=None
         ).merge()
 
         assert result.success is True
@@ -145,7 +145,7 @@ class FloridaMergerTest(TestCase):
         )
 
         result = FloridaDocketMerger(
-            docket_data, existing=self.docket_sc
+            docket_data, existing=self.docket_sc, params=None
         ).merge()
 
         assert result.success is True
@@ -159,7 +159,7 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
-        merger = FloridaDocketMerger(docket_data)
+        merger = FloridaDocketMerger(docket_data, params=None)
 
         assert merger.result is not None
         assert merger.result.success is False
@@ -177,7 +177,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger(docket_data).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         new_pks = (
@@ -203,7 +203,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger(docket_data).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         assert "Docket" in result.updates
@@ -229,7 +229,7 @@ class FloridaMergerTest(TestCase):
             docket_number=agg_dn,
         )
 
-        result = FloridaDocketMerger(docket_data).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         assert agg_docket.pk in result.updates["Docket"]
@@ -246,7 +246,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger(docket_data).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         new_pks = (
@@ -273,7 +273,7 @@ class FloridaMergerTest(TestCase):
             entries=entries,
         )
 
-        result = FloridaDocketMerger(docket_data).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         self.docket_sc.refresh_from_db()
@@ -290,7 +290,7 @@ class FloridaMergerTest(TestCase):
             entries=[],
         )
 
-        result = FloridaDocketMerger(docket_data).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         self.docket_sc.refresh_from_db()

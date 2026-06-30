@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from django.db.models import Model, QuerySet
 from juriscraper.state.florida import (
@@ -36,18 +36,18 @@ def add_scraper_source(scrape: int | None, db: int | None) -> int:
     return db
 
 
-class FloridaPartyMerger(Merger[FloridaParty, Person]):
+class FloridaPartyMerger(Merger[FloridaParty, Person, None]):
     model: ClassVar[type[Model]] = Person
 
 
-def _date_last_filing(docket_data: FloridaCase) -> date | None:
+def _date_last_filing(docket_data: FloridaCase, params: Any) -> date | None:
     filing_dates = sorted(
         e.date_filed for e in docket_data.entries if e.date_filed
     )
     return filing_dates[-1] if filing_dates else docket_data.date_filed
 
 
-def _appeal_from_id(docket_data: FloridaCase) -> str | None:
+def _appeal_from_id(docket_data: FloridaCase, params: Any) -> str | None:
     # Multiple originating cases are ambiguous, so leave the field unset.
     if len(docket_data.originating_cases) != 1:
         return None
@@ -56,7 +56,7 @@ def _appeal_from_id(docket_data: FloridaCase) -> str | None:
     )
 
 
-def _appeal_from_str(docket_data: FloridaCase) -> str | None:
+def _appeal_from_str(docket_data: FloridaCase, params: Any) -> str | None:
     # Multiple originating cases are ambiguous, so leave the field unset.
     if len(docket_data.originating_cases) != 1:
         return ""
@@ -64,22 +64,19 @@ def _appeal_from_str(docket_data: FloridaCase) -> str | None:
 
 
 class FloridaOriginatingCourtInformationMerger(
-    Merger[FloridaOriginatingCase, OriginatingCourtInformation]
+    Merger[FloridaOriginatingCase, OriginatingCourtInformation, None]
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-    docket_number: str = AttributeMerger[FloridaOriginatingCase, str](
-        lambda oc: oc.case_number, strategy=overwrite
+    docket_number: str = AttributeMerger[FloridaOriginatingCase, str, None](
+        lambda oc, params: oc.case_number, strategy=overwrite
     )
-    docket_number_raw: str = AttributeMerger[FloridaOriginatingCase, str](
-        lambda oc: oc.case_number, strategy=overwrite
-    )
+    docket_number_raw: str = AttributeMerger[
+        FloridaOriginatingCase, str, None
+    ](lambda oc, params: oc.case_number, strategy=overwrite)
 
-    @classmethod
-    def get_existing(
-        cls, oci: FloridaCase, _
-    ) -> OriginatingCourtInformation | None:
-        return None
+    def query(self) -> QuerySet[OriginatingCourtInformation]:
+        return OriginatingCourtInformation.objects.none()
 
 
 def _originating_case(
@@ -98,46 +95,46 @@ def _originating_case(
     return docket_data.originating_cases[0]
 
 
-class FloridaDocketMerger(Merger[FloridaCase, Docket]):
+class FloridaDocketMerger(Merger[FloridaCase, Docket, None]):
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
 
-    court_id: str = AttributeMerger[FloridaCase, str](
-        lambda d: FLORIDA_COURT_ID_MAP[d.court_id],
+    court_id: str = AttributeMerger[FloridaCase, str, None](
+        lambda d, params: FLORIDA_COURT_ID_MAP[d.court_id],
         strategy=overwrite,
     )
     source: int = AttributeMerger(
-        lambda _: Docket.SCRAPER,
+        lambda _, params: Docket.SCRAPER,
         strategy=add_scraper_source,
     )
-    date_filed: date | None = AttributeMerger[FloridaCase, date | None](
-        lambda d: d.date_filed,
+    date_filed: date | None = AttributeMerger[FloridaCase, date | None, None](
+        lambda d, params: d.date_filed,
         strategy=overwrite,
     )
     date_last_filing: date | None = AttributeMerger(
         _date_last_filing,
         strategy=overwrite,
     )
-    case_name: str = AttributeMerger[FloridaCase, str](
-        lambda d: d.case_name, strategy=overwrite
+    case_name: str = AttributeMerger[FloridaCase, str, None](
+        lambda d, params: d.case_name, strategy=overwrite
     )
-    case_name_full: str = AttributeMerger[FloridaCase, str](
-        lambda d: d.case_name_full,
+    case_name_full: str = AttributeMerger[FloridaCase, str, None](
+        lambda d, params: d.case_name_full,
         strategy=overwrite,
     )
-    case_name_short: str = AttributeMerger[FloridaCase, str](
-        lambda d: d.case_name, strategy=overwrite
+    case_name_short: str = AttributeMerger[FloridaCase, str, None](
+        lambda d, params: d.case_name, strategy=overwrite
     )
-    docket_number: str = AttributeMerger[FloridaCase, str](
-        lambda d: d.docket_number,
+    docket_number: str = AttributeMerger[FloridaCase, str, None](
+        lambda d, params: d.docket_number,
         strategy=overwrite,
     )
-    docket_number_raw: str = AttributeMerger[FloridaCase, str](
-        lambda d: d.docket_number, strategy=overwrite
+    docket_number_raw: str = AttributeMerger[FloridaCase, str, None](
+        lambda d, params: d.docket_number, strategy=overwrite
     )
-    docket_number_core: str = AttributeMerger[FloridaCase, str](
-        lambda d: make_docket_number_core(
+    docket_number_core: str = AttributeMerger[FloridaCase, str, None](
+        lambda d, params: make_docket_number_core(
             d.docket_number, court_id=FLORIDA_COURT_ID_MAP[d.court_id]
         ),
         strategy=overwrite,
@@ -150,13 +147,14 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     )
     # See https://github.com/freelawproject/courtlistener/issues/7361#issuecomment-4566459292
     pacer_case_id: str = AttributeMerger(
-        lambda d: d.case_uuid, strategy=overwrite
+        lambda d, params: d.case_uuid, strategy=overwrite
     )
     originating_court_information: OriginatingCourtInformation = (
         OneToOneMerger[
             FloridaCase,
             FloridaOriginatingCase,
             OriginatingCourtInformation,
+            None,
         ](
             FloridaOriginatingCourtInformationMerger,
             _originating_case,
