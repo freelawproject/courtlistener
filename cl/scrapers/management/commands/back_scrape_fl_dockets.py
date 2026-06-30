@@ -140,8 +140,10 @@ class S3Cache(RequestHandler):
             )
             return
 
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.save_to_s3, request, response)
+        self.save_to_s3(request, response)
+
+    def __hash__(self) -> int:
+        return hash(id(self))
 
 
 _COURT_ID_MAP: dict[str, FloridaCourtID] = {
@@ -178,14 +180,12 @@ async def _backfill(
                 content = case.model_dump_json(ensure_ascii=True).encode(
                     "utf-8"
                 )
-                # Throttle dispatch so we don't flood the broker / get too far
-                # ahead of the workers. Runs in an executor so the scraper's
-                # in-flight requests on this event loop aren't frozen while we
-                # wait on the queue length.
-                await loop.run_in_executor(None, throttle.maybe_wait)
+
+                throttle.maybe_wait()
                 save_response_to_s3.si(key, content).set(
                     queue=queue_name
                 ).apply_async()
+
                 i += 1
                 if i % 100 == 0:
                     logger.info(
