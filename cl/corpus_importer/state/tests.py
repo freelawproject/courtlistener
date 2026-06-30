@@ -5,7 +5,8 @@ from django.db.models import Model
 from cl.corpus_importer.state.merger import (
     Attribute,
     Merger,
-    Related,
+    OneToManyRelation,
+    OneToOneRelation,
 )
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import CourtFactory, DocketFactory
@@ -171,7 +172,7 @@ class BaseMergerTest(TestCase):
                 param=True, default=self.docket.docket_number + "New"
             )
             originating_court_information: OriginatingCourtInformation = (
-                Related(
+                OneToOneRelation(
                     TestRelatedMerger,
                     lambda d, *args, **kwargs: d["mctest"],
                 )
@@ -209,7 +210,7 @@ class BaseMergerTest(TestCase):
             docket_number: str = Attribute(
                 param=True, default=self.docket.docket_number + "New"
             )
-            docket_entries: list[DocketEntry] = Related(
+            docket_entries: list[DocketEntry] = OneToManyRelation(
                 TestRelatedMerger,
                 lambda d: d["mctest"],
             )
