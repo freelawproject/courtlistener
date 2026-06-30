@@ -34,14 +34,14 @@ def add_scraper_source(scrape: int | None, db: int | None) -> int:
     return db
 
 
-def _date_last_filing(docket_data: FloridaCase) -> date | None:
+def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:
     filing_dates = sorted(
         e.date_filed for e in docket_data.entries if e.date_filed
     )
     return filing_dates[-1] if filing_dates else docket_data.date_filed
 
 
-def _appeal_from_id(docket_data: FloridaCase) -> str | None:
+def _appeal_from_id(docket_data: FloridaCase, params: None) -> str | None:
     # Multiple originating cases are ambiguous, so leave the field unset.
     if len(docket_data.originating_cases) != 1:
         return None
@@ -50,7 +50,7 @@ def _appeal_from_id(docket_data: FloridaCase) -> str | None:
     )
 
 
-def _appeal_from_str(docket_data: FloridaCase) -> str | None:
+def _appeal_from_str(docket_data: FloridaCase, params: None) -> str | None:
     # Multiple originating cases are ambiguous, so leave the field unset.
     if len(docket_data.originating_cases) != 1:
         return ""
@@ -58,26 +58,26 @@ def _appeal_from_str(docket_data: FloridaCase) -> str | None:
 
 
 class FloridaOriginatingCourtInformationMerger(
-    Merger[FloridaOriginatingCase, OriginatingCourtInformation]
+    Merger[FloridaOriginatingCase, None, OriginatingCourtInformation]
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
     docket_number: str = Attribute(
-        lambda oc: oc.case_number, strategy=overwrite
+        lambda oc, params: oc.case_number, strategy=overwrite
     )
     docket_number_raw: str = Attribute(
-        lambda oc: oc.case_number, strategy=overwrite
+        lambda oc, params: oc.case_number, strategy=overwrite
     )
 
     @classmethod
     def get_existing(
-        cls, oci: FloridaCase, _
+        cls, d: FloridaOriginatingCase, manager, params: None
     ) -> OriginatingCourtInformation | None:
         return None
 
 
 def _originating_case(
-    docket_data: FloridaCase,
+    docket_data: FloridaCase, params: None
 ) -> FloridaOriginatingCase | None:
     if docket_data.court_id != FloridaCourtID.SUPREME_COURT.value:
         return None
@@ -92,42 +92,46 @@ def _originating_case(
     return docket_data.originating_cases[0]
 
 
-class FloridaDocketMerger(Merger[FloridaCase, Docket]):
+class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
 
     court_id: str = Attribute(
-        lambda d: FLORIDA_COURT_ID_MAP[d.court_id],
+        lambda d, params: FLORIDA_COURT_ID_MAP[d.court_id],
         strategy=overwrite,
     )
     source: int = Attribute(
-        lambda _: Docket.SCRAPER,
+        lambda _, params: Docket.SCRAPER,
         strategy=add_scraper_source,
     )
     date_filed: date | None = Attribute(
-        lambda d: d.date_filed,
+        lambda d, params: d.date_filed,
         strategy=overwrite,
     )
     date_last_filing: date | None = Attribute(
         _date_last_filing,
         strategy=overwrite,
     )
-    case_name: str = Attribute(lambda d: d.case_name, strategy=overwrite)
+    case_name: str = Attribute(
+        lambda d, params: d.case_name, strategy=overwrite
+    )
     case_name_full: str = Attribute(
-        lambda d: d.case_name_full,
+        lambda d, params: d.case_name_full,
         strategy=overwrite,
     )
-    case_name_short: str = Attribute(lambda d: d.case_name, strategy=overwrite)
+    case_name_short: str = Attribute(
+        lambda d, params: d.case_name, strategy=overwrite
+    )
     docket_number: str = Attribute(
-        lambda d: d.docket_number,
+        lambda d, params: d.docket_number,
         strategy=overwrite,
     )
     docket_number_raw: str = Attribute(
-        lambda d: d.docket_number, strategy=overwrite
+        lambda d, params: d.docket_number, strategy=overwrite
     )
     docket_number_core: str = Attribute(
-        lambda d: make_docket_number_core(
+        lambda d, params: make_docket_number_core(
             d.docket_number, court_id=FLORIDA_COURT_ID_MAP[d.court_id]
         ),
         strategy=overwrite,
@@ -138,7 +142,7 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     )
     # See https://github.com/freelawproject/courtlistener/issues/7361#issuecomment-4566459292
     pacer_case_id: str = Attribute(
-        lambda d: str(d.case_uuid), strategy=overwrite
+        lambda d, params: str(d.case_uuid), strategy=overwrite
     )
     originating_court_information: OriginatingCourtInformation = (
         OneToOneRelation(
@@ -148,16 +152,18 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
     )
 
     @classmethod
-    def get_existing(cls, docket: FloridaCase, _) -> Docket | None:
+    def get_existing(
+        cls, d: FloridaCase, manager, params: None
+    ) -> Docket | None:
         supreme_court_id = FLORIDA_COURT_ID_MAP[
             FloridaCourtID.SUPREME_COURT.value
         ]
-        court_id = FLORIDA_COURT_ID_MAP[docket.court_id]
+        court_id = FLORIDA_COURT_ID_MAP[d.court_id]
 
         docket_obj = async_to_sync(find_docket_object)(
             court_id=court_id,
-            pacer_case_id=str(docket.case_uuid),
-            docket_number=docket.docket_number,
+            pacer_case_id=str(d.case_uuid),
+            docket_number=d.docket_number,
             federal_defendant_number=None,
             federal_dn_judge_initials_assigned=None,
             federal_dn_judge_initials_referred=None,
@@ -166,23 +172,23 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
         )
 
         if docket_obj is None and court_id != supreme_court_id:
-            d = async_to_sync(find_docket_object)(
+            docket = async_to_sync(find_docket_object)(
                 court_id=FL_APPELLATE_COURT_ID,
-                pacer_case_id=str(docket.case_uuid),
-                docket_number=docket.docket_number,
+                pacer_case_id=str(d.case_uuid),
+                docket_number=d.docket_number,
                 federal_defendant_number=None,
                 federal_dn_judge_initials_assigned=None,
                 federal_dn_judge_initials_referred=None,
                 docket_source=Docket.SCRAPER,
                 allow_create=False,
             )
-            return d
+            return docket
 
         return docket_obj
 
     @staticmethod
-    def validate(docket_data: FloridaCase) -> bool:
-        if docket_data.court_id not in FLORIDA_COURT_ID_MAP:
-            logger.error("Unknown court id: %s", docket_data.court_id)
+    def validate(d: FloridaCase) -> bool:
+        if d.court_id not in FLORIDA_COURT_ID_MAP:
+            logger.error("Unknown court id: %s", d.court_id)
             return False
         return True
