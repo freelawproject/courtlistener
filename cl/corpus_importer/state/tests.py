@@ -264,7 +264,7 @@ class BaseMergerTest(TestCase):
 
             @classmethod
             def get_existing(
-                cls, d: dict[str, str], manager, params: None
+                cls, d: dict[str, str], manager, params: dict[str, Any]
             ) -> Docket | None:
                 return None
 

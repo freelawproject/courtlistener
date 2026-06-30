@@ -131,15 +131,18 @@ class AttributeMerger[ScrapeType, ParamType, TransformType](
         ] = strategy
 
 
-def Attribute[ScrapeType, ParamType, TransformType](
-    transform: Callable[[ScrapeType, ParamType], TransformType] | None = None,
-    strategy: Callable[
-        Concatenate[TransformType | None, TransformType | None, ...],
-        TransformType | None,
-    ] = overwrite_if_present,
+def Attribute[TransformType](
+    transform: Callable[..., TransformType] | None = None,
+    strategy: Callable[..., Any] = overwrite_if_present,
     *,
     default: TransformType | None = None,
 ) -> Any:
+    # `transform`/`strategy` are intentionally loosely typed: callers pass bare
+    # `lambda d, params: ...`, whose param types can't be inferred (they'd bind
+    # to a type var appearing only in input position). Spelling the params as
+    # `...` lets the lambda body type-check while still inferring `TransformType`
+    # from the return, so `default` is checked against it. A generic `strategy`
+    # would re-poison that inference, so it stays `Any`.
     return AttributeMerger(transform, strategy, default=default)
 
 
@@ -232,10 +235,9 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return result
 
 
-def OneToOneRelation[ScrapeType, ParamType, ChildType, RM: Model](
+def OneToOneRelation[ParamType, ChildType, RM: Model](
     merger: "type[Merger[ChildType, ParamType, RM]]",
-    transform: Callable[[ScrapeType, ParamType], ChildType | None]
-    | None = None,
+    transform: Callable[..., ChildType | None] | None = None,
 ) -> Any:
     return OneToOneMerger(merger, transform)
 
@@ -293,10 +295,9 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return result
 
 
-def OneToManyRelation[ScrapeType, ParamType, ChildType, RM: Model](
+def OneToManyRelation[ParamType, ChildType, RM: Model](
     merger: "type[Merger[ChildType, ParamType, RM]]",
-    transform: Callable[Concatenate[ScrapeType, ...], Sequence[ChildType]]
-    | None = None,
+    transform: Callable[..., Sequence[ChildType]] | None = None,
 ) -> Any:
     return OneToManyMerger(merger, transform)
 
