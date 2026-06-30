@@ -13,9 +13,9 @@ from cl.corpus_importer.state.florida.utils import (
     make_docket_number_core,
 )
 from cl.corpus_importer.state.merger import (
-    AttributeMerger,
+    Attribute,
     Merger,
-    RelatedMerger,
+    Related,
     overwrite,
 )
 from cl.recap.mergers import (
@@ -62,10 +62,10 @@ class FloridaOriginatingCourtInformationMerger(
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-    docket_number: str = AttributeMerger[FloridaOriginatingCase, str](
+    docket_number: str = Attribute(
         lambda oc: oc.case_number, strategy=overwrite
     )
-    docket_number_raw: str = AttributeMerger[FloridaOriginatingCase, str](
+    docket_number_raw: str = Attribute(
         lambda oc: oc.case_number, strategy=overwrite
     )
 
@@ -97,60 +97,50 @@ class FloridaDocketMerger(Merger[FloridaCase, Docket]):
 
     atomic = True
 
-    court_id: str = AttributeMerger[FloridaCase, str](
+    court_id: str = Attribute(
         lambda d: FLORIDA_COURT_ID_MAP[d.court_id],
         strategy=overwrite,
     )
-    source: int = AttributeMerger(
+    source: int = Attribute(
         lambda _: Docket.SCRAPER,
         strategy=add_scraper_source,
     )
-    date_filed: date | None = AttributeMerger[FloridaCase, date | None](
+    date_filed: date | None = Attribute(
         lambda d: d.date_filed,
         strategy=overwrite,
     )
-    date_last_filing: date | None = AttributeMerger(
+    date_last_filing: date | None = Attribute(
         _date_last_filing,
         strategy=overwrite,
     )
-    case_name: str = AttributeMerger[FloridaCase, str](
-        lambda d: d.case_name, strategy=overwrite
-    )
-    case_name_full: str = AttributeMerger[FloridaCase, str](
+    case_name: str = Attribute(lambda d: d.case_name, strategy=overwrite)
+    case_name_full: str = Attribute(
         lambda d: d.case_name_full,
         strategy=overwrite,
     )
-    case_name_short: str = AttributeMerger[FloridaCase, str](
-        lambda d: d.case_name, strategy=overwrite
-    )
-    docket_number: str = AttributeMerger[FloridaCase, str](
+    case_name_short: str = Attribute(lambda d: d.case_name, strategy=overwrite)
+    docket_number: str = Attribute(
         lambda d: d.docket_number,
         strategy=overwrite,
     )
-    docket_number_raw: str = AttributeMerger[FloridaCase, str](
+    docket_number_raw: str = Attribute(
         lambda d: d.docket_number, strategy=overwrite
     )
-    docket_number_core: str = AttributeMerger[FloridaCase, str](
+    docket_number_core: str = Attribute(
         lambda d: make_docket_number_core(
             d.docket_number, court_id=FLORIDA_COURT_ID_MAP[d.court_id]
         ),
         strategy=overwrite,
     )
-    appeal_from_id: str | None = AttributeMerger(
-        _appeal_from_id, strategy=overwrite
-    )
-    appeal_from_str: str | None = AttributeMerger(
+    appeal_from_id: str | None = Attribute(_appeal_from_id, strategy=overwrite)
+    appeal_from_str: str | None = Attribute(
         _appeal_from_str, strategy=overwrite
     )
     # See https://github.com/freelawproject/courtlistener/issues/7361#issuecomment-4566459292
-    pacer_case_id: str = AttributeMerger(
+    pacer_case_id: str = Attribute(
         lambda d: str(d.case_uuid), strategy=overwrite
     )
-    originating_court_information: OriginatingCourtInformation = RelatedMerger[
-        FloridaCase,
-        FloridaOriginatingCase,
-        OriginatingCourtInformation,
-    ](
+    originating_court_information: OriginatingCourtInformation = Related(
         FloridaOriginatingCourtInformationMerger,
         _originating_case,
     )

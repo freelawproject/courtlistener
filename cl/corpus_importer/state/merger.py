@@ -81,7 +81,7 @@ class MergerSpecification[D, T]:
         return v
 
 
-class AttributeMerger[D, T](MergerSpecification[D, T], Any):
+class AttributeMerger[D, T](MergerSpecification[D, T]):
     """Class encapsulating logic for merging a single attribute from a scrape into a DB object.
 
     :param transform: Defines how to get the DB value from the scrape data
@@ -106,6 +106,18 @@ class AttributeMerger[D, T](MergerSpecification[D, T], Any):
         ] = strategy
 
 
+def Attribute[T](
+    transform: Any
+    | None = None,  # Generic callables confuse mypy; should be Callable[Concatenate[D, ...], T | None] | None
+    strategy: Callable[
+        Concatenate[T | None, T | None, ...], T | None
+    ] = overwrite_if_present,
+    param: bool = False,
+    default: T | None = None,
+) -> Any:
+    return AttributeMerger(transform, strategy, param, default)
+
+
 class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
     __slots__ = "merger"
 
@@ -123,7 +135,7 @@ class SubMerger[D, T, RM: Model](MergerSpecification[D, T]):
         raise NotImplementedError
 
 
-class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
+class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM]):
     """Class encapsulating logic for merging one or more related objects. Can be used to merge one-to-one relationships
     or parent-child relationships.
 
@@ -201,6 +213,16 @@ class RelatedMerger[D, T, RM: Model](SubMerger[D, T, RM], Any):
         raise TypeError(f"Field {self.name} is not a related field.")
 
 
+def Related[T, RM: Model](
+    merger: "type[Merger[T, RM]]",
+    transform: Any
+    | None = None,  # Generic callables confuse mypy; should be Callable[Concatenate[D, ...], T | None] | None
+    param: bool = False,
+    default: T | None = None,
+) -> Any:
+    return RelatedMerger(merger, transform, param, default)
+
+
 class Merger[D, M: Model](ABC):
     """Base class for a merger which takes in `D` and merges it into `model`. Subclasses should generally not be
     instantiated; methods and attributes should be accessed directly from the class.
@@ -232,7 +254,7 @@ class Merger[D, M: Model](ABC):
             if isinstance(value, AttributeMerger)
         }
         cls.__related_mergers__ = cls.__related_mergers__ | {
-            value.name: cast(RelatedMerger[D, Any, M], value)
+            value.name: cast(RelatedMerger[D, Any, Model], value)
             for value in own_attrs
             if isinstance(value, RelatedMerger)
         }
