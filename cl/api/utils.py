@@ -822,10 +822,11 @@ def get_promo_excluded_usernames() -> set[str]:
 
     Excluded users:
     - Users with a manual/commercial API throttle override.
-    - Active LSO and EDU members.
+    - Active EDU members.
 
-    All other authenticated users receive doubled API limits while the
-    promotion switch is enabled.
+    All other authenticated users (paid members, LSO members, and
+    non-members) receive doubled API limits while the promotion switch is
+    enabled.
     """
     manual_users = set(
         APIThrottle.objects.filter(
@@ -834,10 +835,10 @@ def get_promo_excluded_usernames() -> set[str]:
         ).values_list("user__username", flat=True)
     )
     today = now().date()
-    lso_edu_members = set(
+    edu_members = set(
         NeonMembership.objects.filter(
             payment_status=MembershipPaymentStatus.SUCCEEDED,
-            level__in=(NeonMembershipLevel.LSO_1, NeonMembershipLevel.EDU),
+            level=NeonMembershipLevel.EDU,
         )
         .filter(
             Q(termination_date__isnull=True)
@@ -845,7 +846,7 @@ def get_promo_excluded_usernames() -> set[str]:
         )
         .values_list("user__username", flat=True)
     )
-    return manual_users | lso_edu_members
+    return manual_users | edu_members
 
 
 def promo_doubling_applies(user: User) -> bool:

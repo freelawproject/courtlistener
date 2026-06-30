@@ -5240,10 +5240,10 @@ class PromoDoubleThrottleTest(TestCase):
         user = self._make_member(NeonMembershipLevel.TIER_2, "2/min")
         self.assertEqual(self._allowed_count(user, 6), 4)
 
-    def test_lso_member_not_doubled(self) -> None:
-        """LSO members are excluded; 2/min stays 2/min."""
+    def test_lso_member_rate_doubled(self) -> None:
+        """LSO members are included; 2/min becomes 4/min during the promo."""
         user = self._make_member(NeonMembershipLevel.LSO_1, "2/min")
-        self.assertEqual(self._allowed_count(user, 6), 2)
+        self.assertEqual(self._allowed_count(user, 6), 4)
 
     def test_edu_member_not_doubled(self) -> None:
         """EDU members are excluded; 2/min stays 2/min."""

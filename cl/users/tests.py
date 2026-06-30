@@ -4516,12 +4516,13 @@ class ViewApiUsagePromoTest(TestCase):
         self.assertNotContains(response, "<strong>10</strong>")
 
     @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
-    def test_lso_member_not_doubled(self) -> None:
-        """LSO member: rate shown unchanged during the promo."""
+    def test_lso_member_doubled(self) -> None:
+        """LSO member: 10/min is shown as 20/min during the promo."""
         self._add_membership(NeonMembershipLevel.LSO_1, "10/min")
         response = self.client.get(self.url)
-        self.assertContains(response, "<strong>10</strong>")
-        self.assertNotContains(response, "<strong>20</strong>")
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
 
     @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
     def test_edu_member_not_doubled(self) -> None:
