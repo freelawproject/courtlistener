@@ -63,6 +63,7 @@ from cl.api.utils import (
     invert_user_logs,
     is_valid_filter_param,
     promo_doubling_applies,
+    promo_switch_is_active,
 )
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
@@ -5277,6 +5278,28 @@ class PromoDoubleThrottleTest(TestCase):
         )
         self.assertFalse(promo_doubling_applies(user))
         self.assertEqual(self._allowed_count(user, 6), 2)
+
+    def test_switch_status_cached(self) -> None:
+        """The switch is read once, then served from the cache."""
+        with mock.patch(
+            "cl.api.utils.switch_is_active", return_value=True
+        ) as mocked:
+            self.assertTrue(promo_switch_is_active())
+            self.assertTrue(promo_switch_is_active())
+            mocked.assert_called_once()
+        # Switch to a fresh tiered-cache namespace to force a re-read, instead
+        # of flushing the entire cache.
+        with (
+            mock.patch(
+                "cl.lib.decorators.get_tiered_cache_prefix",
+                return_value="tiered_switch_status_reread",
+            ),
+            mock.patch(
+                "cl.api.utils.switch_is_active", return_value=False
+            ) as mocked,
+        ):
+            self.assertFalse(promo_switch_is_active())
+            mocked.assert_called_once()
 
 
 class MembershipThrottleSyncTest(TestCase):

@@ -849,9 +849,20 @@ def get_promo_excluded_usernames() -> set[str]:
     return manual_users | edu_members
 
 
+@tiered_cache(timeout=600)  # 10 minutes
+def promo_switch_is_active() -> bool:
+    """Whether the promo switch is on.
+
+    Cached via tiered_cache (memory tier) so we avoid a waffle (Redis) lookup
+    on every API request. A flip takes up to the cache timeout to take effect,
+    which is acceptable for enabling/disabling the promotion.
+    """
+    return switch_is_active(DOUBLE_API_THROTTLES_SWITCH)
+
+
 def promo_doubling_applies(user: User) -> bool:
     """Return whether the x2 API promotion applies to this user."""
-    if not switch_is_active(DOUBLE_API_THROTTLES_SWITCH):
+    if not promo_switch_is_active():
         return False
     if not user.is_authenticated:
         return False

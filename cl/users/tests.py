@@ -530,7 +530,14 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 username="pandora", password="password"
             )
         )
-        r = await self.async_client.get(reverse("reset_api_token"))
+        # Use an isolated tiered-cache namespace so the cached promo switch
+        # honors the @override_switch above (get_recent reads the base bucket
+        # when the promo is off) without sharing other tests' cached state.
+        with mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            return_value="tiered_reset_token_recent_usage",
+        ):
+            r = await self.async_client.get(reverse("reset_api_token"))
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertContains(r, "<strong>3</strong>")
         self.assertContains(r, "fa-exclamation-triangle")
