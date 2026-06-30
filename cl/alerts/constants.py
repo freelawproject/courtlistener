@@ -12,8 +12,7 @@ MEMBERSHIP_UPGRADE_BASE_URL = (
 # them to MEMBERSHIP_UPGRADE_BASE_URL 404s (see #7136). Route them to a help
 # page that explains how to get more features instead (e.g. cancel the legacy
 # membership and join again).
-# TODO(#7136): replace with the real wiki/help page URL before merging.
-LEGACY_MEMBERSHIP_HELP_URL = "https://free.law/TODO-legacy-membership-help/"
+LEGACY_MEMBERSHIP_HELP_URL = "https://wiki.free.law/c/courtlistener/help/memberships/individual-memberships/legacy-memberships"
 
 RECAP_ALERT_QUOTAS = {
     Alert.REAL_TIME: {
