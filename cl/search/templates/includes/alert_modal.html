@@ -103,7 +103,7 @@
 
             {# Hidden unless shown by JS #}
             <div id="quota-warning" class="alert alert-warning hidden">
-              <p>CourtListener is a project of <a href="https://free.law" target="_blank">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit.</p>
+              <p>CourtListener is a project of <a href="https://free.law" target="_blank" rel="noopener noreferrer">Free Law Project</a>, a federally-recognized 501(c)(3) non-profit.</p>
 
               {% if search_form.type.value != SEARCH_TYPES.RECAP %}
                 <p><a href="{% url "faq" %}#real-time-alerts" target="_blank">Real Time alerts</a> are only supported for members of <a href="https://free.law/">Free Law Project</a>.</p>
@@ -120,10 +120,10 @@
               <p class="bottom">
                 <a href="https://free.law/membership/"
                    id="no-member-button" class="hidden btn btn-danger"
-                   target="_blank">Join Free.law</a>
+                   target="_blank" rel="noopener noreferrer">Join Free.law</a>
                 <a href="https://donate.free.law/constituent/memberships/upgrade/{{ alerts_context.neon_id }}"
                    id="member-button" class="hidden btn btn-danger"
-                   target="_blank">Upgrade Membership</a>
+                   target="_blank" rel="noopener noreferrer">Upgrade Membership</a>
               </p>
             </div>
             {% if request.GET.edit_alert %}
