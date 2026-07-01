@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Any, ClassVar
 
 from django.db.models import Model, QuerySet
@@ -8,6 +9,7 @@ from cl.corpus_importer.state.merger import (
     Merger,
     OneToManyRelation,
     OneToOneRelation,
+    ThroughParameters,
 )
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -281,21 +283,25 @@ class BaseMergerTest(TestCase):
         )
 
     def test_related_mergers_m2m_through(self) -> None:
-        """Does a many-to-many relation with a through model create the
+        """Does a many-to-many relation with a `through` model create the
         targets, link them to the parent, and populate the through row's own
         fields from the same scrape?"""
 
         class TestPartyMerger(Merger[dict[str, str], None, Party]):
             model: ClassVar[type[Model]] = Party
+            key: ClassVar[Iterable[str]] = ["name"]
 
             name: str = Attribute(lambda d, params: d["name"])
-            key = ["name"]
 
-        class TestPartyTypeMerger(Merger[dict[str, str], None, PartyType]):
+        class TestPartyTypeMerger(
+            Merger[dict[str, str], ThroughParameters[None], PartyType]
+        ):
             model: ClassVar[type[Model]] = PartyType
+            key: ClassVar[Iterable[str]] = ["name", "party", "docket"]
 
             name: str = Attribute(lambda d, params: d["type"])
-            key = ["name"]
+            party: Party = Attribute(lambda d, params: params.target)
+            docket: Docket = Attribute(lambda d, params: params.source)
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket

@@ -7,6 +7,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from dataclasses import dataclass, field
 from typing import (
     Any,
     ClassVar,
@@ -20,7 +21,6 @@ from django.db import transaction
 from django.db.models import (
     Field,
     ForeignObjectRel,
-    ManyToManyField,
     Model,
     QuerySet,
 )
@@ -151,7 +151,7 @@ class RelatedMerger[ScrapeType, ParamType, ChildType, OutputType, RM: Model](
     MergerSpecification[ScrapeType, ParamType, OutputType],
     ABC,
 ):
-    __slots__ = "merger"
+    __slots__ = ("merger",)
 
     def __init__(
         self,
@@ -257,15 +257,32 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
     ):
         super().__init__(merger=merger, transform=transform, default=[])
 
-    def get_transform_and_manager(
-        self, parent: Model, scrape: ScrapeType, params: ParamType
-    ) -> tuple[Sequence[ChildType] | None, Manager[RM]]:
-        """Get the transform and manager for the given scrape and params."""
+    def merge(
+        self, parent: RM, scrape: ScrapeType, params: ParamType
+    ) -> MergeResult[Any]:
+        """Run the merge method on the appropriate inputs for the given relationship."""
         transformed = self.transform(scrape, params)
-        related_manager: RelatedManager[Any] = getattr(parent, self.name)
+
         if isinstance(transformed, (str, bytes)):
-            return None, related_manager
-        return transformed, related_manager
+            return MergeResult.failed(self.merger.model.__name__)
+
+        if not transformed:
+            return MergeResult.unnecessary()
+
+        related_manager: RelatedManager[Any] = getattr(parent, self.name)
+
+        related_objects: list[RM] = []
+        result = MergeResult.unnecessary()
+        for child in transformed:
+            related_merge = self.merger(
+                child, manager=related_manager, params=params
+            )
+            result |= related_merge.merge()
+            if related_merge.out is None:
+                continue
+            related_objects.append(related_merge.out)
+        related_manager.add(*related_objects)
+        return result
 
 
 class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
@@ -282,34 +299,25 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
             )
         return errors
 
-    def merge(
-        self, parent: RM, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]:
-        """Run the merge method on the appropriate inputs for the given relationship."""
-        transformed, manager = self.get_transform_and_manager(
-            parent, scrape, params
-        )
-        if transformed is None:
-            return MergeResult.failed(self.merger.model.__name__)
-
-        if not transformed:
-            return MergeResult.unnecessary()
-
-        result = MergeResult.unnecessary()
-        for child in cast(Iterable[Any], transformed):
-            result |= self.merger(
-                child, manager=manager, params=params
-            ).merge()
-        #     children.append(cast(Model, child_obj))
-        # related_manager.add(*children)
-        return result
-
 
 def OneToManyRelation[ParamType, ChildType, RM: Model](
     merger: "type[Merger[ChildType, ParamType, RM]]",
     transform: Callable[..., Sequence[ChildType]] | None = None,
 ) -> Any:
     return OneToManyMerger(merger, transform)
+
+
+@dataclass
+class ThroughParameters[ParamType]:
+    """Wrapper for passing parameters to a `through` model.
+
+    :ivar source: The source object of the relationship
+    :ivar target: The target object of the relationship
+    :ivar params: The parameters passed by the user to the merger"""
+
+    source: Model = field(kw_only=True)
+    target: Model = field(kw_only=True)
+    params: ParamType
 
 
 class ManyToManyMerger[
@@ -326,14 +334,15 @@ class ManyToManyMerger[
     def __init__(
         self,
         merger: "type[Merger[TransformType, ParamType, RM]]",
-        through: "type[Merger[TransformType, ParamType, ThruM]] | None" = None,
+        through: "type[Merger[TransformType, ThroughParameters[ParamType], ThruM]] | None" = None,
         transform: Callable[[ScrapeType, ParamType], Sequence[TransformType]]
         | None = None,
     ):
         super().__init__(merger, transform)
-        self.through: type[Merger[TransformType, ParamType, ThruM]] | None = (
-            through
-        )
+        self.through: (
+            type[Merger[TransformType, ThroughParameters[ParamType], ThruM]]
+            | None
+        ) = through
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
@@ -343,93 +352,46 @@ class ManyToManyMerger[
             )
         return errors
 
-    def _merge_simple(
-        self,
-        parent: Model,
-        transformed: Sequence[TransformType],
-        manager: Manager[RM],
-        params: ParamType,
+    def merge(
+        self, parent: RM, scrape: ScrapeType, params: ParamType
     ) -> MergeResult[Any]:
-        """Merge a simple many-to-many relationship, where the through model is not involved.
+        """Run the merge method on the appropriate inputs for the given relationship."""
+        if self.through is None:
+            # If there's no `through` model, everything is functionally the same as `OneToMany`
+            return super().merge(parent, scrape, params)
 
-        Each child is merged into its own model (creating or updating the target row by its natural key) and the
-        resulting objects are linked to the parent via the relation's manager. `add` is idempotent, so re-running the
-        merge will not create duplicate links."""
+        transformed = self.transform(scrape, params)
+
+        if isinstance(transformed, (str, bytes)):
+            return MergeResult.failed(self.merger.model.__name__)
+
+        if not transformed:
+            return MergeResult.unnecessary()
 
         result = MergeResult.unnecessary()
-        related_objects: list[RM] = []
-        for child in cast(Iterable[Any], transformed):
-            child_merger = self.merger(child, params=params)
-            result |= child_merger.merge()
-            if child_merger.out is None:
-                result |= MergeResult.failed(self.merger.model.__name__)
-                continue
-            related_objects.append(child_merger.out)
-
-        if related_objects:
-            cast("RelatedManager[RM]", manager).add(*related_objects)
-
-        return result
-
-    def _merge_through(
-        self,
-        parent: Model,
-        transformed: Sequence[TransformType],
-        params: ParamType,
-    ) -> MergeResult[Any]:
-        """Merge a many-to-many relationship where the through model carries its own data.
-
-        Each child is merged into the target model, and then a through row linking the parent and that target is merged
-        via the through merger. The two foreign keys are supplied to the through merger as `context` so it can identify
-        (and create) the correct row -- the through merger only needs to declare the through model's own fields."""
-
-        through = self.through
-        if through is None:
-            raise RuntimeError(
-                "_merge_through called without a through merger"
-            )
-
-        field = cast(ManyToManyField, parent._meta.get_field(self.name))
-        source_fk = field.m2m_field_name()
-        target_fk = field.m2m_reverse_field_name()
-
-        result = MergeResult.unnecessary()
-        for child in cast(Iterable[Any], transformed):
+        for child in transformed:
             child_merger = self.merger(child, params=params)
             result |= child_merger.merge()
             related_object = child_merger.out
             if related_object is None:
                 result |= MergeResult.failed(self.merger.model.__name__)
                 continue
-            result |= through(
+
+            result |= self.through(
                 child,
-                params=params,
-                context={source_fk: parent, target_fk: related_object},
+                params=ThroughParameters(
+                    params,
+                    source=parent,
+                    target=related_object,
+                ),
             ).merge()
 
         return result
 
-    def merge(
-        self, parent: Model, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]:
-        """Run the merge method on the appropriate inputs for the given relationship."""
-        transformed, manager = self.get_transform_and_manager(
-            parent, scrape, params
-        )
-        if transformed is None:
-            return MergeResult.failed(self.merger.model.__name__)
-
-        if not transformed:
-            return MergeResult.unnecessary()
-
-        if self.through is None:
-            return self._merge_simple(parent, transformed, manager, params)
-        return self._merge_through(parent, transformed, params)
-
 
 def ManyToManyRelation[ParamType, ChildType, ThruM: Model, RM: Model](
     merger: "type[Merger[ChildType, ParamType, RM]]",
-    through: "type[Merger[ChildType, ParamType, ThruM]] | None" = None,
+    through: "type[Merger[ChildType, ThroughParameters[ParamType], ThruM]] | None" = None,
     transform: Callable[..., Sequence[ChildType]] | None = None,
 ) -> Any:
     return ManyToManyMerger(merger, through, transform)
@@ -573,16 +535,12 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         params: ParamType,
         existing: M | None = None,
         manager: Manager[M] | None = None,
-        context: dict[str, Any] | None = None,
     ):
         """Create an object to track the merge operation on the specified data.
 
         :param scrape: The scraped data to transform. Parameter values are passed as kwargs.
         :param existing: Optional existing object to override the lookup in `get_existing`.
-        :param manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager.
-        :param context: Fixed field values injected by a parent merger (e.g. the foreign keys of a many-to-many through
-            row). These are not transformed or subject to merge strategies: they are applied verbatim when building or
-            creating the object and included as filters in the default `query`, since they help identify the row."""
+        :param manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager."""
         self.guarantee_valid()
         result = None
         valid = self.validate(scrape)
@@ -616,8 +574,6 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
         self.existing: M | None = existing
 
-        self.context: dict[str, Any] = context or {}
-
     def after(self) -> None:
         """Run extra processes after the merge operation completes or fails."""
         ...
@@ -628,7 +584,6 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         :return: The queryset to find the object."""
         return self.manager.filter(
             **{name: self.transformed[name] for name in self.key},
-            **self.context,
         )
 
     def merge(self) -> MergeResult[Any]:
@@ -669,7 +624,6 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                     name: self.transformed[name]
                     for name in self.__registry__.attr.keys()
                 },
-                **self.context,
             ),
         )
 
@@ -713,7 +667,6 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                     name: self.transformed[name]
                     for name in self.__registry__.attr.keys()
                 },
-                **self.context,
             )
             result = MergeResult.created(self.model.__name__, db_obj.pk)
         else:
