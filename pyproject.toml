@@ -107,7 +107,7 @@ dependencies = [
   "types-pytz>=2025.2.0.20251108",
   "psycopg[binary,pool]>=3.3.2",
   "boto3>=1.42.24",
-  "django-tailwind~=3.9.1",
+  "django-tailwind~=4.5.0",
   "django-ses[events]>=4.7.2",
   "django-cotton>=2.6.0",
   "django-cursor-pagination>=0.3.0",
@@ -137,7 +137,7 @@ dev = [
   "types-simplejson>=3.20.0.20250822",
   "lxml-stubs>=0.5.1",
   "django-debug-toolbar>=6.1.0",
-  "django-tailwind[reload]~=3.9.1",
+  "django-tailwind[reload]~=4.5.0",
   "responses>=0.25.8",
 ]
 
