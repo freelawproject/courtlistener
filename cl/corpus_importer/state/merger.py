@@ -494,9 +494,15 @@ class ManyToManyMerger[
             through_objects.append(through_merger.out)
 
         if self.strategy is ManyStrategy.REPLACE:
-            _ = self.through.model._default_manager.exclude(
-                pk__in=[t.pk for t in through_objects]
-            ).delete()
+            # Only prune through objects belonging to this parent; other
+            # parents' relationships are out of scope for this merge.
+            _ = (
+                self.through.model._default_manager.filter(
+                    **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
+                )
+                .exclude(pk__in=[t.pk for t in through_objects])
+                .delete()
+            )
 
         return result
 
