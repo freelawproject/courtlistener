@@ -14,6 +14,7 @@ from django.utils.timezone import now
 from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.lib.string_utils import CaseNameTweaker
+from juriscraper.pacer.free_documents import FreeOpinionReport
 from requests import RequestException
 from urllib3.exceptions import ReadTimeoutError
 
@@ -50,9 +51,20 @@ RECENT_REQUERY_DAYS = 5
 # this many days. Used by the report-stalls action.
 DEFAULT_STALE_DAYS = 14
 
-# Courts that don't provide a usable written opinions report, so we never scrape
-# or report on them.
-EXCLUDED_COURT_IDS = ["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"]
+# Courts we skip when scraping/reporting on the free Written Opinions Report.
+# The set has two sources, kept separate on purpose:
+#
+# 1. Juriscraper's ``FreeOpinionReport.EXCLUDED_COURT_IDS`` — courts whose
+#    report can't be fetched or parsed. They don't have the report enabled
+# 2. ``CL_OPERATIONAL_EXCLUSIONS`` — courts CL deliberately skips for its own
+#    operational reasons (e.g. a court that has IP-blocked us), independent of
+#    whether the report is technically fetchable.
+
+CL_OPERATIONAL_EXCLUSIONS: list[str] = []
+
+EXCLUDED_COURT_IDS = sorted(
+    set(FreeOpinionReport.EXCLUDED_COURT_IDS) | set(CL_OPERATIONAL_EXCLUSIONS)
+)
 
 
 def get_last_complete_date(
