@@ -25,7 +25,7 @@ license = " AGPL-3.0-only"
 license-files = [ "LICENSE.txt" ]
 
 dependencies = [
-  "ada-url>=1.28.0",
+  "ada-url>=1.32.0",
   "beautifulsoup4>=4.14.3",
   "celery>=5.6.2",
   "certifi>=2025.1.31",
