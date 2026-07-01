@@ -10,9 +10,7 @@ from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
-from waffle.testutils import override_switch
 
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.models import APIThrottle, ThrottleType
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import NeonWebhookEventFactory
@@ -197,6 +195,54 @@ class MembershipWebhookTest(TestCase):
     @patch.object(
         MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
     )
+    async def test_create_membership_with_no_payment_data_is_succeeded(
+        self, mock_store_webhook
+    ) -> None:
+        """Memberships without payment data (manual grants, free tiers) land as SUCCEEDED."""
+        self.data["eventTrigger"] = "createMembership"
+        # Default payload has no "payments" key — that's the case under test.
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        membership = await NeonMembership.objects.filter(
+            neon_id="12345"
+        ).afirst()
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_unknown_payment_status_falls_back_to_pending(
+        self, mock_store_webhook
+    ) -> None:
+        """Unrecognized non-empty paymentStatus values still map to PENDING."""
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["payments"] = [
+            {"paymentStatus": "in_review"}
+        ]
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        membership = await NeonMembership.objects.filter(
+            neon_id="12345"
+        ).afirst()
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.PENDING
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
     async def test_edu_unconfirmed_email_sends_confirmation(
         self, mock_store_webhook
     ) -> None:
@@ -344,6 +390,29 @@ class MembershipWebhookTest(TestCase):
 
         membership = await query.afirst()
         self.assertEqual(membership.level, NeonMembershipLevel.EDU)
+        self.assertEqual(
+            membership.payment_status, MembershipPaymentStatus.SUCCEEDED
+        )
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_create_lso_1_membership(self, mock_store_webhook) -> None:
+        """LSO 1 webhooks create an active membership at the LSO_1 level."""
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["membershipName"] = "LSO 1"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v4"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.level, NeonMembershipLevel.LSO_1)
         self.assertEqual(
             membership.payment_status, MembershipPaymentStatus.SUCCEEDED
         )
@@ -832,16 +901,8 @@ class ProfileMembershipTest(TestCase):
             )
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="MembershipWebhookThrottleSyncTest")
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class MembershipWebhookThrottleSyncTest(TestCase):
-    """End-to-end tests that Neon webhooks sync APIThrottle rows.
-
-    Existing webhook tests in MembershipWebhookTest run with the
-    sync_membership_throttles switch off (its default), so the wire-up
-    in MembershipWebhookViewSet is a no-op there. This class flips the
-    switch on at class scope to exercise the actual sync behavior.
-    """
+    """End-to-end tests that Neon webhooks sync APIThrottle rows."""
 
     def setUp(self) -> None:
         self.async_client = AsyncClient()
@@ -874,6 +935,37 @@ class MembershipWebhookThrottleSyncTest(TestCase):
     ) -> None:
         """createMembership writes Tier 1 MEMBERSHIP rates for the user."""
         self.data["eventTrigger"] = "createMembership"
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+        rates = sorted(
+            [
+                rate
+                async for rate in APIThrottle.objects.filter(
+                    user=self.user_profile.user,
+                    throttle_type=ThrottleType.API,
+                    source=APIThrottle.Source.MEMBERSHIP,
+                ).values_list("rate", flat=True)
+            ]
+        )
+        self.assertEqual(rates, sorted(["10/min", "75/hour", "300/day"]))
+
+    @patch.object(
+        MembershipWebhookViewSet,
+        "_store_webhook_payload",
+        return_value=None,
+    )
+    async def test_create_lso_1_membership_assigns_tier_1_throttles(
+        self, mock_store_webhook
+    ) -> None:
+        """LSO 1 webhooks provision the Tier 1 MEMBERSHIP rates."""
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["membershipName"] = "LSO 1"
 
         r = await self.async_client.post(
             reverse("membership-webhooks-list", kwargs={"version": "v3"}),
@@ -985,32 +1077,3 @@ class MembershipWebhookThrottleSyncTest(TestCase):
             ).values_list("rate", "source")
         ]
         self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    @patch.object(
-        MembershipWebhookViewSet,
-        "_store_webhook_payload",
-        return_value=None,
-    )
-    def test_webhook_does_not_sync_when_switch_off(
-        self, mock_store_webhook
-    ) -> None:
-        """With the switch off, webhook handlers don't touch APIThrottle."""
-        self.data["eventTrigger"] = "createMembership"
-
-        client = Client()
-        r = client.post(
-            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
-            data=self.data,
-            content_type="application/json",
-        )
-
-        self.assertEqual(r.status_code, HTTPStatus.CREATED)
-        # NeonMembership row is still created (existing behavior),
-        # but no APIThrottle rows.
-        self.assertTrue(
-            NeonMembership.objects.filter(user=self.user_profile.user).exists()
-        )
-        self.assertFalse(
-            APIThrottle.objects.filter(user=self.user_profile.user).exists()
-        )

@@ -22,13 +22,13 @@ from django.db.models.functions import Substr
 from django.http.request import QueryDict
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.dsl import A, MultiSearch, Q
+from elasticsearch.dsl import Search as SearchDSL
+from elasticsearch.dsl.aggs import DateHistogram
+from elasticsearch.dsl.query import Query, QueryString, Range
+from elasticsearch.dsl.response import Hit, Response
+from elasticsearch.dsl.utils import AttrDict, AttrList
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
-from elasticsearch_dsl import A, MultiSearch, Q
-from elasticsearch_dsl import Search as SearchDSL
-from elasticsearch_dsl.aggs import DateHistogram
-from elasticsearch_dsl.query import Query, QueryString, Range
-from elasticsearch_dsl.response import Hit, Response
-from elasticsearch_dsl.utils import AttrDict, AttrList
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
@@ -2252,7 +2252,7 @@ def merge_unavailable_fields_on_parent_document(
                         doc.transcript,
                         length=settings.NO_MATCH_HL_SIZE,
                     )
-                    if doc.stt_status
+                    if doc.stt_status == Audio.STT_COMPLETE
                     else ""
                 )
                 for doc in oa_docs

@@ -30,7 +30,7 @@ def load_fixture(apps, schema_editor):
         schema_editor,
         "recap-email",
         "recap-email@free.law",
-        ["has_recap_upload_access"],
+        ["has_recap_email_upload_access"],
     )
 
 

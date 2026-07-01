@@ -85,7 +85,7 @@ class OriginatingCourtInformationViewSet(
 ):
     serializer_class = OriginalCourtInformationSerializer
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     # Default cursor ordering key
@@ -383,7 +383,7 @@ class OpinionsCitedViewSet(
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
     permission_classes = [
-        DjangoModelPermissionsOrAnonReadOnly,
+        DjangoModelPermissions,
         V3APIPermission,
     ]
     # Default cursor ordering key

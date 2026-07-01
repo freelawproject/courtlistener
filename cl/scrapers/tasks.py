@@ -6,6 +6,7 @@ import traceback
 from collections import defaultdict
 from io import BytesIO
 
+import botocore.exceptions
 import celery
 import httpx
 import openai
@@ -37,6 +38,10 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
+from cl.lib.storage import (
+    S3GlacierInstantRetrievalStorage,
+    clobbering_get_name,
+)
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
@@ -657,7 +662,6 @@ async def extract_pdf_document_base(
     max_retries=3,
     retry_backoff=10,
 )
-@throttle_task("1/3m")
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
@@ -712,6 +716,9 @@ def process_audio_file(self, pk) -> None:
             "processing_complete",
         ]
     )
+    # Transcription dispatch is owned by reenqueue_pending_audio_tasks_daemon.
+    # We deliberately do not hand off here — the daemon paces dispatches to
+    # stay under OpenAI's safe concurrency.
 
 
 @app.task(
@@ -1001,3 +1008,35 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     except Exception as e:
         logger.warning("Unexpected error during SCOTUS subscription")
         raise ScrapeFailed(str(e))
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+        botocore.exceptions.EndpointConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def save_response_to_s3(self: celery.Task, key: str, content: bytes) -> None:
+    """Archive a scraped response or parsed docket to S3.
+
+    Offloads the (blocking, ~150ms) S3 PUT from the state back-scrape loop onto
+    Celery workers so archiving runs concurrently instead of serially pacing the
+    scrape. Writes to the private Glacier Instant Retrieval bucket, clobbering any
+    existing object at ``key``.
+
+    :param self: The Celery task instance.
+    :param key: Destination S3 key.
+    :param content: Raw bytes to write.
+    :return: None
+    """
+    storage = S3GlacierInstantRetrievalStorage(
+        naming_strategy=clobbering_get_name
+    )
+    with storage.open(key, "wb") as f:
+        f.write(content)
+    logger.info("Archived %s to %s", key, storage.bucket_name)

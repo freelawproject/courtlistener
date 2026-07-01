@@ -15,6 +15,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
+from django.utils.encoding import force_bytes
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.exceptions import UnexpectedContentTypeError
@@ -35,6 +36,7 @@ from cl.citations.models import UnmatchedCitation
 from cl.corpus_importer.tasks import (
     merge_scotus_docket as real_merge_scotus_docket,
 )
+from cl.lib.crypto import sha1
 from cl.lib.exceptions import ScrapeFailed
 from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
@@ -60,6 +62,7 @@ from cl.scrapers.management.commands import (
     update_from_text,
 )
 from cl.scrapers.management.commands.merge_opinion_versions import (
+    delete_version_related_objects,
     merge_judge_names,
     merge_versions_by_download_url,
     passes_length_ratio_check,
@@ -457,6 +460,58 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
 
         opinions = Opinion.objects.filter(cluster=cluster)
         self.assertEqual(opinions.count(), 2)
+
+
+class MakeObjectsContentEncodingTest(TestCase):
+    """Regression for #7504.
+
+    Non-ASCII opinion text (a ``str`` from ``site.download_content()``) must be
+    stored as its UTF-8 bytes, not truncated to its character count. The old
+    ``ContentFile(content)`` reported ``.size`` as the character count, which
+    django-storages sent to S3 as ``x-amz-decoded-content-length`` while the
+    body serialized to more UTF-8 bytes -> S3 ``500 InternalError``.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="test", jurisdiction="F")
+
+    @mock.patch(
+        "cl.scrapers.management.commands.cl_scrape_opinions.get_extension",
+        return_value=".html",
+    )
+    def test_non_ascii_str_content_stored_as_utf8_bytes(self, mock_ext):
+        # em-dash, curly quote, section sign -> char count != UTF-8 byte count
+        content = "<html>" + "—“§" * 500 + "</html>"
+        self.assertNotEqual(len(content), len(content.encode("utf-8")))
+
+        item = {
+            "case_names": "Tëst v. Alaska",
+            "case_dates": date(2026, 6, 24),
+            "date_filed_is_approximate": False,
+            "blocked_statuses": False,
+            "precedential_statuses": "Published",
+        }
+        opinions_content = [
+            (
+                {"download_urls": "https://example.com/x"},
+                content,
+                sha1(force_bytes(content)),
+            )
+        ]
+
+        _, opinions, _, _, _ = cl_scrape_opinions.make_objects(
+            item, self.court, opinions_content
+        )
+        opinion = opinions[0]
+        self.addCleanup(opinion.local_path.delete, save=False)
+
+        opinion.local_path.open("rb")
+        stored = opinion.local_path.read()
+        opinion.local_path.close()
+
+        self.assertEqual(stored, content.encode("utf-8"))
+        self.assertEqual(opinion.local_path.size, len(content.encode("utf-8")))
 
 
 class IngestionTest(TestCase):
@@ -2062,6 +2117,30 @@ class LengthRatioCheckTest(SimpleTestCase):
                 passes, ratio = passes_length_ratio_check(text1, text2)
                 self.assertFalse(passes)
                 self.assertEqual(ratio, 0.0)
+
+
+class DeleteVersionRelatedObjectsTest(TestCase):
+    """Tests for the delete_version_related_objects helper."""
+
+    def test_decrement_clamps_at_zero(self):
+        """citation_count must not go negative when a version is deleted
+        from a cluster whose count is already 0. See #7393
+        """
+        cited_cluster = OpinionClusterWithParentsFactory.create(
+            citation_count=0
+        )
+        cited_opinion = OpinionFactory.create(cluster=cited_cluster)
+        version = OpinionFactory.create(
+            cluster=OpinionClusterWithParentsFactory.create()
+        )
+        OpinionsCited.objects.create(
+            citing_opinion=version, cited_opinion=cited_opinion
+        )
+
+        delete_version_related_objects(version)
+
+        cited_cluster.refresh_from_db()
+        self.assertEqual(cited_cluster.citation_count, 0)
 
 
 class DeleteDuplicatesTest(TestCase):
