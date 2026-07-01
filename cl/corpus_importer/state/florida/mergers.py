@@ -19,6 +19,7 @@ from cl.corpus_importer.state.merger import (
     Attribute,
     Merger,
     OneToOneRelation,
+    RelatedParams,
     overwrite,
 )
 from cl.search.models import Docket, OriginatingCourtInformation
@@ -58,7 +59,11 @@ def _appeal_from_str(docket_data: FloridaCase, params: None) -> str | None:
 
 
 class FloridaOriginatingCourtInformationMerger(
-    Merger[FloridaOriginatingCase, None, OriginatingCourtInformation]
+    Merger[
+        FloridaOriginatingCase,
+        RelatedParams[None],
+        OriginatingCourtInformation,
+    ]
 ):
     model: ClassVar[type[Model]] = OriginatingCourtInformation
 

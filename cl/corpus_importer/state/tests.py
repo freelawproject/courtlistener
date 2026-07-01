@@ -251,7 +251,9 @@ class BaseMergerTest(TestCase):
         """Does a plain (no-through) many-to-many relation create the targets
         and link them to the parent?"""
 
-        class TestPersonMerger(Merger[dict[str, str], None, Person]):
+        class TestPersonMerger(
+            Merger[dict[str, str], RelatedParams[None], Person]
+        ):
             model: ClassVar[type[Model]] = Person
 
             name_first: str = Attribute(lambda d, params: d["first"])
@@ -294,7 +296,9 @@ class BaseMergerTest(TestCase):
         targets, link them to the parent, and populate the through row's own
         fields from the same scrape?"""
 
-        class TestPartyMerger(Merger[dict[str, str], None, Party]):
+        class TestPartyMerger(
+            Merger[dict[str, str], RelatedParams[None], Party]
+        ):
             model: ClassVar[type[Model]] = Party
             key: ClassVar[Iterable[str]] = ["name"]
 

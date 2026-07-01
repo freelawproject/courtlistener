@@ -224,9 +224,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
     def __init__(
         self,
         merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
-        transform: Callable[
-            [ScrapeType, RelatedParams[ParamType]], ChildType | None
-        ]
+        transform: Callable[[ScrapeType, ParamType], ChildType | None]
         | None = None,
     ):
         super().__init__(merger=merger, transform=transform, default=None)
@@ -427,10 +425,10 @@ class ManyToManyMerger[
                     )
                 ]
 
-            if field.remote_field.through != self.through.model:
+            if field.remote_field.through != self.through.model:  # type: ignore[union-attr]
                 errors.append(
                     TypeError(
-                        f"{self.name}: Model for through merger is {self.through.model.__name__} not {field.remote_field.through.__name__}"
+                        f"{self.name}: Model for through merger is {self.through.model.__name__} not {field.remote_field.through.__name__}"  # type: ignore[union-attr]
                     )
                 )
 
@@ -484,9 +482,9 @@ class ManyToManyMerger[
                     params,
                     parent=parent,
                     source=parent,
-                    source_name=related_manager.source_field_name,
+                    source_name=related_manager.source_field_name,  # type: ignore[attr-defined]
                     target=related_object,
-                    target_name=related_manager.target_field_name,
+                    target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
                 ),
                 existing=None,
             )
@@ -504,7 +502,7 @@ class ManyToManyMerger[
 
 
 def ManyToManyRelation[ParamType, ChildType, ThruM: Model, RM: Model](
-    merger: "type[Merger[ChildType, ParamType, RM]]",
+    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
     through: "type[Merger[ChildType, ThroughParameters[ParamType], ThruM]] | None" = None,
     transform: Callable[[Any, Any], Sequence[ChildType]] | None = None,
     *,

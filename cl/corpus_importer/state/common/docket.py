@@ -6,7 +6,14 @@ from juriscraper.state.docket import (
     Docket as ScrapeDocket,
 )
 
-from cl.corpus_importer.state.merger import Attribute, Merger, overwrite
+from cl.corpus_importer.state.common.party import PartyMerger, PartyTypeMerger
+from cl.corpus_importer.state.merger import (
+    Attribute,
+    ManyToManyRelation,
+    Merger,
+    overwrite,
+)
+from cl.people_db.models import Party
 from cl.search.models import Docket
 
 
@@ -16,6 +23,12 @@ def add_scraper_source(scrape: int | None, db: int | None) -> int:
     if db in Docket.NON_SCRAPER_SOURCES():
         return db + Docket.SCRAPER
     return db
+
+
+def _docket_parties(
+    docket: ScrapeDocket[Any, Any, Any], params: Any
+) -> list[Party]:
+    return docket.parties
 
 
 class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
@@ -49,4 +62,9 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     )
     docket_number_raw: str = Attribute(
         lambda d, params: d.docket_number, strategy=overwrite
+    )
+    parties: list[Party] = ManyToManyRelation(
+        PartyMerger,
+        through=PartyTypeMerger,
+        transform=_docket_parties,
     )

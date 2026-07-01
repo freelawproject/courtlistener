@@ -109,7 +109,7 @@ class FloridaMergerTest(TestCase):
 
         assert result.success is True
         assert result.update is True
-        assert result.create is False
+        assert "OriginatingCourtInformation" not in result.creates
         assert existing_oci.pk in result.updates["OriginatingCourtInformation"]
         existing_oci.refresh_from_db()
         assert existing_oci.docket_number == "UPDATED-001"
@@ -130,7 +130,7 @@ class FloridaMergerTest(TestCase):
         ).merge()
 
         assert result.success is True
-        assert result.create is False
+        assert "OriginatingCourtInformation" not in result.creates
         assert "OriginatingCourtInformation" not in result.updates
 
     def test_merge_multiple_originating_cases_uses_first(self):
