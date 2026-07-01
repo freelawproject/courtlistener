@@ -35,7 +35,7 @@ def add_scraper_source(scrape: int | None, db: int | None) -> int:
     return db
 
 
-class FloridaPartyMerger(Merger[FloridaParty, Person, None]):
+class FloridaPartyMerger(Merger[FloridaParty, None, Person]):
     model: ClassVar[type[Model]] = Person
 
 
