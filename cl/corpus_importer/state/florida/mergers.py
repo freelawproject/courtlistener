@@ -1,15 +1,27 @@
 import logging
 from datetime import date
-from typing import ClassVar, override
+from typing import Any, ClassVar, override
 
 from django.db.models import Model, QuerySet
 from juriscraper.state.florida import (
     FloridaCase,
     FloridaOriginatingCase,
+    FloridaParty,
+    FloridaPartyRepresentative,
 )
 from juriscraper.state.florida.cases import FloridaCourtID
 
-from cl.corpus_importer.state.common.docket import DocketMerger
+from cl.corpus_importer.state.common.docket import (
+    DocketMerger,
+    _docket_parties,
+)
+from cl.corpus_importer.state.common.party import (
+    AttorneyMerger,
+    PartyMerger,
+    PartyTypeMerger,
+    RoleMerger,
+    _party_representatives,
+)
 from cl.corpus_importer.state.florida.utils import (
     FL_APPELLATE_COURT_ID,
     FLORIDA_COURT_ID_MAP,
@@ -17,14 +29,35 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyToManyRelation,
     Merger,
     OneToOneRelation,
     RelatedParams,
+    ThroughParameters,
     overwrite,
 )
+from cl.people_db.models import Attorney, Party, Role
 from cl.search.models import Docket, OriginatingCourtInformation
 
 logger = logging.getLogger(__name__)
+
+
+def _florida_representative_role(
+    representative: FloridaPartyRepresentative, params: ThroughParameters[Any]
+) -> int:
+    return Role.ATTORNEY_LEAD if representative.primary_flag else Role.UNKNOWN
+
+
+class FloridaRoleMerger(
+    RoleMerger[FloridaPartyRepresentative, RelatedParams[None]]
+):
+    role: int = Attribute(_florida_representative_role)
+
+
+class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
+    attorneys: list[Attorney] = ManyToManyRelation(
+        AttorneyMerger, FloridaRoleMerger, _party_representatives
+    )
 
 
 def add_scraper_source(scrape: int | None, db: int | None) -> int:
@@ -126,6 +159,12 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
             FloridaOriginatingCourtInformationMerger,
             _originating_case,
         )
+    )
+
+    parties: list[Party] = ManyToManyRelation(
+        FloridaPartyMerger,
+        through=PartyTypeMerger,
+        transform=_docket_parties,
     )
 
     @override

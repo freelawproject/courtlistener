@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import date
 from typing import Any, ClassVar
 
@@ -5,6 +6,7 @@ from django.db.models import Model
 from juriscraper.state.docket import (
     Docket as ScrapeDocket,
 )
+from juriscraper.state.docket import Party as ScrapeParty
 
 from cl.corpus_importer.state.common.party import PartyMerger, PartyTypeMerger
 from cl.corpus_importer.state.merger import (
@@ -25,9 +27,9 @@ def add_scraper_source(scrape: int | None, db: int | None) -> int:
     return db
 
 
-def _docket_parties(
-    docket: ScrapeDocket[Any, Any, Any], params: Any
-) -> list[Party]:
+def _docket_parties[PType: ScrapeParty[Any]](
+    docket: ScrapeDocket[Any, Any, PType], params: Any
+) -> Sequence[PType]:
     return docket.parties
 
 

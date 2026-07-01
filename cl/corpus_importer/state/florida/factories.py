@@ -4,6 +4,7 @@ from factory.base import Factory
 from factory.declarations import LazyAttribute, List, SubFactory
 from factory.faker import Faker
 from juriscraper.state.docket import DocketTransfer
+from juriscraper.state.florida import FloridaPartyRepresentative
 from juriscraper.state.florida.cases import (
     FLORIDA_DOCKET_TYPE_MAP,
     FloridaCase,
@@ -52,7 +53,7 @@ class FloridaDocketTransferFactory(_PydanticConstructFactory):
 
 class FloridaRepresentativeFactory(_PydanticConstructFactory):
     class Meta:
-        model = FloridaParty
+        model = FloridaPartyRepresentative
 
     party_uuid = Faker("uuid4")
     name = Faker("name")

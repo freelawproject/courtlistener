@@ -8,6 +8,7 @@ from cl.corpus_importer.state.merger import (
     Attribute,
     ManyToManyRelation,
     Merger,
+    RelatedParams,
     ThroughParameters,
 )
 from cl.people_db.models import Attorney, Party, PartyType, Role
@@ -35,9 +36,9 @@ class AttorneyMerger[AttyType: ScrapeRepresentative, ParamType](
     model: ClassVar[type[Model]] = Attorney
 
 
-def _party_representatives(
-    party: ScrapeParty[ScrapeRepresentative], params: Any
-) -> list[ScrapeRepresentative]:
+def _party_representatives[RType: ScrapeRepresentative](
+    party: ScrapeParty[RType], params: Any
+) -> list[RType]:
     return party.representatives
 
 
@@ -46,7 +47,7 @@ def _party_name(party: ScrapeParty[ScrapeRepresentative], params: Any) -> str:
 
 
 class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
-    Merger[PType, ParamType, Party]
+    Merger[PType, RelatedParams[ParamType], Party]
 ):
     model: ClassVar[type[Model]] = Party
 
