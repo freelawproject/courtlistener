@@ -297,11 +297,9 @@ class BaseMergerTest(TestCase):
             Merger[dict[str, str], ThroughParameters[None], PartyType]
         ):
             model: ClassVar[type[Model]] = PartyType
-            key: ClassVar[Iterable[str]] = ["name", "party", "docket"]
+            key: ClassVar[Iterable[str]] = ["name"]
 
             name: str = Attribute(lambda d, params: d["type"])
-            party: Party = Attribute(lambda d, params: params.target)
-            docket: Docket = Attribute(lambda d, params: params.source)
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
