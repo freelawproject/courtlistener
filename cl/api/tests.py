@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
@@ -33,9 +33,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework_xml.renderers import XMLRenderer
+from waffle.testutils import override_switch
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
+from cl.api.constants import LEVEL_TO_RATES, TIER_3_RATES
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -50,13 +52,18 @@ from cl.api.models import (
 )
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
+    DOUBLE_API_THROTTLES_SWITCH,
     ExceptionalUserRateThrottle,
     LoggingMixin,
+    apply_membership_throttles,
+    clear_membership_throttles,
     detect_unknown_filter_params,
     get_all_throttle_overrides,
     get_logging_prefix,
     invert_user_logs,
     is_valid_filter_param,
+    promo_doubling_applies,
+    promo_switch_is_active,
 )
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
@@ -76,6 +83,8 @@ from cl.disclosures.api_views import (
 from cl.disclosures.api_views import (
     PositionViewSet as DisclosurePositionViewSet,
 )
+from cl.donate.factories import NeonMembershipFactory
+from cl.donate.models import MembershipPaymentStatus, NeonMembershipLevel
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.favorites.models import GenericCount
 from cl.lib.decorators import clear_tiered_cache
@@ -103,7 +112,10 @@ from cl.people_db.factories import (
     RoleFactory,
 )
 from cl.people_db.models import Attorney
-from cl.recap.factories import ProcessingQueueFactory
+from cl.recap.factories import (
+    FjcIntegratedDatabaseFactory,
+    ProcessingQueueFactory,
+)
 from cl.recap.views import (
     EmailProcessingQueueViewSet,
     FjcIntegratedDatabaseViewSet,
@@ -178,41 +190,12 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, 200)
 
-    async def test_api_index(self) -> None:
-        r = await self.async_client.get(reverse("api_index"))
-        self.assertEqual(r.status_code, 200)
-
     async def test_options_request(self) -> None:
         r = await self.async_client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
 
     async def test_court_index(self) -> None:
         r = await self.async_client.get(reverse("court_index"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_rest_docs(self) -> None:
-        r = await self.async_client.get(reverse("rest_docs"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_rest_change_log(self) -> None:
-        r = await self.async_client.get(reverse("rest_change_log"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_webhook_docs(self) -> None:
-        r = await self.async_client.get(reverse("webhooks_docs"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_tag_api_help(self) -> None:
-        """Can we load the tag API help page?"""
-        r = await self.async_client.get(reverse("tag_api_help"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_webhooks_getting_started(self) -> None:
-        r = await self.async_client.get(reverse("webhooks_getting_started"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_bulk_data_index(self) -> None:
-        r = await self.async_client.get(reverse("bulk_data_index"))
         self.assertEqual(r.status_code, 200)
 
     async def test_coverage_api(self) -> None:
@@ -225,26 +208,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         r = await self.async_client.get("/api/rest/v4/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
-    async def test_api_info_page_displays_latest_rest_docs_by_default(
-        self,
-    ) -> None:
-        response = await self.async_client.get(reverse("rest_docs"))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "rest-docs-vlatest.html")
-
-    async def test_api_info_page_can_display_different_versions_of_rest_docs(
-        self,
-    ) -> None:
-        for version in ["v1", "v2", "v3"]:
-            response = await self.async_client.get(
-                reverse("rest_docs", kwargs={"version": version})
-            )
-            self.assertEqual(response.status_code, 200)
-            self.assertTemplateUsed(response, f"rest-docs-{version}.html")
-            version_to_compare = version.upper() if version != "v3" else "v3"
-            header = f"REST API &ndash; {version_to_compare}"
-            self.assertContains(response, header)
-
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
         r = await self.async_client.get(reverse("wiki_data"))
@@ -254,12 +217,14 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         expected_keys = {
             "court_count",
             "citation_count",
+            "alerts_sent_count",
             "citation_lookup",
             "financial_disclosures",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
         self.assertIsInstance(data["citation_count"], int)
+        self.assertIsInstance(data["alerts_sent_count"], int)
         citation = data["citation_lookup"]
         self.assertIn("throttle_count", citation)
         self.assertIn("throttle_period", citation)
@@ -479,11 +444,11 @@ class ApiQueryCountTests(TestCase):
             path = reverse("docket-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(8):
+        with self.assertNumQueries(6):
             path = reverse("docketentry-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(4):
             path = reverse("recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -502,12 +467,12 @@ class ApiQueryCountTests(TestCase):
             self.client.get(path)
 
     def test_party_endpoint_query_counts(self, mock_logging_prefix) -> None:
-        with self.assertNumQueries(9):
+        with self.assertNumQueries(7):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
 
     def test_attorney_endpoint_query_counts(self, mock_logging_prefix) -> None:
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(4):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
 
@@ -516,7 +481,7 @@ class ApiQueryCountTests(TestCase):
             path = reverse("processingqueue-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(3):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path, {"pacer_doc_id": "17711118263"})
 
@@ -637,6 +602,7 @@ class ApiEventCreationTestCase(TestCase):
         self.assertEqual(event_descriptions, expected_descriptions)
         mock_zoho_task.delay.assert_not_called()
 
+    @mock.patch("cl.api.utils.tag_zoho_record")
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
@@ -644,7 +610,7 @@ class ApiEventCreationTestCase(TestCase):
     )
     @mock.patch.object(LoggingMixin, "milestones", new=[1])
     async def test_are_v4_events_created_properly(
-        self, mock_logging_prefix, mock_zoho_task
+        self, mock_logging_prefix, mock_zoho_task, mock_tag_task
     ) -> None:
         """Are event objects created as V4 API requests are made?"""
         await self.hit_the_api("v4")
@@ -660,7 +626,41 @@ class ApiEventCreationTestCase(TestCase):
             f"User '{self.user.username}' has placed their 1st API v4 request."
         )
         self.assertEqual(event_descriptions, expected_descriptions)
-        mock_zoho_task.delay.assert_called_once_with(self.user.pk, 1)
+        # Without an active membership, the milestone fires the sync task
+        # alone — no chain, no tag task.
+        mock_zoho_task.si.assert_called_once_with(self.user.pk, 1)
+        mock_zoho_task.si.return_value.apply_async.assert_called_once()
+        mock_tag_task.s.assert_not_called()
+
+    @mock.patch("cl.api.utils.celery_chain")
+    @mock.patch("cl.api.utils.tag_zoho_record")
+    @mock.patch("cl.api.utils.create_or_update_zoho_account")
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    @mock.patch.object(LoggingMixin, "milestones", new=[1])
+    async def test_v4_milestone_chains_tag_task_for_active_member(
+        self,
+        mock_logging_prefix,
+        mock_zoho_task,
+        mock_tag_task,
+        mock_chain,
+    ) -> None:
+        """Active members get the tag task chained after the sync task."""
+        await sync_to_async(NeonMembershipFactory.create)(
+            user=self.user, level=NeonMembershipLevel.TIER_2
+        )
+
+        await self.hit_the_api("v4")
+
+        mock_zoho_task.s.assert_called_once_with(self.user.pk, 1)
+        mock_tag_task.s.assert_called_once_with(NeonMembershipLevel.TIER_2)
+        mock_chain.assert_called_once_with(
+            mock_zoho_task.s.return_value,
+            mock_tag_task.s.return_value,
+        )
+        mock_chain.return_value.apply_async.assert_called_once()
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
@@ -1125,8 +1125,8 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         self.q = {"short_name__iexact": "Cc1"}
         count = await self.qs.filter(short_name__iexact="Cc1").acount()
         await self.assertCountInResults(count)
-        self.q = {"short_name__icontains": "cc"}
-        count = await self.qs.filter(short_name__icontains="cc").acount()
+        self.q = {"short_name__istartswith": "cc"}
+        count = await self.qs.filter(short_name__istartswith="cc").acount()
         await self.assertCountInResults(count)
 
     async def test_full_name_filter(self):
@@ -1134,17 +1134,16 @@ class DRFCourtApiFilterTests(TestCase, FilteringCountTestMixin):
         self.q = {"full_name__istartswith": "Child"}
         count = await self.qs.filter(full_name__istartswith="Child").acount()
         await self.assertCountInResults(count)
-        self.q = {"full_name__iendswith": "Court"}
-        count = await self.qs.filter(full_name__iendswith="Court").acount()
-        await self.assertCountInResults(count)
 
     async def test_citation_string_filter(self):
         """Can we filter courts by citation_string with text lookups?"""
         self.q = {"citation_string": "OC"}
         count = await self.qs.filter(citation_string="OC").acount()
         await self.assertCountInResults(count)
-        self.q = {"citation_string__icontains": "2"}
-        count = await self.qs.filter(citation_string__icontains="2").acount()
+        self.q = {"citation_string__istartswith": "CC"}
+        count = await self.qs.filter(
+            citation_string__istartswith="CC"
+        ).acount()
         await self.assertCountInResults(count)
 
     async def test_jurisdiction_filter(self):
@@ -1250,9 +1249,9 @@ class DRFJudgeApiFilterTests(
         await self.assertCountInResults(1)
 
         # Moving on to careers. Bad value, then good.
-        self.q["positions__job_title__icontains"] = "XXX"
+        self.q["positions__job_title__istartswith"] = "XXX"
         await self.assertCountInResults(0)
-        self.q["positions__job_title__icontains"] = "lawyer"
+        self.q["positions__job_title__istartswith"] = "Corporate"
         await self.assertCountInResults(1)
 
         # Moving on to titles...bad value, then good.
@@ -1348,9 +1347,9 @@ class DRFJudgeApiFilterTests(
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
         # Traverse person, position
-        self.q["person__positions__job_title__icontains"] = "xxx"
+        self.q["person__positions__job_title__istartswith"] = "xxx"
         await self.assertCountInResults(0)
-        self.q["person__positions__job_title__icontains"] = "lawyer"
+        self.q["person__positions__job_title__istartswith"] = "Corporate"
         await self.assertCountInResults(2)
 
         # Just traverse to the judge table
@@ -1521,9 +1520,9 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
         await self.assertCountInResults(1)
         self.q = {"parties_represented__id": 9999}
         await self.assertCountInResults(0)
-        self.q = {"parties_represented__name__contains": "Honker"}
+        self.q = {"parties_represented__name__startswith": "Honker"}
         await self.assertCountInResults(1)
-        self.q = {"parties_represented__name__contains": "Honker-Nope"}
+        self.q = {"parties_represented__name__startswith": "Honker-Nope"}
         await self.assertCountInResults(0)
 
         # Adds extra role to the existing attorney
@@ -1638,15 +1637,15 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
 
         self.q = {"name": "Honker"}
         await self.assertCountInResults(1)
-        self.q = {"name__icontains": "Honk"}
+        self.q = {"name__istartswith": "Honk"}
         await self.assertCountInResults(1)
 
         self.q = {"name": "Cardinal Bonds"}
         await self.assertCountInResults(0)
 
-        self.q = {"attorney__name__icontains": "Juneau"}
+        self.q = {"attorney__name__istartswith": "Juneau"}
         await self.assertCountInResults(1)
-        self.q = {"attorney__name__icontains": "Juno"}
+        self.q = {"attorney__name__istartswith": "Juno"}
         await self.assertCountInResults(0)
 
         # Add another attorney to the party record but linked to another docket
@@ -1787,12 +1786,16 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
         # Create two parties with matching names on the same docket
         attorney_1 = await Attorney.objects.aget(pk=self.attorney.pk)
         party1 = await sync_to_async(PartyFactory)(
-            name="First Corp LLC", attorneys=[attorney_1], docket=self.docket
+            name="Corp Alpha Plaintiff LLC",
+            attorneys=[attorney_1],
+            docket=self.docket,
         )
 
         attorney_2 = await Attorney.objects.aget(pk=self.attorney_2.pk)
         party2 = await sync_to_async(PartyFactory)(
-            name="Second Corp Inc", attorneys=[attorney_2], docket=self.docket
+            name="Corp Beta Defendant Inc",
+            attorneys=[attorney_2],
+            docket=self.docket,
         )
         await sync_to_async(PartyTypeFactory.create)(
             docket=self.docket, party=party1, name="Plaintiff"
@@ -1803,7 +1806,7 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestMixin):
 
         self.q = {
             "id": self.docket.id,
-            "parties__name__icontains": "Corp",
+            "parties__name__istartswith": "Corp",
         }
         # Should return exactly 1 result, not 2 duplicates
         await self.assertCountInResults(1)
@@ -2050,12 +2053,15 @@ class V4DRFPaginationTest(TestCase):
             user__username="recap-user",
             user__password=make_password("password"),
         )
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        ps_upload = Permission.objects.filter(
-            codename="has_recap_upload_access"
+        ps = Permission.objects.filter(
+            codename__in=[
+                "has_recap_api_access",
+                "has_recap_upload_access",
+                "view_processingqueue",
+                "view_emailprocessingqueue",
+            ]
         )
         cls.user_1.user.user_permissions.add(*ps)
-        cls.user_1.user.user_permissions.add(*ps_upload)
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         for i in range(10):
             DocketFactory(
@@ -3023,15 +3029,8 @@ class DRFRecapPermissionTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         # Add the permissions to the user.
-        up = UserProfileWithParentsFactory.create(
-            user__username="recap-user",
-            user__password=make_password("password"),
-        )
-        ps = Permission.objects.filter(codename="has_recap_api_access")
-        up.user.user_permissions.add(*ps)
-
         UserProfileWithParentsFactory.create(
-            user__username="pandora",
+            user__username="recap-user",
             user__password=make_password("password"),
         )
 
@@ -3045,31 +3044,25 @@ class DRFRecapPermissionTest(TestCase):
             ]
         ]
 
-    async def test_has_access(self) -> None:
-        """Does the RECAP user have access to all of the RECAP endpoints?"""
+    async def test_authenticated_user_has_access(self) -> None:
+        """Authenticated users can read all RECAP endpoints."""
         self.assertTrue(
             await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
         for path in self.paths:
-            print(f"Access allowed to recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
             self.assertEqual(r.status_code, HTTPStatus.OK)
-            print("✓")
 
-    async def test_lacks_access(self) -> None:
-        """Does a normal user lack access to the RECPAP endpoints?"""
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="pandora", password="password"
-            )
-        )
+    async def test_anonymous_user_lacks_access(self) -> None:
+        """Anonymous users are denied access to RECAP endpoints."""
         for path in self.paths:
-            print(f"Access denied to non-recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
-            self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
-            print("✓")
+            self.assertIn(
+                r.status_code,
+                (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
+            )
 
 
 class WebhooksProxySecurityTest(TestCase):
@@ -4524,6 +4517,23 @@ class UnknownFilterParameterBlockingTests(TestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
+    def test_fjc_class_action_in_lookup_returns_400(self) -> None:
+        """`class_action__in` on the FJC endpoint is no longer a valid filter
+        (it produced a 500 when combined with a BooleanField in
+        django-filter), so it should be rejected as an unknown param."""
+        FjcIntegratedDatabaseFactory(class_action=True)
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse("fjcintegrateddatabase-list", kwargs={"version": "v4"}),
+            {"class_action__in": "True"},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        data = response.json()
+        self.assertEqual(
+            data["detail"], "Unknown filter parameters are not allowed."
+        )
+        self.assertEqual(data["unknown_params"], ["class_action__in"])
+
 
 class UnknownFilterParameterUtilsTests(SimpleTestCase):
     """Unit tests for unknown filter parameter utility functions."""
@@ -4705,11 +4715,13 @@ class APIThrottleConstraintTest(TestCase):
             user=user,
             throttle_type=ThrottleType.API,
             rate="5/min",
+            source=APIThrottle.Source.MANUAL,
         )
         conflict = APIThrottleFactory.build(
             user=user,
             throttle_type=ThrottleType.API,
             rate="10/min",
+            source=APIThrottle.Source.MANUAL,
         )
         with self.assertRaises(ValidationError) as ctx:
             conflict.full_clean()
@@ -4723,11 +4735,13 @@ class APIThrottleConstraintTest(TestCase):
             user=user,
             throttle_type=ThrottleType.API,
             rate="5/min",
+            source=APIThrottle.Source.MANUAL,
         )
         conflict = APIThrottleFactory.build(
             user=user,
             throttle_type=ThrottleType.API,
             rate="10/minute",
+            source=APIThrottle.Source.MANUAL,
         )
         with self.assertRaises(ValidationError):
             conflict.full_clean()
@@ -4748,9 +4762,40 @@ class APIThrottleConstraintTest(TestCase):
         # Should not raise.
         other.full_clean()
 
+    def test_different_sources_do_not_conflict(self) -> None:
+        """A MANUAL and a MEMBERSHIP rate sharing a time unit are allowed."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="5/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        other = APIThrottleFactory.build(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        # Should not raise — different source.
+        other.full_clean()
+
 
 class ThrottleOverrideIntegrationTest(TestCase):
     """Integration tests for throttle overrides using the APIThrottle model."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Start at setUpClass so the patched prefix is active during
+        # setUp/tearDown calls to clear_tiered_cache(). A class decorator
+        # would only wrap test_* methods, leaving setUp unpatched.
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_throttle_override_integration_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
 
     def setUp(self) -> None:
         clear_tiered_cache()
@@ -4860,18 +4905,89 @@ class ThrottleOverrideIntegrationTest(TestCase):
         self.assertIn(citation_throttle.user.username, citation_overrides)
         self.assertNotIn(api_throttle.user.username, citation_overrides)
 
-    async def test_citation_lookup_page_loads_with_throttle_override(
+    def test_overrides_drop_membership_when_user_lacks_active_membership(
         self,
     ) -> None:
-        """Test citation lookup help page loads for user with custom rate."""
-        throttle = await sync_to_async(APIThrottleFactory)(
-            throttle_type=ThrottleType.CITATION_LOOKUP,
-            rate="500/hour",
+        """MEMBERSHIP rows are dropped for users with no NeonMembership."""
+        throttle = APIThrottleFactory(
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
         )
-        client = AsyncClient()
-        await sync_to_async(client.force_login)(throttle.user)
-        response = await client.get(reverse("citation_lookup_api"))
-        self.assertEqual(response.status_code, HTTPStatus.OK)
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(throttle.user.username, overrides)
+
+    def test_overrides_drop_membership_when_membership_terminated(
+        self,
+    ) -> None:
+        """MEMBERSHIP throttles are dropped when termination_date is in the past."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        NeonMembershipFactory(
+            user=user,
+            termination_date=now() - timedelta(days=1),
+        )
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(user.username, overrides)
+
+    def test_overrides_drop_membership_when_payment_failed(self) -> None:
+        """MEMBERSHIP throttles are dropped when payment_status != SUCCEEDED."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        NeonMembershipFactory(
+            user=user,
+            payment_status=MembershipPaymentStatus.FAILED,
+        )
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertNotIn(user.username, overrides)
+
+    def test_overrides_keep_membership_when_active(self) -> None:
+        """MEMBERSHIP throttles for users with an active membership are returned."""
+        user = UserFactory()
+        for rate in ("10/min", "75/hour", "300/day"):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+        NeonMembershipFactory(user=user)
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(user.username, overrides)
+        self.assertEqual(
+            sorted(overrides[user.username]),
+            sorted(["10/min", "75/hour", "300/day"]),
+        )
+
+    def test_overrides_any_manual_drops_all_membership(self) -> None:
+        """A MANUAL override fully replaces the user's MEMBERSHIP set."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="100/day",
+            source=APIThrottle.Source.MANUAL,
+        )
+        for rate in ("10/min", "75/hour"):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+        NeonMembershipFactory(user=user)
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertEqual(overrides[user.username], ["100/day"])
 
 
 @override_settings(
@@ -4882,8 +4998,14 @@ class ThrottleOverrideIntegrationTest(TestCase):
         }
     }
 )
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class MultiRateThrottleTest(TestCase):
-    """Tests for multi-rate enforcement via ExceptionalUserRateThrottle."""
+    """Tests for multi-rate enforcement via ExceptionalUserRateThrottle.
+
+    Pins the promo switch off (it defaults on via WAFFLE_SWITCH_DEFAULT) so
+    these assert base-rate enforcement; the x2 promo is covered separately by
+    PromoDoubleThrottleTest.
+    """
 
     def setUp(self) -> None:
         clear_tiered_cache()
@@ -5033,3 +5155,271 @@ class MultiRateThrottleTest(TestCase):
                 throttle.allow_request(request, view=None)
             self.assertEqual(ctx.exception.wait, 35)
             self.assertIn("5/min", str(ctx.exception.detail))
+
+    def test_manual_zero_min_overrides_active_membership(self) -> None:
+        """A MANUAL 0/min row blocks even when MEMBERSHIP rates would allow."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        for rate in ("10/min", "75/hour"):
+            APIThrottleFactory(
+                user=user,
+                throttle_type=ThrottleType.API,
+                rate=rate,
+                source=APIThrottle.Source.MEMBERSHIP,
+            )
+        NeonMembershipFactory(user=user)
+
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = ExceptionalUserRateThrottle()
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        self.assertIn("blocked", str(ctx.exception.detail).lower())
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="PromoDoubleThrottleTest")
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+class PromoDoubleThrottleTest(TestCase):
+    """Membership-promotion x2 API throttle."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Isolate this class's tiered_cache namespace so cached overrides /
+        # exclusion sets don't leak across classes. Start in setUpClass so the
+        # patched prefix is active during setUp/tearDown clear_tiered_cache().
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_promo_double_throttle_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    @staticmethod
+    def _make_member(level: int, rate: str) -> User:
+        """Active member at `level` with a single MEMBERSHIP API rate."""
+        user = UserFactory()
+        NeonMembershipFactory(user=user, level=level)
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate=rate,
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        return user
+
+    @staticmethod
+    def _allowed_count(user: User, attempts: int) -> int:
+        """Count requests allowed before the throttle first raises Throttled."""
+        request = RequestFactory().get("/")
+        request.user = user
+        allowed = 0
+        for _ in range(attempts):
+            throttle = ExceptionalUserRateThrottle()
+            try:
+                throttle.allow_request(request, view=None)
+            except Throttled:
+                break
+            allowed += 1
+        return allowed
+
+    def test_paid_member_rate_doubled(self) -> None:
+        """A paid member's 2/min is enforced as 4/min during the promo."""
+        user = self._make_member(NeonMembershipLevel.TIER_2, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 4)
+
+    def test_lso_member_rate_doubled(self) -> None:
+        """LSO members are included; 2/min becomes 4/min during the promo."""
+        user = self._make_member(NeonMembershipLevel.LSO_1, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 4)
+
+    def test_edu_member_not_doubled(self) -> None:
+        """EDU members are excluded; 2/min stays 2/min."""
+        user = self._make_member(NeonMembershipLevel.EDU, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 2)
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
+    def test_member_base_rate_when_switch_off(self) -> None:
+        """With the promo off, a paid member's 2/min is enforced as-is."""
+        user = self._make_member(NeonMembershipLevel.TIER_2, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 2)
+
+    def test_non_member_doubled_in_isolated_bucket(self) -> None:
+        """A non-member is eligible and counted in the _promo2x bucket."""
+        user = UserFactory()
+        self.assertTrue(promo_doubling_applies(user))
+        request = RequestFactory().get("/")
+        request.user = user
+        throttle = ExceptionalUserRateThrottle()
+        self.assertTrue(throttle.allow_request(request, view=None))
+        self.assertTrue((throttle.key or "").endswith("_promo2x"))
+
+    def test_manual_override_not_doubled(self) -> None:
+        """Commercial/MANUAL overrides are excluded from the promo."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="2/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        self.assertFalse(promo_doubling_applies(user))
+        self.assertEqual(self._allowed_count(user, 6), 2)
+
+    def test_switch_status_cached(self) -> None:
+        """The switch is read once, then served from the cache."""
+        with mock.patch(
+            "cl.api.utils.switch_is_active", return_value=True
+        ) as mocked:
+            self.assertTrue(promo_switch_is_active())
+            self.assertTrue(promo_switch_is_active())
+            mocked.assert_called_once()
+        # Switch to a fresh tiered-cache namespace to force a re-read, instead
+        # of flushing the entire cache.
+        with (
+            mock.patch(
+                "cl.lib.decorators.get_tiered_cache_prefix",
+                return_value="tiered_switch_status_reread",
+            ),
+            mock.patch(
+                "cl.api.utils.switch_is_active", return_value=False
+            ) as mocked,
+        ):
+            self.assertFalse(promo_switch_is_active())
+            mocked.assert_called_once()
+
+
+class MembershipThrottleSyncTest(TestCase):
+    """Tests for apply_membership_throttles / clear_membership_throttles."""
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_each_tier_writes_correct_rates(self) -> None:
+        """Every level in LEVEL_TO_RATES writes MEMBERSHIP rows with matching rates."""
+        for level, rates in LEVEL_TO_RATES.items():
+            with self.subTest(level=level):
+                user = UserFactory()
+                self.assertTrue(apply_membership_throttles(user, level))
+                got = list(
+                    APIThrottle.objects.filter(
+                        user=user,
+                        throttle_type=ThrottleType.API,
+                        source=APIThrottle.Source.MEMBERSHIP,
+                    ).values_list("rate", flat=True)
+                )
+                self.assertEqual(sorted(got), sorted(rates))
+
+    def test_upgrade_replaces_membership_rows(self) -> None:
+        """A second apply call replaces the previous tier's MEMBERSHIP rows."""
+        user = UserFactory()
+        apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+        apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
+
+        rates = sorted(
+            APIThrottle.objects.filter(
+                user=user,
+                throttle_type=ThrottleType.API,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(rates, sorted(TIER_3_RATES))
+
+    def test_apply_writes_membership_alongside_manual(self) -> None:
+        """MANUAL rows coexist in the DB with MEMBERSHIP rows from apply()."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+
+        manual = list(
+            APIThrottle.objects.filter(
+                user=user, source=APIThrottle.Source.MANUAL
+            ).values_list("rate", flat=True)
+        )
+        membership = sorted(
+            APIThrottle.objects.filter(
+                user=user, source=APIThrottle.Source.MEMBERSHIP
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(manual, ["0/min"])
+        self.assertEqual(membership, sorted(["10/min", "75/hour", "300/day"]))
+
+    def test_clear_only_removes_membership_rows(self) -> None:
+        """clear_membership_throttles deletes MEMBERSHIP rows but not MANUAL."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        clear_membership_throttles(user)
+
+        remaining = list(
+            APIThrottle.objects.filter(user=user).values_list("rate", "source")
+        )
+        self.assertEqual(remaining, [("0/min", APIThrottle.Source.MANUAL)])
+
+    def test_unknown_level_is_no_op(self) -> None:
+        """Levels not in LEVEL_TO_RATES (e.g. BASIC) write no rows and return False."""
+        user = UserFactory()
+        self.assertFalse(
+            apply_membership_throttles(user, NeonMembershipLevel.BASIC)
+        )
+        self.assertFalse(APIThrottle.objects.filter(user=user).exists())
+
+    def test_apply_skips_cache_clear_by_default(self) -> None:
+        """apply_* does not invalidate the cache unless clear_cache=True."""
+        user = UserFactory()
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            apply_membership_throttles(user, NeonMembershipLevel.TIER_1)
+        mock_clear.assert_not_called()
+
+    def test_apply_clears_cache_when_requested(self) -> None:
+        """apply_* invalidates the cache when called with clear_cache=True."""
+        user = UserFactory()
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            apply_membership_throttles(
+                user, NeonMembershipLevel.TIER_1, clear_cache=True
+            )
+        mock_clear.assert_called_once()
+
+    def test_clear_clears_throttle_cache_when_rows_deleted(self) -> None:
+        """clear_* invalidates the cache only when rows actually get deleted."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        with mock.patch("cl.api.utils.clear_tiered_cache") as mock_clear:
+            clear_membership_throttles(user)
+        mock_clear.assert_called_once()

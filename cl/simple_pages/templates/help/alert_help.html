@@ -83,16 +83,16 @@
 <div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">Help with Search and Docket&nbsp;Alerts</h1>
   <p class="lead">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
-  <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a href="{% url "webhooks_docs" %}">webhook events</a> to your server.</p>
+  <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a href="{{ WIKI_API_URL }}/webhooks/about">webhook events</a> to your server.</p>
 
   <h2 id="recap-alerts">Docket Alerts for PACER</h2>
-  <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a href="{% url "webhooks_docs" %}">webhook events</a> whenever new data is found.
+  <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a href="{{ WIKI_API_URL }}/webhooks/about">webhook events</a> whenever new data is found.
   </p>
   <p>Our alerts are only as good as our sources. To learn more about the data sources that trigger alerts see our <a href="{% url "coverage_recap" %}">coverage page</a>.
   </p>
   <p>For active cases, alerts can come within seconds of a new filing. For less active cases, it can take more time or alerts may not arrive at all, if we do not have a source of new information for that case.
   </p>
-  <p>In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
+  <p>Yesterday, we sent {{ alerts_sent_count|intcomma }} alerts.
   </p>
 
   <h3 id="limitations">Limitations</h3>
@@ -357,7 +357,7 @@
       <strong>Email:</strong> Stay informed in your inbox with straightforward notifications. This is the simplest, easiest way to get alerts, and it doesn't require any additional setup.
     </li>
     <li>
-      <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="underline" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
+      <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="underline" href="{{ WIKI_API_URL }}/webhooks/about">webhook documentation</a> to learn more.
     </li>
   </ul>
 

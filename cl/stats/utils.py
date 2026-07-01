@@ -5,12 +5,12 @@ import redis
 from django.conf import settings
 from django.db import OperationalError, connections
 from django.utils.timezone import now
+from elasticsearch.dsl import connections as es_connections
 from elasticsearch.exceptions import (
     ConnectionError,
     ConnectionTimeout,
     RequestError,
 )
-from elasticsearch_dsl import connections as es_connections
 from waffle import switch_is_active
 
 from cl.lib.db_tools import fetchall_as_dict
@@ -224,7 +224,8 @@ def get_replication_statuses() -> dict[str, list[dict[str, str | int]]]:
             confirmed_flush_lsn,
             pg_current_wal_lsn(),
             (pg_current_wal_lsn() - confirmed_flush_lsn) AS lsn_distance
-        FROM pg_replication_slots;
+        FROM pg_replication_slots
+        WHERE slot_type = 'logical';
     """
     for alias in connections:
         with connections[alias].cursor() as cursor:

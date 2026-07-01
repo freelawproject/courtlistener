@@ -132,6 +132,35 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         await self.async_client.post(self.path, self.data, format="json")
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 1)
 
+    async def test_recap_user_cannot_access_recap_email_endpoint(self):
+        """The recap user loaded by the 0002_load_initial_data migration
+        only has has_recap_upload_access and must not be able to GET or
+        POST to the recap-email endpoint, which requires the
+        has_recap_email_upload_access permission instead.
+        """
+
+        def _load_recap_user() -> tuple[User, list[str], str]:
+            recap_user = User.objects.get(username="recap")
+            permissions = list(
+                recap_user.user_permissions.values_list("codename", flat=True)
+            )
+            return recap_user, permissions, recap_user.auth_token.key
+
+        _, user_permissions, token = await sync_to_async(_load_recap_user)()
+        self.assertIn("has_recap_upload_access", user_permissions)
+        self.assertNotIn("has_recap_email_upload_access", user_permissions)
+
+        recap_client = AsyncAPIClient()
+        recap_client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+        get_response = await recap_client.get(self.path)
+        self.assertEqual(get_response.status_code, HTTPStatus.FORBIDDEN)
+
+        post_response = await recap_client.post(
+            self.path, self.data, format="json"
+        )
+        self.assertEqual(post_response.status_code, HTTPStatus.FORBIDDEN)
+
 
 @mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
 @mock.patch(

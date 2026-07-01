@@ -11,6 +11,8 @@
   {{ form.DOCUMENTATION_CHECK_TYPES|uniq|json_script:"requires-check-types" }}
   {% url "terms" as terms_url %}
   {{ terms_url|add:"#removal"|json_script:"terms-url" }}
+  {% url "mcp_help" as mcp_help_url %}
+  {{ mcp_help_url|json_script:"mcp-help-url" }}
 
   <style>
     [x-cloak]{ display: none !important } /* Prevent "blip" on first load */
@@ -78,7 +80,10 @@
           {% endif %}
         </div>
 
-        {#   EMAIL   #}
+        {#   EMAIL — only collected from anonymous users; logged-in users  #}
+        {#   are served by their account email so support staff aren't    #}
+        {#   asked to verify a freely-typed address.                      #}
+        {% if not user.is_authenticated %}
         <div class="form-group">
           {{ form.email.label_tag }}
           {{ form.email }}
@@ -90,6 +95,7 @@
             </p>
           {% endif %}
         </div>
+        {% endif %}
 
         {#   SUBJECT   #}
         {# We use the phone_number field as the subject field to defeat spam #}

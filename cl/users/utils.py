@@ -8,7 +8,12 @@ from cl.api.models import WebhookHistoryEvent
 from cl.favorites.models import DocketTagEvent, NoteEvent, UserTagEvent
 from cl.lib.crypto import md5
 from cl.lib.types import EmailType
-from cl.users.models import UserProfile
+from cl.users.models import (
+    UserProfile,
+    UserProfileBarMembershipEvent,
+    UserProfileEvent,
+    UserProxyEvent,
+)
 
 
 def create_stub_account(
@@ -77,7 +82,18 @@ def convert_to_stub_account(user: User) -> User:
     profile.zip_code = None
     profile.save()
 
-    profile.barmembership.all().delete()
+    profile.barmembership.clear()
+
+    # Blanking the fields above writes the user's prior values (real name,
+    # address, employer, etc.) into the pghistory event tables — UserProxy
+    # stores the old row on update. Purge that history here, after the final
+    # write, so we don't retain the PII we just tried to remove. This must
+    # run after the blanking, not in delete_user_assets, which executes first.
+    UserProfileEvent.objects.filter(user_id=user.pk).delete()
+    UserProxyEvent.objects.filter(pgh_obj_id=user.pk).delete()
+    UserProfileBarMembershipEvent.objects.filter(
+        userprofile_id=profile.pk
+    ).delete()
 
     return user
 
@@ -94,8 +110,12 @@ def delete_user_assets(user: User) -> None:
     user.docket_alerts.all().delete()
     user.notes.all().delete()
     user_tags.delete()
+    user.search_queries.all().delete()
+    user.emails.all().delete()
+    user.scotus_maps.all().delete()
+    # Donations are financial records we need to keep, so disable the
+    # recurring ones rather than deleting them.
     user.monthly_donations.all().update(enabled=False)
-    user.scotus_maps.all().update(deleted=True)
 
     # After deleting user-related objects, nuke history objects related to the
     # user so that events generated due to delete() are also removed.
@@ -115,17 +135,6 @@ emails: dict[str, EmailType] = {
         "account was: \n\n"
         " - %s\n\n"
         "Can't keep 'em all, I suppose.\n\n",
-        "from_email": settings.DEFAULT_FROM_EMAIL,
-        "to": [a[1] for a in settings.MANAGERS],
-    },
-    "take_out_requested": {
-        "subject": "User wants their data. Need to send it to them.",
-        "body": "A user has requested their data in accordance with GDPR. "
-        "This means that if they're a EU citizen, you have to provide "
-        "them with their data. Their username and email are:\n\n"
-        " - %s\n"
-        " - %s\n\n"
-        "Good luck getting this taken care of.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
         "to": [a[1] for a in settings.MANAGERS],
     },

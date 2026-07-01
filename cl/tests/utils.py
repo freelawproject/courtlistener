@@ -83,8 +83,14 @@ class AsyncAPIClient(AsyncClient, APIRequestFactory):
         secure=False,
         **extra,
     ):
-        # Include the CONTENT_TYPE, regardless of whether or not data is empty.
-        if content_type is not None:
+        # Only set CONTENT_TYPE in extra when the body is empty. When data is
+        # non-empty, AsyncRequestFactory.generic already adds the content-type
+        # header from the positional argument; passing it again via extra
+        # would duplicate the header since Django 6.0.4 normalizes
+        # ``CONTENT_TYPE`` → ``content-type`` (CVE-2026-3902 patch), producing
+        # ``application/json,application/json`` and a DRF 415 response and some
+        # tests to fail.
+        if content_type is not None and not data:
             extra["CONTENT_TYPE"] = str(content_type)
 
         return await super().generic(
@@ -104,6 +110,14 @@ def make_client(user_pk: int) -> AsyncAPIClient:
     token_header = f"Token {token}"
     client = AsyncAPIClient()
     client.credentials(HTTP_AUTHORIZATION=token_header)
+    return client
+
+
+def make_session_client(user_pk: int) -> AsyncAPIClient:
+    # Use for endpoints that only accept session authentication
+    user = User.objects.get(pk=user_pk)
+    client = AsyncAPIClient()
+    client.force_login(user)
     return client
 
 
