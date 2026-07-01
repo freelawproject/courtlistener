@@ -19,7 +19,7 @@ jobs:
       - name: Set up docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Build docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile

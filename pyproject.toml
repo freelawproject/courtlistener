@@ -81,7 +81,7 @@ dependencies = [
   "eyecite",
   "scipy>=1.15.2",
   "scikit-learn>=1.9.0",
-  "numpy>=2.4.0",
+  "numpy>=2.5.0",
   "datasketch>=1.8.0",
   "PyStemmer>=3.0.0",
   "factory-boy>=3.3.3",
