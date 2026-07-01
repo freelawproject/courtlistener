@@ -5184,10 +5184,23 @@ class MultiRateThrottleTest(TestCase):
         self.assertIn("blocked", str(ctx.exception.detail).lower())
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="PromoDoubleThrottleTest")
+@override_settings(
+    WAFFLE_CACHE_PREFIX="PromoDoubleThrottleTest",
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "promo-double-throttle-test",
+        }
+    },
+)
 @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
 class PromoDoubleThrottleTest(TestCase):
-    """Membership-promotion x2 API throttle."""
+    """Membership-promotion x2 API throttle.
+
+    The throttle history cache must be private to this class: DRF keys it by
+    user pk in the shared Redis cache, and parallel test workers have separate
+    databases whose pk sequences collide.
+    """
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -5204,9 +5217,11 @@ class PromoDoubleThrottleTest(TestCase):
 
     def setUp(self) -> None:
         clear_tiered_cache()
+        caches["default"].clear()
 
     def tearDown(self) -> None:
         clear_tiered_cache()
+        caches["default"].clear()
 
     @staticmethod
     def _make_member(level: int, rate: str) -> User:
