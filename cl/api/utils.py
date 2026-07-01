@@ -1006,13 +1006,17 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         if self.rate is not None:
             self.num_requests, self.duration = self.parse_rate(self.rate)
 
+    def _promo_applies(self, request) -> bool:
+        """Whether the x2 promo applies to this user-scope request."""
+        return self.scope == "user" and promo_doubling_applies(request.user)
+
     def get_cache_key(self, request, view):
         key = super().get_cache_key(request, view)
         if key is None:
             return None
         # Promo: isolate doubled-quota usage so reverting to base rates at
         # promo end doesn't count it against the smaller window.
-        if self.scope == "user" and promo_doubling_applies(request.user):
+        if self._promo_applies(request):
             return f"{key}_promo2x"
         return key
 
@@ -1029,7 +1033,7 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
 
         overrides = get_all_throttle_overrides(self.throttle_type)
         rates = overrides.get(request.user.username) or self.default_rates
-        if promo_doubling_applies(request.user):
+        if self._promo_applies(request):
             rates = [double_rate(r) for r in rates]
         return self._check_multi_rate(rates)
 
