@@ -6,10 +6,10 @@ from django.db.models import Model, QuerySet
 from juriscraper.state.florida import (
     FloridaCase,
     FloridaOriginatingCase,
-    FloridaParty,
 )
 from juriscraper.state.florida.cases import FloridaCourtID
 
+from cl.corpus_importer.state.common.docket import DocketMerger
 from cl.corpus_importer.state.florida.utils import (
     FL_APPELLATE_COURT_ID,
     FLORIDA_COURT_ID_MAP,
@@ -21,7 +21,6 @@ from cl.corpus_importer.state.merger import (
     OneToOneRelation,
     overwrite,
 )
-from cl.people_db.models import Person
 from cl.search.models import Docket, OriginatingCourtInformation
 
 logger = logging.getLogger(__name__)
@@ -33,10 +32,6 @@ def add_scraper_source(scrape: int | None, db: int | None) -> int:
     if db in Docket.NON_SCRAPER_SOURCES():
         return db + Docket.SCRAPER
     return db
-
-
-class FloridaPartyMerger(Merger[FloridaParty, None, Person]):
-    model: ClassVar[type[Model]] = Person
 
 
 def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:
@@ -94,7 +89,7 @@ def _originating_case(
     return docket_data.originating_cases[0]
 
 
-class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
+class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
@@ -103,34 +98,9 @@ class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
         lambda d, params: FLORIDA_COURT_ID_MAP[d.court_id],
         strategy=overwrite,
     )
-    source: int = Attribute(
-        lambda _, params: Docket.SCRAPER,
-        strategy=add_scraper_source,
-    )
-    date_filed: date | None = Attribute(
-        lambda d, params: d.date_filed,
-        strategy=overwrite,
-    )
     date_last_filing: date | None = Attribute(
         _date_last_filing,
         strategy=overwrite,
-    )
-    case_name: str = Attribute(
-        lambda d, params: d.case_name, strategy=overwrite
-    )
-    case_name_full: str = Attribute(
-        lambda d, params: d.case_name_full,
-        strategy=overwrite,
-    )
-    case_name_short: str = Attribute(
-        lambda d, params: d.case_name, strategy=overwrite
-    )
-    docket_number: str = Attribute(
-        lambda d, params: d.docket_number,
-        strategy=overwrite,
-    )
-    docket_number_raw: str = Attribute(
-        lambda d, params: d.docket_number, strategy=overwrite
     )
     docket_number_core: str = Attribute(
         lambda d, params: make_docket_number_core(

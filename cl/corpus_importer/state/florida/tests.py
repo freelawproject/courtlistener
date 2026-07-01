@@ -1,5 +1,6 @@
 """Tests for Florida docket and originating-court-information merger."""
 
+from copy import copy
 from datetime import date, datetime
 from unittest import mock
 
@@ -165,8 +166,10 @@ class FloridaMergerTest(TestCase):
         assert merger.result.success is False
         assert "Docket" in merger.result.failures
 
-        with self.assertRaises(RuntimeError):
-            merger.merge()
+        before = copy(merger.result)
+        after = merger.merge()
+
+        assert before == after
 
     def test_merge_docket_supreme_court_creates_new(self):
         """Does merge_docket create a new supreme-court docket?"""

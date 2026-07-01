@@ -9,6 +9,7 @@ from cl.corpus_importer.state.merger import (
     Merger,
     OneToManyRelation,
     OneToOneRelation,
+    RelatedParams,
     ThroughParameters,
 )
 from cl.people_db.models import Party, PartyType, Person
@@ -152,7 +153,11 @@ class BaseMergerTest(TestCase):
 
     def test_related_mergers_1to1(self) -> None:
         class TestRelatedMerger(
-            Merger[dict[str, str], None, OriginatingCourtInformation]
+            Merger[
+                dict[str, str],
+                RelatedParams[None],
+                OriginatingCourtInformation,
+            ]
         ):
             model: ClassVar[type[Model]] = OriginatingCourtInformation
 
@@ -193,7 +198,9 @@ class BaseMergerTest(TestCase):
         self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
 
     def test_related_mergers_child(self) -> None:
-        class TestRelatedMerger(Merger[dict[str, str], None, DocketEntry]):
+        class TestRelatedMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
             model: ClassVar[type[Model]] = DocketEntry
 
             description: str = Attribute(lambda d, params: d["df"])

@@ -148,7 +148,21 @@ def Attribute[TransformType](
     return AttributeMerger(transform, strategy, default=default)
 
 
-class RelatedMerger[ScrapeType, ParamType, ChildType, OutputType, RM: Model](
+@dataclass
+class RelatedParams[ParamType]:
+    """Wrapper for passing parameters to a related object."""
+
+    params: ParamType
+    parent: Model = field(kw_only=True)
+
+
+class RelatedMerger[
+    ScrapeType,
+    ParamType,
+    ChildType,
+    OutputType,
+    RM: Model,
+](
     MergerSpecification[ScrapeType, ParamType, OutputType],
     ABC,
 ):
@@ -156,13 +170,15 @@ class RelatedMerger[ScrapeType, ParamType, ChildType, OutputType, RM: Model](
 
     def __init__(
         self,
-        merger: "type[Merger[ChildType, ParamType, RM]]",
+        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
         transform: Callable[[ScrapeType, ParamType], OutputType] | None = None,
         *,
         default: OutputType,
     ):
         super().__init__(transform=transform, default=default)
-        self.merger: type[Merger[ChildType, ParamType, RM]] = merger
+        self.merger: type[Merger[ChildType, RelatedParams[ParamType], RM]] = (
+            merger
+        )
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         errors = super().validate(field)
@@ -195,14 +211,22 @@ class RelatedMerger[ScrapeType, ParamType, ChildType, OutputType, RM: Model](
 
 
 class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
-    RelatedMerger[ScrapeType, ParamType, ChildType, ChildType | None, RM]
+    RelatedMerger[
+        ScrapeType,
+        ParamType,
+        ChildType,
+        ChildType | None,
+        RM,
+    ]
 ):
     """Class encapsulating logic for merging a one-to-one relationship."""
 
     def __init__(
         self,
-        merger: "type[Merger[ChildType, ParamType, RM]]",
-        transform: Callable[[ScrapeType, ParamType], ChildType | None]
+        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+        transform: Callable[
+            [ScrapeType, RelatedParams[ParamType]], ChildType | None
+        ]
         | None = None,
     ):
         super().__init__(merger=merger, transform=transform, default=None)
@@ -221,9 +245,11 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         if merger_input is None:
             return MergeResult.unnecessary()
 
+        related_params = RelatedParams(params, parent=parent)
+
         db_obj = cast(RM | None, getattr(parent, self.name))
         result = self.merger(
-            merger_input, existing=db_obj, params=params
+            merger_input, existing=db_obj, params=related_params
         ).merge()
         if db_obj is None:
             model = self.merger.model
@@ -238,7 +264,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
 
 def OneToOneRelation[ParamType, ChildType, RM: Model](
-    merger: "type[Merger[ChildType, ParamType, RM]]",
+    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
     transform: Callable[..., ChildType | None] | None = None,
 ) -> Any:
     return OneToOneMerger(merger, transform)
@@ -263,7 +289,7 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
     def __init__(
         self,
-        merger: "type[Merger[ChildType, ParamType, RM]]",
+        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
         transform: Callable[[ScrapeType, ParamType], Sequence[ChildType]]
         | None = None,
         *,
@@ -296,10 +322,12 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         if not transformed:
             return result
 
+        related_params = RelatedParams(params, parent=parent)
+
         related_objects: list[RM] = []
         for child in transformed:
             related_merge = self.merger(
-                child, manager=related_manager, params=params
+                child, manager=related_manager, params=related_params
             )
             result |= related_merge.merge()
             if related_merge.out is None:
@@ -331,7 +359,7 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
 
 def OneToManyRelation[ParamType, ChildType, RM: Model](
-    merger: "type[Merger[ChildType, ParamType, RM]]",
+    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
     transform: Callable[..., Sequence[ChildType]] | None = None,
     *,
     strategy: ManyStrategy = ManyStrategy.REPLACE,
@@ -340,7 +368,7 @@ def OneToManyRelation[ParamType, ChildType, RM: Model](
 
 
 @dataclass
-class ThroughParameters[ParamType]:
+class ThroughParameters[ParamType](RelatedParams[ParamType]):
     """Wrapper for passing parameters to a `through` model.
 
     :ivar source: The source object of the relationship
@@ -370,7 +398,7 @@ class ManyToManyMerger[
 
     def __init__(
         self,
-        merger: "type[Merger[TransformType, ParamType, RM]]",
+        merger: "type[Merger[TransformType, RelatedParams[ParamType], RM]]",
         through: "type[Merger[TransformType, ThroughParameters[ParamType], ThruM]] | None" = None,
         transform: Callable[[ScrapeType, ParamType], Sequence[TransformType]]
         | None = None,
@@ -430,11 +458,13 @@ class ManyToManyMerger[
         if not transformed:
             return result
 
+        related_params = RelatedParams(params, parent=parent)
+
         related_objects: list[tuple[TransformType, RM]] = []
         for child in transformed:
             # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
             # this case
-            child_merger = self.merger(child, params=params)
+            child_merger = self.merger(child, params=related_params)
             result |= child_merger.merge()
             if child_merger.out is None:
                 continue
@@ -452,6 +482,7 @@ class ManyToManyMerger[
                 related_transform,
                 params=ThroughParameters(
                     params,
+                    parent=parent,
                     source=parent,
                     source_name=related_manager.source_field_name,
                     target=related_object,
