@@ -1,12 +1,12 @@
 from typing import Any, ClassVar
 
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 
 from cl.corpus_importer.state.merger import (
-    AttributeMerger,
+    Attribute,
     Merger,
-    OneToManyMerger,
-    OneToOneMerger,
+    OneToManyRelation,
+    OneToOneRelation,
 )
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import CourtFactory, DocketFactory
@@ -28,14 +28,14 @@ class BaseMergerTest(TestCase):
     def test_merger_creates_object(self) -> None:
         start_count = Docket.objects.count()
 
-        class TestMerger(Merger[dict[str, str], Docket, None]):
+        class TestMerger(Merger[dict[str, str], None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = AttributeMerger(default=self.court)
-            source: int = AttributeMerger(default=DocketSources.SCRAPER)
-            docket_number: str = AttributeMerger(default="ABCDEFG")
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(default="ABCDEFG")
 
-            def query(self):
+            def query(self) -> QuerySet[Docket]:
                 return Docket.objects.none()
 
         r = TestMerger({}, params=None).merge()
@@ -71,14 +71,14 @@ class BaseMergerTest(TestCase):
         new_dn = dn + "New"
         start_docket_count = Docket.objects.count()
 
-        class TestMerger(Merger[dict[str, str], Docket, None]):
+        class TestMerger(Merger[dict[str, str], None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = AttributeMerger(default=self.court)
-            source: int = AttributeMerger(default=DocketSources.SCRAPER)
-            docket_number: str = AttributeMerger(default=new_dn)
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(default=new_dn)
 
-            def query(self):
+            def query(self) -> QuerySet[Docket]:
                 return Docket.objects.filter(pk=tc.docket.pk)
 
         r = TestMerger({}, params=None).merge()
@@ -126,19 +126,19 @@ class BaseMergerTest(TestCase):
         map_calls = 0
         dn = "ABCDEFG"
 
-        def test_mapping(i: dict[str, str], *args: Any, **kwargs: Any) -> str:
+        def test_mapping(i: dict[str, str], params) -> str:
             nonlocal map_calls
             map_calls += 1
             return dn
 
-        class TestMerger(Merger[dict[str, str], Docket, None]):
+        class TestMerger(Merger[dict[str, str], None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = AttributeMerger(default=self.court)
-            source: int = AttributeMerger(default=DocketSources.SCRAPER)
-            docket_number: str = AttributeMerger(test_mapping)
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(test_mapping)
 
-            def query(self):
+            def query(self) -> QuerySet[Docket]:
                 return Docket.objects.none()
 
         r = TestMerger({}, params=None).merge()
@@ -148,31 +148,34 @@ class BaseMergerTest(TestCase):
 
     def test_related_mergers_1to1(self) -> None:
         class TestRelatedMerger(
-            Merger[dict[str, str], OriginatingCourtInformation, None]
+            Merger[dict[str, str], None, OriginatingCourtInformation]
         ):
             model: ClassVar[type[Model]] = OriginatingCourtInformation
 
-            docket_number: str = AttributeMerger(lambda d, params: d["sr"])
+            docket_number: str = Attribute(lambda d, params: d["sr"])
 
-            def query(self):
-                return OriginatingCourtInformation.objects.none()
+            @classmethod
+            def get_existing(
+                cls, d: dict[str, str], manager, params: None
+            ) -> OriginatingCourtInformation | None:
+                return None
 
-        class TestMerger(Merger[dict[str, Any], Docket, None]):
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = AttributeMerger(default=self.court)
-            source: int = AttributeMerger(default=DocketSources.SCRAPER)
-            docket_number: str = AttributeMerger(
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(
                 default=self.docket.docket_number + "New"
             )
             originating_court_information: OriginatingCourtInformation = (
-                OneToOneMerger(
+                OneToOneRelation(
                     TestRelatedMerger,
                     lambda d, params: d["mctest"],
                 )
             )
 
-            def query(self):
+            def query(self) -> QuerySet[Docket]:
                 return Docket.objects.none()
 
         i = {"mctest": {"sr": "test"}}
@@ -186,33 +189,28 @@ class BaseMergerTest(TestCase):
         self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
 
     def test_related_mergers_child(self) -> None:
-        class TestRelatedMerger(Merger[dict[str, str], DocketEntry, None]):
+        class TestRelatedMerger(Merger[dict[str, str], None, DocketEntry]):
             model: ClassVar[type[Model]] = DocketEntry
 
-            description: str = AttributeMerger(lambda d, params: d["df"])
+            description: str = Attribute(lambda d, params: d["df"])
 
-            def query(self):
+            def query(self) -> QuerySet[DocketEntry]:
                 return DocketEntry.objects.none()
 
-        class TestMerger(Merger[dict[str, Any], Docket, None]):
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = AttributeMerger(default=self.court)
-            source: int = AttributeMerger(default=DocketSources.SCRAPER)
-            docket_number: str = AttributeMerger(
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(
                 default=self.docket.docket_number + "New"
             )
-            docket_entries: list[DocketEntry] = OneToManyMerger[
-                dict[str, list[dict[str, str]]],
-                dict[str, str],
-                DocketEntry,
-                None,
-            ](
+            docket_entries: list[DocketEntry] = OneToManyRelation(
                 TestRelatedMerger,
-                lambda d, params: d["mctest"],  # type: ignore[misc]
+                lambda d, params: d["mctest"],
             )
 
-            def query(self):
+            def query(self) -> QuerySet[Docket]:
                 return Docket.objects.none()
 
         i = {
@@ -239,21 +237,21 @@ class BaseMergerTest(TestCase):
         )
 
     def test_merger_subclassing(self) -> None:
-        class TestMerger(Merger[dict[str, str], Docket, dict[str, Any]]):
+        class TestMerger(Merger[dict[str, str], dict[str, Any], Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = AttributeMerger(default=self.court)
-            source: int = AttributeMerger(default=DocketSources.SCRAPER)
-            docket_number: str = AttributeMerger(default="ABCDEFG")
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(default="ABCDEFG")
 
-            def query(self):
+            def query(self) -> QuerySet[Docket]:
                 return Docket.objects.none()
 
         class TestMerger2(TestMerger):
-            court: Court = AttributeMerger(default=self.court)
-            docket_number: str = AttributeMerger(default="ABCDEFGH")
-            assigned_to_str: str = AttributeMerger(
-                transform=lambda d, params: params["assigned_to_str"]
+            court: Court = Attribute(default=self.court)
+            docket_number: str = Attribute(default="ABCDEFGH")
+            assigned_to_str: str = Attribute(
+                lambda d, params: params["assigned_to_str"]
             )
 
         ats = "test"

@@ -7,6 +7,8 @@ from cl.lib.string_utils import normalize_dashes
 
 logger = logging.getLogger(__name__)
 
+FL_APPELLATE_COURT_ID: str = "fladistctapp"
+
 FLORIDA_COURT_ID_MAP: dict[str, str] = {
     FloridaCourtID.SUPREME_COURT.value: "fla",
     FloridaCourtID.FIRST_COA.value: "fladistctapp1",
@@ -18,7 +20,9 @@ FLORIDA_COURT_ID_MAP: dict[str, str] = {
 }
 
 # Non-comprehensive list of court IDs that can be handled by Florida make_docket_number_core
-FLORIDA_COURT_IDS: set[str] = set(FLORIDA_COURT_ID_MAP.values())
+FLORIDA_COURT_IDS: set[str] = set(FLORIDA_COURT_ID_MAP.values()) | {
+    FL_APPELLATE_COURT_ID
+}
 
 
 def is_florida_court(court_id: str) -> bool:
