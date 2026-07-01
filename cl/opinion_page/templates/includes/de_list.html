@@ -152,7 +152,7 @@
                                   data-target="#modal-buy-pacer"
                                 {% endif %}
                                 target="_blank"
-                                rel="nofollow">
+                                rel="nofollow noopener noreferrer">
                                   {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
                               </a>
                           </li>
@@ -183,7 +183,7 @@
                                   class="open_buy_pacer_modal"
                                 {% endif %}
                                 target="_blank"
-                                rel="nofollow">
+                                rel="nofollow noopener noreferrer">
                                 <i class="fa fa-external-link"></i> Check Availability on PACER
                               </a>
                             </li>
@@ -203,7 +203,7 @@
                             class="btn btn-default btn-xs"
                           {% endif %}
                             target="_blank"
-                            rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                            rel="nofollow noopener noreferrer">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
                           <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
                             {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count %}
@@ -238,7 +238,7 @@
                             class="btn btn-default btn-xs"
                           {% endif %}
                           target="_blank"
-                          rel="nofollow"
+                          rel="nofollow noopener noreferrer"
                           title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i>
                         </a>
                       {% endif %}
