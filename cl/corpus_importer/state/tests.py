@@ -4,10 +4,12 @@ from django.db.models import Model, QuerySet
 
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyToManyRelation,
     Merger,
     OneToManyRelation,
     OneToOneRelation,
 )
+from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import (
@@ -234,6 +236,106 @@ class BaseMergerTest(TestCase):
         )
         self.assertEqual(
             set(de.docket.pk for de in des), set(result.creates["Docket"])
+        )
+
+    def test_related_mergers_m2m_simple(self) -> None:
+        """Does a plain (no-through) many-to-many relation create the targets
+        and link them to the parent?"""
+
+        class TestPersonMerger(Merger[dict[str, str], None, Person]):
+            model: ClassVar[type[Model]] = Person
+
+            name_first: str = Attribute(lambda d, params: d["first"])
+            name_last: str = Attribute(lambda d, params: d["last"])
+            slug: str = Attribute(lambda d, params: d["slug"])
+            key = ["slug"]
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(default="M2M-SIMPLE")
+            panel: list[Person] = ManyToManyRelation(
+                TestPersonMerger,
+                transform=lambda d, params: d["panel"],
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.none()
+
+        i = {
+            "panel": [
+                {"first": "Jane", "last": "Doe", "slug": "jane-doe-m2m"},
+                {"first": "John", "last": "Roe", "slug": "john-roe-m2m"},
+            ]
+        }
+        result = TestMerger(i, params=None).merge()
+
+        self.assertIn("Person", result.creates)
+        self.assertEqual(len(result.creates["Person"]), 2)
+        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
+        self.assertEqual(
+            set(docket.panel.values_list("name_last", flat=True)),
+            {"Doe", "Roe"},
+        )
+
+    def test_related_mergers_m2m_through(self) -> None:
+        """Does a many-to-many relation with a through model create the
+        targets, link them to the parent, and populate the through row's own
+        fields from the same scrape?"""
+
+        class TestPartyMerger(Merger[dict[str, str], None, Party]):
+            model: ClassVar[type[Model]] = Party
+
+            name: str = Attribute(lambda d, params: d["name"])
+            key = ["name"]
+
+        class TestPartyTypeMerger(Merger[dict[str, str], None, PartyType]):
+            model: ClassVar[type[Model]] = PartyType
+
+            name: str = Attribute(lambda d, params: d["type"])
+            key = ["name"]
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=self.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(default="M2M-THROUGH")
+            parties: list[Party] = ManyToManyRelation(
+                TestPartyMerger,
+                TestPartyTypeMerger,
+                lambda d, params: d["parties"],
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.none()
+
+        i = {
+            "parties": [
+                {"name": "Alice", "type": "Plaintiff"},
+                {"name": "Bob", "type": "Defendant"},
+            ]
+        }
+        result = TestMerger(i, params=None).merge()
+
+        self.assertIn("Party", result.creates)
+        self.assertEqual(len(result.creates["Party"]), 2)
+        self.assertIn("PartyType", result.creates)
+        self.assertEqual(len(result.creates["PartyType"]), 2)
+
+        docket = Docket.objects.get(pk=result.creates["Docket"].pop())
+        self.assertEqual(
+            set(docket.parties.values_list("name", flat=True)),
+            {"Alice", "Bob"},
+        )
+        self.assertEqual(
+            {
+                (pt.party.name, pt.name)
+                for pt in PartyType.objects.filter(docket=docket)
+            },
+            {("Alice", "Plaintiff"), ("Bob", "Defendant")},
         )
 
     def test_merger_subclassing(self) -> None:
