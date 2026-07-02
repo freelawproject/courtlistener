@@ -4096,7 +4096,9 @@ class SearchFormCourtCleanTest(TestCase):
 
         self.assertEqual(court_count_human, "2")
         self.assertEqual(court_count, "2")
-        checked_by_id = {court.pk: court.checked for court in court_tabs["federal"]}
+        checked_by_id = {
+            court.pk: court.checked for court in court_tabs["federal"]
+        }
         self.assertEqual(
             checked_by_id,
             {"scotus": True, "ca1": False, "ca2": True},
