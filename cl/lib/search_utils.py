@@ -155,31 +155,24 @@ def merge_form_with_courts(
     """
     # Are any of the checkboxes checked?
 
-    checked_statuses = [
-        field.value()
+    court_field_values = {
+        field.html_name.removeprefix("court_"): field.value()
         for field in search_form
         if field.html_name.startswith("court_")
-    ]
+    }
+    checked_statuses = list(court_field_values.values())
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
-    court_count = str(
-        len([status for status in checked_statuses if status is True])
-    )
+    court_count = str(sum(status is True for status in checked_statuses))
     court_count_human = court_count
     if all_facets_selected:
         court_count_human = "All"
 
-    for field in search_form:
+    for court in courts:
         if no_facets_selected:
-            for court in courts:
-                court.checked = True
-        else:
-            for court in courts:
-                # We're merging two lists, so we have to do a nested loop
-                # to find the right value.
-                if f"court_{court.pk}" == field.html_name:
-                    court.checked = field.value()
-                    break
+            court.checked = True
+        elif court.pk in court_field_values:
+            court.checked = court_field_values[court.pk]
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs: dict[str, list] = {
