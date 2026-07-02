@@ -347,7 +347,7 @@ def process_llm_batches(
     all_cleaned: dict[int, str],
 ) -> dict[int, str]:
     """
-    Processes batches of records using a language model (LLM), recursively retry with smaller batch sizes for failed extractions.
+    Processes batches of records using a language model (LLM), iteratively retry with smaller batch sizes for failed extractions.
 
     :param llm_batches: The batch of records to process. Each item is a dictionary with the docket_id (int) as the key and the raw_docket_number (str) as the value.
     :param system_prompt: The system prompt to provide to the LLM.
