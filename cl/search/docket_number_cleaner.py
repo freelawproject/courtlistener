@@ -453,6 +453,11 @@ def call_models_and_compare_results(
 
     # Compare results and create batch for prediction with larger model
     next_model_batches = []
+    raw_docket_numbers = {
+        docket_id: docket_number_raw
+        for batch in court_batch
+        for docket_id, docket_number_raw in batch.items()
+    }
     for docket_id, docket_number_one in model_one_results.items():
         docket_number_two = model_two_results.get(docket_id, None)
         if docket_number_one == docket_number_two and docket_number_one != "":
@@ -460,15 +465,7 @@ def call_models_and_compare_results(
                 docket_id, docket_number_one, start_timestamp, r
             )
         else:
-            # Find the docket_number_raw from court_batch using docket_id
-            docket_number_raw = next(
-                (
-                    batch[docket_id]
-                    for batch in court_batch
-                    if docket_id in batch
-                ),
-                None,
-            )
+            docket_number_raw = raw_docket_numbers.get(docket_id)
             if docket_number_raw is not None:
                 next_model_batches.append({docket_id: docket_number_raw})
     return next_model_batches
