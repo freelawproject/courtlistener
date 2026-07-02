@@ -23,6 +23,7 @@ from django.utils.timezone import now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
+from juriscraper.pacer.free_documents import FreeOpinionReport
 from juriscraper.state.texas import (
     TexasCaseParty,
 )
@@ -75,6 +76,8 @@ from cl.corpus_importer.management.commands.probe_iquery_pages_daemon import (
     get_latest_pacer_case_id_for_courts,
 )
 from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
+    CL_OPERATIONAL_EXCLUSIONS,
+    EXCLUDED_COURT_IDS,
     OUTSTANDING_FAILED_LOOKBACK_DAYS,
     do_everything,
     get_and_save_free_document_reports,
@@ -626,6 +629,24 @@ class PacerDocketParserTest(TestCase):
         self.assertTrue(row[0].pacer_case_id)
         self.assertTrue(row[0].pacer_doc_id)
         self.assertTrue(row[0].pacer_seq_no)
+
+
+class FreeOpinionExcludedCourtsTest(SimpleTestCase):
+    """The free-opinion exclusion set defers to juriscraper and unions our own
+    operational exclusions, rather than hardcoding a list that drifts."""
+
+    def test_defers_to_juriscraper_and_unions_operational(self) -> None:
+        # Every court juriscraper can't fetch must also be skipped here, and we
+        # add nothing beyond that plus our own operational exclusions. This
+        # guards against anyone re-hardcoding a divergent literal list.
+        expected = set(FreeOpinionReport.EXCLUDED_COURT_IDS) | set(
+            CL_OPERATIONAL_EXCLUSIONS
+        )
+        self.assertEqual(set(EXCLUDED_COURT_IDS), expected)
+
+    def test_operational_exclusions_are_included(self) -> None:
+        for court_id in CL_OPERATIONAL_EXCLUSIONS:
+            self.assertIn(court_id, EXCLUDED_COURT_IDS)
 
 
 class ScrapeFreeOpinionsLoopTest(TestCase):
