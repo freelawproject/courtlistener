@@ -86,6 +86,18 @@
     {% flag "donate_banner" %}
       {% include 'includes/dismissible_nav_banner.html' with responsive=True cookie_sleep_duration=3 link="https://donate.free.law/forms/supportcl" cookie_name="2025_eoy_banner" button_text="Donate Today" text="Donate before December 31 and tell us how CourtListener helped you—your support and your story power the future of open law." title="You built today’s CourtListener. Help build what&nbsp;comes&nbsp;next." %}
     {% endflag %}
+    <!-- Membership Promotion Banner -->
+    {% flag "membership_promotion_banner" %}
+      {# Promo auto-hides after the end date (inclusive Y-m-d), even while the flag stays on. Enable the flag to launch. #}
+      {% now "Y-m-d" as today %}
+      {% if today <= "2026-08-06" %}
+        {% if user.profile.is_member %}
+          {% include 'includes/dismissible_nav_banner.html' with request=request link="https://free.law/2026/07/07/double-api-access-to-courtlistener/" cookie_name="membership_promotion_banner_member" button_text="See What's New" text="🎉 <strong>Make the most of your membership!</strong> Now through <strong>August 6</strong>, we've doubled your access — research case law, set up docket alerts, and verify citations right inside your favorite AI assistant. See how with our <a href='https://wiki.free.law/c/courtlistener/help/api/mcp/model-context-protocol-mcp-server-for-agentic-access'>MCP server</a>. Dive in! 🚀" only %}
+        {% else %}
+          {% include 'includes/dismissible_nav_banner.html' with request=request link="https://free.law/membership/" cookie_name="membership_promotion_banner" button_text="Become a Member" text="🚀 <strong>Limited-time offer!</strong> Now through <strong>August 6</strong>, everyone gets double the access — research case law, set up docket alerts, and verify citations right inside your favorite AI assistant. Learn how with our <a href='https://wiki.free.law/c/courtlistener/help/api/mcp/model-context-protocol-mcp-server-for-agentic-access'>MCP server</a>. Enjoying the extra access? Become a member!" only %}
+        {% endif %}
+      {% endif %}
+    {% endflag %}
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
