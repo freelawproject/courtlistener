@@ -34,6 +34,35 @@ from cl.stats.constants import StatMethod, StatMetric, StatQueryType
 from cl.stats.utils import tally_stat
 
 
+def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
+    """Build the context for the limitations of RECAP alerts."""
+    user = request.user
+    if not user.is_authenticated or not hasattr(user, "profile"):
+        return None
+
+    level = user.membership.level if user.profile.is_member else "free"
+    neon_id = user.membership.neon_id if user.profile.is_member else ""
+    counts = Alert.objects.filter(
+        user=user,
+        alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
+    ).aggregate(
+        rt=Count("pk", filter=Q(rate=Alert.REAL_TIME)),
+        other_rates=Count(
+            "pk",
+            filter=Q(rate__in=[Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]),
+        ),
+    )
+    return {
+        "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
+        "hasUnlimitedAlerts": user.profile.unlimited_docket_alerts,
+        "level": level,
+        "neon_id": neon_id,
+        "counts": counts,
+        "limits": RECAP_ALERT_QUOTAS,
+        "editAlert": edit_alert,
+    }
+
+
 @never_cache
 def new_homepage(request: HttpRequest) -> HttpResponse:
     render_dict = {
@@ -93,32 +122,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
     is_semantic_active = flag_is_active(request, "semantic_search_frontend")
     edit_alert = "edit_alert" in request.GET
-    # Build the context for the limitations of RECAP alerts.
-    user = request.user
-    alerts_context = None
-    if user.is_authenticated and hasattr(user, "profile"):
-        level = user.membership.level if user.profile.is_member else "free"
-        neon_id = user.membership.neon_id if user.profile.is_member else ""
-        # Get the rate counts.
-        counts = Alert.objects.filter(
-            user=user,
-            alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
-        ).aggregate(
-            rt=Count("pk", filter=Q(rate=Alert.REAL_TIME)),
-            other_rates=Count(
-                "pk",
-                filter=Q(rate__in=[Alert.DAILY, Alert.WEEKLY, Alert.MONTHLY]),
-            ),
-        )
-        alerts_context = {
-            "alertType": request.GET.get("type", SEARCH_TYPES.OPINION),
-            "hasUnlimitedAlerts": user.profile.unlimited_docket_alerts,
-            "level": level,
-            "neon_id": neon_id,
-            "counts": counts,
-            "limits": RECAP_ALERT_QUOTAS,
-            "editAlert": edit_alert,
-        }
 
     if request.method == "POST":
         alert_form_context = {
@@ -149,7 +152,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
             # with the errors
             render_dict.update(do_es_search(request.GET.copy()))
             render_dict.update(
-                {"alert_form": alert_form, "alerts_context": alerts_context}
+                {
+                    "alert_form": alert_form,
+                    "alerts_context": get_alerts_context(
+                        request, edit_alert
+                    ),
+                }
             )
             return TemplateResponse(request, "search.html", render_dict)
 
@@ -287,7 +295,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
         render_dict["search_summary_str"], 75, ellipsis="..."
     )
     render_dict.update(
-        {"alert_form": alert_form, "alerts_context": alerts_context}
+        {
+            "alert_form": alert_form,
+            "alerts_context": get_alerts_context(request, edit_alert),
+        }
     )
     return TemplateResponse(request, "search.html", render_dict)
 
