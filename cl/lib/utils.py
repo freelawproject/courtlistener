@@ -1,10 +1,10 @@
 import datetime
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from collections.abc import Iterable as IterableType
 from itertools import chain, islice, tee
 from re import Match
-from typing import Any, cast
+from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
@@ -108,12 +108,12 @@ def is_iter(item: Any) -> bool:
     return isinstance(item, Iterable)
 
 
-def remove_duplicate_dicts[T: Mapping[Any, Any]](dicts: list[T]) -> list[T]:
+def remove_duplicate_dicts(dicts: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
     See: https://stackoverflow.com/a/9427216/64911
     """
-    return [cast(T, dict(t)) for t in {tuple(d.items()) for d in dicts}]
+    return [dict(t) for t in {tuple(d.items()) for d in dicts}]
 
 
 def human_sort(
