@@ -379,10 +379,10 @@ def store_opinion_citations_and_update_parentheticals(
             # Update parenthetical groups for clusters that we have added
             # parentheticals for from this opinion
             logger.debug("Create parenthetical groups: %s", opinion.pk)
-            clusters = OpinionCluster.objects.in_bulk(
-                clusters_to_update_par_groups_for
+            clusters = OpinionCluster.objects.filter(
+                pk__in=clusters_to_update_par_groups_for
             )
-            for cluster in clusters.values():
+            for cluster in clusters:
                 create_parenthetical_groups(cluster)
 
         # Save all the changes to the citing opinion
