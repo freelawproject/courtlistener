@@ -154,9 +154,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             render_dict.update(
                 {
                     "alert_form": alert_form,
-                    "alerts_context": get_alerts_context(
-                        request, edit_alert
-                    ),
+                    "alerts_context": get_alerts_context(request, edit_alert),
                 }
             )
             return TemplateResponse(request, "search.html", render_dict)
