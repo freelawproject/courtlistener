@@ -19,6 +19,10 @@ from cl.alerts.utils import (
     set_skip_percolation_if_bankruptcy_data,
     set_skip_percolation_if_parties_data,
 )
+from cl.corpus_importer.state.florida.utils import is_florida_court
+from cl.corpus_importer.state.florida.utils import (
+    make_docket_number_core as make_florida_docket_number_core,
+)
 from cl.corpus_importer.utils import (
     ais_appellate_court,
     is_long_appellate_document_number,
@@ -169,6 +173,11 @@ async def find_docket_object(
         docket_number_core = make_texas_docket_number_core(docket_number)
         # Texas docket numbers are unique and do not need the extra
         # confirmation that federal docket numbers require.
+        skip_dn_core_confirmation = True
+    elif is_florida_court(court_id):
+        docket_number_core = make_florida_docket_number_core(
+            docket_number, court_id=court_id
+        )
         skip_dn_core_confirmation = True
     else:
         docket_number_core = make_docket_number_core(docket_number)
