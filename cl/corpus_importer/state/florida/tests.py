@@ -1,19 +1,31 @@
 """Tests for Florida docket and originating-court-information merger."""
 
+from copy import copy
 from datetime import date, datetime
 from unittest import mock
 
+from juriscraper.state.docket import PartyType as ScrapePartyType
+from juriscraper.state.florida.cases import FloridaCase
 from juriscraper.state.florida.courts import FloridaCourtID
 
 from cl.corpus_importer.state.florida.factories import (
     FloridaCaseFactory,
+    FloridaCasePartyFactory,
     FloridaDocketEntryFactory,
     FloridaOriginatingCaseFactory,
+    FloridaRepresentativeFactory,
 )
 from cl.corpus_importer.state.florida.mergers import (
     FloridaDocketMerger,
 )
 from cl.corpus_importer.state.florida.utils import make_docket_number_core
+from cl.corpus_importer.state.utils import MergeResult
+from cl.people_db.factories import (
+    AttorneyFactory,
+    PartyFactory,
+    PartyTypeFactory,
+)
+from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket, OriginatingCourtInformation
 from cl.tests.cases import TestCase
@@ -108,7 +120,7 @@ class FloridaMergerTest(TestCase):
 
         assert result.success is True
         assert result.update is True
-        assert result.create is False
+        assert "OriginatingCourtInformation" not in result.creates
         assert existing_oci.pk in result.updates["OriginatingCourtInformation"]
         existing_oci.refresh_from_db()
         assert existing_oci.docket_number == "UPDATED-001"
@@ -129,7 +141,7 @@ class FloridaMergerTest(TestCase):
         ).merge()
 
         assert result.success is True
-        assert result.create is False
+        assert "OriginatingCourtInformation" not in result.creates
         assert "OriginatingCourtInformation" not in result.updates
 
     def test_merge_multiple_originating_cases_uses_first(self):
@@ -159,8 +171,16 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
-        with self.assertRaises(RuntimeError):
-            FloridaDocketMerger(docket_data, params=None).merge()
+        merger = FloridaDocketMerger(docket_data, params=None)
+
+        assert merger.result is not None
+        assert merger.result.success is False
+        assert "Docket" in merger.result.failures
+
+        before = copy(merger.result)
+        after = merger.merge()
+
+        assert before == after
 
     def test_merge_docket_supreme_court_creates_new(self):
         """Does merge_docket create a new supreme-court docket?"""
@@ -214,7 +234,7 @@ class FloridaMergerTest(TestCase):
             court=self.flagg,
             docket_number=agg_dn,
             docket_number_raw=agg_dn,
-            docket_number_core="",
+            docket_number_core=make_docket_number_core(agg_dn),
             pacer_case_id=None,
             source=Docket.SCRAPER,
         )
@@ -312,3 +332,248 @@ class FloridaMergerTest(TestCase):
         assert result.update is True
         assert "Docket" in result.updates
         assert docket.pk in result.updates["Docket"]
+
+
+class FloridaPartyMergerTest(TestCase):
+    """Tests for merging parties, attorneys, and attorney roles from Florida
+    cases."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.flsc = CourtFactory.create(id="fla")
+
+    @staticmethod
+    def _make_case(*parties) -> FloridaCase:
+        return FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            parties=list(parties),
+        )
+
+    @staticmethod
+    def _merged_docket(result: MergeResult) -> Docket:
+        return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
+
+    def test_merge_creates_party_with_type(self):
+        """Does merging create the scrape's party and link it to the docket
+        with the correct party type?"""
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert "Party" in result.creates
+        docket = self._merged_docket(result)
+        party = docket.parties.get()
+        assert party.name == "Acme Corp"
+        party_type = PartyType.objects.get(docket=docket)
+        assert party_type.party_id == party.pk
+        assert party_type.name == "appellant"
+
+    def test_merge_creates_all_parties(self):
+        """Are multiple parties in a scrape merged as separate objects, each
+        with its own party type?"""
+        appellant = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[],
+        )
+        appellee = FloridaCasePartyFactory.create(
+            name="Bob Smith",
+            party_type=ScrapePartyType.APPELLEE,
+            representatives=[],
+        )
+        docket_data = self._make_case(appellant, appellee)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        docket = self._merged_docket(result)
+        assert set(docket.parties.values_list("name", flat=True)) == {
+            "Acme Corp",
+            "Bob Smith",
+        }
+        assert set(
+            PartyType.objects.filter(docket=docket).values_list(
+                "party__name", "name"
+            )
+        ) == {("Acme Corp", "appellant"), ("Bob Smith", "appellee")}
+
+    def test_merge_primary_representative_is_lead_attorney(self):
+        """Is a primary representative merged as a lead attorney for the
+        party on the merged docket?"""
+        rep = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=True
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[rep],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        docket = self._merged_docket(result)
+        party = docket.parties.get()
+        attorney = party.attorneys.get()
+        role = Role.objects.get(party=party, attorney=attorney)
+        assert role.docket_id == docket.pk
+        assert role.role == Role.ATTORNEY_LEAD
+
+    def test_merge_non_primary_representative_role_unknown(self):
+        """Is a non-primary representative given the unknown role?"""
+        rep = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=False
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[rep],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        docket = self._merged_docket(result)
+        party = docket.parties.get()
+        role = Role.objects.get(party=party)
+        assert role.role == Role.UNKNOWN
+
+    def test_merge_sets_attorney_name(self):
+        """Does the merged attorney carry the representative's name?"""
+        rep = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=True
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[rep],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        docket = self._merged_docket(result)
+        attorney = docket.parties.get().attorneys.get()
+        assert attorney.name == "Jane Lawyer"
+
+    def test_merge_party_with_multiple_representatives(self):
+        """Are all of a party's representatives merged as separate attorneys
+        with their own roles?"""
+        lead = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=True
+        )
+        second_chair = FloridaRepresentativeFactory.create(
+            name="John Counsel", primary_flag=False
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[lead, second_chair],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        docket = self._merged_docket(result)
+        party = docket.parties.get()
+        assert party.attorneys.count() == 2
+        assert set(
+            Role.objects.filter(party=party).values_list("role", flat=True)
+        ) == {Role.ATTORNEY_LEAD, Role.UNKNOWN}
+
+    def test_remerge_is_idempotent(self):
+        """Does merging the same case twice avoid duplicating parties,
+        attorneys, and their links?"""
+        rep = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=True
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[rep],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        first = FloridaDocketMerger(docket_data, params=None).merge()
+        second = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert first.success is True
+        assert second.success is True
+        assert second.create is False
+        assert Party.objects.count() == 1
+        assert Attorney.objects.count() == 1
+        assert Role.objects.count() == 1
+        assert PartyType.objects.count() == 1
+
+    def test_merge_does_not_modify_unrelated_parties(self):
+        """Does merging create a new party rather than renaming an existing
+        party from another docket?"""
+        other_docket = DocketFactory.create(court=self.flsc)
+        other_party = PartyFactory.create(
+            name="Unrelated Party",
+            docket=other_docket,
+            attorneys=[AttorneyFactory.create(docket=other_docket)],
+        )
+        PartyTypeFactory.create(
+            docket=other_docket, party=other_party, name="plaintiff"
+        )
+
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        other_party.refresh_from_db()
+        assert other_party.name == "Unrelated Party"
+        docket = self._merged_docket(result)
+        assert list(docket.parties.values_list("name", flat=True)) == [
+            "Acme Corp"
+        ]
+
+    def test_merge_preserves_unrelated_party_types_and_roles(self):
+        """Does merging one docket leave party and attorney links on other
+        dockets in place?"""
+        other_docket = DocketFactory.create(court=self.flsc)
+        other_attorney = AttorneyFactory.create(docket=other_docket)
+        other_party = PartyFactory.create(
+            name="Unrelated Party",
+            docket=other_docket,
+            attorneys=[other_attorney],
+        )
+        other_party_type = PartyTypeFactory.create(
+            docket=other_docket, party=other_party, name="plaintiff"
+        )
+        other_role = Role.objects.get(party=other_party)
+
+        rep = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=True
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[rep],
+        )
+        docket_data = self._make_case(scrape_party)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert PartyType.objects.filter(pk=other_party_type.pk).exists()
+        assert Role.objects.filter(pk=other_role.pk).exists()
+        other_role.refresh_from_db()
+        assert other_role.docket_id == other_docket.pk
