@@ -925,25 +925,25 @@ def fetch_es_results_for_csv(
         return csv_rows, True
 
     results = search["results"]
+    max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            flat_results = []
             for result in results.object_list:
                 parent_dict = result.to_dict(skip_empty=False)
                 child_docs = parent_dict.get("child_docs")
                 if child_docs:
-                    flat_results.extend(
-                        [
-                            doc["_source"].to_dict() | parent_dict
-                            for doc in child_docs
-                        ]
-                    )
+                    for doc in child_docs:
+                        csv_rows.append(doc["_source"].to_dict() | parent_dict)
+                        if len(csv_rows) >= max_results:
+                            return csv_rows, False
                 else:
-                    flat_results.extend([parent_dict])
+                    csv_rows.append(parent_dict)
+                    if len(csv_rows) >= max_results:
+                        return csv_rows, False
         case _:
-            flat_results = [
-                result.to_dict(skip_empty=False)
-                for result in results.object_list
-            ]
+            for result in results.object_list:
+                csv_rows.append(result.to_dict(skip_empty=False))
+                if len(csv_rows) >= max_results:
+                    return csv_rows, False
 
-    return flat_results[: settings.MAX_SEARCH_RESULTS_EXPORTED], False
+    return csv_rows, False
