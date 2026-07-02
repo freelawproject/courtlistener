@@ -480,9 +480,10 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     def merge(self) -> MergeResult[Any]:
         """Merge scraped data into the DB."""
         if self.result is not None:
-            raise RuntimeError(
-                f"Merger {self.__class__.__name__} already merged; cannot merge again."
+            logger.error(
+                f"Merger {self.__class__.__name__} result already set; cannot run merge."
             )
+            return self.result
         if self.existing is None:
             try:
                 self.existing = self.query().get()
