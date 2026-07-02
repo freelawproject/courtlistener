@@ -5,14 +5,17 @@ from datetime import datetime
 from django.contrib.sitemaps import Sitemap
 from django.contrib.sitemaps.views import x_robots_tag
 from django.contrib.sites.shortcuts import get_current_site
-from django.core.cache import caches
+from django.core.cache.backends.base import BaseCache
 from django.core.paginator import EmptyPage, InvalidPage, PageNotAnInteger
 from django.http import Http404, HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.encoding import escape_uri_path, force_bytes
 from django.utils.http import http_date
+from django_ratelimit.core import is_ratelimited
+from django_ratelimit.exceptions import Ratelimited
 
-from cl.lib.ratelimiter import ratelimiter_all_2_per_m
+from cl.lib.ratelimiter import get_ip_for_ratelimiter, is_allowlisted
+from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 
 
 def make_cache_key(
@@ -41,10 +44,10 @@ def make_cache_key(
 
     url = hashlib.md5(force_bytes(base_url))
 
-    return f"sitemap.{section}.{url.hexdigest()}"
+    key = f"sitemap.{section}.{url.hexdigest()}"
+    return key
 
 
-@ratelimiter_all_2_per_m
 @x_robots_tag
 def cached_sitemap(
     request: HttpRequest,
@@ -69,12 +72,27 @@ def cached_sitemap(
     # handle infinite sitemaps, force p=1 by default
     force_page = bool(getattr(sitemap, "force_page_in_cache", False))
 
-    cache = caches["db_cache"]
+    cache: BaseCache = get_s3_cache("db_cache")
     cache_key = make_cache_key(request, section, force_page)
-    urls = cache.get(cache_key)
+    urls = cache.get(make_s3_cache_key(cache_key, 60 * 60 * 24 * 180))
+    if urls is None:
+        urls = cache.get(make_s3_cache_key(cache_key, 60 * 60 * 24))
 
     # return HttpResponse(f'{request.build_absolute_uri(escape_uri_path(request.path))} {cache_key} {urls}', content_type='text/plain')
     if not urls and not isinstance(urls, list):
+        # Cache miss! Apply rate limit before querying DB.
+        if is_ratelimited(
+            request,
+            group="sitemap_miss",
+            key=get_ip_for_ratelimiter,
+            rate="2/m",
+            increment=True,
+        ):
+            if not is_allowlisted(request):
+                raise Ratelimited(
+                    "Rate limit exceeded on sitemap cache misses"
+                )
+
         # No cache for this page, otherwise cache exists and it could be the empty list
         try:
             if callable(sitemap):
@@ -95,7 +113,9 @@ def cached_sitemap(
         else:
             # Partial sitemap. Short cache.
             cache_length = 60 * 60 * 24
-        cache.set(cache_key, urls, cache_length)
+        cache.set(
+            make_s3_cache_key(cache_key, cache_length), urls, cache_length
+        )
 
     lastmod = None
     all_sites_lastmod = True
