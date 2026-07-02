@@ -50,6 +50,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     OriginatingCourtInformation,
     RECAPDocument,
     Tag,
@@ -272,6 +273,37 @@ class OpinionsCitedSerializer(
 
     class Meta:
         model = OpinionsCited
+        fields = "__all__"
+
+
+class OpinionsCitedByRECAPDocumentSerializer(
+    RetrieveFilteredFieldsMixin,
+    DynamicFieldsMixin,
+    HyperlinkedModelSerializerWithId,
+):
+    citing_document = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="recapdocument-detail",
+        queryset=RECAPDocument.objects.all(),
+        style={"base_template": "input.html"},
+    )
+    cited_opinion = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name="opinion-detail",
+        queryset=Opinion.objects.all(),
+        style={"base_template": "input.html"},
+    )
+    cited_opinion_case_name = serializers.CharField(
+        source="cited_opinion.cluster.case_name",
+        read_only=True,
+    )
+    citing_document_description = serializers.CharField(
+        source="citing_document.description",
+        read_only=True,
+    )
+
+    class Meta:
+        model = OpinionsCitedByRECAPDocument
         fields = "__all__"
 
 

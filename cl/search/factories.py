@@ -404,7 +404,9 @@ class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
         model = OpinionsCitedByRECAPDocument
 
     citing_document = SubFactory(RECAPDocumentFactory)
-    cited_opinion = SubFactory(OpinionFactory)
+    # Use OpinionWithParentsFactory (not OpinionFactory) so the default
+    # cited_opinion comes with a cluster, since Opinion.cluster is required
+    cited_opinion = SubFactory(OpinionWithParentsFactory)
 
 
 class EmbeddingDataFactory(DictFactory):
