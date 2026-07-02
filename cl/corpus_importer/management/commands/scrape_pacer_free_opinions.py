@@ -14,6 +14,7 @@ from django.utils.timezone import now
 from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.lib.string_utils import CaseNameTweaker
+from juriscraper.pacer.free_documents import FreeOpinionReport
 from requests import RequestException
 from urllib3.exceptions import ReadTimeoutError
 
@@ -50,9 +51,20 @@ RECENT_REQUERY_DAYS = 5
 # this many days. Used by the report-stalls action.
 DEFAULT_STALE_DAYS = 14
 
-# Courts that don't provide a usable written opinions report, so we never scrape
-# or report on them.
-EXCLUDED_COURT_IDS = ["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"]
+# Courts we skip when scraping/reporting on the free Written Opinions Report.
+# The set has two sources, kept separate on purpose:
+#
+# 1. Juriscraper's ``FreeOpinionReport.EXCLUDED_COURT_IDS`` — courts whose
+#    report can't be fetched or parsed. They don't have the report enabled
+# 2. ``CL_OPERATIONAL_EXCLUSIONS`` — courts CL deliberately skips for its own
+#    operational reasons (e.g. a court that has IP-blocked us), independent of
+#    whether the report is technically fetchable.
+
+CL_OPERATIONAL_EXCLUSIONS: list[str] = []
+
+EXCLUDED_COURT_IDS = sorted(
+    set(FreeOpinionReport.EXCLUDED_COURT_IDS) | set(CL_OPERATIONAL_EXCLUSIONS)
+)
 
 
 def get_last_complete_date(
@@ -426,9 +438,15 @@ def get_pdfs(
             )
         )
         .order_by("row_number", "court_id")
-        .only("pk", "court_id")
+        .values_list("pk", "court_id")
     )
-    count = rows.count()
+
+    # Materialize the ordered (pk, court_id) pairs up front. If done through a
+    # cursor the connection will eventually die due to CeleryThrottle + sleeps.
+    # Each row is (int, 15-char) string, so the backlog should fit. Currently
+    # the pod has no memory limits. See #7507
+    rows_list = list(rows)
+    count = len(rows_list)
     task_name = "downloading"
     logger.info(
         f"{task_name} {count} items from PACER from {date_start} to {date_end}."
@@ -436,11 +454,11 @@ def get_pdfs(
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
     cycle_checker = CycleChecker()
-    for row in rows.iterator():
+    for pk, court_id in rows_list:
         # Wait until the queue is short enough
         throttle.maybe_wait()
 
-        if cycle_checker.check_if_cycled(row.court_id):
+        if cycle_checker.check_if_cycled(court_id):
             # How many courts we cycled in the previous cycle
             cycled_items_count = cycle_checker.count_prev_iteration_courts
 
@@ -454,25 +472,25 @@ def get_pdfs(
                 throttle.update_min_items(min_items)
 
             logger.info(
-                f"Court cycle completed for: {row.court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep 1 second "
+                f"Court cycle completed for: {court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep 1 second "
                 f"before starting the next cycle."
             )
             time.sleep(1)
 
-        logger.info(f"Processing row id: {row.id} from {row.court_id}")
+        logger.info(f"Processing row id: {pk} from {court_id}")
         c = chain(
             process_free_opinion_result.si(
-                row.pk,
-                row.court_id,
+                pk,
+                court_id,
                 cnt,
             ).set(queue=q),
-            get_and_process_free_pdf.s(row.pk, row.court_id).set(queue=q),
+            get_and_process_free_pdf.s(pk, court_id).set(queue=q),
             # `recap_document_into_opinions` uses a different doctor extraction
             # endpoint, so it doesn't depend on the document's content
             # being extracted on `get_and_process_free_pdf`, where it's
             # only extracted if it doesn't require OCR
             recap_document_into_opinions.s().set(queue=q),
-            delete_pacer_row.s(row.pk).set(queue=q),
+            delete_pacer_row.s(pk).set(queue=q),
         )
 
         # we accept same hash RecapDocuments; but we don't want duplicates in

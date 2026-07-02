@@ -42,7 +42,6 @@ from cl.alerts.factories import (
     DocketAlertWithParentsFactory,
 )
 from cl.alerts.models import DocketAlert, DocketAlertEvent
-from cl.api.constants import SYNC_MEMBERSHIP_THROTTLES_SWITCH
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -56,7 +55,8 @@ from cl.api.models import (
     WebhookEventType,
     WebhookVersions,
 )
-from cl.api.utils import clear_tiered_cache
+from cl.api.utils import DOUBLE_API_THROTTLES_SWITCH, clear_tiered_cache
+from cl.donate.factories import NeonMembershipFactory
 from cl.donate.models import (
     PROVIDERS,
     MembershipPaymentStatus,
@@ -432,6 +432,8 @@ class UserDataTest(LiveServerTestCase):
         self.assertEqual(len(recipients), 0)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
@@ -471,6 +473,29 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             reverse("delete_profile_done"),
         )
 
+    @patch("cl.users.views.create_zoho_desk_ticket")
+    async def test_take_out_creates_zoho_desk_ticket(
+        self, mock_task: MagicMock
+    ) -> None:
+        """Does requesting a data export create a Zoho Desk ticket?"""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("take_out"),
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("take_out_done"))
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["email"], user.email)
+        self.assertEqual(call_kwargs["request_type"], "Data Export Request")
+        self.assertIn(user.username, call_kwargs["description"])
+        self.assertIn("Email Confirmed:", call_kwargs["description"])
+
     async def test_reset_api_token_get_renders_confirmation(self) -> None:
         """The reset page renders a password-confirmation form."""
         self.assertTrue(
@@ -505,7 +530,14 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
                 username="pandora", password="password"
             )
         )
-        r = await self.async_client.get(reverse("reset_api_token"))
+        # Use an isolated tiered-cache namespace so the cached promo switch
+        # honors the @override_switch above (get_recent reads the base bucket
+        # when the promo is off) without sharing other tests' cached state.
+        with mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            return_value="tiered_reset_token_recent_usage",
+        ):
+            r = await self.async_client.get(reverse("reset_api_token"))
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertContains(r, "<strong>3</strong>")
         self.assertContains(r, "fa-exclamation-triangle")
@@ -4345,7 +4377,6 @@ class UserProfileTotalApiUsageTest(TestCase):
         self.assertEqual(self.user.profile.total_api_usage, 0)
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsageTest")
 class ViewApiUsageTest(TestCase):
     """Tests for /profile/api-usage/."""
 
@@ -4363,17 +4394,7 @@ class ViewApiUsageTest(TestCase):
     def tearDown(self) -> None:
         clear_tiered_cache()
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    def test_switch_off_hides_new_sections(self) -> None:
-        """With the switch off, only the recent-usage section renders."""
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertNotContains(response, "Your Access Level")
-        self.assertNotContains(response, "Your Total API Usage")
-        self.assertContains(response, "Your API Recent Usage")
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
-    def test_switch_on_shows_default_throttle_rates(self) -> None:
+    def test_shows_default_throttle_rates(self) -> None:
         """Without overrides, access level falls back to settings defaults."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, HTTPStatus.OK)
@@ -4381,8 +4402,7 @@ class ViewApiUsageTest(TestCase):
         # Default rate exposed in DEFAULT_THROTTLE_RATES["user"].
         self.assertContains(response, "per day")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
-    def test_switch_on_shows_override_rates(self) -> None:
+    def test_shows_override_rates(self) -> None:
         """User APIThrottle overrides replace the defaults in the listing."""
         APIThrottleFactory(
             user=self.user,
@@ -4400,7 +4420,6 @@ class ViewApiUsageTest(TestCase):
         # Default "per hour" rate should NOT appear — overrides replace it.
         self.assertNotContains(response, "per hour")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
     def test_blocked_user_filters_zero_rates(self) -> None:
         """A 0/min row is dropped — we don't advertise blocked as a limit."""
         APIThrottleFactory(
@@ -4412,7 +4431,6 @@ class ViewApiUsageTest(TestCase):
         # Heading still renders, but no rate rows for the blocked user.
         self.assertNotContains(response, "per minute")
 
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
     @patch("cl.users.models.get_redis_interface")
     def test_total_section_shows_count_and_donate(
         self, mock_get_redis: MagicMock
@@ -4437,6 +4455,90 @@ class ViewApiUsageTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertIn("/sign-in/", response["Location"])
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsagePromoTest")
+class ViewApiUsagePromoTest(TestCase):
+    """API-usage page reflects the x2 promo per membership type."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Isolate this class's tiered_cache namespace so cached overrides /
+        # exclusion sets don't leak across classes. Start in setUpClass so the
+        # patched prefix is active during setUp/tearDown clear_tiered_cache().
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_view_api_usage_promo_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def _add_membership(self, level: int, rate: str) -> None:
+        """Give the test user an active membership with one MEMBERSHIP rate."""
+        NeonMembershipFactory(user=self.user, level=level)
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate=rate,
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_non_member_default_doubled(self) -> None:
+        """Non-member: the displayed default rate is doubled during the promo."""
+        response = self.client.get(self.url)
+        # Test settings default is 5000/day; promo shows 10,000.
+        self.assertContains(response, "<strong>10,000</strong>")
+        self.assertContains(response, "per day")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
+    def test_non_member_default_not_doubled_when_off(self) -> None:
+        """Non-member: base default rate shown when the promo is off."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>5,000</strong>")
+        self.assertNotContains(response, "<strong>10,000</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_paid_member_doubled(self) -> None:
+        """Paid member: 10/min is shown as 20/min during the promo."""
+        self._add_membership(NeonMembershipLevel.TIER_2, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_lso_member_doubled(self) -> None:
+        """LSO member: 10/min is shown as 20/min during the promo."""
+        self._add_membership(NeonMembershipLevel.LSO_1, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_edu_member_not_doubled(self) -> None:
+        """EDU member: rate shown unchanged during the promo."""
+        self._add_membership(NeonMembershipLevel.EDU, "20/hour")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per hour")
+        self.assertNotContains(response, "<strong>40</strong>")
 
 
 class TagZohoRecordForMembershipTest(TestCase):
@@ -4552,7 +4654,6 @@ class TagZohoRecordTest(SimpleTestCase):
         mock_contacts.add_tags.assert_not_called()
 
 
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
 class RefreshAPIThrottlesAdminTest(TestCase):
     def setUp(self):
         self.staff = UserFactory(is_staff=True, is_superuser=True)
