@@ -285,8 +285,6 @@ class OneToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
             result |= self.merger(
                 child, manager=related_manager, params=params
             ).merge()
-        #     children.append(cast(Model, child_obj))
-        # related_manager.add(*children)
         return result
 
 
