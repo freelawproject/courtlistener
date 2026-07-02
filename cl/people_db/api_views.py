@@ -138,7 +138,9 @@ class PositionViewSet(
 class RetentionEventViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
-    queryset = RetentionEvent.objects.select_related("position").order_by("-id")
+    queryset = RetentionEvent.objects.select_related("position").order_by(
+        "-id"
+    )
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
     permission_classes = [
