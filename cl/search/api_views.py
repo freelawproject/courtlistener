@@ -390,7 +390,9 @@ class OpinionsCitedViewSet(
     ordering = "-id"
     # Additional cursor ordering fields
     cursor_ordering_fields = ["id"]
-    queryset = OpinionsCited.objects.all().order_by("-id")
+    queryset = OpinionsCited.objects.select_related(
+        "citing_opinion", "cited_opinion"
+    ).order_by("-id")
 
 
 class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
