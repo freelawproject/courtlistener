@@ -14,12 +14,10 @@ from waffle import flag_is_active
 from waffle.decorators import waffle_flag
 
 from cl.alerts.constants import (
-    LEGACY_MEMBERSHIP_HELP_URL,
     RECAP_ALERT_QUOTAS,
 )
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
-from cl.donate.models import NeonMembershipLevel
 from cl.lib.bot_detector import is_bot
 from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
 from cl.lib.search_utils import (
