@@ -48,23 +48,15 @@ from cl.people_db.models import (
 )
 
 
-def person_child_queryset(model):
-    return model.objects.select_related("person").order_by("-id")
-
-
 class PersonViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
-    queryset = (
-        Person.objects.select_related("is_alias_of")
-        .prefetch_related(
-            "positions",
-            "educations",
-            "political_affiliations",
-            "sources",
-            "aba_ratings",
-            "race",
-        )
-        .order_by("-id")
-    )
+    queryset = Person.objects.prefetch_related(
+        "positions",
+        "educations__school",
+        "political_affiliations",
+        "sources",
+        "aba_ratings",
+        "race",
+    ).order_by("-id")
     serializer_class = PersonSerializer
     filterset_class = PersonFilter
     permission_classes = [
@@ -99,7 +91,6 @@ class PositionViewSet(
             "predecessor",
             "school",
             "court",
-            "appointer",
         )
         .prefetch_related("retention_events")
         .order_by("-id")
@@ -138,9 +129,7 @@ class PositionViewSet(
 class RetentionEventViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
-    queryset = RetentionEvent.objects.select_related("position").order_by(
-        "-id"
-    )
+    queryset = RetentionEvent.objects.order_by("-id")
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
     permission_classes = [
@@ -161,9 +150,7 @@ class RetentionEventViewSet(
 class EducationViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
-    queryset = Education.objects.select_related("person", "school").order_by(
-        "-id"
-    )
+    queryset = Education.objects.select_related("school").order_by("-id")
     serializer_class = EducationSerializer
     filterset_class = EducationFilter
     permission_classes = [
@@ -182,7 +169,7 @@ class EducationViewSet(
 
 
 class SchoolViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
-    queryset = School.objects.select_related("is_alias_of").order_by("-id")
+    queryset = School.objects.order_by("-id")
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
     permission_classes = [
@@ -203,7 +190,7 @@ class SchoolViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
 class PoliticalAffiliationViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
-    queryset = person_child_queryset(PoliticalAffiliation)
+    queryset = PoliticalAffiliation.objects.order_by("-id")
     serializer_class = PoliticalAffiliationSerializer
     filterset_class = PoliticalAffiliationFilter
     permission_classes = [
@@ -228,7 +215,7 @@ class PoliticalAffiliationViewSet(
 
 
 class SourceViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
-    queryset = person_child_queryset(Source)
+    queryset = Source.objects.order_by("-id")
     serializer_class = SourceSerializer
     filterset_class = SourceFilter
     permission_classes = [
@@ -249,7 +236,7 @@ class SourceViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
 class ABARatingViewSet(
     LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet
 ):
-    queryset = person_child_queryset(ABARating)
+    queryset = ABARating.objects.order_by("-id")
     serializer_class = ABARatingSerializer
     filterset_class = ABARatingFilter
     permission_classes = [
