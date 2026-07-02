@@ -65,7 +65,7 @@ class DocketTagViewSet(ModelViewSet):
     cursor_ordering_fields = ["id"]
 
     def get_queryset(self):
-        return DocketTag.objects.filter(
+        return DocketTag.objects.select_related("docket", "tag").filter(
             Q(tag__user=self.request.user) | Q(tag__published=True)
         )
 
