@@ -3503,6 +3503,7 @@ def process_recap_email(
     unique_case_ids = []
     got_content_updated = False
     main_rds_available = []
+    saved_existing_main_rds = []
     with transaction.atomic():
         # Add/update docket entries for each docket mentioned in the
         # notification.
@@ -3569,7 +3570,18 @@ def process_recap_email(
                 # since there is no document to copy.
                 continue
 
-            for rd in rds_created:
+            # Most RDs match existing records. We initially assumed RECAP email would
+            # always be processed before other RECAP sources, but that's not always the
+            # case. If the Celery queue is busy, processing may be delayed, allowing
+            # another source (e.g. the RSS scraper or a docket upload) to create the RD
+            # first. In those cases, we still need to save the PDF if it is not already
+            # available. Previously, PDFs were only saved for RDs created by this task.
+            existing_rds_to_save = [
+                rd
+                for rd in rds_updated
+                if not rd.is_available and rd.pacer_doc_id == pacer_doc_id
+            ]
+            for rd in rds_created + existing_rds_to_save:
                 # Download and store the main PACER document and then
                 # assign/copy it to each corresponding RECAPDocument.
                 fq = PacerFetchQueue.objects.create(
@@ -3580,6 +3592,9 @@ def process_recap_email(
                 save_pacer_doc_from_pq(self, rd, fq, pq, magic_number)
                 rd.refresh_from_db()
                 main_rds_available.append(rd.is_available)
+            saved_existing_main_rds.extend(
+                rd for rd in existing_rds_to_save if rd.is_available
+            )
 
         # Get NEF attachments and merge them.
         all_attachment_rds = []
@@ -3636,6 +3651,13 @@ def process_recap_email(
     # After properly copying the PDF to related RECAPDocuments,
     # mark the PQ object as successful and delete its filepath_local
     if pq.status != PROCESSING_STATUS.FAILED:
+        if pq.filepath_local and not any(main_rds_available):
+            logger.error(
+                "recap.email: deleting the PDF in PQ %s that was not copied "
+                "to any RECAPDocument. EPQ: %s",
+                pq.pk,
+                epq.pk,
+            )
         async_to_sync(mark_pq_successful)(pq)
 
     for pq in att_pqs:
@@ -3670,7 +3692,7 @@ def process_recap_email(
 
     if not is_potentially_sealed_entry:
         rds_to_extract = (
-            all_attachment_rds + all_created_rds
+            all_attachment_rds + all_created_rds + saved_existing_main_rds
             if not bankr_short_doc_id
             else []
         )

@@ -1575,6 +1575,89 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_copies_pdf_into_existing_rd(
+        self,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
+        mock_download_pdf,
+        mock_webhook_post,
+    ):
+        """Confirm the notification PDF is copied into a matched
+        RECAPDocument that already existed without a document, e.g., created
+        first by the RSS scraper while the recap.email task was queued.
+        """
+
+        notification_data = RECAPEmailNotificationDataFactory(
+            appellate=False,
+            contains_attachments=False,
+        )
+        docket_data = notification_data["dockets"][0]
+        entry_data = docket_data["docket_entries"][0]
+
+        # Simulate the docket entry and RECAPDocument created first by
+        # another source while the recap.email task was queued.
+        docket = await sync_to_async(DocketFactory)(
+            court=self.court,
+            docket_number=docket_data["docket_number"],
+            pacer_case_id=entry_data["pacer_case_id"],
+        )
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=docket,
+            entry_number=entry_data["document_number"],
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            pacer_doc_id=entry_data["pacer_doc_id"],
+            document_number=str(entry_data["document_number"]),
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=False,
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (notification_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from
+            # testing_1@recap.email
+            await self.async_client.post(self.path, self.data, format="json")
+
+        # No duplicated RECAPDocument should be created.
+        self.assertEqual(await RECAPDocument.objects.acount(), 1)
+
+        # The PDF should be copied into the existing RECAPDocument and a
+        # PacerFetchQueue created for it.
+        await rd.arefresh_from_db()
+        self.assertTrue(rd.is_available)
+        self.assertTrue(rd.filepath_local)
+        fetch_queues = PacerFetchQueue.objects.filter(recap_document=rd)
+        self.assertEqual(await fetch_queues.acount(), 1)
+        fetch_queue_first = await fetch_queues.afirst()
+        self.assertEqual(
+            fetch_queue_first.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # The PQ used to download the PDF should be marked successful and
+        # its file deleted.
+        pq = await ProcessingQueue.objects.filter(
+            pacer_doc_id=entry_data["pacer_doc_id"]
+        ).afirst()
+        self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertFalse(pq.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
