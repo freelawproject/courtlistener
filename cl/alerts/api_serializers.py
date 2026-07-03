@@ -9,6 +9,7 @@ from rest_framework.exceptions import APIException, PermissionDenied
 
 from cl.alerts.constants import (
     FLP_MEMBERSHIP_URL,
+    LEGACY_MEMBERSHIP_HELP_URL,
     MEMBERSHIP_UPGRADE_BASE_URL,
 )
 from cl.alerts.models import (
@@ -24,6 +25,7 @@ from cl.alerts.utils import (
     is_match_all_query,
 )
 from cl.api.utils import DynamicFieldsMixin, HyperlinkedModelSerializerWithId
+from cl.donate.models import NeonMembershipLevel
 from cl.search.models import SEARCH_TYPES
 
 # The number of days the alert frequency estimation averages over, matching
@@ -194,8 +196,20 @@ class SearchAlertSerializer(
                     f"Please join Free Law Project as a member: {FLP_MEMBERSHIP_URL}"
                 )
             case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
-                neon_id = user.membership.neon_id
-                upgrade_url = f"{MEMBERSHIP_UPGRADE_BASE_URL}{neon_id}"
+                membership = user.membership
+                if membership.level == NeonMembershipLevel.LEGACY:
+                    # Legacy memberships can't be upgraded online, so point
+                    # them at the help page instead of the Neon upgrade flow.
+                    raise PermissionDenied(
+                        "You've used all of the alerts included with your "
+                        "legacy membership. Legacy memberships can't be "
+                        "upgraded online; see "
+                        f"{LEGACY_MEMBERSHIP_HELP_URL} to learn how to get "
+                        "more features, or disable a RECAP Alert."
+                    )
+                upgrade_url = (
+                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id}"
+                )
                 raise PermissionDenied(
                     "You've used all of the alerts included with your "
                     "membership. To create this alert, upgrade your membership "
