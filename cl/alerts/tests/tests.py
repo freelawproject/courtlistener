@@ -23,6 +23,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
 
+from cl.alerts.constants import LEGACY_MEMBERSHIP_HELP_URL
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
@@ -442,13 +443,26 @@ class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
         url = reverse("show_results") + f"?type={SEARCH_TYPES.RECAP}"
         r = await self.async_client.post(url, params, follow=True)
         content = r.content.decode()
+        # Legacy members can't upgrade online, so they're routed to the help
+        # page rather than the Neon upgrade flow that 404s for them (#7136).
         self.assert_form_validation_error(
-            "You've used all of the alerts included with your membership.",
+            "You've used all of the alerts included with your legacy membership.",
             content,
         )
-        neon_id = self.user_member.user.membership.neon_id
-        expected_upgrade_url = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
-        self.assertIn(expected_upgrade_url, content)
+        # Scope the link assertions to the validation error itself; the alert
+        # modal always renders a (JS-hidden) upgrade button on every page.
+        validation_error = cast(
+            list[HtmlElement],
+            html.fromstring(content).xpath(
+                '//p[contains(@class, "help-block")]'
+            ),
+        )
+        error_html = html.tostring(validation_error[0], encoding="unicode")
+        self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, error_html)
+        self.assertNotIn(
+            "https://donate.free.law/constituent/memberships/upgrade/",
+            error_html,
+        )
 
         alerts = Alert.objects.filter(user=self.user_member.user)
         self.assertEqual(await alerts.acount(), 0)
@@ -1777,7 +1791,7 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
 
     async def test_legacy_member_recap_rt_rejected(self) -> None:
         """Legacy members have a RECAP Real-Time quota of 0, so their first
-        RECAP RT alert is rejected with the membership upgrade message."""
+        RECAP RT alert is rejected with the legacy help message."""
         response = await self.make_an_alert(
             self.client_legacy_member,
             alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
@@ -1786,14 +1800,17 @@ class AlertAPITests(ESIndexTestCase, APITestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
         detail = response.json()["detail"]
+        # Legacy members can't upgrade online, so they're routed to the help
+        # page rather than the Neon upgrade flow that 404s for them (#7136).
         self.assertIn(
-            "You've used all of the alerts included with your membership.",
+            "You've used all of the alerts included with your legacy membership.",
             detail,
         )
+        self.assertIn(LEGACY_MEMBERSHIP_HELP_URL, detail)
         neon_id = await sync_to_async(
             lambda: self.user_legacy_member.membership.neon_id
         )()
-        self.assertIn(
+        self.assertNotIn(
             f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}",
             detail,
         )
