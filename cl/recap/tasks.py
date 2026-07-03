@@ -3032,9 +3032,8 @@ def download_pacer_pdf_and_save_to_pq(
     :param session_data: A SessionData object containing the session's cookies
     and proxy.
     :param cutoff_date: The datetime from which we should query
-     ProcessingQueue objects. For the main RECAPDocument the datetime the
-     EmailProcessingQueue was created. For attachments the datetime the
-     attachment RECAPDocument was created.
+     ProcessingQueue objects, the datetime the EmailProcessingQueue was
+     created, for both the main and attachment RECAPDocuments.
     :param magic_number: The magic number to fetch PACER documents for free.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param pacer_doc_id: The pacer_doc_id to query the free document.
@@ -3509,6 +3508,7 @@ def process_recap_email(
     got_content_updated = False
     main_rds_available = []
     saved_existing_main_rds = []
+    main_rd_already_available = False
     with transaction.atomic():
         # Add/update docket entries for each docket mentioned in the
         # notification.
@@ -3586,6 +3586,14 @@ def process_recap_email(
                 for rd in rds_updated
                 if not rd.is_available and rd.pacer_doc_id == pacer_doc_id
             ]
+            # Track main RDs that already have the document, so the PQ
+            # deletion guard below doesn't report a redundant download as a
+            # loss.
+            main_rd_already_available = main_rd_already_available or any(
+                rd.is_available
+                for rd in rds_updated
+                if rd.pacer_doc_id == pacer_doc_id
+            )
             for rd in rds_created + existing_rds_to_save:
                 # Download and store the main PACER document and then
                 # assign/copy it to each corresponding RECAPDocument.
@@ -3657,7 +3665,11 @@ def process_recap_email(
     # After properly copying the PDF to related RECAPDocuments,
     # mark the PQ object as successful and delete its filepath_local
     if pq.status != PROCESSING_STATUS.FAILED:
-        if pq.filepath_local and not any(main_rds_available):
+        if (
+            pq.filepath_local
+            and not any(main_rds_available)
+            and not main_rd_already_available
+        ):
             logger.error(
                 "recap.email: deleting the PDF in PQ %s that was not copied "
                 "to any RECAPDocument. EPQ: %s",
