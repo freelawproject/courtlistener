@@ -3109,6 +3109,7 @@ def get_and_copy_recap_attachment_docs(
     magic_number: str | None,
     pacer_case_id: str,
     user_pk: int,
+    cutoff_date: datetime,
     de_seq_num: str | None = None,
 ) -> list[ProcessingQueue]:
     """Download and copy the corresponding PACER PDF to all the notification
@@ -3120,6 +3121,11 @@ def get_and_copy_recap_attachment_docs(
     :param magic_number: The magic number to fetch PACER documents for free.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param user_pk: The user to associate with the ProcessingQueue object.
+    :param cutoff_date: The datetime from which ProcessingQueue objects can be
+     reused, the datetime the EmailProcessingQueue was created. This prevents
+     reusing stale PQs from previous notifications whose file was already
+     deleted, while still allowing reuse within this notification's run,
+     retries and multi-docket NEFs.
     :param de_seq_num: The sequential number assigned by the PACER system to
      identify the docket entry within a case.
     :return: None
@@ -3129,7 +3135,6 @@ def get_and_copy_recap_attachment_docs(
     appellate = False
     unique_pqs = []
     for rd_att in att_rds:
-        cutoff_date = rd_att.date_created
         pq = download_pacer_pdf_and_save_to_pq(
             court_id,
             session_data,
@@ -3622,6 +3627,7 @@ def process_recap_email(
                 magic_number,
                 pacer_case_id,
                 user_pk,
+                epq.date_created,
                 de_seq_num=pacer_seq_no,
             )
 

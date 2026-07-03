@@ -12,6 +12,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 
 from cl.alerts.models import DocketAlert
 from cl.api.factories import WEBHOOK_EVENT_STATUS, WebhookFactory
@@ -3065,6 +3066,7 @@ class GetAndCopyRecapAttachments(TestCase):
         rds = RECAPDocument.objects.all()
         self.assertEqual(len(rds), 9)
 
+        cutoff_date = now()
         pq_att1 = ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -3098,6 +3100,7 @@ class GetAndCopyRecapAttachments(TestCase):
             "magic1234",
             "12345",
             self.user.pk,
+            cutoff_date,
         )
 
         rds_all = RECAPDocument.objects.all()
@@ -3148,6 +3151,7 @@ class GetAndCopyRecapAttachments(TestCase):
             "magic1234",
             "12345",
             self.user.pk,
+            now(),
         )
         rds_all = RECAPDocument.objects.all()
         for rd in rds_all:
@@ -3170,6 +3174,60 @@ class GetAndCopyRecapAttachments(TestCase):
                 async_to_sync(mark_pq_successful)(pq)
             self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
             self.assertFalse(pq.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(200, b"Hello World from magic"),
+            "OK",
+        ),
+    )
+    def test_avoid_reusing_stale_pq_from_previous_notification(
+        self,
+        mock_cookie,
+        mock_download,
+    ):
+        """A PQ from a previous notification whose file was already deleted
+        shouldn't be reused for a pre-existing attachment RD. A fresh download
+        must be performed instead of wrongly marking the RD as sealed.
+        """
+
+        rd_att = self.rds_att[0]
+        # Simulate a PQ consumed by a previous notification: marked
+        # successful and its file already deleted.
+        ProcessingQueue.objects.create(
+            court_id=self.d_1.court_id,
+            uploader=self.user,
+            pacer_case_id=self.d_1.pacer_case_id,
+            pacer_doc_id=rd_att.pacer_doc_id,
+            status=PROCESSING_STATUS.SUCCESSFUL,
+            upload_type=UPLOAD_TYPE.PDF,
+        )
+        # The current notification arrives after the stale PQ was created.
+        cutoff_date = now()
+        get_and_copy_recap_attachment_docs(
+            self,
+            [rd_att],
+            self.d_1.court_id,
+            "magic1234",
+            self.d_1.pacer_case_id,
+            self.user.pk,
+            cutoff_date,
+        )
+
+        # The stale PQ shouldn't be reused. A new one is created to download
+        # the PDF, which is copied to the RECAPDocument.
+        pqs = ProcessingQueue.objects.filter(pacer_doc_id=rd_att.pacer_doc_id)
+        self.assertEqual(pqs.count(), 2)
+        rd_att.refresh_from_db()
+        self.assertFalse(rd_att.is_sealed)
+        self.assertTrue(rd_att.is_available)
+        with rd_att.filepath_local.open(mode="rb") as local_path:
+            self.assertEqual(local_path.read(), b"Hello World from magic")
 
 
 @mock.patch(
