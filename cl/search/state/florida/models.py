@@ -30,6 +30,7 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         "search.Docket",
         on_delete=models.CASCADE,
+        related_name="florida_docket_entries",
     )
     date_filed = models.DateTimeField(
         null=True,
@@ -84,6 +85,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     docket_entry = models.ForeignKey(
         FloridaDocketEntry,
         on_delete=models.CASCADE,
+        related_name="documents",
     )
     content_type = models.CharField(max_length=63, null=True, blank=True)
     document_name = models.TextField(blank=True)
