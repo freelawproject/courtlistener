@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
@@ -37,11 +37,7 @@ from waffle.testutils import override_switch
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.api_permissions import V3APIPermission
-from cl.api.constants import (
-    LEVEL_TO_RATES,
-    SYNC_MEMBERSHIP_THROTTLES_SWITCH,
-    TIER_3_RATES,
-)
+from cl.api.constants import LEVEL_TO_RATES, TIER_3_RATES
 from cl.api.factories import (
     APIThrottleFactory,
     WebhookEventFactory,
@@ -56,6 +52,7 @@ from cl.api.models import (
 )
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
+    DOUBLE_API_THROTTLES_SWITCH,
     ExceptionalUserRateThrottle,
     LoggingMixin,
     apply_membership_throttles,
@@ -65,6 +62,8 @@ from cl.api.utils import (
     get_logging_prefix,
     invert_user_logs,
     is_valid_filter_param,
+    promo_doubling_applies,
+    promo_switch_is_active,
 )
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
@@ -4999,8 +4998,14 @@ class ThrottleOverrideIntegrationTest(TestCase):
         }
     }
 )
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class MultiRateThrottleTest(TestCase):
-    """Tests for multi-rate enforcement via ExceptionalUserRateThrottle."""
+    """Tests for multi-rate enforcement via ExceptionalUserRateThrottle.
+
+    Pins the promo switch off (it defaults on via WAFFLE_SWITCH_DEFAULT) so
+    these assert base-rate enforcement; the x2 promo is covered separately by
+    PromoDoubleThrottleTest.
+    """
 
     def setUp(self) -> None:
         clear_tiered_cache()
@@ -5179,8 +5184,139 @@ class MultiRateThrottleTest(TestCase):
         self.assertIn("blocked", str(ctx.exception.detail).lower())
 
 
-@override_settings(WAFFLE_CACHE_PREFIX="MembershipThrottleSyncTest")
-@override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=True)
+@override_settings(
+    WAFFLE_CACHE_PREFIX="PromoDoubleThrottleTest",
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "promo-double-throttle-test",
+        }
+    },
+)
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+class PromoDoubleThrottleTest(TestCase):
+    """Membership-promotion x2 API throttle.
+
+    The throttle history cache must be private to this class: DRF keys it by
+    user pk in the shared Redis cache, and parallel test workers have separate
+    databases whose pk sequences collide.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Isolate this class's tiered_cache namespace so cached overrides /
+        # exclusion sets don't leak across classes. Start in setUpClass so the
+        # patched prefix is active during setUp/tearDown clear_tiered_cache().
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_promo_double_throttle_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    @staticmethod
+    def _make_member(level: int, rate: str) -> User:
+        """Active member at `level` with a single MEMBERSHIP API rate."""
+        user = UserFactory()
+        NeonMembershipFactory(user=user, level=level)
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate=rate,
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        return user
+
+    @staticmethod
+    def _allowed_count(user: User, attempts: int) -> int:
+        """Count requests allowed before the throttle first raises Throttled."""
+        request = RequestFactory().get("/")
+        request.user = user
+        allowed = 0
+        for _ in range(attempts):
+            throttle = ExceptionalUserRateThrottle()
+            try:
+                throttle.allow_request(request, view=None)
+            except Throttled:
+                break
+            allowed += 1
+        return allowed
+
+    def test_paid_member_rate_doubled(self) -> None:
+        """A paid member's 2/min is enforced as 4/min during the promo."""
+        user = self._make_member(NeonMembershipLevel.TIER_2, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 4)
+
+    def test_lso_member_rate_doubled(self) -> None:
+        """LSO members are included; 2/min becomes 4/min during the promo."""
+        user = self._make_member(NeonMembershipLevel.LSO_1, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 4)
+
+    def test_edu_member_not_doubled(self) -> None:
+        """EDU members are excluded; 2/min stays 2/min."""
+        user = self._make_member(NeonMembershipLevel.EDU, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 2)
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
+    def test_member_base_rate_when_switch_off(self) -> None:
+        """With the promo off, a paid member's 2/min is enforced as-is."""
+        user = self._make_member(NeonMembershipLevel.TIER_2, "2/min")
+        self.assertEqual(self._allowed_count(user, 6), 2)
+
+    def test_non_member_doubled_in_isolated_bucket(self) -> None:
+        """A non-member is eligible and counted in the _promo2x bucket."""
+        user = UserFactory()
+        self.assertTrue(promo_doubling_applies(user))
+        request = RequestFactory().get("/")
+        request.user = user
+        throttle = ExceptionalUserRateThrottle()
+        self.assertTrue(throttle.allow_request(request, view=None))
+        self.assertTrue((throttle.key or "").endswith("_promo2x"))
+
+    def test_manual_override_not_doubled(self) -> None:
+        """Commercial/MANUAL overrides are excluded from the promo."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="2/min",
+            source=APIThrottle.Source.MANUAL,
+        )
+        self.assertFalse(promo_doubling_applies(user))
+        self.assertEqual(self._allowed_count(user, 6), 2)
+
+    def test_switch_status_cached(self) -> None:
+        """The switch is read once, then served from the cache."""
+        with mock.patch(
+            "cl.api.utils.switch_is_active", return_value=True
+        ) as mocked:
+            self.assertTrue(promo_switch_is_active())
+            self.assertTrue(promo_switch_is_active())
+            mocked.assert_called_once()
+        # Switch to a fresh tiered-cache namespace to force a re-read, instead
+        # of flushing the entire cache.
+        with (
+            mock.patch(
+                "cl.lib.decorators.get_tiered_cache_prefix",
+                return_value="tiered_switch_status_reread",
+            ),
+            mock.patch(
+                "cl.api.utils.switch_is_active", return_value=False
+            ) as mocked,
+        ):
+            self.assertFalse(promo_switch_is_active())
+            mocked.assert_called_once()
+
+
 class MembershipThrottleSyncTest(TestCase):
     """Tests for apply_membership_throttles / clear_membership_throttles."""
 
@@ -5273,30 +5409,6 @@ class MembershipThrottleSyncTest(TestCase):
             apply_membership_throttles(user, NeonMembershipLevel.BASIC)
         )
         self.assertFalse(APIThrottle.objects.filter(user=user).exists())
-
-    @override_switch(SYNC_MEMBERSHIP_THROTTLES_SWITCH, active=False)
-    def test_switch_off_is_no_op(self) -> None:
-        """With the switch off, neither helper writes nor deletes rows."""
-        user = UserFactory()
-        APIThrottleFactory(
-            user=user,
-            throttle_type=ThrottleType.API,
-            rate="10/min",
-            source=APIThrottle.Source.MEMBERSHIP,
-        )
-
-        self.assertFalse(
-            apply_membership_throttles(user, NeonMembershipLevel.TIER_3)
-        )
-        rates_after_apply = list(
-            APIThrottle.objects.filter(user=user).values_list(
-                "rate", flat=True
-            )
-        )
-        self.assertEqual(rates_after_apply, ["10/min"])  # unchanged
-
-        clear_membership_throttles(user)
-        self.assertTrue(APIThrottle.objects.filter(user=user).exists())
 
     def test_apply_skips_cache_clear_by_default(self) -> None:
         """apply_* does not invalidate the cache unless clear_cache=True."""
