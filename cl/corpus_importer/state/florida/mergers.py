@@ -1,6 +1,8 @@
 import logging
-from datetime import date
+from collections.abc import Iterable
+from datetime import date, datetime
 from typing import Any, ClassVar, override
+from uuid import UUID
 
 from django.db.models import Model, QuerySet
 from juriscraper.state.florida import (
@@ -9,11 +11,23 @@ from juriscraper.state.florida import (
     FloridaParty,
     FloridaPartyRepresentative,
 )
+from juriscraper.state.florida import (
+    FloridaDocketEntry as ScrapeFloridaDocketEntry,
+)
+from juriscraper.state.florida import (
+    FloridaDocument as ScrapeFloridaDocument,
+)
 from juriscraper.state.florida.cases import FloridaCourtID
 
 from cl.corpus_importer.state.common.docket import (
     DocketMerger,
+    _docket_entries,
     _docket_parties,
+)
+from cl.corpus_importer.state.common.docket_entry import (
+    DocketEntryMerger,
+    DocumentMerger,
+    _entry_attachments,
 )
 from cl.corpus_importer.state.common.party import (
     AttorneyMerger,
@@ -29,8 +43,10 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     ManyToManyRelation,
     Merger,
+    OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
     ThroughParameters,
@@ -38,6 +54,10 @@ from cl.corpus_importer.state.merger import (
 )
 from cl.people_db.models import Attorney, Party, Role
 from cl.search.models import Docket, OriginatingCourtInformation
+from cl.search.state.florida.models import (
+    FloridaDocketEntry,
+    FloridaDocument,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +77,70 @@ class FloridaRoleMerger(
 class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
     attorneys: list[Attorney] = ManyToManyRelation(
         AttorneyMerger, FloridaRoleMerger, _party_representatives
+    )
+
+
+def _document_type(document: ScrapeFloridaDocument, params: Any) -> str:
+    return document.document_type or ""
+
+
+class FloridaDocumentMerger[ParamType](
+    DocumentMerger[ScrapeFloridaDocument, ParamType, FloridaDocument]
+):
+    model: ClassVar[type[Model]] = FloridaDocument
+    key: ClassVar[Iterable[str]] = ["link_uuid"]
+
+    document_name: str = Attribute(
+        lambda doc, params: doc.document_name, strategy=overwrite
+    )
+    document_type: str = Attribute(_document_type, strategy=overwrite)
+    content_type: str | None = Attribute(lambda doc, params: doc.content_type)
+    page_count: int | None = Attribute(lambda doc, params: doc.page_count)
+    file_size: int | None = Attribute(lambda doc, params: doc.file_size)
+    link_uuid: UUID = Attribute(
+        lambda doc, params: doc.document_link_uuid, strategy=overwrite
+    )
+
+
+class FloridaDocketEntryMerger[ParamType](
+    DocketEntryMerger[
+        ScrapeFloridaDocketEntry,
+        ParamType,
+        FloridaDocketEntry,
+    ]
+):
+    model: ClassVar[type[Model]] = FloridaDocketEntry
+    key: ClassVar[Iterable[str]] = ["docket_entry_uuid"]
+
+    # Florida's CL field is a DateTimeField, so override the base's
+    # date-only mapping with the scrape's full timestamp.
+    date_filed: datetime = Attribute(
+        lambda e, params: e.datetime_filed, strategy=overwrite
+    )
+    date_submitted: datetime = Attribute(
+        lambda e, params: e.date_submitted, strategy=overwrite
+    )
+    entry_type_raw: str = Attribute(
+        lambda e, params: e.entry_type_raw, strategy=overwrite
+    )
+    entry_name: str = Attribute(
+        lambda e, params: e.entry_name, strategy=overwrite
+    )
+    description: str = Attribute(
+        lambda e, params: e.entry_description, strategy=overwrite
+    )
+    status: str = Attribute(
+        lambda e, params: e.entry_status, strategy=overwrite
+    )
+    docket_entry_uuid: UUID = Attribute(
+        lambda e, params: e.docket_entry_uuid, strategy=overwrite
+    )
+    # APPEND so documents already in the DB but missing from this scrape are
+    # kept.
+    documents: list[FloridaDocument] = OneToManyRelation(
+        FloridaDocumentMerger,
+        _entry_attachments,
+        strategy=ManyStrategy.APPEND,
     )
 
 
@@ -165,6 +249,14 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
         FloridaPartyMerger,
         through=PartyTypeMerger,
         transform=_docket_parties,
+    )
+
+    # APPEND so entries already in the DB but missing from this scrape are
+    # kept (see FloridaDocketEntryMerger.documents).
+    florida_docket_entries: list[FloridaDocketEntry] = OneToManyRelation(
+        FloridaDocketEntryMerger,
+        _docket_entries,
+        strategy=ManyStrategy.APPEND,
     )
 
     @override

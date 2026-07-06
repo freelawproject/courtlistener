@@ -1,9 +1,11 @@
 """Factories for mocking output of Florida Juriscraper modules."""
 
+from datetime import UTC
+
 from factory.base import Factory
 from factory.declarations import LazyAttribute, List, SubFactory
 from factory.faker import Faker
-from juriscraper.state.docket import DocketTransfer
+from juriscraper.state.docket import DocketEntryType, DocketTransfer
 from juriscraper.state.florida import FloridaPartyRepresentative
 from juriscraper.state.florida.cases import (
     FLORIDA_DOCKET_TYPE_MAP,
@@ -12,6 +14,7 @@ from juriscraper.state.florida.cases import (
 )
 from juriscraper.state.florida.courts import FloridaCourtID
 from juriscraper.state.florida.docket_entries import FloridaDocketEntry
+from juriscraper.state.florida.documents import FloridaDocument
 from juriscraper.state.florida.parties import FloridaParty, PartyType
 
 
@@ -83,11 +86,40 @@ class FloridaCasePartyFactory(_PydanticConstructFactory):
     involvement_type_id = Faker("pyint")
 
 
+class FloridaDocumentFactory(_PydanticConstructFactory):
+    class Meta:
+        model = FloridaDocument
+
+    docket_entry_uuid = Faker("uuid4")
+    document_link_uuid = Faker("uuid4")
+    document_name = Faker("text", max_nb_chars=50)
+    user_document_state = Faker("uuid4")
+    case_uuid = Faker("uuid4")
+    case_number = Faker("federal_district_docket_number")
+    case_title = Faker("case_name")
+    court_id = Faker("pyint")
+    document_type = Faker("pystr")
+    content_type = "application/pdf"
+    file_extension = "pdf"
+    page_count = Faker("pyint", min_value=1, max_value=500)
+    file_size = Faker("pyint", min_value=1000)
+    url = Faker("url")
+
+
 class FloridaDocketEntryFactory(_PydanticConstructFactory):
     class Meta:
         model = FloridaDocketEntry
 
-    date_filed = Faker("date_object")
+    docket_entry_uuid = Faker("uuid4")
+    datetime_filed = Faker("date_time", tzinfo=UTC)
+    date_filed = LazyAttribute(lambda o: o.datetime_filed.date())
+    date_submitted = Faker("date_time", tzinfo=UTC)
+    entry_type = Faker("random_element", elements=DocketEntryType)
+    entry_type_raw = Faker("text", max_nb_chars=20)
+    entry_name = Faker("text", max_nb_chars=30)
+    entry_status = Faker("pystr")
+    entry_description = Faker("text")
+    attachments = List([])
 
 
 class FloridaCaseFactory(_PydanticConstructFactory):
