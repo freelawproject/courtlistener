@@ -35,9 +35,9 @@ def is_florida_court(court_id: str) -> bool:
 
 
 # <District>D<Year>-<Case number>
-FLORIDA_APPELLATE_DN_RE = re.compile(r"[1-6]D\d{4}-\d{4}")
+FLORIDA_APPELLATE_DN_RE = re.compile(r"[1-6]D\d{4}-\d{4,5}")
 # SC<Year>-<Case number>
-FLORIDA_SUPREME_DN_RE = re.compile(r"SC\d{4}-\d{4}")
+FLORIDA_SUPREME_DN_RE = re.compile(r"SC\d{4}-\d{4,5}")
 
 
 def make_docket_number_core(
