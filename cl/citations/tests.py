@@ -272,10 +272,18 @@ class CitationTextTest(TestCase):
         )
 
         # override default 200_000 with 50 to prove works
-        with patch(
-            "cl.citations.tasks.make_get_citations_kwargs",
-            side_effect=lambda op: make_get_citations_kwargs(
-                op, chunk_size=50
+        with (
+            patch(
+                "cl.citations.tasks.make_get_citations_kwargs",
+                side_effect=lambda op: make_get_citations_kwargs(
+                    op, chunk_size=50
+                ),
+            ),
+            patch(
+                "cl.citations.tasks.do_resolve_citations",
+                side_effect=lambda citations, _opinion: {
+                    NO_MATCH_RESOURCE: citations
+                },
             ),
         ):
             store_opinion_citations_and_update_parentheticals(
