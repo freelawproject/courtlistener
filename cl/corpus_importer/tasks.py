@@ -4380,14 +4380,16 @@ def merge_texas_document(
                 # object around. It needs to be wrapped in another lambda to
                 # prevent mypy from complaining.
                 (
-                    lambda pk: lambda: chain(
-                        download_texas_document.si(pk),
-                        extract_formatted_text_document.s(
-                            check_if_needed=False,
-                            model_name="search.TexasDocument",
-                            strip_html_tags=True,
-                        ),
-                    ).apply_async()
+                    lambda pk: (
+                        lambda: chain(
+                            download_texas_document.si(pk),
+                            extract_formatted_text_document.s(
+                                check_if_needed=False,
+                                model_name="search.TexasDocument",
+                                strip_html_tags=True,
+                            ),
+                        ).apply_async()
+                    )
                 )(texas_document.pk)
             )
         if existed:

@@ -80,9 +80,9 @@ class TestImportHarvardPDFs(TestCase):
     ):
         # Setup mocks
         mock_listdir.return_value = ["test_crosswalk.json"]
-        mock_exists.side_effect = lambda path: path in [
-            "/mocked_path/crosswalk_dir"
-        ]
+        mock_exists.side_effect = lambda path: (
+            path in ["/mocked_path/crosswalk_dir"]
+        )
 
         # Mock S3 client
         mock_s3 = MagicMock()
