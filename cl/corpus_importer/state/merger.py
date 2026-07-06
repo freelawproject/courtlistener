@@ -563,11 +563,11 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         classes which may not have required properties defined yet."""
         errors = []
 
-        for spec in self.related.values():
-            errors += spec.run_validation(merger)
+        for related_spec in self.related.values():
+            errors += related_spec.run_validation(merger)
 
-        for spec in self.attr.values():
-            errors += spec.run_validation(merger)
+        for attr_spec in self.attr.values():
+            errors += attr_spec.run_validation(merger)
 
         return errors
 
