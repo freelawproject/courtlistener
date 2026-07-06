@@ -10,8 +10,9 @@ COMMENT ON COLUMN "search_floridadocketentry"."entry_type_raw" IS 'Value of `ent
 COMMENT ON COLUMN "search_floridadocketentry"."entry_name" IS 'Pulled directly from Florida results';
 COMMENT ON COLUMN "search_floridadocketentry"."description" IS 'Pulled directly from Florida results';
 COMMENT ON COLUMN "search_floridadocketentry"."status" IS 'Pulled directly from Florida''s `entry_status` field';
+COMMENT ON COLUMN "search_floridadocketentry"."docket_entry_uuid" IS 'Pulled directly from Florida results';
 COMMENT ON COLUMN "search_floridadocketentry"."docket_id" IS 'The Docket this entry is associated with.';
-COMMENT ON COLUMN "search_floridadocketentry"."submitted_by_id" IS 'Not necessary to be a FK. Can just be a string of the submitter''s name.';
+COMMENT ON COLUMN "search_floridadocketentry"."submitted_by_id" IS 'FK to the case party that submitted this document.';
 --
 -- Create model FloridaDocketEntryEvent
 --
@@ -23,8 +24,9 @@ COMMENT ON COLUMN "search_floridadocketentryevent"."entry_type_raw" IS 'Value of
 COMMENT ON COLUMN "search_floridadocketentryevent"."entry_name" IS 'Pulled directly from Florida results';
 COMMENT ON COLUMN "search_floridadocketentryevent"."description" IS 'Pulled directly from Florida results';
 COMMENT ON COLUMN "search_floridadocketentryevent"."status" IS 'Pulled directly from Florida''s `entry_status` field';
+COMMENT ON COLUMN "search_floridadocketentryevent"."docket_entry_uuid" IS 'Pulled directly from Florida results';
 COMMENT ON COLUMN "search_floridadocketentryevent"."docket_id" IS 'The Docket this entry is associated with.';
-COMMENT ON COLUMN "search_floridadocketentryevent"."submitted_by_id" IS 'Not necessary to be a FK. Can just be a string of the submitter''s name.';
+COMMENT ON COLUMN "search_floridadocketentryevent"."submitted_by_id" IS 'FK to the case party that submitted this document.';
 --
 -- Create model FloridaDocument
 --
@@ -36,7 +38,7 @@ COMMENT ON COLUMN "search_floridadocument"."description" IS 'The description of 
 COMMENT ON COLUMN "search_floridadocument"."link_uuid" IS 'The attachment link UUID retrieved from Florida ACIS. Used to generate document download URL.';
 COMMENT ON COLUMN "search_floridadocument"."url" IS 'Download URL for attachment. Derived from uuid and link_uuid. Stored for safety.';
 COMMENT ON COLUMN "search_floridadocument"."processing_error" IS 'The processing error for the document, if any.';
-COMMENT ON COLUMN "search_floridadocument"."docket_entry_id" IS 'The Docket this document is associated with.';
+COMMENT ON COLUMN "search_floridadocument"."docket_entry_id" IS 'The Docket entry this document is associated with.';
 --
 -- Create model FloridaDocumentEvent
 --
@@ -48,7 +50,7 @@ COMMENT ON COLUMN "search_floridadocumentevent"."description" IS 'The descriptio
 COMMENT ON COLUMN "search_floridadocumentevent"."link_uuid" IS 'The attachment link UUID retrieved from Florida ACIS. Used to generate document download URL.';
 COMMENT ON COLUMN "search_floridadocumentevent"."url" IS 'Download URL for attachment. Derived from uuid and link_uuid. Stored for safety.';
 COMMENT ON COLUMN "search_floridadocumentevent"."processing_error" IS 'The processing error for the document, if any.';
-COMMENT ON COLUMN "search_floridadocumentevent"."docket_entry_id" IS 'The Docket this document is associated with.';
+COMMENT ON COLUMN "search_floridadocumentevent"."docket_entry_id" IS 'The Docket entry this document is associated with.';
 --
 -- Create index search_flor_docket__a7c9e7_idx on field(s) docket_entry_uuid of model floridadocketentry
 --

@@ -22,9 +22,9 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     :ivar entry_type_raw: Value of `entry_type_raw` in Juriscraper results. Pulled from Florida API with no modification.
     :ivar entry_name: Pulled directly from Florida results
     :ivar description: Pulled directly from Florida results
-    :ivar submitted_by: Not necessary to be a FK. Can just be a string of the submitter's name.
+    :ivar submitted_by: FK to the case party that submitted this document.
     :ivar status: Pulled directly from Florida's `entry_status` field
-    :ivar uuid: Pulled directly from Florida results
+    :ivar docket_entry_uuid: Pulled directly from Florida results
     """
 
     docket = models.ForeignKey(
@@ -71,7 +71,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     """
     Represents an attachment to a Florida docket entry.
 
-    :ivar docket_entry: The Docket this document is associated with.
+    :ivar docket_entry: The Docket entry this document is associated with.
     :ivar content_type: The MIME type indicated by Florida ACIS
     :ivar document_name: The name of the document in Florida ACIS
     :ivar document_type: The type of the document in Florida ACIS
