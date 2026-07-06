@@ -6,6 +6,7 @@ from django.db.models import Model
 from juriscraper.state.docket import (
     Docket as ScrapeDocket,
 )
+from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
 from juriscraper.state.docket import Party as ScrapeParty
 
 from cl.corpus_importer.state.common.party import PartyMerger, PartyTypeMerger
@@ -33,8 +34,14 @@ def _docket_parties[PType: ScrapeParty[Any]](
     return docket.parties
 
 
+def _docket_entries[EType: ScrapeDocketEntry[Any]](
+    docket: ScrapeDocket[Any, EType, Any], params: Any
+) -> Sequence[EType]:
+    return docket.entries
+
+
 class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
-    Merger[DType, ParamType, Docket]
+    Merger[DType, ParamType, Docket], abstract=True
 ):
     model: ClassVar[type[Model]] = Docket
 
