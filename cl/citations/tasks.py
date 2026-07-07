@@ -140,7 +140,7 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
         pk__in=opinion_pks
-    )
+    ).select_related("cluster")
 
     if disable_parenthetical_groups:
         disconnect_parenthetical_group_signals()
@@ -379,10 +379,11 @@ def store_opinion_citations_and_update_parentheticals(
             # Update parenthetical groups for clusters that we have added
             # parentheticals for from this opinion
             logger.debug("Create parenthetical groups: %s", opinion.pk)
-            for cluster_id in clusters_to_update_par_groups_for:
-                create_parenthetical_groups(
-                    OpinionCluster.objects.get(pk=cluster_id)
-                )
+            clusters = OpinionCluster.objects.filter(
+                pk__in=clusters_to_update_par_groups_for
+            )
+            for cluster in clusters:
+                create_parenthetical_groups(cluster)
 
         # Save all the changes to the citing opinion
         opinion.save()

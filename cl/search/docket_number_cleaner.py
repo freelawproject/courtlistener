@@ -347,7 +347,7 @@ def process_llm_batches(
     all_cleaned: dict[int, str],
 ) -> dict[int, str]:
     """
-    Processes batches of records using a language model (LLM), recursively retry with smaller batch sizes for failed extractions.
+    Processes batches of records using a language model (LLM), iteratively retry with smaller batch sizes for failed extractions.
 
     :param llm_batches: The batch of records to process. Each item is a dictionary with the docket_id (int) as the key and the raw_docket_number (str) as the value.
     :param system_prompt: The system prompt to provide to the LLM.
@@ -358,55 +358,56 @@ def process_llm_batches(
     :param all_cleaned: Accumulator dictionary for all processed records.
     :return: A dictionary mapping record IDs to their cleaned/extracted values, including any unprocessed records after max retries.
     """
-    logger.info(f"---Processing {len(llm_batches)} records with {model_id}---")
-    batches = [
-        llm_batches[i : i + batch_size]
-        for i in range(0, len(llm_batches), batch_size)
-    ]
-    with ThreadPoolExecutor(
-        max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS  # type: ignore
-    ) as executor:
-        future_to_batch = {
-            executor.submit(
-                extract_with_llm, batch, system_prompt, model_id
-            ): batch
-            for batch in batches
-        }
-        for future in as_completed(future_to_batch):
-            parsed_output = future.result()
-            all_cleaned.update(parsed_output or {})
-    # Check for any still-unprocessed records (e.g., if LLM failed to extract)
-    processed_ids = set(all_cleaned.keys())
-    remaining = [
-        batch
-        for batch in llm_batches
-        if list(batch.keys())[0] not in processed_ids
-    ]
-    if remaining and retry < max_retries:
-        # Recurse on remaining
+    remaining = llm_batches
+    current_retry = retry
+    current_batch_size = batch_size
+
+    while remaining:
         logger.info(
-            f"---Retry {retry + 1}/{max_retries} for {len(remaining)} remaining records---"
+            f"---Processing {len(remaining)} records with {model_id}---"
         )
-        retry += 1
-        return process_llm_batches(
-            llm_batches=remaining,
-            system_prompt=system_prompt,
-            model_id=model_id,
-            retry=retry,
-            max_retries=max_retries,
-            batch_size=max(1, int(batch_size / 2)),
-            all_cleaned=all_cleaned,
-        )
-    elif remaining and retry >= max_retries:
-        unprocessed_ids = [list(batch.keys())[0] for batch in remaining]
+        batches = [
+            remaining[i : i + current_batch_size]
+            for i in range(0, len(remaining), current_batch_size)
+        ]
+        with ThreadPoolExecutor(
+            max_workers=settings.DOCKET_NUMBER_CLEANING_MAX_WORKERS  # type: ignore
+        ) as executor:
+            future_to_batch = {
+                executor.submit(
+                    extract_with_llm, batch, system_prompt, model_id
+                ): batch
+                for batch in batches
+            }
+            for future in as_completed(future_to_batch):
+                parsed_output = future.result()
+                all_cleaned.update(parsed_output or {})
+
+        processed_ids = set(all_cleaned.keys())
+        remaining = [
+            batch
+            for batch in remaining
+            if next(iter(batch)) not in processed_ids
+        ]
+        if not remaining:
+            break
+
+        if current_retry >= max_retries:
+            unprocessed_ids = [next(iter(batch)) for batch in remaining]
+            logger.info(
+                f"---{max_retries} max retries reached. {len(remaining)} unprocessed records assigned raw values: {unprocessed_ids}.---"
+            )
+            for batch in remaining:
+                docket_id = next(iter(batch))
+                all_cleaned[docket_id] = batch.get(docket_id, "")
+            break
+
         logger.info(
-            f"---{max_retries} max retries reached. {len(remaining)} unprocessed records assigned raw values: {unprocessed_ids}.---"
+            f"---Retry {current_retry + 1}/{max_retries} for {len(remaining)} remaining records---"
         )
-        for batch in remaining:
-            docket_id = list(batch.keys())[0]
-            all_cleaned[docket_id] = batch.get(
-                docket_id, ""
-            )  # Assign raw if still unprocessed
+        current_retry += 1
+        current_batch_size = max(1, int(current_batch_size / 2))
+
     return all_cleaned
 
 
@@ -453,6 +454,11 @@ def call_models_and_compare_results(
 
     # Compare results and create batch for prediction with larger model
     next_model_batches = []
+    raw_docket_numbers = {
+        docket_id: docket_number_raw
+        for batch in court_batch
+        for docket_id, docket_number_raw in batch.items()
+    }
     for docket_id, docket_number_one in model_one_results.items():
         docket_number_two = model_two_results.get(docket_id, None)
         if docket_number_one == docket_number_two and docket_number_one != "":
@@ -460,15 +466,7 @@ def call_models_and_compare_results(
                 docket_id, docket_number_one, start_timestamp, r
             )
         else:
-            # Find the docket_number_raw from court_batch using docket_id
-            docket_number_raw = next(
-                (
-                    batch[docket_id]
-                    for batch in court_batch
-                    if docket_id in batch
-                ),
-                None,
-            )
+            docket_number_raw = raw_docket_numbers.get(docket_id)
             if docket_number_raw is not None:
                 next_model_batches.append({docket_id: docket_number_raw})
     return next_model_batches
