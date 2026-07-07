@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, ClassVar
 
@@ -33,6 +33,15 @@ def _docket_parties[PType: ScrapeParty[Any]](
     return docket.parties
 
 
+def PartyRelation(
+    *,
+    party: type[Merger[Any, Any, Any]] = PartyMerger,
+    party_type: type[Merger[Any, Any, Any]] = PartyTypeMerger,
+    transform: Callable[[Any, Any], Sequence[Any]] = _docket_parties,
+) -> list[Party]:
+    return ManyToManyRelation(party, party_type, transform=transform)
+
+
 class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     Merger[DType, ParamType, Docket]
 ):
@@ -65,8 +74,4 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     docket_number_raw: str = Attribute(
         lambda d, params: d.docket_number, strategy=overwrite
     )
-    parties: list[Party] = ManyToManyRelation(
-        PartyMerger,
-        through=PartyTypeMerger,
-        transform=_docket_parties,
-    )
+    parties: list[Party] = PartyRelation()

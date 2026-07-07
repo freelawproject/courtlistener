@@ -98,6 +98,7 @@ class FloridaCaseFactory(_PydanticConstructFactory):
     docket_number = Faker("federal_district_docket_number")
     case_name = Faker("case_name")
     case_name_full = Faker("case_name", full=True)
+    case_name_short = Faker("case_name")
     case_caption = Faker("text")
     closed_flag = Faker("pybool")
     class_group_type = Faker("pystr")

@@ -13,14 +13,12 @@ from juriscraper.state.florida.cases import FloridaCourtID
 
 from cl.corpus_importer.state.common.docket import (
     DocketMerger,
-    _docket_parties,
+    PartyRelation,
 )
 from cl.corpus_importer.state.common.party import (
-    AttorneyMerger,
+    AttorneyRelation,
     PartyMerger,
-    PartyTypeMerger,
     RoleMerger,
-    _party_representatives,
 )
 from cl.corpus_importer.state.florida.utils import (
     FL_APPELLATE_COURT_ID,
@@ -29,7 +27,6 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     Attribute,
-    ManyToManyRelation,
     Merger,
     OneToOneRelation,
     RelatedParams,
@@ -55,9 +52,7 @@ class FloridaRoleMerger(
 
 
 class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
-    attorneys: list[Attorney] = ManyToManyRelation(
-        AttorneyMerger, FloridaRoleMerger, _party_representatives
-    )
+    attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
 
 
 def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:
@@ -153,11 +148,7 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
         )
     )
 
-    parties: list[Party] = ManyToManyRelation(
-        FloridaPartyMerger,
-        through=PartyTypeMerger,
-        transform=_docket_parties,
-    )
+    parties: list[Party] = PartyRelation(party=FloridaPartyMerger)
 
     @override
     def query(self) -> QuerySet[Docket]:

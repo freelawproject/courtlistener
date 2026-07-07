@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any, ClassVar, cast
 
 from django.db.models import Model, QuerySet
@@ -62,14 +63,21 @@ def _party_name(party: ScrapeParty[ScrapeRepresentative], params: Any) -> str:
     return party.name
 
 
+def AttorneyRelation(
+    *,
+    attorney: type[Merger[Any, Any, Any]] = AttorneyMerger,
+    role: type[Merger[Any, Any, Any]] = RoleMerger,
+    transform: Callable[[Any, Any], list[Any]] = _party_representatives,
+) -> list[Attorney]:
+    return ManyToManyRelation(attorney, role, transform)
+
+
 class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
     Merger[PType, RelatedParams[ParamType], Party]
 ):
     model: ClassVar[type[Model]] = Party
 
-    attorneys: list[Attorney] = ManyToManyRelation(
-        AttorneyMerger, RoleMerger, _party_representatives
-    )
+    attorneys: list[Attorney] = AttorneyRelation()
     name: str = Attribute(_party_name)
 
     def query(self) -> QuerySet[Party]:
