@@ -60,14 +60,6 @@ class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
     )
 
 
-def add_scraper_source(scrape: int | None, db: int | None) -> int:
-    if not db:
-        db = 0
-    if db in Docket.NON_SCRAPER_SOURCES():
-        return db + Docket.SCRAPER
-    return db
-
-
 def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:
     filing_dates = sorted(
         e.date_filed for e in docket_data.entries if e.date_filed

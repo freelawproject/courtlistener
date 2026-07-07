@@ -56,7 +56,7 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
         strategy=overwrite,
     )
     case_name_short: str = Attribute(
-        lambda d, params: d.case_name, strategy=overwrite
+        lambda d, params: d.case_name_short, strategy=overwrite
     )
     docket_number: str = Attribute(
         lambda d, params: d.docket_number,
