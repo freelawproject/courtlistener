@@ -6,12 +6,14 @@ from dataclasses import dataclass, field
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
+from typing import ClassVar
+from uuid import UUID
 
 import botocore.exceptions
 from asgiref.sync import async_to_sync
 from django.core.management import CommandParser
 from httpx import Response
-from juriscraper.state.florida import FloridaScraper
+from juriscraper.state.florida import FloridaCase, FloridaScraper
 from juriscraper.state.florida.courts import FloridaCourtID
 from juriscraper.state.RequestManager import (
     ExponentialBackoff,
@@ -157,6 +159,60 @@ _COURT_ID_MAP: dict[str, FloridaCourtID] = {
 }
 
 
+async def _get_full_case(
+    court_id: str, case_uuid: str, scraper: FloridaScraper
+) -> FloridaCase | None:
+    """Attempt to fetch the full case data for a given case, returning `None` if any error occurred."""
+    match await scraper.fetch_case_data(case_uuid, court_id):
+        case Exception() as e:
+            logger.error(
+                "Failed to fetch full case data for %s: %s",
+                case_uuid,
+                e,
+            )
+            return None
+        case (_, errors) if errors:
+            logger.error(
+                "Failed to fetch full case data for %s: %r",
+                case_uuid,
+                errors,
+            )
+            return None
+        case (full_case, _):
+            return full_case
+
+
+async def _backfill_targeted(
+    cases: list[tuple[FloridaCourtID, UUID]],
+    throttle: CeleryThrottle,
+    queue_name: str,
+    scraper: FloridaScraper,
+):
+    logger.info("Starting targeted backfill of %d cases...", len(cases))
+    for i, (court_id, case_uuid) in enumerate(cases):
+        logger.info("Fetching case %s for %s", case_uuid, court_id)
+        case = await _get_full_case(court_id.value, str(case_uuid), scraper)
+        if case is None:
+            continue
+
+        content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
+
+        key = f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(case.docket_number)}.json"
+
+        throttle.maybe_wait()
+        save_response_to_s3.si(key, content).set(
+            queue=queue_name
+        ).apply_async()
+
+        if i % 100 == 0:
+            logger.info(
+                "Completed scrape of %d/%d cases (%d.2%%)",
+                i + 1,
+                len(cases),
+                (i + 1) / len(cases) * 100,
+            )
+
+
 async def _backfill(
     date_ranges: dict[FloridaCourtID, tuple[date, date]],
     full_scrape: bool,
@@ -164,9 +220,11 @@ async def _backfill(
     scraper: FloridaScraper,
     throttle: CeleryThrottle,
     queue_name: str,
+    storage: S3GlacierInstantRetrievalStorage,
+    skip_parsed: bool,
 ):
     logger.info("Starting Florida backfill...")
-    loop = asyncio.get_running_loop()
+    full_scrape_loop = full_scrape and not skip_parsed
     try:
         for court_id, (start_date, end_date) in date_ranges.items():
             i = 0
@@ -174,9 +232,19 @@ async def _backfill(
                 start_date,
                 end_date,
                 court_ids=[court_id],
-                full_scrape=full_scrape,
+                full_scrape=full_scrape_loop,
             ):
                 key = f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(case.docket_number)}.json"
+                if skip_parsed and storage.exists(key):
+                    continue
+                if full_scrape and skip_parsed:
+                    full_case = await _get_full_case(
+                        court_id.value, str(case.case_uuid), scraper
+                    )
+                    if not full_case:
+                        continue
+                    case = full_case
+
                 content = case.model_dump_json(ensure_ascii=True).encode(
                     "utf-8"
                 )
@@ -212,6 +280,7 @@ class Command(StateBackScrapeCommand):
         FloridaCourtID.FIFTH_COA: ScraperCheckpointTracker("acisfl5ac"),
         FloridaCourtID.SIXTH_COA: ScraperCheckpointTracker("acisfl6ac"),
     }
+    date_range_required: ClassVar[bool] = False
 
     def add_arguments(self, parser: CommandParser):
         super().add_arguments(parser)
@@ -273,6 +342,19 @@ class Command(StateBackScrapeCommand):
             help="CeleryThrottle min queue depth; the throttle keeps the "
             "queue between this and 2x this value.",
         )
+        parser.add_argument(
+            "--skip-parsed",
+            dest="skip_parsed",
+            action="store_true",
+            help="Whether to skip items which already have parsed files saved in S3.",
+        )
+        parser.add_argument(
+            "--scrape-uuids",
+            dest="scrape_uuids",
+            type=str,
+            default="",
+            help="Path to a CSV of Florida court IDs and case UUIDs for targeted rescraping. Overrides the --backscrape-start, --backscrape-end, --courts, and --use-cache options.",
+        )
 
     def handle(
         self,
@@ -287,24 +369,18 @@ class Command(StateBackScrapeCommand):
         archive_responses: bool,
         queue: str,
         throttle_min_items: int,
-        backscrape_start: str,
-        backscrape_end: str,
+        backscrape_start: str = "",
+        backscrape_end: str = "",
         courts: str,
+        skip_parsed: bool,
+        scrape_uuids: str,
         **options,
     ):
-        logger.info("Setting up Florida back-scrape...")
-        start = _parse_date(backscrape_start)
-        end = _parse_date(backscrape_end)
-        court_ids = [
-            _COURT_ID_MAP[c.strip()] for c in courts.split(",") if c.strip()
-        ]
-        if not court_ids:
-            logger.warning("No courts specified. Defaulting to all courts.")
-            court_ids = list(_COURT_ID_MAP.values())
-
         throttle = CeleryThrottle(
             queue_name=queue, min_items=throttle_min_items
         )
+
+        storage = S3GlacierInstantRetrievalStorage()
 
         scraper = FloridaScraper(
             rps=rps,
@@ -320,9 +396,43 @@ class Command(StateBackScrapeCommand):
                     load=use_cache,
                     throttle=throttle,
                     queue_name=queue,
+                    storage=storage,
                 )
             ],
         )
+
+        logger.info("Setting up Florida back-scrape...")
+        if scrape_uuids:
+            p = Path(scrape_uuids)
+            with p.open() as f:
+                cases = [
+                    (
+                        _COURT_ID_MAP[c.strip()],
+                        UUID(case_uuid.strip()),
+                    )
+                    for c, case_uuid in (line.split(",") for line in f)
+                ]
+            async_to_sync(_backfill_targeted)(
+                cases=cases,
+                throttle=throttle,
+                queue_name=queue,
+                scraper=scraper,
+            )
+            return
+
+        if not backscrape_start or not backscrape_end:
+            logger.error(
+                "Both --backscrape-start and --backscrape-end are required."
+            )
+            return
+        start = _parse_date(backscrape_start)
+        end = _parse_date(backscrape_end)
+        court_ids = [
+            _COURT_ID_MAP[c.strip()] for c in courts.split(",") if c.strip()
+        ]
+        if not court_ids:
+            logger.warning("No courts specified. Defaulting to all courts.")
+            court_ids = list(_COURT_ID_MAP.values())
 
         if auto_resume:
             logger.info("Auto resume enabled. Getting checkpoints...")
@@ -353,4 +463,6 @@ class Command(StateBackScrapeCommand):
             scraper=scraper,
             throttle=throttle,
             queue_name=queue,
+            storage=storage,
+            skip_parsed=skip_parsed,
         )
