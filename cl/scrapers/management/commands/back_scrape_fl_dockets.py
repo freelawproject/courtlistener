@@ -159,7 +159,7 @@ _COURT_ID_MAP: dict[str, FloridaCourtID] = {
 }
 
 
-async def _get_full_case(
+async def _get_full_case(  # type: ignore[return]
     court_id: str, case_uuid: str, scraper: FloridaScraper
 ) -> FloridaCase | None:
     """Attempt to fetch the full case data for a given case, returning `None` if any error occurred."""
@@ -206,7 +206,7 @@ async def _backfill_targeted(
 
         if i % 100 == 0:
             logger.info(
-                "Completed scrape of %d/%d cases (%d.2%%)",
+                "Completed scrape of %d/%d cases (%.2f%%)",
                 i + 1,
                 len(cases),
                 (i + 1) / len(cases) * 100,
@@ -220,8 +220,8 @@ async def _backfill(
     scraper: FloridaScraper,
     throttle: CeleryThrottle,
     queue_name: str,
-    storage: S3GlacierInstantRetrievalStorage,
     skip_parsed: bool,
+    cache: S3Cache,
 ):
     logger.info("Starting Florida backfill...")
     full_scrape_loop = full_scrape and not skip_parsed
@@ -235,7 +235,7 @@ async def _backfill(
                 full_scrape=full_scrape_loop,
             ):
                 key = f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(case.docket_number)}.json"
-                if skip_parsed and storage.exists(key):
+                if skip_parsed and cache.s3_key_exists(key):
                     continue
                 if full_scrape and skip_parsed:
                     full_case = await _get_full_case(
@@ -353,7 +353,7 @@ class Command(StateBackScrapeCommand):
             dest="scrape_uuids",
             type=str,
             default="",
-            help="Path to a CSV of Florida court IDs and case UUIDs for targeted rescraping. Overrides the --backscrape-start, --backscrape-end, --courts, and --use-cache options.",
+            help="Path to a CSV of Florida court IDs and case UUIDs for targeted rescraping. Overrides the --backscrape-start, --backscrape-end, and --courts options.",
         )
 
     def handle(
@@ -382,6 +382,15 @@ class Command(StateBackScrapeCommand):
 
         storage = S3GlacierInstantRetrievalStorage()
 
+        cache = S3Cache(
+            base=S3_BASE,
+            save=archive_responses,
+            load=use_cache,
+            throttle=throttle,
+            queue_name=queue,
+            storage=storage,
+        )
+
         scraper = FloridaScraper(
             rps=rps,
             retry=ExponentialBackoff(
@@ -389,16 +398,7 @@ class Command(StateBackScrapeCommand):
                 backoff=backoff,
                 backoff_growth=backoff_growth,
             ),
-            handlers=[
-                S3Cache(
-                    base=S3_BASE,
-                    save=archive_responses,
-                    load=use_cache,
-                    throttle=throttle,
-                    queue_name=queue,
-                    storage=storage,
-                )
-            ],
+            handlers=[cache],
         )
 
         logger.info("Setting up Florida back-scrape...")
@@ -463,6 +463,6 @@ class Command(StateBackScrapeCommand):
             scraper=scraper,
             throttle=throttle,
             queue_name=queue,
-            storage=storage,
             skip_parsed=skip_parsed,
+            cache=cache,
         )
