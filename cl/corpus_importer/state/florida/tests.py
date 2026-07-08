@@ -217,7 +217,7 @@ class FloridaMergerTest(TestCase):
         assert new_docket.docket_number_raw == "SC2025-9999"
         assert new_docket.case_name == docket_data.case_name
         assert new_docket.case_name_full == docket_data.case_name_full
-        assert new_docket.case_name_short == docket_data.case_name
+        assert new_docket.case_name_short == docket_data.case_name_short
         assert new_docket.date_filed == docket_data.date_filed
 
     def test_merge_docket_existing_supreme_court_is_update(self):

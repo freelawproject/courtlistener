@@ -464,11 +464,15 @@ class ManyToManyMerger[
 
         related_params = RelatedParams(params, parent=parent)
 
+        child_mergers: list[
+            Merger[TransformType, RelatedParams[ParamType], RM]
+        ] = []
         related_objects: list[tuple[TransformType, RM]] = []
         for child in transformed:
             # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
             # this case
             child_merger = self.merger(child, params=related_params)
+            child_mergers.append(child_merger)
             result |= child_merger.merge()
             if child_merger.out is None:
                 continue
@@ -476,10 +480,14 @@ class ManyToManyMerger[
 
         if self.strategy is ManyStrategy.REPLACE:
             # Delete everything we didn't update or create along with associated objects
-            _ = related_manager.exclude(
-                pk__in=[r.pk for _, r in related_objects]
-            ).delete()
+            to_keep = {r.pk for _, r in related_objects} | {
+                m.existing.pk for m in child_mergers if m.existing
+            }
+            _ = related_manager.exclude(pk__in=to_keep).delete()
 
+        through_mergers: list[
+            Merger[TransformType, ThroughParameters[ParamType], ThruM]
+        ] = []
         through_objects: list[ThruM] = []
         for related_transform, related_object in related_objects:
             through_merger = self.through(
@@ -494,19 +502,23 @@ class ManyToManyMerger[
                 ),
                 existing=None,
             )
+            through_mergers.append(through_merger)
             result |= through_merger.merge()
             if through_merger.out is None:
                 continue
             through_objects.append(through_merger.out)
 
-        if self.strategy is ManyStrategy.REPLACE:
+        if self.through_strategy is ManyStrategy.REPLACE:
+            to_keep = {t.pk for t in through_objects} | {
+                m.existing.pk for m in through_mergers if m.existing
+            }
             # Only prune through objects belonging to this parent; other
             # parents' relationships are out of scope for this merge.
             _ = (
                 self.through.model._default_manager.filter(
                     **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
                 )
-                .exclude(pk__in=[t.pk for t in through_objects])
+                .exclude(pk__in=to_keep)
                 .delete()
             )
 
@@ -538,7 +550,7 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
             str, RelatedMerger[ScrapeType, ParamType, Any, Any, Model]
         ]
         | None = None,
-        attr: dict[str, AttributeMerger[ScrapeType, Any, ParamType]]
+        attr: dict[str, AttributeMerger[ScrapeType, ParamType, Any]]
         | None = None,
     ):
         self.related: dict[

@@ -21,8 +21,8 @@ from juriscraper.state.florida.cases import FloridaCourtID
 
 from cl.corpus_importer.state.common.docket import (
     DocketMerger,
+    PartyRelation,
     _docket_entries,
-    _docket_parties,
 )
 from cl.corpus_importer.state.common.docket_entry import (
     DocketEntryMerger,
@@ -30,11 +30,9 @@ from cl.corpus_importer.state.common.docket_entry import (
     _entry_attachments,
 )
 from cl.corpus_importer.state.common.party import (
-    AttorneyMerger,
+    AttorneyRelation,
     PartyMerger,
-    PartyTypeMerger,
     RoleMerger,
-    _party_representatives,
 )
 from cl.corpus_importer.state.florida.utils import (
     FL_APPELLATE_COURT_ID,
@@ -43,8 +41,6 @@ from cl.corpus_importer.state.florida.utils import (
 )
 from cl.corpus_importer.state.merger import (
     Attribute,
-    ManyStrategy,
-    ManyToManyRelation,
     Merger,
     OneToManyRelation,
     OneToOneRelation,
@@ -75,9 +71,7 @@ class FloridaRoleMerger(
 
 
 class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
-    attorneys: list[Attorney] = ManyToManyRelation(
-        AttorneyMerger, FloridaRoleMerger, _party_representatives
-    )
+    attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
 
 
 def _document_type(document: ScrapeFloridaDocument, params: Any) -> str:
@@ -245,11 +239,7 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
         )
     )
 
-    parties: list[Party] = ManyToManyRelation(
-        FloridaPartyMerger,
-        through=PartyTypeMerger,
-        transform=_docket_parties,
-    )
+    parties: list[Party] = PartyRelation(party=FloridaPartyMerger)
 
     # APPEND so entries already in the DB but missing from this scrape are
     # kept (see FloridaDocketEntryMerger.documents).
