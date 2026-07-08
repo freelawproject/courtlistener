@@ -9,11 +9,14 @@ from juriscraper.state.docket import (
 from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
 from juriscraper.state.docket import Party as ScrapeParty
 
+from cl.corpus_importer.state.common.docket_entry import DocketEntryMerger
 from cl.corpus_importer.state.common.party import PartyMerger, PartyTypeMerger
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     ManyToManyRelation,
     Merger,
+    OneToManyRelation,
     overwrite,
 )
 from cl.people_db.models import Party
@@ -41,12 +44,25 @@ def _docket_entries[EType: ScrapeDocketEntry[Any]](
 
 
 def PartyRelation(
+    merger: type[Merger[Any, Any, Any]] = PartyMerger,
     *,
-    party: type[Merger[Any, Any, Any]] = PartyMerger,
     party_type: type[Merger[Any, Any, Any]] = PartyTypeMerger,
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_parties,
 ) -> list[Party]:
-    return ManyToManyRelation(party, party_type, transform=transform)
+    return ManyToManyRelation(merger, party_type, transform=transform)
+
+
+def DocketEntryRelation(
+    merger: type[Merger[Any, Any, Any]] = DocketEntryMerger,
+    *,
+    transform: Callable[[Any, Any], Sequence[Any]] = _docket_entries,
+    strategy: ManyStrategy = ManyStrategy.APPEND,
+) -> list[Any]:
+    return OneToManyRelation(
+        merger,
+        transform,
+        strategy=strategy,
+    )
 
 
 class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
@@ -81,4 +97,5 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     docket_number_raw: str = Attribute(
         lambda d, params: d.docket_number, strategy=overwrite
     )
+    docket_entries: list[Any] = DocketEntryRelation()
     parties: list[Party] = PartyRelation()

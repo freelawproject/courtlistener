@@ -6,7 +6,7 @@ declare any state-specific fields and the attachment relation (its name and
 target model are per-state).
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, cast
 
@@ -16,7 +16,9 @@ from juriscraper.state.docket import Document as ScrapeDocument
 
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     Merger,
+    OneToManyRelation,
     RelatedParams,
     overwrite,
 )
@@ -48,6 +50,19 @@ class DocumentMerger[DocType: ScrapeDocument, ParamType, M: Model](
     url: str = Attribute(_document_url, strategy=overwrite)
 
 
+def AttachmentRelation(
+    merger: type[Merger[Any, Any, Any]] = DocumentMerger,
+    *,
+    transform: Callable[[Any, Any], Any] = _entry_attachments,
+    strategy: ManyStrategy = ManyStrategy.APPEND,
+) -> list[Any]:
+    return OneToManyRelation(
+        merger,
+        transform,
+        strategy=strategy,
+    )
+
+
 class DocketEntryMerger[
     EntryType: ScrapeDocketEntry[Any],
     ParamType,
@@ -55,3 +70,4 @@ class DocketEntryMerger[
 ](Merger[EntryType, RelatedParams[ParamType], M], abstract=True):
     date_filed: date = Attribute(_entry_date_filed, strategy=overwrite)
     entry_type: int = Attribute(_entry_type, strategy=overwrite)
+    documents: list[Any] = AttachmentRelation()

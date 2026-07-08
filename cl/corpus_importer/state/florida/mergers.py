@@ -20,14 +20,14 @@ from juriscraper.state.florida import (
 from juriscraper.state.florida.cases import FloridaCourtID
 
 from cl.corpus_importer.state.common.docket import (
+    DocketEntryRelation,
     DocketMerger,
     PartyRelation,
-    _docket_entries,
 )
 from cl.corpus_importer.state.common.docket_entry import (
+    AttachmentRelation,
     DocketEntryMerger,
     DocumentMerger,
-    _entry_attachments,
 )
 from cl.corpus_importer.state.common.party import (
     AttorneyRelation,
@@ -42,7 +42,6 @@ from cl.corpus_importer.state.florida.utils import (
 from cl.corpus_importer.state.merger import (
     Attribute,
     Merger,
-    OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
     ThroughParameters,
@@ -129,12 +128,8 @@ class FloridaDocketEntryMerger[ParamType](
     docket_entry_uuid: UUID = Attribute(
         lambda e, params: e.docket_entry_uuid, strategy=overwrite
     )
-    # APPEND so documents already in the DB but missing from this scrape are
-    # kept.
-    documents: list[FloridaDocument] = OneToManyRelation(
-        FloridaDocumentMerger,
-        _entry_attachments,
-        strategy=ManyStrategy.APPEND,
+    documents: list[FloridaDocument] = AttachmentRelation(
+        FloridaDocumentMerger
     )
 
 
@@ -239,14 +234,12 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
         )
     )
 
-    parties: list[Party] = PartyRelation(party=FloridaPartyMerger)
+    parties: list[Party] = PartyRelation(FloridaPartyMerger)
 
     # APPEND so entries already in the DB but missing from this scrape are
     # kept (see FloridaDocketEntryMerger.documents).
-    florida_docket_entries: list[FloridaDocketEntry] = OneToManyRelation(
-        FloridaDocketEntryMerger,
-        _docket_entries,
-        strategy=ManyStrategy.APPEND,
+    florida_docket_entries: list[FloridaDocketEntry] = DocketEntryRelation(
+        FloridaDocketEntryMerger
     )
 
     @override
