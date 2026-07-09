@@ -2,6 +2,7 @@ import logging
 from datetime import date
 from typing import ClassVar, override
 
+from asgiref.sync import async_to_sync
 from django.db.models import Model, QuerySet
 from juriscraper.state.florida import FloridaCase, FloridaOriginatingCase
 from juriscraper.state.florida.cases import FloridaCourtID
@@ -17,6 +18,7 @@ from cl.corpus_importer.state.merger import (
     OneToOneRelation,
     overwrite,
 )
+from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket, OriginatingCourtInformation
 
 logger = logging.getLogger(__name__)
@@ -150,30 +152,37 @@ class FloridaDocketMerger(Merger[FloridaCase, None, Docket]):
             FloridaCourtID.SUPREME_COURT.value
         ]
         court_id = FLORIDA_COURT_ID_MAP[self.scrape.court_id]
-        query = Docket.objects.filter(
-            docket_number_core=make_docket_number_core(
-                self.scrape.docket_number
-            )
-        )
-        query_narrow = query.filter(court_id=court_id)
-        query_narrow_with_uuid = query_narrow.filter(
-            pacer_case_id=str(self.scrape.case_uuid)
+        dn_core = make_docket_number_core(
+            self.scrape.docket_number, court_id=court_id
         )
 
-        if query_narrow_with_uuid.exists():
-            return query_narrow_with_uuid
+        query_narrow = async_to_sync(find_docket_object_query)(
+            court_id=court_id,
+            pacer_case_id=str(self.scrape.case_uuid),
+            docket_number=self.scrape.docket_number,
+            docket_number_core=dn_core,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned=None,
+            federal_dn_judge_initials_referred=None,
+            skip_dn_core_confirmation=True,
+        )
 
         if court_id == supreme_court_id:
             return query_narrow
 
-        query_broad = query.filter(court_id=FL_APPELLATE_COURT_ID)
-        query_broad_with_uuid = query_broad.filter(
-            pacer_case_id=str(self.scrape.case_uuid)
-        )
-        if query_broad_with_uuid.exists():
-            return query_broad_with_uuid
+        if query_narrow.count() == 0:
+            return async_to_sync(find_docket_object_query)(
+                court_id=FL_APPELLATE_COURT_ID,
+                pacer_case_id=str(self.scrape.case_uuid),
+                docket_number=self.scrape.docket_number,
+                docket_number_core=dn_core,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                skip_dn_core_confirmation=True,
+            )
 
-        return query_broad
+        return query_narrow
 
     @staticmethod
     def validate(scrape: FloridaCase) -> bool:
