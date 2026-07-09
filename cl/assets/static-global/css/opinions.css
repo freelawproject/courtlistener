@@ -686,6 +686,16 @@ div.footnote:first-of-type {
     display: block;
     text-indent: 1em;
   }
+
+  #pdf-accordion .panel-title a::after {
+    font-family: "FontAwesome";
+    content: "\f0d8";  /* fa-caret-up (panel is open) */
+    float: right;
+  }
+
+  #pdf-accordion .panel-title a.collapsed::after {
+    content: "\f0d7";  /* fa-caret-down (panel is closed) */
+  }
 }
 
 html {

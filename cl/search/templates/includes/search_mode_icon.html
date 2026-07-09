@@ -15,7 +15,7 @@
     - search_form  (required): the SearchForm instance.
     - id_suffix    (optional): suffix for element IDs to avoid dupes.
 {% endcomment %}
-{% load static waffle_tags %}
+{% load waffle_tags %}
 {% flag "semantic_search_frontend" %}
 {% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}
   {% with is_semantic=search_form.semantic.value %}
@@ -27,19 +27,6 @@
         title="{% if is_semantic %}Switch to keyword search{% else %}Switch to semantic search{% endif %}">
     <span class="search-mode-icon">{% if is_semantic %}?{% else %}&amp;{% endif %}</span>
   </span>
-  {% flag "semantic_search_tooltip" %}
-  <div id="semantic-tooltip" class="semantic-tooltip">
-    <div class="semantic-tooltip-arrow"></div>
-    <div class="semantic-tooltip-body">
-      <div class="semantic-tooltip-header">
-        <strong>Try Semantic Search</strong>
-        <button type="button" id="semantic-tooltip-close" class="semantic-tooltip-close">&times;</button>
-      </div>
-      <p>Click to toggle between <strong>&amp;</strong> keyword search and <strong>?</strong> semantic search.</p>
-      <a href="https://free.law/2026/05/04/semantic-search-on-courtlistener">Learn More</a>
-    </div>
-  </div>
-  {% endflag %}
   <input type="hidden"
          name="semantic"
          class="search-mode-value"
@@ -70,9 +57,6 @@
     } catch(e) {}
   })();
   </script>
-  {% flag "semantic_search_tooltip" %}
-  <script type="text/javascript" src="{% static "js/semantic_tooltip.js" %}"></script>
-  {% endflag %}
   {% endwith %}
 {% endif %}
 {% endflag %}
