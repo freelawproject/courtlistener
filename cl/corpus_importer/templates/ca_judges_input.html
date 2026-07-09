@@ -31,11 +31,11 @@
       <div class="text-center">
         <h1 class="v-offset-below-1 v-offset-above-3">{{ title }}</h1>
         <p class="h4">
-          <span class="meta-data-value"><a href="https://en.wikipedia.org/w/index.php?search={{ judge.name_first }}+{{ judge.name_last }}&title=Special:Search&profile=advanced&fulltext=1&ns0=1" target="_blank">Wikipedia</a></span>
-          <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}" target="_blank">Google</a></span>
-          <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}+site%3Aballotpedia.org" target="_blank">Ballotpedia</a></span>
-          <span class="meta-data-value"><a href="https://www.martindale.com/search/attorneys/?term={{ judge.name_first }}%20{{ judge.name_last }}" target="_blank">Martindale</a></span>
-          <span class="meta-data-value"><a href="https://trellis.law/judges/ca/?s={{ judge.name_last }}" target="_blank">Trellis</a></span>
+          <span class="meta-data-value"><a href="https://en.wikipedia.org/w/index.php?search={{ judge.name_first }}+{{ judge.name_last }}&title=Special:Search&profile=advanced&fulltext=1&ns0=1" target="_blank" rel="noopener noreferrer">Wikipedia</a></span>
+          <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}" target="_blank" rel="noopener noreferrer">Google</a></span>
+          <span class="meta-data-value"><a href="https://www.google.com/search?q=judge+{{ judge.name_first }}+{{ judge.name_last }}+site%3Aballotpedia.org" target="_blank" rel="noopener noreferrer">Ballotpedia</a></span>
+          <span class="meta-data-value"><a href="https://www.martindale.com/search/attorneys/?term={{ judge.name_first }}%20{{ judge.name_last }}" target="_blank" rel="noopener noreferrer">Martindale</a></span>
+          <span class="meta-data-value"><a href="https://trellis.law/judges/ca/?s={{ judge.name_last }}" target="_blank" rel="noopener noreferrer">Trellis</a></span>
           {% if perms.people_db.change_person %}
             <span class="meta-data-value"><a href="{% url 'admin:people_db_person_change' judge.id %}" target="_blank" class="btn btn-primary">Admin</a></span>
           {% endif %}

@@ -5,50 +5,28 @@ multiple courts within a state, with rate limiting and retry support.
 """
 
 import json
-import re
 import time
-from collections.abc import Mapping
 from datetime import date, datetime
 
 import requests
 from django.core.files.base import ContentFile
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from juriscraper.lib.importer import build_module_list
 from juriscraper.state.BaseStateScraper import BaseStateScraper
 
 from cl.lib.command_utils import logger
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import (
     S3GlacierInstantRetrievalStorage,
     clobbering_get_name,
 )
+from cl.scrapers.management.utils import (
+    ScraperCheckpointTracker,
+    StateBackScrapeCommand,
+    _make_case_number_key,
+    _parse_date,
+)
 
-REDIS_AUTORESUME_KEY = "scraper:TAMES:end-date"
-
-REDIS = get_redis_interface("CACHE")
-
-
-def get_last_checkpoint() -> date | None:
-    stored_values = REDIS.hgetall(REDIS_AUTORESUME_KEY)
-    if not (stored_values and stored_values.get("checkpoint")):
-        return None
-    latest_checkpoint = datetime.strptime(
-        stored_values.get("checkpoint"),  # type: ignore [arg-type]
-        "%Y-%m-%d",
-    ).date()
-    return latest_checkpoint
-
-
-def set_last_checkpoint(checkpoint: date) -> None:
-    pipe = REDIS.pipeline()
-    pipe.hgetall(REDIS_AUTORESUME_KEY)
-    log_info: Mapping[str | bytes, int | str] = {
-        "checkpoint": checkpoint.isoformat(),
-        "checkpoint_time": datetime.now().isoformat(),
-    }
-    pipe.hset(REDIS_AUTORESUME_KEY, mapping=log_info)
-    pipe.expire(REDIS_AUTORESUME_KEY, 60 * 60 * 24 * 28)  # 4 weeks
-    pipe.execute()
+CHECKPOINT_TRACKER = ScraperCheckpointTracker("TAMES")
 
 
 class RateLimitedRequestManager:
@@ -289,10 +267,8 @@ def save_docket_response(
     )
 
     # Docket number with non-s3-safe characters replaced with a _
-    case_number = re.sub(
-        r"[^0-9a-zA-Z!_.*'()-]",
-        "_",
-        (case_meta.get("case_number")),  # type: ignore [arg-type]
+    case_number = _make_case_number_key(
+        case_meta.get("case_number")  # type: ignore [arg-type]
     )
     base_name = (
         f"responses/dockets/{scraper_class_name}/{court_id}/{case_number}"
@@ -422,7 +398,7 @@ def _checkpoint_and_sleep(
 
     if auto_resume:
         if parsed := parse_date_filed(case.get("date_filed")):
-            set_last_checkpoint(parsed)
+            CHECKPOINT_TRACKER.set(parsed)
             logger.info("Checkpointed at %s", parsed)
         else:
             logger.warning("No parseable date_filed, no checkpoint: %s", case)
@@ -432,57 +408,15 @@ def _checkpoint_and_sleep(
         time.sleep(sleep_minutes * 60)
 
 
-def _parse_date(date_str: str) -> date:
-    """Parse a date string in various formats.
-
-    Args:
-        date_str: Date string (supports YYYY-MM-DD, MM/DD/YYYY, etc.)
-
-    Returns:
-        Parsed date object
-
-    Raises:
-        CommandError: If date cannot be parsed
-    """
-    formats = ["%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"]
-    for fmt in formats:
-        try:
-            return datetime.strptime(date_str, fmt).date()
-        except ValueError:
-            continue
-
-    raise CommandError(
-        f"Unable to parse date: {date_str}. "
-        "Use format YYYY-MM-DD or MM/DD/YYYY"
-    )
-
-
-class Command(BaseCommand):
+class Command(StateBackScrapeCommand):
     help = "Runs BaseStateScraper backfill operations for docket enumeration."
 
     def add_arguments(self, parser):
+        super().add_arguments(parser)
         parser.add_argument(
             "--scraper",
             help="The module path of the scraper to run (e.g., juriscraper.state.texas.tames)",
             required=True,
-        )
-        parser.add_argument(
-            "--backscrape-start",
-            dest="backscrape_start",
-            help="Starting value for backscraper iterable creation. "
-            "Each scraper handles the parsing of the argument,"
-            "since the value may represent a year, a string, a date, etc.",
-        )
-        parser.add_argument(
-            "--backscrape-end",
-            dest="backscrape_end",
-            help="End value for backscraper iterable creation.",
-        )
-        parser.add_argument(
-            "--courts",
-            dest="courts",
-            help="Comma-separated list of court IDs to scrape (e.g., texas_cossup,texas_coa01). "
-            "If not provided, all courts defined by the scraper will be used.",
         )
         parser.add_argument(
             "--search-rate",
@@ -521,7 +455,11 @@ class Command(BaseCommand):
             help="Number of cases to collect before writing a batch meta JSONL file and fetching case pages (default: 100)",
         )
 
-    def handle(self, *args, **options):
+    def handle(
+        self,
+        *args,
+        **options,
+    ):
         scraper_module_path = options["scraper"]
 
         # Validate date range is provided
@@ -572,7 +510,7 @@ class Command(BaseCommand):
 
         if options.get("auto_resume"):
             auto_resume = True
-            saved_checkpoint = get_last_checkpoint()
+            saved_checkpoint = CHECKPOINT_TRACKER.get()
             if saved_checkpoint:
                 end_date = saved_checkpoint
                 logger.info("Autoresuming with an end date of %s", end_date)

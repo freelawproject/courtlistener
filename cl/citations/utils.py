@@ -279,7 +279,7 @@ def get_cited_clusters_ids_to_update(
     ).values_list("cited_opinion_id", flat=True)
 
     cluster_ids_to_update = {
-        o.cluster.pk
+        o.cluster_id
         for o in resolutions
         if o.pk not in currently_cited_opinions
     }
