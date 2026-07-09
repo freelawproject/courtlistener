@@ -19,6 +19,52 @@ from cl.search.models import Docket, OriginatingCourtInformation
 from cl.tests.cases import TestCase
 
 
+class FloridaUtilsTest(TestCase):
+    def test_docket_number_core(self) -> None:
+        """Can we correctly normalize Texas docket numbers?"""
+        self.assertEqual(make_docket_number_core("SC1983-2014"), "sc19832014")
+        self.assertEqual(
+            make_docket_number_core("SC1983-2014", court_id="fla"),
+            "sc19832014",
+        )
+        self.assertEqual(
+            make_docket_number_core("3D2001-20145", court_id="fla"),
+            "3D2001-20145",
+        )
+        self.assertEqual(
+            make_docket_number_core("Meowdy, partner", court_id="tx"),
+            "Meowdy, partner",
+        )
+        self.assertEqual(
+            make_docket_number_core("3D2001-20145", court_id="fladistctapp2"),
+            "3d200120145",
+        )
+        self.assertEqual(
+            make_docket_number_core("SC1983-2014", court_id="fladistctapp2"),
+            "SC1983-2014",
+        )
+        self.assertEqual(
+            make_docket_number_core("WR-70,849-04"), "WR-70,849-04"
+        )
+
+        self.assertEqual(
+            make_docket_number_core("Case Number: SC1983-2014"),
+            "sc19832014",
+        )
+
+        self.assertEqual(
+            make_docket_number_core(
+                "Case Number: 6D2011-1337; 3D2001-20145",
+                court_id="fladistctapp5",
+            ),
+            "3d200120145",
+        )
+
+        self.assertEqual(
+            make_docket_number_core("garbage text"), "garbage text"
+        )
+
+
 class FloridaMergerTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -159,8 +205,11 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
-        with self.assertRaises(RuntimeError):
-            FloridaDocketMerger(docket_data, params=None).merge()
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertEqual(result.success, False)
+        self.assertIn("Docket", result.failures)
+        self.assertEqual(result.failures["Docket"], [None])
 
     def test_merge_docket_supreme_court_creates_new(self):
         """Does merge_docket create a new supreme-court docket?"""
