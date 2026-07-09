@@ -4536,7 +4536,7 @@ class OpinionsCitedByRECAPDocumentAPITests(TestCase):
 
     async def test_filter_by_citing_document(self) -> None:
         """List the opinions cited by a given RECAP document, including
-        citation depth and the cited opinion's case name."""
+        citation depth."""
         response = await self._api_v4_request(
             "opinionscitedbyrecapdocument-list",
             {"citing_document": self.citing_document.pk},
@@ -4548,13 +4548,6 @@ class OpinionsCitedByRECAPDocumentAPITests(TestCase):
 
         result = results[0]
         self.assertEqual(result["depth"], 3)
-        self.assertEqual(
-            result["cited_opinion_case_name"], "Obergefell v. Hodges"
-        )
-        self.assertEqual(
-            result["citing_document_description"],
-            "Motion for Summary Judgment",
-        )
         self.assertIn(
             f"/opinions/{self.cited_opinion.pk}/", result["cited_opinion"]
         )
@@ -4573,9 +4566,22 @@ class OpinionsCitedByRECAPDocumentAPITests(TestCase):
 
         results = response.json()["results"]
         self.assertEqual(len(results), 1)
-        self.assertEqual(
-            results[0]["citing_document_description"],
-            "Motion for Summary Judgment",
+        self.assertIn(
+            f"/recap-documents/{self.citing_document.pk}/",
+            results[0]["citing_document"],
+        )
+
+    async def test_related_field_traversal_is_blocked(self) -> None:
+        """Only exact FK matches are allowed on citing_document and
+        cited_opinion; traversal into related filtersets is rejected."""
+        response = await self._api_v4_request(
+            "opinionscitedbyrecapdocument-list",
+            {"citing_document__is_available": True},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "citing_document__is_available",
+            response.json()["unknown_params"],
         )
 
     async def test_filter_by_depth(self) -> None:
@@ -4592,11 +4598,10 @@ class OpinionsCitedByRECAPDocumentAPITests(TestCase):
 
     def test_list_does_not_n_plus_one(self) -> None:
         """The query count should not grow with the number of rows
-        returned. ``select_related("cited_opinion__cluster",
-        "citing_document")`` should resolve ``cited_opinion_case_name``
-        and ``citing_document_description`` for every row in the same
-        query as the main list, even when each row points at a different
-        opinion/cluster/document.
+        returned. The serializer builds the ``cited_opinion`` and
+        ``citing_document`` hyperlinks from the FK ids already on each
+        row, so no per-row queries should be issued even when each row
+        points at a different opinion/document.
         """
         self.client.force_login(self.user_1.user)
         list_url = reverse(
