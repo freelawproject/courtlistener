@@ -237,11 +237,14 @@ class RECAPDocumentFilter(NoEmptyFilterSet):
 
 
 class OpinionsCitedByRECAPDocumentFilter(NoEmptyFilterSet):
-    citing_document = filters.RelatedFilter(
-        RECAPDocumentFilter, queryset=RECAPDocument.objects.all()
+    # Plain ModelChoiceFilters instead of RelatedFilters, so only exact FK
+    # matches are allowed, blocking traversal into the related filtersets
+    # e.g. ?citing_document__is_available=True
+    citing_document = filters.ModelChoiceFilter(
+        queryset=RECAPDocument.objects.all().only("pk")
     )
-    cited_opinion = filters.RelatedFilter(
-        OpinionFilter, queryset=Opinion.objects.all()
+    cited_opinion = filters.ModelChoiceFilter(
+        queryset=Opinion.objects.all().only("pk")
     )
 
     class Meta:
