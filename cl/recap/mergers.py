@@ -325,7 +325,7 @@ async def find_docket_object(
         skip_dn_core_confirmation,
     )
 
-    if await dqs.acount() == 0 and allow_create:
+    if await dqs.acount() == 0:
         # Couldn't find a docket. Return a new one.
         return (
             Docket(
