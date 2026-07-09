@@ -293,18 +293,16 @@ class OpinionsCitedByRECAPDocumentSerializer(
         queryset=Opinion.objects.all(),
         style={"base_template": "input.html"},
     )
-    cited_opinion_case_name = serializers.CharField(
-        source="cited_opinion.cluster.case_name",
-        read_only=True,
-    )
-    citing_document_description = serializers.CharField(
-        source="citing_document.description",
-        read_only=True,
-    )
 
     class Meta:
         model = OpinionsCitedByRECAPDocument
-        fields = "__all__"
+        fields = (
+            "resource_uri",
+            "id",
+            "citing_document",
+            "cited_opinion",
+            "depth",
+        )
 
 
 class CitationSerializer(ModelSerializer):
