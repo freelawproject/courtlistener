@@ -5,7 +5,12 @@ from datetime import UTC
 from factory.base import Factory
 from factory.declarations import LazyAttribute, List, SubFactory
 from factory.faker import Faker
-from juriscraper.state.docket import DocketEntryType, DocketTransfer
+from juriscraper.state.docket import (
+    DocketEntryType,
+    DocketTransfer,
+    TransferDirection,
+    TransferReason,
+)
 from juriscraper.state.florida import FloridaPartyRepresentative
 from juriscraper.state.florida.cases import (
     FLORIDA_DOCKET_TYPE_MAP,
@@ -47,11 +52,20 @@ class FloridaOriginatingCaseFactory(_PydanticConstructFactory):
     case_number = Faker("federal_district_docket_number")
 
 
-# The merger does not currently read fields off these objects, so the factories
-# just produce stubs.
 class FloridaDocketTransferFactory(_PydanticConstructFactory):
     class Meta:
         model = DocketTransfer
+
+    direction = TransferDirection.INBOUND
+    reason = TransferReason.APPEAL
+    court_id = Faker(
+        "random_element",
+        elements=(
+            FloridaCourtID.CIRCUIT.value,
+            FloridaCourtID.COUNTY.value,
+        ),
+    )
+    docket_number = Faker("federal_district_docket_number")
 
 
 class FloridaRepresentativeFactory(_PydanticConstructFactory):
