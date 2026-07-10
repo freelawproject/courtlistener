@@ -12,7 +12,7 @@ from juriscraper.state.florida.common import (
     FloridaPaginatedResultsParser,
 )
 from juriscraper.state.florida.scraper import CourtMetadata, PaginationFailed
-from pydantic import AliasPath, BaseModel, Field
+from pydantic import AliasPath, BaseModel, ConfigDict, Field
 from pydantic.types import UUID4
 
 from cl.lib.celery_utils import CeleryThrottle
@@ -24,6 +24,9 @@ from cl.scrapers.management.utils import FLScrapeCommand, StatePollCommand
 
 
 class FloridaUpdate(BaseModel):
+    # Frozen so instances are hashable for deduplication
+    model_config = ConfigDict(frozen=True)
+
     case_uuid: UUID4 = Field(
         validation_alias=AliasPath("caseHeader", "caseInstanceUUID")
     )
@@ -123,7 +126,7 @@ class Command(FLScrapeCommand, StatePollCommand):
             logger.info(
                 "Looking for new and updated cases from %s to %s",
                 last_polled,
-                datetime.now(),
+                now,
             )
             seen = set()
             async for update in self.gather_all(
