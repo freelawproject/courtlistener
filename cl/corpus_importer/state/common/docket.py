@@ -97,5 +97,4 @@ class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
     docket_number_raw: str = Attribute(
         lambda d, params: d.docket_number, strategy=overwrite
     )
-    docket_entries: list[Any] = DocketEntryRelation()
     parties: list[Party] = PartyRelation()

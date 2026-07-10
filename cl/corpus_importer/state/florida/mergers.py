@@ -236,8 +236,6 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
 
     parties: list[Party] = PartyRelation(FloridaPartyMerger)
 
-    # APPEND so entries already in the DB but missing from this scrape are
-    # kept (see FloridaDocketEntryMerger.documents).
     florida_docket_entries: list[FloridaDocketEntry] = DocketEntryRelation(
         FloridaDocketEntryMerger
     )
