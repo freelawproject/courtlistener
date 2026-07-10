@@ -125,10 +125,15 @@ class Command(FLScrapeCommand, StatePollCommand):
                 last_polled,
                 datetime.now(),
             )
+            seen = set()
             async for update in self.gather_all(
                 scraper, scraper_courts, courts, last_polled
             ):
                 logger.info("Got update: %s", update)
+                if update in seen:
+                    logger.info("Duplicate update. Skipping.")
+                    continue
+                seen.add(update)
                 court_id = external_id_map[update.court_external_id]
                 try:
                     maybe_case = await scraper.fetch_case_data(
