@@ -325,11 +325,15 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
+        child_mergers: list[
+            Merger[ChildType, RelatedParams[ParamType], RM]
+        ] = []
         related_objects: list[RM] = []
         for child in transformed:
             related_merge = self.merger(
                 child, manager=related_manager, params=related_params
             )
+            child_mergers.append(related_merge)
             result |= related_merge.merge()
             if related_merge.out is None:
                 continue
@@ -339,9 +343,12 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
             case ManyStrategy.APPEND:
                 related_manager.add(*related_objects)
             case ManyStrategy.REPLACE:
-                _ = related_manager.exclude(
-                    pk__in=[r.pk for r in related_objects]
-                ).delete()
+                # Keep existing children whose merge failed, matching the
+                # many-to-many REPLACE semantics below.
+                to_keep = {r.pk for r in related_objects} | {
+                    m.existing.pk for m in child_mergers if m.existing
+                }
+                _ = related_manager.exclude(pk__in=to_keep).delete()
                 related_manager.add(*related_objects)
 
         return result
