@@ -484,7 +484,7 @@ def get_pdfs(
                 court_id,
                 cnt,
             ).set(queue=q),
-            get_and_process_free_pdf.s(pk, court_id).set(queue=q),
+            get_and_process_free_pdf.s(pk, court_id, q).set(queue=q),
             # `recap_document_into_opinions` uses a different doctor extraction
             # endpoint, so it doesn't depend on the document's content
             # being extracted on `get_and_process_free_pdf`, where it's
@@ -521,9 +521,9 @@ def ocr_available(queue: str) -> None:
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
-        extract_pdf_document.si(pk, ocr_available=True).set(
-            queue=q
-        ).apply_async()
+        extract_pdf_document.si(
+            pk, ocr_available=True, citation_queue=q
+        ).set(queue=q).apply_async()
         if i % 1000 == 0:
             logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
 
