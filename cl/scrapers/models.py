@@ -76,6 +76,16 @@ class PACERFreeDocumentRow(models.Model):
     nature_of_suit = models.TextField()
     cause = models.CharField(max_length=2000)
     error_msg = models.TextField()
+    download_attempts = models.PositiveIntegerField(
+        help_text="How many runs have ended with a terminal download "
+        "failure for this row after exhausting in-task retries.",
+        default=0,
+    )
+    last_attempt = models.DateTimeField(
+        help_text="When this row's PDF download last failed terminally.",
+        null=True,
+        blank=True,
+    )
 
 
 class PACERMobilePageData(AbstractDateTimeModel):

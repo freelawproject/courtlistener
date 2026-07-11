@@ -30,7 +30,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile, File
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Prefetch
+from django.db.models import F, Prefetch
 from django.db.models.query import prefetch_related_objects
 from django.utils.timezone import localtime, now
 from eyecite.tokenizers import HyperscanTokenizer
@@ -698,6 +698,45 @@ def process_free_opinion_result(
     }
 
 
+# Cross-run retry budget for free-opinion PDF downloads. A transient
+# terminal failure (blocked court, 5xx, network) leaves the row eligible
+# for future runs until this many runs have failed; the row is then
+# dead-lettered via error_msg so it stops burning a PACER hit per run
+# (see #7489).
+FREE_PDF_MAX_DOWNLOAD_ATTEMPTS = 5
+
+
+def record_free_pdf_terminal_failure(
+    row_pk: int, msg: str, transient: bool
+) -> None:
+    """Record bookkeeping for a terminal free-PDF download failure
+
+    Terminal means the failure is not being retried within this run: the
+    celery chain is about to be cut, so delete_pacer_row will never run for
+    this row. Without bookkeeping, the row would keep error_msg="" and be
+    re-selected by every future get_pdfs run, forever (#7489).
+
+    :param row_pk: The PACERFreeDocumentRow pk.
+    :param msg: A description of the failure.
+    :param transient: True if a future run could plausibly succeed (blocked
+    court, 5xx, network). Transient failures increment download_attempts and
+    leave the row eligible until FREE_PDF_MAX_DOWNLOAD_ATTEMPTS is reached;
+    permanent failures dead-letter the row immediately by setting error_msg.
+    :return: None
+    """
+    row = PACERFreeDocumentRow.objects.filter(pk=row_pk)
+    if not transient:
+        row.update(error_msg=msg, last_attempt=now())
+        return
+    row.update(
+        download_attempts=F("download_attempts") + 1,
+        last_attempt=now(),
+    )
+    row.filter(download_attempts__gte=FREE_PDF_MAX_DOWNLOAD_ATTEMPTS).update(
+        error_msg=f"Retries exhausted across runs: {msg}"
+    )
+
+
 @app.task(
     bind=True,
     autoretry_for=(
@@ -739,6 +778,7 @@ def get_and_process_free_pdf(
         if self.request.retries == self.max_retries:
             msg = f"Blocked by court: {rd.docket_entry.docket.court_id}"
             logger.warning(msg)
+            record_free_pdf_terminal_failure(row_pk, msg, transient=True)
             self.request.chain = None
             return None
         raise self.retry()
@@ -767,6 +807,7 @@ def get_and_process_free_pdf(
             )
             if self.request.retries == self.max_retries:
                 logger.error(msg)
+                record_free_pdf_terminal_failure(row_pk, msg, transient=True)
                 self.request.chain = None
                 return None
             logger.info(f"{msg} Retrying.")  # noqa: G004
@@ -777,6 +818,7 @@ def get_and_process_free_pdf(
                 f"{exc.response.status_code}. Aborting."
             )
             logger.error(msg)
+            record_free_pdf_terminal_failure(row_pk, msg, transient=False)
             self.request.chain = None
             return None
         else:
@@ -785,6 +827,7 @@ def get_and_process_free_pdf(
                 f"{exc}. Aborting."
             )
             logger.error(msg)
+            record_free_pdf_terminal_failure(row_pk, msg, transient=False)
             self.request.chain = None
             return None
     except PacerLoginException as exc:
@@ -802,6 +845,7 @@ def get_and_process_free_pdf(
         msg = "Request exception getting free PDF"
         if self.request.retries == self.max_retries:
             logger.warning(msg)
+            record_free_pdf_terminal_failure(row_pk, msg, transient=True)
             self.request.chain = None
             return None
         logger.info(f"{msg} Retrying.")  # noqa: G004
