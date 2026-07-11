@@ -7,7 +7,12 @@ from unittest import mock
 from juriscraper.state.docket import (
     DocketEntryType as ScrapeDocketEntryType,
 )
+from juriscraper.state.docket import DocketTransfer
 from juriscraper.state.docket import PartyType as ScrapePartyType
+from juriscraper.state.docket import (
+    TransferDirection as ScrapeTransferDirection,
+)
+from juriscraper.state.docket import TransferReason as ScrapeTransferReason
 from juriscraper.state.florida.cases import FloridaCase
 from juriscraper.state.florida.courts import FloridaCourtID
 
@@ -15,6 +20,7 @@ from cl.corpus_importer.state.florida.factories import (
     FloridaCaseFactory,
     FloridaCasePartyFactory,
     FloridaDocketEntryFactory,
+    FloridaDocketTransferFactory,
     FloridaDocumentFactory,
     FloridaOriginatingCaseFactory,
     FloridaRepresentativeFactory,
@@ -33,7 +39,7 @@ from cl.people_db.factories import (
 )
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import Docket, OriginatingCourtInformation
+from cl.search.models import CaseTransfer, Docket, OriginatingCourtInformation
 from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
@@ -796,3 +802,227 @@ class FloridaDocumentMergerTest(TestCase):
 
         assert result.success is True
         assert FloridaDocument.objects.count() == 2
+
+
+class FloridaCaseTransferMergerTest(TestCase):
+    """Tests for merging case transfers from Florida cases."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.flsc = CourtFactory.create(id="fla")
+        cls.flca01 = CourtFactory.create(id="fladistctapp1")
+        cls.flacirct = CourtFactory.create(id="flacirct")
+
+    @staticmethod
+    def _make_case(*transfers, **kwargs) -> FloridaCase:
+        return FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            docket_number="SC2025-4242",
+            originating_cases=[],
+            transfers=list(transfers),
+            entries=[],
+            parties=[],
+            **kwargs,
+        )
+
+    @staticmethod
+    def _circuit_transfer(**kwargs) -> DocketTransfer:
+        values = {
+            "court_id": FloridaCourtID.CIRCUIT.value,
+            "docket_number": "2024-CA-001234",
+        } | kwargs
+        return FloridaDocketTransferFactory.create(**values)
+
+    @staticmethod
+    def _merged_docket(result: MergeResult) -> Docket:
+        return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
+
+    def test_merge_creates_appeal_transfer_from_circuit_court(self):
+        """Does merging create an appeal transfer from the originating
+        circuit court into the scraped docket's court?"""
+        docket_data = self._make_case(self._circuit_transfer())
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert "CaseTransfer" in result.creates
+        docket = self._merged_docket(result)
+        transfer = CaseTransfer.objects.get()
+        assert transfer.origin_court_id == "flacirct"
+        assert transfer.origin_docket_number == "2024-CA-001234"
+        assert transfer.origin_docket is None
+        assert transfer.destination_court_id == "fla"
+        assert transfer.destination_docket_number == docket_data.docket_number
+        assert transfer.destination_docket_id == docket.pk
+        assert transfer.transfer_date == docket_data.date_filed
+        assert transfer.transfer_type == CaseTransfer.APPEAL
+
+    def test_merge_creates_transfer_from_appellate_court(self):
+        """Does a transfer from a district court of appeal map to its
+        specific CourtListener court?"""
+        docket_data = self._make_case(
+            self._circuit_transfer(
+                court_id=FloridaCourtID.FIRST_COA.value,
+                docket_number="1D2023-1111",
+            )
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        transfer = CaseTransfer.objects.get()
+        assert transfer.origin_court_id == "fladistctapp1"
+        assert transfer.origin_docket_number == "1D2023-1111"
+
+    def test_merge_creates_transfer_into_appellate_docket(self):
+        """Are transfers created for district court of appeal dockets too?"""
+        docket_data = FloridaCaseFactory.create(
+            court_id=FloridaCourtID.FIRST_COA.value,
+            docket_number="1D2025-0777",
+            originating_cases=[],
+            transfers=[self._circuit_transfer()],
+            entries=[],
+            parties=[],
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        transfer = CaseTransfer.objects.get()
+        assert transfer.origin_court_id == "flacirct"
+        assert transfer.destination_court_id == "fladistctapp1"
+        assert transfer.destination_docket_id == self._merged_docket(result).pk
+
+    def test_merge_maps_transfer_reason(self):
+        """Does the transfer's reason map to the matching CaseTransfer
+        type?"""
+        docket_data = self._make_case(
+            self._circuit_transfer(reason=ScrapeTransferReason.WORKLOAD)
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        transfer = CaseTransfer.objects.get()
+        assert transfer.transfer_type == CaseTransfer.WORKLOAD
+
+    def test_merge_creates_all_transfers(self):
+        """Are multiple transfers merged as separate objects?"""
+        docket_data = self._make_case(
+            self._circuit_transfer(),
+            self._circuit_transfer(docket_number="2023-CA-000999"),
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert set(
+            CaseTransfer.objects.values_list(
+                "origin_court_id", "origin_docket_number"
+            )
+        ) == {
+            ("flacirct", "2024-CA-001234"),
+            ("flacirct", "2023-CA-000999"),
+        }
+
+    def test_merge_fills_existing_partial_transfer(self):
+        """Does merging fill in the destination docket FK on an existing
+        transfer that only knows its origin docket?"""
+        scrape_transfer = self._circuit_transfer()
+        docket_data = self._make_case(scrape_transfer)
+        origin_docket = DocketFactory.create(
+            court=self.flacirct,
+            docket_number=scrape_transfer.docket_number,
+            pacer_case_id=None,
+            source=Docket.SCRAPER,
+        )
+        partial = CaseTransfer.objects.create(
+            origin_court=self.flacirct,
+            origin_docket_number=scrape_transfer.docket_number,
+            origin_docket=origin_docket,
+            destination_court=self.flsc,
+            destination_docket_number=docket_data.docket_number,
+            destination_docket=None,
+            transfer_date=docket_data.date_filed,
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert "CaseTransfer" not in result.creates
+        assert partial.pk in result.updates["CaseTransfer"]
+        assert CaseTransfer.objects.count() == 1
+        partial.refresh_from_db()
+        assert partial.destination_docket_id == self._merged_docket(result).pk
+        assert partial.origin_docket_id == origin_docket.pk
+
+    def test_remerge_is_idempotent(self):
+        """Does merging the same case twice avoid duplicating transfers?"""
+        docket_data = self._make_case(self._circuit_transfer())
+
+        first = FloridaDocketMerger(docket_data, params=None).merge()
+        second = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert first.success is True
+        assert second.success is True
+        assert "CaseTransfer" not in second.creates
+        assert "CaseTransfer" not in second.updates
+        assert CaseTransfer.objects.count() == 1
+
+    def test_merge_skips_outbound_transfer(self):
+        """Are outbound transfers skipped without failing the merge?"""
+        docket_data = self._make_case(
+            self._circuit_transfer(direction=ScrapeTransferDirection.OUTBOUND)
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert CaseTransfer.objects.count() == 0
+
+    def test_merge_skips_unknown_transfer_reason(self):
+        """Are transfers whose reason has no CaseTransfer type skipped?"""
+        docket_data = self._make_case(
+            self._circuit_transfer(reason=ScrapeTransferReason.UNKNOWN)
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert CaseTransfer.objects.count() == 0
+
+    def test_merge_skips_unmappable_court(self):
+        """Are transfers from courts with no CourtListener mapping skipped
+        without failing the merge?"""
+        docket_data = self._make_case(
+            self._circuit_transfer(
+                court_id=FloridaCourtID.COMPENSATION_CLAIMS.value
+            )
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert CaseTransfer.objects.count() == 0
+
+    def test_merge_skips_court_missing_from_db(self):
+        """Is a mappable court that isn't in the DB skipped without failing
+        the merge?"""
+        docket_data = self._make_case(
+            self._circuit_transfer(court_id=FloridaCourtID.COUNTY.value)
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert CaseTransfer.objects.count() == 0
+
+    def test_merge_skips_empty_docket_number(self):
+        """Is a transfer with no docket number skipped?"""
+        docket_data = self._make_case(self._circuit_transfer(docket_number=""))
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert CaseTransfer.objects.count() == 0

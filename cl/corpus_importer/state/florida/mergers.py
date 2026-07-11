@@ -5,6 +5,7 @@ from typing import Any, ClassVar, override
 from uuid import UUID
 
 from django.db.models import Model, QuerySet
+from juriscraper.state.docket import DocketTransfer
 from juriscraper.state.florida import (
     FloridaCase,
     FloridaOriginatingCase,
@@ -19,6 +20,11 @@ from juriscraper.state.florida import (
 )
 from juriscraper.state.florida.cases import FloridaCourtID
 
+from cl.corpus_importer.state.common.case_transfer import (
+    CaseTransferMerger,
+    CaseTransferRelation,
+    inbound_transfers,
+)
 from cl.corpus_importer.state.common.docket import (
     DocketEntryRelation,
     DocketMerger,
@@ -37,6 +43,7 @@ from cl.corpus_importer.state.common.party import (
 from cl.corpus_importer.state.florida.utils import (
     FL_APPELLATE_COURT_ID,
     FLORIDA_COURT_ID_MAP,
+    FLORIDA_TRANSFER_COURT_ID_MAP,
     make_docket_number_core,
 )
 from cl.corpus_importer.state.merger import (
@@ -48,7 +55,12 @@ from cl.corpus_importer.state.merger import (
     overwrite,
 )
 from cl.people_db.models import Attorney, Party, Role
-from cl.search.models import Docket, OriginatingCourtInformation
+from cl.search.models import (
+    CaseTransfer,
+    Court,
+    Docket,
+    OriginatingCourtInformation,
+)
 from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
@@ -192,6 +204,45 @@ def _originating_case(
     return docket_data.originating_cases[0]
 
 
+def _origin_court_id(transfer: DocketTransfer, params: Any) -> str | None:
+    return FLORIDA_TRANSFER_COURT_ID_MAP.get(transfer.court_id)
+
+
+class FloridaCaseTransferMerger(CaseTransferMerger[DocketTransfer, None]):
+    origin_court_id: str = Attribute(_origin_court_id, strategy=overwrite)
+
+
+def _florida_transfers(
+    docket_data: FloridaCase, params: None
+) -> list[DocketTransfer]:
+    """Filter a case's transfers down to the ones whose far-side court has a
+    CourtListener counterpart in the DB. Skipped transfers are logged but do
+    not fail the merge.
+
+    :param docket_data: The scraped Florida case.
+    :return: The transfers to merge."""
+    transferable: list[DocketTransfer] = []
+    transfers: list[DocketTransfer] = inbound_transfers(docket_data, params)
+    for transfer in transfers:
+        court_id = FLORIDA_TRANSFER_COURT_ID_MAP.get(transfer.court_id)
+        if court_id is None:
+            logger.info(
+                "Skipping CaseTransfer for Florida docket %s: no matching court for Juriscraper court %s",
+                docket_data.docket_number,
+                transfer.court_id,
+            )
+            continue
+        if not Court.objects.filter(pk=court_id).exists():
+            logger.error(
+                "Court with ID %s not found while creating CaseTransfer for Florida docket %s",
+                court_id,
+                docket_data.docket_number,
+            )
+            continue
+        transferable.append(transfer)
+    return transferable
+
+
 class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
     model: ClassVar[type[Model]] = Docket
 
@@ -230,6 +281,10 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
 
     florida_docket_entries: list[FloridaDocketEntry] = DocketEntryRelation(
         FloridaDocketEntryMerger
+    )
+
+    case_transfer_destination_docket: list[CaseTransfer] = (
+        CaseTransferRelation(FloridaCaseTransferMerger, _florida_transfers)
     )
 
     @override
