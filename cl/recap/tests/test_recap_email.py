@@ -12,6 +12,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 
 from cl.alerts.models import DocketAlert
 from cl.api.factories import WEBHOOK_EVENT_STATUS, WebhookFactory
@@ -131,6 +132,35 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 0)
         await self.async_client.post(self.path, self.data, format="json")
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 1)
+
+    async def test_recap_user_cannot_access_recap_email_endpoint(self):
+        """The recap user loaded by the 0002_load_initial_data migration
+        only has has_recap_upload_access and must not be able to GET or
+        POST to the recap-email endpoint, which requires the
+        has_recap_email_upload_access permission instead.
+        """
+
+        def _load_recap_user() -> tuple[User, list[str], str]:
+            recap_user = User.objects.get(username="recap")
+            permissions = list(
+                recap_user.user_permissions.values_list("codename", flat=True)
+            )
+            return recap_user, permissions, recap_user.auth_token.key
+
+        _, user_permissions, token = await sync_to_async(_load_recap_user)()
+        self.assertIn("has_recap_upload_access", user_permissions)
+        self.assertNotIn("has_recap_email_upload_access", user_permissions)
+
+        recap_client = AsyncAPIClient()
+        recap_client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+        get_response = await recap_client.get(self.path)
+        self.assertEqual(get_response.status_code, HTTPStatus.FORBIDDEN)
+
+        post_response = await recap_client.post(
+            self.path, self.data, format="json"
+        )
+        self.assertEqual(post_response.status_code, HTTPStatus.FORBIDDEN)
 
 
 @mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
@@ -1546,6 +1576,169 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_recap_email_copies_pdf_into_existing_rd(
+        self,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
+        mock_download_pdf,
+        mock_webhook_post,
+    ):
+        """Confirm the notification PDF is copied into a matched
+        RECAPDocument that already existed without a document, e.g., created
+        first by the RSS scraper while the recap.email task was queued.
+        """
+
+        notification_data = RECAPEmailNotificationDataFactory(
+            appellate=False,
+            contains_attachments=False,
+        )
+        docket_data = notification_data["dockets"][0]
+        entry_data = docket_data["docket_entries"][0]
+
+        # Simulate the docket entry and RECAPDocument created first by
+        # another source while the recap.email task was queued.
+        docket = await sync_to_async(DocketFactory)(
+            court=self.court,
+            docket_number=docket_data["docket_number"],
+            pacer_case_id=entry_data["pacer_case_id"],
+        )
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=docket,
+            entry_number=entry_data["document_number"],
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            pacer_doc_id=entry_data["pacer_doc_id"],
+            document_number=str(entry_data["document_number"]),
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=False,
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (notification_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from
+            # testing_1@recap.email
+            await self.async_client.post(self.path, self.data, format="json")
+
+        # No duplicated RECAPDocument should be created.
+        self.assertEqual(await RECAPDocument.objects.acount(), 1)
+
+        # The PDF should be copied into the existing RECAPDocument and a
+        # PacerFetchQueue created for it.
+        await rd.arefresh_from_db()
+        self.assertTrue(rd.is_available)
+        self.assertTrue(rd.filepath_local)
+        fetch_queues = PacerFetchQueue.objects.filter(recap_document=rd)
+        self.assertEqual(await fetch_queues.acount(), 1)
+        fetch_queue_first = await fetch_queues.afirst()
+        self.assertEqual(
+            fetch_queue_first.status, PROCESSING_STATUS.SUCCESSFUL
+        )
+
+        # The PQ used to download the PDF should be marked successful and
+        # its file deleted.
+        pq = await ProcessingQueue.objects.filter(
+            pacer_doc_id=entry_data["pacer_doc_id"]
+        ).afirst()
+        self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertFalse(pq.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    async def test_no_error_log_when_main_rd_is_already_available(
+        self,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
+        mock_download_pdf,
+        mock_webhook_post,
+    ):
+        """Confirm no PQ deletion error is logged when the matched
+        RECAPDocument already got the document from another source, since
+        deleting the redundant download is expected, not a loss.
+        """
+
+        notification_data = RECAPEmailNotificationDataFactory(
+            appellate=False,
+            contains_attachments=False,
+        )
+        docket_data = notification_data["dockets"][0]
+        entry_data = docket_data["docket_entries"][0]
+
+        # Simulate the RECAPDocument created first by another source that
+        # also stored its PDF.
+        docket = await sync_to_async(DocketFactory)(
+            court=self.court,
+            docket_number=docket_data["docket_number"],
+            pacer_case_id=entry_data["pacer_case_id"],
+        )
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=docket,
+            entry_number=entry_data["document_number"],
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            pacer_doc_id=entry_data["pacer_doc_id"],
+            document_number=str(entry_data["document_number"]),
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=True,
+            filepath_local=SimpleUploadedFile(
+                "file.pdf", b"Hello World from other source"
+            ),
+        )
+
+        with (
+            mock.patch(
+                "cl.recap.tasks.open_and_validate_email_notification",
+                side_effect=lambda x, y: (notification_data, "HTML"),
+            ),
+            self.assertNoLogs("cl.recap.tasks", level="ERROR"),
+        ):
+            # Trigger a new recap.email notification from
+            # testing_1@recap.email
+            await self.async_client.post(self.path, self.data, format="json")
+
+        # No duplicated RD or FetchQueue should be created, and the existing
+        # document should be kept untouched.
+        self.assertEqual(await RECAPDocument.objects.acount(), 1)
+        self.assertEqual(
+            await PacerFetchQueue.objects.filter(recap_document=rd).acount(),
+            0,
+        )
+        await rd.arefresh_from_db()
+        self.assertTrue(rd.is_available)
+        with rd.filepath_local.open(mode="rb") as local_path:
+            self.assertEqual(
+                local_path.read(), b"Hello World from other source"
+            )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -2953,6 +3146,7 @@ class GetAndCopyRecapAttachments(TestCase):
         rds = RECAPDocument.objects.all()
         self.assertEqual(len(rds), 9)
 
+        cutoff_date = now()
         pq_att1 = ProcessingQueue.objects.create(
             court_id="scotus",
             uploader=self.user,
@@ -2986,6 +3180,7 @@ class GetAndCopyRecapAttachments(TestCase):
             "magic1234",
             "12345",
             self.user.pk,
+            cutoff_date,
         )
 
         rds_all = RECAPDocument.objects.all()
@@ -3036,6 +3231,7 @@ class GetAndCopyRecapAttachments(TestCase):
             "magic1234",
             "12345",
             self.user.pk,
+            now(),
         )
         rds_all = RECAPDocument.objects.all()
         for rd in rds_all:
@@ -3058,6 +3254,60 @@ class GetAndCopyRecapAttachments(TestCase):
                 async_to_sync(mark_pq_successful)(pq)
             self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
             self.assertFalse(pq.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(200, b"Hello World from magic"),
+            "OK",
+        ),
+    )
+    def test_avoid_reusing_stale_pq_from_previous_notification(
+        self,
+        mock_cookie,
+        mock_download,
+    ):
+        """A PQ from a previous notification whose file was already deleted
+        shouldn't be reused for a pre-existing attachment RD. A fresh download
+        must be performed instead of wrongly marking the RD as sealed.
+        """
+
+        rd_att = self.rds_att[0]
+        # Simulate a PQ consumed by a previous notification: marked
+        # successful and its file already deleted.
+        ProcessingQueue.objects.create(
+            court_id=self.d_1.court_id,
+            uploader=self.user,
+            pacer_case_id=self.d_1.pacer_case_id,
+            pacer_doc_id=rd_att.pacer_doc_id,
+            status=PROCESSING_STATUS.SUCCESSFUL,
+            upload_type=UPLOAD_TYPE.PDF,
+        )
+        # The current notification arrives after the stale PQ was created.
+        cutoff_date = now()
+        get_and_copy_recap_attachment_docs(
+            self,
+            [rd_att],
+            self.d_1.court_id,
+            "magic1234",
+            self.d_1.pacer_case_id,
+            self.user.pk,
+            cutoff_date,
+        )
+
+        # The stale PQ shouldn't be reused. A new one is created to download
+        # the PDF, which is copied to the RECAPDocument.
+        pqs = ProcessingQueue.objects.filter(pacer_doc_id=rd_att.pacer_doc_id)
+        self.assertEqual(pqs.count(), 2)
+        rd_att.refresh_from_db()
+        self.assertFalse(rd_att.is_sealed)
+        self.assertTrue(rd_att.is_available)
+        with rd_att.filepath_local.open(mode="rb") as local_path:
+            self.assertEqual(local_path.read(), b"Hello World from magic")
 
 
 @mock.patch(

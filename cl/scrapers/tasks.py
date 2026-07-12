@@ -1,10 +1,12 @@
 import logging
 import random
 import re
+import time
 import traceback
 from collections import defaultdict
 from io import BytesIO
 
+import botocore.exceptions
 import celery
 import httpx
 import openai
@@ -36,6 +38,10 @@ from cl.lib.pacer import map_cl_to_pacer_id
 from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
+from cl.lib.storage import (
+    S3GlacierInstantRetrievalStorage,
+    clobbering_get_name,
+)
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
@@ -96,6 +102,8 @@ def update_document_from_text(
             opinion.__dict__.update(data)
         elif model_name == "OriginatingCourtInformation":
             docket = opinion.cluster.docket
+            if data.get("docket_number"):
+                data["docket_number_raw"] = data["docket_number"]
             if docket.originating_court_information:
                 docket.originating_court_information.__dict__.update(data)
             else:
@@ -608,6 +616,7 @@ async def extract_formatted_text_document_base(
                 rd.ocr_status = AbstractPDF.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
+        rd.plain_text = rd.plain_text.replace("\0", "")
         # Kludgey fix to handle RECAPDocument's custom save logic.
         if isinstance(rd, RECAPDocument):
             await rd.asave(
@@ -653,7 +662,6 @@ async def extract_pdf_document_base(
     max_retries=3,
     retry_backoff=10,
 )
-@throttle_task("1/3m")
 def process_audio_file(self, pk) -> None:
     """Given the key to an audio file, extract its content and add the related
     meta data to the database.
@@ -708,6 +716,9 @@ def process_audio_file(self, pk) -> None:
             "processing_complete",
         ]
     )
+    # Transcription dispatch is owned by reenqueue_pending_audio_tasks_daemon.
+    # We deliberately do not hand off here — the daemon paces dispatches to
+    # stay under OpenAI's safe concurrency.
 
 
 @app.task(
@@ -784,13 +795,13 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     }
 
     words = [
-        re.sub(r"\W+", "", word) for word in transcription.lower().split(" ")
+        word for word in re.split(r"[^a-z0-9]+", transcription.lower()) if word
     ]
 
     if len(words) != 5:
-        raise ValueError(f"Expected 5 words, got {len(words)}")
+        raise ScrapeFailed(f"Expected 5 words, got {len(words)} ({words})")
     if any([len(word) == 0 for word in words]):
-        raise ValueError("Expected all words to be non-empty")
+        raise ScrapeFailed(f"Expected all words to be non-empty (got {words})")
 
     characters = [
         numeric_map[word] if word in numeric_map else word[0] for word in words
@@ -799,8 +810,81 @@ def process_scotus_captcha_transcription(transcription: str) -> str:
     return "".join(characters)
 
 
+def get_scotus_captcha_solution(
+    session: requests.Session,
+    base_url: str,
+    form_url: str,
+    anti_forgery_token: str,
+    n_tries: int = 3,
+    wait: float = 1.0,
+) -> tuple[str, str]:
+    """Get the solution to the SCOTUS audio CAPTCHA with retries.
+
+    :param session: The requests session to use.
+    :param base_url: The base URL of the SCOTUS website.
+    :param form_url: The URL for the subscription form.
+    :param anti_forgery_token: The anti-forgery token to pass in requests.
+    :param n_tries: The maximum number of times to try generating CAPTCHAs.
+        Defaults to 3, which given the 4% failure rate observed in whisper-1,
+        should produce an overall failure rate of 0.0064%.
+    :param wait: Time in seconds to wait between consecutive transcription attempts.
+
+    :return: A tuple containing the solution and the CAPTCHA ID."""
+    captcha_reset_url = f"{base_url}/Captcha/Reset"
+    captcha_payload = {"__RequestVerificationToken": anti_forgery_token}
+    error_messages = []
+
+    for attempt in range(n_tries):
+        reset_response = session.post(
+            captcha_reset_url,
+            data=captcha_payload,
+            headers={
+                "Referer": form_url,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=10,
+        )
+        reset_response.raise_for_status()
+        reset_data = reset_response.json()
+        captcha_id = reset_data.get("captchaId")
+        if not captcha_id:
+            raise ScrapeFailed(
+                f"Failed to get captchaId from /Captcha/Reset. Response: {reset_response.text}"
+            )
+
+        # Fetch the Audio
+        audio_url = f"{base_url}/Captcha/audio?captchaId={captcha_id}"
+        audio_response = session.get(
+            audio_url, headers={"Referer": form_url}, timeout=10
+        )
+        audio_response.raise_for_status()
+
+        # Solve the captcha
+        audio_file = BytesIO(audio_response.content)
+        transcription = call_llm_transcription(
+            ("captcha.wav", audio_file),
+            api_key=settings.OPENAI_TRANSCRIPTION_KEY,
+            model="whisper-1",
+        )
+        try:
+            solution = process_scotus_captcha_transcription(transcription)
+        except ScrapeFailed as e:
+            error_messages.append(str(e))
+        else:
+            if attempt > 0:
+                logger.warning(
+                    f"Generated valid CAPTCHA solution in %d attempts.\nErrors: {error_messages}",
+                    attempt + 1,
+                )
+            return solution, captcha_id
+        time.sleep(wait)
+    raise ValueError(
+        f"Failed to generate valid CAPTCHA solution in {n_tries} attempts.\nErrors: {error_messages}"
+    )
+
+
 @app.task(bind=True, max_retries=3, autoretry_for=(ScrapeFailed,))
-@throttle_task("1/m")
+@throttle_task("30/m")
 def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
     """Subscribe to SCOTUS email updates for a given opinion.
 
@@ -851,39 +935,9 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
         if not anti_forgery_token:
             raise ScrapeFailed("Could not find __RequestVerificationToken.")
 
-        captcha_reset_url = f"{base_url}/Captcha/Reset"
-        captcha_payload = {"__RequestVerificationToken": anti_forgery_token}
-        reset_response = session.post(
-            captcha_reset_url,
-            data=captcha_payload,
-            headers={
-                "Referer": form_url,
-                "X-Requested-With": "XMLHttpRequest",
-            },
-            timeout=10,
+        solution, captcha_id = get_scotus_captcha_solution(
+            session, base_url, form_url, anti_forgery_token
         )
-        reset_response.raise_for_status()
-        reset_data = reset_response.json()
-        captcha_id = reset_data.get("captchaId")
-        if not captcha_id:
-            raise ScrapeFailed(
-                f"Failed to get captchaId from /Captcha/Reset. Response: {reset_response.text}"
-            )
-
-        # Fetch the Audio
-        audio_url = f"{base_url}/Captcha/audio?captchaId={captcha_id}"
-        audio_response = session.get(
-            audio_url, headers={"Referer": form_url}, timeout=10
-        )
-        audio_response.raise_for_status()
-
-        # Solve the captcha
-        audio_file = BytesIO(audio_response.content)
-        transcription = call_llm_transcription(
-            ("captcha.wav", audio_file),
-            api_key=settings.OPENAI_TRANSCRIPTION_KEY,
-        )
-        solution = process_scotus_captcha_transcription(transcription)
 
         # Validate Kendo captcha.
         captcha_validate_url = f"{base_url}/Captcha/validate"
@@ -916,7 +970,7 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
         # Final Payload Update
         payload.update(
             {
-                "Email": "scotus@recap.email",
+                "Email": settings.SCOTUS_RECAP_EMAIL,
                 "captcha": solution,
                 "SubscribeButton": "Subscribe",
             }
@@ -941,16 +995,48 @@ def subscribe_to_scotus_updates(self: celery.Task, pk: int) -> None:
                 f"Main form submission failed for case {docket_number}."
             )
     except requests.JSONDecodeError as e:
-        logger.error(
+        logger.warning(
             "Failed to decode JSON response during SCOTUS subscription: %s", e
         )
         raise ScrapeFailed(f"Failed to decode JSON response: {e}")
     except openai.APIError as e:
-        logger.error("OpenAI API error during SCOTUS subscription: %s", e)
+        logger.warning("OpenAI API error during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"OpenAI API error: {e}")
     except requests.RequestException as e:
-        logger.error("Network error during SCOTUS subscription: %s", e)
+        logger.warning("Network error during SCOTUS subscription: %s", e)
         raise ScrapeFailed(f"Network error: {e}")
     except Exception as e:
-        logger.exception("Unexpected error during SCOTUS subscription")
+        logger.warning("Unexpected error during SCOTUS subscription")
         raise ScrapeFailed(str(e))
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+        botocore.exceptions.EndpointConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+def save_response_to_s3(self: celery.Task, key: str, content: bytes) -> None:
+    """Archive a scraped response or parsed docket to S3.
+
+    Offloads the (blocking, ~150ms) S3 PUT from the state back-scrape loop onto
+    Celery workers so archiving runs concurrently instead of serially pacing the
+    scrape. Writes to the private Glacier Instant Retrieval bucket, clobbering any
+    existing object at ``key``.
+
+    :param self: The Celery task instance.
+    :param key: Destination S3 key.
+    :param content: Raw bytes to write.
+    :return: None
+    """
+    storage = S3GlacierInstantRetrievalStorage(
+        naming_strategy=clobbering_get_name
+    )
+    with storage.open(key, "wb") as f:
+        f.write(content)
+    logger.info("Archived %s to %s", key, storage.bucket_name)

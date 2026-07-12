@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from http import HTTPStatus
 
 from celery import Task
@@ -11,6 +12,7 @@ from requests.exceptions import HTTPError, Timeout
 
 from cl.api.models import Webhook, WebhookEvent
 from cl.celery_init import app
+from cl.donate.models import NeonMembershipLevel
 from cl.lib.email_utils import make_multipart_email
 from cl.lib.neon_utils import NeonClient
 from cl.lib.zoho import (
@@ -126,21 +128,23 @@ def update_neon_account(self: Task, user_id: int) -> None:
     autoretry_for=(Timeout,),
     max_retries=3,
     interval_start=5,
-    ignore_result=True,
 )
 def create_or_update_zoho_account(
     self: Task, user_id: int, milestone: int
-) -> None:
+) -> tuple[str, int] | None:
     """
     Celery task to create or update a Zoho CRM record for a given user.
 
     This task:
     - Builds a Zoho payload from the User model
     - Checks if the user exists as a Contact or Lead in Zoho
-    - Updates the existing record or creates a new Lead if none exist
+    - Updates the existing record or creates a new Contact if none exist
 
     :param user_id: The primary key of the user to sync with Zoho
     :param milestone: A milestone value to store in the 'API_calls' field
+    :return: A ``(module_name, record_id)`` tuple identifying the record that
+        was created or updated. The chained ``tag_zoho_record`` task uses
+        this to skip a follow-up search.
     """
     user = User.objects.select_related("profile").get(pk=user_id)
     milestone_payload = {"API_calls": milestone}
@@ -158,10 +162,9 @@ def create_or_update_zoho_account(
     # Update the first matching Lead, if found
     if lead_records:
         payload = build_zoho_payload_from_user(user, leads_module.module_name)
-        leads_module.update_record(
-            lead_records[0].get_id(), payload | milestone_payload
-        )
-        return
+        record_id = lead_records[0].get_id()
+        leads_module.update_record(record_id, payload | milestone_payload)
+        return ("Leads", record_id)
 
     # Try to find existing Zoho records
     contact_records = contacts_module.get_record_by_cl_id_or_email(
@@ -172,17 +175,92 @@ def create_or_update_zoho_account(
         payload = build_zoho_payload_from_user(
             user, contacts_module.module_name
         )
-        contacts_module.update_record(
-            contact_records[0].get_id(), payload | milestone_payload
-        )
-        return
+        record_id = contact_records[0].get_id()
+        contacts_module.update_record(record_id, payload | milestone_payload)
+        return ("Contacts", record_id)
 
-    # Otherwise, create a new Lead
+    # Otherwise, create a new Contact
     payload = (
-        build_zoho_payload_from_user(user, leads_module.module_name)
+        build_zoho_payload_from_user(user, contacts_module.module_name)
         | milestone_payload
     )
-    leads_module.create_record(payload)
+    created = contacts_module.create_record(payload)
+    return ("Contacts", ContactsModule.get_action_record_id(created[0]))
+
+
+def _membership_tag_for_level(level: int) -> str:
+    """Return the Zoho tag name for a given NeonMembershipLevel."""
+    if level == NeonMembershipLevel.EDU:
+        return "Student"
+    return "CL Membership"
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(Timeout,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def tag_zoho_record_for_membership(
+    self: Task, user_id: int, level: int
+) -> None:
+    """
+    Add the membership tag to the user's Zoho Lead or Contact record.
+
+    Looks up the user in Zoho by CourtListener ID and email, preferring a
+    Lead match over a Contact match (mirroring `create_or_update_zoho_account`).
+    If no record is found, the task is a no-op — the record will get tagged
+    next time the user shows up in Zoho.
+
+    :param user_id: The primary key of the user whose Zoho record to tag.
+    :param level: The NeonMembershipLevel value used to choose the tag name.
+    """
+    user = User.objects.get(pk=user_id)
+    tag_name = _membership_tag_for_level(level)
+
+    leads_module = LeadsModule()
+    contacts_module = ContactsModule()
+
+    lead_records = leads_module.get_record_by_cl_id_or_email(
+        emails=[user.email], cl_ids=[user.pk]
+    )
+    if lead_records:
+        leads_module.add_tags(lead_records[0].get_id(), [tag_name])
+        return
+
+    contact_records = contacts_module.get_record_by_cl_id_or_email(
+        emails=[user.email], cl_ids=[user.pk]
+    )
+    if contact_records:
+        contacts_module.add_tags(contact_records[0].get_id(), [tag_name])
+        return
+
+    logger.info(
+        "No Zoho Lead/Contact found for user %s; skipping membership tag.",
+        user_id,
+    )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(Timeout,),
+    max_retries=3,
+    interval_start=5,
+    ignore_result=True,
+)
+def tag_zoho_record(
+    self: Task,
+    record_info: Sequence[str | int] | None,
+    level: int,
+) -> None:
+    """Tag a known Zoho record. Used as the second link in the API-milestone chain."""
+    if not record_info:
+        return  # upstream didn't find/create anything; nothing to tag
+    module_name, record_id = record_info
+    tag_name = _membership_tag_for_level(level)
+    module = LeadsModule() if module_name == "Leads" else ContactsModule()
+    module.add_tags(int(record_id), [tag_name])
 
 
 @app.task(ignore_result=True)

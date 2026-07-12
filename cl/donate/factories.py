@@ -2,7 +2,13 @@ import factory
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyChoice
 
-from cl.donate.models import NeonWebhookEvent
+from cl.donate.models import (
+    MembershipPaymentStatus,
+    NeonMembership,
+    NeonMembershipLevel,
+    NeonWebhookEvent,
+)
+from cl.users.factories import UserFactory
 
 
 class NeonWebhookEventFactory(DjangoModelFactory):
@@ -17,3 +23,12 @@ class NeonWebhookEventFactory(DjangoModelFactory):
             ),
         }
     )
+
+
+class NeonMembershipFactory(DjangoModelFactory):
+    class Meta:
+        model = NeonMembership
+
+    user = factory.SubFactory(UserFactory)
+    level = NeonMembershipLevel.TIER_1
+    payment_status = MembershipPaymentStatus.SUCCEEDED

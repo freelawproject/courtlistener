@@ -67,7 +67,7 @@ class FjcIntegratedDatabaseFilter(NoEmptyFilterSet):
             "subsection": BASIC_TEXT_LOOKUPS,
             "arbitration_at_filing": ["exact", "in"],
             "arbitration_at_termination": ["exact", "in"],
-            "class_action": ["exact", "in"],
+            "class_action": ["exact"],
             "plaintiff": BASIC_TEXT_LOOKUPS,
             "defendant": BASIC_TEXT_LOOKUPS,
             "termination_class_action_status": ["exact", "in"],

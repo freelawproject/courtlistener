@@ -1,7 +1,7 @@
 import rest_framework_filters as filters
 
 from cl.api.utils import (
-    ALL_TEXT_LOOKUPS,
+    BASIC_TEXT_LOOKUPS,
     DATE_LOOKUPS,
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
@@ -44,9 +44,9 @@ class CourtFilter(NoEmptyFilterSet):
             "position": INTEGER_LOOKUPS,
             "start_date": DATE_LOOKUPS,
             "end_date": DATE_LOOKUPS,
-            "short_name": ALL_TEXT_LOOKUPS,
-            "full_name": ALL_TEXT_LOOKUPS,
-            "citation_string": ALL_TEXT_LOOKUPS,
+            "short_name": BASIC_TEXT_LOOKUPS,
+            "full_name": BASIC_TEXT_LOOKUPS,
+            "citation_string": BASIC_TEXT_LOOKUPS,
         }
 
 
@@ -96,7 +96,7 @@ class DocketFilter(NoEmptyFilterSet):
             "date_last_filing": DATE_LOOKUPS,
             "docket_number": ["exact"],
             "docket_number_core": ["exact", "startswith"],
-            "nature_of_suit": ALL_TEXT_LOOKUPS,
+            "nature_of_suit": BASIC_TEXT_LOOKUPS,
             "pacer_case_id": ["exact"],
             "source": ["exact", "in"],
             "date_blocked": DATE_LOOKUPS,

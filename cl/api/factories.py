@@ -22,6 +22,7 @@ class APIThrottleFactory(DjangoModelFactory):
     throttle_type = ThrottleType.API
     blocked = False
     rate = "100/hour"
+    source = APIThrottle.Source.MANUAL
     notes = Faker("sentence")
 
 

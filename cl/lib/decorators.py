@@ -30,6 +30,14 @@ _memory_cache: dict[str, tuple[float, Any]] = {}
 T = TypeVar("T")
 
 
+def get_tiered_cache_prefix() -> str:
+    """Return the Redis key prefix for tiered_cache.
+
+    Useful for avoiding test collisions when overridden via mock.
+    """
+    return "tiered"
+
+
 def tiered_cache(
     timeout: int,
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
@@ -63,7 +71,7 @@ def tiered_cache(
             key_parts = [func.__module__, func.__name__]
             key_parts.extend(str(arg) for arg in args)
             key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
-            cache_key = f"tiered:{':'.join(key_parts)}"
+            cache_key = f"{get_tiered_cache_prefix()}:{':'.join(key_parts)}"
 
             current_time = time.time()
 
@@ -106,7 +114,7 @@ def clear_tiered_cache() -> None:
     _memory_cache.clear()
     # Clear Redis tier (all keys with tiered: prefix)
     r = get_redis_interface("CACHE")
-    keys = list(r.scan_iter(match=":1:tiered:*"))
+    keys = list(r.scan_iter(match=f":1:{get_tiered_cache_prefix()}:*"))
     if keys:
         r.delete(*keys)
 

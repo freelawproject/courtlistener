@@ -1,0 +1,62 @@
+{% extends "profile/nav.html" %}
+
+{% block title %}Reset Your API Token &ndash; CourtListener.com{% endblock %}
+
+{% block nav-api %}active{% endblock %}
+
+{% block content %}
+  {% include "includes/developer-tabs.html" %}
+
+  <div class="hidden-xs col-sm-1 col-md-3"></div>
+  <div class="col-xs-12 col-sm-10 col-md-6">
+    <h1>You Are About to Reset Your Token</h1>
+    <h3>Your old token will stop working <em>immediately</em>.</h3>
+
+    <p>After you press the button below, your existing API token will be
+       replaced with a new one. Any scripts, integrations, or services that
+       use the old token will fail until you update them with the new
+       value.</p>
+
+    {% if recent_api_count %}
+      <p class="alert alert-warning v-offset-above-2">
+        <i class="fa fa-exclamation-triangle"></i>&nbsp;Your account has made
+        <strong>{{ recent_api_count }}</strong> authenticated API
+        request{{ recent_api_count|pluralize }} in the last five minutes.
+      </p>
+    {% else %}
+      <p class="alert alert-success v-offset-above-2">
+        <i class="fa fa-check-circle-o"></i>&nbsp;Your account has made no
+        authenticated API requests in the last five minutes.
+      </p>
+    {% endif %}
+
+    <p>Resetting your token is the right move if you suspect it has been
+       exposed (for example, committed to a public repository). Otherwise,
+       you may want to <a href="{% url "view_api_token" %}">go back</a>.</p>
+
+    <form id="reset-token-form" action="" method="post" class="v-offset-above-3">{% csrf_token %}
+      <div class="form-group">
+        {{ reset_form.password.label_tag }}
+        {{ reset_form.password }}
+        {% if reset_form.password.errors %}
+          <p class="help-block">
+            {% for error in reset_form.password.errors %}
+              {{ error|escape }}
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+      <button id="reset-token-btn" type="submit" class="btn btn-danger btn-lg">Reset My API Token</button>
+      <a href="{% url "view_api_token" %}" class="btn btn-default btn-lg">Cancel</a>
+    </form>
+  </div>
+  <div class="hidden-xs col-sm-1 col-md-3"></div>
+{% endblock %}
+
+{% block footer-scripts %}
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
+  $("#reset-token-form").on("submit", function () {
+    $("#reset-token-btn").prop("disabled", true).text("Resetting…");
+  });
+</script>
+{% endblock %}

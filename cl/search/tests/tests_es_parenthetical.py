@@ -5,7 +5,7 @@ from functools import reduce
 from unittest import mock
 
 from django.urls import reverse
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from lxml import html
 
 from cl.lib.elasticsearch_utils import (
@@ -71,12 +71,17 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         )
         cls.o.joined_by.add(cls.o.author)
         cls.cluster.panel.add(cls.o.author)
-        cls.citation = CitationWithParentsFactory(cluster=cls.cluster)
+        # Volume/page are set explicitly because Citation.unique_together is
+        # (cluster, volume, reporter, page) — type is not part of it, so the
+        # factory's random volume/page can collide across these three citations.
+        cls.citation = CitationWithParentsFactory(
+            cluster=cls.cluster, volume=1, page=1
+        )
         cls.citation_lexis = CitationWithParentsFactory(
-            cluster=cls.cluster, type=Citation.LEXIS
+            cluster=cls.cluster, type=Citation.LEXIS, volume=2, page=2
         )
         cls.citation_neutral = CitationWithParentsFactory(
-            cluster=cls.cluster, type=Citation.NEUTRAL
+            cluster=cls.cluster, type=Citation.NEUTRAL, volume=3, page=3
         )
         cls.opinion_cited = OpinionsCitedWithParentsFactory(
             citing_opinion=cls.o, cited_opinion=cls.o
@@ -683,13 +688,18 @@ class ParentheticalESSignalProcessorTest(
         # Confirm reverse related fields are updated in ES.
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
         self.assertEqual([], doc.citation)
-        # Create reverse related objects to cluster_1.
-        citation = CitationWithParentsFactory(cluster=self.cluster_1)
+        # Create reverse related objects to cluster_1. Volume/page are set
+        # explicitly because Citation.unique_together is (cluster, volume,
+        # reporter, page) — type is not part of it, so the factory's random
+        # volume/page can collide across these three citations.
+        citation = CitationWithParentsFactory(
+            cluster=self.cluster_1, volume=4, page=4
+        )
         citation_lexis = CitationWithParentsFactory(
-            cluster=self.cluster_1, type=Citation.LEXIS
+            cluster=self.cluster_1, type=Citation.LEXIS, volume=5, page=5
         )
         citation_neutral = CitationWithParentsFactory(
-            cluster=self.cluster_1, type=Citation.NEUTRAL
+            cluster=self.cluster_1, type=Citation.NEUTRAL, volume=6, page=6
         )
         # Reverse related object fields are updated in ES.
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)

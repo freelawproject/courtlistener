@@ -20,7 +20,7 @@ from django.http import QueryDict
 from django.test import Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
+from elasticsearch.dsl import Q
 from factory import RelatedFactory
 from lxml import html
 from selenium.webdriver.common.by import By
@@ -37,6 +37,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.indexing_utils import log_last_document_indexed
 from cl.lib.redis_utils import get_redis_interface
+from cl.lib.search_utils import merge_form_with_courts
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
@@ -4080,6 +4081,28 @@ class SearchFormCourtCleanTest(TestCase):
         cd = form.cleaned_data
         court_ids = set(cd["court"].split())
         self.assertEqual(court_ids, {"scotus", "ca1"})
+
+    def test_merge_form_with_courts_marks_checked_courts(self) -> None:
+        search_form = SearchForm(
+            QueryDict("q=test&type=o&court_scotus=on&court_ca2=on"),
+            courts=[self.court_scotus, self.court_ca1, self.court_ca2],
+        )
+        self.assertTrue(search_form.is_valid())
+
+        court_tabs, court_count_human, court_count = merge_form_with_courts(
+            [self.court_scotus, self.court_ca1, self.court_ca2],
+            search_form,
+        )
+
+        self.assertEqual(court_count_human, "2")
+        self.assertEqual(court_count, "2")
+        checked_by_id = {
+            court.pk: court.checked for court in court_tabs["federal"]
+        }
+        self.assertEqual(
+            checked_by_id,
+            {"scotus": True, "ca1": False, "ca2": True},
+        )
 
     def test_no_court_selection_results_in_empty_court_filter(self) -> None:
         """With no court selection, all picker booleans default to True"""

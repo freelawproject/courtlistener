@@ -7,8 +7,8 @@ from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
-from elasticsearch_dsl import DenseVector
-from elasticsearch_dsl import Document as DSLDocument
+from elasticsearch.dsl import DenseVector
+from elasticsearch.dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
 from cl.audio.audio_sources import AudioSources
@@ -2020,6 +2020,11 @@ class OpinionDocument(CSVSerializableDocumentMixin, OpinionBaseDocument):
                 dims=settings.EMBEDDING_DIMENSIONS,
                 index=True,
                 similarity="dot_product",
+                # Explicitly set to `int8_hnsw` to match the index type used when
+                # this field was originally created under Elasticsearch 9.0, where
+                # `int8_hnsw` was the default for all float vectors regardless of
+                # dimensions.
+                index_options={"type": "int8_hnsw"},
             ),
         }
     )

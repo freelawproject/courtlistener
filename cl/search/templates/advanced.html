@@ -106,19 +106,21 @@
                 <div id="search-container" class="text-center">
                     <label class="sr-only" for="id_q">Search</label>
                     <div class="input-group">
+                        {% include "includes/search_mode_icon.html" %}
                         <input class="form-control input-lg"
                                value="{{ search_form.q.value|default:'' }}"
                                name="q"
                                id="id_q"
                                autocomplete="off"
-                               type="text">
+                               type="text"
+                               placeholder='{% if search_form.type.value == SEARCH_TYPES.OPINION or not search_form.type.value %}{% if search_form.semantic.value %}Natural language search, use &quot;quotes&quot; for exact terms{% else %}Keyword(s) search with operators{% endif %}{% endif %}'>
                         <span class="input-group-btn">
-                        <button type="submit"
-                                class="btn btn-primary btn-lg"
-                                name="search"
-                                id="search-button"><i class="fa fa-search"></i>&nbsp;Search
-                        </button>
-                    </span>
+                            <button type="submit"
+                                    class="btn btn-primary btn-lg"
+                                    name="search"
+                                    id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+                            </button>
+                        </span>
                     </div>
                 </div>
             </form>
@@ -737,7 +739,7 @@
                 <h3>Coverage</h3>
                 <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{% url "coverage_oa" %}">on our coverage page</a>.
                 </p>
-                <p>Our collection of SCOTUS recordings goes back to 2013. Before that, we recommend <a href="https://www.oyez.org" target="_blank">the wonderful Oyez Project</a>, which goes back to 1955.
+                <p>Our collection of SCOTUS recordings goes back to 2013. Before that, we recommend <a href="https://www.oyez.org" target="_blank" rel="noopener noreferrer">the wonderful Oyez Project</a>, which goes back to 1955.
                 </p>
 
                 <h3>Podcasts&nbsp;<i class="fa fa-podcast gray"></i></h3>
@@ -775,12 +777,12 @@
             </div>
             <div class="col-md-4">
                 <h3>Studying the Data</h3>
-                <p>Like all of our data, the judicial database is available <a href="{% url "bulk_data_index" %}">in bulk</a> and <a href="{% url "api_index" %}">via our APIs</a>. This means that interested researchers, start-ups, journalists, and the public can download the data or integrate it into their systems.
+                <p>Like all of our data, the judicial database is available <a href="{{ WIKI_API_URL }}/bulk-data/bulk-legal-data">in bulk</a> and <a href="{{ WIKI_API_URL }}">via our APIs</a>. This means that interested researchers, start-ups, journalists, and the public can download the data or integrate it into their systems.
                 </p>
                 <p>We enthusiastically welcome reuse of and contribution to the data.
                 </p>
                 <p>
-                    <a href="{% url "api_index" %}"
+                    <a href="{{ WIKI_API_URL }}"
                        class="btn btn-primary">Learn More</a>
                 </p>
             </div>

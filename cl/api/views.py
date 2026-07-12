@@ -14,30 +14,29 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
-from django.views.generic import TemplateView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
+from cl.alerts.utils import get_alert_estimation_count
 from cl.api.models import APIThrottle, ThrottleType
-from cl.api.utils import get_all_throttle_overrides, invert_user_logs
+from cl.api.utils import invert_user_logs
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.lib.elasticsearch_utils import (
-    do_es_alert_estimation_query,
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
 )
 from cl.lib.ratelimiter import parse_rate
 from cl.search.documents import (
-    AudioDocument,
-    DocketDocument,
     OpinionClusterDocument,
 )
-from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
+from cl.search.exception import ElasticBadRequestError, ElasticServerError
+from cl.search.models import Citation, Court, OpinionCluster
+from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
+from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
 
@@ -90,99 +89,6 @@ async def court_index(request: HttpRequest) -> HttpResponse:
     courts = await make_court_variable()
     return TemplateResponse(
         request, "jurisdictions.html", {"courts": courts, "private": False}
-    )
-
-
-async def rest_docs(request, version=None):
-    """Show the correct version of the rest docs.
-
-    Latest version is shown when not specified in args.
-    """
-    court_count = await Court.objects.exclude(
-        jurisdiction=Court.TESTING_COURT
-    ).acount()
-    latest = version is None
-    context = {"court_count": court_count, "private": not latest}
-    return TemplateResponse(
-        request,
-        [f"rest-docs-{version}.html", "rest-docs-vlatest.html"],
-        context,
-    )
-
-
-async def api_index(request: HttpRequest) -> HttpResponse:
-    court_count = await Court.objects.exclude(
-        jurisdiction=Court.TESTING_COURT
-    ).acount()
-    return TemplateResponse(
-        request, "docs.html", {"court_count": court_count, "private": False}
-    )
-
-
-async def bulk_data_index(request: HttpRequest) -> HttpResponse:
-    """Shows an index page for the dumps."""
-    disclosure_coverage = await get_coverage_data_fds()
-    return TemplateResponse(
-        request,
-        "bulk-data.html",
-        disclosure_coverage,
-    )
-
-
-def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
-    """
-    Parses a throttle rate string and returns a tuple containing the number of
-    citations allowed and the throttling duration in a format suitable for
-    templates.
-
-    Args:
-        rate (str): A string representing the throttle rate
-
-    Returns:
-        A tuple containing a two elements:
-            - The number of citations allowed (int).
-            - The throttling duration (str).
-    """
-    if not rate:
-        return None
-    duration_as_str = {"s": "second", "m": "minute", "h": "hour", "d": "day"}
-    num, period = rate.split("/")
-    return int(num), duration_as_str[period[0]]
-
-
-async def citation_lookup_api(
-    request: HttpRequest, version=None
-) -> HttpResponse:
-    cite_count = await Citation.objects.acount()
-    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
-    default_throttle_rate = parse_throttle_rate_for_template(rate)
-    custom_throttle_rate = None
-    if request.user and request.user.is_authenticated:
-        overrides = await sync_to_async(get_all_throttle_overrides)(
-            ThrottleType.CITATION_LOOKUP
-        )
-        override = overrides.get(request.user.username)
-        if override is not None:
-            blocked, custom_rate = override
-            if not blocked and custom_rate:
-                custom_throttle_rate = parse_throttle_rate_for_template(
-                    custom_rate
-                )
-
-    return TemplateResponse(
-        request,
-        [
-            f"citation-lookup-api-{version}.html",
-            "citation-lookup-api-vlatest.html",
-        ],
-        {
-            "cite_count": cite_count,
-            "default_throttle_rate": default_throttle_rate,
-            "custom_throttle_rate": custom_throttle_rate,
-            "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
-            "private": False,
-            "version": version if version else "v4",
-        },
     )
 
 
@@ -276,40 +182,27 @@ async def get_result_count(request, version, day_count):
     period.
     """
 
-    search_form = await sync_to_async(SearchForm)(request.GET.copy())
-    if not search_form.is_valid():
+    try:
+        estimation = await sync_to_async(get_alert_estimation_count)(
+            request.GET.copy(), int(day_count)
+        )
+    except (ElasticServerError, ElasticBadRequestError):
+        # The query couldn't be run against Elasticsearch.
+        return JsonResponse(
+            {
+                "error": "Internal server error when trying to get the "
+                "estimation count."
+            },
+            safe=True,
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+    if estimation is None:
         return JsonResponse(
             {"error": "Invalid SearchForm"},
             safe=True,
             status=HTTPStatus.BAD_REQUEST,
         )
-    cd = search_form.cleaned_data
-    search_type = cd["type"]
-    total_case_only_query_results = 0
-    match search_type:
-        case SEARCH_TYPES.ORAL_ARGUMENT:
-            # Elasticsearch version for OA
-            search_query = AudioDocument.search()
-            total_query_results, _ = await sync_to_async(
-                do_es_alert_estimation_query
-            )(search_query, cd, day_count)
-        case SEARCH_TYPES.OPINION:
-            # Elasticsearch version for O
-            search_query = OpinionClusterDocument.search()
-            total_query_results, _ = await sync_to_async(
-                do_es_alert_estimation_query
-            )(search_query, cd, day_count)
-        case SEARCH_TYPES.RECAP:
-            # Elasticsearch version for RECAP
-            search_query = DocketDocument.search()
-            (
-                total_query_results,
-                total_case_only_query_results,
-            ) = await sync_to_async(do_es_alert_estimation_query)(
-                search_query, cd, day_count
-            )
-        case _:
-            total_query_results = 0
+    total_query_results, total_case_only_query_results = estimation
     return JsonResponse(
         {
             "count": total_query_results,
@@ -333,31 +226,25 @@ async def deprecated_api(request, v):
     )
 
 
-async def webhooks_docs(request, version=None):
-    """Show the correct version of the webhooks docs"""
-
-    context = {"private": False}
-    return TemplateResponse(
-        request,
-        [f"webhooks-docs-{version}.html", "webhooks-docs-vlatest.html"],
-        context,
-    )
-
-
-class VersionedTemplateView(TemplateView):
-    """Custom template view to handle the right template based on the path
-    version requested.
+def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
     """
+    Parses a throttle rate string and returns a tuple containing the number of
+    citations allowed and the throttling duration in a format suitable for
+    templates.
 
-    def get_template_names(self):
-        version = self.kwargs.get("version", "vlatest")
-        base_template = self.template_name.replace("-vlatest", f"-{version}")
-        return [base_template, self.template_name]
+    Args:
+        rate (str): A string representing the throttle rate
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["version"] = self.kwargs.get("version", "v4")
-        return context
+    Returns:
+        A tuple containing a two elements:
+            - The number of citations allowed (int).
+            - The throttling duration (str).
+    """
+    if not rate:
+        return None
+    duration_as_str = {"s": "second", "m": "minute", "h": "hour", "d": "day"}
+    num, period = rate.split("/")
+    return int(num), duration_as_str[period[0]]
 
 
 async def wiki_data(request: HttpRequest) -> JsonResponse:
@@ -380,10 +267,15 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
 
     fd_data = await get_coverage_data_fds()
+    # Yesterday's alert total; start=1 skips today's still-filling bucket.
+    alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
+        f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
+    )
 
     data = {
         "court_count": court_count,
         "citation_count": citation_count,
+        "alerts_sent_count": alerts_sent_count,
         "citation_lookup": {
             "throttle_count": count,
             "throttle_period": period,

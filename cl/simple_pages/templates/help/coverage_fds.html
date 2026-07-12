@@ -200,7 +200,7 @@
     <p>We have dedicated considerable energy to develop <a href="https://github.com/freelawproject/disclosure-extractor">a parsing system</a> for these disclosures. This system takes the disclosure, whether it’s a single-page TIFF, multi-page TIFF or PDF, scanned document or text, and converts it into machine-readable JSON data. When we first ran this system, it took weeks for our servers to parse the information from the disclosures.
     </p>
     <p>Additionally, we developed a <a href="https://github.com/freelawproject/nomination-extractor/">machine learning model</a> that extracted 843 Financial Disclosure from over 250k pages of Senate hearing documents.</p>
-    <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a href="{%  url "api_index" %}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
+    <p>Once the parsing was completed, we converted all the disclosures into good PDF files and ingested the data into our database, where it is <a href="{{ WIKI_API_URL }}">available via our APIs and website</a>. As of this moment, there are <strong>{{ disclosures|intcomma }}</strong> disclosures documenting:
     </p>
 
     <ul>

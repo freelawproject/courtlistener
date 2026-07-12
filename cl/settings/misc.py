@@ -52,6 +52,12 @@ GOOGLE_AUTH = {
 STAT_METRICS_PREFIX = "prometheus:stat:"
 
 
+########
+# Wiki #
+########
+WIKI_API_BASE_URL = "https://wiki.free.law/c/courtlistener/help/api"
+
+
 ##############
 # Super Misc #
 ##############
@@ -80,4 +86,9 @@ WEBHOOK_V1_DEPRECATION_DATE = env(
 # does not need OCR.
 CHARS_THRESHOLD_OCR_PER_PAGE = env.int(
     "CHARS_THRESHOLD_OCR_PER_PAGE", default=200
+)
+
+# SCOTUS email subscription
+SCOTUS_RECAP_EMAIL = env(
+    "SCOTUS_RECAP_EMAIL", default="notifications@scotus.recap.email"
 )

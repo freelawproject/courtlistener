@@ -62,6 +62,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.admin import reprocess_failed_epq
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.factories import (
     AppellateAttachmentFactory,
@@ -105,6 +106,8 @@ from cl.recap.models import (
     PROCESSING_STATUS,
     REQUEST_TYPE,
     UPLOAD_TYPE,
+    EmailProcessingQueue,
+    EmailSource,
     FjcIntegratedDatabase,
     PacerFetchQueue,
     PacerHtmlFiles,
@@ -245,6 +248,9 @@ class RecapUploadsTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        recap_user = User.objects.get(username="recap")
+        view_perm = Permission.objects.get(codename="view_processingqueue")
+        recap_user.user_permissions.add(view_perm)
         CourtFactory(id="canb", jurisdiction="FB")
         cls.court = CourtFactory.create(
             id="nysd", jurisdiction="FD", in_use=True
@@ -3832,6 +3838,12 @@ class RecapAttPageFetchApiTest(TestCase):
 
 
 class ProcessingQueueApiFilterTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        recap_user = User.objects.get(username="recap")
+        view_perm = Permission.objects.get(codename="view_processingqueue")
+        recap_user.user_permissions.add(view_perm)
+
     def setUp(self) -> None:
         self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap")
@@ -8858,3 +8870,47 @@ class BadRedactionCheckTest(TestCase):
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("/1/2/", mail.outbox[0].body)
+
+
+class ReprocessFailedEPQTest(TestCase):
+    """Test that the reprocess_failed_epq admin action routes each email
+    source to the matching processing task."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.uploader = User.objects.get(username="recap-email")
+        cls.scotus_epq = EmailProcessingQueue.objects.create(
+            court=CourtFactory(id="scotus"),
+            uploader=cls.uploader,
+            message_id="scotus-message-id",
+            source=EmailSource.SCOTUS,
+        )
+        cls.texas_epq = EmailProcessingQueue.objects.create(
+            court=CourtFactory(id="txctapp1"),
+            uploader=cls.uploader,
+            message_id="texas-message-id",
+            source=EmailSource.STATE,
+        )
+        cls.pacer_epq = EmailProcessingQueue.objects.create(
+            court=CourtFactory(id="canb", jurisdiction="FB"),
+            uploader=cls.uploader,
+            message_id="pacer-message-id",
+            source=EmailSource.PACER,
+        )
+
+    def test_routes_epqs_by_source(self):
+        """Are SCOTUS, Texas, and PACER emails each sent to the right task?"""
+        modeladmin = mock.MagicMock()
+        request = RequestFactory().post("/")
+        with (
+            mock.patch("cl.recap.admin.process_scotus_email") as scotus_mock,
+            mock.patch("cl.recap.admin.process_texas_email") as texas_mock,
+            mock.patch("cl.recap.admin.do_recap_document_fetch") as pacer_mock,
+        ):
+            reprocess_failed_epq(
+                modeladmin, request, EmailProcessingQueue.objects.all()
+            )
+
+        scotus_mock.delay.assert_called_once_with(self.scotus_epq.pk)
+        texas_mock.delay.assert_called_once_with(self.texas_epq.pk)
+        pacer_mock.assert_called_once_with(self.pacer_epq, self.uploader)

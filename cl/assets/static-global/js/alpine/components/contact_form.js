@@ -3,6 +3,7 @@ document.addEventListener('alpine:init', () => {
     issueType: '',
     techTypes: [],
     termsURL: '',
+    mcpHelpURL: '',
     get issue() {
       const isPartnershipsInquiry = this.issueType === 'partnerships';
       const isTechSupport = this.techTypes.includes(this.issueType);
@@ -26,6 +27,7 @@ document.addEventListener('alpine:init', () => {
       const hints = {
         support: `<strong>Need a hand with CourtListener?</strong> This option goes to our general inbox. Doublecheck the other options in the dropdown above to make sure your question gets to the right team. Then, tell us what you’re trying to do and include the exact page link(s).<br><br>${discussionsLink}`,
         api: `<a href="https://free.law">Free Law Project</a> makes it possible for you and your team to access our data. ${discussionsLink}`,
+        mcp: `<strong>Need help with our <a href="${this.mcpHelpURL}">MCP server</a>?</strong> Tell us which client you're using, what you were trying to do, and include any error messages you saw. ${discussionsLink}`,
         recap:
           'Having trouble with the <a href="https://free.law/recap">RECAP extension</a>? Include your browser and version, the page/court link you were on, what you expected, and what happened instead.',
         partnerships:
@@ -57,6 +59,7 @@ document.addEventListener('alpine:init', () => {
       this.requiresCheckTypes = JSON.parse(document.getElementById('requires-check-types').textContent);
       this.techTypes = JSON.parse(document.getElementById('tech-types').textContent);
       this.termsURL = JSON.parse(document.getElementById('terms-url').textContent);
+      this.mcpHelpURL = JSON.parse(document.getElementById('mcp-help-url').textContent);
     },
   }));
 });

@@ -31,8 +31,13 @@
   rules. For example:
 
   {% if FUNDRAISING_MODE %}
-    {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/contact/" text="Message for your banner" emoji="&#128077;" cookie_name="cookie_to_hide_banner"%}
+    {% include 'includes/dismissible_nav_banner.html' with request=request link="https://free.law/contact/" text="Message for your banner" emoji="&#128077;" cookie_name="cookie_to_hide_banner" only %}
   {% endif %}
+
+  IMPORTANT: Always use `only` when including this template to prevent parent
+  context variables (e.g. `title` from docket pages) from leaking into the
+  banner. Pass `request=request` explicitly since the banner needs it for the
+  cookie check.
 
 {% endcomment %}
 

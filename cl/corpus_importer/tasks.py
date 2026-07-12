@@ -421,7 +421,12 @@ def download_recap_item(
     soft_time_limit=240,
 )
 def get_and_save_free_document_report(
-    self: Task, court_id: str, start: date, end: date, log_id: int = 0
+    self: Task,
+    court_id: str,
+    start: date,
+    end: date,
+    log_id: int = 0,
+    day_span: int = 1,
 ) -> tuple[int, int]:
     """Download the Free document report and save it to the DB.
 
@@ -430,6 +435,9 @@ def get_and_save_free_document_report(
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
     :param log_id: a PACERFreeDocumentLog object id
+    :param day_span: how many days each PACER sub-query should cover. Smaller
+    values produce more, smaller requests, which is friendlier to proxy
+    read timeouts.
     :return: The status code of the scrape
     """
     session_data = get_or_cache_pacer_cookies(
@@ -446,7 +454,7 @@ def get_and_save_free_document_report(
     report = FreeOpinionReport(court_id, s)
     msg = ""
     try:
-        report.query(start, end, sort="case_number")
+        report.query(start, end, sort="case_number", day_span=day_span)
     except (
         TypeError,
         RequestException,
@@ -3181,6 +3189,20 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
     :param recap_document_id: RECAPDocument id
     """
 
+    # The case-name LLM call requires a funded OpenAI key. In local
+    # development the dev key has no quota, so skip the call and leave the
+    # scraped case name untouched. Tests (TESTING=True) still run the real
+    # code path with call_llm mocked, and production (DEVELOPMENT=False) is
+    # unaffected.
+    if settings.DEVELOPMENT and not settings.TESTING:
+        logger.info(
+            "Skipping LLM case name classification in development "
+            "(cluster_id=%s, recap_document_id=%s)",
+            cluster_pk,
+            recap_document_id,
+        )
+        return
+
     OPENAI_CASE_LAW_INFERENCE_KEY = env(
         "OPENAI_CASE_LAW_INFERENCE_KEY", default=None
     )
@@ -3483,7 +3505,7 @@ def merge_scotus_docket_entry(
     sequence_number: str,
     input_docket_entry: dict[str, Any],
     download_file: bool = True,
-) -> tuple[bool, int | None]:
+) -> tuple[bool, int | None, list[int]]:
     """Merges a SCOTUS docket entry into CL.
 
     :param docket: The docket this entry belongs to.
@@ -3493,6 +3515,7 @@ def merge_scotus_docket_entry(
     :return: Tuple with the following entries:
         - A flag which is set to true when the SCOTUSDocketEntry was created.
         - The pk of the updated SCOTUSDocketEntry object.
+        - A list of PKs of SCOTUSDocument objects that were created or updated.
     """
     with transaction.atomic():
         # Acquire lock on the docket to prevent race conditions
@@ -3518,7 +3541,7 @@ def merge_scotus_docket_entry(
                     entry_number,
                     docket.pk,
                 )
-                return False, None
+                return False, None, []
 
         else:
             normalize_long_description(input_docket_entry)
@@ -3551,7 +3574,7 @@ def merge_scotus_docket_entry(
                         sequence_number,
                         docket.pk,
                     )
-                    return False, None
+                    return False, None, []
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
                     "Multiple matching unnumbered SCOTUSDocketEntries found for description "
@@ -3559,7 +3582,7 @@ def merge_scotus_docket_entry(
                     input_docket_entry["description"],
                     docket.pk,
                 )
-                return False, None
+                return False, None, []
 
         # Update fields
         de.sequence_number = sequence_number
@@ -3567,35 +3590,39 @@ def merge_scotus_docket_entry(
         de.date_filed = date_filed
         de.save()
 
-        # Merge attachments
+        # Merge attachments; only track newly created document PKs
+        doc_pks = []
         attachments = input_docket_entry["attachments"]
         for document in attachments:
-            merge_scotus_document(de, document, download_file=download_file)
-        return de_created, de.pk
+            created, doc_pk = merge_scotus_document(
+                de, document, download_file=download_file
+            )
+            if created:
+                doc_pks.append(doc_pk)
+        return de_created, de.pk, doc_pks
 
 
 def add_scotus_docket_entries(
     docket: Docket,
     docket_entries: list[dict[str, Any]],
     download_file: bool = True,
-) -> None:
+) -> list[int]:
     """Add or update SCOTUS docket entries for a docket.
 
     :param docket: The Docket to add entries to.
     :param docket_entries: List of docket entry dicts from the scraper.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: A three-tuple containing:
-        - List of SCOTUSDocketEntry PKs that were created or updated
-        - List of SCOTUSDocument PKs that were created
-        - List of SCOTUSDocument PKs that were updated
+    :return: A list of PKs of SCOTUSDocument objects that were created or
+        updated across all entries.
     """
     sequence_numbers = create_docket_entry_sequence_numbers(
         docket_entries, "date_filed"
     )
+    all_doc_pks: list[int] = []
     for sequence_number, docket_entry in zip(
         sequence_numbers, docket_entries, strict=True
     ):
-        de_created, de_pk = merge_scotus_docket_entry(
+        de_created, de_pk, doc_pks = merge_scotus_docket_entry(
             docket,
             sequence_number,
             docket_entry,
@@ -3609,12 +3636,14 @@ def add_scotus_docket_entries(
                 docket.pk,
             )
             continue
+        all_doc_pks.extend(doc_pks)
+    return all_doc_pks
 
 
 def merge_scotus_docket(
     report_data: dict[str, Any],
     download_file: bool = True,
-) -> tuple[Docket, bool]:
+) -> tuple[Docket, bool, list[int]]:
     """Merge SCOTUS docket data into a Docket and ScotusDocketMetadata.
 
     This will create or update the Docket row for the SCOTUS and
@@ -3622,8 +3651,9 @@ def merge_scotus_docket(
 
     :param report_data: A dictionary containing parsed SCOTUS docket data.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: A two-tuple: the created or updated Docket instance, whether the
-    QP file should be downloaded.
+    :return: A three-tuple: the created or updated Docket instance, whether
+    the QP file should be downloaded, and a list of PKs of SCOTUSDocument
+    objects that were created or updated.
     """
     with transaction.atomic():
         court = Court.objects.get(pk="scotus")
@@ -3744,11 +3774,11 @@ def merge_scotus_docket(
 
     # Docket entries merger:
     enrich_scotus_attachments(report_data["docket_entries"])
-    add_scotus_docket_entries(
+    doc_pks = add_scotus_docket_entries(
         d, report_data["docket_entries"], download_file=download_file
     )
 
-    return d, download_qp
+    return d, download_qp, doc_pks
 
 
 @app.task(bind=True)
@@ -3756,7 +3786,7 @@ def process_scotus_docket(
     self,
     report_data: dict[str, Any],
     download_file: bool = True,
-) -> None:
+) -> int:
     """Process and merge a SCOTUS docket report.
 
     This task merges the provided SCOTUS docket report data into the database,
@@ -3766,13 +3796,14 @@ def process_scotus_docket(
     :param self: The Celery task instance.
     :param report_data: Parsed SCOTUS docket report data.
     :param download_file: Whether to trigger PDF download and extraction.
-    :return: None
+    :return: The primary key of the merged Docket.
     """
-    docket, download_qp = merge_scotus_docket(
+    docket, download_qp, _ = merge_scotus_docket(
         report_data, download_file=download_file
     )
     if download_qp:
         download_qp_scotus_pdf.delay(docket.pk)
+    return docket.pk
 
 
 @app.task(
@@ -4613,6 +4644,10 @@ def merge_texas_docket_originating_court(
     if texas_docket_has_appellate_info(docket_data):
         ocd = docket_data["appeals_court"]
         if not ocd["case_number"]:
+            logger.warning(
+                "Skipping merge of OCI for Texas docket %s due to missing originating court docket number.",
+                docket.docket_number,
+            )
             return MergeResult.failed("OriginatingCourtInformation")
         oc_dn = sorted(ocd["case_number"])[0]
         oc_reporter = ""
@@ -4909,6 +4944,7 @@ def merge_texas_docket(
                 docket_source=Docket.SCRAPER,
                 allow_create=True,
             )
+        docket_created = docket.pk is None
         docket.add_scraper_source()
         docket.docket_number = docket_number
         docket.docket_number_core = make_texas_docket_number_core(
@@ -4976,15 +5012,16 @@ def merge_texas_docket(
     result = MergeResult.union(result, party_merge_result)
     result = MergeResult.union(result, entry_merge_result)
     result = MergeResult.union(result, merge_case_transfer_result)
-    # Track the docket PK in the result
-    result.creates.setdefault("Docket", set()).add(docket.pk)
+    bucket = result.creates if docket_created else result.updates
+    bucket.setdefault("Docket", set()).add(docket.pk)
 
     if not result.success:
         logger.error(
-            "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Please review logs.",
+            "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Failures: %s",
             docket_number,
             docket.pk,
             court.pk,
+            result.failures,
         )
 
     return result
@@ -5050,7 +5087,12 @@ def texas_ingest_docket_task(
     )
     if subscription_data and result.create:
         redis = get_redis_interface("CACHE")
-        redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+        added = redis.sadd(TAMES_PENDING_SUBSCRIPTIONS_KEY, subscription_data)
+        if not added:
+            logger.info(
+                "TAMES subscription already pending, skipping: %s",
+                subscription_data,
+            )
     return result
 
 

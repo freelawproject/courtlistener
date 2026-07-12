@@ -45,6 +45,7 @@ urlpatterns = [
                 "extra_context": {"private": False},
             },
         ),
+        name="sign-out",
     ),
     path(
         "reset-password/",
@@ -117,6 +118,11 @@ urlpatterns = [
     path("profile/id/", views.view_user_id, name="view_user_id"),
     path("profile/api/", views.view_api, name="view_api"),
     path("profile/api-token/", views.view_api_token, name="view_api_token"),
+    path(
+        "profile/api-token/reset/",
+        views.reset_api_token,
+        name="reset_api_token",
+    ),
     path("profile/api-usage/", views.view_api_usage, name="view_api_usage"),
     path("profile/webhooks/", views.view_webhooks, name="view_webhooks"),
     path("profile/your-support/", view_donations, name="profile_your_support"),

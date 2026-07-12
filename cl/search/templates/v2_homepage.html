@@ -13,6 +13,7 @@
 {% block header %}
   <c-header
     :request="request"
+    :csrf_token="csrf_token"
     variant="homepage"
     class="bg-greyscale-100"
     only
@@ -216,7 +217,7 @@
           paragraph_text="If you use PACER, consider installing the RECAP extension in your browser. If you are a researcher, you can search millions of federal filings in the RECAP Archive. Journalists and court watchers will find docket alerts invaluable. If you get notifications from PACER, check out our NEF notification handler."
           :buttons="[
             {
-              'style': 'btn-primary',
+              'variant': 'primary',
               'name': 'Install now',
               'options': [
                 {
@@ -238,7 +239,7 @@
                 }
               ]
             }, {
-                'style': 'btn-outline',
+                'variant': 'outline',
                 'name': 'Learn more',
                 'href': 'https://free.law/recap'
             }
@@ -254,9 +255,9 @@
           paragraph_text="After more than a decade of development, these APIs are powerful. Our case law API was the first. Our PACER and oral arguments APIs are the biggest. Our webhooks push data to you. Our citation lookup tool can fight hallucinations in AI tools."
           :buttons="[
             {
-                'style': 'btn-primary',
+                'variant': 'primary',
                 'name': 'Learn more',
-                'href': 'https://www.courtlistener.com/help/api/'
+                'href': '{{ WIKI_API_URL }}'
             }
           ]"
           image_source="{%  static 'png/api_setup_container.png' %}"

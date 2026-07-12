@@ -37,6 +37,8 @@
          The query contains a <a href="{% url "advanced_search" %}#disallowed-wildcards">disallowed wildcard</a> pattern.
       {% elif error_message == "invalid_relative_date_syntax" %}
          The date entered has an invalid format.
+      {% elif error_message == "input_too_long_error" %}
+         Your query is too long for semantic search. Please shorten it or switch to keyword search.
       {% endif %}
     {% else %}
       encountered an error.

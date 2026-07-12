@@ -3,8 +3,9 @@ from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import sync_to_async
-from django.core import mail
+from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import reverse
 from lxml.html import fromstring
@@ -17,6 +18,7 @@ from cl.tests.cases import SimpleTestCase, TestCase
 
 
 # Mock the hcaptcha thing so that we're sure it validates during tests
+@patch("cl.simple_pages.views.create_zoho_desk_ticket")
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class ContactTest(SimpleUserDataMixin, TestCase):
     test_msg = {
@@ -29,7 +31,9 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         "checked_documentation": True,
     }
 
-    async def test_multiple_requests_request(self, mock: MagicMock) -> None:
+    async def test_multiple_requests_request(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Is state persisted in the contact form?
 
         The contact form is abstracted in a way that it can have peculiar
@@ -50,28 +54,93 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         r = await self.async_client.get(reverse("contact"))
         self.assertNotIn("pandora", r.content.decode())
 
-    async def test_contact_logged_in(self, mock: MagicMock) -> None:
-        """Can we use the contact form to send a message when logged in?"""
+    async def test_contact_logged_in(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Can a logged-in user submit the form (without typing an email)?
+
+        The form must not accept an email from a logged-in user — the
+        account email is used directly. The resulting ticket also
+        surfaces the user's account status so support staff don't need
+        to verify it again.
+        """
         self.assertTrue(
             await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
+        msg = self.test_msg.copy()
+        msg.pop("email")
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        kwargs = mock_task.delay.call_args.kwargs
+        pandora_email = await User.objects.values_list(
+            "email", flat=True
+        ).aget(username="pandora")
+        self.assertEqual(kwargs["email"], pandora_email)
+        description = kwargs["description"]
+        self.assertIn("Logged In As: pandora", description)
+        self.assertIn("Email Confirmed: Yes", description)
+        self.assertNotIn("User Email:", description)
+
+    async def test_logged_in_user_email_field_is_ignored(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """An email submitted by a logged-in user must not reach Zoho.
+
+        A malicious or confused logged-in user might POST a fake email
+        (the field exists on the form even though the template hides
+        it). Support staff rely on Zoho's email coming from the
+        authenticated account, so the submitted value must be ignored
+        in favor of the account email.
+        """
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        msg = self.test_msg.copy()
+        msg["email"] = "malevolent@evil.com"
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        kwargs = mock_task.delay.call_args.kwargs
+        pandora_email = await User.objects.values_list(
+            "email", flat=True
+        ).aget(username="pandora")
+        self.assertEqual(kwargs["email"], pandora_email)
+        self.assertNotIn("malevolent@evil.com", kwargs["description"])
+
+    async def test_contact_logged_out(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Can we use the contact form to send a message when logged out?
+
+        Anonymous submissions must not include any "Logged In As" line.
+        """
         response = await self.async_client.post(
             reverse("contact"), self.test_msg
         )
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        mock_task.delay.assert_called_once()
+        description = mock_task.delay.call_args.kwargs["description"]
+        self.assertNotIn("Logged In As", description)
+        self.assertNotIn("Email Confirmed", description)
 
-    async def test_contact_logged_out(self, mock: MagicMock) -> None:
-        """Can we use the contact form to send a message when logged out?"""
-        response = await self.async_client.post(
-            reverse("contact"), self.test_msg
-        )
-        self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+    async def test_logged_out_user_must_provide_email(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Anonymous submissions without an email are rejected."""
+        msg = self.test_msg.copy()
+        msg.pop("email")
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        mock_task.delay.assert_not_called()
 
-    async def test_contact_unicode(self, mock: MagicMock) -> None:
+    async def test_contact_unicode(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Can unicode be used when contacting us?"""
         msg = self.test_msg.copy()
         msg["message"] = (
@@ -82,9 +151,22 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         )
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        mock_task.delay.assert_called_once()
 
-    async def test_spam_message_is_rejected(self, mock: MagicMock) -> None:
+    async def test_message_newlines_become_br(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Multi-line user input renders as <br> in the Zoho description."""
+        msg = self.test_msg.copy()
+        msg["message"] = "Line one\nLine two\nLine three"
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        description = mock_task.delay.call_args.kwargs["description"]
+        self.assertIn("Line one<br>Line two<br>Line three", description)
+
+    async def test_spam_message_is_rejected(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Do we reject it if people put a phone number in the phone_number
         field?
 
@@ -95,15 +177,17 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         msg["phone_number"] = "909-576-4123"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         # Number in middle of subject is OK!
         msg["phone_number"] = "asdf 909 asdf"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mock_task.delay.call_count, 1)
 
-    async def test_removals_require_http(self, mock: MagicMock) -> None:
+    async def test_removals_require_http(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
         """Do we ensure removals have an HTTP link?"""
         msg = self.test_msg.copy()
 
@@ -112,28 +196,28 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         msg["message"] = "test in message with lots of long words"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         msg["phone_number"] = "Please remove link!"
         msg["message"] = "test in message with lots of long words"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         # Test regex matching on removals fails
         msg["phone_number"] = "take down request"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(mock_task.delay.call_count, 0)
 
         # Removal subject with link is OK!
         msg["message"] = "test http in message"
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
-        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mock_task.delay.call_count, 1)
 
     async def test_documentation_checkbox_required(
-        self, mock: MagicMock
+        self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
         """Is the documentation checkbox required for support-type issues?"""
         for issue_type in ContactForm.DOCUMENTATION_CHECK_TYPES:
@@ -158,7 +242,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
                 self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
     async def test_documentation_checkbox_not_required_for_other_types(
-        self, mock: MagicMock
+        self, mock_captcha: MagicMock, mock_task: MagicMock
     ) -> None:
         """Is the documentation checkbox skipped for non-support issue types?"""
         msg = self.test_msg.copy()
@@ -167,11 +251,24 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(reverse("contact"), msg)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
 
+    async def test_issue_type_prefilled_from_query_param(
+        self, mock_captcha: MagicMock, mock_task: MagicMock
+    ) -> None:
+        """Does ?issue_type=mcp preselect the MCP option on first load?"""
+        r = await self.async_client.get(
+            reverse("contact"), {"issue_type": "mcp"}
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        html = fromstring(r.content.decode())
+        selected = html.xpath(
+            "//select[@name='issue_type']/option[@selected]/@value"
+        )
+        self.assertEqual(selected, ["mcp"])
 
-class SimplePagesTest(SimpleUserDataMixin, TestCase):
+
+class PageLoadTestMixin(TestCase):
     def assert_page_title_in_html(self, content: str) -> None:
         """Make sure a page has a valid HTML title"""
-        print("Checking for HTML title tag....", end="")
         html_tree = fromstring(content)
         title = cast(list[str], html_tree.xpath("//title/text()"))
         self.assertGreater(
@@ -184,17 +281,15 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             0,
             msg="The text in this title tag is empty.",
         )
-        print("✓")
 
-    async def assert_page_loads_ok(self, reverse_param: dict) -> None:
+    async def assert_page_loads_ok(self, reverse_param: dict) -> HttpResponse:
         """Does a page load properly?
 
         :param reverse_param: Params that can be sent to Django's reverse
         function to get a URL path.
-        :return: None
+        :return: The response object.
         """
         path = reverse(**reverse_param)
-        print(f"Testing basic load of: {path}...", end="")
         r = await self.async_client.get(path)
         self.assertEqual(
             r.status_code,
@@ -207,11 +302,13 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
                 code=r.status_code,
             ),
         )
-        print("✓")
         is_html = "text/html" in r["content-type"]
         if r["content-type"] and is_html:
             self.assert_page_title_in_html(r.content.decode())
+        return r
 
+
+class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: list[dict[str, Any]] = [
@@ -223,7 +320,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
-            {"viewname": "replication_docs"},
             {"viewname": "terms"},
             {"viewname": "robots"},
             # Contact
@@ -237,25 +333,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "advanced_search"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
-            {"viewname": "mcp_help"},
-            {"viewname": "cluster_redirections_help"},
             {"viewname": "citegeist_help"},
-            # API help pages
-            {"viewname": "case_law_api_help"},
-            {"viewname": "citation_api_help"},
-            {"viewname": "pacer_api_help"},
-            {"viewname": "recap_api_help"},
-            {"viewname": "judge_api_help"},
-            {"viewname": "field_api_help"},
-            {"viewname": "oral_argument_api_help"},
-            {"viewname": "visualization_api_help"},
-            {"viewname": "webhooks_docs"},
-            {"viewname": "webhooks_getting_started"},
-            {"viewname": "citation_lookup_api"},
-            {"viewname": "alert_api_help"},
-            {"viewname": "financial_disclosures_api_help"},
-            {"viewname": "search_api_help"},
-            {"viewname": "rest_change_log"},
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
@@ -302,6 +380,43 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         self.assertIn(
             "with 4 minutes of recordings (and counting).", r.content.decode()
         )
+
+
+@override_flag("use_new_design", True)
+@override_settings(WAFFLE_CACHE_PREFIX="test_v2_register_waffle")
+class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
+    """Registry of pages with v2 (redesigned) templates.
+
+    Adding a page here is part of the definition of done for a
+    redesigned template. The homepage is excluded — it has dedicated
+    tests in cl/search/tests/test_v2_pages.py.
+    """
+
+    V2_PAGES: list[tuple[dict[str, Any], str]] = [
+        # Help pages — (reverse_param, expected v2 template)
+        ({"viewname": "help_home"}, "v2_help/index.html"),
+        ({"viewname": "coverage"}, "v2_help/coverage.html"),
+        ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
+        ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
+        ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
+        ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
+        ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
+        ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
+        ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
+        # Info pages
+        ({"viewname": "terms"}, "v2_terms/latest.html"),
+        ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
+        ({"viewname": "components"}, "v2_components.html"),
+    ]
+
+    async def test_v2_pages(self) -> None:
+        """Do all registered v2 pages load properly with the redesign flag?"""
+        for reverse_param, v2_template in self.V2_PAGES:
+            with self.subTest(
+                "Checking v2 page", reverse_params=reverse_param
+            ):
+                r = await self.assert_page_loads_ok(reverse_param)
+                self.assertTemplateUsed(r, v2_template)
 
 
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
@@ -398,11 +513,9 @@ class SealingOrderDetectionTest(SimpleTestCase):
         self.assertEqual(form.get_zoho_request_type(), "General Support")
 
 
-@override_flag("zoho-desk-tickets", True)
-@override_settings(WAFFLE_CACHE_PREFIX="test_zoho_routing")
 @patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
 class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
-    """Test that form submissions route to the correct Zoho service."""
+    """Test that form submissions route to the correct Zoho category."""
 
     @patch("cl.simple_pages.views.create_zoho_desk_ticket")
     async def test_support_request_creates_desk_ticket(
@@ -422,6 +535,30 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         mock_task.delay.assert_called_once()
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "General Support")
+
+    @patch("cl.simple_pages.views.create_zoho_desk_ticket")
+    async def test_mcp_request_creates_desk_ticket(
+        self, mock_task: MagicMock, mock_captcha: MagicMock
+    ) -> None:
+        msg = {
+            "name": "Dev User",
+            "phone_number": "MCP help",
+            "issue_type": "mcp",
+            "tech_description": "My MCP client cannot connect to the server",
+            "message": "",
+            "email": "dev@example.com",
+            "hcaptcha": "xxx",
+            "checked_documentation": True,
+        }
+        response = await self.async_client.post(reverse("contact"), msg)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["request_type"], "MCP Server")
+        self.assertIn(
+            "My MCP client cannot connect to the server",
+            call_kwargs["description"],
+        )
 
     @patch("cl.simple_pages.views.create_zoho_desk_ticket")
     async def test_partnership_creates_desk_ticket(

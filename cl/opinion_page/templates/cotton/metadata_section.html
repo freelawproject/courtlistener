@@ -1,0 +1,62 @@
+{# Renders a metadata section: optional <h2> heading + <dl> of label/value items. #}
+{# Each item is a dict with: #}
+{#   - label, value (required) #}
+{#   - url (optional): renders value as a link #}
+{#   - nofollow (optional bool): adds nofollow to the link's rel #}
+{#   - is_external (optional bool): renders as an external link, adds noreferrer rel, target=_blank, and "(opens in new tab)" to the accessible name #}
+{#   - aria_label (optional): explicit accessible name for the link (otherwise the link text is used) #}
+{#   - suffix_text (optional): rendered after value in parentheses #}
+{#   - suffix_url (optional): renders suffix_text as a link #}
+{#   - suffix_nofollow / suffix_is_external / suffix_aria_label (optional): same semantics as the value-link variants #}
+<c-vars
+  items=""
+  title=""
+  list_class=""
+/>
+
+{% if items %}
+  {% if title %}
+    <h2 class="mt-6">{{ title }}</h2>
+  {% endif %}
+  <c-description-list class="{{ list_class }}">
+    {% for item in items %}
+      <c-description-item>
+        <c-description-term>{{ item.label }}</c-description-term>
+        <c-description-details>
+          {% if item.url %}
+            <a
+              class="{% if item.is_external %}links-external{% else %}links{% endif %}"
+              href="{{ item.url }}"
+              {% if item.nofollow and item.is_external %}rel="nofollow noreferrer"
+              {% elif item.nofollow %}rel="nofollow"
+              {% elif item.is_external %}rel="noreferrer"
+              {% endif %}
+              {% if item.is_external %}target="_blank" aria-label="{{ item.aria_label|default:item.value }} (opens in new tab)"
+              {% elif item.aria_label %}aria-label="{{ item.aria_label }}"
+              {% endif %}
+            >{{ item.value }}</a>
+          {% else %}
+            {{ item.value }}
+          {% endif %}
+          {% if item.suffix_text %}
+            {% if item.suffix_url %}
+              (<a
+                class="{% if item.suffix_is_external %}links-external{% else %}links{% endif %}"
+                href="{{ item.suffix_url }}"
+                {% if item.suffix_nofollow and item.suffix_is_external %}rel="nofollow noreferrer"
+                {% elif item.suffix_nofollow %}rel="nofollow"
+                {% elif item.suffix_is_external %}rel="noreferrer"
+                {% endif %}
+                {% if item.suffix_is_external %}target="_blank" aria-label="{{ item.suffix_aria_label|default:item.suffix_text }} (opens in new tab)"
+                {% elif item.suffix_aria_label %}aria-label="{{ item.suffix_aria_label }}"
+                {% endif %}
+              >{{ item.suffix_text }}</a>)
+            {% else %}
+              ({{ item.suffix_text }})
+            {% endif %}
+          {% endif %}
+        </c-description-details>
+      </c-description-item>
+    {% endfor %}
+  </c-description-list>
+{% endif %}

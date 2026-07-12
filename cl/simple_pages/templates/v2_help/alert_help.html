@@ -34,19 +34,19 @@
   <c-layout-with-navigation.section id="about">
     <h1>Help with Search and Docket Alerts</h1>
     <p class="text-xl font-sans font-normal text-greyscale-700">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
-    <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a class="links" href="{% url "webhooks_docs" %}">webhook events</a> to your server.</p>
+    <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts. Each of these can send emails to your inbox or <a class="links" href="{{ WIKI_API_URL }}/webhooks/about">webhook events</a> to your server.</p>
   </c-layout-with-navigation.section>
 
   {# Docket Alerts for PACER #}
   <c-layout-with-navigation.section id="recap-alerts">
     <h2>Docket Alerts for PACER</h2>
-    <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a class="links" href="{% url "webhooks_docs" %}">webhook events</a> whenever new data is found.
+    <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a class="links" href="{{ WIKI_API_URL }}/webhooks/about">webhook events</a> whenever new data is found.
     </p>
     <p>Our alerts are only as good as our sources. To learn more about the data sources that trigger alerts see our <a class="links" href="{% url "coverage_recap" %}">coverage page</a>.
     </p>
     <p>For active cases, alerts can come within seconds of a new filing. For less active cases, it can take more time or alerts may not arrive at all, if we do not have a source of new information for that case.
     </p>
-    <p>In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
+    <p>Yesterday, we sent {{ alerts_sent_count|intcomma }} alerts.
     </p>
   </c-layout-with-navigation.section>
 
@@ -329,7 +329,7 @@
         <strong>Email:</strong> Stay informed in your inbox with straightforward notifications. This is the simplest, easiest way to get alerts, and it doesn't require any additional setup.
       </li>
       <li>
-        <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="links" href="{% url "webhooks_docs" %}">webhook documentation</a> to learn more.
+        <strong>Webhooks:</strong> For more advanced uses, webhook events can be sent to your applications or services. This option is mainly for developers. Check out the <a class="links" href="{{ WIKI_API_URL }}/webhooks/about">webhook documentation</a> to learn more.
       </li>
     </ul>
   </c-layout-with-navigation.section>

@@ -10,7 +10,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -81,9 +81,13 @@ jobs:
           cl/search/management/commands/llm_clean_docket_number_daemon.py \
           cl/search/docket_number_cleaner.py \
           cl/search/management/commands/clean_docket_number_raw.py \
+          cl/scrapers/management/utils.py \
           cl/scrapers/management/commands/back_scrape_dockets.py \
+          cl/scrapers/management/commands/back_scrape_fl_dockets.py \
           cl/corpus_importer/management/commands/import_texas_dockets.py \
           cl/corpus_importer/management/utils.py \
           cl/lib/decorators.py \
           cl/corpus_importer/management/commands/import_scotus_dockets.py \
+          cl/corpus_importer/management/commands/probe_scotus_dockets_daemon.py \
+          cl/corpus_importer/scotus_daemon_utils.py \
           cl/scrapers/management/commands/tames_poller.py

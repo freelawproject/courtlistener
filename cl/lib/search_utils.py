@@ -14,8 +14,8 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.http.request import QueryDict
 from django_elasticsearch_dsl.search import Search
-from elasticsearch_dsl import A
-from elasticsearch_dsl.response import Response
+from elasticsearch.dsl import A
+from elasticsearch.dsl.response import Response
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from waffle import flag_is_active
@@ -30,9 +30,11 @@ from cl.lib.elasticsearch_utils import (
     compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
+    get_query_embedding,
     has_semantic_params,
     limit_inner_hits,
     merge_courts_from_db,
+    merge_semantic_relevant_chunks,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
     simplify_estimated_count,
@@ -56,6 +58,7 @@ from cl.search.documents import (
 from cl.search.exception import (
     BadProximityQuery,
     DisallowedWildcardPattern,
+    InputTooLongError,
     InvalidRelativeDateSyntax,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -152,31 +155,24 @@ def merge_form_with_courts(
     """
     # Are any of the checkboxes checked?
 
-    checked_statuses = [
-        field.value()
+    court_field_values = {
+        field.html_name.removeprefix("court_"): field.value()
         for field in search_form
         if field.html_name.startswith("court_")
-    ]
+    }
+    checked_statuses = list(court_field_values.values())
     no_facets_selected = not any(checked_statuses)
     all_facets_selected = all(checked_statuses)
-    court_count = str(
-        len([status for status in checked_statuses if status is True])
-    )
+    court_count = str(sum(status is True for status in checked_statuses))
     court_count_human = court_count
     if all_facets_selected:
         court_count_human = "All"
 
-    for field in search_form:
+    for court in courts:
         if no_facets_selected:
-            for court in courts:
-                court.checked = True
-        else:
-            for court in courts:
-                # We're merging two lists, so we have to do a nested loop
-                # to find the right value.
-                if f"court_{court.pk}" == field.html_name:
-                    court.checked = field.value()
-                    break
+            court.checked = True
+        elif court.pk in court_field_values:
+            court.checked = court_field_values[court.pk]
 
     # Build the dict with jurisdiction keys and arrange courts into tabs
     court_tabs: dict[str, list] = {
@@ -644,6 +640,7 @@ def do_es_search(
     cache_key: str | None = None,
     is_csv_export: bool = False,
     courts: QuerySet[Court] | None = None,
+    is_semantic_frontend_active: bool = False,
 ):
     """Run Elasticsearch searching and filtering and prepare data to display
 
@@ -677,7 +674,11 @@ def do_es_search(
     missing_citations_str: list[str] = []
     error = True
 
-    search_form = SearchForm(get_params, courts=courts)
+    search_form = SearchForm(
+        get_params,
+        courts=courts,
+        is_semantic_frontend_active=is_semantic_frontend_active,
+    )
     match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
@@ -712,6 +713,13 @@ def do_es_search(
                         remove_missing_citations(missing_citations, cd)
                     )
                     cd["q"] = suggested_query if suggested_query else cd["q"]
+
+            # For semantic searches, generate the embedding once so both
+            # the main query and the facets query reuse it instead of
+            # making duplicate calls to the inception microservice.
+            if has_semantic_params(cd) and not cd.get("embedding"):
+                cd["embedding"] = get_query_embedding(cd["q"])
+
             (
                 s,
                 child_docs_count_query,
@@ -727,6 +735,10 @@ def do_es_search(
                 page = 1
             cleaned_params = search_form.cleaned_data.copy()
             cleaned_params["page"] = page
+            # Use a smaller page size for semantic results so the longer
+            # chunk previews are less overwhelming to scan.
+            if has_semantic_params(cd):
+                rows = settings.SEMANTIC_SEARCH_PAGE_SIZE
             (
                 paged_results,
                 query_time,
@@ -740,6 +752,8 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
+            if has_semantic_params(cd):
+                merge_semantic_relevant_chunks(paged_results)
             cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
@@ -775,6 +789,9 @@ def do_es_search(
         except InvalidRelativeDateSyntax:
             error = True
             error_message = "invalid_relative_date_syntax"
+        except InputTooLongError:
+            error = True
+            error_message = "input_too_long_error"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(
@@ -901,25 +918,25 @@ def fetch_es_results_for_csv(
         return csv_rows, True
 
     results = search["results"]
+    max_results = settings.MAX_SEARCH_RESULTS_EXPORTED
     match search_type:
         case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            flat_results = []
             for result in results.object_list:
                 parent_dict = result.to_dict(skip_empty=False)
                 child_docs = parent_dict.get("child_docs")
                 if child_docs:
-                    flat_results.extend(
-                        [
-                            doc["_source"].to_dict() | parent_dict
-                            for doc in child_docs
-                        ]
-                    )
+                    for doc in child_docs:
+                        csv_rows.append(doc["_source"].to_dict() | parent_dict)
+                        if len(csv_rows) >= max_results:
+                            return csv_rows, False
                 else:
-                    flat_results.extend([parent_dict])
+                    csv_rows.append(parent_dict)
+                    if len(csv_rows) >= max_results:
+                        return csv_rows, False
         case _:
-            flat_results = [
-                result.to_dict(skip_empty=False)
-                for result in results.object_list
-            ]
+            for result in results.object_list:
+                csv_rows.append(result.to_dict(skip_empty=False))
+                if len(csv_rows) >= max_results:
+                    return csv_rows, False
 
-    return flat_results[: settings.MAX_SEARCH_RESULTS_EXPORTED], False
+    return csv_rows, False

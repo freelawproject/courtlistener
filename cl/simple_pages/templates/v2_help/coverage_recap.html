@@ -63,7 +63,7 @@
   <c-layout-with-navigation.section id="fetch">
     <h4>PACER Fetch APIs</h4>
     <p>We host free APIs that many organizations use to gather cases and documents from PACER. Every day, many organizations rely on these automated tools to add data to our system.</p>
-    <a class="btn-outline max-md:btn-xl" href="{% url "recap_api_help" %}#pacer-fetch">Learn More</a>
+    <a class="btn-outline max-md:btn-xl" href="{{ WIKI_API_URL }}/rest/v4/recap#pacer-fetch">Learn More</a>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="clients">
@@ -106,7 +106,7 @@
 
   <c-layout-with-navigation.section id="bots">
     <h4>Social Media Bots</h4>
-    <p>We host a fleet of social media bots that download important documents from PACER so they can be shared with the public. The bots use <a class="links" href="{% url "api_index" %}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.</p>
+    <p>We host a fleet of social media bots that download important documents from PACER so they can be shared with the public. The bots use <a class="links" href="{{ WIKI_API_URL }}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.</p>
     <a class="btn-outline max-md:btn-xl" href="https://bots.law" target="_blank" rel="noopener noreferrer">Meet the Bots</a>
   </c-layout-with-navigation.section>
 

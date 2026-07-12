@@ -6,9 +6,18 @@ from django.urls import reverse
 from django.utils.html import format_html
 from hcaptcha.fields import hCaptchaField
 
-from cl.alerts.constants import RECAP_ALERT_QUOTAS
+from cl.alerts.constants import (
+    FLP_MEMBERSHIP_URL,
+    LEGACY_MEMBERSHIP_HELP_URL,
+    MEMBERSHIP_UPGRADE_BASE_URL,
+)
 from cl.alerts.models import Alert
-from cl.alerts.utils import is_match_all_query
+from cl.alerts.utils import (
+    AlertLimitViolation,
+    check_alert_limits,
+    is_match_all_query,
+)
+from cl.donate.models import NeonMembershipLevel
 from cl.search.models import SEARCH_TYPES
 
 
@@ -55,78 +64,56 @@ class CreateAlertForm(ModelForm):
         rate = self.cleaned_data["rate"]
 
         alert_being_edited = self.instance and self.instance.pk
-        if alert_being_edited and rate == Alert.OFF:
-            # Don't check quotas when the user disables their alert.
-            return rate
-
-        quotas_key = (
-            Alert.REAL_TIME if rate == Alert.REAL_TIME else "other_rates"
+        result = check_alert_limits(
+            self.user,
+            rate,
+            self.current_type,
+            exclude_alert_pk=self.instance.pk if alert_being_edited else None,
         )
-        quotas = RECAP_ALERT_QUOTAS[quotas_key]
-        is_member = self.user.profile.is_member
-        has_unlimited_alerts = self.user.profile.unlimited_docket_alerts
-        if is_member:
-            level_key = self.user.membership.level
-        else:
-            level_key = "free"
-
-        flp_membership = "https://free.law/membership/"
-        # Only members or user with unlimited alerts can create RT alerts
-        if rate == Alert.REAL_TIME and not (
-            self.user.profile.is_eligible_for_rt_search_alerts
-        ):
-            msg = format_html(
-                "You must be a <a href='{}' target='_blank'>member</a> to create Real Time alerts.",
-                flp_membership,
-            )
-            raise ValidationError(msg)
-
-        # If the user doesn't have unlimited alerts, only check quotas for
-        # RECAP or DOCKETS alert types
-        if not has_unlimited_alerts and self.current_type in {
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.DOCKETS,
-        }:
-            allowed = quotas.get(level_key, quotas.get("free", 0))
-
-            query_params = {"user": self.user}
-            if rate == Alert.REAL_TIME:
-                query_params["rate"] = Alert.REAL_TIME
-            else:
-                query_params["rate__in"] = [
-                    Alert.DAILY,
-                    Alert.WEEKLY,
-                    Alert.MONTHLY,
-                ]
-            alerts_count = Alert.objects.filter(
-                **query_params,
-                alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
-            )
-            if alert_being_edited:
-                # exclude the alert being edited from the count
-                alerts_count = alerts_count.exclude(pk=self.instance.pk)
-            used = alerts_count.count()
-            profile_url = reverse("profile_search_alerts")
-
-            if used + 1 > allowed:
-                if is_member:
-                    neon_id = self.user.membership.neon_id
-                    upgrade_flp_membership = f"https://donate.free.law/constituent/memberships/upgrade/{neon_id}"
-                    msg = format_html(
+        match result.violation:
+            case AlertLimitViolation.REAL_TIME_NOT_ALLOWED:
+                raise ValidationError(
+                    format_html(
+                        "You must be a <a href='{}' target='_blank'>member</a> to create Real Time alerts.",
+                        FLP_MEMBERSHIP_URL,
+                    )
+                )
+            case AlertLimitViolation.MEMBER_QUOTA_EXCEEDED:
+                membership = self.user.membership
+                if membership.level == NeonMembershipLevel.LEGACY:
+                    # Legacy memberships can't be upgraded online, so point
+                    # them at the help page instead of the Neon upgrade flow.
+                    raise ValidationError(
+                        format_html(
+                            "You've used all of the alerts included with your legacy membership. "
+                            "Legacy memberships can't be upgraded online, but "
+                            "<a href='{}' target='_blank'>here's how to get more features</a>, or "
+                            "<a href='{}'>disable a RECAP Alert</a>.",
+                            LEGACY_MEMBERSHIP_HELP_URL,
+                            reverse("profile_search_alerts"),
+                        )
+                    )
+                upgrade_flp_membership = (
+                    f"{MEMBERSHIP_UPGRADE_BASE_URL}{membership.neon_id}"
+                )
+                raise ValidationError(
+                    format_html(
                         "You've used all of the alerts included with your membership. "
                         "To create this alert, <a href='{}' target='_blank'>upgrade your membership</a> or "
                         "<a href='{}'>disable a RECAP Alert</a>.",
                         upgrade_flp_membership,
-                        profile_url,
+                        reverse("profile_search_alerts"),
                     )
-                else:
-                    msg = format_html(
+                )
+            case AlertLimitViolation.FREE_QUOTA_EXCEEDED:
+                raise ValidationError(
+                    format_html(
                         "To create more than {} alerts and to gain access to real time alerts, "
                         "please join <a href='{}' target='_blank'>Free Law project</a> as a member.",
-                        quotas.get("free"),
-                        flp_membership,
+                        result.free_quota,
+                        FLP_MEMBERSHIP_URL,
                     )
-                raise ValidationError(msg)
+                )
 
         return rate
 

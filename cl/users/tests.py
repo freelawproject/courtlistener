@@ -1,5 +1,7 @@
 import json
+import time
 from datetime import datetime, timedelta
+from decimal import Decimal
 from http import HTTPStatus
 from itertools import product
 from pathlib import Path
@@ -14,6 +16,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.cache import cache as django_cache
 from django.core.mail import (
     EmailMessage,
     EmailMultiAlternatives,
@@ -21,13 +24,17 @@ from django.core.mail import (
     send_mail,
 )
 from django.test import AsyncClient
+from django.test.client import Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import SESBackend, signals
+from rest_framework.authtoken.models import Token
+from rest_framework.throttling import UserRateThrottle
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_switch
 
 from cl.alerts.factories import (
     AlertFactory,
@@ -35,12 +42,27 @@ from cl.alerts.factories import (
     DocketAlertWithParentsFactory,
 )
 from cl.alerts.models import DocketAlert, DocketAlertEvent
-from cl.api.factories import WebhookEventFactory, WebhookFactory
+from cl.api.factories import (
+    APIThrottleFactory,
+    WebhookEventFactory,
+    WebhookFactory,
+)
 from cl.api.models import (
+    APIThrottle,
+    ThrottleType,
     Webhook,
     WebhookEvent,
     WebhookEventType,
     WebhookVersions,
+)
+from cl.api.utils import DOUBLE_API_THROTTLES_SWITCH, clear_tiered_cache
+from cl.donate.factories import NeonMembershipFactory
+from cl.donate.models import (
+    PROVIDERS,
+    MembershipPaymentStatus,
+    MonthlyDonation,
+    NeonMembership,
+    NeonMembershipLevel,
 )
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
@@ -51,18 +73,23 @@ from cl.favorites.models import (
 )
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    SimpleUserDataMixin,
+    UserProfileWithParentsFactory,
+)
 from cl.search.factories import DocketFactory
+from cl.search.models import SearchQuery
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
     ESIndexTestCase,
     LiveServerTestCase,
     RestartSentEmailQuotaMixin,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse as MockPostResponse
-from cl.tests.utils import make_client
+from cl.tests.utils import make_session_client
 from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
@@ -85,11 +112,18 @@ from cl.users.models import (
     EMAIL_NOTIFICATIONS,
     FLAG_TYPES,
     STATUS_TYPES,
+    BarMembership,
     EmailFlag,
     EmailSent,
     FailedEmail,
     UserProfile,
+    UserProfileBarMembershipEvent,
+    UserProfileEvent,
+    UserProxyEvent,
 )
+from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
+from cl.visualizations.factories import VisualizationFactory
+from cl.visualizations.models import SCOTUSMap
 
 
 class UserTest(LiveServerTestCase):
@@ -398,6 +432,8 @@ class UserDataTest(LiveServerTestCase):
         self.assertEqual(len(recipients), 0)
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="ProfileTest")
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class ProfileTest(SimpleUserDataMixin, TestCase):
     async def test_api_page_with_data(self) -> None:
         """Can we access the API stats page after the API has been used?"""
@@ -436,6 +472,134 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
             response,
             reverse("delete_profile_done"),
         )
+
+    @patch("cl.users.views.create_zoho_desk_ticket")
+    async def test_take_out_creates_zoho_desk_ticket(
+        self, mock_task: MagicMock
+    ) -> None:
+        """Does requesting a data export create a Zoho Desk ticket?"""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("take_out"),
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("take_out_done"))
+        mock_task.delay.assert_called_once()
+        call_kwargs = mock_task.delay.call_args.kwargs
+        self.assertEqual(call_kwargs["email"], user.email)
+        self.assertEqual(call_kwargs["request_type"], "Data Export Request")
+        self.assertIn(user.username, call_kwargs["description"])
+        self.assertIn("Email Confirmed:", call_kwargs["description"])
+
+    async def test_reset_api_token_get_renders_confirmation(self) -> None:
+        """The reset page renders a password-confirmation form."""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Reset My API Token")
+        self.assertContains(r, "csrfmiddlewaretoken")
+
+    async def test_reset_api_token_shows_recent_usage_count(self) -> None:
+        """The confirmation page surfaces the recent API request count."""
+        # Prime the throttle cache the same way ExceptionalUserRateThrottle
+        # does: a list of unix timestamps keyed by user pk. We seed three
+        # recent timestamps and one outside the 5-minute window.
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        now_ts = time.time()
+        cache_key = UserRateThrottle.cache_format % {
+            "scope": "user",
+            "ident": user.pk,
+        }
+        django_cache.set(
+            cache_key,
+            [now_ts - 1, now_ts - 60, now_ts - 290, now_ts - 600],
+        )
+        self.addCleanup(django_cache.delete, cache_key)
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        # Use an isolated tiered-cache namespace so the cached promo switch
+        # honors the @override_switch above (get_recent reads the base bucket
+        # when the promo is off) without sharing other tests' cached state.
+        with mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            return_value="tiered_reset_token_recent_usage",
+        ):
+            r = await self.async_client.get(reverse("reset_api_token"))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "<strong>3</strong>")
+        self.assertContains(r, "fa-exclamation-triangle")
+        self.assertContains(r, "alert-warning")
+
+    async def test_reset_api_token_rotates_with_valid_password(self) -> None:
+        """Posting the correct password swaps the token for a new one."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        response = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("view_api_token"))
+
+        # Exactly one token still exists for the user, and the key changed.
+        tokens = Token.objects.filter(user=user)
+        self.assertEqual(await tokens.acount(), 1)
+        new_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertNotEqual(new_key, old_key)
+
+    async def test_reset_api_token_rejects_wrong_password(self) -> None:
+        """A wrong password leaves the existing token untouched."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "not-the-password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertContains(r, "Your password was invalid")
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
+
+    async def test_reset_api_token_requires_login(self) -> None:
+        """Anonymous POSTs are redirected to login, no token is changed."""
+        user = await sync_to_async(User.objects.get)(username="pandora")
+        old_key = (await sync_to_async(Token.objects.get)(user=user)).key
+
+        r = await self.async_client.post(
+            reverse("reset_api_token"),
+            {"password": "password"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
+        self.assertIn(reverse("sign-in"), r.headers.get("Location", ""))
+
+        current_key = (await sync_to_async(Token.objects.get)(user=user)).key
+        self.assertEqual(current_key, old_key)
 
     def test_generate_recap_dot_email_addresses(self) -> None:
         # Test simple username
@@ -565,6 +729,121 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
         self.assertEqual(user_tag_events_first.name, "tag_1_user_2")
         docket_tag_events_first = await docket_tag_events.afirst()
         self.assertEqual(docket_tag_events_first.tag_id, tag_1_user_2.pk)
+
+    def test_purges_user_data_and_history_on_account_deletion(self) -> None:
+        """Deleting an account hard-deletes the user's logged data and the
+        PII left behind in the pghistory event tables, keeps (but disables)
+        donation records, and leaves a second user's data untouched.
+        """
+        victim = UserProfileWithParentsFactory()
+        bystander = UserProfileWithParentsFactory()
+
+        # Edit tracked fields to generate UserProfile/UserProxy history, and
+        # associate a bar membership to generate barmembership history.
+        bar = BarMembership.objects.create(barMembership="CA")
+        for profile in (victim, bystander):
+            profile.user.first_name = "Real Name"
+            profile.user.save()
+            profile.employer = "Real Employer"
+            profile.save()
+            profile.barmembership.add(bar)
+
+            # Usage logs and assets tied to each user.
+            SearchQuery.objects.create(
+                user=profile.user,
+                source=SearchQuery.WEBSITE,
+                engine=SearchQuery.ELASTICSEARCH,
+                get_params="q=something+private",
+                hit_cache=False,
+                failed=False,
+            )
+            EmailSentFactory(user=profile.user)
+            VisualizationFactory(user=profile.user)
+            MonthlyDonation.objects.create(
+                donor=profile.user,
+                enabled=True,
+                payment_provider=PROVIDERS.CREDIT_CARD,
+                monthly_donation_amount=Decimal("10.00"),
+                monthly_donation_day=1,
+                stripe_customer_id="cus_test",
+            )
+
+        # Sanity check: the victim's history and assets exist before deletion.
+        self.assertTrue(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Delete the victim's account.
+        self.assertTrue(
+            self.client.login(
+                username=victim.user.username, password="password"
+            )
+        )
+        self.client.post(
+            reverse("delete_account"),
+            {"password": "password"},
+            follow=True,
+        )
+
+        # The victim's logged data and assets are hard-deleted.
+        self.assertFalse(SearchQuery.objects.filter(user=victim.user).exists())
+        self.assertFalse(EmailSent.objects.filter(user=victim.user).exists())
+        self.assertFalse(SCOTUSMap.objects.filter(user=victim.user).exists())
+
+        # The PII left behind in the event tables is purged.
+        self.assertFalse(
+            UserProfileEvent.objects.filter(user_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProxyEvent.objects.filter(pgh_obj_id=victim.user.pk).exists()
+        )
+        self.assertFalse(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=victim.pk
+            ).exists()
+        )
+
+        # Donations are financial records: kept, but disabled.
+        victim_donations = MonthlyDonation.objects.filter(donor=victim.user)
+        self.assertEqual(victim_donations.count(), 1)
+        self.assertFalse(victim_donations.get().enabled)
+
+        # The bystander is completely untouched.
+        self.assertTrue(
+            SearchQuery.objects.filter(user=bystander.user).exists()
+        )
+        self.assertTrue(EmailSent.objects.filter(user=bystander.user).exists())
+        self.assertTrue(SCOTUSMap.objects.filter(user=bystander.user).exists())
+        self.assertTrue(
+            UserProfileEvent.objects.filter(user_id=bystander.user.pk).exists()
+        )
+        self.assertTrue(
+            UserProxyEvent.objects.filter(
+                pgh_obj_id=bystander.user.pk
+            ).exists()
+        )
+        self.assertTrue(
+            UserProfileBarMembershipEvent.objects.filter(
+                userprofile_id=bystander.pk
+            ).exists()
+        )
+        self.assertTrue(
+            MonthlyDonation.objects.get(donor=bystander.user).enabled
+        )
+
+        # The original bug deleted the shared BarMembership lookup row itself
+        # on account deletion, wiping it for everyone. Guard the regression
+        # directly: the shared row and the bystander's link must both survive.
+        self.assertTrue(BarMembership.objects.filter(pk=bar.pk).exists())
+        self.assertTrue(bystander.barmembership.filter(pk=bar.pk).exists())
 
     async def test_redirect_to_search_alerts_if_no_alerts(self):
         """Tests redirection to search alerts when a user has no alerts"""
@@ -3431,8 +3710,8 @@ class WebhooksHTMXTests(APITestCase):
 
     def setUp(self) -> None:
         self.webhook_path = reverse("webhooks-list")
-        self.client = make_client(self.user_1.pk)
-        self.client_2 = make_client(self.user_2.pk)
+        self.client = make_session_client(self.user_1.pk)
+        self.client_2 = make_session_client(self.user_2.pk)
 
     def tearDown(cls):
         Webhook.objects.all().delete()
@@ -4035,26 +4314,430 @@ class UserAdminApiCallsCountTest(TestCase):
         result = self.user_admin.api_calls_count(unsaved_user)
         self.assertEqual(result, 0)
 
-    @patch("cl.users.admin.get_redis_interface")
+    @patch("cl.users.models.get_redis_interface")
     def test_api_calls_count_sums_v3_and_v4(
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should sum scores from both v3 and v4 keys."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
         mock_redis = MagicMock()
-        mock_redis.zscore.side_effect = lambda key, _: (
-            5.0 if "v3" in key else 10.0
-        )
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 15)
 
-    @patch("cl.users.admin.get_redis_interface")
+    @patch("cl.users.models.get_redis_interface")
     def test_api_calls_count_handles_no_redis_data(
         self, mock_get_redis: MagicMock
     ) -> None:
         """api_calls_count should return 0 when Redis has no data."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
         mock_redis = MagicMock()
-        mock_redis.zscore.return_value = None
+        mock_redis.pipeline.return_value = mock_pipe
         mock_get_redis.return_value = mock_redis
         result = self.user_admin.api_calls_count(self.user)
         self.assertEqual(result, 0)
+
+
+class UserProfileTotalApiUsageTest(TestCase):
+    """Tests for UserProfile.total_api_usage."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_sums_v3_and_v4_counts(self, mock_get_redis: MagicMock) -> None:
+        """Lifetime total combines v3 and v4 ZSCORE values."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [5.0, 10.0]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 15)
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_returns_zero_when_no_redis_data(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """No Redis entries means a zero total, not a crash."""
+        mock_pipe = MagicMock()
+        mock_pipe.execute.return_value = [None, None]
+
+        mock_redis = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        mock_get_redis.return_value = mock_redis
+
+        self.assertEqual(self.user.profile.total_api_usage, 0)
+
+
+class ViewApiUsageTest(TestCase):
+    """Tests for /profile/api-usage/."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def test_shows_default_throttle_rates(self) -> None:
+        """Without overrides, access level falls back to settings defaults."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Your Access Level")
+        # Default rate exposed in DEFAULT_THROTTLE_RATES["user"].
+        self.assertContains(response, "per day")
+
+    def test_shows_override_rates(self) -> None:
+        """User APIThrottle overrides replace the defaults in the listing."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+        )
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="500/day",
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "per minute")
+        self.assertContains(response, "per day")
+        # Default "per hour" rate should NOT appear — overrides replace it.
+        self.assertNotContains(response, "per hour")
+
+    def test_blocked_user_filters_zero_rates(self) -> None:
+        """A 0/min row is dropped — we don't advertise blocked as a limit."""
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate="0/min",
+        )
+        response = self.client.get(self.url)
+        # Heading still renders, but no rate rows for the blocked user.
+        self.assertNotContains(response, "per minute")
+
+    @patch("cl.users.models.get_redis_interface")
+    def test_total_section_shows_count_and_donate(
+        self, mock_get_redis: MagicMock
+    ) -> None:
+        """Lifetime total renders with a donate link when count > 0."""
+        mock_redis = MagicMock()
+        mock_pipe = MagicMock()
+        mock_redis.pipeline.return_value = mock_pipe
+        # pipeline.execute() returns results for v3 then v4 zscore calls
+        mock_pipe.execute.return_value = [42.0, 0.0]
+        mock_get_redis.return_value = mock_redis
+
+        response = self.client.get(self.url)
+        self.assertContains(response, "Your Total API Usage")
+        self.assertNotContains(response, "No API usage yet")
+        self.assertContains(response, "42")
+        self.assertContains(response, "donate.free.law/forms/supportflp")
+
+    def test_unauthenticated_redirected(self) -> None:
+        """The view is login-required."""
+        self.client.logout()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertIn("/sign-in/", response["Location"])
+
+
+@override_settings(WAFFLE_CACHE_PREFIX="ViewApiUsagePromoTest")
+class ViewApiUsagePromoTest(TestCase):
+    """API-usage page reflects the x2 promo per membership type."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # Isolate this class's tiered_cache namespace so cached overrides /
+        # exclusion sets don't leak across classes. Start in setUpClass so the
+        # patched prefix is active during setUp/tearDown clear_tiered_cache().
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_view_api_usage_promo_test",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserProfileWithParentsFactory.create().user
+        cls.user.set_password("password")
+        cls.user.save()
+        cls.url = reverse("view_api_usage")
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        self.client.login(username=self.user.username, password="password")
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+
+    def _add_membership(self, level: int, rate: str) -> None:
+        """Give the test user an active membership with one MEMBERSHIP rate."""
+        NeonMembershipFactory(user=self.user, level=level)
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.API,
+            rate=rate,
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_non_member_default_doubled(self) -> None:
+        """Non-member: the displayed default rate is doubled during the promo."""
+        response = self.client.get(self.url)
+        # Test settings default is 5000/day; promo shows 10,000.
+        self.assertContains(response, "<strong>10,000</strong>")
+        self.assertContains(response, "per day")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
+    def test_non_member_default_not_doubled_when_off(self) -> None:
+        """Non-member: base default rate shown when the promo is off."""
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>5,000</strong>")
+        self.assertNotContains(response, "<strong>10,000</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_paid_member_doubled(self) -> None:
+        """Paid member: 10/min is shown as 20/min during the promo."""
+        self._add_membership(NeonMembershipLevel.TIER_2, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_lso_member_doubled(self) -> None:
+        """LSO member: 10/min is shown as 20/min during the promo."""
+        self._add_membership(NeonMembershipLevel.LSO_1, "10/min")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per minute")
+        self.assertNotContains(response, "<strong>10</strong>")
+
+    @override_switch(DOUBLE_API_THROTTLES_SWITCH, active=True)
+    def test_edu_member_not_doubled(self) -> None:
+        """EDU member: rate shown unchanged during the promo."""
+        self._add_membership(NeonMembershipLevel.EDU, "20/hour")
+        response = self.client.get(self.url)
+        self.assertContains(response, "<strong>20</strong>")
+        self.assertContains(response, "per hour")
+        self.assertNotContains(response, "<strong>40</strong>")
+
+
+class TagZohoRecordForMembershipTest(TestCase):
+    """Tests for the tag_zoho_record_for_membership Celery task."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory.create()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_lead_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead when a Lead match is found by CL ID/email."""
+        mock_lead = MagicMock()
+        mock_lead.get_id.return_value = 42
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = [mock_lead]
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_only_contact_match_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Falls back to the Contact module when no Lead match is found."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contact = MagicMock()
+        mock_contact.get_id.return_value = 99
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = [
+            mock_contact
+        ]
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.EDU
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_no_record_found(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when neither a Lead nor Contact match exists."""
+        mock_leads = mock_leads_class.return_value
+        mock_leads.get_record_by_cl_id_or_email.return_value = []
+        mock_contacts = mock_contacts_class.return_value
+        mock_contacts.get_record_by_cl_id_or_email.return_value = []
+
+        tag_zoho_record_for_membership.delay(
+            self.user.pk, NeonMembershipLevel.TIER_1
+        )
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()
+
+
+class TagZohoRecordTest(SimpleTestCase):
+    """Tests for the tag_zoho_record Celery task (chained, no search)."""
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_lead_when_record_info_points_to_lead(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Lead directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Leads", 42), NeonMembershipLevel.TIER_1)
+
+        mock_leads.add_tags.assert_called_once_with(42, ["CL Membership"])
+        mock_contacts.add_tags.assert_not_called()
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_tags_contact_when_record_info_points_to_contact(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Tags the Contact directly using the record id from the chain."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(("Contacts", 99), NeonMembershipLevel.EDU)
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_called_once_with(99, ["Student"])
+
+    @patch("cl.users.tasks.ContactsModule")
+    @patch("cl.users.tasks.LeadsModule")
+    def test_no_op_when_record_info_is_none(
+        self, mock_leads_class, mock_contacts_class
+    ) -> None:
+        """Skips tagging when the upstream task returned no record."""
+        mock_leads = mock_leads_class.return_value
+        mock_contacts = mock_contacts_class.return_value
+
+        tag_zoho_record.delay(None, NeonMembershipLevel.TIER_1)
+
+        mock_leads.add_tags.assert_not_called()
+        mock_contacts.add_tags.assert_not_called()
+
+
+class RefreshAPIThrottlesAdminTest(TestCase):
+    def setUp(self):
+        self.staff = UserFactory(is_staff=True, is_superuser=True)
+        self.target = UserProfileWithParentsFactory().user
+        self.client = Client()
+        self.client.force_login(self.staff)
+        self.changelist_url = reverse("admin:auth_user_changelist")
+
+    def _run_action(self, *user_pks):
+        return self.client.post(
+            self.changelist_url,
+            {
+                "action": "refresh_api_throttles",
+                "_selected_action": [str(pk) for pk in user_pks],
+            },
+            follow=True,
+        )
+
+    def test_action_refreshes_throttles_for_active_member(self):
+        """The action installs Tier 1 rates for an active Tier 1 member."""
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="t1",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(self.target.pk)
+
+        rates = sorted(
+            APIThrottle.objects.filter(
+                user=self.target,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).values_list("rate", flat=True)
+        )
+        self.assertEqual(rates, sorted(["10/min", "75/hour", "300/day"]))
+
+    def test_action_skips_user_without_active_membership(self):
+        """Users with no active membership are skipped with a warning."""
+        r = self._run_action(self.target.pk)
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no active Neon membership" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+    def test_action_warns_when_level_has_no_mapping(self):
+        """An active membership whose level isn't in LEVEL_TO_RATES is reported."""
+        # BASIC has no entry in LEVEL_TO_RATES, so apply_membership_throttles
+        # returns False even though the membership is active.
+        NeonMembership.objects.create(
+            user=self.target,
+            neon_id="basic",
+            level=NeonMembershipLevel.BASIC,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        r = self._run_action(self.target.pk)
+
+        msgs = [m.message for m in r.context["messages"]]
+        self.assertTrue(any("no matching membership level" in m for m in msgs))
+        # No success message should appear, and no rows should be written.
+        self.assertFalse(any("Refreshed API throttles" in m for m in msgs))
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())
+
+    def test_action_handles_mixed_queryset(self):
+        """Action refreshes active members and skips inactive ones in one run."""
+        active = UserProfileWithParentsFactory().user
+        NeonMembership.objects.create(
+            user=active,
+            neon_id="t2",
+            level=NeonMembershipLevel.TIER_1,
+            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            termination_date=now().date() + timedelta(days=30),
+        )
+
+        self._run_action(active.pk, self.target.pk)
+
+        # Active user got rates
+        self.assertTrue(
+            APIThrottle.objects.filter(
+                user=active,
+                source=APIThrottle.Source.MEMBERSHIP,
+            ).exists()
+        )
+        # Inactive user got nothing
+        self.assertFalse(APIThrottle.objects.filter(user=self.target).exists())

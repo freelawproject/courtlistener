@@ -121,15 +121,21 @@ class AsyncHomepageTest(SimpleUserDataMixin, TestCase):
         await self.async_client.alogout()
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         self.assertIn(">Login</a>", resp.content.decode())
-        self.assertNotIn('id="header-profile-menu"', resp.content.decode())
+        self.assertNotIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
     async def test_header_authenticated_user(self):
         await self.async_client.alogin(username="pandora", password="password")
         resp = await self.async_client.get(reverse("show_results"))
         self.assertEqual(resp.status_code, 200)
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         self.assertNotIn(">Login</a>", resp.content.decode())
-        self.assertIn('id="header-profile-menu"', resp.content.decode())
+        self.assertIn(
+            'aria-label="Toggle account menu"', resp.content.decode()
+        )
 
 
 @override_flag("use_new_design", True)
@@ -142,7 +148,8 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
         html = resp.content.decode()
         self.assertEqual(resp.status_code, 200)
         self.assertTemplateUsed(resp, "v2_homepage.html")
-        self.assertIn('x-data="header"', html)
+        self.assertIn("<header", html)
+        self.assertIn("x-menu", html)
         # Ensure no search widget in header (homepage variant)
         self.assertNotIn(
             'x-data="search"', html.split("<header")[1].split("</header")[0]
@@ -150,6 +157,7 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 
     def test_scroll_buttons_have_accessibility_attrs(self):
         resp = self.client.get(reverse("show_results"))
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         html = resp.content.decode()
         self.assertIn('aria-label="Scroll actions left"', html)
         self.assertIn('aria-label="Scroll actions right"', html)
@@ -157,6 +165,7 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 
     def test_stats_section_order_and_labels(self):
         resp = self.client.get(reverse("show_results"))
+        self.assertTemplateUsed(resp, "v2_homepage.html")
         html = resp.content.decode()
         self.assertIn('id="stats-title"', html)
         expected_labels = [
@@ -178,13 +187,15 @@ class HomepageStructureTest(SimpleUserDataMixin, TestCase):
 class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
     """Tests for corpus search form rendering and accessibility."""
 
-    @classmethod
-    def setUpTestData(cls):
-        """Fetch the homepage once and share across all tests"""
-        super().setUpTestData()
-        cls.response = cls.client_class().get(reverse("show_results"))
-        cls.html = cls.response.content.decode()
-        cls.tree = lhtml.fromstring(cls.html)
+    def setUp(self):
+        """Fetch the v2 homepage for each test.
+
+        Uses setUp (not setUpTestData) so @override_flag is active.
+        """
+        self.response = self.client.get(reverse("show_results"))
+        self.assertTemplateUsed(self.response, "v2_homepage.html")
+        self.html = self.response.content.decode()
+        self.tree = lhtml.fromstring(self.html)
 
     def test_unique_form_field_ids(self):
         """Test that form fields have unique IDs across desktop and mobile forms"""
@@ -274,11 +285,8 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
 
     def test_date_selector_renders(self):
         """Date selector inputs are present in the rendered search page."""
-        response = self.client.get(reverse("show_results"))
-        tree = lhtml.fromstring(response.content.decode())
-
-        after_inputs = tree.xpath('//input[@name="filed_after"]')
-        before_inputs = tree.xpath('//input[@name="filed_before"]')
+        after_inputs = self.tree.xpath('//input[@name="filed_after"]')
+        before_inputs = self.tree.xpath('//input[@name="filed_before"]')
 
         self.assertGreaterEqual(
             len(after_inputs),

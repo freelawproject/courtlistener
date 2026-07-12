@@ -10,7 +10,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import MediumAdjustablePagination
-from cl.api.utils import LoggingMixin
+from cl.api.utils import LoggingMixin, TagRateThrottle
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import (
     DocketTagSerializer,
@@ -27,6 +27,7 @@ class UserTagViewSet(ModelViewSet):
         permissions.IsAuthenticatedOrReadOnly,
         V3APIPermission,
     ]
+    throttle_classes = [TagRateThrottle]
     serializer_class = UserTagSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = UserTagFilter
@@ -54,6 +55,7 @@ class UserTagViewSet(ModelViewSet):
 
 class DocketTagViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsTagOwner, V3APIPermission]
+    throttle_classes = [TagRateThrottle]
     serializer_class = DocketTagSerializer
     filterset_class = DocketTagFilter
     pagination_class = MediumAdjustablePagination

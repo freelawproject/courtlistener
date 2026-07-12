@@ -80,6 +80,10 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
+    build_bankruptcy_metadata,
+    build_docket_metadata,
+    build_docket_tabs,
+    build_originating_court_metadata,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -92,12 +96,14 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     SEARCH_TYPES,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
     Opinion,
     OpinionCluster,
     OpinionsCitedByRECAPDocument,
+    OriginatingCourtInformation,
     Parenthetical,
     RECAPDocument,
     sort_cites,
@@ -397,15 +403,42 @@ async def view_docket(
         rd.prayer_count = prayer_counts.get(rd.id, 0)
         rd.prayer_exists = existing_prayers.get(rd.id, False)
 
+    parties = await docket.parties.aexists()
+    has_idb_data = bool(docket.idb_data_id)
+    has_authorities = await docket.ahas_authorities()
+
+    @sync_to_async
+    def _get_related(
+        d: Docket,
+    ) -> tuple[
+        BankruptcyInformation | None,
+        OriginatingCourtInformation | None,
+    ]:
+        return (
+            getattr(d, "bankruptcy_information", None),
+            getattr(d, "originating_court_information", None),
+        )
+
+    bankr_info, og_info = await _get_related(docket)
+
     context.update(
         {
-            "parties": await docket.parties.aexists(),
-            # Needed to show/hide parties tab.
-            "authorities": await docket.ahas_authorities(),
+            "parties": parties,
+            "authorities": has_authorities,
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
+            "metadata": await sync_to_async(build_docket_metadata)(
+                docket, context["timezone"]
+            ),
+            "bankruptcy_metadata": build_bankruptcy_metadata(bankr_info),
+            "originating_court_metadata": await sync_to_async(
+                build_originating_court_metadata
+            )(docket, og_info),
+            "tabs": build_docket_tabs(
+                docket, parties, has_idb_data, has_authorities
+            ),
         }
     )
     return TemplateResponse(request, "docket.html", context)
@@ -865,29 +898,52 @@ def get_attachment_values(
 
 
 async def get_downloads_context(cluster: OpinionCluster) -> dict[str, Any]:
-    """Generate the context for downloads
+    """Generate the context for downloads.
 
-    :param cluster: The opinion cluster
-    :return: a dict containing a boolean if the cluster has downloads and string gile path to the pdf file
+    Builds a list of embeddable PDFs for accordion display when multiple
+    PDFs exist (e.g. Lead Opinion, Concurrence, Dissent).
+
+    :param cluster: The opinion cluster.
+    :return: A dict with ``has_downloads``, ``download_file_path`` (first PDF URL),
+        and ``embeddable_pdfs`` (list of dicts with label/url/id).
     """
     has_downloads = False
-    pdf_path = None
+    download_file_path = None
+    embeddable_pdfs: list[dict[str, Any]] = []
+
     if cluster.filepath_pdf_harvard:
         has_downloads = True
-        pdf_path = cluster.filepath_pdf_harvard.url
-    else:
-        async for sub_opinion in cluster.sub_opinions.filter(
-            main_version__isnull=True
-        ):
-            if str(sub_opinion.local_path).endswith(".pdf"):
-                has_downloads = True
-                pdf_path = sub_opinion.local_path.url
-                break
-            elif sub_opinion.download_url:
-                has_downloads = True
-                pdf_path = None
+        download_file_path = cluster.filepath_pdf_harvard.url
+        embeddable_pdfs.append(
+            {
+                "label": "Case Law Access Project Scan",
+                "url": cluster.filepath_pdf_harvard.url,
+                "id": "harvard",
+            }
+        )
 
-    return {"has_downloads": has_downloads, "pdf_path": pdf_path}
+    async for sub_opinion in cluster.sub_opinions.filter(
+        main_version__isnull=True
+    ).order_by("ordering_key"):
+        if str(sub_opinion.local_path).endswith(".pdf"):
+            has_downloads = True
+            if not download_file_path:
+                download_file_path = sub_opinion.local_path.url
+            embeddable_pdfs.append(
+                {
+                    "label": sub_opinion.get_type_display(),
+                    "url": sub_opinion.local_path.url,
+                    "id": sub_opinion.pk,
+                }
+            )
+        elif sub_opinion.download_url:
+            has_downloads = True
+
+    return {
+        "has_downloads": has_downloads,
+        "download_file_path": download_file_path,
+        "embeddable_pdfs": embeddable_pdfs,
+    }
 
 
 async def setup_opinion_context(

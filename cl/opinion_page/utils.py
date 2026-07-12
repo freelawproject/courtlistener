@@ -3,6 +3,8 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
+from typing import NotRequired, TypedDict
+from zoneinfo import ZoneInfo
 
 import waffle
 from asgiref.sync import sync_to_async
@@ -11,9 +13,12 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
+from django.urls import reverse
+from django.utils.http import urlencode
+from django.utils.timezone import localtime
 from django_elasticsearch_dsl.search import Search
+from elasticsearch.dsl import Q
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
-from elasticsearch_dsl import Q
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -28,16 +33,441 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
+from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    BankruptcyInformation,
     Docket,
+    DocketEntry,
     OpinionCluster,
+    OriginatingCourtInformation,
 )
 
 logger = logging.getLogger(__name__)
+
+
+class MetadataItem(TypedDict):
+    """Shape of a single item in a metadata description list (see the
+    c-metadata-section cotton component)."""
+
+    label: str
+    value: str
+    url: NotRequired[str]
+    nofollow: NotRequired[bool]
+    is_external: NotRequired[bool]
+    aria_label: NotRequired[str]
+    suffix_text: NotRequired[str]
+    suffix_url: NotRequired[str]
+    suffix_nofollow: NotRequired[bool]
+    suffix_is_external: NotRequired[bool]
+    suffix_aria_label: NotRequired[str]
+
+
+def _person_item(
+    label: str,
+    person: Person | None,
+    person_str: str,
+    search_param: str = "assigned_to",
+) -> MetadataItem | None:
+    """Build a metadata item for a person field with both a FK and a string
+    fallback. Returns a linked item when the person FK is set, a nofollow
+    search-link item when only the string is set, or None when both are empty.
+    """
+    if person:
+        return {
+            "label": label,
+            "value": person.name_full,
+            "url": person.get_absolute_url(),
+        }
+    if person_str:
+        return {
+            "label": label,
+            "value": person_str,
+            "url": f"/?{urlencode({'type': 'r', search_param: f'"{person_str}"'})}",
+            "nofollow": True,
+        }
+    return None
+
+
+def build_citation_string(obj: Docket | DocketEntry) -> str:
+    """Build a Bluebook-style citation string for a docket or docket entry.
+
+    For dockets: name, docket_number, (court)
+    For docket entries: name, docket_number, (court date) ECF No. N
+    """
+    if isinstance(obj, Docket):
+        docket = obj
+        date_of_interest = None
+        ecf = ""
+    elif isinstance(obj, DocketEntry):
+        docket = obj.docket
+        date_of_interest = obj.date_filed
+        ecf = obj.entry_number
+    else:
+        raise NotImplementedError(f"Object not recognized in {__name__}")
+
+    result = f"{docket.case_name}, {docket.docket_number}, ("
+    result = result + docket.court.citation_string
+    if date_of_interest:
+        result = f"{result} {date_of_interest.strftime('%b %d, %Y')}"
+    result = f"{result})"
+    if ecf:
+        result = f"{result} ECF No. {ecf}"
+    return result
+
+
+def build_docket_metadata(
+    docket: Docket, timezone_str: str
+) -> list[MetadataItem]:
+    """Build metadata items for the docket page description list."""
+    items: list[MetadataItem] = []
+
+    if docket.source in docket.RECAP_SOURCES():
+        items.append(
+            {
+                "label": "Last Updated",
+                "value": str(
+                    localtime(docket.date_modified, ZoneInfo(timezone_str))
+                ),
+            }
+        )
+
+    if docket.panel_str:
+        items.append({"label": "Panel", "value": docket.panel_str})
+
+    if assigned := _person_item(
+        "Assigned To", docket.assigned_to, docket.assigned_to_str
+    ):
+        items.append(assigned)
+
+    if referred := _person_item(
+        "Referred To",
+        docket.referred_to,
+        docket.referred_to_str,
+        search_param="referred_to",
+    ):
+        items.append(referred)
+
+    if docket.date_cert_granted:
+        items.append(
+            {
+                "label": "Date Certiorari Granted",
+                "value": str(docket.date_cert_granted),
+            }
+        )
+
+    if docket.date_cert_denied:
+        items.append(
+            {
+                "label": "Date Certiorari Denied",
+                "value": str(docket.date_cert_denied),
+            }
+        )
+
+    if docket.date_argued:
+        items.append(
+            {"label": "Date Argued", "value": str(docket.date_argued)}
+        )
+
+    items.append({"label": "Citation", "value": build_citation_string(docket)})
+
+    if docket.date_reargued:
+        items.append(
+            {"label": "Date Reargued", "value": str(docket.date_reargued)}
+        )
+
+    if docket.date_reargument_denied:
+        items.append(
+            {
+                "label": "Date Reargument Denied",
+                "value": str(docket.date_reargument_denied),
+            }
+        )
+
+    if docket.date_filed:
+        items.append({"label": "Date Filed", "value": str(docket.date_filed)})
+
+    if docket.date_terminated:
+        items.append(
+            {
+                "label": "Date Terminated",
+                "value": str(docket.date_terminated),
+            }
+        )
+
+    if docket.date_last_filing:
+        items.append(
+            {
+                "label": "Date of Last Known Filing",
+                "value": str(docket.date_last_filing),
+            }
+        )
+
+    if docket.cause:
+        items.append(
+            {
+                "label": "Cause",
+                "value": docket.cause,
+                "url": f"/?{urlencode({'type': 'r', 'cause': f'"{docket.cause}"'})}",
+                "nofollow": True,
+            }
+        )
+
+    if docket.nature_of_suit:
+        items.append(
+            {
+                "label": "Nature of Suit",
+                "value": docket.nature_of_suit,
+                "url": f"/?{urlencode({'type': 'r', 'nature_of_suit': f'"{docket.nature_of_suit}"'})}",
+                "nofollow": True,
+            }
+        )
+
+    if docket.jury_demand:
+        items.append(
+            {
+                "label": "Jury Demand",
+                "value": docket.jury_demand,
+                "url": f"/?{urlencode({'type': 'r', 'q': f'juryDemand:"{docket.jury_demand}"'})}",
+                "nofollow": True,
+            }
+        )
+
+    if docket.jurisdiction_type:
+        items.append(
+            {"label": "Jurisdiction Type", "value": docket.jurisdiction_type}
+        )
+
+    if docket.mdl_status:
+        items.append({"label": "MDL Status", "value": docket.mdl_status})
+
+    if docket.appellate_fee_status:
+        items.append(
+            {"label": "Fee Status", "value": docket.appellate_fee_status}
+        )
+
+    if docket.appellate_case_type_information:
+        items.append(
+            {
+                "label": "Case Type Information",
+                "value": docket.appellate_case_type_information,
+            }
+        )
+
+    return items
+
+
+def build_bankruptcy_metadata(
+    bankr_info: BankruptcyInformation | None,
+) -> list[MetadataItem]:
+    """Build metadata items for the bankruptcy information section."""
+    if not bankr_info:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if bankr_info.date_converted:
+        items.append(
+            {
+                "label": "Date Converted",
+                "value": bankr_info.date_converted.strftime("%b. %d, %Y"),
+            }
+        )
+
+    if bankr_info.date_last_to_file_claims:
+        items.append(
+            {
+                "label": "Last Date to File Claims",
+                "value": bankr_info.date_last_to_file_claims.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.date_last_to_file_govt:
+        items.append(
+            {
+                "label": "Last Date to File Claims (Gov't)",
+                "value": bankr_info.date_last_to_file_govt.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.date_debtor_dismissed:
+        items.append(
+            {
+                "label": "Date Debtor Dismissed",
+                "value": bankr_info.date_debtor_dismissed.strftime(
+                    "%b. %d, %Y"
+                ),
+            }
+        )
+
+    if bankr_info.chapter:
+        items.append({"label": "Chapter", "value": bankr_info.chapter})
+
+    if bankr_info.trustee_str:
+        items.append({"label": "Trustee", "value": bankr_info.trustee_str})
+
+    return items
+
+
+def build_originating_court_metadata(
+    docket: Docket, og_info: OriginatingCourtInformation | None
+) -> list[MetadataItem]:
+    """Build metadata items for the originating court information section."""
+    if not og_info:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if docket.appeal_from or docket.appeal_from_str:
+        if docket.appeal_from:
+            appeal_value = docket.appeal_from.short_name
+        else:
+            appeal_value = docket.appeal_from_str
+
+        item: MetadataItem = {
+            "label": "Appealed From",
+            "value": appeal_value,
+        }
+        if og_info.docket_number:
+            item["suffix_text"] = og_info.docket_number
+            if docket.appeal_from:
+                item["suffix_url"] = (
+                    f"/?type=r&docket_number={og_info.docket_number}"
+                    f"&court={docket.appeal_from.pk}"
+                )
+                item["suffix_nofollow"] = True
+                item["suffix_aria_label"] = (
+                    f"Search the RECAP Archive for docket number "
+                    f"{og_info.docket_number}"
+                )
+            elif og_info.administrative_link:
+                item["suffix_url"] = og_info.administrative_link
+                item["suffix_is_external"] = True
+        items.append(item)
+
+    if og_info.court_reporter:
+        items.append(
+            {"label": "Court Reporter", "value": og_info.court_reporter}
+        )
+
+    if trial_judge := _person_item(
+        "Trial Judge", og_info.assigned_to, og_info.assigned_to_str
+    ):
+        items.append(trial_judge)
+
+    if ordering_judge := _person_item(
+        "Ordering Judge",
+        og_info.ordering_judge,
+        og_info.ordering_judge_str,
+    ):
+        items.append(ordering_judge)
+
+    if og_info.date_filed:
+        items.append({"label": "Date Filed", "value": str(og_info.date_filed)})
+
+    if og_info.date_judgment:
+        items.append(
+            {
+                "label": "Date Order/Judgment",
+                "value": str(og_info.date_judgment),
+            }
+        )
+
+    if og_info.date_judgment_eod:
+        items.append(
+            {
+                "label": "Date Order/Judgment EOD",
+                "value": str(og_info.date_judgment_eod),
+            }
+        )
+
+    if og_info.date_filed_noa:
+        items.append(
+            {"label": "Date NOA Filed", "value": str(og_info.date_filed_noa)}
+        )
+
+    if og_info.date_received_coa:
+        items.append(
+            {
+                "label": "Date Rec'd COA",
+                "value": str(og_info.date_received_coa),
+            }
+        )
+
+    return items
+
+
+def build_docket_tabs(
+    docket: Docket,
+    parties: bool,
+    has_idb_data: bool,
+    has_authorities: bool,
+) -> list[dict[str, str]]:
+    """Build the tab navigation items for the docket page.
+
+    Each item is a dict with 'label', 'url', and 'key'.
+    """
+    tabs = [
+        {
+            "label": "Docket Entries",
+            "url": docket.get_absolute_url(),
+            "key": "entries",
+        }
+    ]
+
+    if parties:
+        tabs.append(
+            {
+                "label": "Parties and Attorneys",
+                "url": reverse(
+                    "docket_parties",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "parties",
+            }
+        )
+
+    if has_idb_data:
+        tabs.append(
+            {
+                "label": "FJC Integrated Database",
+                "url": reverse(
+                    "docket_idb_data",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "idb",
+            }
+        )
+
+    if has_authorities:
+        tabs.append(
+            {
+                "label": "Authorities",
+                "url": reverse(
+                    "docket_authorities",
+                    kwargs={
+                        "docket_id": docket.pk,
+                        "slug": docket.slug,
+                    },
+                ),
+                "key": "authorities",
+            }
+        )
+
+    return tabs
 
 
 async def get_case_title(cluster: OpinionCluster) -> str:

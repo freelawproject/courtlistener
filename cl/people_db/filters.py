@@ -2,7 +2,6 @@ import rest_framework_filters as filters
 from django.db.models import Prefetch, QuerySet
 
 from cl.api.utils import (
-    ALL_TEXT_LOOKUPS,
     BASIC_TEXT_LOOKUPS,
     DATE_LOOKUPS,
     DATETIME_LOOKUPS,
@@ -79,7 +78,7 @@ class SchoolFilter(NoEmptyFilterSet):
             "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
-            "name": ALL_TEXT_LOOKUPS,
+            "name": BASIC_TEXT_LOOKUPS,
             "ein": ["exact"],
         }
 
@@ -134,7 +133,7 @@ class PositionFilter(NoEmptyFilterSet):
             "person": ["exact"],
             "appointer": ["exact"],
             "predecessor": ["exact"],
-            "job_title": ALL_TEXT_LOOKUPS,
+            "job_title": BASIC_TEXT_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_nominated": DATE_LOOKUPS,
@@ -265,7 +264,7 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
             "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
-            "name": ALL_TEXT_LOOKUPS,
+            "name": BASIC_TEXT_LOOKUPS,
         }
 
     def filter_join_tables(
@@ -342,7 +341,7 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
             "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
-            "name": ALL_TEXT_LOOKUPS,
+            "name": BASIC_TEXT_LOOKUPS,
         }
 
     def filter_roles(self, qs: QuerySet, name: str, value: bool) -> QuerySet:

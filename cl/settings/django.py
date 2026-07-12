@@ -58,6 +58,9 @@ if env("DB_READ_REPLICA_HOST", default=""):
     }
 
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
+SLACK_REPLICATION_WEBHOOK_URL = env(
+    "SLACK_REPLICATION_WEBHOOK_URL", default=""
+)
 API_READ_DATABASES: list[str] | None = env.list(
     "API_READ_DATABASES", default=None
 )
@@ -129,6 +132,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.template.context_processors.request",
                 "django.template.context_processors.static",
+                "django.template.context_processors.csrf",
                 "cl.lib.context_processors.inject_settings",
                 "cl.lib.context_processors.inject_random_tip",
                 "cl.lib.context_processors.inject_email_ban_status",
@@ -182,6 +186,7 @@ INSTALLED_APPS = [
     "mathfilters",
     "rest_framework",
     "rest_framework.authtoken",
+    "oauth2_provider",
     "django_filters",
     "django_prometheus",
     "storages",
@@ -204,6 +209,7 @@ INSTALLED_APPS = [
     "cl.people_db",
     "cl.lasc",
     "cl.lib",
+    "cl.oauth",
     "cl.opinion_page",
     "cl.recap",
     "cl.recap_rss",
