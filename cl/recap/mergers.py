@@ -214,7 +214,11 @@ async def find_docket_object_query(
         )
 
     for confirm, query in lookups:
-        ds = Docket.objects.filter(Q(court_id=court_id) & query).using(using)
+        ds = (
+            Docket.objects.filter(Q(court_id=court_id) & query)
+            .order_by("pk")
+            .using(using)
+        )
         count = await ds.acount()
         if count == 0:
             continue  # Try a looser lookup.
@@ -341,7 +345,7 @@ async def find_docket_object(
         # Get the item from the default DB
         dqs = dqs.using("default")
 
-    return await dqs.aget()
+    return await dqs.afirst()
 
 
 def add_attorney(atty, p, d):

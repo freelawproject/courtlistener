@@ -56,11 +56,11 @@ def make_docket_number_core(
         logger.error(
             "Cannot make Florida DN core from non-Florida court %s", court_id
         )
-        return docket_number
-    dn_clean = docket_number.strip().upper()
-    if not docket_number:
         return ""
-    dn_clean = normalize_dashes(docket_number)
+    dn_clean = docket_number.strip().upper()
+    if not dn_clean:
+        return ""
+    dn_clean = normalize_dashes(dn_clean)
 
     if court_id == FLORIDA_COURT_ID_MAP[FloridaCourtID.SUPREME_COURT.value]:
         pattern = FLORIDA_SUPREME_DN_RE
@@ -68,7 +68,7 @@ def make_docket_number_core(
         pattern = FLORIDA_APPELLATE_DN_RE
     else:
         logger.error("Unsupported Florida court ID: %s", court_id)
-        return docket_number
+        return ""
 
     matches = pattern.findall(dn_clean)
 
@@ -78,7 +78,7 @@ def make_docket_number_core(
             court_id,
             docket_number,
         )
-        return docket_number
+        return ""
 
     if len(matches) > 1:
         matches.sort()

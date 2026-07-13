@@ -21,7 +21,7 @@ from cl.tests.cases import TestCase
 
 class FloridaUtilsTest(TestCase):
     def test_docket_number_core(self) -> None:
-        """Can we correctly normalize Texas docket numbers?"""
+        """Can we correctly normalize Florida docket numbers?"""
         self.assertEqual(make_docket_number_core("SC1983-2014"), "sc19832014")
         self.assertEqual(
             make_docket_number_core("SC1983-2014", court_id="fla"),
@@ -29,11 +29,11 @@ class FloridaUtilsTest(TestCase):
         )
         self.assertEqual(
             make_docket_number_core("3D2001-20145", court_id="fla"),
-            "3D2001-20145",
+            "",
         )
         self.assertEqual(
             make_docket_number_core("Meowdy, partner", court_id="tx"),
-            "Meowdy, partner",
+            "",
         )
         self.assertEqual(
             make_docket_number_core("3D2001-20145", court_id="fladistctapp2"),
@@ -41,11 +41,9 @@ class FloridaUtilsTest(TestCase):
         )
         self.assertEqual(
             make_docket_number_core("SC1983-2014", court_id="fladistctapp2"),
-            "SC1983-2014",
+            "",
         )
-        self.assertEqual(
-            make_docket_number_core("WR-70,849-04"), "WR-70,849-04"
-        )
+        self.assertEqual(make_docket_number_core("WR-70,849-04"), "")
 
         self.assertEqual(
             make_docket_number_core("Case Number: SC1983-2014"),
@@ -60,9 +58,7 @@ class FloridaUtilsTest(TestCase):
             "3d200120145",
         )
 
-        self.assertEqual(
-            make_docket_number_core("garbage text"), "garbage text"
-        )
+        self.assertEqual(make_docket_number_core("garbage text"), "")
 
 
 class FloridaMergerTest(TestCase):
@@ -258,7 +254,7 @@ class FloridaMergerTest(TestCase):
     def test_merge_docket_appellate_disaggregates_existing(self):
         """Does merge_docket move a matching docket from the aggregate court
         into its specific district court?"""
-        agg_dn = "1D2025-AGG"
+        agg_dn = "1D2025-1234"
         agg_docket = DocketFactory.create(
             court=self.flagg,
             docket_number=agg_dn,
