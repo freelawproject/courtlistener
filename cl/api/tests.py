@@ -5562,6 +5562,35 @@ class TestApiUsageEndpoint(TestCase):
         )
         self.assertEqual(row["used"], 8)  # 5 + 3 citations, not 2 requests
 
+    def test_endpoint_not_throttled_when_user_is_throttled(self):
+        """The endpoint stays reachable after the user is throttled."""
+        APIThrottleFactory(
+            user=self.user, throttle_type=ThrottleType.API, rate="1/min"
+        )
+        now = time.time()
+        caches["default"].set(  # already well over the 1/min limit
+            f"throttle_user_{self.user.pk}",
+            [now - i for i in range(10)],
+            timeout=86400,
+        )
+        clear_tiered_cache()
+        for _ in range(3):
+            self.assertEqual(
+                self.client.get(self.url).status_code, HTTPStatus.OK
+            )
+
+    def test_blocked_user_can_still_read_usage(self):
+        """A '0/min' user is reported blocked and can still reach the endpoint."""
+        APIThrottleFactory(
+            user=self.user, throttle_type=ThrottleType.API, rate="0/min"
+        )
+        clear_tiered_cache()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        row = self._row(response.json(), "user", "0/min")
+        self.assertTrue(row["blocked"])
+        self.assertEqual(row["remaining"], 0)
+
     @patch("cl.api.utils.get_redis_interface")
     def test_historical_usage_data_returned(self, mock_get_redis):
         """Historical usage pulls data from Redis via invert_user_logs."""

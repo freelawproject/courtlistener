@@ -298,11 +298,16 @@ class MembershipInfo(TypedDict):
 class ApiUsageViewSet(ViewSet):
     """Provides the authenticated user's API usage and rate limits.
 
-    Returns current-window throttle consumption, 14-day historical usage,
-    and membership info.
+    Returns current throttle usage, 14-day historical usage, and membership
+    information.
+
+    This endpoint is intentionally not rate-limited. Users must be able to
+    inspect their current usage, including ``reset_at``, even after being
+    throttled on other endpoints, when this information is most useful.
     """
 
     permission_classes = [IsAuthenticated]
+    throttle_classes: list = []
     pagination_class = None
 
     def _get_historical_usage(self, user: User) -> dict[str, int]:
