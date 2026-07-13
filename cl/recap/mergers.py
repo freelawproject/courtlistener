@@ -329,7 +329,13 @@ async def find_docket_object(
         skip_dn_core_confirmation,
     )
 
-    if await dqs.acount() == 0:
+    if using != "default":
+        # Get the item from the default DB
+        dqs = dqs.using("default")
+
+    d = await dqs.afirst()
+
+    if d is None:
         # Couldn't find a docket. Return a new one.
         return (
             Docket(
@@ -341,11 +347,7 @@ async def find_docket_object(
             else None
         )
 
-    if using != "default":
-        # Get the item from the default DB
-        dqs = dqs.using("default")
-
-    return await dqs.afirst()
+    return d
 
 
 def add_attorney(atty, p, d):
