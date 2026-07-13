@@ -32,7 +32,7 @@ dependencies = [
   "courts-db",
   "disposable-email-domains",
   "Django>=6.0.5, <6.1",
-  "django-cache-memoize",
+  "django>=6.0.6,<6.1",
   "django-cors-headers>=4.9.0",
   "django-csp>=4.0",
   "django-extensions>=4.1",
