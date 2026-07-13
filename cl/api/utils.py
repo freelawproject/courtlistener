@@ -1045,7 +1045,7 @@ def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
     the same cache keys the throttles write to. One row per rate, so
     multidimensional limits are fully reported.
     """
-    default_rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
+    default_rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # type: ignore[misc]
     username = user.username
     now = time.time()
     usage_rows: list[ThrottleUsageRow] = []
