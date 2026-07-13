@@ -5445,6 +5445,8 @@ class MembershipThrottleSyncTest(TestCase):
         mock_clear.assert_called_once()
 
 
+@override_settings(WAFFLE_CACHE_PREFIX="TestApiUsageEndpoint")
+@override_switch(DOUBLE_API_THROTTLES_SWITCH, active=False)
 class TestApiUsageEndpoint(TestCase):
     """Tests for the GET /api/rest/v4/api-usage/ endpoint."""
 
