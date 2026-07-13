@@ -37,6 +37,10 @@ from cl.scrapers.tasks import save_response_to_s3
 S3_BASE = Path("responses/dockets/florida")
 
 
+def _make_case_key(court_id: FloridaCourtID, docket_number: str) -> str:
+    return f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(docket_number)}.html"
+
+
 @dataclass
 class S3Cache(RequestHandler):
     """Handler to use S3 as a (successful) response cache
@@ -197,14 +201,14 @@ async def _backfill_targeted(
 
         content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
 
-        key = f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(case.docket_number)}.json"
+        key = _make_case_key(court_id, case.docket_number)
 
         throttle.maybe_wait()
         save_response_to_s3.si(key, content).set(
             queue=queue_name
         ).apply_async()
 
-        if i % 100 == 0:
+        if i % 10 == 0:
             logger.info(
                 "Completed scrape of %d/%d cases (%.2f%%)",
                 i + 1,
@@ -234,7 +238,7 @@ async def _backfill(
                 court_ids=[court_id],
                 full_scrape=full_scrape_loop,
             ):
-                key = f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(case.docket_number)}.json"
+                key = _make_case_key(court_id, case.docket_number)
                 if skip_parsed and cache.s3_key_exists(key):
                     continue
                 if full_scrape and skip_parsed:
