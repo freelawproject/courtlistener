@@ -5449,12 +5449,32 @@ class TestApiUsageEndpoint(TestCase):
     """Tests for the GET /api/rest/v4/api-usage/ endpoint."""
 
     @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # get_current_throttle_usage -> get_all_throttle_overrides is
+        # @tiered_cache; isolate its prefix so state can't leak across classes.
+        patcher = mock.patch(
+            "cl.lib.decorators.get_tiered_cache_prefix",
+            new=lambda: "tiered_api_usage_endpoint",
+        )
+        patcher.start()
+        cls.addClassCleanup(patcher.stop)
+
+    @classmethod
     def setUpTestData(cls):
         cls.user = UserFactory()
 
     def setUp(self):
         self.url = reverse("api-usage-list", kwargs={"version": "v4"})
         self.client.force_login(self.user)
+        clear_tiered_cache()
+
+    def _row(self, data, scope, rate):
+        return next(
+            r
+            for r in data["current_usage"]
+            if r["scope"] == scope and r["rate"] == rate
+        )
 
     def test_unauthenticated_request(self):
         """Anonymous users get a 401."""
@@ -5480,64 +5500,67 @@ class TestApiUsageEndpoint(TestCase):
         cache_key = f"throttle_user_{self.user.pk}"
         default_cache.set(cache_key, timestamps, timeout=3600)
 
-        response = self.client.get(self.url)
-        data = response.json()
-
+        data = self.client.get(self.url).json()
         api_usage = next(
             u for u in data["current_usage"] if u["scope"] == "user"
         )
-        # 10 seeded + 1 from this request itself
-        self.assertGreaterEqual(api_usage["requests_made"], 10)
+        self.assertGreaterEqual(api_usage["used"], 10)
         self.assertIsNotNone(api_usage["reset_at"])
-        self.assertGreater(api_usage["requests_remaining"], 0)
+        self.assertGreater(api_usage["remaining"], 0)
 
     def test_current_usage_empty_cache(self):
-        """No prior requests → requests_made near 0, reset_at null."""
+        """No prior requests → used 0, reset_at null (citations scope)."""
         # Clear any existing throttle state
         default_cache = caches["default"]
         default_cache.delete(f"throttle_user_{self.user.pk}")
         default_cache.delete(f"throttle_citations_{self.user.pk}")
 
-        response = self.client.get(self.url)
-        data = response.json()
-
+        data = self.client.get(self.url).json()
         citation_usage = next(
             u for u in data["current_usage"] if u["scope"] == "citations"
         )
-        self.assertEqual(citation_usage["requests_made"], 0)
+        self.assertEqual(citation_usage["used"], 0)
         self.assertIsNone(citation_usage["reset_at"])
 
     def test_current_usage_with_custom_override(self):
-        """APIThrottle override is reflected in requests_allowed."""
+        """A single APIThrottle override is reflected in the row limit."""
         APIThrottleFactory(
-            user=self.user,
-            throttle_type=ThrottleType.API,
-            rate="100/hour",
+            user=self.user, throttle_type=ThrottleType.API, rate="100/hour"
         )
-        response = self.client.get(self.url)
-        data = response.json()
+        clear_tiered_cache()
+        data = self.client.get(self.url).json()
+        self.assertEqual(self._row(data, "user", "100/hour")["limit"], 100)
 
-        api_usage = next(
-            u for u in data["current_usage"] if u["scope"] == "user"
-        )
-        self.assertEqual(api_usage["rate"], "100/hour")
-        self.assertEqual(api_usage["requests_allowed"], 100)
+    def test_multidimensional_api_override(self):
+        """Multiple API rates for one user are each reported."""
+        for rate in ("100/hour", "1000/day"):
+            APIThrottleFactory(
+                user=self.user, throttle_type=ThrottleType.API, rate=rate
+            )
+        clear_tiered_cache()  # override cache is populated lazily
+        data = self.client.get(self.url).json()
+        self.assertEqual(self._row(data, "user", "100/hour")["limit"], 100)
+        self.assertEqual(self._row(data, "user", "1000/day")["limit"], 1000)
 
-    def test_current_usage_blocked_user(self):
-        """Blocked APIThrottle shows blocked: true."""
-        APIThrottleFactory(
-            user=self.user,
-            throttle_type=ThrottleType.API,
-            blocked=True,
-            rate="",
+    def test_citations_multidimensional_counts_citations(self):
+        """Citations rows sum citation counts, not request counts."""
+        for rate in ("30/min", "200/hour"):
+            APIThrottleFactory(
+                user=self.user,
+                throttle_type=ThrottleType.CITATION_LOOKUP,
+                rate=rate,
+            )
+        now = time.time()
+        caches["default"].set(
+            f"throttle_citations_{self.user.pk}",
+            [[5, now - 1], [3, now - 2]],  # [citation_count, timestamp]
+            timeout=3600,
         )
-        response = self.client.get(self.url)
-        data = response.json()
-
-        api_usage = next(
-            u for u in data["current_usage"] if u["scope"] == "user"
+        clear_tiered_cache()
+        row = self._row(
+            self.client.get(self.url).json(), "citations", "30/min"
         )
-        self.assertTrue(api_usage["blocked"])
+        self.assertEqual(row["used"], 8)  # 5 + 3 citations, not 2 requests
 
     @patch("cl.api.utils.get_redis_interface")
     def test_historical_usage_data_returned(self, mock_get_redis):

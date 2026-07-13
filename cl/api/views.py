@@ -1,7 +1,6 @@
 import logging
 import re
-import time
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from typing import TypedDict, cast
 
@@ -20,14 +19,12 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from cl.alerts.utils import get_alert_estimation_count
-from cl.api.models import APIThrottle, ThrottleType
-from cl.api.utils import invert_user_logs
+from cl.api.utils import get_current_throttle_usage, invert_user_logs
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.lib.elasticsearch_utils import (
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
 )
-from cl.lib.ratelimiter import parse_rate
 from cl.search.documents import (
     OpinionClusterDocument,
 )
@@ -291,24 +288,6 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     return JsonResponse(data)
 
 
-# Scopes to skip when building current_usage — these aren't relevant
-# for authenticated users checking their own limits.
-EXCLUDED_THROTTLE_SCOPES = {"anon"}
-
-
-class CurrentUsageDetails(TypedDict):
-    """One row per throttle scope in the current_usage list."""
-
-    scope: str
-    rate: str
-    requests_made: int
-    requests_allowed: int
-    requests_remaining: int
-    window_duration_seconds: float
-    reset_at: str | None
-    blocked: bool
-
-
 class MembershipInfo(TypedDict):
     """Membership level + active status."""
 
@@ -325,83 +304,6 @@ class ApiUsageViewSet(ViewSet):
 
     permission_classes = [IsAuthenticated]
     pagination_class = None
-
-    def _get_current_usage(self, user: User) -> list[CurrentUsageDetails]:
-        """Read DRF's throttle cache to build per-scope usage.
-
-        Scopes are derived from DEFAULT_THROTTLE_RATES in settings.
-        Overrides are looked up from APIThrottle by scope.
-        Results are sorted by utilization descending — the limit
-        closest to being hit comes first.
-        """
-        default_rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # type: ignore
-        overrides = {
-            t.throttle_type: (t.blocked, t.rate)
-            for t in APIThrottle.objects.filter(user=user)
-        }
-        current_time = time.time()
-        usage: list[CurrentUsageDetails] = []
-
-        for scope, default_rate in default_rates.items():
-            if scope in EXCLUDED_THROTTLE_SCOPES:
-                continue
-
-            blocked = False
-            rate = default_rate
-            throttle_type: ThrottleType | None
-            match scope:
-                case "user":
-                    throttle_type = ThrottleType.API
-                case "citations":
-                    throttle_type = ThrottleType.CITATION_LOOKUP
-                case _:
-                    throttle_type = None
-
-            override = overrides.get(throttle_type) if throttle_type else None
-            if override is not None:
-                blocked, override_rate = override
-                if override_rate:
-                    rate = override_rate
-
-            num_requests, duration = parse_rate(rate)
-            cache_key = f"throttle_{scope}_{user.pk}"
-            history = cache.get(cache_key, [])
-            valid = [ts for ts in history if ts > current_time - duration]
-            requests_made = len(valid)
-
-            # Oldest request in the window determines when the first
-            # slot frees up (sliding window).
-            reset_at = None
-            if valid:
-                oldest_ts = valid[-1]  # list is newest-first
-                reset_at = datetime.fromtimestamp(
-                    oldest_ts + duration, tz=UTC
-                ).isoformat()
-
-            usage.append(
-                {
-                    "scope": scope,
-                    "rate": rate,
-                    "requests_made": requests_made,
-                    "requests_allowed": num_requests,
-                    "requests_remaining": max(num_requests - requests_made, 0),
-                    "window_duration_seconds": duration,
-                    "reset_at": reset_at,
-                    "blocked": blocked,
-                }
-            )
-
-        # Sort by utilization descending — limit closest to being hit first.
-        # Blocked entries float to the top (utilization = 1.0).
-        usage.sort(
-            key=lambda u: (
-                1.0
-                if u["blocked"]
-                else u["requests_made"] / u["requests_allowed"]
-            ),
-            reverse=True,
-        )
-        return usage
 
     def _get_historical_usage(self, user: User) -> dict[str, int]:
         """14-day daily request counts from Redis."""
@@ -426,7 +328,7 @@ class ApiUsageViewSet(ViewSet):
         user = cast(User, request.user)
         return Response(
             {
-                "current_usage": self._get_current_usage(user),
+                "current_usage": get_current_throttle_usage(user),
                 "historical_usage": self._get_historical_usage(user),
                 "membership": self._get_membership(user),
             }
