@@ -225,7 +225,7 @@ async def find_docket_object_query(
         if count == 1:
             if confirm:
                 d = confirm_docket_number_core_lookup_match(
-                    await ds.afirst(),
+                    (await sync_to_async(list)(ds))[0],
                     docket_number,
                     federal_defendant_number,
                     federal_dn_judge_initials_assigned,
@@ -254,7 +254,7 @@ async def find_docket_object_query(
             else:
                 # Choose the oldest one and live with it.
                 dqs = ds.order_by("date_created")[:1]
-                d = await dqs.afirst()
+                d = (await sync_to_async(list)(dqs))[0]
                 if confirm:
                     d = confirm_docket_number_core_lookup_match(
                         d, docket_number
@@ -335,16 +335,12 @@ async def find_docket_object(
 
     d = await dqs.afirst()
 
-    if d is None:
+    if allow_create and d is None:
         # Couldn't find a docket. Return a new one.
-        return (
-            Docket(
-                source=docket_source,
-                pacer_case_id=pacer_case_id,
-                court_id=court_id,
-            )
-            if allow_create
-            else None
+        return Docket(
+            source=docket_source,
+            pacer_case_id=pacer_case_id,
+            court_id=court_id,
         )
 
     return d
