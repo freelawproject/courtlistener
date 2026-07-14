@@ -86,22 +86,12 @@ cnt = CaseNameTweaker()
 def confirm_docket_number_core_lookup_match(
     docket: Docket,
     docket_number: str,
-    federal_defendant_number: str | None = None,
-    federal_dn_judge_initials_assigned: str | None = None,
-    federal_dn_judge_initials_referred: str | None = None,
 ) -> Docket | None:
     """Confirm if the docket_number_core lookup match returns the right docket
-    by confirming the docket_number and docket_number components also matches
-    if they're available.
+    by confirming the cleaned docket numbers also match.
 
     :param docket: The docket matched by the lookup
     :param docket_number: The incoming docket_number to lookup.
-    :param federal_defendant_number: The federal defendant number to validate
-    the match.
-    :param federal_dn_judge_initials_assigned: The judge's initials assigned to
-    validate the match.
-    :param federal_dn_judge_initials_referred: The judge's initials referred to
-    validate the match.
     :return: The docket object if both dockets matched or otherwise None.
     """
     existing_docket_number = clean_docket_number(docket.docket_number_raw)
@@ -109,24 +99,6 @@ def confirm_docket_number_core_lookup_match(
     if existing_docket_number != incoming_docket_number:
         return None
 
-    # If the incoming data contains docket_number components and the docket
-    # also contains DN components, use them to confirm that the docket matches.
-    dn_components = {
-        "federal_defendant_number": federal_defendant_number,
-        "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
-        "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
-    }
-    # Only compare DN component values if both the incoming data and the docket contain
-    # non-None DN component values.
-    for dn_key, dn_value in dn_components.items():
-        incoming_dn_value = dn_value
-        docket_dn_value = getattr(docket, dn_key, None)
-        if (
-            incoming_dn_value
-            and docket_dn_value
-            and incoming_dn_value != docket_dn_value
-        ):
-            return None
     return docket
 
 
@@ -157,35 +129,18 @@ async def find_docket_object_query(
         # blank pacer_case_id values.
         if docket_number_core:
             # Only do these if docket_number_core is not blank. See #5058.
-            lookups.extend(
-                [
-                    (
-                        False,
-                        Q(
-                            pacer_case_id=pacer_case_id,
-                            docket_number_core=docket_number_core,
-                        ),
+            lookups = [
+                (
+                    False,
+                    Q(
+                        pacer_case_id=pacer_case_id,
+                        docket_number_core=docket_number_core,
                     ),
-                    # Appellate docket uploads usually include a pacer_case_id.
-                    # Therefore, include the following lookup to attempt matching
-                    # existing dockets without a pacer_case_id using docket_number_core
-                    # to avoid creating duplicated dockets.
-                    (
-                        dncc,
-                        Q(
-                            pacer_case_id=None,
-                            docket_number_core=docket_number_core,
-                        ),
-                    ),
-                ]
-            )
-        lookups.append((False, Q(pacer_case_id=pacer_case_id)))
-    if docket_number_core and not pacer_case_id:
-        # Sometimes we don't know how to make core docket numbers. If that's
-        # the case, we will have a blank value for the field. We must not do
-        # lookups by blank values. See: freelawproject/courtlistener#1531
-        lookups.extend(
-            [
+                ),
+                # Appellate docket uploads usually include a pacer_case_id.
+                # Therefore, include the following lookup to attempt matching
+                # existing dockets without a pacer_case_id using docket_number_core
+                # to avoid creating duplicated dockets.
                 (
                     dncc,
                     Q(
@@ -193,17 +148,30 @@ async def find_docket_object_query(
                         docket_number_core=docket_number_core,
                     ),
                 ),
-                (
-                    dncc,
-                    Q(docket_number_core=docket_number_core),
-                ),
             ]
-        )
-    elif docket_number and not pacer_case_id:
+        lookups.append((False, Q(pacer_case_id=pacer_case_id)))
+    elif docket_number_core:
+        # Sometimes we don't know how to make core docket numbers. If that's
+        # the case, we will have a blank value for the field. We must not do
+        # lookups by blank values. See: freelawproject/courtlistener#1531
+        lookups = [
+            (
+                dncc,
+                Q(
+                    pacer_case_id=None,
+                    docket_number_core=docket_number_core,
+                ),
+            ),
+            (
+                dncc,
+                Q(docket_number_core=docket_number_core),
+            ),
+        ]
+    elif docket_number:
         # Finally, as a last resort, we can try the docket number. It might not
         # match b/c of punctuation or whatever, but we can try. Avoid lookups
         # by blank docket_number values.
-        lookups.append(
+        lookups = [
             (
                 dncc,
                 Q(
@@ -211,57 +179,73 @@ async def find_docket_object_query(
                     docket_number_raw=docket_number,
                 ),
             ),
+        ]
+
+    confirm_query = Q()
+    component_query = Q()
+    # If the incoming data contains docket_number components and the docket
+    # also contains DN components, use them to confirm that the docket matches.
+    # Only compare DN component values if both the incoming data and the docket contain
+    # non-None DN component values.
+    if federal_defendant_number is not None:
+        component_query &= Q(federal_defendant_number=federal_defendant_number)
+        confirm_query &= Q(federal_defendant_number__isnull=True) | Q(
+            federal_defendant_number=federal_defendant_number
+        )
+    if federal_dn_judge_initials_assigned:
+        component_query &= Q(
+            federal_dn_judge_initials_assigned=federal_dn_judge_initials_assigned
+        )
+        confirm_query &= Q(federal_dn_judge_initials_assigned="") | Q(
+            federal_dn_judge_initials_assigned=federal_dn_judge_initials_assigned
+        )
+    if federal_dn_judge_initials_referred:
+        component_query &= Q(
+            federal_dn_judge_initials_referred=federal_dn_judge_initials_referred
+        )
+        confirm_query &= Q(federal_dn_judge_initials_referred="") | Q(
+            federal_dn_judge_initials_referred=federal_dn_judge_initials_referred
         )
 
     for confirm, query in lookups:
+        q = Q(court_id=court_id)
+        if confirm:
+            q &= confirm_query
         ds = (
-            Docket.objects.filter(Q(court_id=court_id) & query)
-            .order_by("pk")
+            Docket.objects.filter(q & query)
+            .order_by("date_created")
             .using(using)
         )
-        count = await ds.acount()
+        count = await ds.values("pk")[:2].acount()
         if count == 0:
             continue  # Try a looser lookup.
         if count == 1:
             if confirm:
-                d = confirm_docket_number_core_lookup_match(
-                    (await sync_to_async(list)(ds))[0],
-                    docket_number,
-                    federal_defendant_number,
-                    federal_dn_judge_initials_assigned,
-                    federal_dn_judge_initials_referred,
-                )
-                if d is None:
+                d = (await sync_to_async(list)(ds))[0]
+                if (
+                    confirm_docket_number_core_lookup_match(d, docket_number)
+                    is None
+                ):
                     continue
             return ds  # Nailed it!
-        else:  # count > 1
-            # If more than one docket matches, try refining the results using
-            # available docket_number components.
-            dn_components = {
-                "federal_defendant_number": federal_defendant_number,
-                "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
-                "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
-            }
-            dn_lookup = {
-                dn_key: dn_value
-                for dn_key, dn_value in dn_components.items()
-                if dn_value
-            }
-            dn_queryset = ds.filter(**dn_lookup).using(using)
-            count = await dn_queryset.acount()
-            if count == 1:
-                return dn_queryset
-            else:
-                # Choose the oldest one and live with it.
-                dqs = ds.order_by("date_created")[:1]
-                d = (await sync_to_async(list)(dqs))[0]
-                if confirm:
-                    d = confirm_docket_number_core_lookup_match(
-                        d, docket_number
-                    )
-                    if d is None:
-                        continue
-                return dqs
+
+        # If more than one docket matches, try refining the results using
+        # available docket_number components.
+        dqs = ds.filter(component_query)
+        count = await dqs.values("pk")[:2].acount()
+        if count == 1:
+            return dqs
+
+        # Choose the oldest one and live with it.
+        dqs = ds[:1]
+        if confirm:
+            d = (await sync_to_async(list)(dqs))[0]
+            if (
+                confirm_docket_number_core_lookup_match(d, docket_number)
+                is None
+            ):
+                continue
+        return dqs
 
     # Couldn't find a docket.
     return Docket.objects.none()
