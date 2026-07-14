@@ -35,7 +35,7 @@ def save_case_to_s3(
     throttle.maybe_wait()
     save_response_to_s3.si(key, content).set(queue=queue_name).apply_async()
 
-    
+
 def _make_case_key(court_id: FloridaCourtID, docket_number: str) -> str:
     return f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(docket_number)}.html"
 
