@@ -94,6 +94,7 @@ class ScraperCheckpointTracker:
 
 class StateBackScrapeCommand(BaseCommand):
     checkpoint_tracker: ClassVar[ScraperCheckpointTracker]
+    date_range_required: ClassVar[bool] = True
 
     def add_arguments(self, parser: CommandParser):
         super(StateBackScrapeCommand, self).add_arguments(parser)
@@ -103,13 +104,13 @@ class StateBackScrapeCommand(BaseCommand):
             help="Starting value for backscraper iterable creation. "
             "Each scraper handles the parsing of the argument,"
             "since the value may represent a year, a string, a date, etc.",
-            required=True,
+            required=self.date_range_required,
         )
         parser.add_argument(
             "--backscrape-end",
             dest="backscrape_end",
             help="End value for backscraper iterable creation.",
-            required=True,
+            required=self.date_range_required,
         )
         parser.add_argument(
             "--courts",
