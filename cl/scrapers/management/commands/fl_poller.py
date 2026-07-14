@@ -143,11 +143,10 @@ class Command(FLScrapeCommand, StatePollCommand):
                         str(update.case_uuid),
                         court_id.value,
                     )
-                except Exception as e:
-                    logger.error(
-                        "Failed to fetch case data for %s: %r",
+                except Exception:
+                    logger.exception(
+                        "Failed to fetch case data for %s",
                         update.case_uuid,
-                        e,
                     )
                     continue
                 if isinstance(maybe_case, Exception):
@@ -211,7 +210,7 @@ class Command(FLScrapeCommand, StatePollCommand):
                     "caseHeader.filedDateFrom": start.strftime(
                         "%Y-%m-%dT%H:%M:%S.000Z"
                     ),
-                    "sort": "caseHeader.filedDate,desc",
+                    "sort": "caseHeader.filedDate,asc",
                 },
             ):
                 match page:
@@ -238,7 +237,7 @@ class Command(FLScrapeCommand, StatePollCommand):
                 DE_DOC_ENDPOINT,
                 parser,
                 {
-                    "sort": "docketEntryHeader.filedDate,desc",
+                    "sort": "docketEntryHeader.filedDate,asc",
                     "caseHeader.courtID": str(
                         scraper_courts[court_id].court.resource_id
                     ),
