@@ -19,6 +19,7 @@ from requests import RequestException
 from urllib3.exceptions import ReadTimeoutError
 
 from cl.corpus_importer.tasks import (
+    FREE_PDF_MAX_DOWNLOAD_ATTEMPTS,
     delete_pacer_row,
     get_and_process_free_pdf,
     get_and_save_free_document_report,
@@ -413,7 +414,11 @@ def get_pdfs(
     """
     q = cast(str, queue)
     cnt = CaseNameTweaker()
-    base_filter = Q(error_msg="")
+    # Rows with a recorded error are dead-lettered; rows that have failed
+    # transiently too many times across runs stop being re-attempted (#7489)
+    base_filter = Q(error_msg="") & Q(
+        download_attempts__lt=FREE_PDF_MAX_DOWNLOAD_ATTEMPTS
+    )
 
     if courts:
         # Download PDFs only from specified court ids

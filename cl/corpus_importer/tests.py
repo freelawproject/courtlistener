@@ -94,6 +94,7 @@ from cl.corpus_importer.signals import (
 )
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.tasks import (
+    FREE_PDF_MAX_DOWNLOAD_ATTEMPTS,
     MergeResult,
     classify_case_name_by_llm,
     download_texas_document,
@@ -108,6 +109,7 @@ from cl.corpus_importer.tasks import (
     merge_texas_trial_court_data,
     normalize_texas_parties,
     probe_or_scrape_iquery_pages,
+    record_free_pdf_terminal_failure,
 )
 from cl.corpus_importer.utils import (
     DocketSourceException,
@@ -161,6 +163,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.recap.tests.tests import mock_bucket_open
+from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.cluster_sources import ClusterSources
@@ -890,6 +893,85 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
         """do-everything self-monitors by calling the stall reporter."""
         do_everything([self.court.pk], None, None, "pacerdoc1", day_span=1)
         mock_stalls.assert_called_once_with([self.court.pk])
+
+
+class FreePdfTerminalFailureTest(TestCase):
+    """Terminal free-PDF failures must record bookkeeping so rows stop
+    being re-attempted on every run, forever (#7489)."""
+
+    def _row(self, **kwargs) -> PACERFreeDocumentRow:
+        kwargs.setdefault("court_id", "cand")
+        kwargs.setdefault("error_msg", "")
+        return PACERFreeDocumentRowFactory.create(**kwargs)
+
+    def test_transient_failure_increments_attempts(self) -> None:
+        """A transient failure bumps the counter and stamps the time, but
+        leaves the row eligible for a future run."""
+        row = self._row()
+
+        record_free_pdf_terminal_failure(
+            row.pk, "Blocked by court: cand", transient=True
+        )
+
+        row.refresh_from_db()
+        self.assertEqual(row.download_attempts, 1)
+        self.assertIsNotNone(row.last_attempt)
+        self.assertEqual(
+            row.error_msg,
+            "",
+            "A transient failure below the budget must not dead-letter "
+            "the row.",
+        )
+
+    def test_exhausted_transient_failure_is_dead_lettered(self) -> None:
+        """Once the cross-run budget is spent, the row must stop being
+        eligible and record why."""
+        row = self._row(download_attempts=FREE_PDF_MAX_DOWNLOAD_ATTEMPTS - 1)
+
+        record_free_pdf_terminal_failure(
+            row.pk, "Blocked by court: cand", transient=True
+        )
+
+        row.refresh_from_db()
+        self.assertEqual(row.download_attempts, FREE_PDF_MAX_DOWNLOAD_ATTEMPTS)
+        self.assertIn("Retries exhausted across runs", row.error_msg)
+
+    def test_permanent_failure_is_dead_lettered_immediately(self) -> None:
+        """A permanent failure (e.g. 404) dead-letters on the first hit."""
+        row = self._row()
+
+        record_free_pdf_terminal_failure(
+            row.pk,
+            "Ran into unknown HTTPError while getting PDF: 404. Aborting.",
+            transient=False,
+        )
+
+        row.refresh_from_db()
+        self.assertIn("404", row.error_msg)
+        self.assertIsNotNone(row.last_attempt)
+        self.assertEqual(row.download_attempts, 0)
+
+    def test_eligibility_excludes_errored_and_exhausted_rows(self) -> None:
+        """The get_pdfs eligibility filter must skip dead-lettered and
+        budget-exhausted rows while keeping fresh ones."""
+        eligible = self._row()
+        partially_failed = self._row(
+            download_attempts=FREE_PDF_MAX_DOWNLOAD_ATTEMPTS - 1
+        )
+        errored = self._row(error_msg="Some prior failure")
+        exhausted = self._row(download_attempts=FREE_PDF_MAX_DOWNLOAD_ATTEMPTS)
+
+        eligible_pks = set(
+            PACERFreeDocumentRow.objects.filter(
+                error_msg="",
+                download_attempts__lt=FREE_PDF_MAX_DOWNLOAD_ATTEMPTS,
+            ).values_list("pk", flat=True)
+        )
+
+        self.assertIn(eligible.pk, eligible_pks)
+        self.assertIn(partially_failed.pk, eligible_pks)
+        self.assertNotIn(errored.pk, eligible_pks)
+        self.assertNotIn(exhausted.pk, eligible_pks)
 
 
 class GetQuarterTest(SimpleTestCase):
