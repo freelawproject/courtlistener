@@ -13,7 +13,9 @@ from juriscraper.state.florida.courts import FloridaCourtID
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
 from cl.scrapers.management.utils import (
+    FL_COURT_ID_MAP,
     FLScrapeCommand,
+    S3Cache,
     ScraperCheckpointTracker,
     StateBackScrapeCommand,
     _make_case_number_key,
@@ -38,117 +40,6 @@ def save_case_to_s3(
 
 def _make_case_key(court_id: FloridaCourtID, docket_number: str) -> str:
     return f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(docket_number)}.html"
-
-
-@dataclass
-class S3Cache(RequestHandler):
-    """Handler to use S3 as a (successful) response cache
-
-    :ivar base: The prefix where cached values are stored
-    :ivar save: Whether to archive responses
-    :ivar load: Whether to intercept requests and load responses from S3 if available
-    :ivar throttle: The celery throttle to use when adding responses to the queue
-    :ivar queue_name: The celery queue to dispatch archive tasks to
-    :ivar storage: The S3 storage backend to use for archiving and retrieval"""
-
-    base: Path
-    save: bool
-    load: bool
-    throttle: CeleryThrottle
-    queue_name: str
-    storage: S3GlacierInstantRetrievalStorage = field(
-        default_factory=S3GlacierInstantRetrievalStorage
-    )
-
-    @retry(
-        (
-            botocore.exceptions.HTTPClientError,
-            botocore.exceptions.ConnectionError,
-        ),
-        delay=1,
-        backoff=2,
-    )
-    @lru_cache(512)
-    def s3_key_exists(self, key: str) -> bool:
-        """Cached check for whether a key exists in S3 with retries. Allows us to avoid an extra `storage.exists` call
-        when `save` and `load` are both enabled."""
-        if self.storage.exists(key):
-            return True
-        return False
-
-    def make_s3_key(self, request: ScheduledRequest) -> str:
-        url_path = request.url.path.lower().strip("/")
-        url_params = "&".join(
-            [f"{k}={v}" for k, v in sorted(request.url.params.items())]
-        )
-        method = request.method.upper()
-        request_hash = hashlib.sha1(
-            f"{method}|{url_path}|{url_params}".encode()
-        ).hexdigest()
-        return str(self.base / url_path / request_hash)
-
-    def load_from_s3(self, request: ScheduledRequest) -> Response | None:
-        key = self.make_s3_key(request)
-
-        try:
-            if not self.s3_key_exists(key):
-                logger.info("Did not find %s in S3", request.url.path.lower())
-                return None
-
-            logger.info("Loading %s from S3", request.url.path.lower())
-
-            with self.storage.open(key, "rb") as f:
-                return Response(200, content=f.read())
-        except Exception:
-            logger.exception(
-                "Failed to load response from archive for %s",
-                request.url.path.lower(),
-            )
-            return None
-
-    def save_to_s3(
-        self, request: ScheduledRequest, response: Response
-    ) -> None:
-        key = self.make_s3_key(request)
-        try:
-            # Don't try to cache responses that we pulled from the cache
-            if self.load and self.s3_key_exists(key):
-                return
-            self.throttle.maybe_wait()
-            save_response_to_s3.si(key, response.content).set(
-                queue=self.queue_name
-            ).apply_async()
-        except Exception:
-            logger.exception(
-                "Failed to queue archive response for %s", request.url
-            )
-
-    async def before_send(
-        self, manager: RequestManager, request: ScheduledRequest
-    ) -> None:
-        if not self.load:
-            return
-        loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(None, self.load_from_s3, request)
-        if response:
-            request.response.set_result(response)
-
-    async def listen(self, manager: RequestManager, request: ScheduledRequest):
-        if not self.save:
-            return
-
-        try:
-            response = await request.response
-        except Exception:
-            logger.exception(
-                "Cache listener failed to get response for %s", request.url
-            )
-            return
-
-        self.save_to_s3(request, response)
-
-    def __hash__(self) -> int:
-        return hash(id(self))
 
 
 async def _get_full_case(  # type: ignore[return]
@@ -335,38 +226,29 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
         scrape_uuids: str,
         **options,
     ):
-        throttle = CeleryThrottle(
-            queue_name=queue, min_items=throttle_min_items
-        )
-
-        storage = S3GlacierInstantRetrievalStorage()
-
-        cache = S3Cache(
-            base=S3_BASE,
-            save=archive_responses,
-            load=use_cache,
-            throttle=throttle,
-            queue_name=queue,
-            storage=storage,
-        )
-
-        scraper = FloridaScraper(
-            rps=rps,
-            retry=ExponentialBackoff(
-                max_retries=max_retries,
-                backoff=backoff,
-                backoff_growth=backoff_growth,
-            ),
-            handlers=[cache],
-        )
-
         logger.info("Setting up Florida back-scrape...")
+        start = _parse_date(backscrape_start)
+        end = _parse_date(backscrape_end)
+        court_ids = self.parse_court_ids(courts)
+
+        throttle, scraper, cache = self.throttle_scraper_and_cache(
+            rps,
+            max_retries,
+            backoff,
+            backoff_growth,
+            use_cache,
+            archive_responses,
+            queue,
+            throttle_min_items,
+            S3_BASE,
+        )
+
         if scrape_uuids:
             p = Path(scrape_uuids)
             with p.open() as f:
                 cases = [
                     (
-                        _COURT_ID_MAP[c.strip()],
+                        FL_COURT_ID_MAP[c.strip()],
                         UUID(case_uuid.strip()),
                     )
                     for c, case_uuid in (line.split(",") for line in f)
@@ -384,14 +266,6 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
                 "Both --backscrape-start and --backscrape-end are required."
             )
             return
-        start = _parse_date(backscrape_start)
-        end = _parse_date(backscrape_end)
-        court_ids = [
-            _COURT_ID_MAP[c.strip()] for c in courts.split(",") if c.strip()
-        ]
-        if not court_ids:
-            logger.warning("No courts specified. Defaulting to all courts.")
-            court_ids = list(_COURT_ID_MAP.values())
 
         if auto_resume:
             logger.info("Auto resume enabled. Getting checkpoints...")

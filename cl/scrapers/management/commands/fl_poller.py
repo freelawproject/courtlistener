@@ -71,7 +71,7 @@ class Command(FLScrapeCommand, StatePollCommand):
     ):
         court_ids = self.parse_court_ids(courts)
 
-        throttle, scraper = self.throttle_and_scraper(
+        throttle, scraper, _ = self.throttle_scraper_and_cache(
             rps,
             max_retries,
             backoff,

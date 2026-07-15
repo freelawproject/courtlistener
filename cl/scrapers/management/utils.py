@@ -222,7 +222,7 @@ class FLScrapeCommand(BaseCommand):
             court_ids = list(FL_COURT_ID_MAP.values())
         return court_ids
 
-    def throttle_and_scraper(
+    def throttle_scraper_and_cache(
         self,
         rps: float,
         max_retries: int,
@@ -233,10 +233,18 @@ class FLScrapeCommand(BaseCommand):
         queue: str,
         throttle_min_items: int,
         s3_base: Path,
-    ) -> tuple[CeleryThrottle, FloridaScraper]:
+    ) -> "tuple[CeleryThrottle, FloridaScraper, S3Cache]":
         """Initializes a celery queue throttle and Florida scraper with the given parameters and returns them"""
         throttle = CeleryThrottle(
             queue_name=queue, min_items=throttle_min_items
+        )
+
+        cache = S3Cache(
+            base=s3_base,
+            save=archive_responses,
+            load=use_cache,
+            throttle=throttle,
+            queue_name=queue,
         )
 
         scraper = FloridaScraper(
@@ -246,18 +254,10 @@ class FLScrapeCommand(BaseCommand):
                 backoff=backoff,
                 backoff_growth=backoff_growth,
             ),
-            handlers=[
-                S3Cache(
-                    base=s3_base,
-                    save=archive_responses,
-                    load=use_cache,
-                    throttle=throttle,
-                    queue_name=queue,
-                )
-            ],
+            handlers=[cache],
         )
 
-        return throttle, scraper
+        return throttle, scraper, cache
 
 
 @dataclass
