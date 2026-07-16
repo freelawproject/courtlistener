@@ -216,6 +216,9 @@ async def find_docket_object_query(
             .order_by("date_created")
             .using(using)
         )
+        # The `[:2]` slice here turns the query Django sends from `COUNT pk WHERE ...` to `COUNT pk WHERE ... LIMIT 2`,
+        # which we found in testing to have significantly better performance, presumably because Postgres can stop
+        # counting after it hits 2. This is fine since we don't actually care about the value of any count above 1.
         count = await ds.values("pk")[:2].acount()
         if count == 0:
             continue  # Try a looser lookup.
