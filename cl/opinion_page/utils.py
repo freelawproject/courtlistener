@@ -896,9 +896,10 @@ async def es_cited_case_count(
     cluster_cites_query = build_cardinality_count(
         cluster_cites_query, "cluster_id"
     )
-    cited_by_count = (
-        cluster_cites_query.execute().aggregations.unique_documents.value
-    )
+    response = await sync_to_async(
+        cluster_cites_query.execute, thread_sensitive=False
+    )()
+    cited_by_count = response.aggregations.unique_documents.value
 
     await cache.aset(
         cache_cited_by_key,
@@ -948,9 +949,10 @@ async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
     cluster_related_query = build_cardinality_count(
         cluster_related_query, "cluster_id"
     )
-    related_cases_count = (
-        cluster_related_query.execute().aggregations.unique_documents.value
-    )
+    response = await sync_to_async(
+        cluster_related_query.execute, thread_sensitive=False
+    )()
+    related_cases_count = response.aggregations.unique_documents.value
 
     await cache.aset(
         cache_related_cases_key,

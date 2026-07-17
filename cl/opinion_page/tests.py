@@ -1,8 +1,10 @@
 # mypy: disable-error-code=attr-defined
+import asyncio
 import datetime
 import os
 import re
 import shutil
+import threading
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
@@ -58,6 +60,7 @@ from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
     build_originating_court_metadata,
+    es_cited_case_count,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
@@ -158,6 +161,114 @@ class GetDownloadsContextTest(TestCase):
         self.assertTrue(context["has_downloads"])
         self.assertIn("new_version", context["download_file_path"])
         self.assertNotIn("old_version", context["download_file_path"])
+
+
+class UpdateOpinionTabsTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create()
+        OpinionFactory.create(cluster=cls.cluster)
+
+    async def test_es_counts_run_concurrently(self) -> None:
+        both_started = asyncio.Event()
+        started_count = 0
+
+        async def wait_for_other_count(result: int, *_args) -> int:
+            nonlocal started_count
+            started_count += 1
+            if started_count == 2:
+                both_started.set()
+            await asyncio.wait_for(both_started.wait(), timeout=1)
+            return result
+
+        async def get_cited_count(*args) -> int:
+            return await wait_for_other_count(3, *args)
+
+        async def get_related_count(*args) -> int:
+            return await wait_for_other_count(7, *args)
+
+        cited_count = AsyncMock(side_effect=get_cited_count)
+        related_count = AsyncMock(side_effect=get_related_count)
+        downloads_context: dict[str, object] = {
+            "has_downloads": False,
+            "download_file_path": None,
+            "embeddable_pdfs": [],
+        }
+
+        with (
+            mock.patch("cl.opinion_page.views.is_bot", return_value=False),
+            mock.patch(
+                "cl.opinion_page.views.waffle.flag_is_active",
+                return_value=True,
+            ),
+            mock.patch(
+                "cl.opinion_page.views.get_downloads_context",
+                new=AsyncMock(return_value=downloads_context),
+            ),
+            mock.patch(
+                "cl.opinion_page.views.es_cited_case_count", new=cited_count
+            ),
+            mock.patch(
+                "cl.opinion_page.views.es_related_case_count",
+                new=related_count,
+            ),
+            mock.patch(
+                "cl.opinion_page.views.render",
+                return_value=HttpResponse("tabs"),
+            ) as render_mock,
+        ):
+            response = await self.async_client.get(
+                reverse("update_opinion_tabs", args=[self.cluster.pk]),
+                headers={"HX-Request": "true"},
+            )
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        context = render_mock.call_args.args[2]
+        self.assertEqual(context["cited_by_count"], 3)
+        self.assertEqual(context["related_cases_count"], 7)
+
+
+class ESCountAsyncTest(SimpleTestCase):
+    async def test_search_executes_off_the_event_loop_thread(self) -> None:
+        event_loop_thread = threading.get_ident()
+        execute_thread = None
+
+        response = MagicMock()
+        response.aggregations.unique_documents.value = 9
+        search = MagicMock()
+        query = MagicMock()
+        search.query.return_value = query
+
+        def execute_search():
+            nonlocal execute_thread
+            execute_thread = threading.get_ident()
+            return response
+
+        query.execute.side_effect = execute_search
+        cache = MagicMock()
+        cache.aget = AsyncMock(return_value=None)
+        cache.aset = AsyncMock()
+
+        with (
+            mock.patch(
+                "cl.opinion_page.utils.get_s3_cache", return_value=cache
+            ),
+            mock.patch(
+                "cl.opinion_page.utils.make_s3_cache_key", return_value="key"
+            ),
+            mock.patch(
+                "cl.opinion_page.utils.OpinionClusterDocument.search",
+                return_value=search,
+            ),
+            mock.patch(
+                "cl.opinion_page.utils.build_cardinality_count",
+                return_value=query,
+            ),
+        ):
+            result = await es_cited_case_count(1, ["2"])
+
+        self.assertEqual(result, 9)
+        self.assertNotEqual(execute_thread, event_loop_thread)
 
 
 class SimpleLoadTest(TestCase):
