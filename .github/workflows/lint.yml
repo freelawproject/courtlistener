@@ -65,6 +65,7 @@ jobs:
           cl/api/utils.py \
           cl/api/views.py \
           cl/api/webhooks.py \
+          cl/oauth/validators.py \
           cl/tests/utils.py \
           cl/users/email_handlers.py \
           cl/users/forms.py \

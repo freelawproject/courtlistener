@@ -153,7 +153,7 @@ class OAuthMetadataView(APIView):
 
     def get(self, request: Request) -> Response:
         base = request.build_absolute_uri("/").rstrip("/")
-        scopes_supported = ["api"]
+        scopes_supported = ["api", "wiki:read"]
         if settings.OAUTH2_PROVIDER.get("OIDC_ENABLED"):
             scopes_supported.append("openid")
         return Response(
