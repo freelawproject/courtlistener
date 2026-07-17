@@ -752,7 +752,9 @@ async def es_get_related_clusters_with_cache(
     )
     try:
         # Execute the Related Query if needed
-        response = related_query.execute()
+        response = await sync_to_async(
+            related_query.execute, thread_sensitive=False
+        )()
         timeout_related = False
     except (ConnectionError, RequestError, ApiError) as e:
         logger.warning("Error getting cited and related clusters: %s", e)
@@ -834,7 +836,9 @@ async def es_get_cited_clusters_with_cache(
     )
     try:
         # Execute the Related Query if needed
-        response = cited_query.execute()
+        response = await sync_to_async(
+            cited_query.execute, thread_sensitive=False
+        )()
         timeout_cited = False
     except (ConnectionError, RequestError, ApiError) as e:
         logger.warning("Error getting cited and related clusters: %s", e)

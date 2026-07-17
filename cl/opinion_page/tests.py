@@ -60,6 +60,8 @@ from cl.opinion_page.utils import (
     build_docket_tabs,
     build_originating_court_metadata,
     es_cited_case_count,
+    es_get_cited_clusters_with_cache,
+    es_get_related_clusters_with_cache,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
@@ -267,6 +269,96 @@ class ESCountAsyncTest(SimpleTestCase):
             result = await es_cited_case_count(1, ["2"])
 
         self.assertEqual(result, 9)
+        self.assertNotEqual(execute_thread, event_loop_thread)
+
+
+class ESClusterSearchAsyncTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create()
+        OpinionFactory.create(cluster=cls.cluster)
+
+    async def test_related_search_executes_off_event_loop_thread(self) -> None:
+        event_loop_thread = threading.get_ident()
+        execute_thread: int | None = None
+        response = MagicMock()
+        query = MagicMock()
+        query.params.return_value = query
+        query.extra.return_value = query
+
+        def execute_search() -> MagicMock:
+            nonlocal execute_thread
+            execute_thread = threading.get_ident()
+            return response
+
+        query.execute.side_effect = execute_search
+        cache = MagicMock()
+        cache.aset = AsyncMock()
+
+        with (
+            self.settings(RELATED_USE_CACHE=False),
+            mock.patch(
+                "cl.opinion_page.utils.get_s3_cache", return_value=cache
+            ),
+            mock.patch(
+                "cl.opinion_page.utils.make_s3_cache_key", return_value="key"
+            ),
+            mock.patch("cl.opinion_page.utils.is_bot", return_value=False),
+            mock.patch(
+                "cl.opinion_page.utils.waffle.flag_is_active",
+                return_value=True,
+            ),
+            mock.patch("cl.opinion_page.utils.OpinionClusterDocument.search"),
+            mock.patch(
+                "cl.opinion_page.utils.build_related_clusters_query",
+                new=AsyncMock(return_value=query),
+            ),
+        ):
+            await es_get_related_clusters_with_cache(
+                self.cluster, RequestFactory().get("/")
+            )
+
+        self.assertNotEqual(execute_thread, event_loop_thread)
+
+    async def test_cited_search_executes_off_event_loop_thread(self) -> None:
+        event_loop_thread = threading.get_ident()
+        execute_thread: int | None = None
+        response = MagicMock()
+        response.hits.total.value = 1
+        query = MagicMock()
+
+        def execute_search() -> MagicMock:
+            nonlocal execute_thread
+            execute_thread = threading.get_ident()
+            return response
+
+        query.execute.side_effect = execute_search
+        cache = MagicMock()
+        cache.aset = AsyncMock()
+
+        with (
+            self.settings(RELATED_USE_CACHE=False),
+            mock.patch(
+                "cl.opinion_page.utils.get_s3_cache", return_value=cache
+            ),
+            mock.patch(
+                "cl.opinion_page.utils.make_s3_cache_key", return_value="key"
+            ),
+            mock.patch("cl.opinion_page.utils.is_bot", return_value=False),
+            mock.patch(
+                "cl.opinion_page.utils.waffle.flag_is_active",
+                return_value=True,
+            ),
+            mock.patch("cl.opinion_page.utils.OpinionClusterDocument.search"),
+            mock.patch(
+                "cl.opinion_page.utils.build_cites_clusters_query",
+                new=AsyncMock(return_value=query),
+            ),
+        ):
+            await es_get_cited_clusters_with_cache(
+                self.cluster, RequestFactory().get("/")
+            )
+
         self.assertNotEqual(execute_thread, event_loop_thread)
 
 
