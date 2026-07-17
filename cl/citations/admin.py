@@ -1,23 +1,19 @@
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 
-from cl.citations.models import UnmatchedCitation
+from cl.citations.models import (
+    UnmatchedCitation,
+    UnmatchedCitationFromRECAPDocument,
+)
 
 
-@admin.register(UnmatchedCitation)
-class UnmatchedCitationAdmin(CursorPaginatorAdmin):
-    list_display = (
-        "__str__",
-        "citing_opinion",
-    )
-    list_display_links = ("citing_opinion",)
+class UnmatchedCitationAdminMixin(CursorPaginatorAdmin):
     list_filter = ("type", "status")
     search_fields = (
         "volume",
         "reporter",
         "page",
     )
-    raw_id_fields = ("citing_opinion",)
 
     def formfield_for_choice_field(self, db_field, request, **kwargs):
         if db_field.name == "status":
@@ -36,3 +32,23 @@ class UnmatchedCitationAdmin(CursorPaginatorAdmin):
             )
 
         return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+
+@admin.register(UnmatchedCitation)
+class UnmatchedCitationAdmin(UnmatchedCitationAdminMixin):
+    list_display = (
+        "__str__",
+        "citing_opinion",
+    )
+    list_display_links = ("citing_opinion",)
+    raw_id_fields = ("citing_opinion",)
+
+
+@admin.register(UnmatchedCitationFromRECAPDocument)
+class UnmatchedCitationFromRECAPDocumentAdmin(UnmatchedCitationAdminMixin):
+    list_display = (
+        "__str__",
+        "citing_recapdocument",
+    )
+    list_display_links = ("citing_recapdocument",)
+    raw_id_fields = ("citing_recapdocument",)

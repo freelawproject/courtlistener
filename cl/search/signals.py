@@ -6,7 +6,10 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.audio.models import Audio
-from cl.citations.models import UnmatchedCitation
+from cl.citations.models import (
+    UnmatchedCitation,
+    UnmatchedCitationFromRECAPDocument,
+)
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
@@ -579,6 +582,9 @@ if settings.ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED:
     )
 
 
+DEFAULT_RD_CITATION_QUEUE = "celery"
+
+
 @receiver(
     post_save,
     sender=RECAPDocument,
@@ -602,8 +608,14 @@ def handle_recap_doc_change(
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,
         ):
+            # Batch jobs may set ``citation_queue`` on the instance to route
+            # this task off the default queue and avoid clogging it.
+            queue = (
+                getattr(instance, "citation_queue", None)
+                or DEFAULT_RD_CITATION_QUEUE
+            )
             find_citations_and_parantheticals_for_recap_documents.apply_async(
-                args=([instance.pk],)
+                args=([instance.pk],), queue=queue
             )
 
     if (
@@ -621,14 +633,21 @@ def handle_recap_doc_change(
 def update_unmatched_citation(
     sender, instance: Citation, created: bool, **kwargs
 ):
-    """Updates UnmatchedCitation.status to MATCHED, if found"""
+    """Updates the status of matching UnmatchedCitation and
+    UnmatchedCitationFromRECAPDocument rows to FOUND"""
     if not created:
         return
-    UnmatchedCitation.objects.filter(
-        volume=instance.volume,
-        reporter=instance.reporter,
-        page=instance.page,
-    ).update(status=UnmatchedCitation.FOUND)
+    query = {
+        "volume": instance.volume,
+        "reporter": instance.reporter,
+        "page": instance.page,
+    }
+    UnmatchedCitation.objects.filter(**query).update(
+        status=UnmatchedCitation.FOUND
+    )
+    UnmatchedCitationFromRECAPDocument.objects.filter(**query).update(
+        status=UnmatchedCitationFromRECAPDocument.FOUND
+    )
 
 
 @receiver(

@@ -138,7 +138,7 @@ def create_or_update_zoho_account(
     This task:
     - Builds a Zoho payload from the User model
     - Checks if the user exists as a Contact or Lead in Zoho
-    - Updates the existing record or creates a new Lead if none exist
+    - Updates the existing record or creates a new Contact if none exist
 
     :param user_id: The primary key of the user to sync with Zoho
     :param milestone: A milestone value to store in the 'API_calls' field
@@ -179,13 +179,13 @@ def create_or_update_zoho_account(
         contacts_module.update_record(record_id, payload | milestone_payload)
         return ("Contacts", record_id)
 
-    # Otherwise, create a new Lead
+    # Otherwise, create a new Contact
     payload = (
-        build_zoho_payload_from_user(user, leads_module.module_name)
+        build_zoho_payload_from_user(user, contacts_module.module_name)
         | milestone_payload
     )
-    created = leads_module.create_record(payload)
-    return ("Leads", LeadsModule.get_action_record_id(created[0]))
+    created = contacts_module.create_record(payload)
+    return ("Contacts", ContactsModule.get_action_record_id(created[0]))
 
 
 def _membership_tag_for_level(level: int) -> str:

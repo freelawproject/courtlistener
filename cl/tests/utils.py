@@ -113,6 +113,14 @@ def make_client(user_pk: int) -> AsyncAPIClient:
     return client
 
 
+def make_session_client(user_pk: int) -> AsyncAPIClient:
+    # Use for endpoints that only accept session authentication
+    user = User.objects.get(pk=user_pk)
+    client = AsyncAPIClient()
+    client.force_login(user)
+    return client
+
+
 def get_with_wait(
     wait: WebDriverWait,
     locator: tuple[str, str],

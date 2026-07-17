@@ -717,6 +717,7 @@ def get_and_process_free_pdf(
     data: TaskData,
     row_pk: int,
     court_id: str,
+    citation_queue: str | None = None,
 ) -> TaskData | None:
     """Get a PDF from a PACERFreeDocumentRow object
 
@@ -728,6 +729,9 @@ def get_and_process_free_pdf(
          'pacer_court_id': result.court_id}
     :param row_pk: The PACERFreeDocumentRow operate on
     :param court_id: The court_id (used for throttling).
+    :param citation_queue: Celery queue for the citation-extraction task the
+    RECAPDocument post_save signal enqueues after text extraction. Lets batch
+    jobs keep that work off the default queue.
     """
     if data is None:
         return None
@@ -835,7 +839,10 @@ def get_and_process_free_pdf(
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
     async_to_sync(extract_pdf_document_base)(
-        rd.pk, ocr_available=False, check_if_needed=False
+        rd.pk,
+        ocr_available=False,
+        check_if_needed=False,
+        citation_queue=citation_queue,
     )
     return {"result": result, "rd_pk": rd.pk}
 
