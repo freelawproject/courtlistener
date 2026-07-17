@@ -491,6 +491,39 @@ class CitationRedirectorTest(TestCase):
         r = await self.async_client.get(reverse("citation_homepage"))
         self.assertStatus(r, HTTPStatus.OK)
 
+    def test_volume_page_uses_bounded_queries(self) -> None:
+        citation = Citation.objects.get(reporter="F.2d", volume="56", page="9")
+        citation.cluster.blocked = True
+        citation.cluster.save(update_fields=["blocked"])
+        CitationWithParentsFactory.create(
+            cluster=citation.cluster,
+            reporter=citation.reporter,
+            volume=citation.volume,
+            page="999",
+        )
+
+        with self.assertNumQueries(5):
+            response = self.client.get(
+                reverse(
+                    "citation_redirector",
+                    kwargs={"reporter": "f2d", "volume": "56"},
+                )
+            )
+
+        self.assertStatus(response, HTTPStatus.OK)
+        self.assertTrue(response.context["private"])
+        cases = list(response.context["cases"])
+        self.assertEqual(
+            len({case.pk for case in cases}),
+            len(cases),
+        )
+        with self.assertNumQueries(0):
+            display_data = [
+                (case.docket.docket_number, case.citation_string)
+                for case in cases
+            ]
+        self.assertTrue(display_data)
+
     def test_with_a_citation(self) -> None:
         """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?

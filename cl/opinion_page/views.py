@@ -1385,24 +1385,14 @@ async def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = OpinionCluster.objects.filter(
-        citations__reporter=reporter, citations__volume=volume
-    ).order_by("date_filed")
-
-    if not await cases_in_volume.aexists():
-        return await throw_404(
-            request,
-            {
-                "no_cases": True,
-                "reporter": reporter,
-                "volume_names": volume_names,
-                "volume": volume,
-                "private": False,
-            },
+    cases_in_volume = (
+        OpinionCluster.objects.filter(
+            citations__reporter=reporter, citations__volume=volume
         )
-
-    volume_next, volume_previous = await get_prev_next_volumes(
-        reporter, volume
+        .select_related("docket")
+        .prefetch_related("citations")
+        .distinct()
+        .order_by("date_filed")
     )
 
     page = request.GET.get("page", 1)
@@ -1417,18 +1407,36 @@ async def reporter_or_volume_handler(
         except EmptyPage:
             return paginator.page(paginator.num_pages)
 
+    cases_page = await paginate_volumes(cases_in_volume, page)
+    if cases_page.paginator.count == 0:
+        return await throw_404(
+            request,
+            {
+                "no_cases": True,
+                "reporter": reporter,
+                "volume_names": volume_names,
+                "volume": volume,
+                "private": False,
+            },
+        )
+
+    volume_next, volume_previous = await get_prev_next_volumes(
+        reporter, volume
+    )
+    has_blocked_cases = await cases_in_volume.filter(blocked=True).aexists()
+
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         {
-            "cases": await paginate_volumes(cases_in_volume, page),
+            "cases": cases_page,
             "reporter": reporter,
             "variation_names": variation_names,
             "volume": volume,
             "volume_names": volume_names,
             "volume_previous": volume_previous,
             "volume_next": volume_next,
-            "private": any([case.blocked async for case in cases_in_volume]),
+            "private": has_blocked_cases,
         },
     )
 
