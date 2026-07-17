@@ -160,6 +160,31 @@ class GetDownloadsContextTest(TestCase):
         self.assertNotIn("old_version", context["download_file_path"])
 
 
+class OpinionAuthoritiesViewTest(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.cluster = OpinionClusterWithParentsFactory.create()
+        citing_opinion = OpinionFactory.create(cluster=cls.cluster)
+        authority = OpinionClusterWithParentsFactory.create()
+        cited_opinion = OpinionFactory.create(cluster=authority)
+        OpinionsCitedWithParentsFactory.create(
+            citing_opinion=citing_opinion,
+            cited_opinion=cited_opinion,
+        )
+
+    async def test_authorities_page_loads_with_lightweight_opinions(
+        self,
+    ) -> None:
+        path = reverse(
+            "view_case_authorities",
+            kwargs={"pk": self.cluster.pk, "_": "asdf"},
+        )
+        response = await self.async_client.get(path)
+
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertContains(response, "Table of Authorities")
+
+
 class SimpleLoadTest(TestCase):
     fixtures = [
         "test_objects_search.json",
