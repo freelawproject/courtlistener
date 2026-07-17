@@ -36,6 +36,10 @@ from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 
+from cl.corpus_importer.state.florida.utils import is_florida_court
+from cl.corpus_importer.state.florida.utils import (
+    make_docket_number_core as make_florida_docket_number_core,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.decorators import document_model
@@ -701,6 +705,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
             elif is_texas_court(self.court_id):
                 self.docket_number_core = make_texas_docket_number_core(
                     self.docket_number_raw
+                )
+            elif is_florida_court(self.court_id):
+                self.docket_number_core = make_florida_docket_number_core(
+                    self.docket_number_raw, court_id=self.court_id
                 )
             else:
                 self.docket_number_core = make_docket_number_core(
