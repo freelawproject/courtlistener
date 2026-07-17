@@ -24,7 +24,6 @@ from django.template import engines
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
-    SimpleTestCase,
     override_settings,
 )
 from django.test.client import AsyncClient
@@ -110,7 +109,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.sitemaps_infinite.sitemap_generator import generate_urls_chunk
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.providers import fake
 from cl.users.factories import (
     UserFactory,
