@@ -582,6 +582,9 @@ if settings.ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED:
     )
 
 
+DEFAULT_RD_CITATION_QUEUE = "celery"
+
+
 @receiver(
     post_save,
     sender=RECAPDocument,
@@ -605,8 +608,14 @@ def handle_recap_doc_change(
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,
         ):
+            # Batch jobs may set ``citation_queue`` on the instance to route
+            # this task off the default queue and avoid clogging it.
+            queue = (
+                getattr(instance, "citation_queue", None)
+                or DEFAULT_RD_CITATION_QUEUE
+            )
             find_citations_and_parantheticals_for_recap_documents.apply_async(
-                args=([instance.pk],)
+                args=([instance.pk],), queue=queue
             )
 
     if (

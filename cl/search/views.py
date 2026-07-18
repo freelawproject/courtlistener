@@ -13,9 +13,13 @@ from django.views.decorators.http import require_POST
 from waffle import flag_is_active
 from waffle.decorators import waffle_flag
 
-from cl.alerts.constants import RECAP_ALERT_QUOTAS
+from cl.alerts.constants import (
+    LEGACY_MEMBERSHIP_HELP_URL,
+    RECAP_ALERT_QUOTAS,
+)
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
+from cl.donate.models import NeonMembershipLevel
 from cl.lib.bot_detector import is_bot
 from cl.lib.ratelimiter import ratelimiter_unsafe_5_per_d
 from cl.lib.search_utils import (
@@ -42,6 +46,9 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
 
     level = user.membership.level if user.profile.is_member else "free"
     neon_id = user.membership.neon_id if user.profile.is_member else ""
+    # Legacy memberships can't be upgraded online, so the modal routes
+    # them to a help page instead of the Neon upgrade flow (see #7136).
+    is_legacy = level == NeonMembershipLevel.LEGACY
     counts = Alert.objects.filter(
         user=user,
         alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
@@ -57,6 +64,8 @@ def get_alerts_context(request: HttpRequest, edit_alert: bool) -> dict | None:
         "hasUnlimitedAlerts": user.profile.unlimited_docket_alerts,
         "level": level,
         "neon_id": neon_id,
+        "isLegacy": is_legacy,
+        "legacyHelpUrl": LEGACY_MEMBERSHIP_HELP_URL,
         "counts": counts,
         "limits": RECAP_ALERT_QUOTAS,
         "editAlert": edit_alert,
