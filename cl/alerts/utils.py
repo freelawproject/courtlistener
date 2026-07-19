@@ -328,6 +328,11 @@ def fetch_all_search_alerts_results(
     percolator results (if applicable).
     """
 
+    def get_search_after(response):
+        if response and response.hits.hits:
+            return response.hits[-1].meta.sort
+        return None
+
     all_main_alert_hits = []
     all_rd_alert_hits = []
     all_d_alert_hits = []
@@ -348,9 +353,9 @@ def fetch_all_search_alerts_results(
         return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
     alerts_retrieved = main_alerts_returned
-    main_search_after = main_response.hits[-1].meta.sort
-    rd_search_after = rd_response.hits[-1].meta.sort if rd_response else None
-    d_search_after = d_response.hits[-1].meta.sort if d_response else None
+    main_search_after = get_search_after(main_response)
+    rd_search_after = get_search_after(rd_response)
+    d_search_after = get_search_after(d_response)
     while True:
         search_after_params = {
             "main_search_after": main_search_after,
@@ -374,17 +379,9 @@ def fetch_all_search_alerts_results(
         if alerts_retrieved >= main_total_hits or main_alerts_returned == 0:
             break
         else:
-            main_search_after = responses.main_response.hits[-1].meta.sort
-            rd_search_after = (
-                responses.rd_response.hits[-1].meta.sort
-                if responses.rd_response and len(responses[1].hits.hits)
-                else None
-            )
-            d_search_after = (
-                responses.d_response.hits[-1].meta.sort
-                if responses.d_response and len(responses[2].hits.hits)
-                else None
-            )
+            main_search_after = get_search_after(responses.main_response)
+            rd_search_after = get_search_after(responses.rd_response)
+            d_search_after = get_search_after(responses.d_response)
 
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
