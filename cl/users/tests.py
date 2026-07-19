@@ -1220,6 +1220,7 @@ class SNSWebhookTest(TestCase):
     @mock.patch("cl.users.signals.S3PrivateUUIDStorage")
     @mock.patch("cl.users.signals.logger")
     @mock.patch("cl.users.signals.random.random", return_value=0)
+    @override_settings(BOUNCES_STORE_RATE=1)
     def test_store_event_logs_storage_failure(
         self, mock_random, mock_logger, mock_storage
     ) -> None:
