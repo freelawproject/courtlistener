@@ -87,7 +87,9 @@ def store_bounce_or_complaint_obj(
         storage.save(str(s3_path), ContentFile(file_contents))
     except Exception:
         logger.exception(
-            "Failed to store SES %s event for %s", obj_type.value, email_recipient
+            "Failed to store SES %s event for %s",
+            obj_type.value,
+            email_recipient,
         )
         return None
 
