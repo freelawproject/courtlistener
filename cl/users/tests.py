@@ -90,6 +90,7 @@ from cl.tests.cases import (
 )
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_session_client
+from cl.users import signals as user_signals
 from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
@@ -1215,6 +1216,22 @@ class SNSWebhookTest(TestCase):
         )
         # Check if handle_complaint is called
         mock_complaint.assert_called()
+
+    @mock.patch("cl.users.signals.S3PrivateUUIDStorage")
+    @mock.patch("cl.users.signals.logger")
+    @mock.patch("cl.users.signals.random.random", return_value=0)
+    def test_store_event_reraises_storage_failure(
+        self, mock_random, mock_logger, mock_storage
+    ) -> None:
+        """Storage failures must remain visible to the webhook retry path."""
+        mock_storage.return_value.save.side_effect = RuntimeError("S3 failed")
+
+        with self.assertRaises(RuntimeError):
+            user_signals.store_bounce_or_complaint_obj(
+                {}, "user@example.com", user_signals.SESEventType.BOUNCE
+            )
+
+        mock_logger.exception.assert_called_once()
 
     @mock.patch("cl.users.email_handlers.logging")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:
