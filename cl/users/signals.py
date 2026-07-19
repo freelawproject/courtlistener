@@ -89,7 +89,7 @@ def store_bounce_or_complaint_obj(
         logger.exception(
             "Failed to store SES %s event for %s", obj_type.value, email_recipient
         )
-        raise
+        return None
 
 
 @receiver(bounce_received, dispatch_uid="bounce_handler")

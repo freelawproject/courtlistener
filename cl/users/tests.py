@@ -1220,16 +1220,15 @@ class SNSWebhookTest(TestCase):
     @mock.patch("cl.users.signals.S3PrivateUUIDStorage")
     @mock.patch("cl.users.signals.logger")
     @mock.patch("cl.users.signals.random.random", return_value=0)
-    def test_store_event_reraises_storage_failure(
+    def test_store_event_logs_storage_failure(
         self, mock_random, mock_logger, mock_storage
     ) -> None:
-        """Storage failures must remain visible to the webhook retry path."""
+        """Storage failures must be visible without failing the webhook."""
         mock_storage.return_value.save.side_effect = RuntimeError("S3 failed")
 
-        with self.assertRaises(RuntimeError):
-            user_signals.store_bounce_or_complaint_obj(
-                {}, "user@example.com", user_signals.SESEventType.BOUNCE
-            )
+        user_signals.store_bounce_or_complaint_obj(
+            {}, "user@example.com", user_signals.SESEventType.BOUNCE
+        )
 
         mock_logger.exception.assert_called_once()
 
