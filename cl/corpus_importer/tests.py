@@ -16,6 +16,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.management import call_command
+from django.db import IntegrityError, transaction
 from django.db.models.signals import post_save
 from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
@@ -40,6 +41,7 @@ from cl.corpus_importer.factories import (
     CaseLawCourtFactory,
     CaseLawFactory,
     CitationFactory,
+    FreeOpinionRowDataFactory,
 )
 from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
 from cl.corpus_importer.import_columbia.parse_opinions import (
@@ -161,6 +163,7 @@ from cl.recap.management.commands.nightly_pacer_updates import (
 )
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.recap.tests.tests import mock_bucket_open
+from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.cluster_sources import ClusterSources
@@ -629,6 +632,78 @@ class PacerDocketParserTest(TestCase):
         self.assertTrue(row[0].pacer_case_id)
         self.assertTrue(row[0].pacer_doc_id)
         self.assertTrue(row[0].pacer_seq_no)
+
+
+class FixedFreeOpinionReport(FakeFreeOpinionReport):
+    """A fake report that always returns the same document, so re-querying a
+    date yields the same (court_id, pacer_doc_id) pair."""
+
+    @property
+    def data(self, *args, **kwargs):
+        return [
+            FreeOpinionRowDataFactory(
+                court_id="cand",
+                docket_number="5:18-ap-07075",
+                pacer_doc_id="04505578690",
+            )
+        ]
+
+
+class FreeDocumentRowIdempotencyTest(TestCase):
+    """The staging table must not accumulate duplicate rows when a date is
+    re-queried (issue #7490)."""
+
+    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+    def test_re_querying_a_date_does_not_duplicate_rows(
+        self, mock_cookies
+    ) -> None:
+        """Running the ingestion twice for the same date keeps a single row."""
+        with patch(
+            "cl.corpus_importer.tasks.FreeOpinionReport",
+            new=FixedFreeOpinionReport,
+        ):
+            get_and_save_free_document_report(
+                "cand", now().date(), now().date()
+            )
+            get_and_save_free_document_report(
+                "cand", now().date(), now().date()
+            )
+
+        self.assertEqual(
+            PACERFreeDocumentRow.objects.filter(
+                court_id="cand", pacer_doc_id="04505578690"
+            ).count(),
+            1,
+        )
+
+    def test_unique_constraint_blocks_duplicate_doc(self) -> None:
+        """The DB rejects a second row for the same (court_id, pacer_doc_id)."""
+        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="123")
+        with (
+            self.assertRaises(IntegrityError),
+            transaction.atomic(),
+        ):
+            PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="123")
+
+    def test_distinct_doc_ids_are_allowed(self) -> None:
+        """Different documents in the same court coexist."""
+        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="123")
+        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="456")
+        self.assertEqual(
+            PACERFreeDocumentRow.objects.filter(court_id="cand").count(), 2
+        )
+
+    def test_empty_doc_ids_are_not_deduped(self) -> None:
+        """The partial index excludes empty pacer_doc_id, so distinct
+        documents that lack an id are never collapsed together."""
+        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="")
+        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="")
+        self.assertEqual(
+            PACERFreeDocumentRow.objects.filter(
+                court_id="cand", pacer_doc_id=""
+            ).count(),
+            2,
+        )
 
 
 class FreeOpinionExcludedCourtsTest(SimpleTestCase):

@@ -553,8 +553,13 @@ def get_and_save_free_document_report(
         )
         document_rows_to_create.append(document_row)
 
-    # Create PACERFreeDocumentRow in bulk
-    PACERFreeDocumentRow.objects.bulk_create(document_rows_to_create)
+    # Create PACERFreeDocumentRow in bulk. ignore_conflicts makes ingestion
+    # idempotent: re-querying a date (e.g. the recent re-query window or a
+    # forward re-sweep) won't duplicate rows already staged for a
+    # (court_id, pacer_doc_id) pair. See issue #7490.
+    PACERFreeDocumentRow.objects.bulk_create(
+        document_rows_to_create, ignore_conflicts=True
+    )
 
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL, len(document_rows_to_create)
 

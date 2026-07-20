@@ -77,6 +77,18 @@ class PACERFreeDocumentRow(models.Model):
     cause = models.CharField(max_length=2000)
     error_msg = models.TextField()
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["court_id", "pacer_doc_id"],
+                # A partial index: rows without a pacer_doc_id are genuinely
+                # distinct documents that happen to lack an id, so they must not
+                # collapse into one another.
+                condition=~models.Q(pacer_doc_id=""),
+                name="scrapers_pfdr_court_doc_uniq",
+            )
+        ]
+
 
 class PACERMobilePageData(AbstractDateTimeModel):
     """Status information about crawling the PACER Mobile UI for a docket"""
