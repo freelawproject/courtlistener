@@ -561,6 +561,9 @@ def get_and_save_free_document_report(
         document_rows_to_create, ignore_conflicts=True
     )
 
+    # Number of references parsed for this court/date. With ignore_conflicts,
+    # rows already staged for a (court_id, pacer_doc_id) are skipped, so this is
+    # the count of references *seen*, not necessarily newly inserted (#7490).
     return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL, len(document_rows_to_create)
 
 

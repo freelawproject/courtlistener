@@ -17,11 +17,7 @@ class Migration(migrations.Migration):
         migrations.SeparateDatabaseAndState(
             database_operations=[
                 migrations.RunSQL(
-                    sql=(
-                        'CREATE UNIQUE INDEX CONCURRENTLY "scrapers_pfdr_court_doc_uniq" '
-                        'ON "scrapers_pacerfreedocumentrow" ("court_id", "pacer_doc_id") '
-                        "WHERE \"pacer_doc_id\" <> '';"
-                    ),
+                    sql='CREATE UNIQUE INDEX CONCURRENTLY "scrapers_pfdr_court_doc_uniq" ON "scrapers_pacerfreedocumentrow" ("court_id", "pacer_doc_id") WHERE "pacer_doc_id" <> \'\';',
                     reverse_sql='DROP INDEX CONCURRENTLY IF EXISTS "scrapers_pfdr_court_doc_uniq";',
                 ),
             ],
