@@ -2,6 +2,7 @@
 import json
 import logging
 import re
+from collections import defaultdict
 from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any
@@ -796,6 +797,69 @@ async def merge_unnumbered_docket_entries(
     return winner
 
 
+# Entries are merged in chunks of this size: each chunk is prefetched with
+# two queries, keeping peak memory bounded on full-sheet uploads of very
+# large dockets.
+DOCKET_ENTRIES_CHUNK_SIZE = 1_000
+
+
+def _match_cached_docket_entry(
+    des_by_entry_number: dict[int, list[DocketEntry]],
+    docket_entry: dict[str, Any],
+) -> DocketEntry | None:
+    """Resolve an existing DocketEntry from prefetched rows, mirroring the
+    lookup in add_create_docket_entry_transaction. Returns None when the
+    entry is absent or ambiguous so the caller falls back to the
+    transactional path, which handles creation and deduplication (and takes
+    the docket row lock those paths require).
+    """
+    try:
+        entry_number = int(docket_entry["document_number"])
+    except (TypeError, ValueError):
+        return None
+    candidates = des_by_entry_number.get(entry_number, [])
+    pacer_seq_no = docket_entry.get("pacer_seq_no")
+    if pacer_seq_no is None:
+        return candidates[0] if len(candidates) == 1 else None
+    try:
+        seq = int(pacer_seq_no)
+    except (TypeError, ValueError):
+        return None
+    seq_matches = [de for de in candidates if de.pacer_sequence_number == seq]
+    if len(seq_matches) == 1:
+        return seq_matches[0]
+    if seq_matches:
+        return None
+    null_matches = [
+        de for de in candidates if de.pacer_sequence_number is None
+    ]
+    if len(null_matches) == 1:
+        return null_matches[0]
+    return None
+
+
+def _match_cached_rd(
+    cached_rds: list[RECAPDocument] | None,
+    get_params: dict[str, Any],
+) -> RECAPDocument | None:
+    """Mirror RECAPDocument.objects.get(**get_params) against prefetched
+    rows. Returns None unless exactly one row matches, so creation,
+    deduplication, and cold-cache cases all fall back to the DB queries.
+    """
+    if not cached_rds:
+        return None
+    matches = [
+        rd
+        for rd in cached_rds
+        if all(
+            getattr(rd, field) == value
+            for field, value in get_params.items()
+            if field != "docket_entry"
+        )
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
 @sync_to_async
 def add_create_docket_entry_transaction(d, docket_entry):
     with transaction.atomic():
@@ -868,19 +932,30 @@ def add_create_docket_entry_transaction(d, docket_entry):
 
 
 async def get_or_make_docket_entry(
-    d: Docket, docket_entry: dict[str, any]
+    d: Docket,
+    docket_entry: dict[str, any],
+    des_by_entry_number: dict[int, list[DocketEntry]] | None = None,
 ) -> tuple[DocketEntry, bool] | None:
     """Lookup or create a docket entry to match the one that was scraped.
 
     :param d: The docket we expect to find it in.
     :param docket_entry: The scraped dict from Juriscraper for the docket
     entry.
+    :param des_by_entry_number: Optional prefetched DocketEntries for the
+    docket, grouped by entry number. Unambiguous matches are resolved from
+    it without the per-entry transaction and docket row lock.
     :return Tuple of (de, de_created) or None, where:
      - de is the DocketEntry object
      - de_created is a boolean stating whether de was created or not
      - None is returned when things fail.
     """
     if docket_entry["document_number"]:
+        de = None
+        de_created = False
+        if des_by_entry_number is not None:
+            de = _match_cached_docket_entry(des_by_entry_number, docket_entry)
+        if de is not None:
+            return de, de_created
         response = await add_create_docket_entry_transaction(d, docket_entry)
         if response is None:
             return None
@@ -987,14 +1062,70 @@ async def add_docket_entries(
     calculate_recap_sequence_numbers(docket_entries, d.court_id)
 
     is_scotus = d.court_id == "scotus"
+    appellate_court_id_exists = await ais_appellate_court(d.court_id)
     known_filing_dates = [d.date_last_filing]
-    for docket_entry in docket_entries:
-        response = await get_or_make_docket_entry(d, docket_entry)
+
+    # Prefetch the docket's matching entries and their documents in two
+    # queries per chunk, so unchanged entries (the common re-upload case)
+    # are resolved in memory instead of via per-entry queries and docket
+    # row locks. Chunking bounds peak memory on very large uploads; the
+    # caches are refilled at each chunk boundary.
+    des_by_entry_number: dict[int, list[DocketEntry]] = defaultdict(list)
+    rds_by_de_id: dict[int, list[RECAPDocument]] = defaultdict(list)
+
+    async def chunked_docket_entries():
+        for chunk_start in range(
+            0, len(docket_entries), DOCKET_ENTRIES_CHUNK_SIZE
+        ):
+            chunk = docket_entries[
+                chunk_start : chunk_start + DOCKET_ENTRIES_CHUNK_SIZE
+            ]
+            des_by_entry_number.clear()
+            rds_by_de_id.clear()
+            entry_numbers = set()
+            for entry_data in chunk:
+                if entry_data.get("document_number"):
+                    try:
+                        entry_numbers.add(int(entry_data["document_number"]))
+                    except (TypeError, ValueError):
+                        continue
+            if entry_numbers and d.pk:
+                existing_de_ids = []
+                async for existing_de in DocketEntry.objects.filter(
+                    docket=d, entry_number__in=entry_numbers
+                ):
+                    des_by_entry_number[existing_de.entry_number].append(
+                        existing_de
+                    )
+                    existing_de_ids.append(existing_de.pk)
+                async for existing_rd in RECAPDocument.objects.filter(
+                    docket_entry_id__in=existing_de_ids
+                ):
+                    rds_by_de_id[existing_rd.docket_entry_id].append(
+                        existing_rd
+                    )
+            for entry_data in chunk:
+                yield entry_data
+
+    async for docket_entry in chunked_docket_entries():
+        response = await get_or_make_docket_entry(
+            d, docket_entry, des_by_entry_number=des_by_entry_number
+        )
         if response is None:
             continue
         else:
             de, de_created = response[0], response[1]
 
+        # Snapshot the merged fields so the save (and its ES indexing and
+        # pghistory side effects) can be skipped when a re-uploaded entry is
+        # unchanged.
+        de_original_values = (
+            de.description,
+            de.date_filed,
+            de.time_filed,
+            de.pacer_sequence_number,
+            de.recap_sequence_number,
+        )
         de.description = docket_entry["description"] or de.description
         date_filed, time_filed = localize_date_and_time(
             d.court_id, docket_entry["date_filed"]
@@ -1007,14 +1138,25 @@ async def add_docket_entries(
         else:
             de.time_filed = time_filed
         de.date_filed = date_filed
+        # Coerce to int: juriscraper provides strings, and a str-vs-int
+        # mismatch would defeat the unchanged-entry comparison below.
+        pacer_seq_no = docket_entry.get("pacer_seq_no")
         de.pacer_sequence_number = (
-            docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
+            int(pacer_seq_no) if pacer_seq_no else de.pacer_sequence_number
         )
         de.recap_sequence_number = docket_entry["recap_sequence_number"]
         des_returned.append(de)
         if do_not_update_existing and not de_created:
             return (des_returned, rds_updated), rds_created, content_updated
-        await de.asave()
+        de_changed = de_created or de_original_values != (
+            de.description,
+            de.date_filed,
+            de.time_filed,
+            de.pacer_sequence_number,
+            de.recap_sequence_number,
+        )
+        if de_changed:
+            await de.asave()
         if tags:
             for tag in tags:
                 await sync_to_async(tag.tag_object)(de)
@@ -1022,6 +1164,13 @@ async def add_docket_entries(
         if de_created:
             content_updated = True
             known_filing_dates.append(de.date_filed)
+            # Keep the cache complete in case the same entry number appears
+            # again in this upload. entry_number may still be the raw string
+            # from juriscraper here, so coerce it to match the cache keys.
+            try:
+                des_by_entry_number[int(de.entry_number)].append(de)
+            except (TypeError, ValueError):
+                pass
 
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
@@ -1051,7 +1200,6 @@ async def add_docket_entries(
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
 
-        appellate_court_id_exists = await ais_appellate_court(d.court_id)
         if de_created is False and appellate_court_id_exists:
             # In existing appellate entry merges, check if the entry has at
             # least one attachment.
@@ -1062,7 +1210,8 @@ async def add_docket_entries(
                 params["document_type"] = RECAPDocument.ATTACHMENT
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
-            get_params = deepcopy(params)
+            # A shallow copy suffices: only keys are added/removed below.
+            get_params = params.copy()
             if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
             if is_scotus:
@@ -1074,7 +1223,9 @@ async def add_docket_entries(
             if de_created is False:
                 # Try to match the RD regardless of the document_type.
                 del get_params["document_type"]
-            rd = await RECAPDocument.objects.aget(**get_params)
+            rd = _match_cached_rd(rds_by_de_id.get(de.pk), get_params)
+            if rd is None:
+                rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             rd = None
@@ -1110,6 +1261,14 @@ async def add_docket_entries(
                 continue
             rd = await clean_duplicate_documents(params)
 
+        # Snapshot the merged fields so the save (and its ES indexing and
+        # pghistory side effects) can be skipped when a re-uploaded document
+        # is unchanged.
+        rd_original_values = (
+            rd.pacer_doc_id,
+            rd.description,
+            rd.document_number,
+        )
         if docket_entry["pacer_doc_id"]:
             rd.pacer_doc_id = docket_entry["pacer_doc_id"]
         description = docket_entry.get("short_description")
@@ -1131,11 +1290,17 @@ async def add_docket_entries(
                         # Happens from race conditions.
                         continue
         rd.document_number = docket_entry["document_number"] or ""
-        try:
-            await rd.asave()
-        except ValidationError:
-            # Happens from race conditions.
-            continue
+        rd_changed = rd_original_values != (
+            rd.pacer_doc_id,
+            rd.description,
+            rd.document_number,
+        )
+        if rd_changed:
+            try:
+                await rd.asave()
+            except ValidationError:
+                # Happens from race conditions.
+                continue
         if tags:
             for tag in tags:
                 await sync_to_async(tag.tag_object)(rd)
