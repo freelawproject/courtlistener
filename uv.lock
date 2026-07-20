@@ -464,7 +464,7 @@ requires-dist = [
     { name = "celery", specifier = ">=5.6.2" },
     { name = "certifi", specifier = ">=2025.1.31" },
     { name = "courts-db" },
-    { name = "daphne", specifier = ">=4.2.1" },
+    { name = "daphne", specifier = ">=4.2.2" },
     { name = "datasketch", specifier = ">=1.8.0" },
     { name = "dateparser", specifier = "==1.2.2" },
     { name = "disposable-email-domains" },
@@ -713,16 +713,16 @@ wheels = [
 
 [[package]]
 name = "daphne"
-version = "4.2.1"
+version = "4.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "autobahn" },
     { name = "twisted", extra = ["tls"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/9d/322b605fdc03b963cf2d33943321c8f4405e8d82e698bf49d1eed1ca40c4/daphne-4.2.1.tar.gz", hash = "sha256:5f898e700a1fda7addf1541d7c328606415e96a7bd768405f0463c312fcb31b3", size = 45600, upload-time = "2025-07-02T12:57:04.935Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/d3/65ff32c01cc64d44441b038dbb7cfb0c6a5507a1c937b3d41bd99af7bdc4/daphne-4.2.2.tar.gz", hash = "sha256:6c3527d4ce32630ae054dfb0ef5578e9a35d2f39f0ebcd02ef4f9129a121ce8d", size = 47601, upload-time = "2026-06-03T10:53:13.31Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/34/6171ab34715ed210bcd6c2b38839cc792993cff4fe2493f50bc92b0086a0/daphne-4.2.1-py3-none-any.whl", hash = "sha256:881e96b387b95b35ad85acd855f229d7f5b79073d6649089c8a33f661885e055", size = 29015, upload-time = "2025-07-02T12:57:03.793Z" },
+    { url = "https://files.pythonhosted.org/packages/78/ab/85534d9cbca09f3c10f58fc2093659062280ed5703707c0b41dbca8ec297/daphne-4.2.2-py3-none-any.whl", hash = "sha256:466ba8a7c31c5b758953095b451dbad9dc23e5783c68a3716e5fc7aa5f26d168", size = 29466, upload-time = "2026-06-03T10:53:11.841Z" },
 ]
 
 [[package]]
@@ -1865,7 +1865,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "3.0.31"
+version = "3.0.32"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1885,9 +1885,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b0/c5/963247addd03a2af7402be7767b307258a5d006d431ac05191b429794e3a/juriscraper-3.0.31.tar.gz", hash = "sha256:52d159f694af4a945d0f8e5ba8a31d9668edc32f3ef12b739abf7a4f7253f681", size = 435315, upload-time = "2026-07-09T22:35:18.032Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/7b/60b7ef77597170adcafc7c534dbd93bba85760fd0cb9f1e89ec234c122c2/juriscraper-3.0.32.tar.gz", hash = "sha256:bc361689768564a86d0aa949b9d83b15320765b56b8c202198b98ec078b8d1fc", size = 437048, upload-time = "2026-07-15T01:41:56.921Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/73/aa3334a2e96f17ccfeba5fc33aa7d560f742843c6c60294915ebf173a654/juriscraper-3.0.31-py3-none-any.whl", hash = "sha256:5d4cd8589da0cd64d47298855d1671b28d5d4d207fe5ce58c06d576d11f87ff6", size = 671361, upload-time = "2026-07-09T22:35:16.327Z" },
+    { url = "https://files.pythonhosted.org/packages/66/fe/6a414839277ac13b4b4a49b1d84a1b5b3f4c5658cf2f1cfd7ba2c9e2f040/juriscraper-3.0.32-py3-none-any.whl", hash = "sha256:30c20ecfe03def91fc50e09df4ea6d8dbc4afb06cf580ae88ba9419c2e8a57c6", size = 674081, upload-time = "2026-07-15T01:41:54.967Z" },
 ]
 
 [[package]]
