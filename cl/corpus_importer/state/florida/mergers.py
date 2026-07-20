@@ -53,8 +53,16 @@ class FloridaRoleMerger(
     role: int = Attribute(_florida_representative_role)
 
 
+def _florida_party_uuid(party: FloridaParty, params: None) -> str:
+    return str(party.party_uuid)
+
+
 class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
     attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
+    extra_info: str = Attribute(_florida_party_uuid)
+
+    def query(self) -> QuerySet[Party]:
+        return Party.objects.filter(extra_info=self.transformed["extra_info"])
 
 
 def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:
