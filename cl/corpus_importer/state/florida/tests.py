@@ -1,6 +1,5 @@
 """Tests for Florida docket and originating-court-information merger."""
 
-from copy import copy
 from datetime import date, datetime
 from unittest import mock
 
