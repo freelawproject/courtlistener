@@ -269,16 +269,27 @@ emails: dict[str, EmailType] = {
     "not_valid_edu_account": {
         "subject": "Request for a .edu Membership",
         "body": "Hello, %s,\n\n"
-        "Thank you for your interest.\n\n"
-        "We’ve reviewed your request and, unfortunately, it looks like you "
-        "don’t meet the eligibility requirements for a .edu membership. These "
-        "accounts are reserved for users with verified affiliations to "
-        "accredited educational institutions.\n\n"
-        "That said, we’d still love to have you as part of our community. You "
-        "can sign up for a regular membership here: https://free.law/membership/.\n\n"
-        "------------------\n\n"
-        "If you have any questions or believe this decision was made in error, "
-        "please see our contact page, https://www.courtlistener.com/contact/",
+        "We've reviewed your request and, since your email doesn't end in "
+        ".edu, it looks like you don't meet the eligibility requirements for "
+        "an EDU membership. These accounts are reserved for users with "
+        "verified affiliations to accredited educational institutions.\n\n"
+        "If you are one of a small group of individuals where your "
+        "university provided email doesn't end in .edu (which is common for "
+        "international students and a small number of U.S. schools that use "
+        "different email domains), and you'd like to pursue the EDU "
+        "membership option, please fill out our contact form: "
+        "https://www.courtlistener.com/contact/?issue_type=memberships\n\n"
+        "Include the following:\n"
+        "1. Where you're studying or doing research\n"
+        "2. A brief explanation of why you're unable to use a .edu email "
+        "address\n\n"
+        "We'll review your submission and follow up with next steps. More "
+        "details on EDU membership eligibility are available on our wiki: "
+        "https://wiki.free.law/c/courtlistener/help/memberships/individual-memberships/edu-memberships\n\n"
+        "If you are not a student or researcher affiliated with a "
+        "university, we'd still love to have you as part of our community "
+        "and become a paid member. You can find more information about our "
+        "memberships at https://wiki.free.law/c/courtlistener/help/memberships.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
     "not_confirmed_edu_account": {
