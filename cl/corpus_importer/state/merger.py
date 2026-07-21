@@ -275,6 +275,8 @@ class ManyStrategy(Enum):
     """Leave set of existing values and add new values"""
     REPLACE = "replace"
     """Replace entire set of existing values with new values"""
+    DISASSOCIATE = "disassociate"
+    """Remove associations to values absent from the new data but keep the objects themselves in the DB"""
 
 
 class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
@@ -335,7 +337,7 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         match self.strategy:
             case ManyStrategy.APPEND:
                 related_manager.add(*related_objects)
-            case ManyStrategy.REPLACE:
+            case ManyStrategy.REPLACE | ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
 
         return result
@@ -387,7 +389,10 @@ class ManyToManyMerger[
     RM: Model,
     ParamType,
 ](NToManyMerger[ScrapeType, ParamType, TransformType, RM]):
-    """Class encapsulating logic for merging a many-to-many relationship."""
+    """Class encapsulating logic for merging a many-to-many relationship.
+
+    A scrape whose transform yields no children is treated as a partial
+    scrape: existing related objects and through rows are left untouched."""
 
     __slots__: tuple[str, ...] = (
         "through",

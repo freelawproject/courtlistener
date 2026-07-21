@@ -7,6 +7,7 @@ from juriscraper.state.docket import Representative as ScrapeRepresentative
 
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     ManyToManyRelation,
     Merger,
     RelatedParams,
@@ -69,7 +70,9 @@ def AttorneyRelation(
     role: type[Merger[Any, Any, Any]] = RoleMerger,
     transform: Callable[[Any, Any], list[Any]] = _party_representatives,
 ) -> list[Attorney]:
-    return ManyToManyRelation(attorney, role, transform)
+    return ManyToManyRelation(
+        attorney, role, transform, strategy=ManyStrategy.DISASSOCIATE
+    )
 
 
 class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](

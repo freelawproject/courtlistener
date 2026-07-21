@@ -11,6 +11,7 @@ from juriscraper.state.docket import Party as ScrapeParty
 from cl.corpus_importer.state.common.party import PartyMerger, PartyTypeMerger
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     ManyToManyRelation,
     Merger,
     overwrite,
@@ -39,7 +40,11 @@ def PartyRelation(
     party_type: type[Merger[Any, Any, Any]] = PartyTypeMerger,
     transform: Callable[[Any, Any], Sequence[Any]] = _docket_parties,
 ) -> list[Party]:
-    return ManyToManyRelation(party, party_type, transform=transform)
+    """Merge a docket's parties. A re-scrape with no parties (or a party with
+    no representatives) keeps the existing links and roles."""
+    return ManyToManyRelation(
+        party, party_type, transform, strategy=ManyStrategy.DISASSOCIATE
+    )
 
 
 class DocketMerger[DType: ScrapeDocket[Any, Any, Any], ParamType](
