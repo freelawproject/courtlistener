@@ -6,7 +6,6 @@
 {% block sidebar %}{% endblock %}
 
 {% block head %}
-  {# Fetch issue types and terms URL #}
   {{ form.TECH_ISSUE_TYPES|uniq|json_script:"tech-types" }}
   {{ form.DOCUMENTATION_CHECK_TYPES|uniq|json_script:"requires-check-types" }}
 
