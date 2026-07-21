@@ -19,8 +19,9 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.db import transaction
+from django.db import connection, transaction
 from django.test import RequestFactory, SimpleTestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
@@ -5049,6 +5050,78 @@ class RecapDocketTaskTest(TestCase):
         # Confirm docket_id is associated to the PQ
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.docket_id, d.pk)
+
+    def test_unchanged_reupload_is_read_only(self) -> None:
+        """Does re-uploading an identical docket skip entry/document writes?
+
+        A re-upload with no new content must not INSERT, UPDATE, or DELETE
+        docket entries or documents: their date_modified must be preserved
+        and no pghistory or ES indexing side effects triggered. This pins
+        the no-op detection in add_docket_entries (e.g. against type
+        mismatches like str-vs-int pacer_seq_no that would make every entry
+        look changed).
+        """
+        async_to_sync(process_recap_docket)(self.pq.pk)
+        de_modified_before = list(
+            DocketEntry.objects.order_by("pk").values_list(
+                "date_modified", flat=True
+            )
+        )
+        rd_modified_before = list(
+            RECAPDocument.objects.order_by("pk").values_list(
+                "date_modified", flat=True
+            )
+        )
+        self.assertTrue(
+            de_modified_before, msg="Expected entries from the first upload."
+        )
+
+        path = os.path.join(
+            settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
+        )
+        with open(path, "rb") as f:
+            pq_2 = ProcessingQueue.objects.create(
+                court_id="scotus",
+                uploader=self.user,
+                pacer_case_id="asdf",
+                filepath_local=SimpleUploadedFile(self.filename, f.read()),
+                upload_type=UPLOAD_TYPE.DOCKET,
+            )
+        with CaptureQueriesContext(connection) as ctx:
+            async_to_sync(process_recap_docket)(pq_2.pk)
+
+        write_statements = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if q["sql"].startswith(("INSERT", "UPDATE", "DELETE"))
+            and (
+                '"search_docketentry"' in q["sql"]
+                or '"search_recapdocument"' in q["sql"]
+            )
+        ]
+        self.assertEqual(
+            write_statements,
+            [],
+            msg="An unchanged re-upload wrote to docket entries/documents.",
+        )
+        self.assertEqual(
+            de_modified_before,
+            list(
+                DocketEntry.objects.order_by("pk").values_list(
+                    "date_modified", flat=True
+                )
+            ),
+        )
+        self.assertEqual(
+            rd_modified_before,
+            list(
+                RECAPDocument.objects.order_by("pk").values_list(
+                    "date_modified", flat=True
+                )
+            ),
+        )
+        pq_2.refresh_from_db()
+        self.assertEqual(pq_2.status, PROCESSING_STATUS.SUCCESSFUL)
 
     def test_parsing_docket_already_exists(self) -> None:
         """Can we parse an HTML docket for a docket we have in the DB?"""
