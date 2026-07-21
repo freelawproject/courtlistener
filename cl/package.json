@@ -58,7 +58,7 @@
     "webpack": "^5.94.0",
     "webpack-bundle-analyzer": "^4.4.1",
     "webpack-cli": "^4.10.0",
-    "webpack-dev-server": "^5.2.5"
+    "webpack-dev-server": "^6.0.0"
   },
   "dependencies": {
     "@types/react-bootstrap": "^0.32.23",
@@ -68,7 +68,7 @@
     "lodash.debounce": "^4.0.8",
     "react-bootstrap": "^0.33.1",
     "react-input-switch": "^2.2.2",
-    "react-markdown-editor-lite": "^1.2.4",
+    "react-markdown-editor-lite": "^1.4.2",
     "react-showdown": "^2.3.0",
     "style-loader": "^2.0.0"
   },
