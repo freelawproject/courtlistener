@@ -800,7 +800,7 @@ async def merge_unnumbered_docket_entries(
 # Entries are merged in chunks of this size: each chunk is prefetched with
 # two queries, keeping peak memory bounded on full-sheet uploads of very
 # large dockets.
-DOCKET_ENTRIES_CHUNK_SIZE = 1_000
+DOCKET_ENTRIES_CHUNK_SIZE = 500
 
 
 def _match_cached_docket_entry(
@@ -1098,8 +1098,21 @@ async def add_docket_entries(
                         existing_de
                     )
                     existing_de_ids.append(existing_de.pk)
+                # Load only the fields _match_cached_rd can compare plus
+                # the ones mutated before rd.asave(); notably this defers
+                # plain_text, which can be megabytes per row. Accessing any
+                # other field on a cached rd triggers a per-row refresh
+                # query, so keep this list in sync with the get_params keys
+                # built in add_docket_entries.
                 async for existing_rd in RECAPDocument.objects.filter(
                     docket_entry_id__in=existing_de_ids
+                ).only(
+                    "docket_entry",
+                    "pacer_doc_id",
+                    "description",
+                    "document_type",
+                    "attachment_number",
+                    "document_number",
                 ):
                     rds_by_de_id[existing_rd.docket_entry_id].append(
                         existing_rd
