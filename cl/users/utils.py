@@ -288,7 +288,7 @@ emails: dict[str, EmailType] = {
         "https://wiki.free.law/c/courtlistener/help/memberships/individual-memberships/edu-memberships\n\n"
         "If you are not a student or researcher affiliated with a "
         "university, we'd still love to have you as part of our community "
-        "and become a paid member. You can find more information about our "
+        "as a regular member. You can find more information about our "
         "memberships at https://wiki.free.law/c/courtlistener/help/memberships.",
         "from_email": settings.DEFAULT_FROM_EMAIL,
     },
