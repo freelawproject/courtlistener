@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
         migrations.SeparateDatabaseAndState(
             database_operations=[
                 migrations.RunSQL(
-                    sql='CREATE UNIQUE INDEX CONCURRENTLY "scrapers_pfdr_court_doc_uniq" ON "scrapers_pacerfreedocumentrow" ("court_id", "pacer_doc_id") WHERE "pacer_doc_id" <> \'\';',
+                    sql='CREATE UNIQUE INDEX CONCURRENTLY "scrapers_pfdr_court_doc_uniq" ON "scrapers_pacerfreedocumentrow" ("court_id", "pacer_doc_id") WHERE "pacer_doc_id" <> \'\' AND "error_msg" = \'\';',
                     reverse_sql='DROP INDEX CONCURRENTLY IF EXISTS "scrapers_pfdr_court_doc_uniq";',
                 ),
             ],
@@ -26,7 +26,8 @@ class Migration(migrations.Migration):
                     model_name="pacerfreedocumentrow",
                     constraint=models.UniqueConstraint(
                         fields=["court_id", "pacer_doc_id"],
-                        condition=models.Q(("pacer_doc_id", ""), _negated=True),
+                        condition=models.Q(("pacer_doc_id", ""), _negated=True)
+                        & models.Q(("error_msg", "")),
                         name="scrapers_pfdr_court_doc_uniq",
                     ),
                 ),

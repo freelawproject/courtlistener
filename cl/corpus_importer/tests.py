@@ -677,18 +677,27 @@ class FreeDocumentRowIdempotencyTest(TestCase):
         )
 
     def test_unique_constraint_blocks_duplicate_doc(self) -> None:
-        """The DB rejects a second row for the same (court_id, pacer_doc_id)."""
-        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="123")
+        """The DB rejects a second clean row for the same
+        (court_id, pacer_doc_id)."""
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="123", error_msg=""
+        )
         with (
             self.assertRaises(IntegrityError),
             transaction.atomic(),
         ):
-            PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="123")
+            PACERFreeDocumentRowFactory(
+                court_id="cand", pacer_doc_id="123", error_msg=""
+            )
 
     def test_distinct_doc_ids_are_allowed(self) -> None:
         """Different documents in the same court coexist."""
-        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="123")
-        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="456")
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="123", error_msg=""
+        )
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="456", error_msg=""
+        )
         self.assertEqual(
             PACERFreeDocumentRow.objects.filter(court_id="cand").count(), 2
         )
@@ -696,11 +705,66 @@ class FreeDocumentRowIdempotencyTest(TestCase):
     def test_empty_doc_ids_are_not_deduped(self) -> None:
         """The partial index excludes empty pacer_doc_id, so distinct
         documents that lack an id are never collapsed together."""
-        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="")
-        PACERFreeDocumentRowFactory(court_id="cand", pacer_doc_id="")
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="", error_msg=""
+        )
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="", error_msg=""
+        )
         self.assertEqual(
             PACERFreeDocumentRow.objects.filter(
                 court_id="cand", pacer_doc_id=""
+            ).count(),
+            2,
+        )
+
+    def test_errored_row_does_not_block_fresh_requery_row(self) -> None:
+        """An errored row must not block a fresh clean row for the same
+        document on re-query.
+
+        Errored rows (error_msg <> '') are never cleared or deleted, and
+        ``get_pdfs`` only processes rows with ``error_msg=""``. The partial
+        index is scoped to clean rows so re-querying a date within
+        RECENT_REQUERY_DAYS can stage a fresh clean row alongside the stale
+        errored one, preserving the only implicit retry path (issue #7490).
+        """
+        # A previous attempt failed and left an errored row behind.
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="04505578690", error_msg="boom"
+        )
+
+        with (
+            patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies"),
+            patch(
+                "cl.corpus_importer.tasks.FreeOpinionReport",
+                new=FixedFreeOpinionReport,
+            ),
+        ):
+            get_and_save_free_document_report(
+                "cand", now().date(), now().date()
+            )
+
+        base = PACERFreeDocumentRow.objects.filter(
+            court_id="cand", pacer_doc_id="04505578690"
+        )
+        # The errored row is kept and a fresh clean row is staged next to it.
+        self.assertEqual(base.count(), 2)
+        # get_pdfs' Q(error_msg="") filter now sees exactly one clean row to
+        # reprocess, so the document is no longer stranded.
+        self.assertEqual(base.filter(error_msg="").count(), 1)
+
+    def test_errored_rows_are_not_deduped(self) -> None:
+        """Errored rows fall outside the partial index, so a persistently
+        failing document may keep at most a few errored rows without raising."""
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="789", error_msg="boom"
+        )
+        PACERFreeDocumentRowFactory(
+            court_id="cand", pacer_doc_id="789", error_msg="boom again"
+        )
+        self.assertEqual(
+            PACERFreeDocumentRow.objects.filter(
+                court_id="cand", pacer_doc_id="789"
             ).count(),
             2,
         )

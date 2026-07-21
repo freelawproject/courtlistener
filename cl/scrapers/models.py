@@ -81,10 +81,13 @@ class PACERFreeDocumentRow(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["court_id", "pacer_doc_id"],
-                # A partial index: rows without a pacer_doc_id are genuinely
-                # distinct documents that happen to lack an id, so they must not
-                # collapse into one another.
-                condition=~models.Q(pacer_doc_id=""),
+                # A partial index scoped to clean, unprocessed rows:
+                # - rows without a pacer_doc_id are genuinely distinct documents
+                #   that happen to lack an id, so they must not collapse together;
+                # - errored rows (error_msg <> '') are excluded so a fresh
+                #   re-query row can be staged alongside a stale errored row,
+                #   preserving the RECENT_REQUERY_DAYS retry path (issue #7490).
+                condition=~models.Q(pacer_doc_id="") & models.Q(error_msg=""),
                 name="scrapers_pfdr_court_doc_uniq",
             )
         ]
