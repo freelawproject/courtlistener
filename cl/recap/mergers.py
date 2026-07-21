@@ -808,7 +808,14 @@ def _match_cached_docket_entry(
     docket_entry: dict[str, Any],
 ) -> DocketEntry | None:
     """Resolve an existing DocketEntry from prefetched rows, mirroring the
-    lookup in add_create_docket_entry_transaction. Returns None when the
+    lookup in add_create_docket_entry_transaction.
+
+    :param des_by_entry_number: Prefetched DocketEntries for the docket,
+    grouped by entry number. Must contain every row for the entry numbers it
+    covers, so a miss is equivalent to DocketEntry.DoesNotExist.
+    :param docket_entry: The scraped dict from Juriscraper for the docket
+    entry.
+    :return: The single unambiguous DocketEntry match, or None when the
     entry is absent or ambiguous so the caller falls back to the
     transactional path, which handles creation and deduplication (and takes
     the docket row lock those paths require).
@@ -843,8 +850,17 @@ def _match_cached_rd(
     get_params: dict[str, Any],
 ) -> RECAPDocument | None:
     """Mirror RECAPDocument.objects.get(**get_params) against prefetched
-    rows. Returns None unless exactly one row matches, so creation,
-    deduplication, and cold-cache cases all fall back to the DB queries.
+    rows.
+
+    :param cached_rds: The prefetched RECAPDocuments of the docket entry the
+    lookup is scoped to, or None when the entry wasn't prefetched (e.g. it
+    was created during this merge).
+    :param get_params: The keyword arguments the DB lookup would receive.
+    Each key besides docket_entry (implied by the cache's scoping) is
+    compared as an attribute equality, mirroring the SQL WHERE clause.
+    :return: The single matching RECAPDocument, or None unless exactly one
+    row matches, so creation, deduplication, and cold-cache cases all fall
+    back to the DB queries.
     """
     if not cached_rds:
         return None
@@ -1074,6 +1090,17 @@ async def add_docket_entries(
     rds_by_de_id: dict[int, list[RECAPDocument]] = defaultdict(list)
 
     async def chunked_docket_entries():
+        """Yield the upload's entries, refilling the prefetch caches with
+        two queries per chunk of DOCKET_ENTRIES_CHUNK_SIZE entries.
+
+        The caches (closed over from add_docket_entries) are cleared at each
+        chunk boundary, which bounds peak memory on very large uploads while
+        entries created in earlier chunks remain visible through the next
+        chunk's queries.
+
+        :return: An async generator over the docket_entry dicts, in upload
+        order.
+        """
         for chunk_start in range(
             0, len(docket_entries), DOCKET_ENTRIES_CHUNK_SIZE
         ):
