@@ -92,7 +92,7 @@ class PartyMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](
 def _party_type_name(
     party: ScrapeParty[ScrapeRepresentative], params: Any
 ) -> str:
-    return party.party_type.value
+    return party.party_type.value.title()
 
 
 class PartyTypeMerger[PType: ScrapeParty[ScrapeRepresentative], ParamType](

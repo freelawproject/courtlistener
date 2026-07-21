@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from datetime import date
 from typing import Any, ClassVar, override
 
@@ -58,11 +59,19 @@ def _florida_party_uuid(party: FloridaParty, params: None) -> str:
 
 
 class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
+    key: ClassVar[Iterable[str]] = ["extra_info"]
+
     attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
     extra_info: str = Attribute(_florida_party_uuid)
 
     def query(self) -> QuerySet[Party]:
-        return Party.objects.filter(extra_info=self.transformed["extra_info"])
+        return super().query().order_by("date_created")
+
+    def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
+        results = list(qs)
+        if len(results) == 0:
+            return True, None
+        return True, results[0]
 
 
 def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:

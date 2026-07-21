@@ -730,29 +730,41 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     def query(self) -> QuerySet[M]:
         """Constructs a queryset to find an existing object in the DB, using the natural key defined by `cls.key`.
 
+        The `merge` method will limit the queryset to returning at most two objects. If the queryset returns more than
+        one object, the `resolve_query` method will be called to determine which object (if any) to merge into.
+
         :return: The queryset to find the object."""
         return self.manager.filter(
             **{name: self.transformed[name] for name in self.key},
         )
+
+    def resolve_query(self, qs: QuerySet[M]) -> tuple[bool, M | None]:
+        """Called to resolve the output of `self.query()` into a single object to be merged. Returns a tuple where the
+        first entry is a boolean indicating whether the merge can continue and the second is a DB object or `None`. If
+        the query cannot continue, the `merge` method will return a failed result and cancel. If `None` is returned
+        as the DB object, a new object will be created. This method should be deterministic and always return the same
+        output for the same inputs to ensure merge operations are idempotent."""
+        results = list(qs)
+        if len(results) == 0:
+            return True, None
+        if len(results) == 1:
+            return True, results[0]
+        return False, None
 
     def merge(self) -> MergeResult[Any]:
         """Merge scraped data into the DB."""
         if self.result is not None:
             return self.result
         if self.existing is None:
-            try:
-                self.existing = (
-                    self.query().filter(**self._through_params).get()
-                )
-            except self.model.MultipleObjectsReturned:  # type: ignore[attr-defined]
+            qs = self.query().filter(**self._through_params)[:2]
+            valid, self.existing = self.resolve_query(qs)
+            if not valid:
                 logger.error(
                     "Merger %s found multiple objects; skipping merge.",
                     self.__class__.__name__,
                 )
                 self.result = MergeResult.failed(self.model.__name__)
                 return self.result
-            except self.manager.model.DoesNotExist:  # type: ignore[attr-defined]
-                self.existing = None
 
         if self.atomic:
             with transaction.atomic():
