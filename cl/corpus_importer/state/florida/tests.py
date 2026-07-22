@@ -1,6 +1,5 @@
 """Tests for Florida docket and originating-court-information merger."""
 
-from copy import copy
 from datetime import date, datetime
 from unittest import mock
 
@@ -40,6 +39,48 @@ from cl.search.state.florida.models import (
 )
 from cl.search.state.shared import DocketEntryType
 from cl.tests.cases import TestCase
+
+
+class FloridaUtilsTest(TestCase):
+    def test_docket_number_core(self) -> None:
+        """Can we correctly normalize Florida docket numbers?"""
+        self.assertEqual(make_docket_number_core("SC1983-2014"), "sc19832014")
+        self.assertEqual(
+            make_docket_number_core("SC1983-2014", court_id="fla"),
+            "sc19832014",
+        )
+        self.assertEqual(
+            make_docket_number_core("3D2001-20145", court_id="fla"),
+            "",
+        )
+        self.assertEqual(
+            make_docket_number_core("Meowdy, partner", court_id="tx"),
+            "",
+        )
+        self.assertEqual(
+            make_docket_number_core("3D2001-20145", court_id="fladistctapp2"),
+            "3d200120145",
+        )
+        self.assertEqual(
+            make_docket_number_core("SC1983-2014", court_id="fladistctapp2"),
+            "",
+        )
+        self.assertEqual(make_docket_number_core("WR-70,849-04"), "")
+
+        self.assertEqual(
+            make_docket_number_core("Case Number: SC1983-2014"),
+            "sc19832014",
+        )
+
+        self.assertEqual(
+            make_docket_number_core(
+                "Case Number: 6D2011-1337; 3D2001-20145",
+                court_id="fladistctapp5",
+            ),
+            "3d200120145",
+        )
+
+        self.assertEqual(make_docket_number_core("garbage text"), "")
 
 
 class FloridaMergerTest(TestCase):
@@ -182,16 +223,11 @@ class FloridaMergerTest(TestCase):
             court_id=FloridaCourtID.CIRCUIT.value,
         )
 
-        merger = FloridaDocketMerger(docket_data, params=None)
+        result = FloridaDocketMerger(docket_data, params=None).merge()
 
-        assert merger.result is not None
-        assert merger.result.success is False
-        assert "Docket" in merger.result.failures
-
-        before = copy(merger.result)
-        after = merger.merge()
-
-        assert before == after
+        self.assertEqual(result.success, False)
+        self.assertIn("Docket", result.failures)
+        self.assertEqual(result.failures["Docket"], [None])
 
     def test_merge_docket_supreme_court_creates_new(self):
         """Does merge_docket create a new supreme-court docket?"""
@@ -240,7 +276,7 @@ class FloridaMergerTest(TestCase):
     def test_merge_docket_appellate_disaggregates_existing(self):
         """Does merge_docket move a matching docket from the aggregate court
         into its specific district court?"""
-        agg_dn = "1D2025-AGG"
+        agg_dn = "1D2025-1234"
         agg_docket = DocketFactory.create(
             court=self.flagg,
             docket_number=agg_dn,
@@ -383,7 +419,7 @@ class FloridaPartyMergerTest(TestCase):
         assert party.name == "Acme Corp"
         party_type = PartyType.objects.get(docket=docket)
         assert party_type.party_id == party.pk
-        assert party_type.name == "appellant"
+        assert party_type.name == "Appellant"
 
     def test_merge_creates_all_parties(self):
         """Are multiple parties in a scrape merged as separate objects, each
@@ -412,7 +448,7 @@ class FloridaPartyMergerTest(TestCase):
             PartyType.objects.filter(docket=docket).values_list(
                 "party__name", "name"
             )
-        ) == {("Acme Corp", "appellant"), ("Bob Smith", "appellee")}
+        ) == {("Acme Corp", "Appellant"), ("Bob Smith", "Appellee")}
 
     def test_merge_primary_representative_is_lead_attorney(self):
         """Is a primary representative merged as a lead attorney for the
@@ -588,6 +624,50 @@ class FloridaPartyMergerTest(TestCase):
         assert Role.objects.filter(pk=other_role.pk).exists()
         other_role.refresh_from_db()
         assert other_role.docket_id == other_docket.pk
+
+    def test_party_type_change_renames_in_place(self):
+        """When a party's type changes between scrapes, is the single
+        PartyType row renamed rather than duplicated?"""
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[],
+        )
+        docket_data = self._make_case(scrape_party)
+        first = FloridaDocketMerger(docket_data, params=None).merge()
+        assert first.success is True
+        docket = self._merged_docket(first)
+
+        scrape_party.party_type = ScrapePartyType.APPELLEE
+        second = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert second.success is True
+        party_type = PartyType.objects.get(docket=docket)
+        assert party_type.name == "Appellee"
+
+    def test_merge_empty_parties_preserves_existing(self):
+        """Does a scrape with no parties leave existing parties, types, and
+        roles untouched?"""
+        rep = FloridaRepresentativeFactory.create(
+            name="Jane Lawyer", primary_flag=True
+        )
+        scrape_party = FloridaCasePartyFactory.create(
+            name="Acme Corp",
+            party_type=ScrapePartyType.APPELLANT,
+            representatives=[rep],
+        )
+        docket_data = self._make_case(scrape_party)
+        first = FloridaDocketMerger(docket_data, params=None).merge()
+        assert first.success is True
+        docket = self._merged_docket(first)
+
+        docket_data.parties = []
+        second = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert second.success is True
+        assert docket.parties.count() == 1
+        assert PartyType.objects.filter(docket=docket).count() == 1
+        assert Role.objects.filter(docket=docket).count() == 1
 
 
 class FloridaDocketEntryMergerTest(TestCase):

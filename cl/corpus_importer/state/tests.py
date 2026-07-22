@@ -5,6 +5,7 @@ from django.db.models import Model, QuerySet
 
 from cl.corpus_importer.state.merger import (
     Attribute,
+    ManyStrategy,
     ManyToManyRelation,
     Merger,
     OneToManyRelation,
@@ -12,6 +13,7 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     ThroughParameters,
 )
+from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
 from cl.search.factories import CourtFactory, DocketFactory
@@ -351,6 +353,165 @@ class BaseMergerTest(TestCase):
                 for pt in PartyType.objects.filter(docket=docket)
             },
             {("Alice", "Plaintiff"), ("Bob", "Defendant")},
+        )
+
+    def test_related_mergers_m2m_simple_disassociate(self) -> None:
+        """Does DISASSOCIATE on a plain many-to-many remove stale
+        associations while keeping the objects themselves?"""
+        stale = PersonFactory.create()
+        self.docket.panel.add(stale)
+        tc = self
+
+        class TestPersonMerger(
+            Merger[dict[str, str], RelatedParams[None], Person]
+        ):
+            model: ClassVar[type[Model]] = Person
+            key: ClassVar[Iterable[str]] = ["slug"]
+
+            name_first: str = Attribute(lambda d, params: d["first"])
+            name_last: str = Attribute(lambda d, params: d["last"])
+            slug: str = Attribute(lambda d, params: d["slug"])
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.docket.court)
+            source: int = Attribute(default=tc.docket.source)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            panel: list[Person] = ManyToManyRelation(
+                TestPersonMerger,
+                transform=lambda d, params: d["panel"],
+                strategy=ManyStrategy.DISASSOCIATE,
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        i = {
+            "panel": [
+                {"first": "Jane", "last": "Doe", "slug": "jane-doe-dis"},
+            ]
+        }
+        result = TestMerger(i, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.docket.refresh_from_db()
+        self.assertTrue(
+            Person.objects.filter(pk=stale.pk).exists(),
+            "DISASSOCIATE must not delete the stale person.",
+        )
+        self.assertEqual(
+            set(self.docket.panel.values_list("name_last", flat=True)),
+            {"Doe"},
+            "The stale association should be removed.",
+        )
+
+    def test_related_mergers_m2m_through_disassociate(self) -> None:
+        """Does DISASSOCIATE on a through many-to-many prune the stale
+        through rows while keeping the related objects themselves?"""
+        stale_party = Party.objects.create(name="Stale Party")
+        PartyType.objects.create(
+            docket=self.docket, party=stale_party, name="Plaintiff"
+        )
+        tc = self
+
+        class TestPartyMerger(
+            Merger[dict[str, str], RelatedParams[None], Party]
+        ):
+            model: ClassVar[type[Model]] = Party
+            key: ClassVar[Iterable[str]] = ["name"]
+
+            name: str = Attribute(lambda d, params: d["name"])
+
+        class TestPartyTypeMerger(
+            Merger[dict[str, str], ThroughParameters[None], PartyType]
+        ):
+            model: ClassVar[type[Model]] = PartyType
+
+            name: str = Attribute(lambda d, params: d["type"])
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.docket.court)
+            source: int = Attribute(default=tc.docket.source)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            parties: list[Party] = ManyToManyRelation(
+                TestPartyMerger,
+                TestPartyTypeMerger,
+                lambda d, params: d["parties"],
+                strategy=ManyStrategy.DISASSOCIATE,
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        i = {"parties": [{"name": "Alice", "type": "Plaintiff"}]}
+        result = TestMerger(i, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.docket.refresh_from_db()
+        self.assertTrue(
+            Party.objects.filter(pk=stale_party.pk).exists(),
+            "DISASSOCIATE must not delete the stale party itself.",
+        )
+        self.assertFalse(
+            PartyType.objects.filter(
+                docket=self.docket, party=stale_party
+            ).exists(),
+            "The stale party's link to the docket should be removed.",
+        )
+        self.assertEqual(
+            set(self.docket.parties.values_list("name", flat=True)),
+            {"Alice"},
+        )
+
+    def test_related_mergers_m2m_through_replace_deletes(self) -> None:
+        """Characterization: does REPLACE on a through many-to-many delete
+        the stale related objects outright?"""
+        stale_party = Party.objects.create(name="Stale Party")
+        PartyType.objects.create(
+            docket=self.docket, party=stale_party, name="Plaintiff"
+        )
+        tc = self
+
+        class TestPartyMerger(
+            Merger[dict[str, str], RelatedParams[None], Party]
+        ):
+            model: ClassVar[type[Model]] = Party
+            key: ClassVar[Iterable[str]] = ["name"]
+
+            name: str = Attribute(lambda d, params: d["name"])
+
+        class TestPartyTypeMerger(
+            Merger[dict[str, str], ThroughParameters[None], PartyType]
+        ):
+            model: ClassVar[type[Model]] = PartyType
+
+            name: str = Attribute(lambda d, params: d["type"])
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.docket.court)
+            source: int = Attribute(default=tc.docket.source)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            parties: list[Party] = ManyToManyRelation(
+                TestPartyMerger,
+                TestPartyTypeMerger,
+                lambda d, params: d["parties"],
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        i = {"parties": [{"name": "Alice", "type": "Plaintiff"}]}
+        result = TestMerger(i, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertFalse(
+            Party.objects.filter(pk=stale_party.pk).exists(),
+            "REPLACE deletes stale related objects outright.",
         )
 
     def test_merger_subclassing(self) -> None:

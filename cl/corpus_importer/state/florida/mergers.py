@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Any, ClassVar, override
 from uuid import UUID
 
+from asgiref.sync import async_to_sync
 from django.db.models import Model, QuerySet
 from juriscraper.state.florida import (
     FloridaCase,
@@ -48,6 +49,7 @@ from cl.corpus_importer.state.merger import (
     overwrite,
 )
 from cl.people_db.models import Attorney, Party, Role
+from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket, OriginatingCourtInformation
 from cl.search.state.florida.models import (
     FloridaDocketEntry,
@@ -69,8 +71,25 @@ class FloridaRoleMerger(
     role: int = Attribute(_florida_representative_role)
 
 
+def _florida_party_uuid(party: FloridaParty, params: None) -> str:
+    return str(party.party_uuid)
+
+
 class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
+    key: ClassVar[Iterable[str]] = ["extra_info"]
+
     attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
+    extra_info: str = Attribute(_florida_party_uuid)
+    pro_se_flag: bool = Attribute(lambda p, params: p.pro_se_flag)
+
+    def query(self) -> QuerySet[Party]:
+        return super().query().order_by("date_created")
+
+    def resolve_query(self, qs: QuerySet[Party]) -> tuple[bool, Party | None]:
+        results = list(qs)
+        if len(results) == 0:
+            return True, None
+        return True, results[0]
 
 
 def _document_type(document: ScrapeFloridaDocument, params: Any) -> str:
@@ -238,30 +257,37 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
             FloridaCourtID.SUPREME_COURT.value
         ]
         court_id = FLORIDA_COURT_ID_MAP[self.scrape.court_id]
-        query = Docket.objects.filter(
-            docket_number_core=make_docket_number_core(
-                self.scrape.docket_number
-            )
-        )
-        query_narrow = query.filter(court_id=court_id)
-        query_narrow_with_uuid = query_narrow.filter(
-            pacer_case_id=str(self.scrape.case_uuid)
+        dn_core = make_docket_number_core(
+            self.scrape.docket_number, court_id=court_id
         )
 
-        if query_narrow_with_uuid.exists():
-            return query_narrow_with_uuid
+        query_narrow = async_to_sync(find_docket_object_query)(
+            court_id=court_id,
+            pacer_case_id=str(self.scrape.case_uuid),
+            docket_number=self.scrape.docket_number,
+            docket_number_core=dn_core,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned=None,
+            federal_dn_judge_initials_referred=None,
+            skip_dn_core_confirmation=True,
+        )
 
         if court_id == supreme_court_id:
             return query_narrow
 
-        query_broad = query.filter(court_id=FL_APPELLATE_COURT_ID)
-        query_broad_with_uuid = query_broad.filter(
-            pacer_case_id=str(self.scrape.case_uuid)
-        )
-        if query_broad_with_uuid.exists():
-            return query_broad_with_uuid
+        if query_narrow.count() == 0:
+            return async_to_sync(find_docket_object_query)(
+                court_id=FL_APPELLATE_COURT_ID,
+                pacer_case_id=str(self.scrape.case_uuid),
+                docket_number=self.scrape.docket_number,
+                docket_number_core=dn_core,
+                federal_defendant_number=None,
+                federal_dn_judge_initials_assigned=None,
+                federal_dn_judge_initials_referred=None,
+                skip_dn_core_confirmation=True,
+            )
 
-        return query_broad
+        return query_narrow
 
     @staticmethod
     def validate(scrape: FloridaCase) -> bool:
