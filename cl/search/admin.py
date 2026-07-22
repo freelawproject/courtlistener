@@ -41,6 +41,10 @@ from cl.search.models import (
     SearchQuery,
     TrialCourtData,
 )
+from cl.search.state.florida.models import (
+    FloridaDocketEntry,
+    FloridaDocument,
+)
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.visualizations.models import SCOTUSMap
 
@@ -796,3 +800,65 @@ class TexasDocketEntryAdmin(CursorPaginatorAdmin):
     @admin.display(description="Remarks")
     def get_trunc_remarks(self, obj):
         return trunc(obj.remarks, 35, ellipsis="...")
+
+
+class FloridaDocumentInline(admin.StackedInline):
+    model = FloridaDocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(FloridaDocument)
+class FloridaDocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "link_uuid",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by Florida Document link UUID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(FloridaDocketEntry)
+class FloridaDocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (FloridaDocumentInline,)
+    search_help_text = (
+        "Search FloridaDocketEntries by Docket ID or docket entry UUID."
+    )
+    search_fields = (
+        "docket__id",
+        "docket_entry_uuid",
+    )
+    list_display = (
+        "get_pk",
+        "entry_name",
+        "get_trunc_description",
+        "status",
+        "date_filed",
+        "entry_type",
+        "docket_entry_uuid",
+    )
+    raw_id_fields = (
+        "docket",
+        "submitted_by",
+    )
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Florida docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description or "", 35, ellipsis="...")
