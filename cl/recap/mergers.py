@@ -803,12 +803,15 @@ async def merge_unnumbered_docket_entries(
 DOCKET_ENTRIES_CHUNK_SIZE = 500
 
 
-def _match_cached_docket_entry(
+def resolve_docket_entry_in_memory(
     des_by_entry_number: dict[int, list[DocketEntry]],
     docket_entry: dict[str, Any],
 ) -> DocketEntry | None:
-    """Resolve an existing DocketEntry from prefetched rows, mirroring the
-    lookup in add_create_docket_entry_transaction.
+    """Resolve an existing DocketEntry from prefetched rows in memory.
+
+    This mirrors the lookup performed by `add_create_docket_entry_transaction`,
+    avoiding an additional database query when the required DocketEntry has
+    already been prefetched.
 
     :param des_by_entry_number: Prefetched DocketEntries for the docket,
     grouped by entry number. Must contain every row for the entry numbers it
@@ -817,9 +820,11 @@ def _match_cached_docket_entry(
     entry.
     :return: The single unambiguous DocketEntry match, or None when the
     entry is absent or ambiguous so the caller falls back to the
-    transactional path, which handles creation and deduplication (and takes
-    the docket row lock those paths require).
+    add_create_docket_entry_transaction path, which handles creation and
+    deduplication.
     """
+    # DocketEntry.entry_number is an integer, while document_number is a string
+    # We need to cast it for the lookup to match.
     try:
         entry_number = int(docket_entry["document_number"])
     except (TypeError, ValueError):
@@ -827,6 +832,10 @@ def _match_cached_docket_entry(
     candidates = des_by_entry_number.get(entry_number, [])
     pacer_seq_no = docket_entry.get("pacer_seq_no")
     if pacer_seq_no is None:
+        # Mirrors .get(docket=d, entry_number=n): it succeeds only when
+        # exactly one row exists. Zero rows would be DoesNotExist (entry
+        # creation) and two+ MultipleObjectsReturned (logged and skipped);
+        # both are handled by add_create_docket_entry_transaction.
         return candidates[0] if len(candidates) == 1 else None
     try:
         seq = int(pacer_seq_no)
@@ -834,39 +843,54 @@ def _match_cached_docket_entry(
         return None
     seq_matches = [de for de in candidates if de.pacer_sequence_number == seq]
     if len(seq_matches) == 1:
+        # Mirrors .get(docket=d, entry_number=n, pacer_sequence_number=seq)
+        # succeeding with a single row.
         return seq_matches[0]
     if seq_matches:
+        # Two+ rows share this sequence number. The DB lookup would raise
+        # MultipleObjectsReturned and deduplicate by keeping the latest row
+        # and deleting the rest; deletion needs the docket lock, so fall
+        # back.
         return None
     null_matches = [
         de for de in candidates if de.pacer_sequence_number is None
     ]
     if len(null_matches) == 1:
+        # No row has this sequence number (DoesNotExist), but a single
+        # row without one exists, use it. No dedup is required.
         return null_matches[0]
+    # Nothing to match (creation needed) or several null-sequence
+    # rows (dedup deletion needed). Both require the docket lock, so fall
+    # back to add_create_docket_entry_transaction.
     return None
 
 
-def _match_cached_rd(
-    cached_rds: list[RECAPDocument] | None,
+def resolve_rd_in_memory(
+    prefetched_rds: list[RECAPDocument] | None,
     get_params: dict[str, Any],
 ) -> RECAPDocument | None:
-    """Mirror RECAPDocument.objects.get(**get_params) against prefetched
-    rows.
+    """Resolve a RECAPDocument from prefetched rows in memory.
 
-    :param cached_rds: The prefetched RECAPDocuments of the docket entry the
-    lookup is scoped to, or None when the entry wasn't prefetched (e.g. it
-    was created during this merge).
-    :param get_params: The keyword arguments the DB lookup would receive.
-    Each key besides docket_entry (implied by the cache's scoping) is
-    compared as an attribute equality, mirroring the SQL WHERE clause.
-    :return: The single matching RECAPDocument, or None unless exactly one
-    row matches, so creation, deduplication, and cold-cache cases all fall
-    back to the DB queries.
+    This mirrors the ``RECAPDocument.objects.get(**get_params)`` lookup in
+    ``add_docket_entries`` without issuing a database query. It returns a
+    result only when exactly one prefetched row matches, allowing missing,
+    ambiguous, and non-prefetched cases to fall back to the database path.
+
+    :param prefetched_rds: RECAPDocuments prefetched for the docket entry, or
+    ``None`` when the docket entry was not prefetched, such as when it was
+    created during the current merge.
+    :param get_params: Keyword arguments that would be passed to the lookup
+    in ``add_docket_entries``. All fields except ``docket_entry``, which is
+    implied by the prefetched rows' scope, are matched using attribute
+    equality.
+    :return: The single matching RECAPDocument, or ``None`` when the cache is
+    unavailable or the lookup does not produce exactly one match.
     """
-    if not cached_rds:
+    if not prefetched_rds:
         return None
     matches = [
         rd
-        for rd in cached_rds
+        for rd in prefetched_rds
         if all(
             getattr(rd, field) == value
             for field, value in get_params.items()
@@ -969,7 +993,9 @@ async def get_or_make_docket_entry(
         de = None
         de_created = False
         if des_by_entry_number is not None:
-            de = _match_cached_docket_entry(des_by_entry_number, docket_entry)
+            de = resolve_docket_entry_in_memory(
+                des_by_entry_number, docket_entry
+            )
         if de is not None:
             return de, de_created
         response = await add_create_docket_entry_transaction(d, docket_entry)
@@ -1084,8 +1110,8 @@ async def add_docket_entries(
     # Prefetch the docket's matching entries and their documents in two
     # queries per chunk, so unchanged entries (the common re-upload case)
     # are resolved in memory instead of via per-entry queries and docket
-    # row locks. Chunking bounds peak memory on very large uploads; the
-    # caches are refilled at each chunk boundary.
+    # row locks. Prefetch entries and documents in chunks to avoid high
+    # memory usage.
     des_by_entry_number: dict[int, list[DocketEntry]] = defaultdict(list)
     rds_by_de_id: dict[int, list[RECAPDocument]] = defaultdict(list)
 
@@ -1093,10 +1119,9 @@ async def add_docket_entries(
         """Yield the upload's entries, refilling the prefetch caches with
         two queries per chunk of DOCKET_ENTRIES_CHUNK_SIZE entries.
 
-        The caches (closed over from add_docket_entries) are cleared at each
-        chunk boundary, which bounds peak memory on very large uploads while
-        entries created in earlier chunks remain visible through the next
-        chunk's queries.
+        The caches are cleared at each chunk boundary, which bounds peak
+        memory on very large uploads while entries created in earlier chunks
+        remain visible through the next chunk's queries.
 
         :return: An async generator over the docket_entry dicts, in upload
         order.
@@ -1125,7 +1150,7 @@ async def add_docket_entries(
                         existing_de
                     )
                     existing_de_ids.append(existing_de.pk)
-                # Load only the fields _match_cached_rd can compare plus
+                # Load only the fields resolve_rd_in_memory can compare plus
                 # the ones mutated before rd.asave(); notably this defers
                 # plain_text, which can be megabytes per row. Accessing any
                 # other field on a cached rd triggers a per-row refresh
@@ -1178,7 +1203,7 @@ async def add_docket_entries(
         else:
             de.time_filed = time_filed
         de.date_filed = date_filed
-        # Coerce to int: juriscraper provides strings, and a str-vs-int
+        # Cast to int as juriscraper provides strings, and a str-vs-int
         # mismatch would defeat the unchanged-entry comparison below.
         pacer_seq_no = docket_entry.get("pacer_seq_no")
         de.pacer_sequence_number = (
@@ -1204,9 +1229,8 @@ async def add_docket_entries(
         if de_created:
             content_updated = True
             known_filing_dates.append(de.date_filed)
-            # Keep the cache complete in case the same entry number appears
-            # again in this upload. entry_number may still be the raw string
-            # from juriscraper here, so coerce it to match the cache keys.
+            # Consider the recent created entry in case the same entry number
+            # appears again in this upload.
             try:
                 des_by_entry_number[int(de.entry_number)].append(de)
             except (TypeError, ValueError):
@@ -1250,7 +1274,7 @@ async def add_docket_entries(
                 params["document_type"] = RECAPDocument.ATTACHMENT
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
-            # A shallow copy suffices: only keys are added/removed below.
+            # A shallow copy is enough as only keys are added/removed below.
             get_params = params.copy()
             if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
@@ -1263,7 +1287,7 @@ async def add_docket_entries(
             if de_created is False:
                 # Try to match the RD regardless of the document_type.
                 del get_params["document_type"]
-            rd = _match_cached_rd(rds_by_de_id.get(de.pk), get_params)
+            rd = resolve_rd_in_memory(rds_by_de_id.get(de.pk), get_params)
             if rd is None:
                 rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
