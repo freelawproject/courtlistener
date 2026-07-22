@@ -3032,9 +3032,8 @@ def download_pacer_pdf_and_save_to_pq(
     :param session_data: A SessionData object containing the session's cookies
     and proxy.
     :param cutoff_date: The datetime from which we should query
-     ProcessingQueue objects. For the main RECAPDocument the datetime the
-     EmailProcessingQueue was created. For attachments the datetime the
-     attachment RECAPDocument was created.
+     ProcessingQueue objects, the datetime the EmailProcessingQueue was
+     created, for both the main and attachment RECAPDocuments.
     :param magic_number: The magic number to fetch PACER documents for free.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param pacer_doc_id: The pacer_doc_id to query the free document.
@@ -3109,6 +3108,7 @@ def get_and_copy_recap_attachment_docs(
     magic_number: str | None,
     pacer_case_id: str,
     user_pk: int,
+    cutoff_date: datetime,
     de_seq_num: str | None = None,
 ) -> list[ProcessingQueue]:
     """Download and copy the corresponding PACER PDF to all the notification
@@ -3120,6 +3120,11 @@ def get_and_copy_recap_attachment_docs(
     :param magic_number: The magic number to fetch PACER documents for free.
     :param pacer_case_id: The pacer_case_id to query the free document.
     :param user_pk: The user to associate with the ProcessingQueue object.
+    :param cutoff_date: The datetime from which ProcessingQueue objects can be
+     reused, the datetime the EmailProcessingQueue was created. This prevents
+     reusing stale PQs from previous notifications whose file was already
+     deleted, while still allowing reuse within this notification's run,
+     retries and multi-docket NEFs.
     :param de_seq_num: The sequential number assigned by the PACER system to
      identify the docket entry within a case.
     :return: None
@@ -3129,7 +3134,6 @@ def get_and_copy_recap_attachment_docs(
     appellate = False
     unique_pqs = []
     for rd_att in att_rds:
-        cutoff_date = rd_att.date_created
         pq = download_pacer_pdf_and_save_to_pq(
             court_id,
             session_data,
@@ -3503,6 +3507,8 @@ def process_recap_email(
     unique_case_ids = []
     got_content_updated = False
     main_rds_available = []
+    saved_existing_main_rds = []
+    main_rd_already_available = False
     with transaction.atomic():
         # Add/update docket entries for each docket mentioned in the
         # notification.
@@ -3569,7 +3575,26 @@ def process_recap_email(
                 # since there is no document to copy.
                 continue
 
-            for rd in rds_created:
+            # Most RDs match existing records. We initially assumed RECAP email would
+            # always be processed before other RECAP sources, but that's not always the
+            # case. If the Celery queue is busy, processing may be delayed, allowing
+            # another source (e.g. the RSS scraper or a docket upload) to create the RD
+            # first. In those cases, we still need to save the PDF if it is not already
+            # available. Previously, PDFs were only saved for RDs created by this task.
+            existing_rds_to_save = [
+                rd
+                for rd in rds_updated
+                if not rd.is_available and rd.pacer_doc_id == pacer_doc_id
+            ]
+            # Track main RDs that already have the document, so the PQ
+            # deletion guard below doesn't report a redundant download as a
+            # loss.
+            main_rd_already_available = main_rd_already_available or any(
+                rd.is_available
+                for rd in rds_updated
+                if rd.pacer_doc_id == pacer_doc_id
+            )
+            for rd in rds_created + existing_rds_to_save:
                 # Download and store the main PACER document and then
                 # assign/copy it to each corresponding RECAPDocument.
                 fq = PacerFetchQueue.objects.create(
@@ -3580,6 +3605,9 @@ def process_recap_email(
                 save_pacer_doc_from_pq(self, rd, fq, pq, magic_number)
                 rd.refresh_from_db()
                 main_rds_available.append(rd.is_available)
+            saved_existing_main_rds.extend(
+                rd for rd in existing_rds_to_save if rd.is_available
+            )
 
         # Get NEF attachments and merge them.
         all_attachment_rds = []
@@ -3607,6 +3635,7 @@ def process_recap_email(
                 magic_number,
                 pacer_case_id,
                 user_pk,
+                epq.date_created,
                 de_seq_num=pacer_seq_no,
             )
 
@@ -3636,6 +3665,17 @@ def process_recap_email(
     # After properly copying the PDF to related RECAPDocuments,
     # mark the PQ object as successful and delete its filepath_local
     if pq.status != PROCESSING_STATUS.FAILED:
+        if (
+            pq.filepath_local
+            and not any(main_rds_available)
+            and not main_rd_already_available
+        ):
+            logger.error(
+                "recap.email: deleting the PDF in PQ %s that was not copied "
+                "to any RECAPDocument. EPQ: %s",
+                pq.pk,
+                epq.pk,
+            )
         async_to_sync(mark_pq_successful)(pq)
 
     for pq in att_pqs:
@@ -3670,7 +3710,7 @@ def process_recap_email(
 
     if not is_potentially_sealed_entry:
         rds_to_extract = (
-            all_attachment_rds + all_created_rds
+            all_attachment_rds + all_created_rds + saved_existing_main_rds
             if not bankr_short_doc_id
             else []
         )
