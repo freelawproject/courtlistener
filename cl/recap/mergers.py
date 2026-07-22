@@ -1114,6 +1114,10 @@ async def add_docket_entries(
     # memory usage.
     des_by_entry_number: dict[int, list[DocketEntry]] = defaultdict(list)
     rds_by_de_id: dict[int, list[RECAPDocument]] = defaultdict(list)
+    # Entry pks covered by the current chunk's document prefetch. Needed to
+    # distinguish "prefetched and has no documents" (rds_by_de_id has no
+    # key) from "never prefetched", where the DB must be consulted.
+    prefetched_de_pks: set[int] = set()
 
     async def chunked_docket_entries():
         """Yield the upload's entries, refilling the prefetch caches with
@@ -1134,6 +1138,7 @@ async def add_docket_entries(
             ]
             des_by_entry_number.clear()
             rds_by_de_id.clear()
+            prefetched_de_pks.clear()
             entry_numbers = set()
             for entry_data in chunk:
                 if entry_data.get("document_number"):
@@ -1150,6 +1155,7 @@ async def add_docket_entries(
                         existing_de
                     )
                     existing_de_ids.append(existing_de.pk)
+                    prefetched_de_pks.add(existing_de.pk)
                 # Load only the fields resolve_rd_in_memory can compare plus
                 # the ones mutated before rd.asave(); notably this defers
                 # plain_text, which can be megabytes per row. Accessing any
@@ -1266,10 +1272,18 @@ async def add_docket_entries(
 
         if de_created is False and appellate_court_id_exists:
             # In existing appellate entry merges, check if the entry has at
-            # least one attachment.
-            appellate_rd_att_exists = await de.recap_documents.filter(
-                document_type=RECAPDocument.ATTACHMENT
-            ).aexists()
+            # least one attachment. Answer from the prefetched documents
+            # when this entry was covered by the chunk prefetch (the cache
+            # holds all of its documents); otherwise ask the DB as before.
+            if de.pk in prefetched_de_pks:
+                appellate_rd_att_exists = any(
+                    cached_rd.document_type == RECAPDocument.ATTACHMENT
+                    for cached_rd in rds_by_de_id.get(de.pk, ())
+                )
+            else:
+                appellate_rd_att_exists = await de.recap_documents.filter(
+                    document_type=RECAPDocument.ATTACHMENT
+                ).aexists()
             if appellate_rd_att_exists:
                 params["document_type"] = RECAPDocument.ATTACHMENT
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]

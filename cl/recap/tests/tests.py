@@ -5076,6 +5076,7 @@ class RecapDocketTaskTest(TestCase):
             de_modified_before, msg="Expected entries from the first upload."
         )
 
+        # Re-upload the case again.
         path = os.path.join(
             settings.INSTALL_ROOT, "cl", "recap", "test_assets", self.filename
         )
@@ -5090,6 +5091,12 @@ class RecapDocketTaskTest(TestCase):
         with CaptureQueriesContext(connection) as ctx:
             async_to_sync(process_recap_docket)(pq_2.pk)
 
+        # An unchanged re-upload must be read-only for entries and
+        # documents: no INSERTs (every row already exists), and no UPDATEs
+        # or DELETEs (no merged field changed). A write here means the
+        # unchanged-row detection in add_docket_entries regressed, which
+        # would also fire its pghistory triggers and ES indexing dispatches
+        # per row.
         write_statements = [
             q["sql"]
             for q in ctx.captured_queries
@@ -5103,6 +5110,29 @@ class RecapDocketTaskTest(TestCase):
             write_statements,
             [],
             msg="An unchanged re-upload wrote to docket entries/documents.",
+        )
+        # The upload fits in a single chunk, so matching existing entries
+        # and documents should cost exactly the two prefetch queries; any
+        # increase means per-entry lookups (N+1) have crept back in. The
+        # COUNT(*) exclusion allows the single per-upload entry count from
+        # get_blocked_status in update_docket_metadata, which is unrelated
+        # to entry matching.
+        select_statements = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if q["sql"].startswith("SELECT")
+            and not q["sql"].startswith("SELECT COUNT(")
+            and (
+                'FROM "search_docketentry"' in q["sql"]
+                or 'FROM "search_recapdocument"' in q["sql"]
+            )
+        ]
+        self.assertEqual(
+            len(select_statements),
+            2,
+            msg="Expected only the two chunk prefetch queries against "
+            f"entries/documents, got {len(select_statements)}: "
+            f"{select_statements}",
         )
         self.assertEqual(
             de_modified_before,
