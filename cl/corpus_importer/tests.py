@@ -94,8 +94,8 @@ from cl.corpus_importer.signals import (
     update_latest_case_id_and_schedule_iquery_sweep,
 )
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
+from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.tasks import (
-    MergeResult,
     classify_case_name_by_llm,
     download_texas_document,
     generate_ia_json,

@@ -107,7 +107,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
             ]
             handle_hard_bounce(bounce_sub_type, hard_recipient_emails)
             normalized_recipients = normalize_addresses(hard_recipient_emails)
-        elif bounce_type == "Transient" or "Undetermined":
+        elif bounce_type in ("Transient", "Undetermined"):
             # Only consider a soft bounce those that contains a "failed" action
             # in its bounce recipient, avoiding other bounces that might not
             # be related to failed deliveries, like auto-responders.
