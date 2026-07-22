@@ -1,7 +1,8 @@
 import logging
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, datetime
 from typing import Any, ClassVar, override
+from uuid import UUID
 
 from asgiref.sync import async_to_sync
 from django.db.models import Model, QuerySet
@@ -11,11 +12,23 @@ from juriscraper.state.florida import (
     FloridaParty,
     FloridaPartyRepresentative,
 )
+from juriscraper.state.florida import (
+    FloridaDocketEntry as ScrapeFloridaDocketEntry,
+)
+from juriscraper.state.florida import (
+    FloridaDocument as ScrapeFloridaDocument,
+)
 from juriscraper.state.florida.cases import FloridaCourtID
 
 from cl.corpus_importer.state.common.docket import (
+    DocketEntryRelation,
     DocketMerger,
     PartyRelation,
+)
+from cl.corpus_importer.state.common.docket_entry import (
+    AttachmentRelation,
+    DocketEntryMerger,
+    DocumentMerger,
 )
 from cl.corpus_importer.state.common.party import (
     AttorneyRelation,
@@ -38,6 +51,10 @@ from cl.corpus_importer.state.merger import (
 from cl.people_db.models import Attorney, Party, Role
 from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket, OriginatingCourtInformation
+from cl.search.state.florida.models import (
+    FloridaDocketEntry,
+    FloridaDocument,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +90,66 @@ class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
         if len(results) == 0:
             return True, None
         return True, results[0]
+
+
+def _document_type(document: ScrapeFloridaDocument, params: Any) -> str:
+    return document.document_type or ""
+
+
+class FloridaDocumentMerger[ParamType](
+    DocumentMerger[ScrapeFloridaDocument, ParamType, FloridaDocument]
+):
+    model: ClassVar[type[Model]] = FloridaDocument
+    key: ClassVar[Iterable[str]] = ["link_uuid"]
+
+    document_name: str = Attribute(
+        lambda doc, params: doc.document_name, strategy=overwrite
+    )
+    document_type: str = Attribute(_document_type, strategy=overwrite)
+    content_type: str | None = Attribute(lambda doc, params: doc.content_type)
+    page_count: int | None = Attribute(lambda doc, params: doc.page_count)
+    file_size: int | None = Attribute(lambda doc, params: doc.file_size)
+    link_uuid: UUID = Attribute(
+        lambda doc, params: doc.document_link_uuid, strategy=overwrite
+    )
+
+
+class FloridaDocketEntryMerger[ParamType](
+    DocketEntryMerger[
+        ScrapeFloridaDocketEntry,
+        ParamType,
+        FloridaDocketEntry,
+    ]
+):
+    model: ClassVar[type[Model]] = FloridaDocketEntry
+    key: ClassVar[Iterable[str]] = ["docket_entry_uuid"]
+
+    # Florida's CL field is a DateTimeField, so override the base's
+    # date-only mapping with the scrape's full timestamp.
+    date_filed: datetime = Attribute(
+        lambda e, params: e.datetime_filed, strategy=overwrite
+    )
+    date_submitted: datetime = Attribute(
+        lambda e, params: e.date_submitted, strategy=overwrite
+    )
+    entry_type_raw: str = Attribute(
+        lambda e, params: e.entry_type_raw, strategy=overwrite
+    )
+    entry_name: str = Attribute(
+        lambda e, params: e.entry_name, strategy=overwrite
+    )
+    description: str = Attribute(
+        lambda e, params: e.entry_description, strategy=overwrite
+    )
+    status: str = Attribute(
+        lambda e, params: e.entry_status, strategy=overwrite
+    )
+    docket_entry_uuid: UUID = Attribute(
+        lambda e, params: e.docket_entry_uuid, strategy=overwrite
+    )
+    documents: list[FloridaDocument] = AttachmentRelation(
+        FloridaDocumentMerger
+    )
 
 
 def _date_last_filing(docket_data: FloridaCase, params: None) -> date | None:
@@ -168,7 +245,11 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
         )
     )
 
-    parties: list[Party] = PartyRelation(party=FloridaPartyMerger)
+    parties: list[Party] = PartyRelation(FloridaPartyMerger)
+
+    florida_docket_entries: list[FloridaDocketEntry] = DocketEntryRelation(
+        FloridaDocketEntryMerger
+    )
 
     @override
     def query(self) -> QuerySet[Docket]:

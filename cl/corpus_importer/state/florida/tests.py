@@ -3,6 +3,9 @@
 from datetime import date, datetime
 from unittest import mock
 
+from juriscraper.state.docket import (
+    DocketEntryType as ScrapeDocketEntryType,
+)
 from juriscraper.state.docket import PartyType as ScrapePartyType
 from juriscraper.state.florida.cases import FloridaCase
 from juriscraper.state.florida.courts import FloridaCourtID
@@ -11,13 +14,16 @@ from cl.corpus_importer.state.florida.factories import (
     FloridaCaseFactory,
     FloridaCasePartyFactory,
     FloridaDocketEntryFactory,
+    FloridaDocumentFactory,
     FloridaOriginatingCaseFactory,
     FloridaRepresentativeFactory,
 )
 from cl.corpus_importer.state.florida.mergers import (
+    FloridaDocketEntryMerger,
     FloridaDocketMerger,
 )
 from cl.corpus_importer.state.florida.utils import make_docket_number_core
+from cl.corpus_importer.state.merger import RelatedParams
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -27,6 +33,11 @@ from cl.people_db.factories import (
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Docket, OriginatingCourtInformation
+from cl.search.state.florida.models import (
+    FloridaDocketEntry,
+    FloridaDocument,
+)
+from cl.search.state.shared import DocketEntryType
 from cl.tests.cases import TestCase
 
 
@@ -657,3 +668,211 @@ class FloridaPartyMergerTest(TestCase):
         assert docket.parties.count() == 1
         assert PartyType.objects.filter(docket=docket).count() == 1
         assert Role.objects.filter(docket=docket).count() == 1
+
+
+class FloridaDocketEntryMergerTest(TestCase):
+    """Tests for merging docket entries from Florida cases."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.flsc = CourtFactory.create(id="fla")
+
+    @staticmethod
+    def _make_case(*entries) -> FloridaCase:
+        return FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            entries=list(entries),
+        )
+
+    @staticmethod
+    def _merged_docket(result: MergeResult) -> Docket:
+        return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
+
+    def test_merge_creates_docket_entries(self):
+        """Does merging a case create its docket entries with the scrape's
+        field values?"""
+        entry = FloridaDocketEntryFactory.create(
+            entry_type=ScrapeDocketEntryType.MOTION,
+            entry_type_raw="motions other",
+            entry_name="Motion for Extension",
+            entry_description="Requesting more time.",
+            entry_status="Filed",
+            attachments=[],
+        )
+        docket_data = self._make_case(entry)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert "FloridaDocketEntry" in result.creates
+        docket = self._merged_docket(result)
+        merged = docket.florida_docket_entries.get()
+        assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
+        assert merged.date_filed == entry.datetime_filed
+        assert merged.date_submitted == entry.date_submitted
+        assert merged.entry_type == DocketEntryType.MOTION
+        assert merged.entry_type_raw == "motions other"
+        assert merged.entry_name == "Motion for Extension"
+        assert merged.description == "Requesting more time."
+        assert merged.status == "Filed"
+
+    def test_merge_creates_all_docket_entries(self):
+        """Are multiple entries in a scrape merged as separate objects?"""
+        entries = [
+            FloridaDocketEntryFactory.create(attachments=[]) for _ in range(3)
+        ]
+        docket_data = self._make_case(*entries)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        docket = self._merged_docket(result)
+        assert docket.florida_docket_entries.count() == 3
+        assert {
+            str(uuid)
+            for uuid in docket.florida_docket_entries.values_list(
+                "docket_entry_uuid", flat=True
+            )
+        } == {str(e.docket_entry_uuid) for e in entries}
+
+    def test_remerge_entries_is_idempotent(self):
+        """Does merging the same case twice avoid duplicating entries?"""
+        entry = FloridaDocketEntryFactory.create(attachments=[])
+        docket_data = self._make_case(entry)
+
+        first = FloridaDocketMerger(docket_data, params=None).merge()
+        second = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert first.success is True
+        assert second.success is True
+        assert "FloridaDocketEntry" not in second.creates
+        assert FloridaDocketEntry.objects.count() == 1
+
+    def test_remerge_updates_entry_fields(self):
+        """Does remerging an entry update its fields in place?"""
+        entry = FloridaDocketEntryFactory.create(
+            entry_status="Filed", attachments=[]
+        )
+        docket_data = self._make_case(entry)
+        FloridaDocketMerger(docket_data, params=None).merge()
+        merged = FloridaDocketEntry.objects.get()
+
+        entry.entry_status = "Disposed"
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert merged.pk in result.updates["FloridaDocketEntry"]
+        merged.refresh_from_db()
+        assert merged.status == "Disposed"
+
+    def test_merge_keeps_entries_missing_from_scrape(self):
+        """Are DB entries kept when a later scrape doesn't include them?"""
+        first_entry = FloridaDocketEntryFactory.create(attachments=[])
+        docket_data = self._make_case(first_entry)
+        FloridaDocketMerger(docket_data, params=None).merge()
+
+        docket_data.entries = [
+            FloridaDocketEntryFactory.create(attachments=[])
+        ]
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert FloridaDocketEntry.objects.count() == 2
+
+    def test_entry_merger_standalone(self):
+        """Can an entry be merged directly into an existing docket, outside
+        of a full docket merge?"""
+        docket = DocketFactory.create(court=self.flsc)
+        entry = FloridaDocketEntryFactory.create(attachments=[])
+
+        result = FloridaDocketEntryMerger(
+            entry,
+            manager=docket.florida_docket_entries,
+            params=RelatedParams(None, parent=docket),
+        ).merge()
+
+        assert result.success is True
+        merged = docket.florida_docket_entries.get()
+        assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
+
+
+class FloridaDocumentMergerTest(TestCase):
+    """Tests for merging documents attached to Florida docket entries."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.flsc = CourtFactory.create(id="fla")
+
+    @staticmethod
+    def _make_case(*documents) -> FloridaCase:
+        entry = FloridaDocketEntryFactory.create(
+            attachments=list(documents),
+        )
+        return FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            entries=[entry],
+        )
+
+    def test_merge_creates_documents(self):
+        """Does merging a case create its entries' documents with the
+        scrape's field values?"""
+        document = FloridaDocumentFactory.create(
+            document_name="Initial Brief",
+            document_type="Brief",
+            content_type="application/pdf",
+            page_count=12,
+            file_size=34567,
+            url="https://acis.flcourts.gov/docs/1",
+        )
+        docket_data = self._make_case(document)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert "FloridaDocument" in result.creates
+        merged = FloridaDocument.objects.get()
+        assert merged.docket_entry.docket_entry_uuid is not None
+        assert str(merged.link_uuid) == str(document.document_link_uuid)
+        assert merged.document_name == "Initial Brief"
+        assert merged.document_type == "Brief"
+        assert merged.content_type == "application/pdf"
+        assert merged.page_count == 12
+        assert merged.file_size == 34567
+        assert merged.url == "https://acis.flcourts.gov/docs/1"
+
+    def test_merge_document_without_type_is_blank(self):
+        """Is a scrape document with no document type merged with a blank
+        string instead of None?"""
+        document = FloridaDocumentFactory.create(document_type=None)
+        docket_data = self._make_case(document)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        merged = FloridaDocument.objects.get()
+        assert merged.document_type == ""
+
+    def test_remerge_documents_is_idempotent(self):
+        """Does merging the same case twice avoid duplicating documents?"""
+        document = FloridaDocumentFactory.create()
+        docket_data = self._make_case(document)
+
+        first = FloridaDocketMerger(docket_data, params=None).merge()
+        second = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert first.success is True
+        assert second.success is True
+        assert "FloridaDocument" not in second.creates
+        assert FloridaDocument.objects.count() == 1
+
+    def test_merge_keeps_documents_missing_from_scrape(self):
+        """Are DB documents kept when a later scrape doesn't include them?"""
+        document = FloridaDocumentFactory.create()
+        docket_data = self._make_case(document)
+        FloridaDocketMerger(docket_data, params=None).merge()
+
+        docket_data.entries[0].attachments = [FloridaDocumentFactory.create()]
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        assert result.success is True
+        assert FloridaDocument.objects.count() == 2

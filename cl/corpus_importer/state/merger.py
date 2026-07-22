@@ -70,6 +70,22 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
         self.default: OutputType = default
         self.name: str = ""
 
+    def run_validation(
+        self, merger: "type[Merger[Any, Any, Any]]"
+    ) -> list[Exception]:
+        """Runs validation for this spec against the given merger, returning any errors found."""
+        try:
+            f = merger.model._meta.get_field(self.name)
+        except FieldDoesNotExist as e:
+            return [e]
+        if isinstance(f, GenericForeignKey):
+            return [
+                TypeError(
+                    f"{self.name}: Generic foreign keys are not supported yet."
+                )
+            ]
+        return self.validate(f)
+
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
         """Validate this specification for the given field.
 
@@ -84,19 +100,6 @@ class MergerSpecification[ScrapeType, ParamType, OutputType]:
             return
         self.name = name
         owner.__registry__.register(self)
-        try:
-            f = owner.model._meta.get_field(self.name)
-        except FieldDoesNotExist as e:
-            owner.errors.append(e)
-            return
-        if isinstance(f, GenericForeignKey):
-            owner.errors.append(
-                TypeError(
-                    f"{self.name}: Generic foreign keys are not supported yet."
-                )
-            )
-            return
-        owner.errors += self.validate(f)
 
     def _default_transform(
         self, scrape: ScrapeType, params: ParamType
@@ -324,11 +327,15 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
+        child_mergers: list[
+            Merger[ChildType, RelatedParams[ParamType], RM]
+        ] = []
         related_objects: list[RM] = []
         for child in transformed:
             related_merge = self.merger(
                 child, manager=related_manager, params=related_params
             )
+            child_mergers.append(related_merge)
             result |= related_merge.merge()
             if related_merge.out is None:
                 continue
@@ -337,7 +344,15 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         match self.strategy:
             case ManyStrategy.APPEND:
                 related_manager.add(*related_objects)
-            case ManyStrategy.REPLACE | ManyStrategy.DISASSOCIATE:
+            case ManyStrategy.REPLACE:
+                # Keep existing children whose merge failed, matching the
+                # many-to-many REPLACE semantics below.
+                to_keep = {r.pk for r in related_objects} | {
+                    m.existing.pk for m in child_mergers if m.existing
+                }
+                _ = related_manager.exclude(pk__in=to_keep).delete()
+                related_manager.add(*related_objects)
+            case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
 
         return result
@@ -567,6 +582,21 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
             related=self.related | other.related, attr=self.attr | other.attr
         )
 
+    def validate(
+        self, merger: "type[Merger[ScrapeType, ParamType, Any]]"
+    ) -> list[Exception]:
+        """Run validation for every attached spec against the given merger. Used to defer running validation on base
+        classes which may not have required properties defined yet."""
+        errors = []
+
+        for related_spec in self.related.values():
+            errors += related_spec.run_validation(merger)
+
+        for attr_spec in self.attr.values():
+            errors += attr_spec.run_validation(merger)
+
+        return errors
+
     def update(self, other: Self):
         self.related.update(other.related)
         self.attr.update(other.attr)
@@ -584,7 +614,12 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
 class MergerMeta(type):
     @classmethod
     def __prepare__(
-        cls, name: str, bases: tuple[type, ...], /, **kwargs
+        cls,
+        name: str,
+        bases: tuple[type, ...],
+        /,
+        abstract: bool = False,
+        **kwargs,
     ) -> MutableMapping[str, object]:
         # We need this so that merger subclassing works like you'd expect.
         # Because we're efficient and don't check for specifications on every merge, we need to keep a cache. A
@@ -636,8 +671,18 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     errors: ClassVar[list[Exception]]
     __registry__: ClassVar[MergerSpecRegistry[Any, Any]]
 
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls, abstract: bool = False) -> None:
+        """:param abstract: Whether this merger is abstract and should not be instantiated/validated."""
+
         super().__init_subclass__()
+
+        if abstract:
+            logger.info(
+                "Skipping validation of abstract merger: %s", cls.__name__
+            )
+            return
+
+        cls.errors += cls.__registry__.validate(cls)
 
         model_fields = cls.model._meta.get_fields()
         fields = {field.name: field for field in model_fields}
