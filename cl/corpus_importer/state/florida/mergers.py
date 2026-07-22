@@ -63,6 +63,7 @@ class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
 
     attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
     extra_info: str = Attribute(_florida_party_uuid)
+    pro_se_flag: bool = Attribute(lambda p, params: p.pro_se_flag)
 
     def query(self) -> QuerySet[Party]:
         return super().query().order_by("date_created")
