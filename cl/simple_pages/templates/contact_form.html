@@ -6,13 +6,8 @@
 {% block sidebar %}{% endblock %}
 
 {% block head %}
-  {# Fetch issue types and terms URL #}
   {{ form.TECH_ISSUE_TYPES|uniq|json_script:"tech-types" }}
   {{ form.DOCUMENTATION_CHECK_TYPES|uniq|json_script:"requires-check-types" }}
-  {% url "terms" as terms_url %}
-  {{ terms_url|add:"#removal"|json_script:"terms-url" }}
-  {% url "mcp_help" as mcp_help_url %}
-  {{ mcp_help_url|json_script:"mcp-help-url" }}
 
   <style>
     [x-cloak]{ display: none !important } /* Prevent "blip" on first load */
@@ -62,8 +57,8 @@
           </p>
         {% endif %}
 
-        {#   Hint based on issue type (see contact_form.js)   #}
-        <div x-show="hint" x-html="hint" style="margin-top: 8px"></div>
+        {#   Hint based on issue type   #}
+        {% include "includes/contact_form_hint.html" only %}
       </div>
 
       <div x-show="issue.isValidType">
