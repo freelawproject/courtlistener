@@ -3,8 +3,8 @@ document.body.addEventListener('htmx:afterRequest', function (event) {
 });
 
 document.body.addEventListener('htmx:configRequest', function (event) {
-  var formData = new URLSearchParams(new FormData(event.srcElement));
-  var values = Array.from(formData.values());
+  const formData = new URLSearchParams(new FormData(event.srcElement));
+  const values = Array.from(formData.values());
   event.detail.parameters = {};
   event.detail.parameters['court_ids'] = values.map(encodeURIComponent).join(',');
   if (values.length === 0) {
@@ -66,7 +66,7 @@ function abbreviate_group_names(data) {
 }
 
 document.body.addEventListener('htmx:afterSettle', function (event) {
-  var results = JSON.parse(event.detail.xhr.response);
+  const results = JSON.parse(event.detail.xhr.response);
   $('#json-data').data('json', JSON.stringify(results));
   $('#fullScreenModal').modal('show');
 });
@@ -77,7 +77,7 @@ $('#fullScreenModal').on('shown.bs.modal', function () {
 
 $(document).ready(function () {
   $('.btn-default').on('click', function () {
-    var circuitName = $(this).text();
+    const circuitName = $(this).text();
     $('#modalLabel').text(circuitName);
   });
 });
@@ -102,7 +102,7 @@ function getTextWidth(text) {
 
 function get_right_margins(results, smallScreen = false) {
   let right_margin = 0;
-  var longest_label;
+  let longest_label;
   results.forEach((group) => {
     group.data.forEach((item) => {
       const labelLength = item.label.length;
@@ -112,8 +112,8 @@ function get_right_margins(results, smallScreen = false) {
       }
     });
   });
-  let width = getTextWidth(longest_label)
-  let padding = smallScreen ? 0 : 20;
+  const width = getTextWidth(longest_label)
+  const padding = smallScreen ? 0 : 20;
   return width + padding;
 }
 
@@ -121,11 +121,10 @@ function initializeTimelinesChart() {
   // Try to fit the chart to the size of the users screen
   const container = document.getElementById('timeline-body');
   const containerWidth = container.clientWidth;
-  var right_margin;
-  var left_margin;
-  var jsonData;
-  jsonData = $('#json-data').data('json');
-  var results = JSON.parse(jsonData);
+  let right_margin;
+  let left_margin;
+  const jsonData = $('#json-data').data('json');
+  const results = JSON.parse(jsonData);
   abbreviate_group_names(results);
 
   if (containerWidth > 750) {
