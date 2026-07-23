@@ -5051,6 +5051,78 @@ class RecapDocketTaskTest(TestCase):
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.docket_id, d.pk)
 
+    def test_es_tracker_skips_deferred_fields(self) -> None:
+        """Does merging a changed document avoid field tracker refreshes?
+
+        The merge prefetch loads RECAPDocuments with .only(), deferring
+        heavy fields like plain_text that the ES field tracker also tracks.
+        A still-deferred field was never read nor assigned and Django's
+        save() excludes it from the UPDATE, so it cannot have changed;
+        check_fields_that_changed must skip deferred fields instead of
+        triggering one refresh query per field during the merge, leaving
+        only the merge's own queries.
+        """
+        court = CourtFactory(id="cand", jurisdiction="FD")
+        d = DocketFactory(source=Docket.RECAP, court=court)
+        de_data = DocketEntryDataFactory(
+            date_filed=date(2024, 1, 2),
+            document_number="1",
+            pacer_doc_id="99001",
+            short_description="Original short description",
+        )
+        # The first merge creates the entry and its document and normalizes
+        # their fields; it's not measured.
+        async_to_sync(add_docket_entries)(d, [de_data])
+
+        # Re-merge with a changed document description so the document save
+        # path (and its ES field tracker check) runs. ES signal receivers
+        # no-op while ELASTICSEARCH_DISABLED (the tests' default), so
+        # enable them here; the celery chain is mocked so the eagerly
+        # executed ES indexing tasks don't pollute the query count, while
+        # the tracker check still runs, as it happens before the chain is
+        # built.
+        de_data["short_description"] = "Amended short description"
+        with (
+            self.settings(ELASTICSEARCH_DISABLED=False),
+            mock.patch("cl.lib.es_signal_processor.chain"),
+            CaptureQueriesContext(connection) as ctx,
+        ):
+            async_to_sync(add_docket_entries)(d, [de_data])
+
+        rd = RECAPDocument.objects.get(docket_entry__docket=d)
+        self.assertEqual(rd.description, "Amended short description")
+
+        de_rd_queries = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if '"search_docketentry"' in q["sql"]
+            or '"search_recapdocument"' in q["sql"]
+        ]
+        # The merge's required SELECTs are the two chunk prefetches plus
+        # two from RECAPDocument.save() on the changed document: the
+        # docket_entry FK load and the duplicate-document guard. The ES
+        # field tracker refreshing deferred fields would add one
+        # single-field SELECT per deferred tracked field on top.
+        select_statements = [
+            q for q in de_rd_queries if q.startswith("SELECT")
+        ]
+        self.assertEqual(
+            len(select_statements),
+            4,
+            msg="Expected only the merge's own SELECT queries; extra "
+            "SELECTs mean the ES field tracker refreshed deferred fields: "
+            f"{select_statements}",
+        )
+        update_statements = [
+            q for q in de_rd_queries if q.startswith(("UPDATE", "INSERT"))
+        ]
+        self.assertEqual(
+            len(update_statements),
+            1,
+            msg="Expected a single UPDATE for the changed document, got: "
+            f"{update_statements}",
+        )
+
     def test_unchanged_reupload_is_read_only(self) -> None:
         """Does re-uploading an identical docket skip entry/document writes?
 
@@ -5060,8 +5132,14 @@ class RecapDocketTaskTest(TestCase):
         the no-op detection in add_docket_entries (e.g. against type
         mismatches like str-vs-int pacer_seq_no that would make every entry
         look changed).
+
+        The Docket itself is the exception: process_recap_docket saves it
+        unconditionally, so Docket.date_modified must still bump on every
+        upload, preserving it as an upload-time tracer.
         """
-        async_to_sync(process_recap_docket)(self.pq.pk)
+        returned_data = async_to_sync(process_recap_docket)(self.pq.pk)
+        docket = Docket.objects.get(pk=returned_data["docket_pk"])
+        docket_modified_before = docket.date_modified
         de_modified_before = list(
             DocketEntry.objects.order_by("pk").values_list(
                 "date_modified", flat=True
@@ -5150,6 +5228,11 @@ class RecapDocketTaskTest(TestCase):
                 )
             ),
         )
+        # The Docket, unlike its entries and documents, is saved on every
+        # upload, so its date_modified must keep advancing: it records the
+        # last time an upload touched the docket.
+        docket.refresh_from_db()
+        self.assertGreater(docket.date_modified, docket_modified_before)
         pq_2.refresh_from_db()
         self.assertEqual(pq_2.status, PROCESSING_STATUS.SUCCESSFUL)
 

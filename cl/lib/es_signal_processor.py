@@ -71,7 +71,15 @@ def check_fields_that_changed(
     changed.
     """
     changed_fields = []
+    # A field deferred during the merge process (`add_docket_entries`) in
+    # `chunked_docket_entries` was neither read nor assigned after the instance
+    # was loaded. Django's `save()` omits deferred fields from the `UPDATE`, so
+    # they cannot have changed. Skip them to prevent `getattr()` from triggering
+    # a per-field query to fetch their values.
+    deferred_fields = current_instance.get_deferred_fields()
     for field in tracked_set.fields:
+        if field in deferred_fields:
+            continue
         current_value = getattr(current_instance, field)
         if previous_instance:
             previous_value = getattr(previous_instance, field)
