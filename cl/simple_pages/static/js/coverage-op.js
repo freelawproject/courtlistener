@@ -125,7 +125,7 @@ function initializeTimelinesChart() {
   var left_margin;
   var jsonData;
   jsonData = $('#json-data').data('json');
-  results = JSON.parse(jsonData);
+  var results = JSON.parse(jsonData);
   abbreviate_group_names(results);
 
   if (containerWidth > 750) {
