@@ -4,6 +4,21 @@
   <h2>{{ heading }}</h2>
 
   {% if documents %}
+    <p>You are about to seal up to {{ documents|length }} document{{ documents|pluralize }}.</p>
+
+    {# Numbers below come from the 1s-per-document throttle in seal_documents() (cl/search/utils.py) #}
+    {# and the gunicorn worker timeout of 180s (--timeout 180 in docker/django/docker-entrypoint.sh). #}
+    {% if documents|length > 100 %}
+      <ul class="messagelist">
+        <li class="warning">
+          Sealing is throttled to one document per second to avoid
+          overloading archive.org. Server requests time out after 3 minutes,
+          so sealing more than ~100 documents at once may fail partway
+          through.
+        </li>
+      </ul>
+    {% endif %}
+
     <form method="post">
       {% csrf_token %}
 
