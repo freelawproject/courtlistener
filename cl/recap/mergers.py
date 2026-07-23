@@ -3,6 +3,7 @@ import json
 import logging
 import re
 from collections import defaultdict
+from collections.abc import AsyncGenerator
 from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any
@@ -1119,7 +1120,7 @@ async def add_docket_entries(
     # key) from "never prefetched", where the DB must be consulted.
     prefetched_de_pks: set[int] = set()
 
-    async def chunked_docket_entries():
+    async def chunked_docket_entries() -> AsyncGenerator[dict[str, Any]]:
         """Yield the upload's entries, refilling the prefetch caches with
         two queries per chunk of DOCKET_ENTRIES_CHUNK_SIZE entries.
 
