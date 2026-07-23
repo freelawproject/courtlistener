@@ -1,6 +1,8 @@
 import logging
+import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Literal, TypeVar
 
 import nh3
@@ -53,6 +55,7 @@ from cl.lib.model_helpers import (
     normalize_texas_appellate_docket_number,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
+from cl.lib.recap_utils import get_bucket_name
 from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
@@ -1273,6 +1276,17 @@ class RECAPDocument(
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        root = "recap-thumbnails" if thumbs else "recap"
+        return os.path.join(
+            root,
+            get_bucket_name(
+                self.docket_entry.docket.court_id,
+                self.docket_entry.docket.pacer_case_id,
+            ),
+            filename,
+        )
+
     def get_absolute_url(self) -> str:
         if not self.document_number:
             # Numberless entries don't get URLs
@@ -1789,6 +1803,14 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
 
     class Meta:
         verbose_name_plural = "Claim History Entries"
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        root = "claim-thumbnails" if thumbs else "claim"
+        return os.path.join(
+            root,
+            get_bucket_name(self.claim.docket.court_id, self.pacer_case_id),
+            filename,
+        )
 
 
 class FederalCourtsQuerySet(models.QuerySet):
@@ -3982,6 +4004,11 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         verbose_name = "SCOTUS Docket Metadata"
         verbose_name_plural = "SCOTUS Docket Metadata"
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        slug = slugify(Path(filename).stem)
+        root = Path("scotus") / ("qp-thumbnails" if thumbs else "qp")
+        return str(root / f"gov.scotus.{slug}.pdf")
+
 
 @pghistory.track()
 @document_model
@@ -4236,6 +4263,14 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
 
     def __str__(self) -> str:
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        slug = slugify(Path(filename).stem)
+        ext = Path(filename).suffix or ".pdf"
+        root = Path("scotus") / (
+            "documents-thumbnails" if thumbs else "documents"
+        )
+        return str(root / f"gov.scotus.{slug}{ext}")
 
     @property
     def needs_extraction(self):

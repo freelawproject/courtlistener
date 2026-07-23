@@ -1,7 +1,10 @@
 """Models unique to New York Court of Appeals (Court-PASS) dockets."""
 
+from pathlib import Path
+
 import pghistory
 from django.db import models
+from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
@@ -143,3 +146,12 @@ class NYCoADocument(AbstractDateTimeModel, AbstractPDF):
             models.Index(fields=["filepath_local"]),
         ]
         unique_together = [["docket_entry", "document_number"]]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        slug = slugify(Path(filename).stem)
+        ext = Path(filename).suffix or ".pdf"
+        court_id = self.docket_entry.docket.court_id
+        directory = f"{court_id}-thumbnails" if thumbs else court_id
+        return str(
+            Path("us/state/ny") / directory / f"gov.ny.{court_id}.{slug}{ext}"
+        )

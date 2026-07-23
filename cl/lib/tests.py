@@ -12,6 +12,7 @@ from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
 
+from cl.lasc.models import LASCPDF
 from cl.lib.courts import (
     get_active_court_from_cache,
     get_minimal_list_of_courts,
@@ -30,6 +31,8 @@ from cl.lib.model_helpers import (
     is_texas_court,
     linkify_orig_docket_number,
     make_docket_number_core,
+    make_pdf_path,
+    make_pdf_thumb_path,
     make_scotus_docket_number_core,
     make_texas_docket_number_core,
     make_upload_path,
@@ -50,7 +53,7 @@ from cl.lib.pacer_session import (
 )
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
-from cl.lib.recap_utils import needs_ocr
+from cl.lib.recap_utils import get_bucket_name, needs_ocr
 from cl.lib.redis_utils import (
     acquire_redis_lock,
     get_redis_interface,
@@ -74,7 +77,22 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterWithMultipleOpinionsFactory,
 )
-from cl.search.models import Court, Docket, Opinion, OpinionCluster
+from cl.search.models import (
+    Claim,
+    ClaimHistory,
+    Court,
+    Docket,
+    DocketEntry,
+    Opinion,
+    OpinionCluster,
+    RECAPDocument,
+    SCOTUSDocketEntry,
+    ScotusDocketMetadata,
+    SCOTUSDocument,
+)
+from cl.search.state.florida.models import FloridaDocketEntry, FloridaDocument
+from cl.search.state.new_york.models import NYCoADocketEntry, NYCoADocument
+from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.tests.cases import TestCase
 from cl.users.factories import UserFactory
 
@@ -279,6 +297,100 @@ class TestPacerSessionUtils(TestCase):
         self.assertIsInstance(session_data, SessionData)
         self.assertEqual(mock_log_into_pacer.call_count, 1)
         self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
+
+
+class TestMakePdfPath(SimpleTestCase):
+    """Pin the storage layout produced by each model's get_pdf_path.
+
+    These paths name existing objects in S3, so they must never change
+    for documents. Thumbnails live in a parallel -thumbnails directory.
+    """
+
+    def test_make_pdf_path(self) -> None:
+        recap_bucket = get_bucket_name("ca1", "12345")
+        claim_bucket = get_bucket_name("canb", "9999")
+        cases = (
+            (
+                RECAPDocument(
+                    docket_entry=DocketEntry(
+                        docket=Docket(court_id="ca1", pacer_case_id="12345")
+                    )
+                ),
+                f"recap/{recap_bucket}/foo.pdf",
+                f"recap-thumbnails/{recap_bucket}/foo.pdf",
+            ),
+            (
+                ClaimHistory(
+                    claim=Claim(docket=Docket(court_id="canb")),
+                    pacer_case_id="9999",
+                ),
+                f"claim/{claim_bucket}/foo.pdf",
+                f"claim-thumbnails/{claim_bucket}/foo.pdf",
+            ),
+            (
+                LASCPDF(docket_number="19STCV28994", document_id="abc123"),
+                "/us/state/ca/lasc/19STCV28994/gov.ca.lasc.19STCV28994.abc123.foopdf.pdf",
+                "/us/state/ca/lasc/19STCV28994-thumbnails/gov.ca.lasc.19STCV28994.abc123.foopdf.pdf",
+            ),
+            (
+                ScotusDocketMetadata(),
+                "scotus/qp/gov.scotus.foo.pdf",
+                "scotus/qp-thumbnails/gov.scotus.foo.pdf",
+            ),
+            (
+                SCOTUSDocument(
+                    docket_entry=SCOTUSDocketEntry(
+                        docket=Docket(court_id="scotus")
+                    )
+                ),
+                "scotus/documents/gov.scotus.foo.pdf",
+                "scotus/documents-thumbnails/gov.scotus.foo.pdf",
+            ),
+            (
+                TexasDocument(
+                    docket_entry=TexasDocketEntry(
+                        docket=Docket(court_id="texapp")
+                    )
+                ),
+                "us/state/tx/texapp/gov.tx.texapp.foo.pdf",
+                "us/state/tx/texapp-thumbnails/gov.tx.texapp.foo.pdf",
+            ),
+            (
+                FloridaDocument(
+                    docket_entry=FloridaDocketEntry(
+                        docket=Docket(court_id="fla")
+                    )
+                ),
+                "us/state/fl/fla/gov.fl.fla.foo.pdf",
+                "us/state/fl/fla-thumbnails/gov.fl.fla.foo.pdf",
+            ),
+            (
+                NYCoADocument(
+                    docket_entry=NYCoADocketEntry(docket=Docket(court_id="ny"))
+                ),
+                "us/state/ny/ny/gov.ny.ny.foo.pdf",
+                "us/state/ny/ny-thumbnails/gov.ny.ny.foo.pdf",
+            ),
+        )
+        for instance, expected_doc, expected_thumb in cases:
+            with self.subTest(model=type(instance).__name__):
+                self.assertEqual(
+                    make_pdf_path(instance, "foo.pdf"), expected_doc
+                )
+                self.assertEqual(
+                    make_pdf_thumb_path(instance, "foo.pdf"), expected_thumb
+                )
+
+    def test_thumbnail_keeps_png_extension(self) -> None:
+        """Thumbnail filenames like 42.thumb.350.png must not be renamed
+        to .pdf or collide with the document namespace."""
+        ny = NYCoADocument(
+            docket_entry=NYCoADocketEntry(docket=Docket(court_id="ny"))
+        )
+        self.assertEqual(
+            make_pdf_thumb_path(ny, "42.thumb.350.png"),
+            "us/state/ny/ny-thumbnails/gov.ny.ny.42thumb350.png",
+        )
 
 
 class TestStringUtils(SimpleTestCase):
