@@ -1,3 +1,4 @@
+import time
 from datetime import UTC, datetime, timedelta
 from urllib import parse
 
@@ -145,7 +146,11 @@ def seal_documents(queryset: QuerySet) -> list[str]:
     """
     ia_failures = []
     deleted_filepaths = []
-    for rd in queryset:
+    for i, rd in enumerate(queryset):
+        if i > 0:
+            # Throttle deletions to avoid overloading archive.org.
+            time.sleep(1)
+
         # Thumbnail
         if rd.thumbnail:
             deleted_filepaths.append(rd.thumbnail.name)

@@ -8798,10 +8798,11 @@ class RECAPIndexingTest(
         docket_doc_no_parties.delete()
         docket_with_no_parties_no_separator.delete()
 
+    @mock.patch("cl.search.utils.time.sleep")
     @mock.patch("cl.search.utils.delete_from_ia")
     @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_seal_documents_action(
-        self, mock_delete_from_ia, mock_invalidate_cloudfront
+        self, mock_delete_from_ia, mock_invalidate_cloudfront, mock_sleep
     ):
         """Confirm that seal_documents admin action updates related RDs in ES"""
 
@@ -8862,6 +8863,9 @@ class RECAPIndexingTest(
             "Successfully sealed and removed 2 document(s).",
             messages.SUCCESS,
         )
+        # The throttle sleep only runs between documents, so sealing two
+        # documents should trigger it exactly once.
+        mock_sleep.assert_called_once_with(1)
 
         # Confirm DB update:
         rd_1.refresh_from_db()
