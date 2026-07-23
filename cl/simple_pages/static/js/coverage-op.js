@@ -124,6 +124,14 @@ function initializeTimelinesChart() {
   let right_margin;
   let left_margin;
   const jsonData = $('#json-data').data('json');
+  // JSON may be validly absent if no timeline has been displayed. If so, go no further. Ideally, behavior under this
+  // condition varies between “show chart for just downloaded data” (where JSON should exist and be well-formed) and
+  // “redisplay chart, if any, upon resize” (where JSON can be absent). Alas, correcting this would entail a large
+  // change to a relatively unimportant corner of the website. It would also be a half measure, because the whole
+  // timeline dialog integration ultimately needs reimplementation to jettison jQuery and use HTMX idiomatically.
+  if (typeof jsonData === 'undefined') {
+    return;
+  }
   const results = JSON.parse(jsonData);
   abbreviate_group_names(results);
 
