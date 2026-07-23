@@ -120,6 +120,12 @@ class AbstractPDF(models.Model):
     class Meta:
         abstract = True
 
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Return the storage path for this document, or for its
+        thumbnail when ``thumbs`` is True. Used by the ``upload_to``
+        callbacks on ``filepath_local`` and ``thumbnail``."""
+        raise NotImplementedError
+
 
 class AbstractFile(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)

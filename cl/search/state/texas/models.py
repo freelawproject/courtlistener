@@ -1,7 +1,10 @@
 """Models unique to Texas dockets."""
 
+from pathlib import Path
+
 import pghistory
 from django.db import models
+from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
@@ -98,3 +101,12 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
             models.Index(fields=["filepath_local"]),
         ]
         unique_together = [["docket_entry", "media_id"]]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        slug = slugify(Path(filename).stem)
+        ext = Path(filename).suffix or ".pdf"
+        court_id = self.docket_entry.docket.court_id
+        directory = f"{court_id}-thumbnails" if thumbs else court_id
+        return str(
+            Path("us/state/tx") / directory / f"gov.tx.{court_id}.{slug}{ext}"
+        )

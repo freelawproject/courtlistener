@@ -1,3 +1,5 @@
+import os
+
 from django.contrib.contenttypes.fields import (
     GenericForeignKey,
     GenericRelation,
@@ -5,10 +7,12 @@ from django.contrib.contenttypes.fields import (
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Q
+from django.utils.text import slugify
 
 from cl.lib.model_helpers import make_pdf_path
 from cl.lib.models import AbstractDateTimeModel, AbstractJSON, AbstractPDF
 from cl.lib.storage import IncrementingAWSMediaStorage
+from cl.lib.string_utils import trunc
 
 
 class UPLOAD_TYPE:
@@ -68,6 +72,16 @@ class LASCPDF(AbstractPDF, AbstractDateTimeModel):
 
     class Meta:
         verbose_name = "LASC PDF"
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        slug = slugify(trunc(filename, 40))
+        root = f"/us/state/ca/lasc/{self.docket_number}"
+        if thumbs:
+            root += "-thumbnails"
+        file_name = (
+            f"gov.ca.lasc.{self.docket_number}.{self.document_id}.{slug}.pdf"
+        )
+        return os.path.join(root, file_name)
 
 
 class QueuedCase(AbstractDateTimeModel):

@@ -2,6 +2,7 @@ from typing import Any
 
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse
@@ -44,6 +45,11 @@ from cl.search.models import (
 from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
+)
+from cl.search.state.new_york.models import (
+    NYCoADocketEntry,
+    NYCoADocketMetadata,
+    NYCoADocument,
 )
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.visualizations.models import SCOTUSMap
@@ -413,12 +419,43 @@ class CaseTransferAdmin(CursorPaginatorAdmin):
     )
 
 
+class ExactSearchMixin:
+    """Search the admin changelist by exact match on a single field.
+
+    Django casts non-text fields to CharField for the default icontains
+    search, which prevents index usage on large tables and makes a pk
+    search match substrings of other ids. Filtering the field directly
+    keeps the lookup exact and indexed.
+
+    See: https://github.com/freelawproject/courtlistener/issues/6790
+    """
+
+    exact_search_field: str = "pk"
+
+    def get_search_results(
+        self, request: HttpRequest, queryset: QuerySet, search_term: str
+    ) -> tuple[QuerySet, bool]:
+        if not search_term:
+            return queryset, False
+        try:
+            return (
+                queryset.filter(
+                    **{self.exact_search_field: search_term.strip()}
+                ),
+                False,
+            )
+        except (ValueError, ValidationError):
+            return queryset.none(), False
+
+
 @admin.register(RECAPDocument)
-class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+class RECAPDocumentAdmin(
+    ExactSearchMixin, SealableDocumentAdmin, CursorPaginatorAdmin
+):
     change_form_template = "admin/change_form_with_custom_links.html"
     search_fields = (
         "pk",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by ExactSearchMixin
     search_help_text = "Search by RECAP Document ID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry", "tags")
@@ -437,26 +474,6 @@ class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
 
     def get_seal_documents(self, obj):
         return [obj]
-
-    def get_search_results(
-        self, request: HttpRequest, queryset: QuerySet, search_term: str
-    ) -> tuple[QuerySet, bool]:
-        """Override to search by pk without varchar casting.
-
-        Django 6.0.1 casts non-text fields to CharField for text lookups,
-        which prevents index usage on large tables. This method handles
-        pk searches with direct integer comparison.
-
-        See: https://github.com/freelawproject/courtlistener/issues/6790
-        """
-        if not search_term:
-            return queryset, False
-
-        try:
-            pk_value = int(search_term.strip())
-            return queryset.filter(pk=pk_value), False
-        except ValueError:
-            return queryset.none(), False
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
@@ -723,10 +740,10 @@ class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
 
 
 @admin.register(SCOTUSDocument)
-class SCOTUSDocumentAdmin(CursorPaginatorAdmin):
+class SCOTUSDocumentAdmin(ExactSearchMixin, CursorPaginatorAdmin):
     search_fields = (
         "pk",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by ExactSearchMixin
     search_help_text = "Search by SCOTUSDocument Document ID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry",)
@@ -747,10 +764,11 @@ class TexasDocumentInline(admin.StackedInline):
 
 
 @admin.register(TexasDocument)
-class TexasDocumentAdmin(CursorPaginatorAdmin):
+class TexasDocumentAdmin(ExactSearchMixin, CursorPaginatorAdmin):
+    exact_search_field = "media_version_id"
     search_fields = (
         "media_version_id",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by ExactSearchMixin
     search_help_text = (
         "Search by Texas Document media version ID (exact match)."
     )
@@ -813,10 +831,11 @@ class FloridaDocumentInline(admin.StackedInline):
 
 
 @admin.register(FloridaDocument)
-class FloridaDocumentAdmin(CursorPaginatorAdmin):
+class FloridaDocumentAdmin(ExactSearchMixin, CursorPaginatorAdmin):
+    exact_search_field = "link_uuid"
     search_fields = (
         "link_uuid",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by ExactSearchMixin
     search_help_text = "Search by Florida Document link UUID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry",)
@@ -862,3 +881,67 @@ class FloridaDocketEntryAdmin(CursorPaginatorAdmin):
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
         return trunc(obj.description or "", 35, ellipsis="...")
+
+
+@admin.register(NYCoADocketMetadata)
+class NYCoADocketMetadataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("docket",)
+    list_display = ("__str__",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+class NYCoADocumentInline(admin.StackedInline):
+    model = NYCoADocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(NYCoADocument)
+class NYCoADocumentAdmin(ExactSearchMixin, CursorPaginatorAdmin):
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by ExactSearchMixin
+    search_help_text = "Search by NYCoADocument Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(NYCoADocketEntry)
+class NYCoADocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (NYCoADocumentInline,)
+    search_help_text = (
+        "Search NYCoADocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "filing_type",
+        "party",
+        "date_received",
+        "page",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_received", "date_created", "date_modified")
+
+    @admin.display(description="NYCoA docket entry")
+    def get_pk(self, obj):
+        return obj.pk

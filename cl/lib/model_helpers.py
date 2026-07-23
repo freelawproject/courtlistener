@@ -4,10 +4,11 @@ import re
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
-from django.utils.text import get_valid_filename, slugify
+from django.utils.text import get_valid_filename
 from django.utils.timezone import now
 from juriscraper.state.texas.common import (
     DOCKET_NUMBER_REGEXES as TEXAS_DN_REGEXES,
@@ -15,7 +16,7 @@ from juriscraper.state.texas.common import (
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
-from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.string_utils import normalize_dashes
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
@@ -382,63 +383,20 @@ def base_recap_path(instance, filename, base_dir):
     )
 
 
-def make_pdf_path(instance, filename, thumbs=False):
-    from cl.lasc.models import LASCPDF
-    from cl.search.models import (
-        ClaimHistory,
-        FloridaDocument,
-        RECAPDocument,
-        ScotusDocketMetadata,
-        SCOTUSDocument,
-        TexasDocument,
-    )
+class SupportsPdfPath(Protocol):
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str: ...
 
-    if isinstance(instance, RECAPDocument):
-        root = "recap"
-        court_id = instance.docket_entry.docket.court_id
-        pacer_case_id = instance.docket_entry.docket.pacer_case_id
-    elif isinstance(instance, ClaimHistory):
-        root = "claim"
-        court_id = instance.claim.docket.court_id
-        pacer_case_id = instance.pacer_case_id
-    elif isinstance(instance, LASCPDF):
-        slug = slugify(trunc(filename, 40))
-        root = f"/us/state/ca/lasc/{instance.docket_number}/"
-        file_name = f"gov.ca.lasc.{instance.docket_number}.{instance.document_id}.{slug}.pdf"
 
-        return os.path.join(root, file_name)
-    elif isinstance(instance, ScotusDocketMetadata):
-        slug = slugify(Path(filename).stem)
-        file_name = f"gov.scotus.{slug}.pdf"
-        return str(Path("scotus") / "qp" / file_name)
-    elif isinstance(instance, SCOTUSDocument):
-        slug = slugify(Path(filename).stem)
-        file_name = f"gov.scotus.{slug}.pdf"
-        return str(Path("scotus") / "documents" / file_name)
-    elif isinstance(instance, TexasDocument):
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = instance.docket_entry.docket.court_id
-        root = Path(f"us/state/tx/{court_id}")
-        file_name = f"gov.tx.{court_id}.{slug}{ext}"
-        return str(root / file_name)
-    elif isinstance(obj, FloridaDocument):
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = instance.docket_entry.docket.court_id
-        root = Path(f"us/state/fl/{court_id}")
-        file_name = f"gov.fl.{court_id}.{slug}{ext}"
-        return str(root / file_name)
-    else:
-        raise ValueError(
-            f"Unknown model type in make_pdf_path function: {type(instance)}"
-        )
+def make_pdf_path(
+    instance: SupportsPdfPath, filename: str, thumbs: bool = False
+) -> str:
+    """upload_to callback for PDF FileFields.
 
-    if thumbs:
-        root = f"{root}-thumbnails"
-    return os.path.join(
-        root, get_bucket_name(court_id, pacer_case_id), filename
-    )
+    Existing migrations reference this function by its dotted path, so it
+    must remain importable from here. The path logic itself lives on each
+    model's ``get_pdf_path`` method.
+    """
+    return instance.get_pdf_path(filename, thumbs=thumbs)
 
 
 def make_json_path(instance, filename):
@@ -453,7 +411,7 @@ def make_lasc_json_path(instance, filename):
     return make_lasc_path(instance, filename)
 
 
-def make_pdf_thumb_path(instance, filename):
+def make_pdf_thumb_path(instance: SupportsPdfPath, filename: str) -> str:
     return make_pdf_path(instance, filename, thumbs=True)
 
 
