@@ -45,6 +45,11 @@ from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
 )
+from cl.search.state.new_york.models import (
+    NYCoADocketEntry,
+    NYCoADocketMetadata,
+    NYCoADocument,
+)
 from cl.search.state.texas.models import TexasDocketEntry, TexasDocument
 from cl.visualizations.models import SCOTUSMap
 
@@ -862,3 +867,67 @@ class FloridaDocketEntryAdmin(CursorPaginatorAdmin):
     @admin.display(description="Description")
     def get_trunc_description(self, obj):
         return trunc(obj.description or "", 35, ellipsis="...")
+
+
+@admin.register(NYCoADocketMetadata)
+class NYCoADocketMetadataAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("docket",)
+    list_display = ("__str__",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+class NYCoADocumentInline(admin.StackedInline):
+    model = NYCoADocument
+    extra = 1
+
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(NYCoADocument)
+class NYCoADocumentAdmin(CursorPaginatorAdmin):
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by get_search_results
+    search_help_text = "Search by NYCoADocument Document ID (exact match)."
+    list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
+    raw_id_fields = ("docket_entry",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+
+
+@admin.register(NYCoADocketEntry)
+class NYCoADocketEntryAdmin(CursorPaginatorAdmin):
+    inlines = (NYCoADocumentInline,)
+    search_help_text = (
+        "Search NYCoADocketEntries by Docket ID or sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "filing_type",
+        "party",
+        "date_received",
+        "page",
+        "sequence_number",
+    )
+    raw_id_fields = ("docket",)
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
+    list_filter = ("date_received", "date_created", "date_modified")
+
+    @admin.display(description="NYCoA docket entry")
+    def get_pk(self, obj):
+        return obj.pk

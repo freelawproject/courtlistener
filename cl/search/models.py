@@ -58,6 +58,7 @@ from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
 from cl.search.state.florida.models import *
+from cl.search.state.new_york.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
 
