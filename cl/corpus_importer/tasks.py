@@ -2381,11 +2381,18 @@ def get_document_number_for_appellate(
     pdf_bytes = None
     document_number = ""
 
-    # Appellate courts that don't use regular docket entry numbering. Their PDF
-    # headers report a document number that doesn't match the pacer_doc_id used
-    # when the same entry arrives via an extension upload, causing duplicated
-    # docket entries when both sources are merged. For these courts, check the
-    # download confirmation page before falling back to the PDF.
+    # Appellate courts "ca8", "cadc" don't use regular docket entry
+    # numbering. Their PDF headers report a document number that doesn't
+    # match the pacer_doc_id used when the same entry arrives via an
+    # extension upload, causing duplicated docket entries when both sources
+    # are merged. For these courts, check the download confirmation page
+    # before falling back to the PDF.
+    #
+    # We fetch document_number via get_document_number_from_confirmation_page
+    # instead of just using pacer_doc_id directly so we can detect if the court
+    # starts reporting regular document numbers instead of pacer_doc_id-style
+    # ones. If we used pacer_doc_id directly, we would never notice that change.
+    # The alert below depends on reading what the confirmation page actually reports.
     check_confirmation_page_first = (
         court_id in ("ca8", "cadc") and pacer_doc_id and not acms
     )

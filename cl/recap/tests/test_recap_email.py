@@ -3652,9 +3652,9 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
     )
     @mock.patch(
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
-        side_effect=lambda z, x: "0012345678",
+        side_effect=lambda z, x: "0011345678",
     )
-    async def test_nda_get_document_number_confirmation_page_strips_leading_zeros(
+    async def test_nda_confirmation_page_merges_existing_entry_without_duplicating(
         self,
         mock_bucket_open,
         mock_pacer_court_accessible,
@@ -3663,9 +3663,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         mock_download_pdf_by_magic_number,
         mock_get_document_number_from_confirmation_page,
     ):
-        """This test verifies that a document number with two leading zeros
-        returned by the PACER download confirmation page for ca8/cadc is
-        normalized (leading zeros stripped) before being stored.
+        """This test verifies that merging an NDA recap.email notification
+        into a Docket/DocketEntry/RECAPDocument already created by a
+        different source (e.g. the extension) updates the existing records
+        instead of creating duplicates.
         """
 
         email_data = RECAPEmailNotificationDataFactory(
@@ -3678,10 +3679,34 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
                         RECAPEmailDocketEntryDataFactory(
                             document_number=None,
                             pacer_doc_id="04505578698",
+                            description="BRIEFING SCHEDULE SET AS FOLLOWS: Transcript due on or before 08/31/2026. Appendix due 09/10/2026 (...)",
                         )
                     ],
                 )
             ],
+        )
+        docket_data = email_data["dockets"][0]
+        entry_data = docket_data["docket_entries"][0]
+
+        # Simulate the docket entry and RECAPDocument already created by a
+        # different source (e.g. the extension) for the same case/document,
+        # before this recap.email notification arrives.
+        docket = await sync_to_async(DocketFactory)(
+            court=self.court_ca8,
+            docket_number=docket_data["docket_number"],
+            pacer_case_id=entry_data["pacer_case_id"],
+        )
+        de = await sync_to_async(DocketEntryFactory)(
+            docket=docket,
+            entry_number=10345678,
+            description="Old description",
+        )
+        rd = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de,
+            pacer_doc_id=entry_data["pacer_doc_id"],
+            document_number="10345678",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            is_available=False,
         )
 
         with mock.patch(
@@ -3694,23 +3719,25 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
                 self.path, self.data_ca8, format="json"
             )
 
-        email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(await email_processing.acount(), 1)
+        # No duplicated Docket, DocketEntry or RECAPDocument should be
+        # created; the existing ones must be updated instead.
+        self.assertEqual(await Docket.objects.acount(), 1)
+        self.assertEqual(await DocketEntry.objects.acount(), 1)
+        self.assertEqual(await RECAPDocument.objects.acount(), 1)
 
-        recap_document = RECAPDocument.objects.all().prefetch_related(
-            "docket_entry"
-        )
-        self.assertEqual(await recap_document.acount(), 1)
-        recap_document_first = await recap_document.afirst()
+        await de.arefresh_from_db()
+        await rd.arefresh_from_db()
 
-        # The confirmation page returned "0012345678". The fourth-digit-
+        # The confirmation page returned "0011345678". The fourth-digit-
         # forcing logic runs first, turning it into "0010345678"; that
         # value is then normalized through int(), stripping the leading
         # zeros and leaving "10345678".
-        self.assertEqual(recap_document_first.document_number, "10345678")
-        self.assertEqual(
-            recap_document_first.docket_entry.entry_number, 10345678
-        )
+        self.assertEqual(de.entry_number, 10345678)
+        self.assertEqual(rd.document_number, "10345678")
+
+        # The existing entry's description was updated from the
+        # notification, confirming it was merged rather than duplicated.
+        self.assertEqual(de.description, "BRIEFING SCHEDULE SET AS FOLLOWS: Transcript due on or before 08/31/2026. Appendix due 09/10/2026 (...)")
 
 
 def mock_method_set_rd_sealed_status(
