@@ -136,7 +136,9 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         ),
         # These prevent docket deletion but not cluster deletion
         "audio.Audio": lambda cluster: cluster.docket.audio_files,
-        "people_db.AttorneyOrganizationAssociation": lambda cluster: cluster.docket.attorneyorganizationassociation_set,
+        "people_db.AttorneyOrganizationAssociation": lambda cluster: (
+            cluster.docket.attorneyorganizationassociation_set
+        ),
         "people_db.PartyType": lambda cluster: cluster.docket.party_types,
         "people_db.Role": lambda cluster: cluster.docket.role_set,
         "search.BankruptcyInformation": lambda cluster: getattr(
@@ -144,8 +146,8 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         ),
         "search.Claim": lambda cluster: cluster.docket.claims,
         "search.DocketEntry": lambda cluster: cluster.docket.docket_entries,
-        "search.OpinionCluster": lambda cluster: cluster.docket.clusters.exclude(
-            pk=cluster.pk
+        "search.OpinionCluster": lambda cluster: (
+            cluster.docket.clusters.exclude(pk=cluster.pk)
         ),
     }
 
