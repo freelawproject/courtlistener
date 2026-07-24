@@ -208,7 +208,7 @@ def fetch_doc_report(
     """
     exception_raised = False
     status = PACERFreeDocumentLog.SCRAPE_FAILED
-    rows_to_create = 0
+    references_found = 0
 
     log = mark_court_in_progress(pacer_court_id, end)
 
@@ -220,7 +220,7 @@ def fetch_doc_report(
         end,
     )
     try:
-        status, rows_to_create = get_and_save_free_document_report(
+        status, references_found = get_and_save_free_document_report(
             pacer_court_id, start, end, log.pk, day_span=day_span
         )  # type: ignore
     except (
@@ -259,8 +259,8 @@ def fetch_doc_report(
 
     if not exception_raised:
         logger.info(
-            "Got %s document references for %s between %s and %s",
-            rows_to_create,
+            "Parsed %s document references for %s between %s and %s",
+            references_found,
             pacer_court_id,
             start,
             end,
