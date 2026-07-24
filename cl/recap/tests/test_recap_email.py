@@ -3742,6 +3742,46 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
             "BRIEFING SCHEDULE SET AS FOLLOWS: Transcript due on or before 08/31/2026. Appendix due 09/10/2026 (...)",
         )
 
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+        side_effect=lambda z, x: "148",
+    )
+    @mock.patch("cl.corpus_importer.tasks.logger.error")
+    async def test_nda_confirmation_page_regular_number_triggers_alert(
+        self,
+        mock_logger_error,
+        mock_bucket_open,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_cookies_cache,
+        mock_download_pdf_by_magic_number,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """This test verifies that get_document_number_for_appellate logs
+        an alert when the ca8/cadc confirmation page returns a
+        regular-looking (short) document number, signaling that the court
+        may have switched to standard docket numbering and may no longer
+        need the confirmation-page-first handling.
+        """
+
+        await self.async_client.post(self.path, self.data_ca8, format="json")
+
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(await email_processing.acount(), 1)
+
+        mock_logger_error.assert_called_once_with(
+            "Court %s returned a regular-looking document number '%s' for "
+            "pacer_doc_id %s. It may no longer need special handling in "
+            "get_document_number_for_appellate.",
+            "ca8",
+            "148",
+            mock.ANY,
+        )
+
 
 def mock_method_set_rd_sealed_status(
     rd: RECAPDocument, magic_number: str | None, potentially_sealed: bool
