@@ -121,7 +121,17 @@
     @apply transition-[opacity,transform] ease-in-out pointer-events-none focus-visible:pointer-events-auto top-0 left-0 bg-primary-600 text-white absolute p-2 m-2 -translate-y-24 focus-visible:translate-y-0 focus-visible:opacity-100 opacity-0 focus-visible:ring focus-visible:ring-primary-900 focus-visible:outline focus-visible:outline-primary-900 z-50;
   }
   .input-text {
-    @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3;
+    @apply border border-greyscale-200 rounded-lg h-10 py-2.5 px-3 appearance-none;
+  }
+  /* Selects lose their native arrow with appearance-none; redraw it as a
+     background image. Can't use the checkbox/radio mask + ::before pattern
+     because <select> is a replaced element and doesn't render pseudo-elements.
+     chevron.svg's currentColor resolves to black in a background-image. */
+  select.input-text {
+    @apply pr-9 bg-no-repeat;
+    background-image: url("/static/svg/chevron.svg");
+    background-position: right theme(spacing.3) center;
+    background-size: theme(spacing.5);
   }
   .links {
     @apply underline text-primary-600 hover:text-primary-800;

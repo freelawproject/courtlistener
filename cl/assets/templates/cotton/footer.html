@@ -71,8 +71,8 @@
         </div>
         <div class="flex flex-col w-41 lg:w-28 gap-4">
           <h5 class="text-sm font-normal text-greyscale-600">Legal</h5>
-          <a href="{% url "terms" %}" class="text-sm font-medium">Terms & Privacy</a>
-          <a href="{% url "terms" %}#removal" class="text-sm font-medium">Removal</a>
+          <a href="{{ WIKI_TERMS_URL }}" class="text-sm font-medium">Terms & Privacy</a>
+          <a href="{{ WIKI_REMOVAL_URL }}" class="text-sm font-medium">Removal</a>
           <a
             href="https://free.law/vulnerability-disclosure-policy/"
             class="text-sm font-medium"
