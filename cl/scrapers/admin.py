@@ -14,6 +14,7 @@ class PACERFreeDocumentLogAdmin(admin.ModelAdmin):
         "__str__",
         "court_id",
         "status",
+        "document_count",
         "date_started",
         "date_completed",
         "date_queried",

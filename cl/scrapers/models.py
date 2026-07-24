@@ -59,6 +59,14 @@ class PACERFreeDocumentLog(models.Model):
     status = models.SmallIntegerField(
         help_text="The status of the scrape.", choices=SCRAPE_STATUSES
     )
+    document_count = models.IntegerField(
+        help_text="The number of results the Written Opinions report "
+        "returned for this scrape. Null means unknown (the scrape failed "
+        "or predates this field); 0 means the scrape succeeded with no "
+        "results.",
+        null=True,
+        blank=True,
+    )
 
 
 class PACERFreeDocumentRow(models.Model):

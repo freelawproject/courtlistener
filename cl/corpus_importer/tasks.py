@@ -438,7 +438,8 @@ def get_and_save_free_document_report(
     :param day_span: how many days each PACER sub-query should cover. Smaller
     values produce more, smaller requests, which is friendlier to proxy
     read timeouts.
-    :return: The status code of the scrape
+    :return: a two-tuple of the scrape status code and the number of report
+    results saved (0 when the scrape failed)
     """
     session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
@@ -490,7 +491,7 @@ def get_and_save_free_document_report(
 
         if self.request.retries == self.max_retries:
             logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         logger.info(f"{msg} Retrying.", court_id, start, end)  # noqa: G004
         raise self.retry(exc=exc, countdown=5)
 
@@ -500,7 +501,7 @@ def get_and_save_free_document_report(
         # IndexError: When the page isn't downloaded properly.
         # HTTPError: raise_for_status in parse hit bad status.
         if self.request.retries == self.max_retries:
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, 0
         raise self.retry(exc=exc, countdown=5)
 
     if log_id and not settings.DEVELOPMENT:
@@ -1014,15 +1015,27 @@ def upload_to_ia(
 
 
 @app.task
-def mark_court_done_on_date(log_id: int, status: int) -> int | None:
+def mark_court_done_on_date(
+    log_id: int, status: int, document_count: int | None = None
+) -> int | None:
+    """Update a free-opinion scrape log row with its final outcome.
+
+    :param log_id: the PACERFreeDocumentLog primary key
+    :param status: the final scrape status
+    :param document_count: the number of results the report returned, or None
+    when unknown (e.g. the scrape failed)
+    :returns: the status that was saved, or None if the log row is gone
+    :rtype: int | None
+    """
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
         return None
-    else:
-        doc_log.status = status
-        doc_log.date_completed = now()
-        doc_log.save()
+
+    doc_log.status = status
+    doc_log.date_completed = now()
+    doc_log.document_count = document_count
+    doc_log.save()
 
     return status
 

@@ -204,12 +204,8 @@ def fetch_doc_report(
     :param start: start date to query
     :param end: end date to query
     :param day_span: how many days each PACER sub-query should cover
-    :return: true if an exception occurred else false
+    :return: true if the scrape failed else false
     """
-    exception_raised = False
-    status = PACERFreeDocumentLog.SCRAPE_FAILED
-    rows_to_create = 0
-
     log = mark_court_in_progress(pacer_court_id, end)
 
     logger.info(
@@ -220,7 +216,7 @@ def fetch_doc_report(
         end,
     )
     try:
-        status, rows_to_create = get_and_save_free_document_report(
+        status, document_count = get_and_save_free_document_report(
             pacer_court_id, start, end, log.pk, day_span=day_span
         )  # type: ignore
     except (
@@ -250,25 +246,30 @@ def fetch_doc_report(
             f"{end} due to {reason}.",
             exc_info=True,
         )
-        exception_raised = True
+        mark_court_done_on_date(log.pk, PACERFreeDocumentLog.SCRAPE_FAILED)
+        return True
 
-        mark_court_done_on_date(
-            log.pk,
-            PACERFreeDocumentLog.SCRAPE_FAILED,
-        )
-
-    if not exception_raised:
-        logger.info(
-            "Got %s document references for %s between %s and %s",
-            rows_to_create,
+    if status != PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
+        # The task exhausted its retries and reported failure without
+        # raising. The result count is unknown, so it stays null.
+        logger.error(
+            "Failed to get free document references for %s between %s and %s.",
             pacer_court_id,
             start,
             end,
         )
-        # Scrape successful
         mark_court_done_on_date(log.pk, status)
+        return True
 
-    return exception_raised
+    logger.info(
+        "Got %s document references for %s between %s and %s",
+        document_count,
+        pacer_court_id,
+        start,
+        end,
+    )
+    mark_court_done_on_date(log.pk, status, document_count=document_count)
+    return False
 
 
 def get_and_save_free_document_reports(
