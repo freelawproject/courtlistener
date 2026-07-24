@@ -1779,7 +1779,7 @@ class RecapEmailDocketAlerts(TestCase, SearchAlertsAssertions):
         self.assertEqual(await recap_document.acount(), 1)
         recap_document_first = await recap_document.afirst()
         self.assertEqual(recap_document_first.pacer_doc_id, "009033568259")
-        self.assertEqual(recap_document_first.document_number, "009033568259")
+        self.assertEqual(recap_document_first.document_number, "9033568259")
         docket = recap_document_first.docket_entry.docket
         self.assertEqual(
             docket.case_name, "Rosemarie Vargas v. Facebook, Inc."
@@ -3467,7 +3467,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         self.assertEqual(await recap_document.acount(), 1)
         recap_document_first = await recap_document.afirst()
         self.assertEqual(recap_document_first.is_available, True)
-        self.assertEqual(recap_document_first.document_number, "011012443447")
+        self.assertEqual(recap_document_first.document_number, "11012443447")
         self.assertEqual(
             recap_document_first.docket_entry.entry_number, 11012443447
         )
@@ -3645,6 +3645,72 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         recap_document_first = await recap_document.afirst()
         self.assertEqual(recap_document_first.document_number, "148")
         self.assertEqual(recap_document_first.docket_entry.entry_number, 148)
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Document not available from magic link."),
+    )
+    @mock.patch(
+        "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
+        side_effect=lambda z, x: "0012345678",
+    )
+    async def test_nda_get_document_number_confirmation_page_strips_leading_zeros(
+        self,
+        mock_bucket_open,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_cookies_cache,
+        mock_download_pdf_by_magic_number,
+        mock_get_document_number_from_confirmation_page,
+    ):
+        """This test verifies that a document number with two leading zeros
+        returned by the PACER download confirmation page for ca8/cadc is
+        normalized (leading zeros stripped) before being stored.
+        """
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=True,
+            acms=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            document_number=None,
+                            pacer_doc_id="04505578698",
+                        )
+                    ],
+                )
+            ],
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new nda recap.email notification for ca8, a court
+            # that checks the confirmation page before the PDF.
+            await self.async_client.post(
+                self.path, self.data_ca8, format="json"
+            )
+
+        email_processing = EmailProcessingQueue.objects.all()
+        self.assertEqual(await email_processing.acount(), 1)
+
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
+        recap_document_first = await recap_document.afirst()
+
+        # The confirmation page returned "0012345678". The fourth-digit-
+        # forcing logic runs first, turning it into "0010345678"; that
+        # value is then normalized through int(), stripping the leading
+        # zeros and leaving "10345678".
+        self.assertEqual(recap_document_first.document_number, "10345678")
+        self.assertEqual(
+            recap_document_first.docket_entry.entry_number, 10345678
+        )
 
 
 def mock_method_set_rd_sealed_status(

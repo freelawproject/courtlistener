@@ -2449,6 +2449,10 @@ def get_document_number_for_appellate(
         # 00218987740 -> 00208987740, 123119177518 -> 123019177518
         document_number = f"{document_number[:3]}0{document_number[4:]}"
 
+        # int() strips any number of leading zeros; convert back to str since
+        # document_number stays a string throughout this function.
+        document_number = str(int(document_number))
+
     return document_number
 
 
