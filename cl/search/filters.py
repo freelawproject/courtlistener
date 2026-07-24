@@ -18,6 +18,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    Parenthetical,
     RECAPDocument,
     Tag,
 )
@@ -188,6 +189,22 @@ class OpinionsCitedFilter(NoEmptyFilterSet):
         model = OpinionsCited
         fields = {
             "id": INTEGER_LOOKUPS,
+        }
+
+
+class ParentheticalFilter(NoEmptyFilterSet):
+    describing_opinion = filters.RelatedFilter(
+        OpinionFilter, queryset=Opinion.objects.all()
+    )
+    described_opinion = filters.RelatedFilter(
+        OpinionFilter, queryset=Opinion.objects.all()
+    )
+
+    class Meta:
+        model = Parenthetical
+        fields = {
+            "id": INTEGER_LOOKUPS,
+            "score": INTEGER_LOOKUPS,
         }
 
 
