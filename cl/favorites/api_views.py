@@ -10,7 +10,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import MediumAdjustablePagination
-from cl.api.utils import LoggingMixin, TagRateThrottle
+from cl.api.utils import EventCounterThrottle, LoggingMixin, TagRateThrottle
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import (
     DocketTagSerializer,
@@ -20,6 +20,7 @@ from cl.favorites.api_serializers import (
 )
 from cl.favorites.filters import DocketTagFilter, PrayerFilter, UserTagFilter
 from cl.favorites.models import DocketTag, GenericCount, Prayer, UserTag
+from cl.lib.bot_detector import is_bot
 
 
 class UserTagViewSet(ModelViewSet):
@@ -100,6 +101,7 @@ class EventCounterViewset(CreateModelMixin, GenericViewSet):
     serializer_class = EventCountSerializer
     permission_classes = (permissions.AllowAny,)
     authentication_classes = []
+    throttle_classes = [EventCounterThrottle]
 
     def create(self, request, *args, **kwargs):
         """
@@ -112,8 +114,15 @@ class EventCounterViewset(CreateModelMixin, GenericViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         event_data = serializer.validated_data
+
+        if is_bot(request):
+            # Recognized crawlers shouldn't inflate view/download counters.
+            return Response(
+                {"label": event_data["label"], "value": 0},
+                status=HTTPStatus.ACCEPTED,
+            )
+
         with transaction.atomic():
             counter_record, _ = (
                 GenericCount.objects.select_for_update().get_or_create(
