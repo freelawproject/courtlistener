@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% comment %}
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                 ATTENTION!                                 ║
+║ This template has a new version behind the use_new_design waffle flag.     ║
+║                                                                            ║
+║ When modifying this template, please also update the new version at:       ║
+║ cl/simple_pages/templates/v2_help/coverage_texas.html                      ║
+║                                                                            ║
+║ Once the new design is fully implemented, all legacy templates             ║
+║ (including this one) and the waffle flag will be removed.                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
+{% block title %}Texas State Court Coverage — CourtListener.com{% endblock %}
+{% block og_title %}Texas State Court Coverage — CourtListener.com{% endblock %}
+{% block description %}CourtListener has docket data covering the Texas Supreme Court, the Court of Criminal Appeals, and the state's 15 Courts of Appeals. Learn more about where it comes from and how we keep it up to date.{% endblock %}
+{% block og_description %}CourtListener has docket data covering the Texas Supreme Court, the Court of Criminal Appeals, and the state's 15 Courts of Appeals. Learn more about where it comes from and how we keep it up to date.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-xs-12 hidden-md hidden-lg">
+    <h4 class="v-offset-below-2">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "coverage" %}">Back to Coverage Overview</a>
+    </h4>
+  </div>
+
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h4 class="v-offset-below-3">
+        <i class="fa fa-arrow-circle-o-left gray"></i>
+        <a href="{% url "coverage" %}">Back to Coverage Home</a>
+      </h4>
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#sources">Data Sources</a></li>
+        <li><a href="#courts">Included Courts</a></li>
+        <li><a href="#what-we-have">What We Have</a></li>
+        <li><a href="#roadmap">Availability and Roadmap</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6" role="main">
+    <h1 id="overview">Texas State Court Coverage — What Does CourtListener Have?</h1>
+    <p class="lead">CourtListener has a deep, ongoing collection of docket data from the Texas Supreme Court and every Texas appellate court.</p>
+    <p>Our Texas collection covers cases, docket entries, and documents — including PDFs, WordPerfect files, HTML records, and audio recordings — from the state's appellate court system. The data goes back roughly a century and is refreshed continuously.
+    </p>
+
+    <hr>
+    <h2 id="sources">Data Sources</h2>
+    <p>Texas publishes docket information through a centralized appellate case management system called <strong>TAMES</strong> (Texas Appeals Management and e-Filing System). We collect data from TAMES in two complementary ways:
+    </p>
+    <ol>
+      <li>
+        <p><strong>The TAMES website.</strong> Our scraper visits the public TAMES pages for each Texas appellate court <strong>every hour</strong> and pulls down new cases, entries, and documents. In practice, TAMES tends to publish a fresh batch of new content roughly <strong>once a day</strong>.
+        </p>
+      </li>
+      <li>
+        <p><strong>TAMES case-mail emails.</strong> TAMES sends notification emails with updates to existing cases. We receive these emails, parse them, and feed the updates back into our database. These emails also generally arrive in a single batch about once a day, giving us a second channel for picking up activity on cases we already know about.
+        </p>
+      </li>
+    </ol>
+    <p><strong>Note:</strong> TAMES usually doesn't publish new content over the weekend, so new cases may not appear in CourtListener on Sundays or Mondays.
+    </p>
+    <p>Together, these two systems let CourtListener mirror Texas's appellate dockets as closely as TAMES does.
+    </p>
+
+    <hr>
+    <h2 id="courts">Included Courts</h2>
+    <p>Our Texas collection covers <strong>17 appellate courts</strong>:
+    </p>
+    <ul>
+      <li>Texas Supreme Court</li>
+      <li>Texas Court of Criminal Appeals</li>
+      <li>1st Court of Appeals</li>
+      <li>2nd Court of Appeals</li>
+      <li>3rd Court of Appeals</li>
+      <li>4th Court of Appeals</li>
+      <li>5th Court of Appeals</li>
+      <li>6th Court of Appeals</li>
+      <li>7th Court of Appeals</li>
+      <li>8th Court of Appeals</li>
+      <li>9th Court of Appeals</li>
+      <li>10th Court of Appeals</li>
+      <li>11th Court of Appeals</li>
+      <li>12th Court of Appeals</li>
+      <li>13th Court of Appeals</li>
+      <li>14th Court of Appeals</li>
+      <li>15th Court of Appeals</li>
+    </ul>
+
+    <hr>
+    <h2 id="what-we-have">What We Have</h2>
+    <p>Our Texas docket collection covers cases from <strong>1900 to the present</strong>, and currently contains:
+    </p>
+    <ul>
+      <li><strong>Hundreds of thousands of cases</strong> from the Texas Supreme Court and the state's appellate courts</li>
+      <li><strong>Millions of docket entries</strong></li>
+      <li><strong>Millions of documents</strong>, including PDFs, WordPerfect files, HTML records, and MP3 audio recordings</li>
+    </ul>
+
+    <hr>
+    <h2 id="roadmap">Availability and Roadmap</h2>
+    <p>This data is currently available for <strong>database replication</strong> through Free Law Project. It is <em>not yet</em> integrated into CourtListener's search, the public REST API, alerts, or our other end-user services.
+    </p>
+    <p>Bringing Texas state court data into search, the API, alerts, and the rest of CourtListener is on our roadmap. If you are interested in using this data or in helping fund the work to make it more broadly available, please <a href="{% url "contact" %}">get in touch</a>.
+    </p>
+    {% include "includes/donate_footer_plea.html" %}
+  </div>
+{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}

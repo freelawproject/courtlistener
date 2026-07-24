@@ -317,6 +317,8 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             {"viewname": "coverage_fds"},
             {"viewname": "coverage_recap"},
             {"viewname": "coverage_oa"},
+            {"viewname": "coverage_scotus"},
+            {"viewname": "coverage_texas"},
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
@@ -396,6 +398,8 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
         ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
         ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
+        ({"viewname": "coverage_scotus"}, "v2_help/coverage_scotus.html"),
+        ({"viewname": "coverage_texas"}, "v2_help/coverage_texas.html"),
         ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
         ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
         ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),

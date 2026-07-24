@@ -9,6 +9,10 @@
   :nav_items="[
       {'href': '#recap-archive', 'text': 'PACER Data Coverage'},
       {'href': '#opinions', 'text': 'Case Law Coverage'},
+      {'href': '#scotus-dockets', 'text': 'Supreme Court Docket Coverage'},
+      {'href': '#states', 'text': 'State Court Coverage', 'children': [
+        {'href': '#texas', 'text': 'Texas'},
+      ]},
       {'href': '#financial-disclosures', 'text': 'Financial Disclosure Coverage'},
       {'href': '#judges', 'text': 'Judge Coverage'},
       {'href': '#oral-arguments', 'text': 'Oral Argument Coverage'},
@@ -34,6 +38,23 @@
     <h2>Case Law</h2>
     <p>Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet. We have over nine million decisions from over 2000 courts. See our page on this topic for more details.</p>
     <a href="{% url "coverage_opinions" %}" class="btn-outline max-md:btn-xl">Case Law Coverage</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="scotus-dockets">
+    <h2>Supreme Court Dockets</h2>
+    <p>We have a deep collection of Supreme Court of the United States docket data &mdash; hundreds of thousands of cases, nearly a million docket entries, and hundreds of thousands of filings &mdash; gathered from the Court's website and case-update emails. See our page on this topic for more details.</p>
+    <a href="{% url "coverage_scotus" %}" class="btn-outline max-md:btn-xl">Supreme Court Docket Coverage</a>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="states">
+    <h2>State Courts</h2>
+    <p>We're adding filings and other information from the most populous states. See below for the states we currently support, and check back as we add more.</p>
+  </c-layout-with-navigation.section>
+
+  <c-layout-with-navigation.section id="texas">
+    <h4>Texas</h4>
+    <p>We have docket data covering the Texas Supreme Court, the Court of Criminal Appeals, and all 15 of the state's Courts of Appeals &mdash; hundreds of thousands of cases, millions of docket entries, and millions of documents. See our page on this topic for more details.</p>
+    <a href="{% url "coverage_texas" %}" class="btn-outline max-md:btn-xl">Texas Coverage</a>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="financial-disclosures">

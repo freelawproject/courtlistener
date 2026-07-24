@@ -365,6 +365,22 @@ async def coverage_recap(request: HttpRequest) -> HttpResponse:
     )
 
 
+async def coverage_scotus(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "help/coverage_scotus.html",
+        {"private": False},
+    )
+
+
+async def coverage_texas(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "help/coverage_texas.html",
+        {"private": False},
+    )
+
+
 async def feeds(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,

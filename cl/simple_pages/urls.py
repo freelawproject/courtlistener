@@ -16,6 +16,8 @@ from cl.simple_pages.views import (
     coverage_oa,
     coverage_opinions,
     coverage_recap,
+    coverage_scotus,
+    coverage_texas,
     delete_help,
     faq,
     feeds,
@@ -54,6 +56,16 @@ urlpatterns = [
         "help/coverage/recap/",
         coverage_recap,  # type: ignore[arg-type]
         name="coverage_recap",
+    ),
+    path(
+        "help/coverage/scotus/",
+        coverage_scotus,  # type: ignore[arg-type]
+        name="coverage_scotus",
+    ),
+    path(
+        "help/coverage/texas/",
+        coverage_texas,  # type: ignore[arg-type]
+        name="coverage_texas",
     ),
     path("help/markdown/", markdown_help, name="markdown_help"),  # type: ignore[arg-type]
     path("help/alerts/", alert_help, name="alert_help"),  # type: ignore[arg-type]

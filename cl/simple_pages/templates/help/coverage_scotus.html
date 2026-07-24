@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% comment %}
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                 ATTENTION!                                 ║
+║ This template has a new version behind the use_new_design waffle flag.     ║
+║                                                                            ║
+║ When modifying this template, please also update the new version at:       ║
+║ cl/simple_pages/templates/v2_help/coverage_scotus.html                     ║
+║                                                                            ║
+║ Once the new design is fully implemented, all legacy templates             ║
+║ (including this one) and the waffle flag will be removed.                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+{% endcomment %}
+
+{% block title %}Supreme Court Docket Coverage — CourtListener.com{% endblock %}
+{% block og_title %}Supreme Court Docket Coverage — CourtListener.com{% endblock %}
+{% block description %}CourtListener has a vast collection of Supreme Court of the United States docket data. Learn more about where it comes from and how we keep it up to date.{% endblock %}
+{% block og_description %}CourtListener has a vast collection of Supreme Court of the United States docket data. Learn more about where it comes from and how we keep it up to date.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-xs-12 hidden-md hidden-lg">
+    <h4 class="v-offset-below-2">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "coverage" %}">Back to Coverage Overview</a>
+    </h4>
+  </div>
+
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+    <div id="toc">
+      <h4 class="v-offset-below-3">
+        <i class="fa fa-arrow-circle-o-left gray"></i>
+        <a href="{% url "coverage" %}">Back to Coverage Home</a>
+      </h4>
+      <h3>Table of Contents</h3>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#sources">Data Sources</a></li>
+        <li><a href="#what-we-have">What We Have</a></li>
+        <li><a href="#roadmap">Availability and Roadmap</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-xs-12 col-md-8 col-lg-6" role="main">
+    <h1 id="overview">Supreme Court Docket Coverage — What Does CourtListener Have?</h1>
+    <p class="lead">CourtListener has a comprehensive collection of docket data from the Supreme Court of the United States.</p>
+    <p>Our SCOTUS collection covers the cases, docket entries, and documents that the Court publishes on its website.
+    </p>
+    <p>This is not the same as our <a href="{% url "coverage_opinions" %}">case law collection</a>, which focuses on the Court's published opinions. The pages described here are the underlying <em>dockets</em> — the running record of activity in each case, including filings, orders, motions, and briefs.
+    </p>
+
+    <hr>
+    <h2 id="sources">Data Sources</h2>
+    <p>We get SCOTUS data from two places, both operated by the Court itself:
+    </p>
+    <ol>
+      <li>
+        <p><strong>The Supreme Court's docket website.</strong> The Court publishes case dockets and filings on <a href="https://www.supremecourt.gov/">supremecourt.gov</a>. Our scraper visits these pages <strong>every hour</strong> and pulls down new content.
+        </p>
+      </li>
+      <li>
+        <p><strong>Case-update emails.</strong> The Court sends notification emails when there is activity on a case. We receive these notifications, parse them, and feed the updates back into our database so cases stay current in close to real time.
+        </p>
+      </li>
+    </ol>
+    <p>Together, these two systems let CourtListener mirror the Supreme Court's docket as closely as possible.
+    </p>
+
+    <hr>
+    <h2 id="what-we-have">What We Have</h2>
+    <p>Our SCOTUS docket collection covers cases from <strong>2000 to the present</strong>, and currently contains:
+    </p>
+    <ul>
+      <li><strong>Hundreds of thousands of cases</strong></li>
+      <li><strong>Nearly a million docket entries</strong></li>
+      <li><strong>Hundreds of thousands of documents</strong> downloaded from the Court (PDFs)</li>
+    </ul>
+
+    <hr>
+    <h2 id="roadmap">Availability and Roadmap</h2>
+    <p>This data is currently available for <strong>database replication</strong> through Free Law Project. It is <em>not yet</em> integrated into CourtListener's search, the public REST API, alerts, or our other end-user services.
+    </p>
+    <p>Bringing SCOTUS docket data into search, the API, alerts, and the rest of CourtListener is on our roadmap. If you are interested in using this data or in helping fund the work to make it more broadly available, please <a href="{% url "contact" %}">get in touch</a>.
+    </p>
+    {% include "includes/donate_footer_plea.html" %}
+  </div>
+{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
