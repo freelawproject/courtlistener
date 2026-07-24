@@ -6,8 +6,10 @@ from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.http import HttpResponse
+from django.template import engines
 from django.test import override_settings
 from django.urls import reverse
+from django_cotton.compiler_regex import CottonCompiler
 from lxml.html import fromstring
 from waffle.testutils import override_flag
 
@@ -621,3 +623,92 @@ class ZohoRoutingTest(SimpleUserDataMixin, TestCase):
         call_kwargs = mock_task.delay.call_args.kwargs
         self.assertEqual(call_kwargs["request_type"], "Sealing Order")
         self.assertEqual(call_kwargs["assignee_id"], "")
+
+
+class DialogComponentTest(SimpleTestCase):
+    """The <c-dialog> component uses ``variant`` to switch between a centred
+    modal layout and a right-side drawer, and ``disable_transitions`` to strip
+    Alpine.js transition attributes for contexts like testing where animations
+    are unwanted.  Lock in that each prop produces the expected HTML structure.
+    """
+
+    def _render(self, props: str = "") -> str:
+        compiled = CottonCompiler().process(
+            f"{{% load component_tags %}}<c-dialog {props}></c-dialog>"
+        )
+        return engines["django"].from_string(compiled).render({})
+
+    def _root(self, html: str):
+        """Return the ``x-data="dialog"`` root element.
+
+        Iterates element-wise rather than using XPath because attribute names
+        containing ``:`` are not first-class in XPath.
+        """
+        for el in fromstring(html).iter():
+            if el.attrib.get("x-data") == "dialog":
+                return el
+        return None
+
+    def _overlay(self, html: str):
+        """Return the ``x-dialog:overlay`` element."""
+        for el in fromstring(html).iter():
+            if "x-dialog:overlay" in el.attrib:
+                return el
+        return None
+
+    def _panel(self, html: str):
+        """Return the ``x-dialog:panel`` element."""
+        for el in fromstring(html).iter():
+            if "x-dialog:panel" in el.attrib:
+                return el
+        return None
+
+    def test_default_variant_root_has_flex_justify_center(self) -> None:
+        root = self._root(self._render())
+        self.assertIsNotNone(root, "root x-data=dialog element not found")
+        class_ = root.attrib.get("class", "")
+        self.assertIn("flex", class_)
+        self.assertIn("justify-center", class_)
+
+    def test_drawer_variant_root_omits_flex_justify_center(self) -> None:
+        root = self._root(self._render('variant="drawer"'))
+        self.assertIsNotNone(root, "root x-data=dialog element not found")
+        self.assertNotIn("justify-center", root.attrib.get("class", ""))
+
+    def test_drawer_variant_panel_uses_fixed_right_side_positioning(
+        self,
+    ) -> None:
+        panel = self._panel(self._render('variant="drawer"'))
+        self.assertIsNotNone(panel, "x-dialog:panel element not found")
+        class_ = panel.attrib.get("class", "")
+        self.assertIn("inset-y-0", class_)
+        self.assertIn("right-0", class_)
+
+    def test_default_variant_panel_uses_full_width(self) -> None:
+        panel = self._panel(self._render())
+        self.assertIsNotNone(panel, "x-dialog:panel element not found")
+        self.assertIn("w-full", panel.attrib.get("class", ""))
+
+    def test_overlay_has_transitions_by_default(self) -> None:
+        overlay = self._overlay(self._render())
+        self.assertIsNotNone(overlay, "x-dialog:overlay element not found")
+        self.assertIn("x-transition:enter", overlay.attrib)
+
+    def test_disable_transitions_removes_overlay_transitions(self) -> None:
+        overlay = self._overlay(self._render("disable_transitions"))
+        self.assertIsNotNone(overlay, "x-dialog:overlay element not found")
+        self.assertNotIn("x-transition:enter", overlay.attrib)
+
+    def test_drawer_panel_has_slide_transitions_by_default(self) -> None:
+        panel = self._panel(self._render('variant="drawer"'))
+        self.assertIsNotNone(panel, "x-dialog:panel element not found")
+        self.assertIn("x-transition:enter", panel.attrib)
+
+    def test_disable_transitions_removes_drawer_panel_transitions(
+        self,
+    ) -> None:
+        panel = self._panel(
+            self._render('variant="drawer" disable_transitions')
+        )
+        self.assertIsNotNone(panel, "x-dialog:panel element not found")
+        self.assertNotIn("x-transition:enter", panel.attrib)
