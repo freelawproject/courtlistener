@@ -20,6 +20,7 @@ from cl.favorites.api_serializers import (
 )
 from cl.favorites.filters import DocketTagFilter, PrayerFilter, UserTagFilter
 from cl.favorites.models import DocketTag, GenericCount, Prayer, UserTag
+from cl.lib.bot_detector import is_bot
 
 
 class UserTagViewSet(ModelViewSet):
@@ -113,8 +114,15 @@ class EventCounterViewset(CreateModelMixin, GenericViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         event_data = serializer.validated_data
+
+        if is_bot(request):
+            # Recognized crawlers shouldn't inflate view/download counters.
+            return Response(
+                {"label": event_data["label"], "value": 0},
+                status=HTTPStatus.ACCEPTED,
+            )
+
         with transaction.atomic():
             counter_record, _ = (
                 GenericCount.objects.select_for_update().get_or_create(
