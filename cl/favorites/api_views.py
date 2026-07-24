@@ -10,7 +10,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import MediumAdjustablePagination
-from cl.api.utils import LoggingMixin, TagRateThrottle
+from cl.api.utils import EventCounterThrottle, LoggingMixin, TagRateThrottle
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import (
     DocketTagSerializer,
@@ -100,6 +100,7 @@ class EventCounterViewset(CreateModelMixin, GenericViewSet):
     serializer_class = EventCountSerializer
     permission_classes = (permissions.AllowAny,)
     authentication_classes = []
+    throttle_classes = [EventCounterThrottle]
 
     def create(self, request, *args, **kwargs):
         """
