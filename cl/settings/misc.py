@@ -56,6 +56,8 @@ STAT_METRICS_PREFIX = "prometheus:stat:"
 # Wiki #
 ########
 WIKI_API_BASE_URL = "https://wiki.free.law/c/courtlistener/help/api"
+WIKI_TERMS_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-terms-of-service-and-policies"
+WIKI_REMOVAL_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-content-removal-policy"
 
 
 ##############
