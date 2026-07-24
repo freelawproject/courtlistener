@@ -5073,14 +5073,20 @@ class RecapDocketTaskTest(TestCase):
         # The first merge creates the entry and its document and normalizes
         # their fields; it's not measured.
         async_to_sync(add_docket_entries)(d, [de_data])
+        de = DocketEntry.objects.get(docket=d)
+        de_modified_before = de.date_modified
+        rd_modified_before = RECAPDocument.objects.get(
+            docket_entry=de
+        ).date_modified
 
-        # Re-merge with a changed document description so the document save
-        # path (and its ES field tracker check) runs. ES signal receivers
-        # no-op while ELASTICSEARCH_DISABLED (the tests' default), so
-        # enable them here; the celery chain is mocked so the eagerly
-        # executed ES indexing tasks don't pollute the query count, while
-        # the tracker check still runs, as it happens before the chain is
-        # built.
+        # Re-merge with a changed entry and document description so both
+        # save paths (and their ES field tracker checks) run. ES signal
+        # receivers no-op while ELASTICSEARCH_DISABLED (the tests'
+        # default), so enable them here; the celery chain is mocked so the
+        # eagerly executed ES indexing tasks don't pollute the query count,
+        # while the tracker check still runs, as it happens before the
+        # chain is built.
+        de_data["description"] = "Amended long description"
         de_data["short_description"] = "Amended short description"
         with (
             self.settings(ELASTICSEARCH_DISABLED=False),
@@ -5091,6 +5097,11 @@ class RecapDocketTaskTest(TestCase):
 
         rd = RECAPDocument.objects.get(docket_entry__docket=d)
         self.assertEqual(rd.description, "Amended short description")
+        de.refresh_from_db()
+        self.assertEqual(de.description, "Amended long description")
+        # Both rows changed and were saved, so their date_modified advances.
+        self.assertGreater(rd.date_modified, rd_modified_before)
+        self.assertGreater(de.date_modified, de_modified_before)
 
         de_rd_queries = [
             q["sql"]
@@ -5098,17 +5109,19 @@ class RecapDocketTaskTest(TestCase):
             if '"search_docketentry"' in q["sql"]
             or '"search_recapdocument"' in q["sql"]
         ]
-        # The merge's required SELECTs are the two chunk prefetches plus
-        # two from RECAPDocument.save() on the changed document: the
-        # docket_entry FK load and the duplicate-document guard. The ES
-        # field tracker refreshing deferred fields would add one
-        # single-field SELECT per deferred tracked field on top.
+        # The merge's required SELECTs are the two chunk prefetches, two
+        # from RECAPDocument.save() on the changed document (the
+        # docket_entry FK load and the duplicate-document guard), and one
+        # from the changed entry's ES handler resolving the documents that
+        # embed the entry's fields. The ES field tracker refreshing
+        # deferred fields would add one single-field SELECT per deferred
+        # tracked field on top.
         select_statements = [
             q for q in de_rd_queries if q.startswith("SELECT")
         ]
         self.assertEqual(
             len(select_statements),
-            4,
+            5,
             msg="Expected only the merge's own SELECT queries; extra "
             "SELECTs mean the ES field tracker refreshed deferred fields: "
             f"{select_statements}",
@@ -5118,9 +5131,9 @@ class RecapDocketTaskTest(TestCase):
         ]
         self.assertEqual(
             len(update_statements),
-            1,
-            msg="Expected a single UPDATE for the changed document, got: "
-            f"{update_statements}",
+            2,
+            msg="Expected one UPDATE for the changed entry and one for the "
+            f"changed document, got: {update_statements}",
         )
 
     def test_unchanged_reupload_is_read_only(self) -> None:
