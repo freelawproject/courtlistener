@@ -9,16 +9,7 @@ from cl.lib.models import AbstractDateTimeModel, AbstractPDF
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
 
-
-class ProcessingError:
-    BAD_URL = 1
-    EXTRACTION_FAILURE = 2
-    SEALED = 3
-    CHOICES = (
-        (BAD_URL, "Bad URL"),
-        (EXTRACTION_FAILURE, "Extraction Failure"),
-        (SEALED, "Sealed"),
-    )
+from cl.search.state.shared import ProcessingError
 
 
 @pghistory.track()
