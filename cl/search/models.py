@@ -824,6 +824,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
         if self.source in self.NON_ANON_2020_SOURCES():
             self.source = self.source + self.ANON_2020
 
+    def add_uspto_ptlitig_source(self) -> None:
+        if self.source in self.NON_USPTO_PTLITIG_SOURCES():
+            self.source = self.source + self.USPTO_PTLITIG
+
     @property
     def pacer_court_id(self):
         if hasattr(self, "_pacer_court_id"):
