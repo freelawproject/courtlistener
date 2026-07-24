@@ -40,12 +40,14 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         null=True,
         blank=True,
     )
-    entry_type = models.SmallIntegerField(choices=DocketEntryType.CHOICES)
+    entry_type = models.SmallIntegerField(
+        choices=DocketEntryType.CHOICES, default=DocketEntryType.UNKNOWN
+    )
     entry_type_raw = models.TextField(blank=True)
     entry_name = models.TextField(blank=True)
-    description = models.TextField(null=True, blank=True)
+    description = models.TextField(blank=True)
     submitted_by = models.ForeignKey(
-        "people_db.Person",
+        "people_db.Party",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -56,11 +58,10 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     class Meta:
         app_label = "search"
         ordering = ["-date_filed"]
-        indexes = [models.Index(fields=["docket_entry_uuid"])]
         verbose_name_plural = "Florida Docket Entries"
         constraints = [
             models.UniqueConstraint(
-                fields=["docket", "docket_entry_uuid"],
+                fields=["docket_entry_uuid", "docket"],
                 name="unique_docket_entry_uuid_per_docket",
             )
         ]
@@ -87,10 +88,10 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
         on_delete=models.CASCADE,
         related_name="documents",
     )
-    content_type = models.CharField(max_length=63, null=True, blank=True)
+    content_type = models.CharField(max_length=63, blank=True)
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
-    description = models.TextField(null=True, blank=True)
+    description = models.TextField(blank=True)
     link_uuid = models.UUIDField()
     url = models.URLField(max_length=250)
     processing_error = models.SmallIntegerField(
@@ -102,7 +103,10 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     class Meta:
         app_label = "search"
         ordering = ["link_uuid"]
-        indexes = [models.Index(fields=["link_uuid"])]
+        indexes = [
+            models.Index(fields=["link_uuid"]),
+            models.Index(fields=["filepath_local"]),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["docket_entry", "link_uuid"],
