@@ -16,7 +16,7 @@ from typing import Any, cast
 import requests
 from celery import chain
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from juriscraper.state.texas.tames import TAMESScraper
 from lxml import etree
 
@@ -32,6 +32,7 @@ from cl.scrapers.management.commands.back_scrape_dockets import (
     RateLimitedRequestManager,
     save_docket_response,
 )
+from cl.scrapers.management.utils import StatePollCommand
 from cl.scrapers.models import AccountSubscription, Scraper
 
 REDIS_KEY = "tames:polling:last_seen_cases"
@@ -232,40 +233,20 @@ def subscribe_pending_cases(redis, tames_user: dict[str, str]) -> None:
     )
 
 
-class Command(BaseCommand):
+class Command(StatePollCommand):
     help = (
         "Continuously polls TAMES for new cases and backfills "
         "when changes are detected."
     )
 
     def add_arguments(self, parser) -> None:
-        parser.add_argument(
-            "--polling-delay",
-            type=int,
-            default=60,
-            help="Minutes to sleep between poll cycles.",
-        )
-        parser.add_argument(
-            "--case-backfill-days",
-            type=int,
-            default=1,
-            help="Number of days to look back for backfill.",
-        )
+        super().add_arguments(parser)
         parser.add_argument(
             "--poll-window-days",
             type=int,
             default=7,
             help=(
                 "Window size for polling search query in days (default: 7)."
-            ),
-        )
-        parser.add_argument(
-            "--courts",
-            default=None,
-            help=(
-                "Comma-separated list of TAMES court IDs to poll "
-                "(e.g., texas_cossup,texas_coa01). "
-                "Defaults to all TAMES courts."
             ),
         )
         parser.add_argument(
