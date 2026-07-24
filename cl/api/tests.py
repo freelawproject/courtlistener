@@ -129,6 +129,7 @@ from cl.search.api_views import (
     DocketEntryViewSet,
     DocketViewSet,
     OpinionClusterViewSet,
+    OpinionsCitedByRECAPDocumentViewSet,
     OpinionsCitedViewSet,
     OpinionViewSet,
     OriginatingCourtInformationViewSet,
@@ -142,6 +143,8 @@ from cl.search.factories import (
     DocketFactory,
     OpinionClusterWithChildrenAndParentsFactory,
     OpinionClusterWithParentsFactory,
+    OpinionFactory,
+    OpinionsCitedByRECAPDocumentFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
@@ -2635,6 +2638,18 @@ class V4DRFPaginationTest(TestCase):
             viewset=OpinionsCitedViewSet,
         )
 
+    async def test_opinions_cited_by_recap_document_endpoint(self):
+        """Test the V4 OpinionsCitedByRECAPDocument endpoint confirming that
+        their cursor and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="opinionscitedbyrecapdocument-list",
+            default_ordering="-id",
+            secondary_cursor_key="id",
+            non_cursor_key="cited_opinion",
+            viewset=OpinionsCitedByRECAPDocumentViewSet,
+        )
+
     async def test_tag_endpoint(self):
         """Test the V4 Tag endpoint confirming that their cursor and page
         number pagination works properly."""
@@ -4478,6 +4493,148 @@ class BankruptcyInformationAPITests(TestCase):
             {"id", "docket_number", "bankruptcy_information"},
         )
         self.assertIsNotNone(docket_with_bankruptcy["bankruptcy_information"])
+
+
+class OpinionsCitedByRECAPDocumentAPITests(TestCase):
+    """Tests for the opinions-cited-by-recap-document v4 endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-citation-user",
+            user__password=make_password("password"),
+        )
+        ps = Permission.objects.filter(codename="has_recap_api_access")
+        cls.user_1.user.user_permissions.add(*ps)
+
+        cls.cited_opinion = OpinionFactory(
+            cluster=OpinionClusterWithParentsFactory(
+                case_name="Obergefell v. Hodges"
+            )
+        )
+        cls.citing_document = RECAPDocumentFactory(
+            description="Motion for Summary Judgment"
+        )
+        cls.citation = OpinionsCitedByRECAPDocumentFactory(
+            citing_document=cls.citing_document,
+            cited_opinion=cls.cited_opinion,
+            depth=3,
+        )
+
+        # An unrelated citation, to confirm filters narrow the results
+        cls.other_citation = OpinionsCitedByRECAPDocumentFactory(
+            citing_document=RECAPDocumentFactory(),
+            cited_opinion=OpinionFactory(
+                cluster=OpinionClusterWithParentsFactory()
+            ),
+        )
+
+    async def _api_v4_request(self, endpoint, params=None):
+        url = reverse(endpoint, kwargs={"version": "v4"})
+        api_client = await sync_to_async(make_client)(self.user_1.user.pk)
+        return await api_client.get(url, params or {})
+
+    async def test_filter_by_citing_document(self) -> None:
+        """List the opinions cited by a given RECAP document, including
+        citation depth."""
+        response = await self._api_v4_request(
+            "opinionscitedbyrecapdocument-list",
+            {"citing_document": self.citing_document.pk},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertEqual(result["depth"], 3)
+        self.assertIn(
+            f"/opinions/{self.cited_opinion.pk}/", result["cited_opinion"]
+        )
+        self.assertIn(
+            f"/recap-documents/{self.citing_document.pk}/",
+            result["citing_document"],
+        )
+
+    async def test_filter_by_cited_opinion(self) -> None:
+        """List the RECAP documents that cite a given opinion."""
+        response = await self._api_v4_request(
+            "opinionscitedbyrecapdocument-list",
+            {"cited_opinion": self.cited_opinion.pk},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertIn(
+            f"/recap-documents/{self.citing_document.pk}/",
+            results[0]["citing_document"],
+        )
+
+    async def test_related_field_traversal_is_blocked(self) -> None:
+        """Only exact FK matches are allowed on citing_document and
+        cited_opinion; traversal into related filtersets is rejected."""
+        response = await self._api_v4_request(
+            "opinionscitedbyrecapdocument-list",
+            {"citing_document__is_available": True},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "citing_document__is_available",
+            response.json()["unknown_params"],
+        )
+
+    async def test_filter_by_depth(self) -> None:
+        """The depth filter supports finding heavily-relied-on citations."""
+        response = await self._api_v4_request(
+            "opinionscitedbyrecapdocument-list",
+            {"depth__gte": 2},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        results = response.json()["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["id"], self.citation.pk)
+
+    def test_list_does_not_n_plus_one(self) -> None:
+        """The query count should not grow with the number of rows
+        returned. The serializer builds the ``cited_opinion`` and
+        ``citing_document`` hyperlinks from the FK ids already on each
+        row, so no per-row queries should be issued even when each row
+        points at a different opinion/document.
+        """
+        self.client.force_login(self.user_1.user)
+        list_url = reverse(
+            "opinionscitedbyrecapdocument-list", kwargs={"version": "v4"}
+        )
+
+        # Warm-up request (discarded), so the first capture below isn't
+        # skewed by one-time setup queries (waffle, pghistory, throttle)
+        self.client.get(list_url, {"depth": 3})
+
+        # Both requests filter on depth, so only the row count differs
+
+        # One row: cls.citation only (depth=3).
+        with CaptureQueriesContext(connection) as ctx_one:
+            response = self.client.get(list_url, {"depth": 3})
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(len(response.json()["results"]), 1)
+
+        # Two rows: cls.citation (depth=3) and cls.other_citation
+        # (depth=1, the model default), each pointing at a distinct
+        # cited_opinion/cluster and citing_document
+        with CaptureQueriesContext(connection) as ctx_two:
+            response = self.client.get(list_url, {"depth__gte": 0})
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(len(response.json()["results"]), 2)
+
+        self.assertEqual(
+            len(ctx_one.captured_queries),
+            len(ctx_two.captured_queries),
+            "Query count grew with the number of distinct rows returned "
+            "- this indicates an N+1 on cited_opinion__cluster or "
+            "citing_document.",
+        )
 
 
 class UnknownFilterParameterBlockingTests(TestCase):
