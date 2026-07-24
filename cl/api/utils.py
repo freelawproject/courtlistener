@@ -965,6 +965,12 @@ class TagRateThrottle(UserRateThrottle):
     scope = "tags"
 
 
+class EventCounterThrottle(UserRateThrottle):
+    """Throttles increment-event"""
+
+    scope = "events"
+
+
 def has_throttle_override(user: User, throttle_type: int) -> bool:
     """Whether the user has an active throttle override of the given type.
 
