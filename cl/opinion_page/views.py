@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
@@ -1093,11 +1094,16 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
             request, "includes/opinion_tabs.html", {"cluster": None}
         )
 
-    authorities_count = await cluster.aauthority_count()
-    summaries_count = await cluster.parentheticals.acount()
-
-    ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o_es"
+    (
+        authorities_count,
+        summaries_count,
+        ui_flag_for_o_es,
+        download_context,
+    ) = await asyncio.gather(
+        cluster.aauthority_count(),
+        cluster.parentheticals.acount(),
+        sync_to_async(waffle.flag_is_active)(request, "ui_flag_for_o_es"),
+        get_downloads_context(cluster),
     )
     # Default count when flag is disabled
     cited_by_count = 0
@@ -1109,9 +1115,9 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
             str(opinion.pk)
             async for opinion in cluster.sub_opinions.all().only("pk")
         ]
-        cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
-        related_cases_count = await es_related_case_count(
-            cluster.id, sub_opinion_pks
+        cited_by_count, related_cases_count = await asyncio.gather(
+            es_cited_case_count(cluster.id, sub_opinion_pks),
+            es_related_case_count(cluster.id, sub_opinion_pks),
         )
 
     # Get `tab` from request parameters (fallback to 'opinions')
@@ -1128,7 +1134,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         "es_enabled": ui_flag_for_o_es,
     }
 
-    download_context = await get_downloads_context(cluster)
     context.update(download_context)
 
     return await sync_to_async(render)(
