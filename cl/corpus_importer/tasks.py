@@ -2380,11 +2380,47 @@ def get_document_number_for_appellate(
 
     pdf_bytes = None
     document_number = ""
-    # Try to get the document number for appellate documents from the PDF first
-    if pq.filepath_local:
+
+    # Appellate courts "ca8", "cadc" don't use regular docket entry
+    # numbering. Their PDF headers report a document number that doesn't
+    # match the pacer_doc_id used when the same entry arrives via an
+    # extension upload, causing duplicated docket entries when both sources
+    # are merged. For these courts, check the download confirmation page
+    # before falling back to the PDF.
+    #
+    # We fetch document_number via get_document_number_from_confirmation_page
+    # instead of just using pacer_doc_id directly so we can detect if the court
+    # starts reporting regular document numbers instead of pacer_doc_id-style
+    # ones. If we used pacer_doc_id directly, we would never notice that change.
+    # The alert below depends on reading what the confirmation page actually reports.
+    check_confirmation_page_first = (
+        court_id in ("ca8", "cadc") and pacer_doc_id and not acms
+    )
+    if check_confirmation_page_first:
+        document_number = get_document_number_from_confirmation_page(
+            court_id, pacer_doc_id
+        )
+        if document_number and not is_long_appellate_document_number(
+            document_number
+        ):
+            # This court is expected to report long, pacer_doc_id-style
+            # numbers on the confirmation page. A regular-looking number
+            # here suggests the court switched to normal docket numbering.
+            # Alert so we can verify and clean up entries.
+            logger.error(
+                "Court %s returned a regular-looking document number '%s' for "
+                "pacer_doc_id %s. It may no longer need special handling in "
+                "get_document_number_for_appellate.",
+                court_id,
+                document_number,
+                pacer_doc_id,
+            )
+
+    # Try to get the document number for appellate documents from the PDF
+    if not document_number and pq.filepath_local:
         with pq.filepath_local.open(mode="rb") as local_path:
             pdf_bytes = local_path.read()
-    if pdf_bytes:
+    if not document_number and pdf_bytes:
         # For other jurisdictions try first to get it from the PDF document.
         dn_response = async_to_sync(microservice)(
             service="document-number",
@@ -2394,7 +2430,12 @@ def get_document_number_for_appellate(
         if dn_response.is_success and dn_response.text:
             document_number = dn_response.text
 
-    if not document_number and pacer_doc_id and not acms:
+    if (
+        not document_number
+        and pacer_doc_id
+        and not acms
+        and not check_confirmation_page_first
+    ):
         # If we still don't have the document number fall back on the
         # download confirmation page
         document_number = get_document_number_from_confirmation_page(
@@ -2414,6 +2455,10 @@ def get_document_number_for_appellate(
         # Force the fourth-digit to 0:
         # 00218987740 -> 00208987740, 123119177518 -> 123019177518
         document_number = f"{document_number[:3]}0{document_number[4:]}"
+
+        # int() strips any number of leading zeros; convert back to str since
+        # document_number stays a string throughout this function.
+        document_number = str(int(document_number))
 
     return document_number
 
