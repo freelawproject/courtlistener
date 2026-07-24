@@ -102,7 +102,7 @@
                 {% endif %}
 
                 <label>
-                  {{ consent_form.consent }} I consent to CourtListener and Free Law Project using information I provide for services on this website such as sending me emails and creating alerts. Checking this box does <strong>not</strong> sign me up for any newsletters. I further consent to the data usages described in the CourtListener <a href="{% url "terms" %}">Terms of Service</a>.
+                  {{ consent_form.consent }} I consent to CourtListener and Free Law Project using information I provide for services on this website such as sending me emails and creating alerts. Checking this box does <strong>not</strong> sign me up for any newsletters. I further consent to the data usages described in the CourtListener <a href="{{ WIKI_TERMS_URL }}">Terms of Service</a>.
                 </label>
                 {{ consent_form.hcaptcha }}
                 <div class="form-group">
