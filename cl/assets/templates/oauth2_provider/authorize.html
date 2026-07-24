@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}{% if error %}Authorization error{% else %}Authorize {{ application.name }}{% endif %} – CourtListener.com{% endblock %}
+
+{% block privacy %}
+  <meta name="robots" content="noindex, noodp, noarchive, noimageindex"/>
+{% endblock %}
+
+{% block footer-scripts %}{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+  <div class="col-xs-10 col-sm-8 col-md-6 well">
+    {% if not error %}
+      <h2>Authorize <em>{{ application.name }}</em>?</h2>
+      <p class="gray">
+        Signed in as <strong>{{ request.user.username }}</strong>.
+      </p>
+
+      <p class="lead v-offset-above-2">
+        The application <strong>{{ application.name }}</strong> is
+        requesting access to your CourtListener account. If you
+        approve, it will be able to:
+      </p>
+
+      <ul>
+        {% for scope in scopes_descriptions %}
+          <li>{{ scope }}</li>
+        {% endfor %}
+      </ul>
+
+      {% if form.redirect_uri.value %}
+        <p>
+          After you decide, you will be redirected to:
+          <br>
+          <code>{{ form.redirect_uri.value }}</code>
+        </p>
+      {% endif %}
+
+      <div class="alert alert-warning v-offset-above-2" role="alert">
+        <i class="fa fa-exclamation-triangle"></i>
+        Only authorize applications you trust. They will be able to
+        act on your behalf within the permissions listed above.
+      </div>
+
+      {% if form.errors %}
+        {% for error in form.non_field_errors %}
+          <p class="alert alert-danger">{{ error|escape }}</p>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" id="authorizationForm">{% csrf_token %}
+        {% for field in form %}
+          {% if field.is_hidden %}{{ field }}{% endif %}
+        {% endfor %}
+        <div class="text-right v-offset-above-2">
+          <button type="submit" class="btn btn-default btn-lg">Cancel</button>
+          <button type="submit" name="allow" value="Authorize" class="btn btn-primary btn-lg">Allow access</button>
+        </div>
+      </form>
+    {% else %}
+      <h2>Something went wrong</h2>
+      <p class="lead">We couldn’t complete this authorization request.</p>
+      <p>
+        <strong>Error:</strong> {{ error.error }}
+        {% if error.description %}
+          <br><strong>Details:</strong> {{ error.description }}
+        {% endif %}
+      </p>
+      <p>
+        Try returning to the application that sent you here and
+        starting over. If the problem continues, please
+        <a href="{% url "contact" %}">contact us</a>.
+      </p>
+    {% endif %}
+  </div>
+  <div class="col-xs-1 col-sm-2 col-md-3"></div>
+{% endblock %}
