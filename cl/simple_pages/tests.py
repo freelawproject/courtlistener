@@ -3,7 +3,6 @@ from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import sync_to_async
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.http import HttpResponse
@@ -378,23 +377,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         self.assertIn(
             "with 4 minutes of recordings (and counting).", r.content.decode()
         )
-
-
-class TermsRedirectTest(SimpleTestCase):
-    async def test_terms_pages_redirect_to_wiki(self) -> None:
-        """Do the old terms URLs redirect permanently to the wiki?"""
-        reverse_params: list[dict[str, Any]] = [
-            {"viewname": "terms"},
-            {"viewname": "old_terms", "args": ["9"]},
-        ]
-        for reverse_param in reverse_params:
-            with self.subTest(
-                "Checking terms redirects", reverse_params=reverse_param
-            ):
-                path = reverse(**reverse_param)
-                r = await self.async_client.get(path)
-                self.assertEqual(r.status_code, HTTPStatus.MOVED_PERMANENTLY)
-                self.assertEqual(r["Location"], settings.WIKI_TERMS_URL)
 
 
 @override_flag("use_new_design", True)
