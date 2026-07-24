@@ -3737,7 +3737,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
         # The existing entry's description was updated from the
         # notification, confirming it was merged rather than duplicated.
-        self.assertEqual(de.description, "BRIEFING SCHEDULE SET AS FOLLOWS: Transcript due on or before 08/31/2026. Appendix due 09/10/2026 (...)")
+        self.assertEqual(
+            de.description,
+            "BRIEFING SCHEDULE SET AS FOLLOWS: Transcript due on or before 08/31/2026. Appendix due 09/10/2026 (...)",
+        )
 
 
 def mock_method_set_rd_sealed_status(
