@@ -1173,9 +1173,8 @@ async def add_docket_entries(
                     "attachment_number",
                     "document_number",
                     # Saving a deferred instance only writes loaded fields,
-                    # so the timestamps must be loaded for auto_now to bump
-                    # date_modified when a changed document is saved.
-                    "date_created",
+                    # so date_modified must be loaded for auto_now to bump
+                    # it when a changed document is saved.
                     "date_modified",
                 ):
                     rds_by_de_id[existing_rd.docket_entry_id].append(
