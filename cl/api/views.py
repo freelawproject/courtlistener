@@ -1,23 +1,33 @@
 import logging
 import re
-from datetime import date
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
+from typing import TypedDict, cast
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.viewsets import ViewSet
 
 from cl.alerts.utils import get_alert_estimation_count
+from cl.api.utils import get_current_throttle_usage, invert_user_logs
+from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.lib.elasticsearch_utils import (
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
 )
-from cl.search.documents import OpinionClusterDocument
+from cl.search.documents import (
+    OpinionClusterDocument,
+)
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
 from cl.search.utils import get_redis_stat_sum
@@ -276,3 +286,55 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
     return JsonResponse(data)
+
+
+class MembershipInfo(TypedDict):
+    """Membership level + active status."""
+
+    level: str
+    is_active: bool
+
+
+class ApiUsageViewSet(ViewSet):
+    """Provides the authenticated user's API usage and rate limits.
+
+    Returns current throttle usage, 14-day historical usage, and membership
+    information.
+
+    This endpoint is intentionally not rate-limited. Users must be able to
+    inspect their current usage, including ``reset_at``, even after being
+    throttled on other endpoints, when this information is most useful.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes: list = []
+    pagination_class = None
+
+    def _get_historical_usage(self, user: User) -> dict[str, int]:
+        """14-day daily request counts from Redis."""
+        start = datetime.today() - timedelta(days=14)
+        end = datetime.today()
+        data = invert_user_logs(start, end, add_usernames=False)
+        return data.get(user.pk, {"total": 0})  # type: ignore[call-overload]
+
+    def _get_membership(self, user: User) -> MembershipInfo | None:
+        """Return the user's membership level and active status."""
+        try:
+            membership = NeonMembership.objects.get(user=user)
+        except NeonMembership.DoesNotExist:
+            return None
+        level_display = dict(NeonMembershipLevel.TYPES).get(
+            membership.level, "Unknown"
+        )
+        return {"level": level_display, "is_active": membership.is_active}
+
+    def list(self, request: Request, *args, **kwargs) -> Response:
+        # IsAuthenticated permission class rules out AnonymousUser at runtime.
+        user = cast(User, request.user)
+        return Response(
+            {
+                "current_usage": get_current_throttle_usage(user),
+                "historical_usage": self._get_historical_usage(user),
+                "membership": self._get_membership(user),
+            }
+        )

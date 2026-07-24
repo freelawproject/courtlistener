@@ -1223,10 +1223,22 @@ class TestFilesizeConversions(SimpleTestCase):
 class TestRateLimiters(SimpleTestCase):
     def test_parsing_rates(self) -> None:
         qa_pairs = [
+            # Single-letter unit
             ("1/s", (1, 1)),
-            ("10/10s", (10, 10)),
             ("1/m", (1, 60)),
+            # Multiplier + single-letter unit
+            ("10/10s", (10, 10)),
             ("1/5m", (1, 300)),
+            # Word-form unit
+            ("10/second", (10, 1)),
+            ("60/minute", (60, 60)),
+            ("5000/hour", (5000, 3600)),
+            ("100/day", (100, 86400)),
+            # abbreviated word-form unit
+            ("10/sec", (10, 1)),
+            ("60/min", (60, 60)),
+            ("5000/hr", (5000, 3600)),
+            ("100/d", (100, 86400)),
         ]
         for q, a in qa_pairs:
             with self.subTest("Parsing rates...", rate=q):

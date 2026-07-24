@@ -59,6 +59,7 @@ from cl.donate.models import (
     NeonMembershipLevel,
 )
 from cl.lib.decorators import clear_tiered_cache, tiered_cache
+from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.constants import StatMetric, StatWebhookEventType
 from cl.stats.models import Event
@@ -957,6 +958,133 @@ def get_recent_api_request_count(user: User, window_seconds: int) -> int:
     history: list[float] = default_cache.get(key, [])
     cutoff = time.time() - window_seconds
     return sum(1 for ts in history if ts > cutoff)
+
+
+class ThrottleUsageRow(TypedDict):
+    """Current usage information for a single throttle rate window."""
+
+    scope: str
+    rate: str
+    used: int
+    limit: int
+    remaining: int
+    window_seconds: int
+    reset_at: str | None
+    blocked: bool
+
+
+def _coerce_rate_list(raw: str | list[str] | None) -> list[str]:
+    """Return a throttle rate configuration as a list of rate strings."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [raw]
+    return list(raw)
+
+
+def _effective_rates(
+    throttle_type: ThrottleType,
+    username: str,
+    default_rates: dict[str, str | list[str]],
+    default_scope: str,
+) -> list[str]:
+    """Return the effective rate list for a user's throttle type."""
+    return get_all_throttle_overrides(throttle_type).get(
+        username
+    ) or _coerce_rate_list(default_rates.get(default_scope))
+
+
+def _build_usage_rows(
+    scope: str,
+    rates: list[str],
+    now: float,
+    weighted_history: list[tuple[int, float]],
+) -> list[ThrottleUsageRow]:
+    """Build throttle usage rows for a scope from cached request history.
+
+    History contains ``(weight, timestamp)`` pairs, where the weight is one
+    request for API throttles or the citation count for citation throttles.
+    """
+    usage_rows: list[ThrottleUsageRow] = []
+    for rate in rates:
+        limit, duration = parse_rate(rate)
+        cutoff = now - duration
+        in_window = [(w, ts) for w, ts in weighted_history if ts > cutoff]
+        used = sum(w for w, _ in in_window)
+
+        reset_at = None
+        if in_window:
+            # Oldest in-window entry frees a slot when it exits the window.
+            oldest_ts = min(ts for _, ts in in_window)
+            reset_at = datetime.fromtimestamp(
+                oldest_ts + duration, tz=UTC
+            ).isoformat()
+
+        usage_rows.append(
+            {
+                "scope": scope,
+                "rate": rate,
+                "used": used,
+                "limit": limit,
+                "remaining": max(limit - used, 0),
+                "window_seconds": duration,
+                "reset_at": reset_at,
+                "blocked": limit == 0,
+            }
+        )
+    return usage_rows
+
+
+def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
+    """Per-(scope, rate) live throttle usage for an authenticated user.
+
+    Mirrors enforcement exactly: effective rates come from
+    ``get_all_throttle_overrides`` (MANUAL/MEMBERSHIP precedence + membership
+    expiry honored), falling back to ``DEFAULT_THROTTLE_RATES``; the x2 promo
+    is applied to the API scope when it applies to this user; counts come from
+    the same cache keys the throttles write to. One row per rate, so
+    multidimensional limits are fully reported.
+    """
+    default_rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # type: ignore[misc]
+    username = user.username
+    now = time.time()
+    usage_rows: list[ThrottleUsageRow] = []
+
+    # --- API scope ("user"): one timestamp per request -----------------
+    api_rates = _effective_rates(
+        ThrottleType.API, username, default_rates, "user"
+    )
+    api_key = f"throttle_user_{user.pk}"
+    if promo_doubling_applies(user):
+        api_rates = [double_rate(r) for r in api_rates]
+        api_key = f"{api_key}_promo2x"
+    api_history: list[float] = default_cache.get(api_key, [])
+    usage_rows += _build_usage_rows(
+        "user", api_rates, now, [(1, ts) for ts in api_history]
+    )
+
+    # --- Citations scope: history is [citation_count, timestamp] -------
+    citation_rates = _effective_rates(
+        ThrottleType.CITATION_LOOKUP, username, default_rates, "citations"
+    )
+    citation_history: list[tuple[int, float]] = default_cache.get(
+        f"throttle_citations_{user.pk}", []
+    )
+    usage_rows += _build_usage_rows(
+        "citations",
+        citation_rates,
+        now,
+        [(count, ts) for count, ts in citation_history],
+    )
+
+    # Limit closest to being hit first; blocked rows float to the top.
+    usage_rows.sort(
+        key=lambda r: 1.0
+        if r["blocked"]
+        else (r["used"] / r["limit"] if r["limit"] else 0.0),
+        reverse=True,
+    )
+    return usage_rows
 
 
 class TagRateThrottle(UserRateThrottle):
