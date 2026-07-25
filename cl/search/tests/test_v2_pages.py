@@ -299,7 +299,6 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
             "Expected at least one input with name='filed_before'",
         )
 
-
     def test_corpus_search_tabs_are_server_rendered(self):
         """Corpus search tab labels appear in HTML before Alpine runs.
 
@@ -332,9 +331,10 @@ class CorpusSearchFormTest(SimpleUserDataMixin, TestCase):
                     f"found {tab_labels!r}",
                 )
         self.assertFalse(
-            tablist[0].xpath('.//template[@x-for]'),
+            tablist[0].xpath(".//template[@x-for]"),
             "Homepage tablist should not use Alpine x-for for initial render",
         )
+
 
 @override_flag("use_new_design", True)
 @patch("cl.search.utils.get_redis_interface")

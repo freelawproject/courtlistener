@@ -15,7 +15,11 @@ from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import make_aware
 from elasticsearch.dsl import AttrDict, AttrList
 
-from cl.search.constants import ALERTS_HL_TAG, CORPUS_SEARCH_SCOPES, SEARCH_HL_TAG
+from cl.search.constants import (
+    ALERTS_HL_TAG,
+    CORPUS_SEARCH_SCOPES,
+    SEARCH_HL_TAG,
+)
 from cl.search.models import SEARCH_TYPES, Court
 
 register = template.Library()
