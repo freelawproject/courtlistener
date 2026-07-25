@@ -493,30 +493,6 @@ async def citegeist_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "citegeist.html", {"private": False})
 
 
-async def old_terms(request: HttpRequest, v: str) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        f"terms/{v}.html",
-        {
-            "title": f"Archived Terms of Service and Policies, v{v} – "
-            "CourtListener.com",
-            "private": True,
-            "is_archived": True,
-        },
-    )
-
-
-async def latest_terms(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "terms/latest.html",
-        {
-            "title": "Terms of Service and Policies – CourtListener.com",
-            "private": False,
-        },
-    )
-
-
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 

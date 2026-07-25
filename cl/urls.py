@@ -7,7 +7,6 @@ from django.views.generic import RedirectView
 from django_s3_express_cache.decorators import cache_page
 
 from cl.audio.sitemap import AudioSitemap, BlockedAudioSitemap
-from cl.disclosures.sitemap import DisclosureSitemap
 from cl.lib.converters import BlankSlugConverter
 from cl.opinion_page.sitemap import (
     BlockedDocketSitemap,
@@ -25,7 +24,6 @@ sitemaps = {
     SEARCH_TYPES.ORAL_ARGUMENT: AudioSitemap,
     SEARCH_TYPES.OPINION: OpinionSitemap,
     SEARCH_TYPES.PEOPLE: PersonSitemap,
-    "disclosures": DisclosureSitemap,
     "simple": SimpleSitemap,
     "blocked-audio": BlockedAudioSitemap,
     "blocked-dockets": BlockedDocketSitemap,

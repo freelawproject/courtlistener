@@ -18,6 +18,8 @@ def inject_settings(request):
         "DOCKET_ALERT_RECAP_BONUS": settings.DOCKET_ALERT_RECAP_BONUS,
         "SEARCH_TYPES": SEARCH_TYPES,
         "WIKI_API_URL": settings.WIKI_API_BASE_URL,
+        "WIKI_TERMS_URL": settings.WIKI_TERMS_URL,
+        "WIKI_REMOVAL_URL": settings.WIKI_REMOVAL_URL,
     }
 
 

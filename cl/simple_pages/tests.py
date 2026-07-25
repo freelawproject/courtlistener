@@ -320,7 +320,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
-            {"viewname": "terms"},
             {"viewname": "robots"},
             # Contact
             {"viewname": "contact"},
@@ -334,8 +333,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
             {"viewname": "citegeist_help"},
-            {"viewname": "old_terms", "args": ["1"]},
-            {"viewname": "old_terms", "args": ["2"]},
             # Monitoring pages
             {"viewname": "celery_queue_lengths"},
             {"viewname": "heartbeat"},
@@ -404,7 +401,6 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
         ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
         # Info pages
-        ({"viewname": "terms"}, "v2_terms/latest.html"),
         ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
         ({"viewname": "components"}, "v2_components.html"),
     ]
