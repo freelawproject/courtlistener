@@ -234,13 +234,6 @@ def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
     return int(num), duration_as_str[period[0]]
 
 
-RSS_JURISDICTION_LABELS = {
-    Court.FEDERAL_APPELLATE: "Appellate Courts",
-    Court.FEDERAL_DISTRICT: "District Courts",
-    Court.FEDERAL_BANKRUPTCY: "Bankruptcy Courts",
-}
-
-
 async def make_rss_feed_markdown(
     courts: QuerySet,
     jurisdictions: list[str],
@@ -255,6 +248,11 @@ async def make_rss_feed_markdown(
         RSS entry types; otherwise render comma-separated court names.
     :return: A markdown string with one section per jurisdiction.
     """
+    jurisdiction_labels = {
+        Court.FEDERAL_APPELLATE: "Appellate Courts",
+        Court.FEDERAL_DISTRICT: "District Courts",
+        Court.FEDERAL_BANKRUPTCY: "Bankruptcy Courts",
+    }
     groups: dict[str, list[Court]] = {}
     async for court in courts:
         groups.setdefault(court.jurisdiction, []).append(court)
@@ -265,15 +263,14 @@ async def make_rss_feed_markdown(
         if not group:
             continue
         if include_entry_types:
-            rows = "\n".join(
-                f"| {court.short_name} "
-                f"| {court.pacer_rss_entry_types.replace('|', ' ')} |"
-                for court in group
-            )
-            body = f"| Court | Docket Entry Types |\n|---|---|\n{rows}"
+            lines = ["| Court | Docket Entry Types |", "|---|---|"]
+            for court in group:
+                entry_types = court.pacer_rss_entry_types.replace("|", " ")
+                lines.append(f"| {court.short_name} | {entry_types} |")
+            body = "\n".join(lines)
         else:
             body = ", ".join(court.short_name for court in group)
-        sections.append(f"# {RSS_JURISDICTION_LABELS[jurisdiction]}\n\n{body}")
+        sections.append(f"# {jurisdiction_labels[jurisdiction]}\n\n{body}")
     return "\n\n".join(sections)
 
 
