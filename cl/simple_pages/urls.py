@@ -20,9 +20,7 @@ from cl.simple_pages.views import (
     faq,
     feeds,
     help_home,
-    latest_terms,
     markdown_help,
-    old_terms,
     podcasts,
     prayer_help,
     recap_email_help,
@@ -98,8 +96,19 @@ urlpatterns = [
         "coverage/financial-disclosures/",
         RedirectView.as_view(pattern_name="coverage_fds", permanent=True),
     ),
-    path("terms/v/<int:v>/", old_terms, name="old_terms"),  # type: ignore[arg-type]
-    path("terms/", latest_terms, name="terms"),  # type: ignore[arg-type]
+    # Terms moved to the wiki. These redirects preserve external links
+    # and bookmarks; internal links point directly to wiki URLs to avoid
+    # double-hops. Started: 2026-07-23
+    path(
+        "terms/v/<int:v>/",
+        RedirectView.as_view(url=settings.WIKI_TERMS_URL, permanent=True),
+        name="old_terms",
+    ),
+    path(
+        "terms/",
+        RedirectView.as_view(url=settings.WIKI_TERMS_URL, permanent=True),
+        name="terms",
+    ),
     path("components/", components, name="components"),  # type: ignore[arg-type]
     # Robots
     path(
