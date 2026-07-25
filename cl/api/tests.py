@@ -223,6 +223,9 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             "financial_disclosures",
             "alerts",
             "rss_feeds",
+            "prayers",
+            "feeds",
+            "podcasts",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
@@ -241,6 +244,17 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         self.assertIsInstance(alerts["max_attorneys_to_percolate"], int)
         for key in ("full", "partial", "none"):
             self.assertIsInstance(data["rss_feeds"][key], str)
+        prayers = data["prayers"]
+        self.assertIsInstance(prayers["daily_quota"], int)
+        self.assertEqual(
+            prayers["member_daily_quota"], prayers["daily_quota"] * 3
+        )
+        self.assertIsInstance(prayers["granted_count"], int)
+        self.assertIsInstance(prayers["distinct_users"], int)
+        self.assertIsInstance(prayers["distinct_documents"], int)
+        self.assertIsInstance(prayers["total_cost"], str)
+        self.assertIsInstance(data["feeds"]["opinion_courts"], str)
+        self.assertIsInstance(data["podcasts"]["oral_argument_courts"], str)
 
 
 @override_settings(
@@ -251,10 +265,15 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
     }
 )
 class WikiDataRssFeedTests(TestCase):
-    """Test the RSS feed markdown rendered by the wiki-data endpoint."""
+    """Test the markdown fragments rendered by the wiki-data endpoint."""
 
     @classmethod
     def setUpTestData(cls):
+        cls.scraped_court = CourtFactory(
+            full_name="Supreme Court of Testlandia",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=True,
+        )
         cls.full_fd = CourtFactory(
             jurisdiction=Court.FEDERAL_DISTRICT,
             short_name="D. Full Feed",
@@ -305,6 +324,29 @@ class WikiDataRssFeedTests(TestCase):
         self.assertIn("D. No Feed", none_feed)
         # Courts with feeds don't appear in the no-feed section.
         self.assertNotIn("D. Full Feed", none_feed)
+
+    async def test_court_link_list_markdown(self) -> None:
+        """Are scraped courts rendered as markdown link lists?"""
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+
+        pk = self.scraped_court.pk
+        self.assertIn(
+            f"- [Supreme Court of Testlandia]"
+            f"(https://www.courtlistener.com/feed/court/{pk}/)",
+            data["feeds"]["opinion_courts"],
+        )
+        self.assertIn(
+            f"- [Supreme Court of Testlandia]"
+            f"(https://www.courtlistener.com/podcast/court/{pk}/)",
+            data["podcasts"]["oral_argument_courts"],
+        )
+        # Courts without scrapers don't appear in either list.
+        self.assertNotIn("D. Full Feed", data["feeds"]["opinion_courts"])
+        self.assertNotIn(
+            "D. Full Feed", data["podcasts"]["oral_argument_courts"]
+        )
 
 
 class CoverageTests(ESIndexTestCase, TestCase):

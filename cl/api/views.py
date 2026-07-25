@@ -13,6 +13,8 @@ from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 
 from cl.alerts.utils import get_alert_estimation_count
+from cl.favorites.models import Prayer
+from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.lib.elasticsearch_utils import (
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
@@ -274,6 +276,21 @@ async def make_rss_feed_markdown(
     return "\n\n".join(sections)
 
 
+async def make_court_link_list(courts: QuerySet, url_template: str) -> str:
+    """Render courts as a markdown list of links for the wiki.
+
+    :param courts: The courts to render.
+    :param url_template: An absolute URL template with a {pk} placeholder.
+    :return: A markdown bullet list linking each court.
+    """
+    return "\n".join(
+        [
+            f"- [{court.full_name}]({url_template.format(pk=court.pk)})"
+            async for court in courts
+        ]
+    )
+
+
 async def wiki_data(request: HttpRequest) -> JsonResponse:
     """Provide data for the external wiki's help pages.
 
@@ -298,6 +315,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
         f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
     )
+    granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
     # PACER RSS feed coverage, pre-rendered as markdown for the alerts help
     # page. The full-feed section omits appellate courts to match the old
@@ -350,6 +368,28 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
             "max_attorneys_to_percolate": settings.MAX_ATTORNEYS_TO_PERCOLATE,  # type: ignore[misc]
         },
         "rss_feeds": rss_feeds,
+        "prayers": {
+            "daily_quota": settings.ALLOWED_PRAYER_COUNT,  # type: ignore[misc]
+            "member_daily_quota": settings.ALLOWED_PRAYER_COUNT * 3,  # type: ignore[misc]
+            "granted_count": granted_stats.prayer_count,
+            "distinct_users": granted_stats.distinct_users,
+            "distinct_documents": granted_stats.distinct_count,
+            "total_cost": granted_stats.total_cost,
+        },
+        "feeds": {
+            "opinion_courts": await make_court_link_list(
+                Court.objects.filter(in_use=True, has_opinion_scraper=True),
+                "https://www.courtlistener.com/feed/court/{pk}/",
+            ),
+        },
+        "podcasts": {
+            "oral_argument_courts": await make_court_link_list(
+                Court.objects.filter(
+                    in_use=True, has_oral_argument_scraper=True
+                ),
+                "https://www.courtlistener.com/podcast/court/{pk}/",
+            ),
+        },
     }
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
