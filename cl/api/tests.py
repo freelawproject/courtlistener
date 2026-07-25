@@ -210,6 +210,7 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
+        await caches["default"].adelete("wiki-data")
         r = await self.async_client.get(reverse("wiki_data"))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "application/json")
@@ -220,6 +221,8 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             "alerts_sent_count",
             "citation_lookup",
             "financial_disclosures",
+            "alerts",
+            "rss_feeds",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
@@ -231,6 +234,77 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         self.assertIn("max_per_request", citation)
         self.assertIn("disclosures", data["financial_disclosures"])
         self.assertIn("investments", data["financial_disclosures"])
+        alerts = data["alerts"]
+        self.assertIsInstance(alerts["max_free_docket_alerts"], int)
+        self.assertIsInstance(alerts["docket_alert_recap_bonus"], int)
+        self.assertIsInstance(alerts["rt_alerts_sending_rate"], int)
+        self.assertIsInstance(alerts["max_attorneys_to_percolate"], int)
+        for key in ("full", "partial", "none"):
+            self.assertIsInstance(data["rss_feeds"][key], str)
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+)
+class WikiDataRssFeedTests(TestCase):
+    """Test the RSS feed markdown rendered by the wiki-data endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.full_fd = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Feed",
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_f = CourtFactory(
+            jurisdiction=Court.FEDERAL_APPELLATE,
+            short_name="Full Feed Circuit",
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.partial_fb = CourtFactory(
+            jurisdiction=Court.FEDERAL_BANKRUPTCY,
+            short_name="Bankr. D. Partial",
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="order, motion",
+        )
+        cls.no_feed_fd = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. No Feed",
+            pacer_has_rss_feed=False,
+        )
+
+    def setUp(self) -> None:
+        self.async_client = AsyncClient()
+        caches["default"].delete("wiki-data")
+
+    async def test_rss_feed_markdown(self) -> None:
+        """Are courts rendered into the right RSS feed markdown sections?"""
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        rss_feeds = json.loads(r.content)["rss_feeds"]
+
+        full = rss_feeds["full"]
+        self.assertIn("**District Courts**", full)
+        self.assertIn("D. Full Feed", full)
+        # Appellate courts are omitted from the full feed section.
+        self.assertNotIn("Full Feed Circuit", full)
+
+        partial = rss_feeds["partial"]
+        self.assertIn("**Bankruptcy Courts**", partial)
+        self.assertIn("| Court | Docket Entry Types |", partial)
+        self.assertIn("| Bankr. D. Partial | order, motion |", partial)
+
+        none_feed = rss_feeds["none"]
+        self.assertIn("**District Courts**", none_feed)
+        self.assertIn("D. No Feed", none_feed)
+        # Courts with feeds don't appear in the no-feed section.
+        self.assertNotIn("D. Full Feed", none_feed)
 
 
 class CoverageTests(ESIndexTestCase, TestCase):

@@ -234,6 +234,51 @@ def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
     return int(num), duration_as_str[period[0]]
 
 
+RSS_JURISDICTION_LABELS = {
+    Court.FEDERAL_APPELLATE: "Appellate Courts",
+    Court.FEDERAL_DISTRICT: "District Courts",
+    Court.FEDERAL_BANKRUPTCY: "Bankruptcy Courts",
+}
+
+
+async def make_rss_feed_markdown(
+    courts: QuerySet,
+    jurisdictions: list[str],
+    include_entry_types: bool = False,
+) -> str:
+    """Render PACER courts grouped by jurisdiction as wiki-ready markdown.
+
+    :param courts: The courts to render.
+    :param jurisdictions: Jurisdictions to include, in display order. Courts
+        in other jurisdictions are omitted.
+    :param include_entry_types: If True, render a table showing each court's
+        RSS entry types; otherwise render comma-separated court names.
+    :return: A markdown string with one section per jurisdiction.
+    """
+    groups: dict[str, list[Court]] = {}
+    async for court in courts:
+        groups.setdefault(court.jurisdiction, []).append(court)
+
+    sections = []
+    for jurisdiction in jurisdictions:
+        group = groups.get(jurisdiction)
+        if not group:
+            continue
+        if include_entry_types:
+            rows = "\n".join(
+                f"| {court.short_name} "
+                f"| {court.pacer_rss_entry_types.replace('|', ' ')} |"
+                for court in group
+            )
+            body = f"| Court | Docket Entry Types |\n|---|---|\n{rows}"
+        else:
+            body = ", ".join(court.short_name for court in group)
+        sections.append(
+            f"**{RSS_JURISDICTION_LABELS[jurisdiction]}**\n\n{body}"
+        )
+    return "\n\n".join(sections)
+
+
 async def wiki_data(request: HttpRequest) -> JsonResponse:
     """Provide data for the external wiki's help pages.
 
@@ -259,6 +304,35 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
         f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
     )
 
+    # PACER RSS feed coverage, pre-rendered as markdown for the alerts help
+    # page. The full-feed section omits appellate courts to match the old
+    # /help/alerts page, which only listed district and bankruptcy courts.
+    pacer_courts = Court.federal_courts.all_pacer_courts()
+    district_and_bankruptcy = [
+        Court.FEDERAL_DISTRICT,
+        Court.FEDERAL_BANKRUPTCY,
+    ]
+    all_jurisdictions = [Court.FEDERAL_APPELLATE, *district_and_bankruptcy]
+    rss_feeds = {
+        "full": await make_rss_feed_markdown(
+            pacer_courts.filter(
+                pacer_has_rss_feed=True, pacer_rss_entry_types="all"
+            ),
+            district_and_bankruptcy,
+        ),
+        "partial": await make_rss_feed_markdown(
+            pacer_courts.filter(pacer_has_rss_feed=True).exclude(
+                pacer_rss_entry_types="all"
+            ),
+            all_jurisdictions,
+            include_entry_types=True,
+        ),
+        "none": await make_rss_feed_markdown(
+            pacer_courts.filter(pacer_has_rss_feed=False),
+            all_jurisdictions,
+        ),
+    }
+
     data = {
         "court_count": court_count,
         "citation_count": citation_count,
@@ -272,6 +346,15 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
             "disclosures": fd_data["disclosures"],
             "investments": fd_data["investments"],
         },
+        "alerts": {
+            "max_free_docket_alerts": settings.MAX_FREE_DOCKET_ALERTS,  # type: ignore[misc]
+            "docket_alert_recap_bonus": settings.DOCKET_ALERT_RECAP_BONUS,  # type: ignore[misc]
+            "rt_alerts_sending_rate": int(
+                settings.REAL_TIME_ALERTS_SENDING_RATE / 60  # type: ignore[misc]
+            ),
+            "max_attorneys_to_percolate": settings.MAX_ATTORNEYS_TO_PERCOLATE,  # type: ignore[misc]
+        },
+        "rss_feeds": rss_feeds,
     }
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
