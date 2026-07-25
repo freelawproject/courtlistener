@@ -1395,7 +1395,23 @@ async def reporter_or_volume_handler(
             citations__reporter=reporter, citations__volume=volume
         )
         .select_related("docket")
-        .prefetch_related("citations")
+        .only(
+            "case_name",
+            "case_name_full",
+            "case_name_short",
+            "date_filed",
+            "slug",
+            "blocked",
+            "docket__docket_number",
+        )
+        .prefetch_related(
+            Prefetch(
+                "citations",
+                queryset=Citation.objects.only(
+                    "volume", "reporter", "page", "type", "cluster_id"
+                ),
+            )
+        )
         .distinct()
         .order_by("date_filed")
     )

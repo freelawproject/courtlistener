@@ -694,7 +694,9 @@ class CitationRedirectorTest(TestCase):
         self.assertStatus(r, HTTPStatus.OK)
 
     def test_volume_page_uses_bounded_queries(self) -> None:
-        citation = Citation.objects.get(reporter="F.2d", volume="56", page="9")
+        citation = CitationWithParentsFactory.create(
+            reporter="F.2d", volume="56", page="9"
+        )
         citation.cluster.blocked = True
         citation.cluster.save(update_fields=["blocked"])
         CitationWithParentsFactory.create(
