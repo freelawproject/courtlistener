@@ -273,9 +273,7 @@ async def make_rss_feed_markdown(
             body = f"| Court | Docket Entry Types |\n|---|---|\n{rows}"
         else:
             body = ", ".join(court.short_name for court in group)
-        sections.append(
-            f"**{RSS_JURISDICTION_LABELS[jurisdiction]}**\n\n{body}"
-        )
+        sections.append(f"# {RSS_JURISDICTION_LABELS[jurisdiction]}\n\n{body}")
     return "\n\n".join(sections)
 
 

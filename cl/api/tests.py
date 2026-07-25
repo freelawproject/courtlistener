@@ -290,18 +290,18 @@ class WikiDataRssFeedTests(TestCase):
         rss_feeds = json.loads(r.content)["rss_feeds"]
 
         full = rss_feeds["full"]
-        self.assertIn("**District Courts**", full)
+        self.assertIn("# District Courts", full)
         self.assertIn("D. Full Feed", full)
         # Appellate courts are omitted from the full feed section.
         self.assertNotIn("Full Feed Circuit", full)
 
         partial = rss_feeds["partial"]
-        self.assertIn("**Bankruptcy Courts**", partial)
+        self.assertIn("# Bankruptcy Courts", partial)
         self.assertIn("| Court | Docket Entry Types |", partial)
         self.assertIn("| Bankr. D. Partial | order, motion |", partial)
 
         none_feed = rss_feeds["none"]
-        self.assertIn("**District Courts**", none_feed)
+        self.assertIn("# District Courts", none_feed)
         self.assertIn("D. No Feed", none_feed)
         # Courts with feeds don't appear in the no-feed section.
         self.assertNotIn("D. Full Feed", none_feed)
