@@ -187,6 +187,8 @@ class OpinionAuthoritiesViewTest(TestCase):
 
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertContains(response, "Table of Authorities")
+
+
 class UpdateOpinionTabsTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
