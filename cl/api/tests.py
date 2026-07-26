@@ -90,6 +90,7 @@ from cl.favorites.models import GenericCount
 from cl.lib.decorators import clear_tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
+from cl.lib.url_utils import BASE_URL
 from cl.people_db.api_views import (
     ABARatingViewSet,
     AttorneyViewSet,
@@ -223,6 +224,9 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             "financial_disclosures",
             "alerts",
             "rss_feeds",
+            "prayers",
+            "feeds",
+            "podcasts",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
@@ -241,6 +245,17 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         self.assertIsInstance(alerts["max_attorneys_to_percolate"], int)
         for key in ("full", "partial", "none"):
             self.assertIsInstance(data["rss_feeds"][key], str)
+        prayers = data["prayers"]
+        self.assertIsInstance(prayers["daily_quota"], int)
+        self.assertEqual(
+            prayers["member_daily_quota"], prayers["daily_quota"] * 3
+        )
+        self.assertIsInstance(prayers["granted_count"], int)
+        self.assertIsInstance(prayers["distinct_users"], int)
+        self.assertIsInstance(prayers["distinct_documents"], int)
+        self.assertIsInstance(prayers["total_cost"], str)
+        self.assertIsInstance(data["feeds"]["opinion_courts"], str)
+        self.assertIsInstance(data["podcasts"]["oral_argument_courts"], str)
 
 
 @override_settings(
@@ -251,13 +266,33 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
     }
 )
 class WikiDataRssFeedTests(TestCase):
-    """Test the RSS feed markdown rendered by the wiki-data endpoint."""
+    """Test the markdown fragments rendered by the wiki-data endpoint."""
 
     @classmethod
     def setUpTestData(cls):
+        cls.scraped_court = CourtFactory(
+            full_name="Supreme Court of Testlandia",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=True,
+        )
         cls.full_fd = CourtFactory(
             jurisdiction=Court.FEDERAL_DISTRICT,
             short_name="D. Full Feed",
+            position=940.1,
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_fd_two = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Two",
+            position=940.2,
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_fd_three = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Three",
+            position=940.3,
             pacer_has_rss_feed=True,
             pacer_rss_entry_types="all",
         )
@@ -291,7 +326,10 @@ class WikiDataRssFeedTests(TestCase):
 
         full = rss_feeds["full"]
         self.assertIn("# District Courts", full)
-        self.assertIn("D. Full Feed", full)
+        # Three courts flow into a two-column table reading top to bottom,
+        # then left to right.
+        self.assertIn("| D. Full Feed | D. Full Three |", full)
+        self.assertIn("| D. Full Two |  |", full)
         # Appellate courts are omitted from the full feed section.
         self.assertNotIn("Full Feed Circuit", full)
 
@@ -305,6 +343,65 @@ class WikiDataRssFeedTests(TestCase):
         self.assertIn("D. No Feed", none_feed)
         # Courts with feeds don't appear in the no-feed section.
         self.assertNotIn("D. Full Feed", none_feed)
+
+    async def test_court_link_list_markdown(self) -> None:
+        """Are scraped courts rendered as markdown link lists?"""
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+
+        pk = self.scraped_court.pk
+        feed_url = BASE_URL + reverse(
+            "jurisdiction_feed", kwargs={"court": pk}
+        )
+        self.assertIn(
+            f"- [Supreme Court of Testlandia]({feed_url})",
+            data["feeds"]["opinion_courts"],
+        )
+        podcast_url = BASE_URL + reverse(
+            "jurisdiction_podcast", kwargs={"court": pk}
+        )
+        self.assertIn(
+            f"- [Supreme Court of Testlandia]({podcast_url})",
+            data["podcasts"]["oral_argument_courts"],
+        )
+        # Courts without scrapers don't appear in either list.
+        self.assertNotIn("D. Full Feed", data["feeds"]["opinion_courts"])
+        self.assertNotIn(
+            "D. Full Feed", data["podcasts"]["oral_argument_courts"]
+        )
+
+    async def test_bust_cache_param(self) -> None:
+        """Does ?bust_cache rebuild the cached response for staff only?"""
+        sentinel = {"sentinel": True}
+        await caches["default"].aset("wiki-data", sentinel)
+
+        # Without the param, the cached payload is served.
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # Anonymous and non-staff users can't bust the cache.
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+        non_staff = await sync_to_async(UserFactory)(is_staff=False)
+        await self.async_client.aforce_login(non_staff)
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # Staff can: the response is rebuilt and re-cached.
+        staff = await sync_to_async(UserFactory)(is_staff=True)
+        await self.async_client.aforce_login(staff)
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        data = json.loads(r.content)
+        self.assertIn("rss_feeds", data)
+        cached = await caches["default"].aget("wiki-data")
+        self.assertIn("rss_feeds", cached)
 
 
 class CoverageTests(ESIndexTestCase, TestCase):
