@@ -14,6 +14,7 @@ from waffle.testutils import override_flag
 from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.simple_pages.forms import ContactForm
+from cl.simple_pages.sitemap import SimpleSitemap
 from cl.tests.cases import SimpleTestCase, TestCase
 
 
@@ -306,6 +307,22 @@ class PageLoadTestMixin(TestCase):
         if r["content-type"] and is_html:
             self.assert_page_title_in_html(r.content.decode())
         return r
+
+
+class SimpleSitemapTest(TestCase):
+    def test_every_sitemap_entry_reverses(self) -> None:
+        """Does every sitemap entry point to a URL name that still exists?
+
+        Regression test for stale entries left behind when a page is
+        removed, like the old contribute page.
+        """
+        sitemap = SimpleSitemap()
+        for item in sitemap.items():
+            with self.subTest(view_name=item["view_name"]):
+                self.assertTrue(sitemap.location(item))
+
+        r = self.client.get(reverse("sitemaps", kwargs={"section": "simple"}))
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
 class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
