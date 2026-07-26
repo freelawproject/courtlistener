@@ -1,8 +1,8 @@
-"""301 redirects from old API help pages to wiki.free.law.
+"""301 redirects from old API and help pages to wiki.free.law.
 
-API documentation has permanently moved to the wiki. These redirects
-preserve external links and bookmarks. Internal links point directly
-to wiki URLs to avoid double-hops.
+API documentation and general help pages have permanently moved to the
+wiki. These redirects preserve external links and bookmarks. Internal
+links point directly to wiki URLs to avoid double-hops.
 """
 
 from django.conf import settings
@@ -40,6 +40,69 @@ _PATH_REDIRECTS: list[tuple[str, str, str]] = [
     (
         "api/replication/",
         "replication/database-replication-for-organizations-and-researchers",
+        "",
+    ),
+]
+
+# Help pages that moved to the wiki. Same shape as _PATH_REDIRECTS, but
+# these use settings.WIKI_HELP_BASE_URL. Started: 2026-07-26
+# (old_path, wiki_suffix, url_name | "")
+_HELP_PATH_REDIRECTS: list[tuple[str, str, str]] = [
+    (
+        "feeds/",
+        "general/using-atom-and-rss-feeds-for-the-latest-updates",
+        "feeds_info",
+    ),
+    (
+        "podcasts/",
+        "general/custom-podcasts-of-oral-argument-audio-recordings",
+        "podcasts",
+    ),
+    (
+        "help/markdown/",
+        "general/markdown-guide-for-courtlistener",
+        "markdown_help",
+    ),
+    ("help/alerts/", "alerts/", "alert_help"),
+    (
+        "help/delete-account/",
+        "general/how-do-i-delete-my-courtlistener-account",
+        "delete_help",
+    ),
+    (
+        "help/tags-notes/",
+        "general/using-tags-to-organize-docket-collections",
+        "tag_notes_help",
+    ),
+    (
+        "help/search-operators/",
+        "search/advanced-search-and-query-techniques",
+        "advanced_search",
+    ),
+    (
+        "help/citegeist/",
+        "search/the-citegeist-relevancy-engine",
+        "citegeist_help",
+    ),
+    (
+        "help/relative-dates/",
+        "search/use-relative-date-queries-to-keep-alerts-fresh",
+        "relative_dates",
+    ),
+    (
+        "help/pray-and-pay/",
+        "recap/help-with-pray-and-pay-project",
+        "pray_and_pay_help",
+    ),
+    (
+        "help/recap/email/",
+        "recap/recap-email/recapemail-overview",
+        "recap_email_help",
+    ),
+    # Added 2018-10-23
+    (
+        "search/advanced-techniques/",
+        "search/advanced-search-and-query-techniques",
         "",
     ),
 ]
@@ -83,6 +146,18 @@ def _build_patterns() -> list:
             path(
                 old_path,
                 RedirectView.as_view(url=url, permanent=True),
+                name=name or None,
+            )
+        )
+
+    for old_path, wiki_suffix, name in _HELP_PATH_REDIRECTS:
+        patterns.append(
+            path(
+                old_path,
+                RedirectView.as_view(
+                    url=f"{settings.WIKI_HELP_BASE_URL}/{wiki_suffix}",
+                    permanent=True,
+                ),
                 name=name or None,
             )
         )
