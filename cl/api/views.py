@@ -358,7 +358,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
             all_jurisdictions,
         ),
     }
-    granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+    prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
     data = {
         "court_count": court_count,
@@ -385,10 +385,10 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
         "prayers": {
             "daily_quota": settings.ALLOWED_PRAYER_COUNT,  # type: ignore[misc]
             "member_daily_quota": settings.ALLOWED_PRAYER_COUNT * 3,  # type: ignore[misc]
-            "granted_count": granted_stats.prayer_count,
-            "distinct_users": granted_stats.distinct_users,
-            "distinct_documents": granted_stats.distinct_count,
-            "total_cost": granted_stats.total_cost,
+            "granted_count": prayer_stats.prayer_count,
+            "distinct_users": prayer_stats.distinct_users,
+            "distinct_documents": prayer_stats.distinct_count,
+            "total_cost": prayer_stats.total_cost,
         },
         "feeds": {
             "opinion_courts": await make_court_link_list(
