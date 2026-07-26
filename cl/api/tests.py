@@ -278,21 +278,21 @@ class WikiDataRssFeedTests(TestCase):
         cls.full_fd = CourtFactory(
             jurisdiction=Court.FEDERAL_DISTRICT,
             short_name="D. Full Feed",
-            position=1.0,
+            position=940.1,
             pacer_has_rss_feed=True,
             pacer_rss_entry_types="all",
         )
         cls.full_fd_two = CourtFactory(
             jurisdiction=Court.FEDERAL_DISTRICT,
             short_name="D. Full Two",
-            position=2.0,
+            position=940.2,
             pacer_has_rss_feed=True,
             pacer_rss_entry_types="all",
         )
         cls.full_fd_three = CourtFactory(
             jurisdiction=Court.FEDERAL_DISTRICT,
             short_name="D. Full Three",
-            position=3.0,
+            position=940.3,
             pacer_has_rss_feed=True,
             pacer_rss_entry_types="all",
         )
@@ -372,7 +372,7 @@ class WikiDataRssFeedTests(TestCase):
         )
 
     async def test_bust_cache_param(self) -> None:
-        """Does ?bust_cache skip the cached response and rebuild it?"""
+        """Does ?bust_cache rebuild the cached response for staff only?"""
         sentinel = {"sentinel": True}
         await caches["default"].aset("wiki-data", sentinel)
 
@@ -380,7 +380,21 @@ class WikiDataRssFeedTests(TestCase):
         r = await self.async_client.get(reverse("wiki_data"))
         self.assertEqual(json.loads(r.content), sentinel)
 
-        # With it, the response is rebuilt and re-cached.
+        # Anonymous and non-staff users can't bust the cache.
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+        non_staff = await sync_to_async(UserFactory)(is_staff=False)
+        await self.async_client.aforce_login(non_staff)
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # Staff can: the response is rebuilt and re-cached.
+        staff = await sync_to_async(UserFactory)(is_staff=True)
+        await self.async_client.aforce_login(staff)
         r = await self.async_client.get(
             reverse("wiki_data"), {"bust_cache": ""}
         )

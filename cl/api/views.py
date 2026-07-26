@@ -307,11 +307,15 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     Returns counts and settings used across several API documentation pages
     so the wiki can display them via external data connectors.
 
-    Pass ?bust_cache to skip the cached response and rebuild it, e.g. after
-    court metadata changes.
+    Staff users can pass ?bust_cache to skip the cached response and rebuild
+    it, e.g. after court metadata changes. The rebuild is expensive, so the
+    param is ignored for everybody else.
     """
     cache_key = "wiki-data"
-    if "bust_cache" not in request.GET:
+    bust_cache = (
+        "bust_cache" in request.GET and (await request.auser()).is_staff  # type: ignore[attr-defined]
+    )
+    if not bust_cache:
         data = await cache.aget(cache_key)
         if data is not None:
             return JsonResponse(data)
