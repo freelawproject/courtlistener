@@ -90,6 +90,7 @@ from cl.favorites.models import GenericCount
 from cl.lib.decorators import clear_tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
+from cl.lib.url_utils import BASE_URL
 from cl.people_db.api_views import (
     ABARatingViewSet,
     AttorneyViewSet,
@@ -350,14 +351,18 @@ class WikiDataRssFeedTests(TestCase):
         data = json.loads(r.content)
 
         pk = self.scraped_court.pk
-        self.assertIn(
-            f"- [Supreme Court of Testlandia]"
-            f"(https://www.courtlistener.com/feed/court/{pk}/)",
-            data["feeds"]["opinion_courts"],
+        feed_url = BASE_URL + reverse(
+            "jurisdiction_feed", kwargs={"court": pk}
         )
         self.assertIn(
-            f"- [Supreme Court of Testlandia]"
-            f"(https://www.courtlistener.com/podcast/court/{pk}/)",
+            f"- [Supreme Court of Testlandia]({feed_url})",
+            data["feeds"]["opinion_courts"],
+        )
+        podcast_url = BASE_URL + reverse(
+            "jurisdiction_podcast", kwargs={"court": pk}
+        )
+        self.assertIn(
+            f"- [Supreme Court of Testlandia]({podcast_url})",
             data["podcasts"]["oral_argument_courts"],
         )
         # Courts without scrapers don't appear in either list.

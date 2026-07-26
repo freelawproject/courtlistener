@@ -10,15 +10,18 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.views.decorators.cache import cache_page
 
 from cl.alerts.utils import get_alert_estimation_count
+from cl.custom_filters.templatetags.partition_util import columns
 from cl.favorites.models import Prayer
 from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.lib.elasticsearch_utils import (
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
 )
+from cl.lib.url_utils import BASE_URL
 from cl.search.documents import OpinionClusterDocument
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
@@ -273,31 +276,29 @@ async def make_rss_feed_markdown(
             body = "\n".join(lines)
         else:
             names = [court.short_name for court in group]
-            column_height = (len(names) + 1) // 2
             lines = ["| | |", "|---|---|"]
-            for i in range(column_height):
-                left = names[i]
-                right_index = i + column_height
-                right = names[right_index] if right_index < len(names) else ""
+            for row in columns(names, 2):
+                left = row[0]
+                right = row[1] if len(row) > 1 else ""
                 lines.append(f"| {left} | {right} |")
             body = "\n".join(lines)
         sections.append(f"# {jurisdiction_labels[jurisdiction]}\n\n{body}")
     return "\n\n".join(sections)
 
 
-async def make_court_link_list(courts: QuerySet, url_template: str) -> str:
+async def make_court_link_list(courts: QuerySet, url_name: str) -> str:
     """Render courts as a markdown list of links for the wiki.
 
     :param courts: The courts to render.
-    :param url_template: An absolute URL template with a {pk} placeholder.
+    :param url_name: The URL name to reverse for each court's link. It must
+        take a single "court" kwarg.
     :return: A markdown bullet list linking each court.
     """
-    return "\n".join(
-        [
-            f"- [{court.full_name}]({url_template.format(pk=court.pk)})"
-            async for court in courts
-        ]
-    )
+    lines = []
+    async for court in courts:
+        url = BASE_URL + reverse(url_name, kwargs={"court": court.pk})
+        lines.append(f"- [{court.full_name}]({url})")
+    return "\n".join(lines)
 
 
 async def wiki_data(request: HttpRequest) -> JsonResponse:
@@ -328,7 +329,6 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
         f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
     )
-    granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
     # PACER RSS feed coverage, pre-rendered as markdown for the alerts help
     # page. The full-feed section omits appellate courts to match the old
@@ -358,6 +358,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
             all_jurisdictions,
         ),
     }
+    granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
     data = {
         "court_count": court_count,
@@ -392,7 +393,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
         "feeds": {
             "opinion_courts": await make_court_link_list(
                 Court.objects.filter(in_use=True, has_opinion_scraper=True),
-                "https://www.courtlistener.com/feed/court/{pk}/",
+                "jurisdiction_feed",
             ),
         },
         "podcasts": {
@@ -400,7 +401,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
                 Court.objects.filter(
                     in_use=True, has_oral_argument_scraper=True
                 ),
-                "https://www.courtlistener.com/podcast/court/{pk}/",
+                "jurisdiction_podcast",
             ),
         },
     }
