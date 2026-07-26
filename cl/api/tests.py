@@ -277,6 +277,21 @@ class WikiDataRssFeedTests(TestCase):
         cls.full_fd = CourtFactory(
             jurisdiction=Court.FEDERAL_DISTRICT,
             short_name="D. Full Feed",
+            position=1.0,
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_fd_two = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Two",
+            position=2.0,
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_fd_three = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Three",
+            position=3.0,
             pacer_has_rss_feed=True,
             pacer_rss_entry_types="all",
         )
@@ -310,7 +325,10 @@ class WikiDataRssFeedTests(TestCase):
 
         full = rss_feeds["full"]
         self.assertIn("# District Courts", full)
-        self.assertIn("D. Full Feed", full)
+        # Three courts flow into a two-column table reading top to bottom,
+        # then left to right.
+        self.assertIn("| D. Full Feed | D. Full Three |", full)
+        self.assertIn("| D. Full Two |  |", full)
         # Appellate courts are omitted from the full feed section.
         self.assertNotIn("Full Feed Circuit", full)
 
@@ -347,6 +365,24 @@ class WikiDataRssFeedTests(TestCase):
         self.assertNotIn(
             "D. Full Feed", data["podcasts"]["oral_argument_courts"]
         )
+
+    async def test_bust_cache_param(self) -> None:
+        """Does ?bust_cache skip the cached response and rebuild it?"""
+        sentinel = {"sentinel": True}
+        await caches["default"].aset("wiki-data", sentinel)
+
+        # Without the param, the cached payload is served.
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # With it, the response is rebuilt and re-cached.
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        data = json.loads(r.content)
+        self.assertIn("rss_feeds", data)
+        cached = await caches["default"].aget("wiki-data")
+        self.assertIn("rss_feeds", cached)
 
 
 class CoverageTests(ESIndexTestCase, TestCase):

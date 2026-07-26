@@ -247,7 +247,8 @@ async def make_rss_feed_markdown(
     :param jurisdictions: Jurisdictions to include, in display order. Courts
         in other jurisdictions are omitted.
     :param include_entry_types: If True, render a table showing each court's
-        RSS entry types; otherwise render comma-separated court names.
+        RSS entry types; otherwise render court names in a two-column table
+        that reads top to bottom, then left to right.
     :return: A markdown string with one section per jurisdiction.
     """
     jurisdiction_labels = {
@@ -271,7 +272,15 @@ async def make_rss_feed_markdown(
                 lines.append(f"| {court.short_name} | {entry_types} |")
             body = "\n".join(lines)
         else:
-            body = ", ".join(court.short_name for court in group)
+            names = [court.short_name for court in group]
+            column_height = (len(names) + 1) // 2
+            lines = ["| | |", "|---|---|"]
+            for i in range(column_height):
+                left = names[i]
+                right_index = i + column_height
+                right = names[right_index] if right_index < len(names) else ""
+                lines.append(f"| {left} | {right} |")
+            body = "\n".join(lines)
         sections.append(f"# {jurisdiction_labels[jurisdiction]}\n\n{body}")
     return "\n\n".join(sections)
 
@@ -296,11 +305,15 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
 
     Returns counts and settings used across several API documentation pages
     so the wiki can display them via external data connectors.
+
+    Pass ?bust_cache to skip the cached response and rebuild it, e.g. after
+    court metadata changes.
     """
     cache_key = "wiki-data"
-    data = await cache.aget(cache_key)
-    if data is not None:
-        return JsonResponse(data)
+    if "bust_cache" not in request.GET:
+        data = await cache.aget(cache_key)
+        if data is not None:
+            return JsonResponse(data)
 
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
