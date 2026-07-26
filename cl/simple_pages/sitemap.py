@@ -28,7 +28,6 @@ class SimpleSitemap(sitemaps.Sitemap):
             ),
             make_url_dict("coverage_fds", priority=0.4),
             make_url_dict("coverage_recap", priority=0.4),
-            make_url_dict("contribute", priority=0.6, changefreq="never"),
             make_url_dict("contact", priority=0.5),
             # Help pages
             make_url_dict("help_home", priority=0.5, changefreq="monthly"),
