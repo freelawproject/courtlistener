@@ -6,20 +6,14 @@ from http import HTTPStatus
 from typing import Any
 
 from asgiref.sync import sync_to_async
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db.models import (
-    Case,
     Count,
-    IntegerField,
     QuerySet,
     Sum,
-    Value,
-    When,
 )
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
-from django.template import loader
 from django.template.response import TemplateResponse
 from django.urls import reverse
 
@@ -35,8 +29,6 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.favorites.models import Prayer
-from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.people_db.models import Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
@@ -45,11 +37,9 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.selectors import get_available_documents_estimate_count
-from cl.search.utils import get_redis_stat_sum
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
-from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
 
@@ -93,91 +83,6 @@ async def faq(request: HttpRequest) -> HttpResponse:
 
 async def help_home(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "help/index.html", {"private": False})
-
-
-async def alert_help(request: HttpRequest) -> HttpResponse:
-    jurisdiction_ordering = Case(
-        When(jurisdiction="F", then=Value(0)),
-        When(jurisdiction="FD", then=Value(1)),
-        When(jurisdiction="FB", then=Value(2)),
-        default=Value(999),
-        output_field=IntegerField(),
-    )  # Sort apellate courts first, then district, then bankruptcy.
-
-    no_feeds = (
-        Court.federal_courts.all_pacer_courts()
-        .filter(
-            pacer_has_rss_feed=False,
-        )
-        .order_by(jurisdiction_ordering)
-    )
-    partial_feeds = (
-        Court.federal_courts.all_pacer_courts()
-        .filter(pacer_has_rss_feed=True)
-        .exclude(pacer_rss_entry_types="all")
-        .order_by(jurisdiction_ordering)
-    )
-    full_feeds = (
-        Court.federal_courts.all_pacer_courts()
-        .filter(pacer_has_rss_feed=True, pacer_rss_entry_types="all")
-        .order_by(jurisdiction_ordering)
-    )
-    context = {
-        "no_feeds": no_feeds,
-        "partial_feeds": partial_feeds,
-        "full_feeds": full_feeds,
-        "private": False,
-        "rt_alerts_sending_rate": int(
-            settings.REAL_TIME_ALERTS_SENDING_RATE / 60
-        ),
-        "MAX_ATTORNEYS_TO_PERCOLATE": settings.MAX_ATTORNEYS_TO_PERCOLATE,
-        # Yesterday's alert total; start=1 skips today's still-filling bucket.
-        "alerts_sent_count": await sync_to_async(get_redis_stat_sum)(
-            f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
-        ),
-    }
-    return TemplateResponse(request, "help/alert_help.html", context)
-
-
-async def delete_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request, "help/delete_account_help.html", {"private": False}
-    )
-
-
-async def markdown_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request, "help/markdown_help.html", {"private": False}
-    )
-
-
-async def prayer_help(request: HttpRequest) -> HttpResponse:
-    stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
-
-    context = {
-        "daily_quota": settings.ALLOWED_PRAYER_COUNT,
-        "private": False,
-        "granted_stats": stats,
-    }
-
-    return TemplateResponse(request, "help/prayer_help.html", context)
-
-
-async def relative_dates(request: HttpRequest) -> HttpResponse:
-    context = {
-        "private": False,
-    }
-    return TemplateResponse(request, "help/relative_dates_help.html", context)
-
-
-async def tag_notes_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "help/tags_help.html", {"private": False})
-
-
-async def recap_email_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request, "help/recap_email_help.html", {"private": False}
-    )
 
 
 async def broken_email_help(request: HttpRequest) -> HttpResponse:
@@ -365,33 +270,6 @@ async def coverage_recap(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def feeds(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "feeds.html",
-        {
-            "opinion_courts": Court.objects.filter(
-                in_use=True, has_opinion_scraper=True
-            ),
-            "private": False,
-        },
-    )
-
-
-async def podcasts(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "podcasts.html",
-        {
-            "oral_argument_courts": Court.objects.filter(
-                in_use=True, has_oral_argument_scraper=True
-            ),
-            "count": await Audio.objects.all().acount(),
-            "private": False,
-        },
-    )
-
-
 async def contact(
     request: HttpRequest,
     template_path: str = "contact_form.html",
@@ -475,22 +353,6 @@ async def contact(
 
 async def contact_thanks(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "contact_thanks.html", {"private": True})
-
-
-async def advanced_search(request: HttpRequest) -> HttpResponse:
-    types = ["opinions", "parentheticals", "recap_archive", "oral_arguments"]
-    json_template = loader.get_template("includes/available_fields.json")
-    json_content = json_template.render()
-    data = json.loads(json_content)
-    return TemplateResponse(
-        request,
-        "help/advanced_search.html",
-        {"private": False, "data": data, "types": types},
-    )
-
-
-async def citegeist_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "citegeist.html", {"private": False})
 
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
