@@ -19,7 +19,7 @@
       {% if user.is_authenticated %}
         <div class="modal-body logged-in hidden">
           {% if not request.GET.edit_alert %}
-            <p>Get regular notifications about this query by creating an alert. <a href="{% url "alert_help" %}">Learn more&nbsp;<i
+            <p>Get regular notifications about this query by creating an alert. <a href="{{ WIKI_HELP_URL }}/alerts/search-alerts-for-case-law-and-filings">Learn more&nbsp;<i
                     class="fa fa-question-circle gray"></i></a>
             </p>
           {% endif %}

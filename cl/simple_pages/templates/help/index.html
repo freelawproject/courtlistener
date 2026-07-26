@@ -25,21 +25,11 @@
   <div class="hidden-xs col-sm-2 col-md-3"></div>
   <div class="col-xs-12 col-sm-8 col-md-6">
     <h1>Getting Help on CourtListener</h1>
-    <p class="lead">The following help articles are currently available:</p>
-    <ol>
-      <li><p><a href="{% url "alert_help" %}">Help with search and docket alerts</a></p></li>
-      <li><p><a href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></p></li>
-      <li><p><a href="{% url "recap_email_help" %}">Help with @recap.email</a></p></li>
-      <li><p><a href="{% url "advanced_search" %}">Help with advanced search parameters</a></p></li>
-      <li><p><a href="{% url "citegeist_help" %}">How search results are ranked</a></p></li>
-      <li><p><a href="{% url "relative_dates" %}">Help with relative date queries</a></p></li>
-      <li><p><a href="{% url "tag_notes_help" %}">Learn how to tag dockets and save notes</a></p></li>
-      <li><p><a href="{% url "feeds_info" %}">Learn about RSS feeds</a></p></li>
-      <li><p><a href="{% url "podcasts" %}">Learn about our Podcasts</a></p></li>
-      <li><p><a href="{% url "markdown_help" %}">Help formatting with Markdown</a></p></li>
-      <li><p><a href="{% url "donation_help" %}">Help with your donations</a></p></li>
-      <li><p><a href="{% url "delete_help" %}">Help deleting your account</a></p></li>
-    </ol>
+    <p class="lead">Our help articles are available on the Free Law Project wiki.</p>
+    <p>
+      <a href="{{ WIKI_HELP_URL }}" class="btn btn-primary btn-lg">Help Articles on the Wiki</a>
+      <a href="{% url "donation_help" %}" class="btn btn-default btn-lg">Help with your Donations</a>
+    </p>
 
     <h2 class="v-offset-above-3">About our Data</h2>
     <p class="lead">We've built some of the biggest open datasets in the world. Learn more about them:</p>

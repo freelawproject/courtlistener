@@ -319,20 +319,13 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             {"viewname": "coverage_oa"},
             # Info pages
             {"viewname": "faq"},
-            {"viewname": "feeds_info"},
             {"viewname": "robots"},
             # Contact
             {"viewname": "contact"},
             {"viewname": "contact_thanks"},
             # Help pages
             {"viewname": "help_home"},
-            {"viewname": "alert_help"},
-            {"viewname": "delete_help"},
-            {"viewname": "markdown_help"},
-            {"viewname": "advanced_search"},
-            {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
-            {"viewname": "citegeist_help"},
             # Monitoring pages
             {"viewname": "celery_queue_lengths"},
             {"viewname": "heartbeat"},
@@ -396,12 +389,7 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "coverage_fds"}, "v2_help/coverage_fds.html"),
         ({"viewname": "coverage_oa"}, "v2_help/coverage_oa.html"),
         ({"viewname": "coverage_recap"}, "v2_help/coverage_recap.html"),
-        ({"viewname": "alert_help"}, "v2_help/alert_help.html"),
-        ({"viewname": "tag_notes_help"}, "v2_help/tags_help.html"),
-        ({"viewname": "recap_email_help"}, "v2_help/recap_email_help.html"),
-        ({"viewname": "markdown_help"}, "v2_help/markdown_help.html"),
         # Info pages
-        ({"viewname": "citegeist_help"}, "v2_citegeist.html"),
         ({"viewname": "components"}, "v2_components.html"),
     ]
 

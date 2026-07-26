@@ -4,10 +4,7 @@ from django.views.generic import RedirectView
 from django.views.generic.base import TemplateView
 
 from cl.simple_pages.views import (
-    advanced_search,
-    alert_help,
     broken_email_help,
-    citegeist_help,
     components,
     contact,
     contact_thanks,
@@ -16,24 +13,14 @@ from cl.simple_pages.views import (
     coverage_oa,
     coverage_opinions,
     coverage_recap,
-    delete_help,
     faq,
-    feeds,
     help_home,
-    markdown_help,
-    podcasts,
-    prayer_help,
-    recap_email_help,
-    relative_dates,
-    tag_notes_help,
     validate_for_wot,
 )
 
 urlpatterns = [
     # Footer stuff
     path("faq/", faq, name="faq"),  # type: ignore[arg-type]
-    path("feeds/", feeds, name="feeds_info"),  # type: ignore[arg-type]
-    path("podcasts/", podcasts, name="podcasts"),  # type: ignore[arg-type]
     path("contact/", contact, name="contact"),  # type: ignore[arg-type]
     path("contact/thanks/", contact_thanks, name="contact_thanks"),  # type: ignore[arg-type]
     # Help pages
@@ -55,16 +42,7 @@ urlpatterns = [
         coverage_recap,  # type: ignore[arg-type]
         name="coverage_recap",
     ),
-    path("help/markdown/", markdown_help, name="markdown_help"),  # type: ignore[arg-type]
-    path("help/alerts/", alert_help, name="alert_help"),  # type: ignore[arg-type]
-    path("help/delete-account/", delete_help, name="delete_help"),  # type: ignore[arg-type]
-    path("help/tags-notes/", tag_notes_help, name="tag_notes_help"),  # type: ignore[arg-type]
-    path("help/search-operators/", advanced_search, name="advanced_search"),  # type: ignore[arg-type]
-    path("help/citegeist/", citegeist_help, name="citegeist_help"),  # type: ignore[arg-type]
-    path("help/recap/email/", recap_email_help, name="recap_email_help"),  # type: ignore[arg-type]
     path("help/broken-email/", broken_email_help, name="broken_email_help"),  # type: ignore[arg-type]
-    path("help/pray-and-pay/", prayer_help, name="pray_and_pay_help"),  # type: ignore[arg-type]
-    path("help/relative-dates/", relative_dates, name="relative_dates"),  # type: ignore[arg-type]
     path(
         "help/mcp/",
         RedirectView.as_view(
@@ -80,11 +58,6 @@ urlpatterns = [
             permanent=True,
         ),
         name="cluster_redirections_help",
-    ),
-    # Added 2018-10-23
-    path(
-        "search/advanced-techniques/",
-        RedirectView.as_view(pattern_name="advanced_search", permanent=True),
     ),
     # Redirect coverage pages from /coverage/ to /help/coverage/
     # Started: 2023-01-17

@@ -38,7 +38,7 @@
       <b>{{ request.user.profile.recap_email }}</b>
     </p>
     {%  endspaceless %}
-    <p><a href="{% url "recap_email_help" %}#how-do-i-set-it-up" class="btn btn-lg btn-primary">Explain how</a></p>
+    <p><a href="{{ WIKI_HELP_URL }}/recap/recap-email/recapemail-overview#how-do-i-set-it-up" class="btn btn-lg btn-primary">Explain how</a></p>
 
     <h2 class="v-offset-above-3">Auto-Subscribe to your cases</h2>
     <p>With auto-subscribe on, we'll forward your notifications when we get them. To decide about each case manually, set auto-subscribe to off.</p>
@@ -60,7 +60,7 @@
       </div>
     </div>
     <hr>
-    <a href="{% url "recap_email_help" %}" class="btn btn-primary btn-lg">Learn more</a>
+    <a href="{{ WIKI_HELP_URL }}/recap/recap-email/recapemail-overview" class="btn btn-primary btn-lg">Learn more</a>
   </div>
   <div class="col-sm-3"></div>
 {% endblock %}
