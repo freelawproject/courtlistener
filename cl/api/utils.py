@@ -1466,69 +1466,6 @@ def invert_user_logs(
     return user_keyed_out
 
 
-def get_user_ids_for_date_range(
-    start: str | datetime,
-    end: str | datetime,
-) -> set[int]:
-    """Get a list of user IDs that used the API during a span of time
-
-    :param start: The beginning of when you want to find users. A str to be
-    interpreted by dateparser.
-    :param end: The end of when you want to find users.  A str to be
-    interpreted by dateparser.
-    :return Set of user IDs during a time period. Will not contain anonymous
-    users.
-    """
-    r = get_redis_interface("STATS")
-    pipe = r.pipeline()
-
-    date_strs = make_date_str_list(start, end)
-    for d in date_strs:
-        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1)
-
-    results: list = pipe.execute()
-    result_set: set = set().union(*results)
-    return {int(i) for i in result_set if i.isdigit()}
-
-
-def get_count_for_endpoint(endpoint: str, start: str, end: str) -> int:
-    """Get the count of hits for an endpoint by name, during a date range
-
-    :param endpoint: The endpoint to get the count for. Typically something
-    like 'docket-list' or 'docket-detail'
-    :param start: The beginning date (inclusive) you want the results for.
-    :param end: The end date (inclusive) you want the results for.
-    :return int: The count for that endpoint
-    """
-    r = get_redis_interface("STATS")
-    pipe = r.pipeline()
-
-    dates = make_date_str_list(start, end)
-    for d in dates:
-        pipe.zscore(f"api:v3.endpoint.d:{d}.counts", endpoint)
-    results = pipe.execute()
-    return sum(r for r in results if r)
-
-
-def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
-    """
-
-    :param endpoint: The endpoint to get the average timing for. Typically
-    something like 'docket-list' or 'docket-detail'
-    :param d: The date to get the timing for (a date object)
-    :return: The average number of ms that endpoint used to serve requests on
-    that day.
-    """
-    d_str = d.isoformat()
-    r = get_redis_interface("STATS")
-    pipe = r.pipeline()
-    pipe.zscore(f"api:v3.endpoint.d:{d_str}.timings", endpoint)
-    pipe.zscore(f"api:v3.endpoint.d:{d_str}.counts", endpoint)
-    results = pipe.execute()
-
-    return results[0] / results[1]
-
-
 def get_next_webhook_retry_date(retry_counter: int) -> datetime:
     """Returns the next retry datetime to schedule a webhook retry based on its
     current retry counter.
