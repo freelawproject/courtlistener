@@ -140,7 +140,6 @@
             {% if user.is_authenticated %}
               <ul class="nav navbar-nav navbar-right">
                 <li><a href="https://free.law/about/">About</a></li>
-                <li><a href="{% url "faq" %}">FAQ</a></li>
                 <li class="dropdown">
                   <a href="#"
                      class="dropdown-toggle"
@@ -179,7 +178,6 @@
             {% else %}
               <ul class="nav navbar-nav navbar-right">
                 <li><a href="https://free.law/about/">About</a></li>
-                <li><a href="{% url "faq" %}">FAQ</a></li>
                 <li class="visible-xs">
                   <a href="https://free.law/membership/"
                     >Become a Member</a>
@@ -378,7 +376,7 @@
               <a href="https://free.law/about/">About</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "help_home" %}">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
+              <a href="{% url "help_home" %}">Help</a>
             </div>
             <div class="footer-item">
               <a href="https://donate.free.law/forms/supportflp">Donate</a>
