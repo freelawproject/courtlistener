@@ -1,4 +1,3 @@
-import difflib
 import itertools
 import json
 import logging
@@ -17,7 +16,6 @@ from django.db.utils import OperationalError
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
-from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
 from cl.corpus_importer.utils import (
@@ -143,30 +141,6 @@ def filepath_list(
         files.extend(glob(glob_path))
     files = human_sort(files, key=None)  # type: ignore
     return files  # type: ignore
-
-
-def check_for_match(new_case: str, possibilities: list[str]) -> bool:
-    """Check for matches based on case names
-
-    This code is a variation of get_closest_match_index used in juriscraper.
-    It checks if the case name we are trying to add matches any duplicate
-    citation cases already in the system.
-
-    :param new_case: The importing case name
-    :param possibilities: The array of cases already in the
-    system with the same citation
-    :return: Returns the match if any, otherwise returns None.
-    """
-    new_case = normalize_phrase(new_case)
-    possibilities = [normalize_phrase(x) for x in possibilities]
-    try:
-        match = difflib.get_close_matches(
-            new_case, possibilities, n=1, cutoff=0.7
-        )[0]
-        return True if match else False
-    except IndexError:
-        # No good matches.
-        return False
 
 
 def map_opinion_type(harvard_opinion_type: str) -> str:
