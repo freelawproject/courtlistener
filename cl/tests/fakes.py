@@ -64,12 +64,6 @@ class FakeNewAppellateCaseDocketReport(FakeDocketReport):
         return data
 
 
-class FakeEmptyAcmsCaseSearch(FakeDocketReport):
-    @property
-    def data(self):
-        return {}
-
-
 class FakeAcmsCaseSearch(FakeDocketReport):
     @property
     def data(self):
