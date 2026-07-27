@@ -51,9 +51,7 @@ info_tips = (
     ),
     'The current design of CourtListener was <a href="https://free.law/2014/11/13/check-out-courtlisteners-new-paint-and-features/">created by a volunteer</a>.',
     # Neutral Citations
-    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="{}#explain-neutral-citations">neutral citations</a>.'.format(
-        reverse("faq")
-    ),
+    'WestLaw currently has a monopoly on citations. This hinders legal innovation but few courts have adopted <a href="https://free.law/advocacy/neutral-citations">neutral citations</a>.',
     # Features
     f'You can <a href="{settings.WIKI_HELP_BASE_URL}/alerts/search-alerts-for-case-law-and-filings">create an alert</a> for any query to receive an email if the query has new results.',
     f'There is an <a href="{settings.WIKI_HELP_BASE_URL}/general/using-atom-and-rss-feeds-for-the-latest-updates">RSS feed</a> for every query so you can easily stay up to date.',
