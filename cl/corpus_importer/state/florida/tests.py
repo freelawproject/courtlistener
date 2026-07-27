@@ -417,11 +417,13 @@ class FloridaPartyMergerTest(TestCase):
             name="Acme Corp",
             party_type=ScrapePartyType.APPELLANT,
             representatives=[],
+            pro_se_flag=False,
         )
         appellee = FloridaCasePartyFactory.create(
             name="Bob Smith",
             party_type=ScrapePartyType.APPELLEE,
             representatives=[],
+            pro_se_flag=True,
         )
         docket_data = self._make_case(appellant, appellee)
 
@@ -435,9 +437,12 @@ class FloridaPartyMergerTest(TestCase):
         }
         assert set(
             PartyType.objects.filter(docket=docket).values_list(
-                "party__name", "name"
+                "party__name", "name", "pro_se"
             )
-        ) == {("Acme Corp", "Appellant"), ("Bob Smith", "Appellee")}
+        ) == {
+            ("Acme Corp", "Appellant", PartyType.PRO_SE_NO),
+            ("Bob Smith", "Appellee", PartyType.PRO_SE_YES),
+        }
 
     def test_merge_primary_representative_is_lead_attorney(self):
         """Is a primary representative merged as a lead attorney for the
