@@ -18,13 +18,6 @@ from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.redis_utils import get_redis_interface
 
-donation_exclusion_codes = [
-    1,  # Unknown error
-    3,  # Cancelled
-    6,  # Failed
-    7,  # Reclaimed/Refunded
-]
-
 
 class BarMembership(models.Model):
     barMembership = USStateField(
