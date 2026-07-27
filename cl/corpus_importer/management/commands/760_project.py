@@ -14,7 +14,6 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer_session import ProxyPacerSession, SessionData
-from cl.search.models import Court, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
@@ -88,23 +87,6 @@ def get_dockets(options):
                     },
                 ).set(queue=q),
             ).apply_async()
-
-
-def get_att_pages(options):
-    rd_pks = RECAPDocument.objects.filter(
-        tags__name=TAG,
-        docket_entry__docket__court__jurisdiction__in=[
-            Court.FEDERAL_DISTRICT,
-            Court.FEDERAL_BANKRUPTCY,
-        ],
-    ).values_list("pk", flat=True)
-    session = ProxyPacerSession(
-        username=PACER_USERNAME, password=PACER_PASSWORD
-    )
-    session.login()
-    get_district_attachment_pages(
-        options=options, rd_pks=rd_pks, tag_names=[TAG], session=session
-    )
 
 
 class Command(VerboseCommand):
