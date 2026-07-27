@@ -7,7 +7,6 @@ from cl.disclosures.models import (
     FinancialDisclosure,
     Gift,
     Investment,
-    NonInvestmentIncome,
     Position,
     Reimbursement,
     SpouseIncome,
@@ -43,11 +42,6 @@ class ReimbursementFactory(DjangoModelFactory):
 class DebtFactory(DjangoModelFactory):
     class Meta:
         model = Debt
-
-
-class NonInvestmentIncomeFactory(DjangoModelFactory):
-    class Meta:
-        model = NonInvestmentIncome
 
 
 class SpousalIncomeFactory(DjangoModelFactory):
