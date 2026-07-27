@@ -304,29 +304,6 @@ def hash_item(item):
     return item_hash
 
 
-# TODO Remove after scheduled merge_rss_feed_contents have been processed
-async def is_cached(item_hash: str) -> bool:
-    """Check if a hash is in the RSS Item Cache"""
-    return await RssItemCache.objects.filter(hash=item_hash).aexists()
-
-
-# TODO Remove after scheduled merge_rss_feed_contents have been processed
-async def cache_hash(item_hash: str) -> bool:
-    """Add a new hash to the RSS Item Cache
-
-    :param item_hash: A SHA1 hash you wish to cache.
-    :returns True if successful, False if not.
-    """
-    try:
-        await RssItemCache.objects.acreate(hash=item_hash)
-    except IntegrityError:
-        # Happens during race conditions or when you try to cache something
-        # that's already in there.
-        return False
-    else:
-        return True
-
-
 def rss_cache_prefix() -> str:
     return "rss_hash"
 
