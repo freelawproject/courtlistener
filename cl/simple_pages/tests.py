@@ -335,7 +335,6 @@ class SimplePagesTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
             {"viewname": "coverage_recap"},
             {"viewname": "coverage_oa"},
             # Info pages
-            {"viewname": "faq"},
             {"viewname": "robots"},
             # Contact
             {"viewname": "contact"},

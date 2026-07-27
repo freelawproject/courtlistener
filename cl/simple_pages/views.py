@@ -36,7 +36,6 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
-from cl.search.selectors import get_available_documents_estimate_count
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
 from cl.simple_pages.tasks import create_zoho_desk_ticket
@@ -47,38 +46,6 @@ logger = logging.getLogger(__name__)
 async def about(request: HttpRequest) -> HttpResponse:
     """Loads the about page"""
     return TemplateResponse(request, "about.html", {"private": False})
-
-
-async def faq(request: HttpRequest) -> HttpResponse:
-    """Loads the FAQ page"""
-    faq_cache_key = "faq-stats"
-    template_data = await cache.aget(faq_cache_key)
-    if template_data is None:
-        template_data = {
-            "scraped_court_count": await Court.objects.filter(
-                in_use=True, has_opinion_scraper=True
-            ).acount(),
-            "total_recap_count": await sync_to_async(
-                get_available_documents_estimate_count
-            )(),
-            "total_oa_minutes": (
-                (await Audio.objects.aaggregate(Sum("duration")))[
-                    "duration__sum"
-                ]
-                or 0
-            )
-            / 60,
-            "total_judge_count": await Person.objects.all().acount(),
-        }
-        five_days = 60 * 60 * 24 * 5
-        await cache.aset(faq_cache_key, template_data, five_days)
-
-    return await contact(
-        request,
-        template_path="faq.html",
-        template_data=template_data,
-        initial={"subject": "FAQs"},
-    )
 
 
 async def help_home(request: HttpRequest) -> HttpResponse:
