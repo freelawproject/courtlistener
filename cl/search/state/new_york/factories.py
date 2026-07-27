@@ -18,7 +18,7 @@ class NYCoADocketMetadataFactory(DjangoModelFactory):
     issue = Faker("text", max_nb_chars=25)
     summary = Faker("text", max_nb_chars=25)
     decision_date = Faker("date")
-    opinion_by = Faker("name")
+    lower_court_citation = Faker("text", max_nb_chars=25)
     official_citation = Faker("text", max_nb_chars=25)
 
     class Meta:
@@ -43,7 +43,7 @@ class NYCoADocumentFactory(DjangoModelFactory):
     docket_entry = SubFactory(NYCoADocketEntryFactory)
     file_name = Faker("file_name", extension="pdf")
     document_number = Sequence(lambda n: n + 1)
-    available = True
+    available = Faker("boolean", chance_of_getting_true=75)
 
     class Meta:
         model = NYCoADocument

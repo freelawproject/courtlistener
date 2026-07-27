@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 from collections.abc import Callable
 from functools import partial
@@ -320,8 +319,8 @@ def make_path(root: str, filename: str) -> str:
     Start with the `root` node, and use the current date as the subdirectories.
     """
     d = now()
-    return os.path.join(
-        root, f"{d.year}", f"{d.month:02d}", f"{d.day:02d}", filename
+    return str(
+        Path(root) / f"{d.year}" / f"{d.month:02d}" / f"{d.day:02d}" / filename
     )
 
 
@@ -354,8 +353,8 @@ def make_lasc_path(instance, filename):
 
     Start with the `root` node, and use the current date as the subdirectories.
     """
-    return os.path.join(
-        "lasc-data", f"{instance.sha1[0:2]}", f"{instance.sha1[2:]}.json"
+    return str(
+        Path("lasc-data") / instance.sha1[0:2] / f"{instance.sha1[2:]}.json"
     )
 
 
@@ -373,13 +372,13 @@ def base_recap_path(instance, filename, base_dir):
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
     """
-    return os.path.join(
-        base_dir,
-        get_bucket_name(
+    return str(
+        Path(base_dir)
+        / get_bucket_name(
             instance.docket_entry.docket.court_id,
             instance.docket_entry.docket.pacer_case_id,
-        ),
-        filename,
+        )
+        / filename
     )
 
 

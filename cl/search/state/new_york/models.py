@@ -18,6 +18,7 @@ __all__ = [
 
 
 @pghistory.track()
+@document_model
 class NYCoADocketMetadata(AbstractDateTimeModel):
     """New York Court of Appeals-specific metadata associated with a docket.
 
@@ -49,15 +50,14 @@ class NYCoADocketMetadata(AbstractDateTimeModel):
         null=True,
         auto_now=False,
     )
-    opinion_by = models.TextField(
-        help_text="The author of the opinion, for decided cases.",
-        null=True,
+    lower_court_citation = models.CharField(
+        help_text="The lower court citation if available.",
+        max_length=255,
         blank=True,
     )
     official_citation = models.CharField(
         help_text="The official citation, for decided cases.",
         max_length=255,
-        null=True,
         blank=True,
     )
 
@@ -98,11 +98,6 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
         on_delete=models.CASCADE,
     )
     page = models.IntegerField(
-        help_text=(
-            "The Court-PASS page this entry was scraped from. Entries are "
-            "numbered independently per page, so this is part of the natural "
-            "key."
-        ),
         choices=EntryPage.choices,
     )
     filing_type = models.TextField(blank=True)
