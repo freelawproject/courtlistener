@@ -115,3 +115,11 @@ def render_required_scripts(context):
             )
         )
     return mark_safe("\n".join(pieces))
+
+
+@register.filter
+def get_item(dictionary, key):
+    """
+    Dict lookup for cookie ID purpose so far.
+    """
+    return dictionary.get(key)
