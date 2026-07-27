@@ -1,7 +1,6 @@
 import json
 import re
 from datetime import date, datetime
-from urllib.parse import urljoin
 
 import httpx
 from asgiref.sync import async_to_sync
@@ -12,8 +11,6 @@ from eyecite.find import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
-from lxml import html
-from reporters_db import REPORTERS
 
 from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.utils import winnow_case_name
@@ -154,55 +151,6 @@ def get_child_court(child_court_name: str, court_id: str) -> Court | None:
         return None
 
     return child_court
-
-
-async def test_for_meta_redirections(
-    r: httpx.Response,
-) -> tuple[bool, str | None]:
-    """Test for meta data redirections
-
-    :param r: A response object
-    :return:  A boolean and value
-    """
-    response = await microservice(
-        service="buffer-extension",
-        file=r.content,
-        params={"mime": True},
-    )
-    extension = response.text
-
-    if extension == ".html":
-        html_tree = html.fromstring(r.text)
-        try:
-            path = (
-                "//meta[translate(@http-equiv, 'REFSH', 'refsh') = "
-                "'refresh']/@content"
-            )
-            attr = html_tree.xpath(path)[0]
-            wait, text = attr.split(";")
-            if text.lower().startswith("url="):
-                url = text[4:]
-                if not url.startswith("http"):
-                    # Relative URL, adapt
-                    url = urljoin(r.url, url)
-                return True, url
-        except IndexError:
-            return False, None
-    return False, None
-
-
-async def follow_redirections(
-    r: httpx.Response, s: httpx.AsyncClient
-) -> httpx.Response:
-    """
-    Parse and recursively follow meta refresh redirections if they exist until
-    there are no more.
-    """
-    redirected, url = await test_for_meta_redirections(r)
-    if redirected:
-        logger.info(f"Following a meta redirection to: {url.encode()}")
-        r = await follow_redirections(await s.get(url), s)
-    return r
 
 
 @retry(
@@ -421,34 +369,6 @@ def update_or_create_docket(
             setattr(docket, field, value)
 
     return docket
-
-
-def scraped_citation_object_is_valid(citation_object: dict) -> bool:
-    """Validate Citation objects from `Site.extract_from_text`
-
-    Check that the parsed `Citation.reporter` exists in reporters-db
-    and that the `Citation.type` matches the reporters-db type
-
-    :param citation_object: dict got from `Site.extract_from_text`
-    :return: True if the parsed reporter and type match with reporters-db
-        False otherwise
-    """
-    parsed_reporter = citation_object["reporter"]
-    try:
-        reporter = REPORTERS[parsed_reporter]
-        mapped_type = map_reporter_db_cite_type(reporter[0].get("cite_type"))
-        if mapped_type == citation_object["type"]:
-            return True
-        logger.error(
-            "Citation.type '%s' from `extract_from_text` does not match reporters-db type '%s' for reporter '%s'",
-            citation_object["type"],
-            mapped_type,
-            parsed_reporter,
-        )
-    except KeyError:
-        logger.error("Parsed reporter '%s' does not exist", parsed_reporter)
-
-    return False
 
 
 def save_response(site: AbstractSite) -> None:

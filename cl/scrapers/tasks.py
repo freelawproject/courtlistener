@@ -61,8 +61,6 @@ from cl.search.state.texas.models import ProcessingError, TexasDocument
 
 logger = logging.getLogger(__name__)
 
-ExtractProcessResult = tuple[str, str | None]
-
 
 def update_document_from_text(
     opinion: Opinion, juriscraper_module: str = ""
