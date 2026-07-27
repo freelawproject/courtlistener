@@ -10,21 +10,6 @@ from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 
 
-class PAYMENT_TYPES:
-    DONATION = "donation"
-    PAYMENT = "payment"
-    BADGE_SIGNUP = "badge_signup"
-
-
-class FREQUENCIES:
-    ONCE = "once"
-    MONTHLY = "monthly"
-    NAMES = (
-        (MONTHLY, "Monthly"),
-        (ONCE, "Once"),
-    )
-
-
 class PROVIDERS:
     DWOLLA = "dwolla"
     PAYPAL = "paypal"
