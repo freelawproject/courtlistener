@@ -422,7 +422,7 @@ def make_pdf_path(instance, filename, thumbs=False):
         root = Path(f"us/state/tx/{court_id}")
         file_name = f"gov.tx.{court_id}.{slug}{ext}"
         return str(root / file_name)
-    elif isinstance(obj, FloridaDocument):
+    elif isinstance(instance, FloridaDocument):
         slug = slugify(Path(filename).stem)
         ext = Path(filename).suffix or ".pdf"
         court_id = instance.docket_entry.docket.court_id
