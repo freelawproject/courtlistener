@@ -19,16 +19,6 @@ PRIORITY_SEP: str = "\x06\x16"
 DEFAULT_PRIORITY_STEPS: list[int] = [0, 3, 6, 9]
 
 
-def clear_queue(queue_name: str):
-    """Empty out a queue, nuking the tasks in it."""
-    priority_names = [
-        make_queue_name_for_pri(queue_name, pri)
-        for pri in DEFAULT_PRIORITY_STEPS
-    ]
-    r = get_redis_interface("CELERY")
-    return sum([r.delete(x) for x in priority_names])
-
-
 def make_queue_name_for_pri(queue: str, pri: int) -> str:
     """Make a queue name for redis
 
