@@ -8802,7 +8802,7 @@ class RECAPIndexingTest(
     @mock.patch("cl.search.utils.delete_from_ia")
     @mock.patch("cl.search.utils.invalidate_cloudfront")
     def test_seal_documents_action(
-        self, mock_delete_from_ia, mock_invalidate_cloudfront, mock_sleep
+        self, mock_invalidate_cloudfront, mock_delete_from_ia, mock_sleep
     ):
         """Confirm that seal_documents admin action updates related RDs in ES"""
 
