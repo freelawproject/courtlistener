@@ -207,10 +207,6 @@ def get_party(partystr):
     return partydict[partystr]
 
 
-def get_appointer(appointstr):
-    return appointstr
-
-
 def get_suffix(suffstr):
     suffdict = {
         "Jr": "jr",
@@ -273,17 +269,6 @@ def get_aba(abastr):
         return None
     aba = abadict[abastr]
     return aba
-
-
-def get_select(state, year):
-    select_dict = {
-        "P": "e_part",
-        "NP": "e_non_part",
-        "G": "a_gov",
-        "L": "a_legis",
-        "M": "a_gov",
-    }
-    return "P"
 
 
 def get_gender(gender_str):
