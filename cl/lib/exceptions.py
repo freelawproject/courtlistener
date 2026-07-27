@@ -4,12 +4,6 @@ class ScrapeFailed(Exception):
     pass
 
 
-class ConfigurationException(Exception):
-    """Raised when required configuration is not set."""
-
-    pass
-
-
 class SubscriptionFailure(Exception):
     """Raised when subscribing to case updates fails."""
 
