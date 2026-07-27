@@ -197,6 +197,15 @@ def _build_patterns() -> list:
         )
     )
 
+    # FAQ page removed; content split across free.law and the wiki.
+    # Redirect preserves external links and bookmarks. Started: 2026-07-26
+    patterns.append(
+        path(
+            "faq/",
+            RedirectView.as_view(pattern_name="help_home", permanent=True),
+        )
+    )
+
     return patterns
 
 
