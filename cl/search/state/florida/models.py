@@ -24,9 +24,21 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     :ivar description: Pulled directly from Florida results
     :ivar submitted_by: FK to the case party that submitted this document may be null if the party cannot be found.
     :ivar submitted_by_name: The name of the party that submitted this entry.
-    :ivar status: Pulled directly from Florida's `entry_status` field
+    :ivar status: Mapped from Florida's `entry_status` field. Can be "stricken",
+    "vacated", or "docketed", or "unknown".
     :ivar docket_entry_uuid: Pulled directly from Florida results
     """
+
+    STATUS_STRICKEN = 0
+    STATUS_VACATED = 1
+    STATUS_DOCKETED = 2
+    STATUS_UNKNOWN = 3
+    STATUS_CHOICES = (
+        (STATUS_STRICKEN, "Stricken"),
+        (STATUS_VACATED, "Vacated"),
+        (STATUS_DOCKETED, "Docketed"),
+        (STATUS_UNKNOWN, "Unknown"),
+    )
 
     docket = models.ForeignKey(
         "search.Docket",
@@ -54,7 +66,7 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         blank=True,
     )
     submitted_by_name = models.TextField(blank=True)
-    status = models.CharField(max_length=50, blank=True)
+    status = models.SmallIntegerField(choices=STATUS_CHOICES)
     docket_entry_uuid = models.UUIDField()
 
     class Meta:
