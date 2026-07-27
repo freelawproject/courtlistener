@@ -22,7 +22,8 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
     :ivar entry_type_raw: Value of `entry_type_raw` in Juriscraper results. Pulled from Florida API with no modification.
     :ivar entry_name: Pulled directly from Florida results
     :ivar description: Pulled directly from Florida results
-    :ivar submitted_by: FK to the case party that submitted this document.
+    :ivar submitted_by: FK to the case party that submitted this document may be null if the party cannot be found.
+    :ivar submitted_by_name: The name of the party that submitted this entry.
     :ivar status: Pulled directly from Florida's `entry_status` field
     :ivar docket_entry_uuid: Pulled directly from Florida results
     """
@@ -52,7 +53,8 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         null=True,
         blank=True,
     )
-    status = models.TextField(blank=True)
+    submitted_by_name = models.TextField(blank=True)
+    status = models.CharField(max_length=50, blank=True)
     docket_entry_uuid = models.UUIDField()
 
     class Meta:
@@ -104,12 +106,11 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
         app_label = "search"
         ordering = ["link_uuid"]
         indexes = [
-            models.Index(fields=["link_uuid"]),
             models.Index(fields=["filepath_local"]),
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["docket_entry", "link_uuid"],
+                fields=["link_uuid", "docket_entry"],
                 name="unique_link_uuid_per_docket_entry",
             )
         ]
