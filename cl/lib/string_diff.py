@@ -77,22 +77,6 @@ def find_best_match(items, s, case_sensitive=True):
     }
 
 
-def find_confidences(results, case_name):
-    """Returns all matches above a threshold.
-
-    This is nearly identical to find_best_match, but returns any good matches
-    in an array, and returns their confidence thresholds in a second array.
-    """
-    diff_ratios = []
-    for result in results:
-        # Calculate its diff_ratio, and add it to an array
-        candidate_case_name = result["caseName"]
-        diff = gen_diff_ratio(candidate_case_name, case_name)
-        diff_ratios.append(diff)
-
-    return diff_ratios
-
-
 def string_to_vector(text: str) -> Counter:
     """Convert strings to counter dict.
 
