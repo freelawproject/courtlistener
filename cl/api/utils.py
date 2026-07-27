@@ -21,12 +21,9 @@ from django.db import transaction
 from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
-from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
 from django.utils.functional import cached_property
 from django.utils.timezone import now
-from django.views.decorators.cache import cache_page
-from django.views.decorators.vary import vary_on_headers
 from django_ratelimit.core import get_header
 from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
@@ -625,16 +622,6 @@ class LoggingMixin:
             create_or_update_zoho_account.si(
                 user.pk, int(user_count)
             ).apply_async(ignore_result=True)
-
-
-class CacheListMixin:
-    """Cache listed results"""
-
-    @method_decorator(cache_page(60))
-    # Ensure that permissions are maintained and not cached!
-    @method_decorator(vary_on_headers("Cookie", "Authorization"))
-    def list(self, *args, **kwargs):
-        return super().list(*args, **kwargs)
 
 
 def make_cache_key_for_no_filter_mixin(
@@ -1320,24 +1307,6 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
                 "wait_until": soonest_time,
             }
         )
-
-
-class RECAPUsersReadOnly(DjangoModelPermissions):
-    """Provides access to users with the right permissions.
-
-    Such users must have the has_recap_api_access flag set on their account for
-    this object type.
-    """
-
-    perms_map = {
-        "GET": ["%(app_label)s.has_recap_api_access"],
-        "OPTIONS": ["%(app_label)s.has_recap_api_access"],
-        "HEAD": ["%(app_label)s.has_recap_api_access"],
-        "POST": ["%(app_label)s.add_%(model_name)s"],
-        "PUT": ["%(app_label)s.change_%(model_name)s"],
-        "PATCH": ["%(app_label)s.change_%(model_name)s"],
-        "DELETE": ["%(app_label)s.delete_%(model_name)s"],
-    }
 
 
 class RECAPUploaders(DjangoModelPermissions):
