@@ -201,10 +201,6 @@ class DocketEntrySerializer(
         fields = "__all__"
 
 
-class FullDocketSerializer(DocketSerializer):
-    docket_entries = DocketEntrySerializer(many=True, read_only=True)
-
-
 class CourtSerializer(
     RetrieveFilteredFieldsMixin,
     DynamicFieldsMixin,
