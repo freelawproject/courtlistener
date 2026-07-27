@@ -37,7 +37,3 @@ EMAIL_MAX_TEMP_COUNTER = env.int("EMAIL_MAX_TEMP_COUNTER", default=10)
 SERVER_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_FROM_EMAIL = "CourtListener <noreply@courtlistener.com>"
 DEFAULT_ALERTS_EMAIL = "CourtListener Alerts <alerts@courtlistener.com>"
-SCRAPER_ADMINS = (
-    ("Slack Juriscraper Channel", "j9f4b5n5x7k8x2r1@flp-talk.slack.com"),
-    ("PA", "arderyp@protonmail.com"),
-)

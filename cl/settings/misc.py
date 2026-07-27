@@ -1,4 +1,3 @@
-import os
 from datetime import date
 
 import environ
@@ -38,13 +37,6 @@ LASC_PASSWORD = env("LASC_PASSWORD", default="")
 # TAMES (Texas courts CaseMail)
 TAMES_USER = env("TAMES_USER", default="")
 
-# Google auth
-here = os.path.dirname(os.path.realpath(__file__))
-GOOGLE_AUTH = {
-    "PATH": os.path.join(here, "google_auth.json"),
-    "PROJECT": "courtlistener-development",
-}
-
 
 ################
 # Stats / Metrics
@@ -66,7 +58,6 @@ WIKI_REMOVAL_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom
 ##############
 
 # Key for Follow the Money API
-FTM_KEY = env("FTM_KEY", default="")
 FTM_LAST_UPDATED = env("FTM_LAST_UPDATED", default=date.today())
 
 # Pay and Pray quota
