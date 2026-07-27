@@ -66,7 +66,9 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         blank=True,
     )
     submitted_by_name = models.TextField(blank=True)
-    status = models.SmallIntegerField(choices=STATUS_CHOICES)
+    status = models.SmallIntegerField(
+        choices=STATUS_CHOICES, default=STATUS_UNKNOWN
+    )
     docket_entry_uuid = models.UUIDField()
 
     class Meta:
