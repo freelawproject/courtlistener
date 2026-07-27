@@ -2,7 +2,6 @@
 import hashlib
 import json
 import random
-import uuid
 
 
 def md5(s):
@@ -101,11 +100,3 @@ def sha256(s):
     sha256sum = hashlib.sha256()
     sha256sum.update(s)
     return sha256sum.hexdigest()
-
-
-def uuid_hex():
-    """Generate a UUID4 hex code
-
-    :return: A UUID4 hex code
-    """
-    return uuid.uuid4().hex
