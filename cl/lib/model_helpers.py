@@ -691,21 +691,6 @@ def choices_to_csv(obj, field_name):
     return oxford_join(choice_values, conjunction="or", separator=";")
 
 
-def disable_auto_now_fields(*models):
-    """Turns off the auto_now and auto_now_add attributes on a Model's fields,
-    so that an instance of the Model can be saved with a custom value.
-
-    Based on: https://stackoverflow.com/questions/7499767/temporarily-disable-auto-now-auto-now-add
-    """
-    for model in models:
-        # noinspection PyProtectedMember
-        for field in model._meta.local_fields:
-            if hasattr(field, "auto_now"):
-                field.auto_now = False
-            if hasattr(field, "auto_now_add"):
-                field.auto_now_add = False
-
-
 def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
     """Make an originating docket number for an appellate case into a link (MVP version)
 
