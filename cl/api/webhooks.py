@@ -3,20 +3,14 @@ import random
 
 import requests
 from django.conf import settings
-from elasticsearch.dsl.response import Response
 from rest_framework.renderers import JSONRenderer
 
-from cl.alerts.api_serializers import (
-    DocketAlertSerializer,
-    SearchAlertSerializerModel,
-)
-from cl.alerts.models import Alert
+from cl.alerts.api_serializers import DocketAlertSerializer
 from cl.alerts.utils import OldAlertReport
 from cl.api.models import (
     Webhook,
     WebhookEvent,
     WebhookEventType,
-    WebhookVersions,
 )
 from cl.api.utils import (
     generate_webhook_key_content,
@@ -25,10 +19,6 @@ from cl.api.utils import (
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
-from cl.search.api_serializers import (
-    OpinionClusterWebhookResultSerializer,
-    V3OpinionESResultSerializer,
-)
 
 
 def send_webhook_event(
@@ -156,49 +146,3 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
                 content=post_content,
             )
             send_webhook_event(webhook_event, json_bytes)
-
-
-def send_search_alert_webhook(
-    results: Response,
-    webhook: Webhook,
-    alert: Alert,
-) -> None:
-    """Send a search alert webhook event containing search results from a
-    search alert object.
-
-    :param results: The search results returned for this alert.
-    :param webhook: The webhook endpoint object to send the event to.
-    :param alert: The search alert object.
-    """
-
-    serialized_alert = SearchAlertSerializerModel(alert).data
-    # ES results serialization
-    match webhook.version:
-        case WebhookVersions.v1:
-            serialized_results = V3OpinionESResultSerializer(
-                results,
-                many=True,
-            ).data
-        case WebhookVersions.v2:
-            serialized_results = OpinionClusterWebhookResultSerializer(
-                results,
-                many=True,
-            ).data
-
-    post_content = {
-        "webhook": generate_webhook_key_content(webhook),
-        "payload": {
-            "results": serialized_results,
-            "alert": serialized_alert,
-        },
-    }
-    renderer = JSONRenderer()
-    json_bytes = renderer.render(
-        post_content,
-        accepted_media_type="application/json;",
-    )
-    webhook_event = WebhookEvent.objects.create(
-        webhook=webhook,
-        content=post_content,
-    )
-    send_webhook_event(webhook_event, json_bytes)
