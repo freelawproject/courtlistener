@@ -80,6 +80,12 @@ def _origin_docket_number(transfer: DocketTransfer, params: Any) -> str:
     return transfer.docket_number
 
 
+def _destination_docket_id(
+    transfer: DocketTransfer, params: RelatedParams[Any]
+) -> int:
+    return params.parent.pk
+
+
 def _transfer_type(transfer: DocketTransfer, params: Any) -> int:
     return TRANSFER_REASON_MAP[transfer.reason]
 
@@ -113,11 +119,14 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
         "origin_court_id",
         "origin_docket_number",
         "destination_court_id",
-        "destination_docket_number",
-        "transfer_date",
+        "destination_docket_id",
         "transfer_type",
     ]
 
+    destination_docket_id: int = Attribute(
+        _destination_docket_id,
+        strategy=overwrite,
+    )
     origin_docket_number: str = Attribute(
         _origin_docket_number, strategy=overwrite
     )

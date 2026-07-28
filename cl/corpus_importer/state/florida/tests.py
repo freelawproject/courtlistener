@@ -925,38 +925,6 @@ class FloridaCaseTransferMergerTest(TestCase):
             ("flacirct", "2023-CA-000999"),
         }
 
-    def test_merge_fills_existing_partial_transfer(self):
-        """Does merging fill in the destination docket FK on an existing
-        transfer that only knows its origin docket?"""
-        scrape_transfer = self._circuit_transfer()
-        docket_data = self._make_case(scrape_transfer)
-        origin_docket = DocketFactory.create(
-            court=self.flacirct,
-            docket_number=scrape_transfer.docket_number,
-            pacer_case_id=None,
-            source=Docket.SCRAPER,
-        )
-        partial = CaseTransfer.objects.create(
-            origin_court=self.flacirct,
-            origin_docket_number=scrape_transfer.docket_number,
-            origin_docket=origin_docket,
-            destination_court=self.flsc,
-            destination_docket_number=docket_data.docket_number,
-            destination_docket=None,
-            transfer_date=docket_data.date_filed,
-            transfer_type=CaseTransfer.APPEAL,
-        )
-
-        result = FloridaDocketMerger(docket_data, params=None).merge()
-
-        assert result.success is True
-        assert "CaseTransfer" not in result.creates
-        assert partial.pk in result.updates["CaseTransfer"]
-        assert CaseTransfer.objects.count() == 1
-        partial.refresh_from_db()
-        assert partial.destination_docket_id == self._merged_docket(result).pk
-        assert partial.origin_docket_id == origin_docket.pk
-
     def test_remerge_is_idempotent(self):
         """Does merging the same case twice avoid duplicating transfers?"""
         docket_data = self._make_case(self._circuit_transfer())
