@@ -47,16 +47,16 @@
     <h4>@recap.email system</h4>
     <p>People that receive ECF notification emails from PACER can use the <code>@recap.email system</code> to seamlessly add documents to the RECAP Archive.</p>
     <p>Each time they get a notification from PACER, we get it too.</p>
-    <a class="btn-outline max-md:btn-xl" href="{% url "recap_email_help" %}">Learn More</a>
+    <a class="btn-outline max-md:btn-xl" href="{{ WIKI_HELP_URL }}/recap/recap-email/recapemail-overview">Learn More</a>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="special-scrapers">
     <h4>Special Case Scrapers</h4>
-    <p>CourtListener automatically identifies certain cases as "special." These cases get additional monitoring via scrapers that regularly gather data from PACER. Examples of special cases are those that have active <a class="links" href="{% url "alert_help" %}#recap-alerts">Docket Alerts</a>, are saved in <a class="links" href="{% url "tag_notes_help" %}#notes">Notes</a>, or are otherwise popular or important.
+    <p>CourtListener automatically identifies certain cases as "special." These cases get additional monitoring via scrapers that regularly gather data from PACER. Examples of special cases are those that have active <a class="links" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">Docket Alerts</a>, are saved in <a class="links" href="{{ WIKI_HELP_URL }}/general/using-notes-to-annotate-content">Notes</a>, or are otherwise popular or important.
     </p>
     <div class="flex flex-col md:flex-row gap-2">
-      <a class="btn-outline max-md:btn-xl" href="{% url "alert_help" %}">Learn About Docket Alerts</a>
-      <a class="btn-outline max-md:btn-xl" href="{% url "tag_notes_help" %}">Learn About Notes</a>
+      <a class="btn-outline max-md:btn-xl" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer">Learn About Docket Alerts</a>
+      <a class="btn-outline max-md:btn-xl" href="{{ WIKI_HELP_URL }}/general/using-notes-to-annotate-content">Learn About Notes</a>
     </div>
   </c-layout-with-navigation.section>
 
@@ -94,7 +94,7 @@
   <c-layout-with-navigation.section id="rss">
     <h4>PACER RSS Feeds</h4>
     <p>Most federal district courts provide RSS feeds listing their latest docket entries. We crawl these feeds on an ongoing basis to get the latest docket entries.</p>
-    <p>For details on which courts have enabled RSS feeds, <a class="links" href="{% url "alert_help" %}#coverage-gaps">see the documentation on alerts</a>.</p>
+    <p>For details on which courts have enabled RSS feeds, <a class="links" href="{{ WIKI_HELP_URL }}/alerts/docket-alerts-for-pacer#coverage-gaps">see the documentation on alerts</a>.</p>
   </c-layout-with-navigation.section>
 
   <c-layout-with-navigation.section id="free-pacer-scraper">

@@ -10,13 +10,18 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.views.decorators.cache import cache_page
 
 from cl.alerts.utils import get_alert_estimation_count
+from cl.custom_filters.templatetags.partition_util import columns
+from cl.favorites.models import Prayer
+from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.lib.elasticsearch_utils import (
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
 )
+from cl.lib.url_utils import BASE_URL
 from cl.search.documents import OpinionClusterDocument
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
@@ -245,7 +250,8 @@ async def make_rss_feed_markdown(
     :param jurisdictions: Jurisdictions to include, in display order. Courts
         in other jurisdictions are omitted.
     :param include_entry_types: If True, render a table showing each court's
-        RSS entry types; otherwise render comma-separated court names.
+        RSS entry types; otherwise render court names in a two-column table
+        that reads top to bottom, then left to right.
     :return: A markdown string with one section per jurisdiction.
     """
     jurisdiction_labels = {
@@ -269,9 +275,30 @@ async def make_rss_feed_markdown(
                 lines.append(f"| {court.short_name} | {entry_types} |")
             body = "\n".join(lines)
         else:
-            body = ", ".join(court.short_name for court in group)
+            names = [court.short_name for court in group]
+            lines = ["| | |", "|---|---|"]
+            for row in columns(names, 2):
+                left = row[0]
+                right = row[1] if len(row) > 1 else ""
+                lines.append(f"| {left} | {right} |")
+            body = "\n".join(lines)
         sections.append(f"# {jurisdiction_labels[jurisdiction]}\n\n{body}")
     return "\n\n".join(sections)
+
+
+async def make_court_link_list(courts: QuerySet, url_name: str) -> str:
+    """Render courts as a markdown list of links for the wiki.
+
+    :param courts: The courts to render.
+    :param url_name: The URL name to reverse for each court's link. It must
+        take a single "court" kwarg.
+    :return: A markdown bullet list linking each court.
+    """
+    lines = []
+    async for court in courts:
+        url = BASE_URL + reverse(url_name, kwargs={"court": court.pk})
+        lines.append(f"- [{court.full_name}]({url})")
+    return "\n".join(lines)
 
 
 async def wiki_data(request: HttpRequest) -> JsonResponse:
@@ -279,11 +306,19 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
 
     Returns counts and settings used across several API documentation pages
     so the wiki can display them via external data connectors.
+
+    Staff users can pass ?bust_cache to skip the cached response and rebuild
+    it, e.g. after court metadata changes. The rebuild is expensive, so the
+    param is ignored for everybody else.
     """
     cache_key = "wiki-data"
-    data = await cache.aget(cache_key)
-    if data is not None:
-        return JsonResponse(data)
+    bust_cache = (
+        "bust_cache" in request.GET and (await request.auser()).is_staff  # type: ignore[attr-defined]
+    )
+    if not bust_cache:
+        data = await cache.aget(cache_key)
+        if data is not None:
+            return JsonResponse(data)
 
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
@@ -327,6 +362,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
             all_jurisdictions,
         ),
     }
+    prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
     data = {
         "court_count": court_count,
@@ -350,6 +386,28 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
             "max_attorneys_to_percolate": settings.MAX_ATTORNEYS_TO_PERCOLATE,  # type: ignore[misc]
         },
         "rss_feeds": rss_feeds,
+        "prayers": {
+            "daily_quota": settings.ALLOWED_PRAYER_COUNT,  # type: ignore[misc]
+            "member_daily_quota": settings.ALLOWED_PRAYER_COUNT * 3,  # type: ignore[misc]
+            "granted_count": prayer_stats.prayer_count,
+            "distinct_users": prayer_stats.distinct_users,
+            "distinct_documents": prayer_stats.distinct_count,
+            "total_cost": prayer_stats.total_cost,
+        },
+        "feeds": {
+            "opinion_courts": await make_court_link_list(
+                Court.objects.filter(in_use=True, has_opinion_scraper=True),
+                "jurisdiction_feed",
+            ),
+        },
+        "podcasts": {
+            "oral_argument_courts": await make_court_link_list(
+                Court.objects.filter(
+                    in_use=True, has_oral_argument_scraper=True
+                ),
+                "jurisdiction_podcast",
+            ),
+        },
     }
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
