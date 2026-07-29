@@ -1148,6 +1148,18 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
             return f"{key}_promo2x"
         return key
 
+    def get_effective_rates(self, request) -> list[str]:
+        """The rates to enforce for this request.
+
+        Per-user ``APIThrottle`` overrides win over the scope defaults, with
+        the x2 promo applied on top when it applies.
+        """
+        overrides = get_all_throttle_overrides(self.throttle_type)
+        rates = overrides.get(request.user.username) or self.default_rates
+        if self._promo_applies(request):
+            rates = [double_rate(r) for r in rates]
+        return rates
+
     def allow_request(self, request, view):
         if self.rate is None:
             return True
@@ -1159,11 +1171,7 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
 
-        overrides = get_all_throttle_overrides(self.throttle_type)
-        rates = overrides.get(request.user.username) or self.default_rates
-        if self._promo_applies(request):
-            rates = [double_rate(r) for r in rates]
-        return self._check_multi_rate(rates)
+        return self._check_multi_rate(self.get_effective_rates(request))
 
     def _check_multi_rate(self, rates: list[str]) -> bool:
         """Enforce multiple rate windows against one shared timestamp history.
@@ -1282,8 +1290,7 @@ class AlertThrottle(ExceptionalUserRateThrottle):
         if self.key is None:
             return True
 
-        overrides = get_all_throttle_overrides(self.throttle_type)
-        rates = overrides.get(request.user.username) or self.default_rates
+        rates = self.get_effective_rates(request)
         if not rates:
             # No commercial alert throttle configured for this user; their
             # alert creation isn't rate-limited beyond the global throttle.
