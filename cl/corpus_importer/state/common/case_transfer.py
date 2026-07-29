@@ -115,11 +115,16 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
     Juriscraper court ID to a CourtListener one."""
 
     model: ClassVar[type[Model]] = CaseTransfer
+    # Both ends are identified by court and docket number rather than by FK so
+    # a transfer can be matched with only one end present in the DB. Matching
+    # on `destination_docket_id` would restrict the lookup to transfers already
+    # attached to this docket, making the partial transfer in `query` and the
+    # back-fill in `update_existing` unreachable.
     key: ClassVar[Iterable[str]] = [
         "origin_court_id",
         "origin_docket_number",
         "destination_court_id",
-        "destination_docket_id",
+        "destination_docket_number",
         "transfer_type",
     ]
 
@@ -148,6 +153,10 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
         already attached to the parent docket.
 
         :return: The queryset to find the transfer."""
+        # `super().query()` can't be used here. For a related merger
+        # `self.manager` is the parent docket's reverse FK manager, so it would
+        # constrain the lookup to `destination_docket = parent` and hide the
+        # very partial transfers this method exists to find.
         candidates = cast(
             QuerySet[CaseTransfer],
             CaseTransfer.objects.filter(

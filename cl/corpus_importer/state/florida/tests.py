@@ -1018,6 +1018,39 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert "CaseTransfer" not in second.updates
         assert CaseTransfer.objects.count() == 1
 
+    def test_merge_fills_existing_partial_transfer(self):
+        """Does merging fill in the destination docket FK on an existing
+        transfer that only knows its origin docket?"""
+        scrape_transfer = self._circuit_transfer()
+        docket_data = self._make_case(scrape_transfer)
+        origin_docket = DocketFactory.create(
+            court=self.flacirct,
+            docket_number=scrape_transfer.docket_number,
+        )
+        partial = CaseTransfer.objects.create(
+            origin_court=self.flacirct,
+            origin_docket_number=scrape_transfer.docket_number,
+            origin_docket=origin_docket,
+            destination_court=self.flsc,
+            destination_docket_number=docket_data.docket_number,
+            destination_docket=None,
+            transfer_date=docket_data.date_filed,
+            transfer_type=CaseTransfer.APPEAL,
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertNotIn("CaseTransfer", result.creates)
+        self.assertIn(partial.pk, result.updates["CaseTransfer"])
+        self.assertEqual(CaseTransfer.objects.count(), 1)
+        partial.refresh_from_db()
+        self.assertEqual(
+            partial.destination_docket_id, self._merged_docket(result).pk
+        )
+        # The origin side set by the earlier merge is left alone.
+        self.assertEqual(partial.origin_docket_id, origin_docket.pk)
+
     def test_merge_skips_outbound_transfer(self):
         """Are outbound transfers skipped without failing the merge?"""
         docket_data = self._make_case(
