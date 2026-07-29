@@ -19,7 +19,11 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from cl.alerts.utils import get_alert_estimation_count
-from cl.api.utils import get_current_throttle_usage, invert_user_logs
+from cl.api.utils import (
+    ApiUsageRateThrottle,
+    get_current_throttle_usage,
+    invert_user_logs,
+)
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.lib.elasticsearch_utils import (
     get_court_opinions_counts,
@@ -307,7 +311,7 @@ class ApiUsageViewSet(ViewSet):
     """
 
     permission_classes = [IsAuthenticated]
-    throttle_classes: list = []
+    throttle_classes = [ApiUsageRateThrottle]
     pagination_class = None
 
     def _get_historical_usage(self, user: User) -> dict[str, int]:

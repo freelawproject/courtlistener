@@ -1457,6 +1457,19 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         )
 
 
+class ApiUsageRateThrottle(ExceptionalUserRateThrottle):
+    """Dedicated throttle for the API usage endpoint (scope 'api_usage').
+
+    Has its own cache key, so monitoring usage never consumes the quota being
+    monitored, and exhausting the API quota never limits this endpoint.
+    """
+
+    scope = "api_usage"
+
+    def get_effective_rates(self, request) -> list[str]:
+        return self.default_rates
+
+
 class RECAPUsersReadOnly(DjangoModelPermissions):
     """Provides access to users with the right permissions.
 
