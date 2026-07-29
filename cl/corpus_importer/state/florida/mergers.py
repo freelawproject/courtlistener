@@ -33,6 +33,7 @@ from cl.corpus_importer.state.common.docket_entry import (
 from cl.corpus_importer.state.common.party import (
     AttorneyRelation,
     PartyMerger,
+    PartyTypeMerger,
     RoleMerger,
 )
 from cl.corpus_importer.state.florida.utils import (
@@ -48,7 +49,7 @@ from cl.corpus_importer.state.merger import (
     ThroughParameters,
     overwrite,
 )
-from cl.people_db.models import Attorney, Party, Role
+from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket, OriginatingCourtInformation
 from cl.search.state.florida.models import (
@@ -71,6 +72,16 @@ class FloridaRoleMerger(
     role: int = Attribute(_florida_representative_role)
 
 
+def _florida_pro_se(party: FloridaParty, params: None) -> int:
+    return PartyType.PRO_SE_YES if party.pro_se_flag else PartyType.PRO_SE_NO
+
+
+class FloridaPartyTypeMerger(
+    PartyTypeMerger[FloridaParty, RelatedParams[None]]
+):
+    pro_se: int = Attribute(_florida_pro_se)
+
+
 def _florida_party_uuid(party: FloridaParty, params: None) -> str:
     return str(party.party_uuid)
 
@@ -80,7 +91,6 @@ class FloridaPartyMerger(PartyMerger[FloridaParty, RelatedParams[None]]):
 
     attorneys: list[Attorney] = AttorneyRelation(role=FloridaRoleMerger)
     extra_info: str = Attribute(_florida_party_uuid)
-    pro_se_flag: bool = Attribute(lambda p, params: p.pro_se_flag)
 
     def query(self) -> QuerySet[Party]:
         return super().query().order_by("date_created")
@@ -245,7 +255,9 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
         )
     )
 
-    parties: list[Party] = PartyRelation(FloridaPartyMerger)
+    parties: list[Party] = PartyRelation(
+        FloridaPartyMerger, party_type=FloridaPartyTypeMerger
+    )
 
     florida_docket_entries: list[FloridaDocketEntry] = DocketEntryRelation(
         FloridaDocketEntryMerger
