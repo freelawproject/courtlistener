@@ -4,6 +4,20 @@
   <h2>{{ heading }}</h2>
 
   {% if documents %}
+    <p>You are about to seal up to {{ documents|length }} document{{ documents|pluralize }}.</p>
+
+    {# Threshold pairs the per-document throttle in seal_documents() (cl/search/utils.py) #}
+    {# with the CDN request timeout; revisit if either of those changes. #}
+    {% if documents|length > 50 %}
+      <ul class="messagelist">
+        <li class="warning">
+          Sealing is throttled to avoid overloading archive.org, so large
+          batches can hit the request timeout and stop partway through.
+          Consider sealing in smaller batches.
+        </li>
+      </ul>
+    {% endif %}
+
     <form method="post">
       {% csrf_token %}
 

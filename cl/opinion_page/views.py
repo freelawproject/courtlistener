@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 from collections import OrderedDict, defaultdict
 from datetime import timedelta
@@ -1093,11 +1094,16 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
             request, "includes/opinion_tabs.html", {"cluster": None}
         )
 
-    authorities_count = await cluster.aauthority_count()
-    summaries_count = await cluster.parentheticals.acount()
-
-    ui_flag_for_o_es = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o_es"
+    (
+        authorities_count,
+        summaries_count,
+        ui_flag_for_o_es,
+        download_context,
+    ) = await asyncio.gather(
+        cluster.aauthority_count(),
+        cluster.parentheticals.acount(),
+        sync_to_async(waffle.flag_is_active)(request, "ui_flag_for_o_es"),
+        get_downloads_context(cluster),
     )
     # Default count when flag is disabled
     cited_by_count = 0
@@ -1109,9 +1115,9 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
             str(opinion.pk)
             async for opinion in cluster.sub_opinions.all().only("pk")
         ]
-        cited_by_count = await es_cited_case_count(cluster.id, sub_opinion_pks)
-        related_cases_count = await es_related_case_count(
-            cluster.id, sub_opinion_pks
+        cited_by_count, related_cases_count = await asyncio.gather(
+            es_cited_case_count(cluster.id, sub_opinion_pks),
+            es_related_case_count(cluster.id, sub_opinion_pks),
         )
 
     # Get `tab` from request parameters (fallback to 'opinions')
@@ -1128,7 +1134,6 @@ async def update_opinion_tabs(request: HttpRequest, pk: int):
         "es_enabled": ui_flag_for_o_es,
     }
 
-    download_context = await get_downloads_context(cluster)
     context.update(download_context)
 
     return await sync_to_async(render)(
@@ -1385,24 +1390,30 @@ async def reporter_or_volume_handler(
         )
 
     # Show all the cases for a volume-reporter dyad
-    cases_in_volume = OpinionCluster.objects.filter(
-        citations__reporter=reporter, citations__volume=volume
-    ).order_by("date_filed")
-
-    if not await cases_in_volume.aexists():
-        return await throw_404(
-            request,
-            {
-                "no_cases": True,
-                "reporter": reporter,
-                "volume_names": volume_names,
-                "volume": volume,
-                "private": False,
-            },
+    cases_in_volume = (
+        OpinionCluster.objects.filter(
+            citations__reporter=reporter, citations__volume=volume
         )
-
-    volume_next, volume_previous = await get_prev_next_volumes(
-        reporter, volume
+        .select_related("docket")
+        .only(
+            "case_name",
+            "case_name_full",
+            "case_name_short",
+            "date_filed",
+            "slug",
+            "blocked",
+            "docket__docket_number",
+        )
+        .prefetch_related(
+            Prefetch(
+                "citations",
+                queryset=Citation.objects.only(
+                    "volume", "reporter", "page", "type", "cluster_id"
+                ),
+            )
+        )
+        .distinct()
+        .order_by("date_filed")
     )
 
     page = request.GET.get("page", 1)
@@ -1417,18 +1428,36 @@ async def reporter_or_volume_handler(
         except EmptyPage:
             return paginator.page(paginator.num_pages)
 
+    cases_page = await paginate_volumes(cases_in_volume, page)
+    if cases_page.paginator.count == 0:
+        return await throw_404(
+            request,
+            {
+                "no_cases": True,
+                "reporter": reporter,
+                "volume_names": volume_names,
+                "volume": volume,
+                "private": False,
+            },
+        )
+
+    volume_next, volume_previous = await get_prev_next_volumes(
+        reporter, volume
+    )
+    has_blocked_cases = await cases_in_volume.filter(blocked=True).aexists()
+
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         {
-            "cases": await paginate_volumes(cases_in_volume, page),
+            "cases": cases_page,
             "reporter": reporter,
             "variation_names": variation_names,
             "volume": volume,
             "volume_names": volume_names,
             "volume_previous": volume_previous,
             "volume_next": volume_next,
-            "private": any([case.blocked async for case in cases_in_volume]),
+            "private": has_blocked_cases,
         },
     )
 

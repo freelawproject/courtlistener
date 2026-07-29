@@ -12,6 +12,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.views.decorators.cache import cache_page
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -24,11 +25,15 @@ from cl.api.utils import (
     get_current_throttle_usage,
     invert_user_logs,
 )
+from cl.custom_filters.templatetags.partition_util import columns
 from cl.donate.models import NeonMembership, NeonMembershipLevel
+from cl.favorites.models import Prayer
+from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.lib.elasticsearch_utils import (
     get_court_opinions_counts,
     get_opinions_coverage_over_time,
 )
+from cl.lib.url_utils import BASE_URL
 from cl.search.documents import (
     OpinionClusterDocument,
 )
@@ -248,16 +253,86 @@ def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
     return int(num), duration_as_str[period[0]]
 
 
+async def make_rss_feed_markdown(
+    courts: QuerySet,
+    jurisdictions: list[str],
+    include_entry_types: bool = False,
+) -> str:
+    """Render PACER courts grouped by jurisdiction as wiki-ready markdown.
+
+    :param courts: The courts to render.
+    :param jurisdictions: Jurisdictions to include, in display order. Courts
+        in other jurisdictions are omitted.
+    :param include_entry_types: If True, render a table showing each court's
+        RSS entry types; otherwise render court names in a two-column table
+        that reads top to bottom, then left to right.
+    :return: A markdown string with one section per jurisdiction.
+    """
+    jurisdiction_labels = {
+        Court.FEDERAL_APPELLATE: "Appellate Courts",
+        Court.FEDERAL_DISTRICT: "District Courts",
+        Court.FEDERAL_BANKRUPTCY: "Bankruptcy Courts",
+    }
+    groups: dict[str, list[Court]] = {}
+    async for court in courts:
+        groups.setdefault(court.jurisdiction, []).append(court)
+
+    sections = []
+    for jurisdiction in jurisdictions:
+        group = groups.get(jurisdiction)
+        if not group:
+            continue
+        if include_entry_types:
+            lines = ["| Court | Docket Entry Types |", "|---|---|"]
+            for court in group:
+                entry_types = court.pacer_rss_entry_types.replace("|", " ")
+                lines.append(f"| {court.short_name} | {entry_types} |")
+            body = "\n".join(lines)
+        else:
+            names = [court.short_name for court in group]
+            lines = ["| | |", "|---|---|"]
+            for row in columns(names, 2):
+                left = row[0]
+                right = row[1] if len(row) > 1 else ""
+                lines.append(f"| {left} | {right} |")
+            body = "\n".join(lines)
+        sections.append(f"# {jurisdiction_labels[jurisdiction]}\n\n{body}")
+    return "\n\n".join(sections)
+
+
+async def make_court_link_list(courts: QuerySet, url_name: str) -> str:
+    """Render courts as a markdown list of links for the wiki.
+
+    :param courts: The courts to render.
+    :param url_name: The URL name to reverse for each court's link. It must
+        take a single "court" kwarg.
+    :return: A markdown bullet list linking each court.
+    """
+    lines = []
+    async for court in courts:
+        url = BASE_URL + reverse(url_name, kwargs={"court": court.pk})
+        lines.append(f"- [{court.full_name}]({url})")
+    return "\n".join(lines)
+
+
 async def wiki_data(request: HttpRequest) -> JsonResponse:
     """Provide data for the external wiki's help pages.
 
     Returns counts and settings used across several API documentation pages
     so the wiki can display them via external data connectors.
+
+    Staff users can pass ?bust_cache to skip the cached response and rebuild
+    it, e.g. after court metadata changes. The rebuild is expensive, so the
+    param is ignored for everybody else.
     """
     cache_key = "wiki-data"
-    data = await cache.aget(cache_key)
-    if data is not None:
-        return JsonResponse(data)
+    bust_cache = (
+        "bust_cache" in request.GET and (await request.auser()).is_staff  # type: ignore[attr-defined]
+    )
+    if not bust_cache:
+        data = await cache.aget(cache_key)
+        if data is not None:
+            return JsonResponse(data)
 
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
@@ -273,6 +348,36 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
         f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
     )
 
+    # PACER RSS feed coverage, pre-rendered as markdown for the alerts help
+    # page. The full-feed section omits appellate courts to match the old
+    # /help/alerts page, which only listed district and bankruptcy courts.
+    pacer_courts = Court.federal_courts.all_pacer_courts()
+    district_and_bankruptcy = [
+        Court.FEDERAL_DISTRICT,
+        Court.FEDERAL_BANKRUPTCY,
+    ]
+    all_jurisdictions = [Court.FEDERAL_APPELLATE, *district_and_bankruptcy]
+    rss_feeds = {
+        "full": await make_rss_feed_markdown(
+            pacer_courts.filter(
+                pacer_has_rss_feed=True, pacer_rss_entry_types="all"
+            ),
+            district_and_bankruptcy,
+        ),
+        "partial": await make_rss_feed_markdown(
+            pacer_courts.filter(pacer_has_rss_feed=True).exclude(
+                pacer_rss_entry_types="all"
+            ),
+            all_jurisdictions,
+            include_entry_types=True,
+        ),
+        "none": await make_rss_feed_markdown(
+            pacer_courts.filter(pacer_has_rss_feed=False),
+            all_jurisdictions,
+        ),
+    }
+    prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+
     data = {
         "court_count": court_count,
         "citation_count": citation_count,
@@ -285,6 +390,37 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
         "financial_disclosures": {
             "disclosures": fd_data["disclosures"],
             "investments": fd_data["investments"],
+        },
+        "alerts": {
+            "max_free_docket_alerts": settings.MAX_FREE_DOCKET_ALERTS,  # type: ignore[misc]
+            "docket_alert_recap_bonus": settings.DOCKET_ALERT_RECAP_BONUS,  # type: ignore[misc]
+            "rt_alerts_sending_rate": int(
+                settings.REAL_TIME_ALERTS_SENDING_RATE / 60  # type: ignore[misc]
+            ),
+            "max_attorneys_to_percolate": settings.MAX_ATTORNEYS_TO_PERCOLATE,  # type: ignore[misc]
+        },
+        "rss_feeds": rss_feeds,
+        "prayers": {
+            "daily_quota": settings.ALLOWED_PRAYER_COUNT,  # type: ignore[misc]
+            "member_daily_quota": settings.ALLOWED_PRAYER_COUNT * 3,  # type: ignore[misc]
+            "granted_count": prayer_stats.prayer_count,
+            "distinct_users": prayer_stats.distinct_users,
+            "distinct_documents": prayer_stats.distinct_count,
+            "total_cost": prayer_stats.total_cost,
+        },
+        "feeds": {
+            "opinion_courts": await make_court_link_list(
+                Court.objects.filter(in_use=True, has_opinion_scraper=True),
+                "jurisdiction_feed",
+            ),
+        },
+        "podcasts": {
+            "oral_argument_courts": await make_court_link_list(
+                Court.objects.filter(
+                    in_use=True, has_oral_argument_scraper=True
+                ),
+                "jurisdiction_podcast",
+            ),
         },
     }
     one_day = 60 * 60 * 24
