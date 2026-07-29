@@ -12,7 +12,11 @@ from cl.recap.models import (
     PacerHtmlFiles,
     ProcessingQueue,
 )
-from cl.recap.tasks import do_recap_document_fetch, process_texas_email
+from cl.recap.tasks import (
+    do_recap_document_fetch,
+    process_scotus_email,
+    process_texas_email,
+)
 
 
 @admin.register(ProcessingQueue)
@@ -75,8 +79,10 @@ class PacerHtmlFilesAdmin(CursorPaginatorAdmin):
 def reprocess_failed_epq(modeladmin, request, queryset):
     recap_email_user = User.objects.get(username="recap-email")
     for epq in queryset:
-        if epq.source == EmailSource.STATE:
-            if is_texas_court(epq.court):
+        if epq.source == EmailSource.SCOTUS:
+            process_scotus_email.delay(epq.pk)
+        elif epq.source == EmailSource.STATE:
+            if is_texas_court(epq.court_id):
                 process_texas_email.delay(epq.pk)
         else:
             do_recap_document_fetch(epq, recap_email_user)

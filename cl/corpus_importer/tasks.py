@@ -8,7 +8,6 @@ import re
 import shutil
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
@@ -117,6 +116,7 @@ from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
+from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
     compute_binary_probe_jitter,
@@ -716,6 +716,7 @@ def get_and_process_free_pdf(
     data: TaskData,
     row_pk: int,
     court_id: str,
+    citation_queue: str | None = None,
 ) -> TaskData | None:
     """Get a PDF from a PACERFreeDocumentRow object
 
@@ -727,6 +728,9 @@ def get_and_process_free_pdf(
          'pacer_court_id': result.court_id}
     :param row_pk: The PACERFreeDocumentRow operate on
     :param court_id: The court_id (used for throttling).
+    :param citation_queue: Celery queue for the citation-extraction task the
+    RECAPDocument post_save signal enqueues after text extraction. Lets batch
+    jobs keep that work off the default queue.
     """
     if data is None:
         return None
@@ -834,7 +838,10 @@ def get_and_process_free_pdf(
     # Get the data temporarily. OCR is done for all nightly free
     # docs in a separate batch, but may as well do the easy ones.
     async_to_sync(extract_pdf_document_base)(
-        rd.pk, ocr_available=False, check_if_needed=False
+        rd.pk,
+        ocr_available=False,
+        check_if_needed=False,
+        citation_queue=citation_queue,
     )
     return {"result": result, "rd_pk": rd.pk}
 
@@ -2373,11 +2380,47 @@ def get_document_number_for_appellate(
 
     pdf_bytes = None
     document_number = ""
-    # Try to get the document number for appellate documents from the PDF first
-    if pq.filepath_local:
+
+    # Appellate courts "ca8", "cadc" don't use regular docket entry
+    # numbering. Their PDF headers report a document number that doesn't
+    # match the pacer_doc_id used when the same entry arrives via an
+    # extension upload, causing duplicated docket entries when both sources
+    # are merged. For these courts, check the download confirmation page
+    # before falling back to the PDF.
+    #
+    # We fetch document_number via get_document_number_from_confirmation_page
+    # instead of just using pacer_doc_id directly so we can detect if the court
+    # starts reporting regular document numbers instead of pacer_doc_id-style
+    # ones. If we used pacer_doc_id directly, we would never notice that change.
+    # The alert below depends on reading what the confirmation page actually reports.
+    check_confirmation_page_first = (
+        court_id in ("ca8", "cadc") and pacer_doc_id and not acms
+    )
+    if check_confirmation_page_first:
+        document_number = get_document_number_from_confirmation_page(
+            court_id, pacer_doc_id
+        )
+        if document_number and not is_long_appellate_document_number(
+            document_number
+        ):
+            # This court is expected to report long, pacer_doc_id-style
+            # numbers on the confirmation page. A regular-looking number
+            # here suggests the court switched to normal docket numbering.
+            # Alert so we can verify and clean up entries.
+            logger.error(
+                "Court %s returned a regular-looking document number '%s' for "
+                "pacer_doc_id %s. It may no longer need special handling in "
+                "get_document_number_for_appellate.",
+                court_id,
+                document_number,
+                pacer_doc_id,
+            )
+
+    # Try to get the document number for appellate documents from the PDF
+    if not document_number and pq.filepath_local:
         with pq.filepath_local.open(mode="rb") as local_path:
             pdf_bytes = local_path.read()
-    if pdf_bytes:
+    if not document_number and pdf_bytes:
         # For other jurisdictions try first to get it from the PDF document.
         dn_response = async_to_sync(microservice)(
             service="document-number",
@@ -2387,7 +2430,12 @@ def get_document_number_for_appellate(
         if dn_response.is_success and dn_response.text:
             document_number = dn_response.text
 
-    if not document_number and pacer_doc_id and not acms:
+    if (
+        not document_number
+        and pacer_doc_id
+        and not acms
+        and not check_confirmation_page_first
+    ):
         # If we still don't have the document number fall back on the
         # download confirmation page
         document_number = get_document_number_from_confirmation_page(
@@ -2407,6 +2455,10 @@ def get_document_number_for_appellate(
         # Force the fourth-digit to 0:
         # 00218987740 -> 00208987740, 123119177518 -> 123019177518
         document_number = f"{document_number[:3]}0{document_number[4:]}"
+
+        # int() strips any number of leading zeros; convert back to str since
+        # document_number stays a string throughout this function.
+        document_number = str(int(document_number))
 
     return document_number
 
@@ -4076,90 +4128,6 @@ def download_texas_document_unthrottled(
 TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
 
 
-@dataclass
-class MergeResult[T = int]:
-    """Stores data about the result of an attempted merge operation.
-
-    :ivar creates: Objects which needed to be created. Key is object name and
-        value is a list of PKs to created objects.
-    :ivar updates: Objects which needed to be updated.
-    :ivar failures: Objects for which the merge operation failed. Items will be
-        None if an object needed to be created but that operation failed."""
-
-    creates: dict[str, set[T]] = field(default_factory=dict)
-    updates: dict[str, set[T]] = field(default_factory=dict)
-    failures: dict[str, list[T | None]] = field(default_factory=dict)
-
-    @staticmethod
-    def union[S, U](
-        a: MergeResult[S], b: MergeResult[U]
-    ) -> MergeResult[S | U]:
-        """
-        Creates a new MergeResult object storing the combined results of two
-        objects.
-        """
-        return MergeResult[S | U](
-            creates={
-                k: a.creates.get(k, set()) | b.creates.get(k, set())
-                for k in a.creates.keys() | b.creates.keys()
-            },
-            updates={
-                k: a.updates.get(k, set()) | b.updates.get(k, set())
-                for k in a.updates.keys() | b.updates.keys()
-            },
-            failures={
-                k: [*a.failures.get(k, []), *b.failures.get(k, [])]
-                for k in a.failures.keys() | b.failures.keys()
-            },
-        )
-
-    @property
-    def success(self) -> bool:
-        return not self.failures
-
-    @property
-    def update(self) -> bool:
-        return bool(self.updates)
-
-    @property
-    def create(self) -> bool:
-        return bool(self.creates)
-
-    @staticmethod
-    def created[S](model: str, pk: S) -> MergeResult[S]:
-        """Shorthand for the result of a successful create operation.
-
-        :param model: The model which was created.
-        :param pk: The primary key of created object.
-        :returns: The constructed MergeResult object."""
-        return MergeResult(creates={model: {pk}})
-
-    @staticmethod
-    def updated[S](model: str, pk: S) -> MergeResult[S]:
-        """Shorthand for the result of a successful update operation.
-
-        :param model: The model which was updated.
-        :param pk: The primary key of the updated object.
-        :return: The constructed MergeResult object."""
-        return MergeResult(updates={model: {pk}})
-
-    @staticmethod
-    def failed[S](model: str, pk: S | None = None) -> MergeResult[S]:
-        """Shorthand for the result of a failed merge operation.
-
-        :param model: The model which failed.
-        :param pk: The (optional) primary key of the failed object.
-        :return: The constructed MergeResult object."""
-        return MergeResult(failures={model: [pk]})
-
-    @staticmethod
-    def unnecessary() -> MergeResult:
-        """Shorthand for the result of an unnecessary merge operation.
-
-        :return: The constructed MergeResult object."""
-        return MergeResult()
-
-
 def merge_texas_trial_court_data(
     docket: Docket,
     docket_data: TexasCourtOfCriminalAppealsDocket | TexasSupremeCourtDocket,
@@ -4902,14 +4870,19 @@ def merge_texas_docket(
     :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation."""
-    court = Court.objects.get(
-        pk=texas_js_court_id_to_court_id(docket_data["court_id"])
-    )
+    court_id = texas_js_court_id_to_court_id(docket_data["court_id"])
     docket_number = docket_data["docket_number"]
     logger.info("Merging Texas docket %s", docket_number)
 
     if docket_data["court_type"] == CourtType.UNKNOWN.value:
         logger.error("Texas docket %s has unknown court type", docket_number)
+        return MergeResult.failed("Docket")
+    if court_id is None:
+        logger.error(
+            "Could not determine Court pk for Texas docket %s with court ID %s",
+            docket_number,
+            docket_data["court_id"],
+        )
         return MergeResult.failed("Docket")
 
     with transaction.atomic():
@@ -4930,12 +4903,12 @@ def merge_texas_docket(
             )
             if docket is not None:
                 logger.info(
-                    "Disaggregating Texas appellate docket %s", docket_number
+                    "Disaggregated Texas appellate docket %s", docket_number
                 )
-                docket.court = court
+                docket.court_id = court_id
         if docket is None:
             docket = async_to_sync(find_docket_object)(
-                court_id=court.pk,
+                court_id=court_id,
                 pacer_case_id=None,
                 docket_number=docket_number,
                 federal_defendant_number=None,
@@ -5020,7 +4993,7 @@ def merge_texas_docket(
             "One or more steps in Texas case merging failed for docket %s (pk %s) in court %s. Failures: %s",
             docket_number,
             docket.pk,
-            court.pk,
+            court_id,
             result.failures,
         )
 

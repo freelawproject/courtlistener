@@ -75,6 +75,7 @@ class DynamicClientRegistrationView(APIView):
 
     authentication_classes: list[Any] = []
     permission_classes: list[Any] = []
+    throttle_classes: list[Any] = []
 
     def handle_exception(self, exc: Exception) -> Response:
         if isinstance(exc, Ratelimited):
@@ -150,6 +151,7 @@ class OAuthMetadataView(APIView):
 
     authentication_classes: list[Any] = []
     permission_classes: list[Any] = []
+    throttle_classes: list[Any] = []
 
     def get(self, request: Request) -> Response:
         base = request.build_absolute_uri("/").rstrip("/")

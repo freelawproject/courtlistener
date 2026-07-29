@@ -248,7 +248,7 @@
             </div>
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -297,7 +297,7 @@
             </div>
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -416,7 +416,7 @@
             </div>
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -488,7 +488,7 @@
 
             <div class="col-sm-3">
                 {% include "includes/operators_quick_list.html" %}
-                <a class="text-right" href="{% url 'advanced_search' %}">More
+                <a class="text-right" href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">More
                     details&hellip;</a>
             </div>
         </div>
@@ -624,7 +624,7 @@
                 <h3>Alerts</h3>
                 <p>For the courts where we get content on an <a href="{% url "coverage_opinions" %}">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new decision matching your query.
                 </p>
-                <p>Some popular queries are your company name or that of your competitor, a legal area that you follow, or even <a href="https://free.law/2016/01/30/citation-searching/">a citation alert</a> that emails when a certain case is cited. We also offer <a href="{% url "feeds_info" %}">custom RSS feeds</a> for any search query.
+                <p>Some popular queries are your company name or that of your competitor, a legal area that you follow, or even <a href="https://free.law/2016/01/30/citation-searching/">a citation alert</a> that emails when a certain case is cited. We also offer <a href="{{ WIKI_HELP_URL }}/general/using-atom-and-rss-feeds-for-the-latest-updates">custom RSS feeds</a> for any search query.
                 </p>
                 <p>To get started, do a search, then save it as an alert from the sidebar of your list of results.
                 </p>
@@ -635,7 +635,7 @@
                 </p>
                 <p>
                     <a class="btn btn-primary"
-                       href="{% url 'advanced_search' %}">Learn More</a>
+                       href="{{ WIKI_HELP_URL }}/search/advanced-search-and-query-techniques">Learn More</a>
                 </p>
             </div>
         </div>
@@ -746,7 +746,7 @@
                 <p>For every jurisdiction <a href="{% url "coverage_oa" %}">that we support</a>, we provide Podcasts automatically, so you can listen to the latest arguments from that court. It is also possible to create a Podcast from any search that you make, allowing you to make custom Podcasts with only the information you want to hear.
                 </p>
                 <p>
-                    <a href="{% url "podcasts" %}" class="btn btn-primary">Learn
+                    <a href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings" class="btn btn-primary">Learn
                         More</a>
                 </p>
             </div>

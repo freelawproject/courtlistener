@@ -452,6 +452,7 @@ def extract_recap_pdf(
     pks: int | list[int],
     ocr_available: bool = True,
     check_if_needed: bool = True,
+    citation_queue: str | None = None,
 ):
     """
     Temporary task method to prevent `extract_recap_pdf` tasks currently in the
@@ -459,7 +460,11 @@ def extract_recap_pdf(
     tasks referencing this method.
     """
     return async_to_sync(extract_pdf_document_base)(
-        pks, ocr_available, check_if_needed, "search.RECAPDocument"
+        pks,
+        ocr_available,
+        check_if_needed,
+        "search.RECAPDocument",
+        citation_queue,
     )
 
 
@@ -480,6 +485,7 @@ def extract_formatted_text_document(
     check_if_needed: bool = True,
     model_name: str = "search.RECAPDocument",
     strip_html_tags: bool = False,
+    citation_queue: str | None = None,
 ) -> list[int]:
     """Celery task wrapper for `extract_formatted_text_document_base`.
 
@@ -516,7 +522,12 @@ def extract_formatted_text_document(
     """
 
     return async_to_sync(extract_formatted_text_document_base)(
-        pks, ocr_available, check_if_needed, model_name, strip_html_tags
+        pks,
+        ocr_available,
+        check_if_needed,
+        model_name,
+        strip_html_tags,
+        citation_queue,
     )
 
 
@@ -536,6 +547,7 @@ def extract_pdf_document(
     ocr_available: bool = True,
     check_if_needed: bool = True,
     model_name: str = "search.RECAPDocument",
+    citation_queue: str | None = None,
 ) -> list[int]:
     """Thin wrapper around extract_formatted_text_document.
 
@@ -543,7 +555,11 @@ def extract_pdf_document(
     continue to work until they are fully processed.
     """
     return async_to_sync(extract_pdf_document_base)(
-        pks, ocr_available, check_if_needed, model_name
+        pks,
+        ocr_available,
+        check_if_needed,
+        model_name,
+        citation_queue,
     )
 
 
@@ -553,6 +569,7 @@ async def extract_formatted_text_document_base(
     check_if_needed: bool = True,
     model_name: str = "search.RECAPDocument",
     strip_html_tags: bool = False,
+    citation_queue: str | None = None,
 ) -> list[int]:
     """Extract the contents from a document if necessary.
 
@@ -565,6 +582,10 @@ async def extract_formatted_text_document_base(
     :param strip_html_tags: Whether to strip HTML tags from the extracted
     content. Use for HTML or WPD documents so that plain_text contains
     plain text rather than markup.
+    :param citation_queue: Celery queue for the citation-extraction task the
+    RECAPDocument post_save signal enqueues when plain_text changes. Lets batch
+    jobs route that costly work off the default queue. See
+    cl.search.signals.handle_recap_doc_change.
 
     :return: A list of processed document pks.
     """
@@ -619,6 +640,10 @@ async def extract_formatted_text_document_base(
         rd.plain_text = rd.plain_text.replace("\0", "")
         # Kludgey fix to handle RECAPDocument's custom save logic.
         if isinstance(rd, RECAPDocument):
+            # Steer the citation-extraction task the post_save signal enqueues
+            # onto the requested queue (batch jobs use this to keep the default
+            # queue clear).
+            rd.citation_queue = citation_queue
             await rd.asave(
                 do_extraction=False,
                 update_fields=["ocr_status", "plain_text"],
@@ -641,6 +666,7 @@ async def extract_pdf_document_base(
     ocr_available: bool = True,
     check_if_needed: bool = True,
     model_name: str = "search.RECAPDocument",
+    citation_queue: str | None = None,
 ) -> list[int]:
     """Thin wrapper around extract_formatted_text_document_base.
 
@@ -648,7 +674,11 @@ async def extract_pdf_document_base(
     continue to work until they are fully processed.
     """
     return await extract_formatted_text_document_base(
-        pks, ocr_available, check_if_needed, model_name
+        pks,
+        ocr_available,
+        check_if_needed,
+        model_name,
+        citation_queue=citation_queue,
     )
 
 
