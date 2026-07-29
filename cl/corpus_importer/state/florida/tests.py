@@ -11,6 +11,7 @@ from juriscraper.state.florida.cases import FloridaCase
 from juriscraper.state.florida.courts import FloridaCourtID
 
 from cl.corpus_importer.state.florida.factories import (
+    FloridaCaseActorFactory,
     FloridaCaseFactory,
     FloridaCasePartyFactory,
     FloridaDocketEntryFactory,
@@ -701,7 +702,7 @@ class FloridaDocketEntryMergerTest(TestCase):
             entry_type_raw="motions other",
             entry_name="Motion for Extension",
             entry_description="Requesting more time.",
-            entry_status="Filed",
+            entry_status="Docketed",
             attachments=[],
         )
         docket_data = self._make_case(entry)
@@ -719,7 +720,9 @@ class FloridaDocketEntryMergerTest(TestCase):
         assert merged.entry_type_raw == "motions other"
         assert merged.entry_name == "Motion for Extension"
         assert merged.description == "Requesting more time."
-        assert merged.status == "Filed"
+        self.assertEqual(merged.status, FloridaDocketEntry.STATUS_DOCKETED)
+        self.assertEqual(merged.submitted_by_name, "")
+        self.assertIsNone(merged.submitted_by_id)
 
     def test_merge_creates_all_docket_entries(self):
         """Are multiple entries in a scrape merged as separate objects?"""
@@ -756,19 +759,108 @@ class FloridaDocketEntryMergerTest(TestCase):
     def test_remerge_updates_entry_fields(self):
         """Does remerging an entry update its fields in place?"""
         entry = FloridaDocketEntryFactory.create(
-            entry_status="Filed", attachments=[]
+            entry_status="Docketed", attachments=[]
         )
         docket_data = self._make_case(entry)
         FloridaDocketMerger(docket_data, params=None).merge()
         merged = FloridaDocketEntry.objects.get()
 
-        entry.entry_status = "Disposed"
+        entry.entry_status = "Stricken"
         result = FloridaDocketMerger(docket_data, params=None).merge()
 
         assert result.success is True
         assert merged.pk in result.updates["FloridaDocketEntry"]
         merged.refresh_from_db()
-        assert merged.status == "Disposed"
+        self.assertEqual(merged.status, FloridaDocketEntry.STATUS_STRICKEN)
+
+    def test_merge_unrecognized_entry_status_is_unknown(self):
+        """Is an entry status Florida hasn't shown us before stored as
+        unknown rather than failing the merge?"""
+        entry = FloridaDocketEntryFactory.create(
+            entry_status="Surprising", attachments=[]
+        )
+        docket_data = self._make_case(entry)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        merged = FloridaDocketEntry.objects.get()
+        self.assertEqual(merged.status, FloridaDocketEntry.STATUS_UNKNOWN)
+
+    def test_merge_submitted_by_links_docket_party(self):
+        """Is a submitter that matches a party on the docket linked to that
+        party?"""
+        party = FloridaCasePartyFactory.create(
+            name="Acme Corp", representatives=[]
+        )
+        entry = FloridaDocketEntryFactory.create(
+            submitted_by=[
+                FloridaCaseActorFactory.create(display_name="Acme Corp")
+            ],
+            attachments=[],
+        )
+        docket_data = FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            entries=[entry],
+            parties=[party],
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        merged = FloridaDocketEntry.objects.get()
+        self.assertEqual(merged.submitted_by_name, "Acme Corp")
+        self.assertEqual(
+            merged.submitted_by_id, Party.objects.get(name="Acme Corp").pk
+        )
+
+    def test_merge_submitted_by_unknown_party_keeps_name_only(self):
+        """Is a submitter who isn't a party on the docket -- court staff, for
+        instance -- recorded by name with no party link?"""
+        entry = FloridaDocketEntryFactory.create(
+            submitted_by=[
+                FloridaCaseActorFactory.create(display_name="Broward Clerk")
+            ],
+            attachments=[],
+        )
+        docket_data = self._make_case(entry)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        merged = FloridaDocketEntry.objects.get()
+        self.assertEqual(merged.submitted_by_name, "Broward Clerk")
+        self.assertIsNone(merged.submitted_by_id)
+
+    def test_remerge_keeps_resolved_submitted_by_party(self):
+        """Does a later scrape that can't match the submitter keep the party
+        we resolved earlier?"""
+        party = FloridaCasePartyFactory.create(
+            name="Acme Corp", representatives=[]
+        )
+        entry = FloridaDocketEntryFactory.create(
+            submitted_by=[
+                FloridaCaseActorFactory.create(display_name="Acme Corp")
+            ],
+            attachments=[],
+        )
+        docket_data = FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            entries=[entry],
+            parties=[party],
+        )
+        FloridaDocketMerger(docket_data, params=None).merge()
+        merged = FloridaDocketEntry.objects.get()
+        resolved_party_id = merged.submitted_by_id
+        self.assertIsNotNone(resolved_party_id)
+
+        entry.submitted_by = []
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        merged.refresh_from_db()
+        self.assertEqual(merged.submitted_by_id, resolved_party_id)
+        self.assertEqual(merged.submitted_by_name, "")
 
     def test_merge_keeps_entries_missing_from_scrape(self):
         """Are DB entries kept when a later scrape doesn't include them?"""
@@ -856,6 +948,18 @@ class FloridaDocumentMergerTest(TestCase):
         assert result.success is True
         merged = FloridaDocument.objects.get()
         assert merged.document_type == ""
+
+    def test_merge_document_without_content_type_is_blank(self):
+        """Is a scrape document with no content type merged with a blank
+        string instead of None?"""
+        document = FloridaDocumentFactory.create(content_type=None)
+        docket_data = self._make_case(document)
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        merged = FloridaDocument.objects.get()
+        self.assertEqual(merged.content_type, "")
 
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice avoid duplicating documents?"""

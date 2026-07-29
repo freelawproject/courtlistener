@@ -514,6 +514,114 @@ class BaseMergerTest(TestCase):
             "REPLACE deletes stale related objects outright.",
         )
 
+    def test_related_mergers_child_replace_keeps_rows_on_invalid_child(
+        self,
+    ) -> None:
+        """Does REPLACE leave existing rows alone when a child's input is
+        invalid? The child gives up before looking anything up, so the row it
+        would have matched isn't known and can't be pruned safely."""
+        stale = DocketEntry.objects.create(
+            docket=self.docket, description="Stale"
+        )
+        tc = self
+
+        class TestRelatedMerger(
+            Merger[dict[str, str], RelatedParams[None], DocketEntry]
+        ):
+            model: ClassVar[type[Model]] = DocketEntry
+            key: ClassVar[Iterable[str]] = ["description"]
+
+            description: str = Attribute(lambda d, params: d["df"])
+
+            @staticmethod
+            def validate(scrape: dict[str, str]) -> bool:
+                return scrape["df"] != "Invalid"
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.docket.court)
+            source: int = Attribute(default=tc.docket.source)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            docket_entries: list[DocketEntry] = OneToManyRelation(
+                TestRelatedMerger,
+                lambda d, params: d["entries"],
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        i = {"entries": [{"df": "Fresh"}, {"df": "Invalid"}]}
+        result = TestMerger(i, params=None).merge()
+
+        self.assertFalse(result.success)
+        self.assertTrue(
+            DocketEntry.objects.filter(pk=stale.pk).exists(),
+            "A failed child merge must not let REPLACE delete existing rows.",
+        )
+        self.assertEqual(
+            set(
+                self.docket.docket_entries.values_list(
+                    "description", flat=True
+                )
+            ),
+            {"Stale", "Fresh"},
+        )
+
+    def test_related_mergers_m2m_replace_keeps_rows_on_ambiguous_child(
+        self,
+    ) -> None:
+        """Does REPLACE leave existing rows alone when a child's lookup
+        matches several rows? The merger can't pick one, so it never learns
+        which row belongs to this scrape."""
+        stale_party = Party.objects.create(name="Stale Party")
+        PartyType.objects.create(
+            docket=self.docket, party=stale_party, name="Plaintiff"
+        )
+        Party.objects.create(name="Ambiguous")
+        Party.objects.create(name="Ambiguous")
+        tc = self
+
+        class TestPartyMerger(
+            Merger[dict[str, str], RelatedParams[None], Party]
+        ):
+            model: ClassVar[type[Model]] = Party
+            key: ClassVar[Iterable[str]] = ["name"]
+
+            name: str = Attribute(lambda d, params: d["name"])
+
+        class TestPartyTypeMerger(
+            Merger[dict[str, str], ThroughParameters[None], PartyType]
+        ):
+            model: ClassVar[type[Model]] = PartyType
+
+            name: str = Attribute(lambda d, params: d["type"])
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.docket.court)
+            source: int = Attribute(default=tc.docket.source)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            parties: list[Party] = ManyToManyRelation(
+                TestPartyMerger,
+                TestPartyTypeMerger,
+                lambda d, params: d["parties"],
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        i = {"parties": [{"name": "Ambiguous", "type": "Plaintiff"}]}
+        result = TestMerger(i, params=None).merge()
+
+        self.assertFalse(result.success)
+        self.assertTrue(
+            Party.objects.filter(pk=stale_party.pk).exists(),
+            "An ambiguous child lookup must not let REPLACE delete existing "
+            "rows.",
+        )
+
     def test_merger_subclassing(self) -> None:
         class TestMerger(Merger[dict[str, str], dict[str, Any], Docket]):
             model: ClassVar[type[Model]] = Docket

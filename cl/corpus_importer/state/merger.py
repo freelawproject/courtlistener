@@ -345,12 +345,9 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
             case ManyStrategy.APPEND:
                 related_manager.add(*related_objects)
             case ManyStrategy.REPLACE:
-                # Keep existing children whose merge failed, matching the
-                # many-to-many REPLACE semantics below.
-                to_keep = {r.pk for r in related_objects} | {
-                    m.existing.pk for m in child_mergers if m.existing
-                }
-                _ = related_manager.exclude(pk__in=to_keep).delete()
+                if all(m.out is not None for m in child_mergers):
+                    to_keep = {r.pk for r in related_objects}
+                    _ = related_manager.exclude(pk__in=to_keep).delete()
                 related_manager.add(*related_objects)
             case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
@@ -492,11 +489,15 @@ class ManyToManyMerger[
                 continue
             related_objects.append((child, child_merger.out))
 
-        if self.strategy is ManyStrategy.REPLACE:
+        # A failed merge can leave behind a row that its merger never identified:
+        # invalid input and an ambiguous lookup both give up without setting
+        # `existing`. Those rows aren't in the keep set, so a `REPLACE` prune has to be
+        # skipped entirely rather than deleting data a later scrape could still match.
+        if self.strategy is ManyStrategy.REPLACE and all(
+            m.out is not None for m in child_mergers
+        ):
             # Delete everything we didn't update or create along with associated objects
-            to_keep = {r.pk for _, r in related_objects} | {
-                m.existing.pk for m in child_mergers if m.existing
-            }
+            to_keep = {r.pk for _, r in related_objects}
             _ = related_manager.exclude(pk__in=to_keep).delete()
 
         through_mergers: list[
@@ -522,10 +523,10 @@ class ManyToManyMerger[
                 continue
             through_objects.append(through_merger.out)
 
-        if self.through_strategy is ManyStrategy.REPLACE:
-            to_keep = {t.pk for t in through_objects} | {
-                m.existing.pk for m in through_mergers if m.existing
-            }
+        if self.through_strategy is ManyStrategy.REPLACE and all(
+            m.out is not None for m in through_mergers
+        ):
+            to_keep = {t.pk for t in through_objects}
             # Only prune through objects belonging to this parent; other
             # parents' relationships are out of scope for this merge.
             _ = (
