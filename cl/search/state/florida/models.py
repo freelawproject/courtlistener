@@ -93,7 +93,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     :ivar content_type: The MIME type indicated by Florida ACIS
     :ivar document_name: The name of the document in Florida ACIS
     :ivar document_type: The type of the document in Florida ACIS
-    :ivar description: The description of the document in Florida ACIS
     :ivar link_uuid: The attachment link UUID retrieved from Florida ACIS. Used to generate document download URL.
     :ivar url: Download URL for attachment. Derived from uuid and link_uuid. Stored for safety.
     :ivar processing_error: The processing error for the document, if any.
@@ -107,7 +106,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     content_type = models.CharField(max_length=63, blank=True)
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
-    description = models.TextField(blank=True)
     link_uuid = models.UUIDField()
     url = models.URLField(max_length=250)
     processing_error = models.SmallIntegerField(
