@@ -1417,6 +1417,10 @@ class Party(AbstractDateTimeModel):
         "October, 2020.",
         db_index=True,
     )
+    pro_se_flag = models.BooleanField(
+        help_text="Whether the party is representing themselves (pro se).",
+        default=False,
+    )
 
     class Meta:
         verbose_name_plural = "Parties"
