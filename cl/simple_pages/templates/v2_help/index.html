@@ -15,26 +15,11 @@
 
     <div class="flex flex-col gap-6">
       <div class="flex flex-col gap-2">
-        <h2 class="text-display-xs font-semibold text-greyscale-900">Getting Help on</h2>
-        <p class="text-sm font-normal text-greyscale-600">The following help articles are currently available:</p>
+        <h2 class="text-display-xs font-semibold text-greyscale-900">Help Articles</h2>
+        <p class="text-sm font-normal text-greyscale-600">Our help articles are available on the Free Law Project wiki.</p>
       </div>
-      <div class="pl-4">
-        <ol
-          class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
-          <li><a class="links" href="{% url "alert_help" %}">Help with search and docket alerts</a></li>
-          <li><a class="links" href="{% url "recap_email_help" %}">Help with @recap.email</a></li>
-          <li><a class="links" href="{% url "advanced_search" %}">Help with advanced search parameters</a></li>
-          <li><a class="links" href="{% url "citegeist_help" %}">How search results are ranked</a></li>
-          <li><a class="links" href="{% url "relative_dates" %}">Help with relative date queries</a></li>
-          <li><a class="links" href="{% url "tag_notes_help" %}">Learn how to tag dockets and save notes</a></li>
-          <li><a class="links" href="{% url "feeds_info" %}">Learn about RSS feeds</a></li>
-          <li><a class="links" href="{% url "podcasts" %}">Learn about our Podcasts</a></li>
-          <li><a class="links" href="{% url "markdown_help" %}">Help formatting with Markdown</a></li>
-          <li><a class="links" href="{% url "donation_help" %}">Help with your donations</a></li>
-          <li><a class="links" href="{% url "delete_help" %}">Help deleting your account</a></li>
-          <li><a class="links" href="{% url "pray_and_pay_help" %}">Help with Pray and Pay project</a></li>
-        </ol>
-      </div>
+      <a href="{{ WIKI_HELP_URL }}" class="btn-primary max-md:btn-xl">Help Articles on the Wiki</a>
+      <a href="{% url "donation_help" %}" class="btn-outline max-md:btn-xl">Help with your Donations</a>
     </div>
 
     <div class="flex flex-col gap-6">
@@ -70,7 +55,7 @@
           </p>
         </div>
         <a
-          href="{% url "terms" %}#removal"
+          href="{{ WIKI_REMOVAL_URL }}"
           class="py-2.5 px-3.5 rounded-lg outline outline-1 outline-greyscale-300 w-fit text-sm font-normal text-greyscale-700"
         >
           Read our Removal Policy to Learn More
@@ -80,15 +65,9 @@
       <div class="flex flex-col gap-4">
         <div class="flex flex-col gap-4">
           <h2 class="text-display-xs font-semibold text-greyscale-900">More Help?</h2>
-          <p class="text-sm font-normal text-greyscale-600">If you're unable to find what you're looking for above you have a few more options:</p>
+          <p class="text-sm font-normal text-greyscale-600">If you're unable to find what you're looking for above, get in touch:</p>
         </div>
         <div class="flex items-start gap-4">
-          <a
-            href="{% url "faq" %}"
-            class="py-2.5 px-3.5 rounded-lg outline outline-1 outline-greyscale-300 w-fit text-sm font-normal text-greyscale-700"
-          >
-            Try our FAQs
-          </a>
           <a
             href="{% url "contact" %}"
             class="py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal text-white bg-primary-600"
