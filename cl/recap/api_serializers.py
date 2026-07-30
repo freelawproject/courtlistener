@@ -53,6 +53,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             "docket",
             "docket_entry",
             "recap_document",
+            "source",
         )
         extra_kwargs = {"filepath_local": {"write_only": True}}
 

@@ -380,6 +380,19 @@ class RecapUploadsTest(TestCase):
         pq = await ProcessingQueue.objects.aget(pk=j["id"])
         self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
 
+    async def test_client_submitted_source_is_ignored(self, mock):
+        """A client-submitted `source` value should be ignored; the PQ
+        should still be tagged with source=EXTENSION, set server-side by
+        the view.
+        """
+        self.data["source"] = PROCESSING_QUEUE_SOURCE.REPLICATION
+        r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        j = json.loads(r.content)
+        pq = await ProcessingQueue.objects.aget(pk=j["id"])
+        self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
+
     async def test_uploading_a_zip(self, mock):
         """Can we upload a zip?"""
         self.data.update({"upload_type": UPLOAD_TYPE.DOCUMENT_ZIP})
