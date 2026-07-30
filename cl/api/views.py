@@ -23,7 +23,7 @@ from cl.alerts.utils import get_alert_estimation_count
 from cl.api.utils import (
     ApiUsageRateThrottle,
     get_current_throttle_usage,
-    invert_user_logs,
+    get_user_api_usage,
 )
 from cl.custom_filters.templatetags.partition_util import columns
 from cl.donate.models import NeonMembership, NeonMembershipLevel
@@ -452,10 +452,8 @@ class ApiUsageViewSet(ViewSet):
 
     def _get_historical_usage(self, user: User) -> dict[str, int]:
         """14-day daily request counts from Redis."""
-        start = datetime.today() - timedelta(days=14)
-        end = datetime.today()
-        data = invert_user_logs(start, end, add_usernames=False)
-        return data.get(user.pk, {"total": 0})  # type: ignore[call-overload]
+        today = datetime.today()
+        return get_user_api_usage(user.pk, today - timedelta(days=14), today)
 
     def _get_membership(self, user: User) -> MembershipInfo | None:
         """Return the user's membership level and active status."""

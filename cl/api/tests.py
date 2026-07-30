@@ -61,6 +61,7 @@ from cl.api.utils import (
     detect_unknown_filter_params,
     get_all_throttle_overrides,
     get_logging_prefix,
+    get_user_api_usage,
     invert_user_logs,
     is_valid_filter_param,
     promo_doubling_applies,
@@ -3704,6 +3705,37 @@ class TestApiUsage(SimpleTestCase):
         self.assertEqual(results, expected)
 
     @patch("cl.api.utils.get_redis_interface")
+    def test_single_user_usage_combines_versions(self, mock_get_redis):
+        """get_user_api_usage sums v3 and v4 scores per date."""
+        mock_get_redis.return_value = self.mock_redis
+        self.mock_pipeline.execute.return_value = [
+            100.0,  # Jan 1 v3
+            50.0,  # Jan 1 v4
+            None,  # Jan 2 v3, no usage
+            25.0,  # Jan 2 v4
+        ]
+
+        results = get_user_api_usage(1, start="2023-01-01", end="2023-01-02")
+
+        self.assertEqual(
+            results, {"2023-01-01": 150, "2023-01-02": 25, "total": 175}
+        )
+        # Guards the member encoding: a mismatch reads as zero, not an error.
+        self.mock_pipeline.zscore.assert_any_call(
+            "api:v4.user.d:2023-01-01.counts", 1
+        )
+
+    @patch("cl.api.utils.get_redis_interface")
+    def test_single_user_usage_with_no_history(self, mock_get_redis):
+        """A user with no requests in the range still gets a total."""
+        mock_get_redis.return_value = self.mock_redis
+        self.mock_pipeline.execute.return_value = [None, None]
+
+        results = get_user_api_usage(1, start="2023-01-01", end="2023-01-01")
+
+        self.assertEqual(results, {"total": 0})
+
+    @patch("cl.api.utils.get_redis_interface")
     def test_anonymous_user_handling(self, mock_get_redis):
         """
         Test the handling of anonymous users, which have special requirements:
@@ -5770,22 +5802,17 @@ class TestApiUsageEndpoint(TestCase):
 
     @patch("cl.api.utils.get_redis_interface")
     def test_historical_usage_data_returned(self, mock_get_redis):
-        """Historical usage pulls data from Redis via invert_user_logs."""
+        """Historical usage pulls data from Redis via get_user_api_usage."""
         mock_redis = MagicMock()
         mock_pipeline = MagicMock()
         mock_redis.pipeline.return_value = mock_pipeline
         mock_get_redis.return_value = mock_redis
 
-        # invert_user_logs issues two queries (v3 + v4) per date in the range.
-        # _get_historical_usage asks for a 15-day inclusive window
-        # (today - 14 days through today), so the pipeline returns 30 entries.
-        # Seed today's v3/v4 slots; leave the rest empty.
-        num_dates = 15
-        execute_results: list[list[tuple[str, float]]] = [
-            [] for _ in range(num_dates * 2)
-        ]
-        execute_results[-2] = [(str(self.user.pk), 42.0)]  # today, v3
-        execute_results[-1] = [(str(self.user.pk), 18.0)]  # today, v4
+        # get_user_api_usage issues one ZSCORE per (date, version) across the
+        # 15-day inclusive window, so the pipeline returns 30 scalars.
+        execute_results: list[float | None] = [None] * 30
+        execute_results[-2] = 42.0  # today, v3
+        execute_results[-1] = 18.0  # today, v4
         mock_pipeline.execute.return_value = execute_results
 
         response = self.client.get(self.url)
@@ -5804,7 +5831,7 @@ class TestApiUsageEndpoint(TestCase):
         mock_get_redis.return_value = mock_redis
 
         # 15-day window × 2 versions = 30 empty result slots, no user data anywhere.
-        mock_pipeline.execute.return_value = [[] for _ in range(15 * 2)]
+        mock_pipeline.execute.return_value = [None] * 30
 
         response = self.client.get(self.url)
         data = response.json()

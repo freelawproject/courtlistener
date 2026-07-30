@@ -1655,6 +1655,51 @@ def invert_user_logs(
     return user_keyed_out
 
 
+def get_user_api_usage(
+    user_id: int,
+    start: str | datetime,
+    end: str | datetime,
+) -> dict[str, int]:
+    """Get one user's daily API usage counts over a date range.
+
+    Combines v3 and v4 counts using O(1) ZSCORE lookups against the per-day
+    sorted sets that ``LoggingMixin`` populates, so the cost is independent of
+    how many users hit the API. ``invert_user_logs`` answers the same question
+    by reading every day's set in full, which suits the admin-facing reports
+    but is wasteful for a single user.
+
+    :param user_id: The pk of the user whose usage to look up
+    :param start: Beginning date (inclusive) for the query range
+    :param end: End date (inclusive) for the query range
+    :return: Dictionary mapping ISO dates with usage to their counts, in
+        chronological order, followed by a 'total' key. Dates without usage
+        are omitted; 'total' is always present.
+    """
+    r = get_redis_interface("STATS")
+    pipe = r.pipeline()
+    versions = ["v3", "v4"]
+    dates = make_date_str_list(start, end)
+    for d in dates:
+        for version in versions:
+            # Members are written by zincrby with an int pk, which redis-py
+            # encodes as its decimal string, so an int argument matches. A
+            # mismatch here would read as zero usage rather than erroring.
+            pipe.zscore(f"api:{version}.user.d:{d}.counts", user_id)
+
+    # One score (or None) per version per date, e.g.
+    # [v3_day1, v4_day1, v3_day2, v4_day2, ...].
+    results = pipe.execute()
+
+    out: dict[str, int] = {}
+    total = 0
+    for d, scores in zip(dates, batched(results, len(versions)), strict=True):
+        if count := sum(int(score) for score in scores if score):
+            out[d] = count
+            total += count
+    out["total"] = total
+    return out
+
+
 def get_user_ids_for_date_range(
     start: str | datetime,
     end: str | datetime,
