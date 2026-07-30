@@ -188,6 +188,7 @@ from cl.recap.mergers import (
     update_docket_metadata,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     UPLOAD_TYPE,
     FjcIntegratedDatabase,
     PacerHtmlFiles,
@@ -2149,6 +2150,7 @@ def get_bankr_claims_registry(
 def create_attachment_pq(
     rd_pk: int,
     user_pk: int,
+    source: int = PROCESSING_QUEUE_SOURCE.UNKNOWN,
 ) -> ProcessingQueue:
     """Create a ProcessingQueue instance for an attachment.
 
@@ -2157,6 +2159,9 @@ def create_attachment_pq(
 
     :param rd_pk: The pk of the RECAPDocument.
     :param user_pk: The pk of the User uploading the attachment.
+    :param source: The PROCESSING_QUEUE_SOURCE value to tag this PQ with.
+    Defaults to UNKNOWN since this helper is also used by internal
+    management-command scripts that don't have a more specific source.
     :return: A ProcessingQueue instance for the attachment upload.
     """
 
@@ -2168,6 +2173,7 @@ def create_attachment_pq(
         uploader=user,
         upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
         pacer_case_id=rd.docket_entry.docket.pacer_case_id,
+        source=source,
     )
     return pq
 
@@ -2224,6 +2230,7 @@ def save_attachment_pq_from_text(
     pq = create_attachment_pq(
         rd_pk,
         user_pk,
+        source=PROCESSING_QUEUE_SOURCE.EMAIL,
     )
     pq.filepath_local.save(
         "attachment_page.html", ContentFile(att_report_text.encode())
