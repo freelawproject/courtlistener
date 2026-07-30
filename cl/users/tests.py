@@ -182,7 +182,7 @@ class UserTest(LiveServerTestCase):
             # No spaces
             ("/test test", True),
             # A safe redirect
-            (reverse("faq"), False),
+            (reverse("help_home"), False),
             # CRLF injection attack
             (
                 "/%0d/evil.com/&email=Your+Account+still+in+maintenance,please+click+Return+below",
@@ -222,9 +222,9 @@ class UserTest(LiveServerTestCase):
         evil_text = "visit https://evil.com/malware.exe to win $100 giftcard"
         url_params = [
             # A safe redirect and email
-            (reverse("faq"), "test@free.law", False),
+            (reverse("help_home"), "test@free.law", False),
             # Text injection attack
-            (reverse("faq"), evil_text, True),
+            (reverse("help_home"), evil_text, True),
             # open redirect and text injection attack
             ("https://evil.com&email=e%40e.net", evil_text, True),
         ]
@@ -259,7 +259,7 @@ class UserTest(LiveServerTestCase):
         """Do we allow good redirects in login while banning bad ones?"""
         next_params = [
             # A safe redirect
-            (reverse("faq"), False),
+            (reverse("help_home"), False),
             # Redirection to the register page
             (reverse("register"), True),
             # No open redirects (to a domain outside CL)

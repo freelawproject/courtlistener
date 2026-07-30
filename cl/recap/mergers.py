@@ -2,6 +2,8 @@
 import json
 import logging
 import re
+from collections import defaultdict
+from collections.abc import AsyncGenerator
 from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any
@@ -18,6 +20,10 @@ from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 from cl.alerts.utils import (
     set_skip_percolation_if_bankruptcy_data,
     set_skip_percolation_if_parties_data,
+)
+from cl.corpus_importer.state.florida.utils import is_florida_court
+from cl.corpus_importer.state.florida.utils import (
+    make_docket_number_core as make_florida_docket_number_core,
 )
 from cl.corpus_importer.utils import (
     ais_appellate_court,
@@ -82,22 +88,12 @@ cnt = CaseNameTweaker()
 def confirm_docket_number_core_lookup_match(
     docket: Docket,
     docket_number: str,
-    federal_defendant_number: str | None = None,
-    federal_dn_judge_initials_assigned: str | None = None,
-    federal_dn_judge_initials_referred: str | None = None,
 ) -> Docket | None:
     """Confirm if the docket_number_core lookup match returns the right docket
-    by confirming the docket_number and docket_number components also matches
-    if they're available.
+    by confirming the cleaned docket numbers also match.
 
     :param docket: The docket matched by the lookup
     :param docket_number: The incoming docket_number to lookup.
-    :param federal_defendant_number: The federal defendant number to validate
-    the match.
-    :param federal_dn_judge_initials_assigned: The judge's initials assigned to
-    validate the match.
-    :param federal_dn_judge_initials_referred: The judge's initials referred to
-    validate the match.
     :return: The docket object if both dockets matched or otherwise None.
     """
     existing_docket_number = clean_docket_number(docket.docket_number_raw)
@@ -105,25 +101,159 @@ def confirm_docket_number_core_lookup_match(
     if existing_docket_number != incoming_docket_number:
         return None
 
+    return docket
+
+
+async def find_docket_object_query(
+    court_id: str,
+    pacer_case_id: str | None,
+    docket_number: str,
+    docket_number_core: str | None,
+    federal_defendant_number: str | None,
+    federal_dn_judge_initials_assigned: str | None,
+    federal_dn_judge_initials_referred: str | None,
+    using: str = "default",
+    skip_dn_core_confirmation: bool = False,
+) -> QuerySet[Docket]:
+    """Construct a queryset to be used by `find_docket_object` and other methods which need to use the same docket-finding
+    process. Parameters have the same meaning as `find_docket_object` except `skip_dn_core_confirmation`, which tells
+    the function to just return the first result with one match without doing any further verification (`True` for state
+    and SCOTUS, `False` otherwise).
+
+    Will only ever return querysets with zero or one results."""
+
+    # Attempt several lookups of decreasing specificity. Note that
+    # pacer_case_id is required for Docket and Docket History uploads.
+    lookups: list[tuple[bool, Q]] = []
+    dncc = not skip_dn_core_confirmation and bool(docket_number_core)
+    if pacer_case_id:
+        # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
+        # blank pacer_case_id values.
+        if docket_number_core:
+            # Only do these if docket_number_core is not blank. See #5058.
+            lookups = [
+                (
+                    False,
+                    Q(
+                        pacer_case_id=pacer_case_id,
+                        docket_number_core=docket_number_core,
+                    ),
+                ),
+                # Appellate docket uploads usually include a pacer_case_id.
+                # Therefore, include the following lookup to attempt matching
+                # existing dockets without a pacer_case_id using docket_number_core
+                # to avoid creating duplicated dockets.
+                (
+                    dncc,
+                    Q(
+                        pacer_case_id=None,
+                        docket_number_core=docket_number_core,
+                    ),
+                ),
+            ]
+        lookups.append((False, Q(pacer_case_id=pacer_case_id)))
+    elif docket_number_core:
+        # Sometimes we don't know how to make core docket numbers. If that's
+        # the case, we will have a blank value for the field. We must not do
+        # lookups by blank values. See: freelawproject/courtlistener#1531
+        lookups = [
+            (
+                dncc,
+                Q(
+                    pacer_case_id=None,
+                    docket_number_core=docket_number_core,
+                ),
+            ),
+            (
+                dncc,
+                Q(docket_number_core=docket_number_core),
+            ),
+        ]
+    elif docket_number:
+        # Finally, as a last resort, we can try the docket number. It might not
+        # match b/c of punctuation or whatever, but we can try. Avoid lookups
+        # by blank docket_number values.
+        lookups = [
+            (
+                dncc,
+                Q(
+                    pacer_case_id=None,
+                    docket_number_raw=docket_number,
+                ),
+            ),
+        ]
+
+    confirm_query = Q()
+    component_query = Q()
     # If the incoming data contains docket_number components and the docket
     # also contains DN components, use them to confirm that the docket matches.
-    dn_components = {
-        "federal_defendant_number": federal_defendant_number,
-        "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
-        "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
-    }
     # Only compare DN component values if both the incoming data and the docket contain
     # non-None DN component values.
-    for dn_key, dn_value in dn_components.items():
-        incoming_dn_value = dn_value
-        docket_dn_value = getattr(docket, dn_key, None)
-        if (
-            incoming_dn_value
-            and docket_dn_value
-            and incoming_dn_value != docket_dn_value
-        ):
-            return None
-    return docket
+    if federal_defendant_number is not None:
+        component_query &= Q(federal_defendant_number=federal_defendant_number)
+        confirm_query &= Q(federal_defendant_number__isnull=True) | Q(
+            federal_defendant_number=federal_defendant_number
+        )
+    if federal_dn_judge_initials_assigned:
+        component_query &= Q(
+            federal_dn_judge_initials_assigned=federal_dn_judge_initials_assigned
+        )
+        confirm_query &= Q(federal_dn_judge_initials_assigned="") | Q(
+            federal_dn_judge_initials_assigned=federal_dn_judge_initials_assigned
+        )
+    if federal_dn_judge_initials_referred:
+        component_query &= Q(
+            federal_dn_judge_initials_referred=federal_dn_judge_initials_referred
+        )
+        confirm_query &= Q(federal_dn_judge_initials_referred="") | Q(
+            federal_dn_judge_initials_referred=federal_dn_judge_initials_referred
+        )
+
+    for confirm, query in lookups:
+        q = Q(court_id=court_id)
+        if confirm:
+            q &= confirm_query
+        ds = (
+            Docket.objects.filter(q & query)
+            .order_by("date_created")
+            .using(using)
+        )
+        # The `[:2]` slice here turns the query Django sends from `COUNT pk WHERE ...` to `COUNT pk WHERE ... LIMIT 2`,
+        # which we found in testing to have significantly better performance, presumably because Postgres can stop
+        # counting after it hits 2. This is fine since we don't actually care about the value of any count above 1.
+        count = await ds.values("pk")[:2].acount()
+        if count == 0:
+            continue  # Try a looser lookup.
+        if count == 1:
+            if confirm:
+                d = (await sync_to_async(list)(ds))[0]
+                if (
+                    confirm_docket_number_core_lookup_match(d, docket_number)
+                    is None
+                ):
+                    continue
+            return ds  # Nailed it!
+
+        # If more than one docket matches, try refining the results using
+        # available docket_number components.
+        dqs = ds.filter(component_query)
+        count = await dqs.values("pk")[:2].acount()
+        if count == 1:
+            return dqs
+
+        # Choose the oldest one and live with it.
+        dqs = ds[:1]
+        if confirm:
+            d = (await sync_to_async(list)(dqs))[0]
+            if (
+                confirm_docket_number_core_lookup_match(d, docket_number)
+                is None
+            ):
+                continue
+        return dqs
+
+    # Couldn't find a docket.
+    return Docket.objects.none()
 
 
 async def find_docket_object(
@@ -154,9 +284,6 @@ async def find_docket_object(
       found
     :return The docket found or created.
     """
-    # Attempt several lookups of decreasing specificity. Note that
-    # pacer_case_id is required for Docket and Docket History uploads.
-    d = None
     if court_id == "scotus":
         docket_number_core = make_scotus_docket_number_core(docket_number)
         # SCOTUS docket numbers can contain multiple NN-NNNN numbers
@@ -170,119 +297,40 @@ async def find_docket_object(
         # Texas docket numbers are unique and do not need the extra
         # confirmation that federal docket numbers require.
         skip_dn_core_confirmation = True
+    elif is_florida_court(court_id):
+        docket_number_core = make_florida_docket_number_core(
+            docket_number, court_id=court_id
+        )
+        skip_dn_core_confirmation = True
     else:
         docket_number_core = make_docket_number_core(docket_number)
         skip_dn_core_confirmation = False
-    lookups = []
-    if pacer_case_id:
-        # Appellate RSS feeds don't contain a pacer_case_id, avoid lookups by
-        # blank pacer_case_id values.
-        if docket_number_core:
-            # Only do these if docket_number_core is not blank. See #5058.
-            lookups.extend(
-                [
-                    {
-                        "pacer_case_id": pacer_case_id,
-                        "docket_number_core": docket_number_core,
-                    },
-                    # Appellate docket uploads usually include a pacer_case_id.
-                    # Therefore, include the following lookup to attempt matching
-                    # existing dockets without a pacer_case_id using docket_number_core
-                    # to avoid creating duplicated dockets.
-                    {
-                        "pacer_case_id": None,
-                        "docket_number_core": docket_number_core,
-                    },
-                ]
-            )
-        lookups.append({"pacer_case_id": pacer_case_id})
-    if docket_number_core and not pacer_case_id:
-        # Sometimes we don't know how to make core docket numbers. If that's
-        # the case, we will have a blank value for the field. We must not do
-        # lookups by blank values. See: freelawproject/courtlistener#1531
-        lookups.extend(
-            [
-                {
-                    "pacer_case_id": None,
-                    "docket_number_core": docket_number_core,
-                },
-                {"docket_number_core": docket_number_core},
-            ]
-        )
-    elif docket_number and not pacer_case_id:
-        # Finally, as a last resort, we can try the docket number. It might not
-        # match b/c of punctuation or whatever, but we can try. Avoid lookups
-        # by blank docket_number values.
-        lookups.append(
-            {"pacer_case_id": None, "docket_number_raw": docket_number},
-        )
 
-    for kwargs in lookups:
-        ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
-        count = await ds.acount()
-        if count == 0:
-            continue  # Try a looser lookup.
-        if count == 1:
-            d = await ds.afirst()
-            if (
-                not skip_dn_core_confirmation
-                and kwargs.get("pacer_case_id") is None
-                and kwargs.get("docket_number_core")
-            ):
-                d = confirm_docket_number_core_lookup_match(
-                    d,
-                    docket_number,
-                    federal_defendant_number,
-                    federal_dn_judge_initials_assigned,
-                    federal_dn_judge_initials_referred,
-                )
-            if d:
-                break  # Nailed it!
-        elif count > 1:
-            # If more than one docket matches, try refining the results using
-            # available docket_number components.
-            dn_components = {
-                "federal_defendant_number": federal_defendant_number,
-                "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
-                "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
-            }
-            dn_lookup = {
-                dn_key: dn_value
-                for dn_key, dn_value in dn_components.items()
-                if dn_value
-            }
-            dn_queryset = ds.filter(**dn_lookup).using(using)
-            count = await dn_queryset.acount()
-            if count == 1:
-                d = await dn_queryset.afirst()
-            else:
-                # Choose the oldest one and live with it.
-                d = await ds.aearliest("date_created")
-                if (
-                    not skip_dn_core_confirmation
-                    and kwargs.get("pacer_case_id") is None
-                    and kwargs.get("docket_number_core")
-                ):
-                    d = confirm_docket_number_core_lookup_match(
-                        d, docket_number
-                    )
-            if d:
-                break
-    if d is None:
-        # Couldn't find a docket. Return a new one.
-        return (
-            Docket(
-                source=docket_source,
-                pacer_case_id=pacer_case_id,
-                court_id=court_id,
-            )
-            if allow_create
-            else None
-        )
+    dqs = await find_docket_object_query(
+        court_id,
+        pacer_case_id,
+        docket_number,
+        docket_number_core,
+        federal_defendant_number,
+        federal_dn_judge_initials_assigned,
+        federal_dn_judge_initials_referred,
+        using,
+        skip_dn_core_confirmation,
+    )
 
     if using != "default":
         # Get the item from the default DB
-        d = await Docket.objects.aget(pk=d.pk)
+        dqs = dqs.using("default")
+
+    d = await dqs.afirst()
+
+    if allow_create and d is None:
+        # Couldn't find a docket. Return a new one.
+        return Docket(
+            source=docket_source,
+            pacer_case_id=pacer_case_id,
+            court_id=court_id,
+        )
 
     return d
 
@@ -750,6 +798,109 @@ async def merge_unnumbered_docket_entries(
     return winner
 
 
+# Entries are merged in chunks of this size: each chunk is prefetched with
+# two queries, keeping peak memory bounded on full-sheet uploads of very
+# large dockets.
+DOCKET_ENTRIES_CHUNK_SIZE = 500
+
+
+def resolve_docket_entry_in_memory(
+    des_by_entry_number: dict[int, list[DocketEntry]],
+    docket_entry: dict[str, Any],
+) -> DocketEntry | None:
+    """Resolve an existing DocketEntry from prefetched rows in memory.
+
+    This mirrors the lookup performed by `add_create_docket_entry_transaction`,
+    avoiding an additional database query when the required DocketEntry has
+    already been prefetched.
+
+    :param des_by_entry_number: Prefetched DocketEntries for the docket,
+    grouped by entry number. Must contain every row for the entry numbers it
+    covers, so a miss is equivalent to DocketEntry.DoesNotExist.
+    :param docket_entry: The scraped dict from Juriscraper for the docket
+    entry.
+    :return: The single unambiguous DocketEntry match, or None when the
+    entry is absent or ambiguous so the caller falls back to the
+    add_create_docket_entry_transaction path, which handles creation and
+    deduplication.
+    """
+    # DocketEntry.entry_number is an integer, while document_number is a string
+    # We need to cast it for the lookup to match.
+    try:
+        entry_number = int(docket_entry["document_number"])
+    except (TypeError, ValueError):
+        return None
+    candidates = des_by_entry_number.get(entry_number, [])
+    pacer_seq_no = docket_entry.get("pacer_seq_no")
+    if pacer_seq_no is None:
+        # Mirrors .get(docket=d, entry_number=n): it succeeds only when
+        # exactly one row exists. Zero rows would be DoesNotExist (entry
+        # creation) and two+ MultipleObjectsReturned (logged and skipped);
+        # both are handled by add_create_docket_entry_transaction.
+        return candidates[0] if len(candidates) == 1 else None
+    try:
+        seq = int(pacer_seq_no)
+    except (TypeError, ValueError):
+        return None
+    seq_matches = [de for de in candidates if de.pacer_sequence_number == seq]
+    if len(seq_matches) == 1:
+        # Mirrors .get(docket=d, entry_number=n, pacer_sequence_number=seq)
+        # succeeding with a single row.
+        return seq_matches[0]
+    if seq_matches:
+        # Two+ rows share this sequence number. The DB lookup would raise
+        # MultipleObjectsReturned and deduplicate by keeping the latest row
+        # and deleting the rest; deletion needs the docket lock, so fall
+        # back.
+        return None
+    null_matches = [
+        de for de in candidates if de.pacer_sequence_number is None
+    ]
+    if len(null_matches) == 1:
+        # No row has this sequence number (DoesNotExist), but a single
+        # row without one exists, use it. No dedup is required.
+        return null_matches[0]
+    # Nothing to match (creation needed) or several null-sequence
+    # rows (dedup deletion needed). Both require the docket lock, so fall
+    # back to add_create_docket_entry_transaction.
+    return None
+
+
+def resolve_rd_in_memory(
+    prefetched_rds: list[RECAPDocument] | None,
+    get_params: dict[str, Any],
+) -> RECAPDocument | None:
+    """Resolve a RECAPDocument from prefetched rows in memory.
+
+    This mirrors the ``RECAPDocument.objects.get(**get_params)`` lookup in
+    ``add_docket_entries`` without issuing a database query. It returns a
+    result only when exactly one prefetched row matches, allowing missing,
+    ambiguous, and non-prefetched cases to fall back to the database path.
+
+    :param prefetched_rds: RECAPDocuments prefetched for the docket entry, or
+    ``None`` when the docket entry was not prefetched, such as when it was
+    created during the current merge.
+    :param get_params: Keyword arguments that would be passed to the lookup
+    in ``add_docket_entries``. All fields except ``docket_entry``, which is
+    implied by the prefetched rows' scope, are matched using attribute
+    equality.
+    :return: The single matching RECAPDocument, or ``None`` when the cache is
+    unavailable or the lookup does not produce exactly one match.
+    """
+    if not prefetched_rds:
+        return None
+    matches = [
+        rd
+        for rd in prefetched_rds
+        if all(
+            getattr(rd, field) == value
+            for field, value in get_params.items()
+            if field != "docket_entry"
+        )
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
 @sync_to_async
 def add_create_docket_entry_transaction(d, docket_entry):
     with transaction.atomic():
@@ -822,19 +973,32 @@ def add_create_docket_entry_transaction(d, docket_entry):
 
 
 async def get_or_make_docket_entry(
-    d: Docket, docket_entry: dict[str, any]
+    d: Docket,
+    docket_entry: dict[str, any],
+    des_by_entry_number: dict[int, list[DocketEntry]] | None = None,
 ) -> tuple[DocketEntry, bool] | None:
     """Lookup or create a docket entry to match the one that was scraped.
 
     :param d: The docket we expect to find it in.
     :param docket_entry: The scraped dict from Juriscraper for the docket
     entry.
+    :param des_by_entry_number: Optional prefetched DocketEntries for the
+    docket, grouped by entry number. Unambiguous matches are resolved from
+    it without the per-entry transaction and docket row lock.
     :return Tuple of (de, de_created) or None, where:
      - de is the DocketEntry object
      - de_created is a boolean stating whether de was created or not
      - None is returned when things fail.
     """
     if docket_entry["document_number"]:
+        de = None
+        de_created = False
+        if des_by_entry_number is not None:
+            de = resolve_docket_entry_in_memory(
+                des_by_entry_number, docket_entry
+            )
+        if de is not None:
+            return de, de_created
         response = await add_create_docket_entry_transaction(d, docket_entry)
         if response is None:
             return None
@@ -941,14 +1105,103 @@ async def add_docket_entries(
     calculate_recap_sequence_numbers(docket_entries, d.court_id)
 
     is_scotus = d.court_id == "scotus"
+    appellate_court_id_exists = await ais_appellate_court(d.court_id)
     known_filing_dates = [d.date_last_filing]
-    for docket_entry in docket_entries:
-        response = await get_or_make_docket_entry(d, docket_entry)
+
+    # Prefetch the docket's matching entries and their documents in two
+    # queries per chunk, so unchanged entries (the common re-upload case)
+    # are resolved in memory instead of via per-entry queries and docket
+    # row locks. Prefetch entries and documents in chunks to avoid high
+    # memory usage.
+    des_by_entry_number: dict[int, list[DocketEntry]] = defaultdict(list)
+    rds_by_de_id: dict[int, list[RECAPDocument]] = defaultdict(list)
+    # Entry pks covered by the current chunk's document prefetch. Needed to
+    # distinguish "prefetched and has no documents" (rds_by_de_id has no
+    # key) from "never prefetched", where the DB must be consulted.
+    prefetched_de_pks: set[int] = set()
+
+    async def chunked_docket_entries() -> AsyncGenerator[dict[str, Any]]:
+        """Yield the upload's entries, refilling the prefetch caches with
+        two queries per chunk of DOCKET_ENTRIES_CHUNK_SIZE entries.
+
+        The caches are cleared at each chunk boundary, which bounds peak
+        memory on very large uploads while entries created in earlier chunks
+        remain visible through the next chunk's queries.
+
+        :return: An async generator over the docket_entry dicts, in upload
+        order.
+        """
+        for chunk_start in range(
+            0, len(docket_entries), DOCKET_ENTRIES_CHUNK_SIZE
+        ):
+            chunk = docket_entries[
+                chunk_start : chunk_start + DOCKET_ENTRIES_CHUNK_SIZE
+            ]
+            des_by_entry_number.clear()
+            rds_by_de_id.clear()
+            prefetched_de_pks.clear()
+            entry_numbers = set()
+            for entry_data in chunk:
+                if entry_data.get("document_number"):
+                    try:
+                        entry_numbers.add(int(entry_data["document_number"]))
+                    except (TypeError, ValueError):
+                        continue
+            if entry_numbers and d.pk:
+                existing_de_ids = []
+                async for existing_de in DocketEntry.objects.filter(
+                    docket=d, entry_number__in=entry_numbers
+                ):
+                    des_by_entry_number[existing_de.entry_number].append(
+                        existing_de
+                    )
+                    existing_de_ids.append(existing_de.pk)
+                    prefetched_de_pks.add(existing_de.pk)
+                # Load only the fields resolve_rd_in_memory can compare plus
+                # the ones mutated before rd.asave(); notably this defers
+                # plain_text, which can be megabytes per row. Accessing any
+                # other field on a cached rd triggers a per-row refresh
+                # query, so keep this list in sync with the get_params keys
+                # built in add_docket_entries.
+                async for existing_rd in RECAPDocument.objects.filter(
+                    docket_entry_id__in=existing_de_ids
+                ).only(
+                    "docket_entry",
+                    "pacer_doc_id",
+                    "description",
+                    "document_type",
+                    "attachment_number",
+                    "document_number",
+                    # Saving a deferred instance only writes loaded fields,
+                    # so date_modified must be loaded for auto_now to bump
+                    # it when a changed document is saved.
+                    "date_modified",
+                ):
+                    rds_by_de_id[existing_rd.docket_entry_id].append(
+                        existing_rd
+                    )
+            for entry_data in chunk:
+                yield entry_data
+
+    async for docket_entry in chunked_docket_entries():
+        response = await get_or_make_docket_entry(
+            d, docket_entry, des_by_entry_number=des_by_entry_number
+        )
         if response is None:
             continue
         else:
             de, de_created = response[0], response[1]
 
+        # Snapshot the merged fields so the save (and its ES indexing and
+        # pghistory side effects) can be skipped when a re-uploaded entry is
+        # unchanged.
+        de_original_values = (
+            de.description,
+            de.date_filed,
+            de.time_filed,
+            de.pacer_sequence_number,
+            de.recap_sequence_number,
+        )
         de.description = docket_entry["description"] or de.description
         date_filed, time_filed = localize_date_and_time(
             d.court_id, docket_entry["date_filed"]
@@ -961,14 +1214,25 @@ async def add_docket_entries(
         else:
             de.time_filed = time_filed
         de.date_filed = date_filed
+        # Cast to int as juriscraper provides strings, and a str-vs-int
+        # mismatch would defeat the unchanged-entry comparison below.
+        pacer_seq_no = docket_entry.get("pacer_seq_no")
         de.pacer_sequence_number = (
-            docket_entry.get("pacer_seq_no") or de.pacer_sequence_number
+            int(pacer_seq_no) if pacer_seq_no else de.pacer_sequence_number
         )
         de.recap_sequence_number = docket_entry["recap_sequence_number"]
         des_returned.append(de)
         if do_not_update_existing and not de_created:
             return (des_returned, rds_updated), rds_created, content_updated
-        await de.asave()
+        de_changed = de_created or de_original_values != (
+            de.description,
+            de.date_filed,
+            de.time_filed,
+            de.pacer_sequence_number,
+            de.recap_sequence_number,
+        )
+        if de_changed:
+            await de.asave()
         if tags:
             for tag in tags:
                 await sync_to_async(tag.tag_object)(de)
@@ -976,6 +1240,12 @@ async def add_docket_entries(
         if de_created:
             content_updated = True
             known_filing_dates.append(de.date_filed)
+            # Consider the recent created entry in case the same entry number
+            # appears again in this upload.
+            try:
+                des_by_entry_number[int(de.entry_number)].append(de)
+            except (TypeError, ValueError):
+                pass
 
         # Then make the RECAPDocument object. Try to find it. If we do, update
         # the pacer_doc_id field if it's blank. If we can't find it, create it
@@ -1005,18 +1275,26 @@ async def add_docket_entries(
         # entry, we avoid creating the main RD a second+ time when we get the
         # docket sheet a second+ time.
 
-        appellate_court_id_exists = await ais_appellate_court(d.court_id)
         if de_created is False and appellate_court_id_exists:
             # In existing appellate entry merges, check if the entry has at
-            # least one attachment.
-            appellate_rd_att_exists = await de.recap_documents.filter(
-                document_type=RECAPDocument.ATTACHMENT
-            ).aexists()
+            # least one attachment. Answer from the prefetched documents
+            # when this entry was covered by the chunk prefetch (the cache
+            # holds all of its documents); otherwise ask the DB as before.
+            if de.pk in prefetched_de_pks:
+                appellate_rd_att_exists = any(
+                    cached_rd.document_type == RECAPDocument.ATTACHMENT
+                    for cached_rd in rds_by_de_id.get(de.pk, ())
+                )
+            else:
+                appellate_rd_att_exists = await de.recap_documents.filter(
+                    document_type=RECAPDocument.ATTACHMENT
+                ).aexists()
             if appellate_rd_att_exists:
                 params["document_type"] = RECAPDocument.ATTACHMENT
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
-            get_params = deepcopy(params)
+            # A shallow copy is enough as only keys are added/removed below.
+            get_params = params.copy()
             if de_created is False and not appellate_court_id_exists:
                 get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
             if is_scotus:
@@ -1028,7 +1306,9 @@ async def add_docket_entries(
             if de_created is False:
                 # Try to match the RD regardless of the document_type.
                 del get_params["document_type"]
-            rd = await RECAPDocument.objects.aget(**get_params)
+            rd = resolve_rd_in_memory(rds_by_de_id.get(de.pk), get_params)
+            if rd is None:
+                rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             rd = None
@@ -1064,6 +1344,14 @@ async def add_docket_entries(
                 continue
             rd = await clean_duplicate_documents(params)
 
+        # Snapshot the merged fields so the save (and its ES indexing and
+        # pghistory side effects) can be skipped when a re-uploaded document
+        # is unchanged.
+        rd_original_values = (
+            rd.pacer_doc_id,
+            rd.description,
+            rd.document_number,
+        )
         if docket_entry["pacer_doc_id"]:
             rd.pacer_doc_id = docket_entry["pacer_doc_id"]
         description = docket_entry.get("short_description")
@@ -1085,11 +1373,17 @@ async def add_docket_entries(
                         # Happens from race conditions.
                         continue
         rd.document_number = docket_entry["document_number"] or ""
-        try:
-            await rd.asave()
-        except ValidationError:
-            # Happens from race conditions.
-            continue
+        rd_changed = rd_original_values != (
+            rd.pacer_doc_id,
+            rd.description,
+            rd.document_number,
+        )
+        if rd_changed:
+            try:
+                await rd.asave()
+            except ValidationError:
+                # Happens from race conditions.
+                continue
         if tags:
             for tag in tags:
                 await sync_to_async(tag.tag_object)(rd)
