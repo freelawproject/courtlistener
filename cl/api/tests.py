@@ -5830,3 +5830,33 @@ class TestApiUsageEndpoint(TestCase):
         response = self.client.get(self.url)
         data = response.json()
         self.assertIsNone(data["membership"])
+
+    def test_reset_at_matches_retry_after_after_a_rate_cut(self):
+        """reset_at tracks Retry-After when a rate drops mid-window."""
+        # Nine requests across the hour, then the limit falls 10/h -> 5/h.
+        now = time.time()
+        history = [now - 60 * i for i in range(5, 50, 5)]  # newest-first
+        caches["default"].set(
+            f"throttle_user_{self.user.pk}", history, timeout=3600
+        )
+        APIThrottleFactory(
+            user=self.user, throttle_type=ThrottleType.API, rate="5/hour"
+        )
+        clear_tiered_cache()
+
+        row = self._row(self.client.get(self.url).json(), "user", "5/hour")
+
+        throttle = ExceptionalUserRateThrottle()
+        throttle.history = history
+        throttle.now = now
+        throttle.num_requests, throttle.duration = throttle.parse_rate(
+            "5/hour"
+        )
+
+        self.assertEqual(row["used"], 9)
+        self.assertEqual(row["remaining"], 0)
+        self.assertAlmostEqual(
+            datetime.fromisoformat(row["reset_at"]).timestamp(),
+            now + throttle.wait(),
+            delta=1,
+        )

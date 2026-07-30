@@ -994,6 +994,48 @@ def _effective_rates(
     ) or _coerce_rate_list(default_rates.get(default_scope))
 
 
+def _next_available_at(
+    in_window: list[tuple[int, float]],
+    used: int,
+    limit: int,
+    duration: int,
+) -> float | None:
+    """When the window will next admit a request that it won't admit now.
+
+    This function calculates the earliest time at which a new request can be
+    accommodated in the throttle window, considering the current usage and
+    the limit.
+
+    :param in_window: ``(weight, timestamp)`` entries inside the rate window.
+    :param used: Total weight currently in the window.
+    :param limit: Requests (or citations) the rate allows per window.
+    :param duration: Window length in seconds.
+    :return: Unix timestamp, or None if no expiry would admit a request.
+    """
+    if not in_window or limit == 0:
+        # A '0/...' rate blocks outright; no amount of expiry admits anything.
+        return None
+
+    # Weight that must expire before the next request fits: enforcement admits
+    # a request while used < limit. Clamped at 1 because under the limit the
+    # next request already fits, and the oldest entry leaving the window is
+    # simply when capacity next grows.
+    needed = max(used - limit + 1, 1)
+
+    expiry: float | None = None
+    expired = 0
+    for weight, timestamp in sorted(in_window, key=lambda entry: entry[1]):
+        # An oversized entry occupies proportionally more of the window, so it
+        # holds its slot proportionally longer — matches throttle_request.
+        expiry = timestamp + max(weight / limit, 1) * duration
+        expired += weight
+        if expired >= needed:
+            break
+    # Exhausting the loop means even a drained window can't fit the request;
+    # enforcement reports the newest entry's scaled expiry, so return that.
+    return expiry
+
+
 def _build_usage_rows(
     scope: str,
     rates: list[str],
@@ -1012,13 +1054,12 @@ def _build_usage_rows(
         in_window = [(w, ts) for w, ts in weighted_history if ts > cutoff]
         used = sum(w for w, _ in in_window)
 
-        reset_at = None
-        if in_window:
-            # Oldest in-window entry frees a slot when it exits the window.
-            oldest_ts = min(ts for _, ts in in_window)
-            reset_at = datetime.fromtimestamp(
-                oldest_ts + duration, tz=UTC
-            ).isoformat()
+        next_at = _next_available_at(in_window, used, limit, duration)
+        reset_at = (
+            None
+            if next_at is None
+            else datetime.fromtimestamp(next_at, tz=UTC).isoformat()
+        )
 
         usage_rows.append(
             {
