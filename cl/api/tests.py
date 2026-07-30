@@ -5641,6 +5641,10 @@ class TestApiUsageEndpoint(TestCase):
         self.url = reverse("api-usage-list", kwargs={"version": "v4"})
         self.client.force_login(self.user)
         clear_tiered_cache()
+        # Throttle history lives in the cache, which isn't rolled back between
+        # tests. Without this, requests accumulate across the class and the
+        # later tests might get a 429 instead of a payload.
+        caches["default"].delete(f"throttle_api_usage_{self.user.pk}")
 
     def _row(self, data, scope, rate):
         return next(
