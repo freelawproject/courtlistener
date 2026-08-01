@@ -20,7 +20,7 @@ jobs:
 
     # Install a Python compatible with pyproject (necessary later for
     # `github/codeql-action/init`)
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
         python-version: '3.13'
 
