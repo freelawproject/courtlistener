@@ -25,6 +25,7 @@ from cl.corpus_importer.state.florida.mergers import (
 )
 from cl.corpus_importer.state.florida.utils import make_docket_number_core
 from cl.corpus_importer.state.merger import RelatedParams
+from cl.corpus_importer.state.tests import QueryCountTestCase
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -39,10 +40,9 @@ from cl.search.state.florida.models import (
     FloridaDocument,
 )
 from cl.search.state.shared import DocketEntryType
-from cl.tests.cases import TestCase
 
 
-class FloridaUtilsTest(TestCase):
+class FloridaUtilsTest(QueryCountTestCase):
     def test_docket_number_core(self) -> None:
         """Can we correctly normalize Florida docket numbers?"""
         self.assertEqual(make_docket_number_core("SC1983-2014"), "sc19832014")
@@ -84,7 +84,7 @@ class FloridaUtilsTest(TestCase):
         self.assertEqual(make_docket_number_core("garbage text"), "")
 
 
-class FloridaMergerTest(TestCase):
+class FloridaMergerTest(QueryCountTestCase):
     @classmethod
     def setUpTestData(cls):
         cls.flsc = CourtFactory.create(id="fla")
@@ -382,7 +382,7 @@ class FloridaMergerTest(TestCase):
         assert docket.pk in result.updates["Docket"]
 
 
-class FloridaPartyMergerTest(TestCase):
+class FloridaPartyMergerTest(QueryCountTestCase):
     """Tests for merging parties, attorneys, and attorney roles from Florida
     cases."""
 
@@ -676,7 +676,7 @@ class FloridaPartyMergerTest(TestCase):
         assert Role.objects.filter(docket=docket).count() == 1
 
 
-class FloridaDocketEntryMergerTest(TestCase):
+class FloridaDocketEntryMergerTest(QueryCountTestCase):
     """Tests for merging docket entries from Florida cases."""
 
     @classmethod
@@ -893,7 +893,7 @@ class FloridaDocketEntryMergerTest(TestCase):
         assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
 
 
-class FloridaDocumentMergerTest(TestCase):
+class FloridaDocumentMergerTest(QueryCountTestCase):
     """Tests for merging documents attached to Florida docket entries."""
 
     @classmethod

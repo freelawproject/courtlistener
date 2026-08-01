@@ -329,6 +329,7 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
             federal_dn_judge_initials_assigned=None,
             federal_dn_judge_initials_referred=None,
             skip_dn_core_confirmation=True,
+            cheap_count=False,
         )
 
         if court_id == supreme_court_id:
@@ -344,6 +345,7 @@ class FloridaDocketMerger(DocketMerger[FloridaCase, None]):
                 federal_dn_judge_initials_assigned=None,
                 federal_dn_judge_initials_referred=None,
                 skip_dn_core_confirmation=True,
+                cheap_count=False,
             )
 
         return query_narrow

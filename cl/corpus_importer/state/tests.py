@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from typing import Any, ClassVar
 
+from django.db import connection
 from django.db.models import Model, QuerySet
 
 from cl.corpus_importer.state.merger import (
@@ -26,7 +27,90 @@ from cl.search.models import (
 from cl.tests.cases import TestCase
 
 
-class BaseMergerTest(TestCase):
+class QueryCountTestCase(TestCase):
+    """Track the number of queries run during each test and print a summary
+    once the class finishes.
+
+    Queries executed while inside a ``Merger.merge()`` call are counted as
+    "merger" queries; everything else (factories, assertion fetches, other
+    test scaffolding) is counted as "test"."""
+
+    _query_counts: ClassVar[dict[str, dict[str, int]]]
+    _merger_queries: ClassVar[dict[str, list[str]]]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._query_counts = {}
+        cls._merger_queries = {}
+        super().setUpClass()
+
+    def setUp(self) -> None:
+        super().setUp()
+        counts = {"merger": 0, "test": 0}
+        merger_sql: list[str] = []
+        merge_depth = 0
+
+        original_merge = Merger.merge
+
+        def counting_merge(merger_self: Any) -> Any:
+            nonlocal merge_depth
+            merge_depth += 1
+            try:
+                return original_merge(merger_self)
+            finally:
+                merge_depth -= 1
+
+        def count_query(
+            execute: Any, sql: Any, params: Any, many: Any, context: Any
+        ) -> Any:
+            # Skip savepoint bookkeeping from transaction.atomic(); it only
+            # appears because tests already run inside a transaction.
+            if not sql.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
+                if merge_depth:
+                    counts["merger"] += 1
+                    merger_sql.append(sql)
+                else:
+                    counts["test"] += 1
+            return execute(sql, params, many, context)
+
+        Merger.merge = counting_merge  # type: ignore[method-assign, assignment]
+        self.addCleanup(setattr, Merger, "merge", original_merge)
+
+        wrapper = connection.execute_wrapper(count_query)
+        wrapper.__enter__()
+
+        def record_query_count() -> None:
+            wrapper.__exit__(None, None, None)
+            self._query_counts[self._testMethodName] = counts
+            self._merger_queries[self._testMethodName] = merger_sql
+
+        self.addCleanup(record_query_count)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        print(f"\n{cls.__name__} query counts:")
+        for name, counts in sorted(cls._query_counts.items()):
+            total = counts["merger"] + counts["test"]
+            print(
+                f"  {name}: {total}"
+                f" ({counts['merger']} merger, {counts['test']} test)"
+            )
+            # for sql in cls._merger_queries[name]:
+            #     sql = re.sub(r"^SELECT .*? FROM", "SELECT ... FROM", sql)
+            #     sql = re.sub(
+            #         r"\([^)]*\) VALUES \([^)]*\)", "(...) VALUES (...)", sql
+            #     )
+            #     print(f"    {sql}")
+        merger_total = sum(c["merger"] for c in cls._query_counts.values())
+        test_total = sum(c["test"] for c in cls._query_counts.values())
+        print(
+            f"  total: {merger_total + test_total}"
+            f" ({merger_total} merger, {test_total} test)"
+        )
+
+
+class BaseMergerTest(QueryCountTestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory.create()
@@ -81,7 +165,7 @@ class BaseMergerTest(TestCase):
         class TestMerger(Merger[dict[str, str], None, Docket]):
             model: ClassVar[type[Model]] = Docket
 
-            court: Court = Attribute(default=self.court)
+            court_id: Court = Attribute(default=self.court.id)
             source: int = Attribute(default=DocketSources.SCRAPER)
             docket_number: str = Attribute(default=new_dn)
 
@@ -251,7 +335,8 @@ class BaseMergerTest(TestCase):
 
     def test_related_mergers_m2m_simple(self) -> None:
         """Does a plain (no-through) many-to-many relation create the targets
-        and link them to the parent?"""
+        and link them to the parent? Uses batched candidate lookups so the
+        bulk-linking path is exercised."""
 
         class TestPersonMerger(
             Merger[dict[str, str], RelatedParams[None], Person]
@@ -262,6 +347,12 @@ class BaseMergerTest(TestCase):
             name_last: str = Attribute(lambda d, params: d["last"])
             slug: str = Attribute(lambda d, params: d["slug"])
             key = ["slug"]
+
+            @classmethod
+            def candidates(
+                cls, parent: Model, params: RelatedParams[None]
+            ) -> QuerySet[Person]:
+                return Person.objects.filter(empanelled_dockets=parent)
 
         class TestMerger(Merger[dict[str, Any], None, Docket]):
             model: ClassVar[type[Model]] = Docket

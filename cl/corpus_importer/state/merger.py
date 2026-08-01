@@ -156,7 +156,7 @@ class RelatedParams[ParamType]:
     """Wrapper for passing parameters to a related object."""
 
     params: ParamType
-    parent: Model = field(kw_only=True)
+    parent: Model | None = field(kw_only=True)
 
 
 class RelatedMerger[
@@ -202,14 +202,15 @@ class RelatedMerger[
             else:
                 errors.append(
                     TypeError(
-                        f"Field {self.name} is related to {field.related_model.__name__}, not {self.merger.model.__name__}"  # type: ignore[union-attr]
+                        f"Field {self.name} is related to {field.related_model.__name__}, not {self.merger.model.__name__}"
+                        # type: ignore[union-attr]
                     )
                 )
         return errors
 
     @abstractmethod
     def merge(
-        self, parent: RM, scrape: ScrapeType, params: ParamType
+        self, parent: RM | None, scrape: ScrapeType, params: ParamType
     ) -> MergeResult[Any]: ...
 
 
@@ -239,7 +240,7 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return errors
 
     def merge(
-        self, parent: RM, scrape: ScrapeType, params: ParamType
+        self, parent: RM | None, scrape: ScrapeType, params: ParamType
     ) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship."""
         merger_input = self.transform(scrape, params)
@@ -248,20 +249,13 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
-        db_obj = cast(RM | None, getattr(parent, self.name))
-        result = self.merger(
+        if parent is None:
+            db_obj = None
+        else:
+            db_obj = cast(RM | None, getattr(parent, self.name))
+        return self.merger(
             merger_input, existing=db_obj, params=related_params
         ).merge()
-        if db_obj is None:
-            model = self.merger.model
-            model_name = model.__name__
-            if model_name in result.creates:
-                db_obj_pk = next(iter(result.creates[model_name]))
-                field = parent._meta.get_field(self.name)
-                attname = getattr(field, "attname", f"{self.name}_id")
-                setattr(parent, attname, db_obj_pk)
-                parent.save(update_fields=[attname])
-        return result
 
 
 def OneToOneRelation[ParamType, ChildType, RM: Model](
@@ -302,7 +296,7 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         self.strategy: ManyStrategy = strategy
 
     def _transform_result_and_manager(
-        self, parent: RM, scrape: ScrapeType, params: ParamType
+        self, parent: RM | None, scrape: ScrapeType, params: ParamType
     ) -> "tuple[Sequence[ChildType], MergeResult[Any], RelatedManager[Any]]":
         related_manager: RelatedManager[Any] = getattr(parent, self.name)
         transformed = self.transform(scrape, params)
@@ -315,9 +309,13 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
         return transformed, MergeResult.unnecessary(), related_manager
 
     def merge(
-        self, parent: RM, scrape: ScrapeType, params: ParamType
+        self, parent: RM | None, scrape: ScrapeType, params: ParamType
     ) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship."""
+        if parent is None:
+            logger.error("Parent not provided for N to many merging")
+            return MergeResult.failed(self.merger.model.__name__)
+
         transformed, result, related_manager = (
             self._transform_result_and_manager(parent, scrape, params)
         )
@@ -342,8 +340,6 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
             related_objects.append(related_merge.out)
 
         match self.strategy:
-            case ManyStrategy.APPEND:
-                related_manager.add(*related_objects)
             case ManyStrategy.REPLACE:
                 if all(m.out is not None for m in child_mergers):
                     to_keep = {r.pk for r in related_objects}
@@ -351,6 +347,10 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
                 related_manager.add(*related_objects)
             case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
+            # If we're using the `APPEND` strategy, we don't need to do anything special since the `RelatedManager`
+            # handles everything for us
+            case _:
+                pass
 
         return result
 
@@ -445,7 +445,8 @@ class ManyToManyMerger[
             if field.remote_field.through != self.through.model:  # type: ignore[union-attr]
                 errors.append(
                     TypeError(
-                        f"{self.name}: Model for through merger is {self.through.model.__name__} not {field.remote_field.through.__name__}"  # type: ignore[union-attr]
+                        f"{self.name}: Model for through merger is {self.through.model.__name__} not {field.remote_field.through.__name__}"
+                        # type: ignore[union-attr]
                     )
                 )
 
@@ -459,9 +460,12 @@ class ManyToManyMerger[
         return errors
 
     def merge(
-        self, parent: RM, scrape: ScrapeType, params: ParamType
+        self, parent: RM | None, scrape: ScrapeType, params: ParamType
     ) -> MergeResult[Any]:
         """Run the merge method on the appropriate inputs for the given relationship."""
+        if parent is None:
+            logger.error("%s: No parent model specified", self.name)
+            return MergeResult.failed(self.merger.model.__name__)
         if self.through is None:
             # If there's no `through` model, everything is functionally the same as `OneToMany`
             return super().merge(parent, scrape, params)
@@ -567,6 +571,10 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         | None = None,
         attr: dict[str, AttributeMerger[ScrapeType, ParamType, Any]]
         | None = None,
+        one_to_one: dict[
+            str, OneToOneMerger[ScrapeType, ParamType, Any, Model]
+        ]
+        | None = None,
     ):
         self.related: dict[
             str, RelatedMerger[ScrapeType, ParamType, Any, Any, Model]
@@ -574,13 +582,20 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         self.attr: dict[str, AttributeMerger[ScrapeType, ParamType, Any]] = (
             attr or {}
         )
+        self.one_to_one: dict[
+            str, OneToOneMerger[ScrapeType, ParamType, Any, Model]
+        ] = one_to_one or {}
 
     def __copy__(self) -> Self:
-        return self.__class__(related=self.related, attr=self.attr)
+        return self.__class__(
+            related=self.related, attr=self.attr, one_to_one=self.one_to_one
+        )
 
     def __or__(self, other: Self) -> Self:
         return self.__class__(
-            related=self.related | other.related, attr=self.attr | other.attr
+            related=self.related | other.related,
+            attr=self.attr | other.attr,
+            one_to_one=self.one_to_one | other.one_to_one,
         )
 
     def validate(
@@ -601,11 +616,14 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
     def update(self, other: Self):
         self.related.update(other.related)
         self.attr.update(other.attr)
+        self.one_to_one.update(other.one_to_one)
 
     def register(self, spec: MergerSpecification[ScrapeType, ParamType, Any]):
         match spec:
             case AttributeMerger():
                 self.attr[spec.name] = spec
+            case OneToOneMerger():
+                self.one_to_one[spec.name] = spec
             case RelatedMerger():
                 self.related[spec.name] = spec
             case _:
@@ -754,6 +772,10 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                 name: spec.transform(scrape, params)
                 for name, spec in self.__registry__.related.items()
             }
+            | {
+                name: spec.transform(scrape, params)
+                for name, spec in self.__registry__.one_to_one.items()
+            }
             if valid
             else {}
         )
@@ -807,7 +829,12 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         if self.result is not None:
             return self.result
         if self.existing is None:
-            qs = self.query().filter(**self._through_params)[:2]
+            qs = self.query()
+            # Filtering invalidates the cache even if the filter is empty. Try to avoid that.
+            if self._through_params:
+                qs = qs.filter(**self._through_params)
+            if qs._result_cache is None:
+                qs = qs[:2]
             valid, self.existing = self.resolve_query(qs)
             if not valid:
                 logger.error(
@@ -827,21 +854,20 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         self.after()
         return result
 
-    def build_object(self) -> M:
-        """Build the object to be merged into the DB based on `self.transformed`"""
-        return cast(
+    def update_existing(self) -> MergeResult[Any]:
+        """Merge attributes and 1-1 relations into `self.existing` in-place."""
+        obj = cast(
             M,
             self.model(
-                **{
-                    name: self.transformed[name]
-                    for name in self.__registry__.attr.keys()
-                },
+                **(
+                    {
+                        name: self.transformed[name]
+                        for name in self.__registry__.attr.keys()
+                    }
+                    | self._through_params
+                ),
             ),
         )
-
-    def update_existing(self, obj: M) -> list[str]:
-        """Merge `obj` into `self.existing` in-place and return the names of the updated fields. Does not execute
-        related mergers."""
 
         if self.existing is None:
             raise ValueError("Cannot merge object into None")
@@ -857,10 +883,40 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                     merged,
                 )
                 updated.append(name)
+        result = MergeResult.unnecessary()
+        for name, spec in self.__registry__.one_to_one.items():
+            updated.append(name)
+            result |= spec.merge(self.existing, self.scrape, self.params)
         if updated:
+            result |= MergeResult.updated(
+                self.model.__name__, self.existing.pk
+            )
             self.existing.save(update_fields=updated)
 
-        return updated
+        return result
+
+    def create_new(self) -> tuple[M, MergeResult[Any]]:
+        result = MergeResult.unnecessary()
+        o2o_params: dict[str, Any] = {}
+        for name, spec in self.__registry__.one_to_one.items():
+            field = self.model._meta.get_field(name)
+            attname = getattr(field, "attname", f"{name}_id")
+            result |= spec.merge(None, self.scrape, self.params)
+            model_name = spec.merger.model.__name__
+            if model_name in result.creates:
+                o2o_params[attname] = next(iter(result.creates[model_name]))
+        db_obj = self.manager.create(
+            **(
+                {
+                    name: self.transformed[name]
+                    for name in self.__registry__.attr.keys()
+                }
+                | self._through_params
+                | o2o_params
+            ),
+        )
+        result |= MergeResult.created(self.model.__name__, db_obj.pk)
+        return db_obj, result
 
     def merge_one(self) -> tuple[MergeResult[Any], M | None]:
         """Merge the object's own attributes and then all of its related/child
@@ -874,22 +930,9 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         result = MergeResult.unnecessary()
 
         if self.existing is None:
-            db_obj = self.manager.create(
-                **(
-                    {
-                        name: self.transformed[name]
-                        for name in self.__registry__.attr.keys()
-                    }
-                    | self._through_params
-                ),
-            )
-            result = MergeResult.created(self.model.__name__, db_obj.pk)
+            db_obj, result = self.create_new()
         else:
-            obj = self.build_object()
-            if self.update_existing(obj):
-                result = MergeResult.updated(
-                    self.model.__name__, self.existing.pk
-                )
+            result |= self.update_existing()
             db_obj = self.existing
 
         for rm in self.__registry__.related.values():
