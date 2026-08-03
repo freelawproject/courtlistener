@@ -121,7 +121,7 @@ class FloridaDocketEntryFactory(_PydanticConstructFactory):
     class Meta:
         model = FloridaDocketEntry
 
-    docket_entry_uuid = Faker("uuid4")
+    docket_entry_uuid = Faker("uuid4", cast_to=None)
     datetime_filed = Faker("date_time", tzinfo=UTC)
     date_filed = LazyAttribute(lambda o: o.datetime_filed.date())
     date_submitted = Faker("date_time", tzinfo=UTC)

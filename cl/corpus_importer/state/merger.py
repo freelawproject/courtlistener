@@ -343,7 +343,6 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
                 if all(m.out is not None for m in child_mergers):
                     to_keep = {r.pk for r in related_objects}
                     _ = related_manager.exclude(pk__in=to_keep).delete()
-                related_manager.add(*related_objects)
             case ManyStrategy.DISASSOCIATE:
                 related_manager.set(related_objects)
             # If we're using the `APPEND` strategy, we don't need to do anything special since the `RelatedManager`
@@ -433,26 +432,19 @@ class ManyToManyMerger[
             errors.append(
                 TypeError(f"{self.name}: Is not a many-to-many field")
             )
-        if self.through:
-            if field.remote_field is None:
-                return errors + [
-                    TypeError(
-                        f"{self.name}: No through model specified on source field"
-                    )
-                ]
 
+        if self.through:
             if field.remote_field.through != self.through.model:  # type: ignore[union-attr]
                 errors.append(
                     TypeError(
-                        f"{self.name}: Model for through merger is {self.through.model.__name__} not {field.remote_field.through.__name__}"
-                        # type: ignore[union-attr]
+                        f"{self.name}: Model for through merger is {self.through.model.__name__} not {field.remote_field.through.__name__}"  # type: ignore[union-attr]
                     )
                 )
 
-            if field.remote_field.model != self.merger.model:
+            if field.remote_field.model != self.merger.model:  # type: ignore[union-attr]
                 errors.append(
                     TypeError(
-                        f"{self.name}: Model for source merger is {self.merger.model.__name__} not {field.remote_field.model.__name__}"
+                        f"{self.name}: Model for source merger is {self.merger.model.__name__} not {field.remote_field.model.__name__}"  # type: ignore[union-attr]
                     )
                 )
 
@@ -478,19 +470,24 @@ class ManyToManyMerger[
 
         related_params = RelatedParams(params, parent=parent)
 
-        child_mergers: list[
+        # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
+        # this case
+        init_result, child_mergers = self.merger.init_many(
+            transformed, params=related_params
+        )
+        result |= init_result
+        mergers_with_output: list[
             Merger[TransformType, RelatedParams[ParamType], RM]
         ] = []
-        related_objects: list[tuple[TransformType, RM]] = []
-        for child in transformed:
-            # We don't pass the manager, because it will automatically create `through` objects, which we don't want in
-            # this case
-            child_merger = self.merger(child, params=related_params)
-            child_mergers.append(child_merger)
+        children_to_keep: set[Any] = set()
+        for child_merger in child_mergers:
             result |= child_merger.merge()
             if child_merger.out is None:
-                continue
-            related_objects.append((child, child_merger.out))
+                if child_merger.existing is not None:
+                    children_to_keep.add(child_merger.existing.pk)
+            else:
+                mergers_with_output.append(child_merger)
+                children_to_keep.add(child_merger.out.pk)
 
         # A failed merge can leave behind a row that its merger never identified:
         # invalid input and an ambiguous lookup both give up without setting
@@ -500,25 +497,22 @@ class ManyToManyMerger[
             m.out is not None for m in child_mergers
         ):
             # Delete everything we didn't update or create along with associated objects
-            to_keep = {r.pk for _, r in related_objects}
-            _ = related_manager.exclude(pk__in=to_keep).delete()
+            _ = related_manager.exclude(pk__in=children_to_keep).delete()
 
         through_mergers: list[
             Merger[TransformType, ThroughParameters[ParamType], ThruM]
         ] = []
         through_objects: list[ThruM] = []
-        for related_transform, related_object in related_objects:
+        for m in mergers_with_output:
             through_merger = self.through(
-                related_transform,
+                m.scrape,
                 params=ThroughParameters(
                     params,
                     parent=parent,
                     source=parent,
-                    source_name=related_manager.source_field_name,
-                    # type: ignore[attr-defined]
-                    target=related_object,
-                    target_name=related_manager.target_field_name,
-                    # type: ignore[attr-defined]
+                    source_name=related_manager.source_field_name,  # type: ignore[attr-defined]
+                    target=m.out,  # type: ignore[arg-type]
+                    target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
                 ),
                 existing=None,
             )
@@ -536,8 +530,7 @@ class ManyToManyMerger[
             # parents' relationships are out of scope for this merge.
             _ = (
                 self.through.model._default_manager.filter(
-                    **{related_manager.source_field_name: parent}
-                    # type: ignore[attr-defined]
+                    **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
                 )
                 .exclude(pk__in=to_keep)
                 .delete()
@@ -734,36 +727,56 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         """Check if the implementor has overridden the query method. This is
         useful because natural keys allow us to use some nice optimizations when
         merging N-to-many relations."""
-        return cls.query == Merger.query
+        return (
+            cls.query == Merger.query
+            and cls.resolve_query == Merger.resolve_query
+        )
 
     @classmethod
     def init_many(
         cls,
         scrapes: Sequence[ScrapeType],
         *,
-        params: ParamType,
+        params: ParamType | Sequence[ParamType],
         manager: Manager[M] | None = None,
     ) -> tuple[MergeResult[Any], list[Self]]:
         result = MergeResult.unnecessary()
-        mergers = [
-            cls(scrape, params=params, manager=manager, lookup=False)
-            for scrape in scrapes
-        ]
+        if isinstance(params, Sequence):
+            if len(params) != len(scrapes):
+                logger.error(
+                    "Different number of params and scrape entries for merger %s (%s != %s)",
+                    cls.__name__,
+                    len(params),
+                    len(scrapes),
+                )
+            mergers = [
+                cls(scrape, params=param, manager=manager, lookup=True)
+                for scrape, param in zip(scrapes, params)
+            ]
+        else:
+            mergers = [
+                cls(scrape, params=params, manager=manager, lookup=True)
+                for scrape in scrapes
+            ]
         if not cls.uses_natural_key():
             return result, mergers
 
         merger_hashed: dict[int, Self] = {}
         for merger in mergers:
+            merger.lookup = False
             if merger.result is not None:
                 result |= merger.result
                 continue
             k = merger._hash_natural_key_transform()
             if k in merger_hashed:
                 logger.error(
-                    "Found multiple matching objects for model %s",
+                    "Multiple scraped instances with same natural key for model %s",
                     merger.model.__name__,
                 )
-                return MergeResult.failed(merger.model.__name__), []
+                merger_hashed[k].result = MergeResult.failed(
+                    merger_hashed[k].model.__name__
+                )
+                result |= MergeResult.failed(merger.model.__name__)
             merger_hashed[k] = merger
 
         query = reduce(
@@ -773,6 +786,18 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         for obj in query.iterator():
             k = cls._hash_natural_key_model(obj)
             if k in merger_hashed:
+                if merger_hashed[k].existing is not None:
+                    logger.error(
+                        "Found multiple matching objects for natural key of %s",
+                        merger_hashed[k].model.__name__,
+                    )
+                    merger_hashed[k].result = MergeResult.failed(
+                        merger_hashed[k].model.__name__
+                    )
+                    result |= MergeResult.failed(
+                        merger_hashed[k].model.__name__
+                    )
+                    continue
                 merger_hashed[k].existing = obj
         return result, mergers
 
@@ -954,9 +979,13 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                 )
                 updated.append(name)
         result = MergeResult.unnecessary()
-        for name, spec in self.__registry__.one_to_one.items():
-            updated.append(name)
-            result |= spec.merge(self.existing, self.scrape, self.params)
+        for name, o2o_spec in self.__registry__.one_to_one.items():
+            o2o_result = o2o_spec.merge(
+                self.existing, self.scrape, self.params
+            )
+            if o2o_result.update or o2o_result.create:
+                updated.append(name)
+            result |= o2o_result
         if updated:
             result |= MergeResult.updated(
                 self.model.__name__, self.existing.pk

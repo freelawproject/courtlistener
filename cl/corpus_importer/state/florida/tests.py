@@ -557,16 +557,22 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         )
         docket_data = self._make_case(scrape_party)
 
-        first = FloridaDocketMerger(docket_data, params=None).merge()
-        second = FloridaDocketMerger(docket_data, params=None).merge()
+        first_merger = FloridaDocketMerger(docket_data, params=None)
+        first = first_merger.merge()
+        first_db = first_merger.out
+        second_merger = FloridaDocketMerger(docket_data, params=None)
+        second = second_merger.merge()
+        second_db = second_merger.out
 
-        assert first.success is True
-        assert second.success is True
-        assert second.create is False
-        assert Party.objects.count() == 1
-        assert Attorney.objects.count() == 1
-        assert Role.objects.count() == 1
-        assert PartyType.objects.count() == 1
+        self.assertEqual(first_db, second_db)
+        self.assertTrue(first.success)
+        self.assertTrue(second.success)
+        self.assertFalse(second.create)
+        self.assertFalse(second.update)
+        self.assertEqual(Party.objects.count(), 1)
+        self.assertEqual(Attorney.objects.count(), 1)
+        self.assertEqual(Role.objects.count(), 1)
+        self.assertEqual(PartyType.objects.count(), 1)
 
     def test_merge_does_not_modify_unrelated_parties(self):
         """Does merging create a new party rather than renaming an existing
