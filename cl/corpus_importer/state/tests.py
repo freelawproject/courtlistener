@@ -90,12 +90,13 @@ class QueryCountTestCase(TestCase):
     def tearDownClass(cls) -> None:
         super().tearDownClass()
         print(f"\n{cls.__name__} query counts:")
+        ROW_WIDTH = 65
+        print("-" * (ROW_WIDTH + 10))
+        print(f"| {'Test':^{ROW_WIDTH}} | {'Qs':^3} |")
+        print("|-" + "-" * ROW_WIDTH + "-|-----|")
         for name, counts in sorted(cls._query_counts.items()):
-            total = counts["merger"] + counts["test"]
-            print(
-                f"  {name}: {total}"
-                f" ({counts['merger']} merger, {counts['test']} test)"
-            )
+            # total = counts["merger"] + counts["test"]
+            print(f"| {name:>{ROW_WIDTH}} | {counts['merger']:>3} |")
             # for sql in cls._merger_queries[name]:
             #     sql = re.sub(r"^SELECT .*? FROM", "SELECT ... FROM", sql)
             #     sql = re.sub(
@@ -103,11 +104,9 @@ class QueryCountTestCase(TestCase):
             #     )
             #     print(f"    {sql}")
         merger_total = sum(c["merger"] for c in cls._query_counts.values())
-        test_total = sum(c["test"] for c in cls._query_counts.values())
-        print(
-            f"  total: {merger_total + test_total}"
-            f" ({merger_total} merger, {test_total} test)"
-        )
+        # test_total = sum(c["test"] for c in cls._query_counts.values())
+        print(f"| {'total':>{ROW_WIDTH}} | {merger_total:>3} |")
+        print("-" * (ROW_WIDTH + 10))
 
 
 class BaseMergerTest(QueryCountTestCase):

@@ -1,3 +1,4 @@
+import json
 import logging
 import typing
 from abc import ABC, abstractmethod
@@ -9,6 +10,7 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import reduce
 from typing import (
     Any,
     ClassVar,
@@ -325,19 +327,16 @@ class NToManyMerger[ScrapeType, ParamType, ChildType, RM: Model](
 
         related_params = RelatedParams(params, parent=parent)
 
-        child_mergers: list[
-            Merger[ChildType, RelatedParams[ParamType], RM]
-        ] = []
+        init_result, child_mergers = self.merger.init_many(
+            transformed, params=related_params, manager=related_manager
+        )
+        result |= init_result
         related_objects: list[RM] = []
-        for child in transformed:
-            related_merge = self.merger(
-                child, manager=related_manager, params=related_params
-            )
-            child_mergers.append(related_merge)
-            result |= related_merge.merge()
-            if related_merge.out is None:
+        for child_merger in child_mergers:
+            result |= child_merger.merge()
+            if child_merger.out is None:
                 continue
-            related_objects.append(related_merge.out)
+            related_objects.append(child_merger.out)
 
         match self.strategy:
             case ManyStrategy.REPLACE:
@@ -515,9 +514,11 @@ class ManyToManyMerger[
                     params,
                     parent=parent,
                     source=parent,
-                    source_name=related_manager.source_field_name,  # type: ignore[attr-defined]
+                    source_name=related_manager.source_field_name,
+                    # type: ignore[attr-defined]
                     target=related_object,
-                    target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
+                    target_name=related_manager.target_field_name,
+                    # type: ignore[attr-defined]
                 ),
                 existing=None,
             )
@@ -535,7 +536,8 @@ class ManyToManyMerger[
             # parents' relationships are out of scope for this merge.
             _ = (
                 self.through.model._default_manager.filter(
-                    **{related_manager.source_field_name: parent}  # type: ignore[attr-defined]
+                    **{related_manager.source_field_name: parent}
+                    # type: ignore[attr-defined]
                 )
                 .exclude(pk__in=to_keep)
                 .delete()
@@ -727,6 +729,53 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                 )
             )
 
+    @classmethod
+    def uses_natural_key(cls) -> bool:
+        """Check if the implementor has overridden the query method. This is
+        useful because natural keys allow us to use some nice optimizations when
+        merging N-to-many relations."""
+        return cls.query == Merger.query
+
+    @classmethod
+    def init_many(
+        cls,
+        scrapes: Sequence[ScrapeType],
+        *,
+        params: ParamType,
+        manager: Manager[M] | None = None,
+    ) -> tuple[MergeResult[Any], list[Self]]:
+        result = MergeResult.unnecessary()
+        mergers = [
+            cls(scrape, params=params, manager=manager, lookup=False)
+            for scrape in scrapes
+        ]
+        if not cls.uses_natural_key():
+            return result, mergers
+
+        merger_hashed: dict[int, Self] = {}
+        for merger in mergers:
+            if merger.result is not None:
+                result |= merger.result
+                continue
+            k = merger._hash_natural_key_transform()
+            if k in merger_hashed:
+                logger.error(
+                    "Found multiple matching objects for model %s",
+                    merger.model.__name__,
+                )
+                return MergeResult.failed(merger.model.__name__), []
+            merger_hashed[k] = merger
+
+        query = reduce(
+            lambda q1, q2: q1 | q2,
+            (merger.query() for merger in merger_hashed.values()),
+        )
+        for obj in query.iterator():
+            k = cls._hash_natural_key_model(obj)
+            if k in merger_hashed:
+                merger_hashed[k].existing = obj
+        return result, mergers
+
     @staticmethod
     def validate(scrape: ScrapeType) -> bool:
         """Validate the input data before attempting a merge operation
@@ -743,12 +792,15 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         params: ParamType,
         existing: M | None = None,
         manager: Manager[M] | None = None,
+        lookup: bool = True,
     ):
         """Create an object to track the merge operation on the specified data.
 
         :param scrape: The scraped data to transform. Parameter values are passed as kwargs.
         :param existing: Optional existing object to override the lookup in `get_existing`.
-        :param manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager."""
+        :param manager: The manager to use for lookups and creation of objects. Defaults to the model's default manager.
+        :param lookup: Whether the merger should attempt to lookup missing objects. Useful for optimizing queries in
+            N-to-many relations."""
         self.guarantee_valid()
         result = None
         valid = self.validate(scrape)
@@ -795,6 +847,24 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         self.manager: Manager[M] = manager
 
         self.existing: M | None = existing
+        self.lookup: bool = lookup
+
+    def _hash_natural_key_transform(self) -> int:
+        return hash(
+            json.dumps(
+                {name: str(self.transformed[name]) for name in self.key},
+                sort_keys=True,
+            )
+        )
+
+    @classmethod
+    def _hash_natural_key_model(cls, obj: M) -> int:
+        return hash(
+            json.dumps(
+                {name: str(getattr(obj, name)) for name in cls.key},
+                sort_keys=True,
+            )
+        )
 
     def after(self) -> None:
         """Run extra processes after the merge operation completes or fails."""
@@ -828,7 +898,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         """Merge scraped data into the DB."""
         if self.result is not None:
             return self.result
-        if self.existing is None:
+        if self.existing is None and self.lookup:
             qs = self.query()
             # Filtering invalidates the cache even if the filter is empty. Try to avoid that.
             if self._through_params:
