@@ -499,24 +499,23 @@ class ManyToManyMerger[
             # Delete everything we didn't update or create along with associated objects
             _ = related_manager.exclude(pk__in=children_to_keep).delete()
 
-        through_mergers: list[
-            Merger[TransformType, ThroughParameters[ParamType], ThruM]
-        ] = []
-        through_objects: list[ThruM] = []
-        for m in mergers_with_output:
-            through_merger = self.through(
-                m.scrape,
-                params=ThroughParameters(
+        through_init_result, through_mergers = self.through.init_many(
+            [m.scrape for m in mergers_with_output],
+            params=[
+                ThroughParameters(
                     params,
                     parent=parent,
                     source=parent,
                     source_name=related_manager.source_field_name,  # type: ignore[attr-defined]
                     target=m.out,  # type: ignore[arg-type]
                     target_name=related_manager.target_field_name,  # type: ignore[attr-defined]
-                ),
-                existing=None,
-            )
-            through_mergers.append(through_merger)
+                )
+                for m in mergers_with_output
+            ],
+        )
+        result |= through_init_result
+        through_objects: list[ThruM] = []
+        for through_merger in through_mergers:
             result |= through_merger.merge()
             if through_merger.out is None:
                 continue
@@ -779,12 +778,19 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                 result |= MergeResult.failed(merger.model.__name__)
             merger_hashed[k] = merger
 
+        if not merger_hashed:
+            return result, mergers
+
         query = reduce(
             lambda q1, q2: q1 | q2,
-            (merger.query() for merger in merger_hashed.values()),
+            (
+                merger.query().filter(**merger._through_params)
+                for merger in merger_hashed.values()
+            ),
         )
+        through_names = next(iter(merger_hashed.values()))._through_params
         for obj in query.iterator():
-            k = cls._hash_natural_key_model(obj)
+            k = cls._hash_natural_key_model(obj, through_names)
             if k in merger_hashed:
                 if merger_hashed[k].existing is not None:
                     logger.error(
@@ -877,16 +883,26 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
     def _hash_natural_key_transform(self) -> int:
         return hash(
             json.dumps(
-                {name: str(self.transformed[name]) for name in self.key},
+                {name: str(self.transformed[name]) for name in self.key}
+                | {
+                    name: str(obj.pk)
+                    for name, obj in self._through_params.items()
+                },
                 sort_keys=True,
             )
         )
 
     @classmethod
-    def _hash_natural_key_model(cls, obj: M) -> int:
+    def _hash_natural_key_model(
+        cls, obj: M, through_names: Iterable[str] = ()
+    ) -> int:
         return hash(
             json.dumps(
-                {name: str(getattr(obj, name)) for name in cls.key},
+                {name: str(getattr(obj, name)) for name in cls.key}
+                | {
+                    name: str(getattr(obj, f"{name}_id"))
+                    for name in through_names
+                },
                 sort_keys=True,
             )
         )
