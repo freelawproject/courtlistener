@@ -711,6 +711,13 @@ class BaseMergerTest(QueryCountTestCase):
             "An ambiguous child lookup must not let REPLACE delete existing "
             "rows.",
         )
+        self.assertTrue(
+            PartyType.objects.filter(
+                docket=self.docket, party=stale_party
+            ).exists(),
+            "An ambiguous child lookup must not let REPLACE prune existing "
+            "through rows.",
+        )
 
     def test_merger_subclassing(self) -> None:
         class TestMerger(Merger[dict[str, str], dict[str, Any], Docket]):

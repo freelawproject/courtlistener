@@ -493,9 +493,8 @@ class ManyToManyMerger[
         # invalid input and an ambiguous lookup both give up without setting
         # `existing`. Those rows aren't in the keep set, so a `REPLACE` prune has to be
         # skipped entirely rather than deleting data a later scrape could still match.
-        if self.strategy is ManyStrategy.REPLACE and all(
-            m.out is not None for m in child_mergers
-        ):
+        all_children_merged = all(m.out is not None for m in child_mergers)
+        if self.strategy is ManyStrategy.REPLACE and all_children_merged:
             # Delete everything we didn't update or create along with associated objects
             _ = related_manager.exclude(pk__in=children_to_keep).delete()
 
@@ -521,8 +520,13 @@ class ManyToManyMerger[
                 continue
             through_objects.append(through_merger.out)
 
-        if self.through_strategy is ManyStrategy.REPLACE and all(
-            m.out is not None for m in through_mergers
+        # Through mergers exist only for children that merged successfully, so
+        # a failed child's through row is never in the keep set. Pruning is
+        # only safe when every child produced output.
+        if (
+            self.through_strategy is ManyStrategy.REPLACE
+            and all_children_merged
+            and all(m.out is not None for m in through_mergers)
         ):
             to_keep = {t.pk for t in through_objects}
             # Only prune through objects belonging to this parent; other
