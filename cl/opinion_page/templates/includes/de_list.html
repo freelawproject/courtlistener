@@ -110,6 +110,24 @@
                     </a>
                   {% endif %}
                 </div>
+                <div class="col-xs-3 hidden-sm hidden-md hidden-lg hidden-print">
+                  {% if rd.filepath_local %}
+                    <a href="{{ rd.filepath_local.url }}"
+                       role="button"
+                       class="btn btn-primary btn-xs"
+                       rel="nofollow"
+                       title="Download PDF"><i class="fa fa-download"></i>
+                    </a>
+                  {% elif rd.url %}
+                    <a href="{{ rd.url }}"
+                       role="button"
+                       class="btn btn-default btn-xs"
+                       target="_blank"
+                       rel="nofollow noopener noreferrer"
+                       title="View on SCOTUS"><i class="fa fa-external-link"></i>
+                    </a>
+                  {% endif %}
+                </div>
               </div>
             {% endfor %}
           {% endif %}
