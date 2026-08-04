@@ -2,6 +2,7 @@ import logging
 import re
 from datetime import datetime
 from typing import Literal, TypeVar
+from urllib.parse import quote
 
 import nh3
 import pghistory
@@ -885,6 +886,15 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 return self.pacer_appellate_url_with_caseId(path)
         else:
             return self.pacer_district_url("DktRpt.pl")
+
+    @property
+    def scotus_docket_url(self) -> str:
+        if not self.docket_number:
+            return ""
+        return (
+            "https://www.supremecourt.gov/search.aspx"
+            f"?filename=/docket/docketfiles/html/public/{quote(self.docket_number)}.html"
+        )
 
     @property
     def pacer_alias_url(self):
