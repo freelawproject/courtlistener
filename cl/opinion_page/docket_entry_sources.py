@@ -41,7 +41,10 @@ def _recap_entries(docket: Docket) -> QuerySet:
 
 def _scotus_entries(docket: Docket) -> QuerySet:
     return docket.scotusdocketentry_set.all().prefetch_related(
-        Prefetch("scotusdocument_set", queryset=SCOTUSDocument.objects.all())
+        Prefetch(
+            "scotusdocument_set",
+            queryset=SCOTUSDocument.objects.defer("plain_text"),
+        )
     )
 
 
