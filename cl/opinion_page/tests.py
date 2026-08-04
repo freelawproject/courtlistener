@@ -1548,6 +1548,36 @@ class ScotusDocketFlagDisabledTest(TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    async def test_sibling_tab_views_also_404_when_flag_disabled(
+        self,
+    ) -> None:
+        """The flag check lives in core_docket_data(), so
+        every view that shares it must 404 (not only view_docket).
+        """
+        # view_download_docket requires login.
+        user = await sync_to_async(UserFactory)()
+        await self.async_client.aforce_login(user)
+        for url_name, kwargs in (
+            (
+                "docket_parties",
+                {"docket_id": self.docket.pk, "slug": self.docket.slug},
+            ),
+            (
+                "docket_idb_data",
+                {"docket_id": self.docket.pk, "slug": self.docket.slug},
+            ),
+            (
+                "docket_authorities",
+                {"docket_id": self.docket.pk, "slug": self.docket.slug},
+            ),
+            ("view_download_docket", {"docket_id": self.docket.pk}),
+        ):
+            with self.subTest(url_name=url_name):
+                r = await self.async_client.get(
+                    reverse(url_name, kwargs=kwargs)
+                )
+                self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_enabled_waffle")
 @override_flag("scotus_docket_page", active=True)
@@ -2944,6 +2974,10 @@ class DocketEntryFileDownload(TestCase):
         response = self.client.get(download_path)
         self.assertRedirects(response, redirect_path)
 
+    @override_settings(
+        WAFFLE_CACHE_PREFIX="test_csv_export_scotus_docket_waffle"
+    )
+    @override_flag("scotus_docket_page", active=True)
     def test_csv_export_return_gracefully_for_scotus_docket(self) -> None:
         """SCOTUSDocketEntry/SCOTUSDocument don't implement CSV
         export yet, but the button should stay visible. Clicking

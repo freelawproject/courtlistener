@@ -359,11 +359,6 @@ async def view_docket(
     form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
-    if docket.court_id == "scotus" and not await sync_to_async(
-        waffle.flag_is_active
-    )(request, "scotus_docket_page"):
-        raise Http404("Docket not found.")
-
     source = get_docket_entry_source(docket)
     de_list = await fetch_docket_entries(docket)
 

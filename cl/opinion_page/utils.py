@@ -11,7 +11,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.urls import reverse
 from django.utils.http import urlencode
@@ -545,6 +545,15 @@ async def core_docket_data(
 ) -> tuple[Docket, dict[str, bool | str | Docket | NoteForm]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
+
+    # SCOTUS content is made available using a waffle flag:
+    # every docket-related view shares this helper, so access
+    # control resides here.
+    if docket.court_id == "scotus" and not await sync_to_async(
+        waffle.flag_is_active
+    )(request, "scotus_docket_page"):
+        raise Http404("Docket not found.")
+
     title = make_docket_title(docket)
 
     try:
