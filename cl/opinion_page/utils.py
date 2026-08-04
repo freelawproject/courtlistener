@@ -21,6 +21,7 @@ from elasticsearch.dsl import Q
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
+from cl.custom_filters.templatetags.extras import safe_external_url
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -346,7 +347,7 @@ def build_scotus_metadata(
             {"label": "Linked With", "value": scotus_metadata.linked_with}
         )
 
-    if scotus_metadata.questions_presented_url:
+    if safe_external_url(scotus_metadata.questions_presented_url):
         items.append(
             {
                 "label": "Questions Presented",

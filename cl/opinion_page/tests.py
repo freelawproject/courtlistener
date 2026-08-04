@@ -1639,6 +1639,31 @@ class ScotusDocketFlagEnabledTest(TestCase):
             "sourced from the Supreme Court of the United States", content
         )
 
+    async def test_scotus_metadata_section_hidden_when_all_fields_blank(
+        self,
+    ) -> None:
+        """The SCOTUS metadata section heading must not render when
+        every field on ScotusDocketMetadata row is blank, the guard
+        needs to check whether there's anything to show, not just
+        whether the row exists.
+        """
+        await sync_to_async(ScotusDocketMetadataFactory)(
+            docket=self.docket,
+            capital_case=False,
+            date_discretionary_court_decision=None,
+            linked_with="",
+            questions_presented_url="",
+            questions_presented_file="",
+        )
+
+        r = await self.async_client.get(
+            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
+        )
+        content = r.content.decode()
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertNotIn("SCOTUS Docket Metadata", content)
+
     async def test_scotus_docket_entry_filters_still_work(self) -> None:
         """filters must work against SCOTUSDocketEntry field names
         (entry_number/date_filed), not just DocketEntry's."""
@@ -3296,6 +3321,20 @@ class BuildScotusMetadataTest(TestCase):
         qp = next(i for i in items if i["label"] == "Questions Presented")
         self.assertEqual(qp["url"], "https://example.com/qp.pdf")
         self.assertTrue(qp["is_external"])
+
+    def test_omits_questions_presented_url_with_unsafe_scheme(self) -> None:
+        """questions_presented_url is ingested straight
+        from the SCOTUS scraper. A invalid URL must never reach
+        the rendered href.
+        """
+        scotus_metadata = ScotusDocketMetadataFactory(
+            docket=self.docket,
+            questions_presented_url="javascript:alert(1)",
+        )
+        items = build_scotus_metadata(scotus_metadata)
+        self.assertFalse(
+            any(i["label"] == "Questions Presented" for i in items)
+        )
 
 
 class BuildDocketTabsTest(SimpleTestCase):

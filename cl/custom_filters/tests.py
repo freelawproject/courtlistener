@@ -12,6 +12,7 @@ from cl.custom_filters.templatetags.extras import (
     highlight_query,
     humanize_number,
     render_field_with_id,
+    safe_external_url,
 )
 from cl.custom_filters.templatetags.svg_tags import svg
 from cl.custom_filters.templatetags.text_filters import (
@@ -528,3 +529,22 @@ class TestSvgTag(SimpleTestCase):
         with self.settings(DEBUG=False):
             result = svg("nonexistent_svg_that_does_not_exist")
             self.assertEqual(result, "")
+
+
+class TestSafeExternalUrlFilter(SimpleTestCase):
+    """Tests for the safe_external_url template filter."""
+
+    def test_allows_http_and_https(self) -> None:
+        self.assertEqual(
+            safe_external_url("https://example.com"), "https://example.com"
+        )
+        self.assertEqual(
+            safe_external_url("http://example.com"), "http://example.com"
+        )
+
+    def test_blocks_javascript_scheme(self) -> None:
+        self.assertEqual(safe_external_url("javascript:alert(1)"), "")
+
+    def test_blocks_empty_and_none(self) -> None:
+        self.assertEqual(safe_external_url(""), "")
+        self.assertEqual(safe_external_url(None), "")
