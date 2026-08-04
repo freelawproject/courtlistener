@@ -469,7 +469,7 @@ def render_field_with_id(field, field_id):
 
 
 @register.filter
-def safe_external_url(url: str) -> str:
+def http_url(url: str) -> str:
     """Return the URL only if it uses the http/https scheme, else "".
 
     Guards against rendering an unvalidated string as a

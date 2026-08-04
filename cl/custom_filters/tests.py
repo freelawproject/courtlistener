@@ -10,9 +10,9 @@ from cl.custom_filters.templatetags.extras import (
     get_item,
     granular_date,
     highlight_query,
+    http_url,
     humanize_number,
     render_field_with_id,
-    safe_external_url,
 )
 from cl.custom_filters.templatetags.svg_tags import svg
 from cl.custom_filters.templatetags.text_filters import (
@@ -531,20 +531,18 @@ class TestSvgTag(SimpleTestCase):
             self.assertEqual(result, "")
 
 
-class TestSafeExternalUrlFilter(SimpleTestCase):
-    """Tests for the safe_external_url template filter."""
+class TestHttpUrlFilter(SimpleTestCase):
+    """Tests for the http_url template filter."""
 
     def test_allows_http_and_https(self) -> None:
         self.assertEqual(
-            safe_external_url("https://example.com"), "https://example.com"
+            http_url("https://example.com"), "https://example.com"
         )
-        self.assertEqual(
-            safe_external_url("http://example.com"), "http://example.com"
-        )
+        self.assertEqual(http_url("http://example.com"), "http://example.com")
 
     def test_blocks_javascript_scheme(self) -> None:
-        self.assertEqual(safe_external_url("javascript:alert(1)"), "")
+        self.assertEqual(http_url("javascript:alert(1)"), "")
 
     def test_blocks_empty_and_none(self) -> None:
-        self.assertEqual(safe_external_url(""), "")
-        self.assertEqual(safe_external_url(None), "")
+        self.assertEqual(http_url(""), "")
+        self.assertEqual(http_url(None), "")

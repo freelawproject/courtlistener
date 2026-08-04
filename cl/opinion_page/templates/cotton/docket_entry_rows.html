@@ -85,10 +85,10 @@
                           <c-button variant="dark" href="{{ rd.filepath_local.url }}" rel="nofollow" class="text-sm px-3 py-1.5">
                             Download PDF
                           </c-button>
-                        {% elif rd.url|safe_external_url %}
+                        {% elif rd.url|http_url %}
                           <c-button
                             variant="outline"
-                            href="{{ rd.url|safe_external_url }}"
+                            href="{{ rd.url|http_url }}"
                             target="_blank"
                             rel="nofollow noreferrer noopener"
                             class="text-sm px-3 py-1.5"
