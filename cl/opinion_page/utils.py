@@ -44,6 +44,7 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
+    ScotusDocketMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -312,6 +313,56 @@ def build_bankruptcy_metadata(
 
     if bankr_info.trustee_str:
         items.append({"label": "Trustee", "value": bankr_info.trustee_str})
+
+    return items
+
+
+def build_scotus_metadata(
+    scotus_metadata: ScotusDocketMetadata | None,
+) -> list[MetadataItem]:
+    """Build metadata items for the SCOTUS docket metadata section."""
+    if not scotus_metadata:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if scotus_metadata.capital_case:
+        items.append({"label": "Capital Case", "value": "Yes"})
+
+    if scotus_metadata.date_discretionary_court_decision:
+        items.append(
+            {
+                "label": "Date of Discretionary Court Decision",
+                "value": (
+                    scotus_metadata.date_discretionary_court_decision.strftime(
+                        "%b. %d, %Y"
+                    )
+                ),
+            }
+        )
+
+    if scotus_metadata.linked_with:
+        items.append(
+            {"label": "Linked With", "value": scotus_metadata.linked_with}
+        )
+
+    if scotus_metadata.questions_presented_url:
+        items.append(
+            {
+                "label": "Questions Presented",
+                "value": "View",
+                "url": scotus_metadata.questions_presented_url,
+                "is_external": True,
+            }
+        )
+    elif scotus_metadata.questions_presented_file:
+        items.append(
+            {
+                "label": "Questions Presented",
+                "value": "View",
+                "url": scotus_metadata.questions_presented_file.url,
+            }
+        )
 
     return items
 
