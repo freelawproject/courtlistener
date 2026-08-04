@@ -41,10 +41,14 @@
 {% else %}
   <div class="row">
     <div class="col-sm-8">
-      <p class="lead">There are no entries for this docket in the RECAP Archive. Please download the latest from PACER while using the RECAP Extension.
-      </p>
+      {% if is_scotus %}
+        <p class="lead">There are no entries for this docket yet.</p>
+      {% else %}
+        <p class="lead">There are no entries for this docket in the RECAP Archive. Please download the latest from PACER while using the RECAP Extension.
+        </p>
+      {% endif %}
     </div>
-    {% if docket.pacer_docket_url %}
+    {% if not is_scotus and docket.pacer_docket_url %}
       <div class="col-sm-4 right">
         <p>
           {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
