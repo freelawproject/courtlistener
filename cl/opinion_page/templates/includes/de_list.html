@@ -1,3 +1,4 @@
+{% load extras %}
 {% load pacer %}
 {% load tz %}
 {% load waffle_tags %}
@@ -100,8 +101,8 @@
                        class="btn btn-primary btn-xs">
                       Download PDF
                     </a>
-                  {% elif rd.url %}
-                    <a href="{{ rd.url }}"
+                  {% elif rd.url|safe_external_url %}
+                    <a href="{{ rd.url|safe_external_url }}"
                        rel="nofollow noopener noreferrer"
                        target="_blank"
                        role="button"
@@ -118,8 +119,8 @@
                        rel="nofollow"
                        title="Download PDF"><i class="fa fa-download"></i>
                     </a>
-                  {% elif rd.url %}
-                    <a href="{{ rd.url }}"
+                  {% elif rd.url|safe_external_url %}
+                    <a href="{{ rd.url|safe_external_url }}"
                        role="button"
                        class="btn btn-default btn-xs"
                        target="_blank"

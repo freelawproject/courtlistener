@@ -464,18 +464,18 @@
           <span class="meta-data-value">{{ scotus_meta.linked_with }}</span>
         </p>
       {% endif %}
-      {% if scotus_meta.questions_presented_url %}
+      {% if scotus_meta.questions_presented_url|safe_external_url %}
         <p class="bottom">
           <span class="meta-data-header">Questions Presented:</span>
           <span class="meta-data-value">
-            <a href="{{ scotus_meta.questions_presented_url }}" target="_blank" rel="nofollow noopener noreferrer">View <i class="fa fa-external-link"></i></a>
+            <a href="{{ scotus_meta.questions_presented_url|safe_external_url }}" target="_blank" rel="nofollow noopener noreferrer">View <i class="fa fa-external-link"></i></a>
           </span>
         </p>
       {% elif scotus_meta.questions_presented_file %}
         <p class="bottom">
           <span class="meta-data-header">Questions Presented:</span>
           <span class="meta-data-value">
-            <a href="{{ scotus_meta.questions_presented_file.url }}" target="_blank" rel="nofollow">View</a>
+            <a href="{{ scotus_meta.questions_presented_file.url }}" target="_blank" rel="nofollow noopener noreferrer">View</a>
           </span>
         </p>
       {% endif %}
