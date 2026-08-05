@@ -900,6 +900,26 @@ class ProfileMembershipTest(TestCase):
                 "Should not be a member a day after termination.",
             )
 
+    def test_is_member_true_when_payment_pending(self):
+        """A member keeps benefits while their payment is still pending."""
+        NeonMembership.objects.create(
+            level=NeonMembershipLevel.LEGACY,
+            user=self.user_profile.user,
+            payment_status=MembershipPaymentStatus.PENDING,
+        )
+        self.user_profile.refresh_from_db()
+        self.assertTrue(self.user_profile.is_member)
+
+    def test_is_member_false_when_payment_failed(self):
+        """A failed/declined payment revokes membership benefits."""
+        NeonMembership.objects.create(
+            level=NeonMembershipLevel.LEGACY,
+            user=self.user_profile.user,
+            payment_status=MembershipPaymentStatus.FAILED,
+        )
+        self.user_profile.refresh_from_db()
+        self.assertFalse(self.user_profile.is_member)
+
 
 class MembershipWebhookThrottleSyncTest(TestCase):
     """End-to-end tests that Neon webhooks sync APIThrottle rows."""
