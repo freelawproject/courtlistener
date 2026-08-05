@@ -3575,17 +3575,19 @@ def merge_scotus_docket_entry(
         entry_number = input_docket_entry.get("document_number")
         date_filed = input_docket_entry["date_filed"]
         description = input_docket_entry["description"]
+        de = None
+        de_created = False
         if entry_number:
-            params = {
-                "docket": docket,
-                "entry_number": entry_number,
-            }
             try:
-                de = SCOTUSDocketEntry.objects.get(**params)
-                de_created = False
+                de = SCOTUSDocketEntry.objects.get(
+                    docket=docket,
+                    entry_number=entry_number,
+                )
             except SCOTUSDocketEntry.DoesNotExist:
-                de = SCOTUSDocketEntry(**params)
-                de_created = True
+                # The entry may have been merged before it had attachments,
+                # when no entry number could be parsed for it. Fall back to
+                # the unnumbered lookups to avoid creating a duplicate.
+                pass
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
                     "Multiple matching SCOTUSDocketEntries found for entry_number "
@@ -3595,7 +3597,7 @@ def merge_scotus_docket_entry(
                 )
                 return False, None, []
 
-        else:
+        if de is None:
             normalize_long_description(input_docket_entry)
             try:
                 de = SCOTUSDocketEntry.objects.get(
@@ -3603,7 +3605,6 @@ def merge_scotus_docket_entry(
                     description=input_docket_entry["description"],
                     date_filed=input_docket_entry["date_filed"],
                 )
-                de_created = False
             except SCOTUSDocketEntry.DoesNotExist:
                 # Check if sequence_number already exists
                 try:
@@ -3611,7 +3612,6 @@ def merge_scotus_docket_entry(
                         docket=docket,
                         sequence_number=sequence_number,
                     )
-                    de_created = False
                 except SCOTUSDocketEntry.DoesNotExist:
                     de = SCOTUSDocketEntry(
                         docket=docket,
@@ -3637,6 +3637,8 @@ def merge_scotus_docket_entry(
                 return False, None, []
 
         # Update fields
+        if entry_number:
+            de.entry_number = entry_number
         de.sequence_number = sequence_number
         de.description = description
         de.date_filed = date_filed
