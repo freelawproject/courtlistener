@@ -4,6 +4,7 @@ from factory.base import Factory
 from factory.declarations import LazyAttribute, List, SubFactory
 from factory.faker import Faker
 from juriscraper.state.docket import DocketTransfer
+from juriscraper.state.florida import FloridaPartyRepresentative
 from juriscraper.state.florida.cases import (
     FLORIDA_DOCKET_TYPE_MAP,
     FloridaCase,
@@ -11,7 +12,7 @@ from juriscraper.state.florida.cases import (
 )
 from juriscraper.state.florida.courts import FloridaCourtID
 from juriscraper.state.florida.docket_entries import FloridaDocketEntry
-from juriscraper.state.florida.parties import FloridaParty
+from juriscraper.state.florida.parties import FloridaParty, PartyType
 
 
 class _PydanticConstructFactory(Factory):
@@ -50,9 +51,36 @@ class FloridaDocketTransferFactory(_PydanticConstructFactory):
         model = DocketTransfer
 
 
+class FloridaRepresentativeFactory(_PydanticConstructFactory):
+    class Meta:
+        model = FloridaPartyRepresentative
+
+    party_uuid = Faker("uuid4")
+    name = Faker("name")
+    sort_name = Faker("name")
+    primary_flag = Faker("pybool")
+
+
 class FloridaCasePartyFactory(_PydanticConstructFactory):
     class Meta:
         model = FloridaParty
+
+    party_uuid = Faker("uuid4")
+    party_type_raw = Faker("text")
+    party_type = Faker("random_element", elements=PartyType)
+    party_type_id = Faker("pyint")
+    party_subtype = Faker("pystr")
+    party_subtype_id = Faker("pyint")
+    status = Faker("pystr")
+    status_id = Faker("pyint")
+    name = Faker("name")
+    sort_name = Faker("name")
+    pro_se_flag = Faker("pybool")
+    order_by = Faker("pyint")
+    representatives = List([SubFactory(FloridaRepresentativeFactory)])
+    non_public_flag = Faker("pybool")
+    party_number = Faker("pyint")
+    involvement_type_id = Faker("pyint")
 
 
 class FloridaDocketEntryFactory(_PydanticConstructFactory):
@@ -70,6 +98,7 @@ class FloridaCaseFactory(_PydanticConstructFactory):
     docket_number = Faker("federal_district_docket_number")
     case_name = Faker("case_name")
     case_name_full = Faker("case_name", full=True)
+    case_name_short = Faker("case_name")
     case_caption = Faker("text")
     closed_flag = Faker("pybool")
     class_group_type = Faker("pystr")

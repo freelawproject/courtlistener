@@ -55,9 +55,13 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
     ]
 
     def get_queryset(self):
-        return SCOTUSMap.objects.filter(
-            Q(user=self.request.user) | Q(published=True)
-        ).order_by("-id")
+        return (
+            SCOTUSMap.objects.filter(
+                Q(user=self.request.user) | Q(published=True)
+            )
+            .prefetch_related("json_versions", "clusters")
+            .order_by("-id")
+        )
 
     def create(self, request, *args, **kwargs):
         # Override create by copying from source so we can throw 403's
