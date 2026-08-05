@@ -25,7 +25,7 @@ from cl.corpus_importer.state.florida.mergers import (
 )
 from cl.corpus_importer.state.florida.utils import make_docket_number_core
 from cl.corpus_importer.state.merger import RelatedParams
-from cl.corpus_importer.state.tests import QueryCountTestCase
+from cl.corpus_importer.state.tests import merger_test
 from cl.corpus_importer.state.utils import MergeResult
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -40,9 +40,10 @@ from cl.search.state.florida.models import (
     FloridaDocument,
 )
 from cl.search.state.shared import DocketEntryType
+from cl.tests.cases import TestCase
 
 
-class FloridaUtilsTest(QueryCountTestCase):
+class FloridaUtilsTest(TestCase):
     def test_docket_number_core(self) -> None:
         """Can we correctly normalize Florida docket numbers?"""
         self.assertEqual(make_docket_number_core("SC1983-2014"), "sc19832014")
@@ -84,7 +85,7 @@ class FloridaUtilsTest(QueryCountTestCase):
         self.assertEqual(make_docket_number_core("garbage text"), "")
 
 
-class FloridaMergerTest(QueryCountTestCase):
+class FloridaMergerTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.flsc = CourtFactory.create(id="fla")
@@ -114,6 +115,7 @@ class FloridaMergerTest(QueryCountTestCase):
         "cl.corpus_importer.state.florida.mergers.FloridaOriginatingCourtInformationMerger.merge",
         return_value=("failure", {"OriginatingCourtInformation": [1]}),
     )
+    @merger_test(expected_query_count=15)
     def test_merge_skips_non_sc_oci(self, mock_merge: mock.Mock):
         """Does merge skip OCI merging for non-supreme-court dockets?"""
         docket_data = FloridaCaseFactory.create(
@@ -125,6 +127,7 @@ class FloridaMergerTest(QueryCountTestCase):
         mock_merge.assert_not_called()
         assert result.success is True
 
+    @merger_test(expected_query_count=14)
     def test_merge_creates_new_oci(self):
         """Does merge create a new OCI when none exists?"""
         self.docket_sc.originating_court_information = None
@@ -150,6 +153,7 @@ class FloridaMergerTest(QueryCountTestCase):
         assert oci.docket_number == "ORIG-001"
         assert oci.docket_number_raw == "ORIG-001"
 
+    @merger_test(expected_query_count=14)
     def test_merge_updates_existing_oci(self):
         """Does merge update an existing OCI when one is already linked?"""
         existing_oci = OriginatingCourtInformation.objects.create(
@@ -179,6 +183,7 @@ class FloridaMergerTest(QueryCountTestCase):
         assert existing_oci.docket_number == "UPDATED-001"
         assert existing_oci.docket_number_raw == "UPDATED-001"
 
+    @merger_test(expected_query_count=13)
     def test_merge_no_originating_cases_skips_oci(self):
         """Does merge skip OCI merging when there are no originating cases?"""
         self.docket_sc.originating_court_information = None
@@ -197,6 +202,7 @@ class FloridaMergerTest(QueryCountTestCase):
         assert "OriginatingCourtInformation" not in result.creates
         assert "OriginatingCourtInformation" not in result.updates
 
+    @merger_test(expected_query_count=14)
     def test_merge_multiple_originating_cases_uses_first(self):
         """Does merge pick the first originating case when several exist?"""
         self.docket_sc.originating_court_information = None
@@ -218,6 +224,7 @@ class FloridaMergerTest(QueryCountTestCase):
         oci = OriginatingCourtInformation.objects.get(pk=oci_pk)
         assert oci.docket_number == "FIRST-001"
 
+    @merger_test(expected_query_count=0)
     def test_merge_docket_unknown_court_fails(self):
         """Does merge_docket fail when the court id is unknown?"""
         docket_data = FloridaCaseFactory(
@@ -257,6 +264,7 @@ class FloridaMergerTest(QueryCountTestCase):
         assert new_docket.case_name_short == docket_data.case_name_short
         assert new_docket.date_filed == docket_data.date_filed
 
+    @merger_test(expected_query_count=14)
     def test_merge_docket_existing_supreme_court_is_update(self):
         """Does merge_docket update an existing supreme-court docket in place?"""
         docket_data = FloridaCaseFactory(
@@ -274,6 +282,7 @@ class FloridaMergerTest(QueryCountTestCase):
         self.docket_sc.refresh_from_db()
         assert self.docket_sc.case_name == docket_data.case_name
 
+    @merger_test(expected_query_count=18)
     def test_merge_docket_appellate_disaggregates_existing(self):
         """Does merge_docket move a matching docket from the aggregate court
         into its specific district court?"""
@@ -299,6 +308,7 @@ class FloridaMergerTest(QueryCountTestCase):
         agg_docket.refresh_from_db()
         assert agg_docket.court_id == "fladistctapp1"
 
+    @merger_test(expected_query_count=13)
     def test_merge_docket_appellate_creates_new(self):
         """Does merge_docket create a new docket in the specific appellate
         court when no existing docket matches?"""
@@ -320,6 +330,7 @@ class FloridaMergerTest(QueryCountTestCase):
         assert new_docket.court_id == "fladistctapp2"
         assert new_docket.docket_number == "2D2025-BRAND-NEW"
 
+    @merger_test(expected_query_count=18)
     def test_merge_docket_uses_latest_entry_for_date_last_filing(self):
         """Does merge_docket pick the latest entry date for date_last_filing?"""
         entries = [
@@ -342,6 +353,7 @@ class FloridaMergerTest(QueryCountTestCase):
         self.docket_sc.refresh_from_db()
         assert self.docket_sc.date_last_filing == date(2025, 3, 10)
 
+    @merger_test(expected_query_count=14)
     def test_merge_docket_no_entries_falls_back_to_date_filed(self):
         """When there are no entries, does date_last_filing fall back to
         date_filed?"""
@@ -360,6 +372,7 @@ class FloridaMergerTest(QueryCountTestCase):
         assert self.docket_sc.date_filed == filed.date()
         assert self.docket_sc.date_last_filing == filed.date()
 
+    @merger_test(expected_query_count=16)
     def test_uuid_matches(self):
         """Does case_uuid correctly map as a lookup to pacer_case_id?"""
         docket_data = FloridaCaseFactory(
@@ -382,7 +395,7 @@ class FloridaMergerTest(QueryCountTestCase):
         assert docket.pk in result.updates["Docket"]
 
 
-class FloridaPartyMergerTest(QueryCountTestCase):
+class FloridaPartyMergerTest(TestCase):
     """Tests for merging parties, attorneys, and attorney roles from Florida
     cases."""
 
@@ -401,6 +414,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
     def _merged_docket(result: MergeResult) -> Docket:
         return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
 
+    @merger_test(expected_query_count=10)
     def test_merge_creates_party_with_type(self):
         """Does merging create the scrape's party and link it to the docket
         with the correct party type?"""
@@ -422,6 +436,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         assert party_type.party_id == party.pk
         assert party_type.name == "Appellant"
 
+    @merger_test(expected_query_count=13)
     def test_merge_creates_all_parties(self):
         """Are multiple parties in a scrape merged as separate objects, each
         with its own party type?"""
@@ -456,6 +471,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
             ("Bob Smith", "Appellee", PartyType.PRO_SE_YES),
         }
 
+    @merger_test(expected_query_count=15)
     def test_merge_primary_representative_is_lead_attorney(self):
         """Is a primary representative merged as a lead attorney for the
         party on the merged docket?"""
@@ -479,6 +495,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         assert role.docket_id == docket.pk
         assert role.role == Role.ATTORNEY_LEAD
 
+    @merger_test(expected_query_count=15)
     def test_merge_non_primary_representative_role_unknown(self):
         """Is a non-primary representative given the unknown role?"""
         rep = FloridaRepresentativeFactory.create(
@@ -499,6 +516,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         role = Role.objects.get(party=party)
         assert role.role == Role.UNKNOWN
 
+    @merger_test(expected_query_count=15)
     def test_merge_sets_attorney_name(self):
         """Does the merged attorney carry the representative's name?"""
         rep = FloridaRepresentativeFactory.create(
@@ -518,6 +536,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         attorney = docket.parties.get().attorneys.get()
         assert attorney.name == "Jane Lawyer"
 
+    @merger_test(expected_query_count=18)
     def test_merge_party_with_multiple_representatives(self):
         """Are all of a party's representatives merged as separate attorneys
         with their own roles?"""
@@ -544,6 +563,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
             Role.objects.filter(party=party).values_list("role", flat=True)
         ) == {Role.ATTORNEY_LEAD, Role.UNKNOWN}
 
+    @merger_test(expected_query_count=25)
     def test_remerge_is_idempotent(self):
         """Does merging the same case twice avoid duplicating parties,
         attorneys, and their links?"""
@@ -574,6 +594,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         self.assertEqual(Role.objects.count(), 1)
         self.assertEqual(PartyType.objects.count(), 1)
 
+    @merger_test(expected_query_count=10)
     def test_merge_does_not_modify_unrelated_parties(self):
         """Does merging create a new party rather than renaming an existing
         party from another docket?"""
@@ -604,6 +625,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
             "Acme Corp"
         ]
 
+    @merger_test(expected_query_count=15)
     def test_merge_preserves_unrelated_party_types_and_roles(self):
         """Does merging one docket leave party and attorney links on other
         dockets in place?"""
@@ -637,6 +659,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         other_role.refresh_from_db()
         assert other_role.docket_id == other_docket.pk
 
+    @merger_test(expected_query_count=17)
     def test_party_type_change_renames_in_place(self):
         """When a party's type changes between scrapes, is the single
         PartyType row renamed rather than duplicated?"""
@@ -657,6 +680,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         party_type = PartyType.objects.get(docket=docket)
         assert party_type.name == "Appellee"
 
+    @merger_test(expected_query_count=18)
     def test_merge_empty_parties_preserves_existing(self):
         """Does a scrape with no parties leave existing parties, types, and
         roles untouched?"""
@@ -682,7 +706,7 @@ class FloridaPartyMergerTest(QueryCountTestCase):
         assert Role.objects.filter(docket=docket).count() == 1
 
 
-class FloridaDocketEntryMergerTest(QueryCountTestCase):
+class FloridaDocketEntryMergerTest(TestCase):
     """Tests for merging docket entries from Florida cases."""
 
     @classmethod
@@ -700,6 +724,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
     def _merged_docket(result: MergeResult) -> Docket:
         return Docket.objects.get(pk=next(iter(result.creates["Docket"])))
 
+    @merger_test(expected_query_count=15)
     def test_merge_creates_docket_entries(self):
         """Does merging a case create its docket entries with the scrape's
         field values?"""
@@ -730,6 +755,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         self.assertEqual(merged.submitted_by_name, "")
         self.assertIsNone(merged.submitted_by_id)
 
+    @merger_test(expected_query_count=17)
     def test_merge_creates_all_docket_entries(self):
         """Are multiple entries in a scrape merged as separate objects?"""
         entries = [
@@ -749,6 +775,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
             )
         } == {str(e.docket_entry_uuid) for e in entries}
 
+    @merger_test(expected_query_count=25)
     def test_remerge_entries_is_idempotent(self):
         """Does merging the same case twice avoid duplicating entries?"""
         entry = FloridaDocketEntryFactory.create(attachments=[])
@@ -762,6 +789,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         assert "FloridaDocketEntry" not in second.creates
         assert FloridaDocketEntry.objects.count() == 1
 
+    @merger_test(expected_query_count=26)
     def test_remerge_updates_entry_fields(self):
         """Does remerging an entry update its fields in place?"""
         entry = FloridaDocketEntryFactory.create(
@@ -779,6 +807,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         merged.refresh_from_db()
         self.assertEqual(merged.status, FloridaDocketEntry.STATUS_STRICKEN)
 
+    @merger_test(expected_query_count=15)
     def test_merge_unrecognized_entry_status_is_unknown(self):
         """Is an entry status Florida hasn't shown us before stored as
         unknown rather than failing the merge?"""
@@ -793,6 +822,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         merged = FloridaDocketEntry.objects.get()
         self.assertEqual(merged.status, FloridaDocketEntry.STATUS_UNKNOWN)
 
+    @merger_test(expected_query_count=11)
     def test_merge_submitted_by_links_docket_party(self):
         """Is a submitter that matches a party on the docket linked to that
         party?"""
@@ -820,6 +850,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
             merged.submitted_by_id, Party.objects.get(name="Acme Corp").pk
         )
 
+    @merger_test(expected_query_count=16)
     def test_merge_submitted_by_unknown_party_keeps_name_only(self):
         """Is a submitter who isn't a party on the docket -- court staff, for
         instance -- recorded by name with no party link?"""
@@ -838,6 +869,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         self.assertEqual(merged.submitted_by_name, "Broward Clerk")
         self.assertIsNone(merged.submitted_by_id)
 
+    @merger_test(expected_query_count=18)
     def test_remerge_keeps_resolved_submitted_by_party(self):
         """Does a later scrape that can't match the submitter keep the party
         we resolved earlier?"""
@@ -868,6 +900,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         self.assertEqual(merged.submitted_by_id, resolved_party_id)
         self.assertEqual(merged.submitted_by_name, "")
 
+    @merger_test(expected_query_count=27)
     def test_merge_keeps_entries_missing_from_scrape(self):
         """Are DB entries kept when a later scrape doesn't include them?"""
         first_entry = FloridaDocketEntryFactory.create(attachments=[])
@@ -882,6 +915,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         assert result.success is True
         assert FloridaDocketEntry.objects.count() == 2
 
+    @merger_test(expected_query_count=2)
     def test_entry_merger_standalone(self):
         """Can an entry be merged directly into an existing docket, outside
         of a full docket merge?"""
@@ -899,7 +933,7 @@ class FloridaDocketEntryMergerTest(QueryCountTestCase):
         assert str(merged.docket_entry_uuid) == str(entry.docket_entry_uuid)
 
 
-class FloridaDocumentMergerTest(QueryCountTestCase):
+class FloridaDocumentMergerTest(TestCase):
     """Tests for merging documents attached to Florida docket entries."""
 
     @classmethod
@@ -916,6 +950,7 @@ class FloridaDocumentMergerTest(QueryCountTestCase):
             entries=[entry],
         )
 
+    @merger_test(expected_query_count=17)
     def test_merge_creates_documents(self):
         """Does merging a case create its entries' documents with the
         scrape's field values?"""
@@ -943,6 +978,7 @@ class FloridaDocumentMergerTest(QueryCountTestCase):
         assert merged.file_size == 34567
         assert merged.url == "https://acis.flcourts.gov/docs/1"
 
+    @merger_test(expected_query_count=17)
     def test_merge_document_without_type_is_blank(self):
         """Is a scrape document with no document type merged with a blank
         string instead of None?"""
@@ -955,6 +991,7 @@ class FloridaDocumentMergerTest(QueryCountTestCase):
         merged = FloridaDocument.objects.get()
         assert merged.document_type == ""
 
+    @merger_test(expected_query_count=17)
     def test_merge_document_without_content_type_is_blank(self):
         """Is a scrape document with no content type merged with a blank
         string instead of None?"""
@@ -967,6 +1004,7 @@ class FloridaDocumentMergerTest(QueryCountTestCase):
         merged = FloridaDocument.objects.get()
         self.assertEqual(merged.content_type, "")
 
+    @merger_test(expected_query_count=29)
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice avoid duplicating documents?"""
         document = FloridaDocumentFactory.create()
@@ -980,6 +1018,7 @@ class FloridaDocumentMergerTest(QueryCountTestCase):
         assert "FloridaDocument" not in second.creates
         assert FloridaDocument.objects.count() == 1
 
+    @merger_test(expected_query_count=29)
     def test_merge_keeps_documents_missing_from_scrape(self):
         """Are DB documents kept when a later scrape doesn't include them?"""
         document = FloridaDocumentFactory.create()

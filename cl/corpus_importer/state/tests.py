@@ -1,5 +1,5 @@
-from collections.abc import Iterable
-from typing import Any, ClassVar
+from collections.abc import Callable, Iterable
+from typing import Any, ClassVar, ParamSpec, TypeVar
 
 from django.db import connection
 from django.db.models import Model, QuerySet
@@ -26,95 +26,78 @@ from cl.search.models import (
 )
 from cl.tests.cases import TestCase
 
-
-class QueryCountTestCase(TestCase):
-    """Track the number of queries run during each test and print a summary
-    once the class finishes.
-
-    Queries executed while inside a ``Merger.merge()`` call are counted as
-    "merger" queries; everything else (factories, assertion fetches, other
-    test scaffolding) is counted as "test"."""
-
-    _query_counts: ClassVar[dict[str, dict[str, int]]]
-    _merger_queries: ClassVar[dict[str, list[str]]]
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls._query_counts = {}
-        cls._merger_queries = {}
-        super().setUpClass()
-
-    def setUp(self) -> None:
-        super().setUp()
-        counts = {"merger": 0, "test": 0}
-        merger_sql: list[str] = []
-        merge_depth = 0
-
-        original_merge = Merger.merge
-
-        def counting_merge(merger_self: Any) -> Any:
-            nonlocal merge_depth
-            merge_depth += 1
-            try:
-                return original_merge(merger_self)
-            finally:
-                merge_depth -= 1
-
-        def count_query(
-            execute: Any, sql: Any, params: Any, many: Any, context: Any
-        ) -> Any:
-            # Skip savepoint bookkeeping from transaction.atomic(); it only
-            # appears because tests already run inside a transaction.
-            if not sql.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
-                if merge_depth:
-                    counts["merger"] += 1
-                    merger_sql.append(sql)
-                else:
-                    counts["test"] += 1
-            return execute(sql, params, many, context)
-
-        Merger.merge = counting_merge  # type: ignore[method-assign, assignment]
-        self.addCleanup(setattr, Merger, "merge", original_merge)
-
-        wrapper = connection.execute_wrapper(count_query)
-        wrapper.__enter__()
-
-        def record_query_count() -> None:
-            wrapper.__exit__(None, None, None)
-            self._query_counts[self._testMethodName] = counts
-            self._merger_queries[self._testMethodName] = merger_sql
-
-        self.addCleanup(record_query_count)
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        super().tearDownClass()
-        print(f"\n{cls.__name__} query counts:")
-        ROW_WIDTH = 65
-        print("-" * (ROW_WIDTH + 10))
-        print(f"| {'Test':^{ROW_WIDTH}} | {'Qs':^3} |")
-        print("|-" + "-" * ROW_WIDTH + "-|-----|")
-        for name, counts in sorted(cls._query_counts.items()):
-            # total = counts["merger"] + counts["test"]
-            print(f"| {name:>{ROW_WIDTH}} | {counts['merger']:>3} |")
-            # for sql in cls._merger_queries[name]:
-            #     sql = re.sub(r"^SELECT .*? FROM", "SELECT ... FROM", sql)
-            #     sql = re.sub(
-            #         r"\([^)]*\) VALUES \([^)]*\)", "(...) VALUES (...)", sql
-            #     )
-            #     print(f"    {sql}")
-        merger_total = sum(c["merger"] for c in cls._query_counts.values())
-        # test_total = sum(c["test"] for c in cls._query_counts.values())
-        print(f"| {'total':>{ROW_WIDTH}} | {merger_total:>3} |")
-        print("-" * (ROW_WIDTH + 10))
+Param = ParamSpec("Param")
+Return = TypeVar("Return")
 
 
-class BaseMergerTest(QueryCountTestCase):
+def merger_test(
+    *, expected_query_count: int | range | None = None
+) -> Callable[[Callable[Param, Return]], Callable[Param, Return]]:
+    def decorator(f: Callable[Param, Return]) -> Callable[Param, Return]:
+        def wrapper(*args: Param.args, **kwargs: Param.kwargs) -> Return:
+            counts = {"merger": 0, "test": 0}
+            merger_sql: list[str] = []
+            merge_depth = 0
+
+            original_merge = Merger.merge
+
+            def counting_merge(merger_self: Any) -> Any:
+                nonlocal merge_depth
+                merge_depth += 1
+                try:
+                    return original_merge(merger_self)
+                finally:
+                    merge_depth -= 1
+
+            def count_query(
+                execute: Any, sql: Any, params: Any, many: Any, context: Any
+            ) -> Any:
+                # Skip savepoint bookkeeping from transaction.atomic(); it only
+                # appears because tests already run inside a transaction.
+                if not sql.startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
+                    if merge_depth:
+                        counts["merger"] += 1
+                        merger_sql.append(sql)
+                    else:
+                        counts["test"] += 1
+                return execute(sql, params, many, context)
+
+            Merger.merge = counting_merge  # type: ignore[method-assign, assignment]
+
+            with connection.execute_wrapper(count_query):
+                output = f(*args, **kwargs)
+
+            if expected_query_count is not None:
+                if isinstance(args[0], TestCase):
+                    # It's okay if the query count is below the expect amount, but we still assert it isn't to force
+                    # the expectation to be updated whenever performance is improved.
+                    if isinstance(expected_query_count, int):
+                        args[0].assertEqual(
+                            counts["merger"],
+                            expected_query_count,
+                            "Merger query count should be equal to expectation.",
+                        )
+                    elif isinstance(expected_query_count, range):
+                        args[0].assertIn(
+                            counts["merger"],
+                            expected_query_count,
+                            "Merger query count should be in expected range.",
+                        )
+
+            return output
+
+        return wrapper
+
+    return decorator
+
+
+class BaseMergerTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory.create()
         cls.docket = DocketFactory.create()
 
+    @merger_test(expected_query_count=1)
     def test_merger_creates_object(self) -> None:
         start_count = Docket.objects.count()
 
@@ -155,6 +138,7 @@ class BaseMergerTest(QueryCountTestCase):
         self.assertEqual(created_docket.court_id, self.court.id)
         self.assertEqual(created_docket.source, DocketSources.SCRAPER)
 
+    @merger_test(expected_query_count=2)
     def test_merger_updates_docket(self) -> None:
         tc = self
         dn = self.docket.docket_number
@@ -212,6 +196,7 @@ class BaseMergerTest(QueryCountTestCase):
             self.court.id,
         )
 
+    @merger_test(expected_query_count=1)
     def test_mappings_called(self) -> None:
         map_calls = 0
         dn = "ABCDEFG"
@@ -236,6 +221,7 @@ class BaseMergerTest(QueryCountTestCase):
         docket = Docket.objects.get(pk=r.creates["Docket"].pop())
         self.assertEqual(docket.docket_number, dn)
 
+    @merger_test(expected_query_count=3)
     def test_related_mergers_1to1(self) -> None:
         class TestRelatedMerger(
             Merger[
@@ -282,6 +268,7 @@ class BaseMergerTest(QueryCountTestCase):
         self.assertEqual(oci.docket_number, i["mctest"]["sr"])
         self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
 
+    @merger_test(expected_query_count=5)
     def test_related_mergers_child(self) -> None:
         class TestRelatedMerger(
             Merger[dict[str, str], RelatedParams[None], DocketEntry]
@@ -332,6 +319,7 @@ class BaseMergerTest(QueryCountTestCase):
             set(de.docket.pk for de in des), set(result.creates["Docket"])
         )
 
+    @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_simple(self) -> None:
         """Does a plain (no-through) many-to-many relation create the targets
         and link them to the parent? Uses batched candidate lookups so the
@@ -383,6 +371,7 @@ class BaseMergerTest(QueryCountTestCase):
             {"Doe", "Roe"},
         )
 
+    @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_through(self) -> None:
         """Does a many-to-many relation with a `through` model create the
         targets, link them to the parent, and populate the through row's own
@@ -445,6 +434,7 @@ class BaseMergerTest(QueryCountTestCase):
             {("Alice", "Plaintiff"), ("Bob", "Defendant")},
         )
 
+    @merger_test(expected_query_count=9)
     def test_related_mergers_m2m_simple_disassociate(self) -> None:
         """Does DISASSOCIATE on a plain many-to-many remove stale
         associations while keeping the objects themselves?"""
@@ -496,6 +486,7 @@ class BaseMergerTest(QueryCountTestCase):
             "The stale association should be removed.",
         )
 
+    @merger_test(expected_query_count=10)
     def test_related_mergers_m2m_through_disassociate(self) -> None:
         """Does DISASSOCIATE on a through many-to-many prune the stale
         through rows while keeping the related objects themselves?"""
@@ -556,6 +547,7 @@ class BaseMergerTest(QueryCountTestCase):
             {"Alice"},
         )
 
+    @merger_test(expected_query_count=15)
     def test_related_mergers_m2m_through_replace_deletes(self) -> None:
         """Characterization: does REPLACE on a through many-to-many delete
         the stale related objects outright?"""
@@ -604,6 +596,7 @@ class BaseMergerTest(QueryCountTestCase):
             "REPLACE deletes stale related objects outright.",
         )
 
+    @merger_test(expected_query_count=4)
     def test_related_mergers_child_replace_keeps_rows_on_invalid_child(
         self,
     ) -> None:
@@ -658,6 +651,7 @@ class BaseMergerTest(QueryCountTestCase):
             {"Stale", "Fresh"},
         )
 
+    @merger_test(expected_query_count=3)
     def test_related_mergers_m2m_replace_keeps_rows_on_ambiguous_child(
         self,
     ) -> None:
@@ -719,6 +713,7 @@ class BaseMergerTest(QueryCountTestCase):
             "through rows.",
         )
 
+    @merger_test(expected_query_count=1)
     def test_merger_subclassing(self) -> None:
         class TestMerger(Merger[dict[str, str], dict[str, Any], Docket]):
             model: ClassVar[type[Model]] = Docket
