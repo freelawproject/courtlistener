@@ -1355,6 +1355,21 @@ class AlertThrottle(ExceptionalUserRateThrottle):
         return self._check_multi_rate(rates)
 
 
+class FetchRateThrottle(ExceptionalUserRateThrottle):
+    """Dedicated rate limit for the RECAP Fetch API (scope 'fetch').
+
+    Buying PACER documents via the Fetch API is something CourtListener
+    wants to encourage, so it runs at its own generous default rate instead
+    of being capped by the global per-user API throttle, and that rate
+    applies to every authenticated user regardless of membership status.
+    See #7503. Individual abusive users can still be capped or blocked via
+    a MANUAL ``APIThrottle`` row of this type, same as other scopes.
+    """
+
+    scope = "fetch"
+    throttle_type = ThrottleType.RECAP_FETCH
+
+
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
     """
     Limits the rate of API calls that may be made by users based on the

@@ -55,6 +55,7 @@ from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     DOUBLE_API_THROTTLES_SWITCH,
     ExceptionalUserRateThrottle,
+    FetchRateThrottle,
     LoggingMixin,
     apply_membership_throttles,
     clear_membership_throttles,
@@ -5403,6 +5404,103 @@ class MultiRateThrottleTest(TestCase):
         request.user = user
 
         throttle = ExceptionalUserRateThrottle()
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        self.assertIn("blocked", str(ctx.exception.detail).lower())
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "fetch-rate-throttle-test",
+        }
+    }
+)
+class FetchRateThrottleTest(TestCase):
+    """Tests for FetchRateThrottle, the Fetch API's dedicated throttle.
+
+    See #7503: the Fetch API runs at its own generous default rate,
+    independent of the global per-user API throttle.
+    """
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    def test_default_rate_applies(self) -> None:
+        """The default 'fetch' rate is enforced when a user has no override."""
+        user = UserFactory()
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        num_requests, _ = FetchRateThrottle().parse_rate(
+            FetchRateThrottle.THROTTLE_RATES["fetch"]
+        )
+        for _ in range(num_requests):
+            throttle = FetchRateThrottle()
+            self.assertTrue(throttle.allow_request(request, view=None))
+
+        throttle = FetchRateThrottle()
+        with self.assertRaises(Throttled):
+            throttle.allow_request(request, view=None)
+
+    def test_default_rate_is_independent_of_global_user_throttle(
+        self,
+    ) -> None:
+        """A tight global API override doesn't affect the fetch scope."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="1/min",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        for _ in range(5):
+            throttle = FetchRateThrottle()
+            self.assertTrue(throttle.allow_request(request, view=None))
+
+    def test_manual_override_tightens_default_rate(self) -> None:
+        """A MANUAL RECAP_FETCH override replaces the default fetch rate."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="1/min",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = FetchRateThrottle()
+        self.assertTrue(throttle.allow_request(request, view=None))
+
+        throttle = FetchRateThrottle()
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        self.assertIn("1/min", str(ctx.exception.detail))
+
+    def test_zero_rate_blocks(self) -> None:
+        """A 0/min RECAP_FETCH override blocks the user entirely."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="0/min",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = FetchRateThrottle()
         with self.assertRaises(Throttled) as ctx:
             throttle.allow_request(request, view=None)
         self.assertIn("blocked", str(ctx.exception.detail).lower())
