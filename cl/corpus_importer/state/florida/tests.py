@@ -1099,6 +1099,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert transfer.transfer_date == docket_data.date_filed
         assert transfer.transfer_type == CaseTransfer.APPEAL
 
+    @merger_test(expected_query_count=8)
     def test_merge_creates_transfer_from_appellate_court(self):
         """Does a transfer from a district court of appeal map to its
         specific CourtListener court?"""
@@ -1116,6 +1117,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert transfer.origin_court_id == "fladistctapp1"
         assert transfer.origin_docket_number == "1D2023-1111"
 
+    @merger_test(expected_query_count=11)
     def test_merge_creates_transfer_into_appellate_docket(self):
         """Are transfers created for district court of appeal dockets too?"""
         docket_data = FloridaCaseFactory.create(
@@ -1135,6 +1137,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert transfer.destination_court_id == "fladistctapp1"
         assert transfer.destination_docket_id == self._merged_docket(result).pk
 
+    @merger_test(expected_query_count=8)
     def test_merge_maps_transfer_reason(self):
         """Does the transfer's reason map to the matching CaseTransfer
         type?"""
@@ -1148,6 +1151,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         transfer = CaseTransfer.objects.get()
         assert transfer.transfer_type == CaseTransfer.WORKLOAD
 
+    @merger_test(expected_query_count=12)
     def test_merge_creates_all_transfers(self):
         """Are multiple transfers merged as separate objects?"""
         docket_data = self._make_case(
@@ -1167,6 +1171,7 @@ class FloridaCaseTransferMergerTest(TestCase):
             ("flacirct", "2023-CA-000999"),
         }
 
+    @merger_test(expected_query_count=12)
     def test_remerge_is_idempotent(self):
         """Does merging the same case twice avoid duplicating transfers?"""
         docket_data = self._make_case(self._circuit_transfer())
@@ -1180,6 +1185,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert "CaseTransfer" not in second.updates
         assert CaseTransfer.objects.count() == 1
 
+    @merger_test(expected_query_count=8)
     def test_merge_fills_existing_partial_transfer(self):
         """Does merging fill in the destination docket FK on an existing
         transfer that only knows its origin docket?"""
@@ -1213,6 +1219,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         # The origin side set by the earlier merge is left alone.
         self.assertEqual(partial.origin_docket_id, origin_docket.pk)
 
+    @merger_test(expected_query_count=4)
     def test_merge_skips_outbound_transfer(self):
         """Are outbound transfers skipped without failing the merge?"""
         docket_data = self._make_case(
@@ -1224,6 +1231,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert result.success is True
         assert CaseTransfer.objects.count() == 0
 
+    @merger_test(expected_query_count=4)
     def test_merge_skips_unknown_transfer_reason(self):
         """Are transfers whose reason has no CaseTransfer type skipped?"""
         docket_data = self._make_case(
@@ -1235,6 +1243,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert result.success is True
         assert CaseTransfer.objects.count() == 0
 
+    @merger_test(expected_query_count=4)
     def test_merge_skips_unmappable_court(self):
         """Are transfers from courts with no CourtListener mapping skipped
         without failing the merge?"""
@@ -1249,6 +1258,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert result.success is True
         assert CaseTransfer.objects.count() == 0
 
+    @merger_test(expected_query_count=5)
     def test_merge_skips_court_missing_from_db(self):
         """Is a mappable court that isn't in the DB skipped without failing
         the merge?"""
@@ -1261,6 +1271,7 @@ class FloridaCaseTransferMergerTest(TestCase):
         assert result.success is True
         assert CaseTransfer.objects.count() == 0
 
+    @merger_test(expected_query_count=4)
     def test_merge_skips_empty_docket_number(self):
         """Is a transfer with no docket number skipped?"""
         docket_data = self._make_case(self._circuit_transfer(docket_number=""))
