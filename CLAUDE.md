@@ -12,7 +12,7 @@ done, that's guidance to humans; AIs MUST do those things.
 
 ## Developer Guides
 
-- **Getting Started**: https://wiki.free.law/c/courtlistener/dev-guide/getting-started
+- **Getting Started**: https://wiki.free.law/c/courtlistener/dev-guide/getting-started.md
 
 ## Frontend
 
@@ -45,8 +45,8 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
 6. **Async Patterns**: Many views use async. Use `sync_to_async` and `async_to_sync` from
    `asgiref.sync` when needed.
 
-7. **Imports**: MUST put imports at the top of the file; inline imports are permitted
-   only to prevent circular dependency problems.
+7. **Imports**: MUST put imports at the top of the file; inline imports are permitted only
+   to prevent circular dependency problems.
 
 ### Python Style Rules
 
@@ -79,9 +79,21 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
 ### Test Base Classes
 
 MUST read the testing guide before writing tests and follow it
-strictly: https://wiki.free.law/c/courtlistener/dev-guide/automated-tests
+strictly: https://wiki.free.law/c/courtlistener/dev-guide/automated-tests.md
 
-SHOULD use project-specific test classes from `cl.tests.cases`:
+MUST use `self.assertCondition` methods instead of bare `assert` statements since they
+provide better failure diagnostics.
+
+```python
+def my_test(self):
+    # Do this
+    self.assertEqual(a, b)
+
+    # Not this
+    assert a == b
+```
+
+MUST use project-specific test classes from `cl.tests.cases`:
 
 ```python
 from cl.tests.cases import SimpleTestCase, TestCase, APITestCase
@@ -117,7 +129,7 @@ docker exec cl-django python manage.py test --keepdb cl.appname.tests.TestClassN
 
 ### Testing Guidelines
 
-- MAY omit the `--keepdb` to ensure the test database is up to date
+- MAY omit `--keepdb` to ensure the test database is up to date
 - SHOULD keep the database between test runs for efficiency
 - SHOULD use `subTest()` to reduce test methods while testing multiple cases
 - SHOULD avoid selenium tests (they're slow)
@@ -128,8 +140,8 @@ docker exec cl-django python manage.py test --keepdb cl.appname.tests.TestClassN
 
 ## Database Migrations
 
-When creating code that modifies Django models, MUST strictly follow the Database Migration
-guide: https://wiki.free.law/c/courtlistener/dev-guide/database-migrations
+When creating code that modifies Django models, MUST strictly follow the Database
+Migration guide: https://wiki.free.law/c/courtlistener/dev-guide/database-migrations.md
 
 ## Submitting Work
 
