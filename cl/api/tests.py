@@ -5144,7 +5144,7 @@ class ThrottleOverrideIntegrationTest(TestCase):
         self.assertNotIn(user.username, overrides)
 
     def test_overrides_drop_membership_when_payment_failed(self) -> None:
-        """MEMBERSHIP throttles are dropped when payment_status != SUCCEEDED."""
+        """MEMBERSHIP throttles are dropped when payment_status is FAILED."""
         user = UserFactory()
         APIThrottleFactory(
             user=user,
@@ -5158,6 +5158,22 @@ class ThrottleOverrideIntegrationTest(TestCase):
         )
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(user.username, overrides)
+
+    def test_overrides_keep_membership_when_payment_pending(self) -> None:
+        """MEMBERSHIP throttles are kept while a payment is still pending."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        NeonMembershipFactory(
+            user=user,
+            payment_status=MembershipPaymentStatus.PENDING,
+        )
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(user.username, overrides)
 
     def test_overrides_keep_membership_when_active(self) -> None:
         """MEMBERSHIP throttles for users with an active membership are returned."""

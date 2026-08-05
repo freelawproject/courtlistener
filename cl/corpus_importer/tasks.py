@@ -4236,7 +4236,6 @@ def merge_case_transfer(case_transfer: CaseTransfer) -> MergeResult:
         origin_docket_number=case_transfer.origin_docket_number,
         destination_court=case_transfer.destination_court,
         destination_docket_number=case_transfer.destination_docket_number,
-        transfer_date=case_transfer.transfer_date,
         transfer_type=case_transfer.transfer_type,
     )
     try:
