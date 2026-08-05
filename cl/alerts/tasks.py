@@ -230,6 +230,9 @@ def make_alert_messages(
         "docket_alert_secret_key": None,
         "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
         "recap_alerts_banner": switch_is_active("recap-alerts-email-banner"),
+        # Emails render without request context processors, so the wiki URL
+        # must be injected here for the tag/note help links.
+        "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
     }
     messages = []
     for recipient in da_recipients:

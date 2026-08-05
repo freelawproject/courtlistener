@@ -18,7 +18,10 @@ from juriscraper.state.florida.cases import (
     FloridaOriginatingCase,
 )
 from juriscraper.state.florida.courts import FloridaCourtID
-from juriscraper.state.florida.docket_entries import FloridaDocketEntry
+from juriscraper.state.florida.docket_entries import (
+    FloridaCaseActor,
+    FloridaDocketEntry,
+)
 from juriscraper.state.florida.documents import FloridaDocument
 from juriscraper.state.florida.parties import FloridaParty, PartyType
 
@@ -120,19 +123,31 @@ class FloridaDocumentFactory(_PydanticConstructFactory):
     url = Faker("url")
 
 
+class FloridaCaseActorFactory(_PydanticConstructFactory):
+    class Meta:
+        model = FloridaCaseActor
+
+    display_name = Faker("name")
+    sort_name = Faker("name")
+
+
 class FloridaDocketEntryFactory(_PydanticConstructFactory):
     class Meta:
         model = FloridaDocketEntry
 
-    docket_entry_uuid = Faker("uuid4")
+    docket_entry_uuid = Faker("uuid4", cast_to=None)
     datetime_filed = Faker("date_time", tzinfo=UTC)
     date_filed = LazyAttribute(lambda o: o.datetime_filed.date())
     date_submitted = Faker("date_time", tzinfo=UTC)
     entry_type = Faker("random_element", elements=DocketEntryType)
     entry_type_raw = Faker("text", max_nb_chars=20)
     entry_name = Faker("text", max_nb_chars=30)
-    entry_status = Faker("pystr")
+    entry_status = Faker(
+        "random_element",
+        elements=("Docketed", "***STRICKEN***", "***VACATED***"),
+    )
     entry_description = Faker("text")
+    submitted_by = List([])
     attachments = List([])
 
 

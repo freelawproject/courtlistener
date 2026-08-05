@@ -90,6 +90,7 @@ from cl.favorites.models import GenericCount
 from cl.lib.decorators import clear_tiered_cache
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
+from cl.lib.url_utils import BASE_URL
 from cl.people_db.api_views import (
     ABARatingViewSet,
     AttorneyViewSet,
@@ -210,6 +211,7 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
     async def test_wiki_data_endpoint(self) -> None:
         """Does the wiki data endpoint return the expected JSON structure?"""
+        await caches["default"].adelete("wiki-data")
         r = await self.async_client.get(reverse("wiki_data"))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "application/json")
@@ -220,6 +222,11 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
             "alerts_sent_count",
             "citation_lookup",
             "financial_disclosures",
+            "alerts",
+            "rss_feeds",
+            "prayers",
+            "feeds",
+            "podcasts",
         }
         self.assertEqual(set(data.keys()), expected_keys)
         self.assertIsInstance(data["court_count"], int)
@@ -231,6 +238,170 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         self.assertIn("max_per_request", citation)
         self.assertIn("disclosures", data["financial_disclosures"])
         self.assertIn("investments", data["financial_disclosures"])
+        alerts = data["alerts"]
+        self.assertIsInstance(alerts["max_free_docket_alerts"], int)
+        self.assertIsInstance(alerts["docket_alert_recap_bonus"], int)
+        self.assertIsInstance(alerts["rt_alerts_sending_rate"], int)
+        self.assertIsInstance(alerts["max_attorneys_to_percolate"], int)
+        for key in ("full", "partial", "none"):
+            self.assertIsInstance(data["rss_feeds"][key], str)
+        prayers = data["prayers"]
+        self.assertIsInstance(prayers["daily_quota"], int)
+        self.assertEqual(
+            prayers["member_daily_quota"], prayers["daily_quota"] * 3
+        )
+        self.assertIsInstance(prayers["granted_count"], int)
+        self.assertIsInstance(prayers["distinct_users"], int)
+        self.assertIsInstance(prayers["distinct_documents"], int)
+        self.assertIsInstance(prayers["total_cost"], str)
+        self.assertIsInstance(data["feeds"]["opinion_courts"], str)
+        self.assertIsInstance(data["podcasts"]["oral_argument_courts"], str)
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+)
+class WikiDataRssFeedTests(TestCase):
+    """Test the markdown fragments rendered by the wiki-data endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.scraped_court = CourtFactory(
+            full_name="Supreme Court of Testlandia",
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=True,
+        )
+        cls.full_fd = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Feed",
+            position=940.1,
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_fd_two = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Two",
+            position=940.2,
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_fd_three = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. Full Three",
+            position=940.3,
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.full_f = CourtFactory(
+            jurisdiction=Court.FEDERAL_APPELLATE,
+            short_name="Full Feed Circuit",
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="all",
+        )
+        cls.partial_fb = CourtFactory(
+            jurisdiction=Court.FEDERAL_BANKRUPTCY,
+            short_name="Bankr. D. Partial",
+            pacer_has_rss_feed=True,
+            pacer_rss_entry_types="order, motion",
+        )
+        cls.no_feed_fd = CourtFactory(
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            short_name="D. No Feed",
+            pacer_has_rss_feed=False,
+        )
+
+    def setUp(self) -> None:
+        self.async_client = AsyncClient()
+        caches["default"].delete("wiki-data")
+
+    async def test_rss_feed_markdown(self) -> None:
+        """Are courts rendered into the right RSS feed markdown sections?"""
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        rss_feeds = json.loads(r.content)["rss_feeds"]
+
+        full = rss_feeds["full"]
+        self.assertIn("# District Courts", full)
+        # Three courts flow into a two-column table reading top to bottom,
+        # then left to right.
+        self.assertIn("| D. Full Feed | D. Full Three |", full)
+        self.assertIn("| D. Full Two |  |", full)
+        # Appellate courts are omitted from the full feed section.
+        self.assertNotIn("Full Feed Circuit", full)
+
+        partial = rss_feeds["partial"]
+        self.assertIn("# Bankruptcy Courts", partial)
+        self.assertIn("| Court | Docket Entry Types |", partial)
+        self.assertIn("| Bankr. D. Partial | order, motion |", partial)
+
+        none_feed = rss_feeds["none"]
+        self.assertIn("# District Courts", none_feed)
+        self.assertIn("D. No Feed", none_feed)
+        # Courts with feeds don't appear in the no-feed section.
+        self.assertNotIn("D. Full Feed", none_feed)
+
+    async def test_court_link_list_markdown(self) -> None:
+        """Are scraped courts rendered as markdown link lists?"""
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.content)
+
+        pk = self.scraped_court.pk
+        feed_url = BASE_URL + reverse(
+            "jurisdiction_feed", kwargs={"court": pk}
+        )
+        self.assertIn(
+            f"- [Supreme Court of Testlandia]({feed_url})",
+            data["feeds"]["opinion_courts"],
+        )
+        podcast_url = BASE_URL + reverse(
+            "jurisdiction_podcast", kwargs={"court": pk}
+        )
+        self.assertIn(
+            f"- [Supreme Court of Testlandia]({podcast_url})",
+            data["podcasts"]["oral_argument_courts"],
+        )
+        # Courts without scrapers don't appear in either list.
+        self.assertNotIn("D. Full Feed", data["feeds"]["opinion_courts"])
+        self.assertNotIn(
+            "D. Full Feed", data["podcasts"]["oral_argument_courts"]
+        )
+
+    async def test_bust_cache_param(self) -> None:
+        """Does ?bust_cache rebuild the cached response for staff only?"""
+        sentinel = {"sentinel": True}
+        await caches["default"].aset("wiki-data", sentinel)
+
+        # Without the param, the cached payload is served.
+        r = await self.async_client.get(reverse("wiki_data"))
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # Anonymous and non-staff users can't bust the cache.
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+        non_staff = await sync_to_async(UserFactory)(is_staff=False)
+        await self.async_client.aforce_login(non_staff)
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # Staff can: the response is rebuilt and re-cached.
+        staff = await sync_to_async(UserFactory)(is_staff=True)
+        await self.async_client.aforce_login(staff)
+        r = await self.async_client.get(
+            reverse("wiki_data"), {"bust_cache": ""}
+        )
+        data = json.loads(r.content)
+        self.assertIn("rss_feeds", data)
+        cached = await caches["default"].aget("wiki-data")
+        self.assertIn("rss_feeds", cached)
 
 
 class CoverageTests(ESIndexTestCase, TestCase):
@@ -4936,7 +5107,7 @@ class ThrottleOverrideIntegrationTest(TestCase):
         self.assertNotIn(user.username, overrides)
 
     def test_overrides_drop_membership_when_payment_failed(self) -> None:
-        """MEMBERSHIP throttles are dropped when payment_status != SUCCEEDED."""
+        """MEMBERSHIP throttles are dropped when payment_status is FAILED."""
         user = UserFactory()
         APIThrottleFactory(
             user=user,
@@ -4950,6 +5121,22 @@ class ThrottleOverrideIntegrationTest(TestCase):
         )
         overrides = get_all_throttle_overrides(ThrottleType.API)
         self.assertNotIn(user.username, overrides)
+
+    def test_overrides_keep_membership_when_payment_pending(self) -> None:
+        """MEMBERSHIP throttles are kept while a payment is still pending."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="10/min",
+            source=APIThrottle.Source.MEMBERSHIP,
+        )
+        NeonMembershipFactory(
+            user=user,
+            payment_status=MembershipPaymentStatus.PENDING,
+        )
+        overrides = get_all_throttle_overrides(ThrottleType.API)
+        self.assertIn(user.username, overrides)
 
     def test_overrides_keep_membership_when_active(self) -> None:
         """MEMBERSHIP throttles for users with an active membership are returned."""
