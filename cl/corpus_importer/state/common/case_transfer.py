@@ -27,6 +27,7 @@ from cl.corpus_importer.state.merger import (
     OneToManyRelation,
     RelatedParams,
     overwrite,
+    overwrite_if_present,
 )
 from cl.search.models import CaseTransfer, Docket
 
@@ -82,8 +83,10 @@ def _origin_docket_number(transfer: DocketTransfer, params: Any) -> str:
 
 def _destination_docket_id(
     transfer: DocketTransfer, params: RelatedParams[Any]
-) -> int:
-    return params.parent.pk
+) -> int | None:
+    if params.parent is not None:
+        return params.parent.pk
+    return None
 
 
 def _transfer_type(transfer: DocketTransfer, params: Any) -> int:
@@ -130,7 +133,7 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
 
     destination_docket_id: int = Attribute(
         _destination_docket_id,
-        strategy=overwrite,
+        strategy=overwrite_if_present,
     )
     origin_docket_number: str = Attribute(
         _origin_docket_number, strategy=overwrite
@@ -167,21 +170,6 @@ class CaseTransferMerger[TransferType: DocketTransfer, ParamType](
         if fillable.exists():
             return fillable
         return candidates.filter(destination_docket=self.params.parent)
-
-    @override
-    def update_existing(self, obj: CaseTransfer) -> list[str]:
-        """Fill in the destination docket FK on a partial transfer in
-        addition to the regular attribute merging.
-
-        :param obj: The transfer built from the scrape data.
-        :return: The names of the updated fields."""
-        updated = super().update_existing(obj)
-        existing = self.existing
-        if existing is not None and existing.destination_docket_id is None:
-            existing.destination_docket_id = self.params.parent.pk
-            existing.save(update_fields=["destination_docket_id"])
-            updated.append("destination_docket_id")
-        return updated
 
 
 def CaseTransferRelation(
