@@ -441,9 +441,14 @@ class ApiUsageViewSet(ViewSet):
     Returns current throttle usage, 14-day historical usage, and membership
     information.
 
-    This endpoint is intentionally not rate-limited. Users must be able to
-    inspect their current usage, including ``reset_at``, even after being
-    throttled on other endpoints, when this information is most useful.
+    This endpoint uses its own dedicated ``api_usage`` throttle scope, which is
+    deliberately kept separate from the main API quota. That isolation serves
+    two purposes: monitoring your usage never consumes the quota being
+    monitored, and a user who has exhausted their API quota elsewhere can still
+    reach this endpoint to inspect their usage and ``reset_at`` — exactly when
+    that information is most useful. The ``api_usage`` scope carries a generous
+    limit of its own only to keep the endpoint from being abused; that limit is
+    reported alongside the others in the ``current_usage`` list.
     """
 
     permission_classes = [IsAuthenticated]

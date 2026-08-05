@@ -5787,6 +5787,25 @@ class TestApiUsageEndpoint(TestCase):
         )
         self.assertEqual(row["used"], 8)  # 5 + 3 citations, not 2 requests
 
+    def test_api_usage_scope_reported(self):
+        """This endpoint's own api_usage scope and limits appear in usage."""
+        now = time.time()
+        caches["default"].set(
+            f"throttle_api_usage_{self.user.pk}",
+            [now - i for i in range(3)],
+            timeout=3600,
+        )
+        data = self.client.get(self.url).json()
+        # Both configured api_usage rates are reported with their limits.
+        self.assertEqual(self._row(data, "api_usage", "10/min")["limit"], 10)
+        self.assertEqual(
+            self._row(data, "api_usage", "120/hour")["limit"], 120
+        )
+        # The 3 seeded timestamps (plus this request) count against the window.
+        self.assertGreaterEqual(
+            self._row(data, "api_usage", "10/min")["used"], 3
+        )
+
     def test_endpoint_not_throttled_when_user_is_throttled(self):
         """The endpoint stays reachable after the user is throttled."""
         APIThrottleFactory(

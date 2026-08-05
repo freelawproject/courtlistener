@@ -1083,7 +1083,9 @@ def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
     expiry honored), falling back to ``DEFAULT_THROTTLE_RATES``; the x2 promo
     is applied to the API scope when it applies to this user; counts come from
     the same cache keys the throttles write to. One row per rate, so
-    multidimensional limits are fully reported.
+    multidimensional limits are fully reported. The dedicated ``api_usage``
+    scope that governs this endpoint is included too; it is never overridden,
+    so it always reports the default rates.
     """
     default_rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # type: ignore[misc]
     username = user.username
@@ -1115,6 +1117,18 @@ def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
         citation_rates,
         now,
         [(count, ts) for count, ts in citation_history],
+    )
+
+    # --- API usage scope: this endpoint's own limit -------------------
+    api_usage_rates = _coerce_rate_list(default_rates.get("api_usage"))
+    api_usage_history: list[float] = default_cache.get(
+        f"throttle_api_usage_{user.pk}", []
+    )
+    usage_rows += _build_usage_rows(
+        "api_usage",
+        api_usage_rates,
+        now,
+        [(1, ts) for ts in api_usage_history],
     )
 
     # Limit closest to being hit first; blocked rows float to the top.
