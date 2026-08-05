@@ -1003,6 +1003,15 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             o2o_result = o2o_spec.merge(
                 self.existing, self.scrape, self.params
             )
+            model_name = o2o_spec.merger.model.__name__
+            if model_name in o2o_result.creates:
+                field = self.model._meta.get_field(name)
+                attname = getattr(field, "attname", f"{name}_id")
+                setattr(
+                    self.existing,
+                    attname,
+                    next(iter(o2o_result.creates[model_name])),
+                )
             if o2o_result.update or o2o_result.create:
                 updated.append(name)
             result |= o2o_result

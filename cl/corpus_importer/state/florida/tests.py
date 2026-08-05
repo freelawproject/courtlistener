@@ -145,13 +145,17 @@ class FloridaMergerTest(TestCase):
             docket_data, existing=self.docket_sc, params=None
         ).merge()
 
-        assert result.success is True
-        assert result.create is True
-        assert "OriginatingCourtInformation" in result.creates
+        self.assertTrue(result.success)
+        self.assertTrue(result.create)
+        self.assertIn("OriginatingCourtInformation", result.creates)
         oci_pk = next(iter(result.creates["OriginatingCourtInformation"]))
         oci = OriginatingCourtInformation.objects.get(pk=oci_pk)
-        assert oci.docket_number == "ORIG-001"
-        assert oci.docket_number_raw == "ORIG-001"
+        self.assertEqual(oci.docket_number, "ORIG-001")
+        self.assertEqual(oci.docket_number_raw, "ORIG-001")
+        self.docket_sc.refresh_from_db()
+        self.assertEqual(
+            self.docket_sc.originating_court_information_id, oci_pk
+        )
 
     @merger_test(expected_query_count=14)
     def test_merge_updates_existing_oci(self):
@@ -372,7 +376,7 @@ class FloridaMergerTest(TestCase):
         assert self.docket_sc.date_filed == filed.date()
         assert self.docket_sc.date_last_filing == filed.date()
 
-    @merger_test(expected_query_count=16)
+    @merger_test(expected_query_count=15)
     def test_uuid_matches(self):
         """Does case_uuid correctly map as a lookup to pacer_case_id?"""
         docket_data = FloridaCaseFactory(
@@ -386,13 +390,16 @@ class FloridaMergerTest(TestCase):
                 docket_data.docket_number
             ),
             pacer_case_id=str(docket_data.case_uuid),
+            # A random RECAP source makes Docket.save query the court table,
+            # making the query count above flaky.
+            source=Docket.SCRAPER,
         )
         result = FloridaDocketMerger(docket_data, params=None).merge()
 
-        assert result.success is True
-        assert result.update is True
-        assert "Docket" in result.updates
-        assert docket.pk in result.updates["Docket"]
+        self.assertTrue(result.success)
+        self.assertTrue(result.update)
+        self.assertIn("Docket", result.updates)
+        self.assertIn(docket.pk, result.updates["Docket"])
 
 
 class FloridaPartyMergerTest(TestCase):
