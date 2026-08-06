@@ -1027,7 +1027,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged = FloridaDocument.objects.get()
         self.assertEqual(merged.content_type, "")
 
-    @merger_test(expected_query_count=31)
+    @merger_test(expected_query_count=30)
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice avoid duplicating documents?"""
         document = FloridaDocumentFactory.create()
@@ -1053,6 +1053,60 @@ class FloridaDocumentMergerTest(TestCase):
 
         assert result.success is True
         assert FloridaDocument.objects.count() == 2
+
+    def _merge_downloaded_bad_url_document(self):
+        """Merge a case, then flag its document as downloaded with a bad URL.
+
+        Returns the scrape document and the merged FloridaDocument, set up so
+        a re-merge exercises the pre_update download-state reset."""
+        document = FloridaDocumentFactory.create(
+            url="https://acis.flcourts.gov/docs/old",
+        )
+        docket_data = self._make_case(document)
+        FloridaDocketMerger(docket_data, params=None).merge()
+
+        merged = FloridaDocument.objects.get()
+        merged.processing_error = ProcessingError.BAD_URL
+        merged.filepath_local = "florida/old-file.pdf"
+        merged.ocr_status = FloridaDocument.OCR_UNNECESSARY
+        merged.save()
+        return document, docket_data, merged
+
+    @merger_test(expected_query_count=31)
+    def test_remerge_changed_url_resets_download_state(self):
+        """Does updating a document clear its bad-URL flag, stored file, and
+        OCR status so it gets downloaded again?"""
+        document, docket_data, merged = (
+            self._merge_downloaded_bad_url_document()
+        )
+
+        document.url = "https://acis.flcourts.gov/docs/new"
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertIn(merged.pk, result.updates["FloridaDocument"])
+        merged.refresh_from_db()
+        self.assertEqual(merged.url, "https://acis.flcourts.gov/docs/new")
+        self.assertIsNone(merged.processing_error)
+        self.assertFalse(merged.filepath_local)
+        self.assertIsNone(merged.ocr_status)
+
+    @merger_test(expected_query_count=30)
+    def test_remerge_unchanged_document_keeps_download_state(self):
+        """Is download state (bad-URL flag, stored file, OCR status) left
+        alone when the rescraped document is unchanged?"""
+        _document, docket_data, merged = (
+            self._merge_downloaded_bad_url_document()
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertNotIn("FloridaDocument", result.updates)
+        merged.refresh_from_db()
+        self.assertEqual(merged.processing_error, ProcessingError.BAD_URL)
+        self.assertEqual(merged.filepath_local, "florida/old-file.pdf")
+        self.assertEqual(merged.ocr_status, FloridaDocument.OCR_UNNECESSARY)
 
 
 class FloridaCaseTransferMergerTest(TestCase):

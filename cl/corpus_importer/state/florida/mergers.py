@@ -68,7 +68,6 @@ from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
 )
-from cl.search.state.shared import ProcessingError
 
 logger = logging.getLogger(__name__)
 
@@ -138,12 +137,6 @@ class FloridaDocumentMerger[ParamType](
     file_size: int | None = Attribute(lambda doc, params: doc.file_size)
     link_uuid: UUID = Attribute(
         lambda doc, params: doc.document_link_uuid, strategy=overwrite
-    )
-    processing_error: ProcessingError | None = Attribute(
-        lambda _, params: None,
-        strategy=lambda scrape, db: (
-            scrape if db == ProcessingError.BAD_URL else db
-        ),
     )
 
 
