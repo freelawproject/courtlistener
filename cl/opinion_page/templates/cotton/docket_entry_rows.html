@@ -1,7 +1,8 @@
-{% load pacer tz component_tags svg_tags %}
+{% load extras pacer tz component_tags svg_tags %}
 
 <c-vars
   docket_entries=""
+  is_scotus=False
   class=""
 />
 
@@ -56,7 +57,55 @@
           {% endif %}
         </div>
 
-        {# RECAP documents #}
+        {# Documents #}
+        {% if is_scotus %}
+          {% with documents=de.scotusdocument_set.all %}
+            {% if documents %}
+              <ul role="list" class="list-none p-0 m-0" aria-label="Documents for this entry">
+                {% for rd in documents %}
+                  <li class="mt-3 md:ml-28">
+                    <div class="flex flex-wrap items-start gap-2">
+                      <div class="w-32 shrink-0">
+                        {% if rd.attachment_number %}
+                          <span class="text-greyscale-900 text-sm font-medium">Attachment {{ rd.attachment_number }}</span>
+                        {% else %}
+                          <span class="text-greyscale-900 text-sm font-medium">Main Document</span>
+                        {% endif %}
+                        {% if rd.description %}
+                          <p class="md:hidden text-sm text-greyscale-900 mt-0.5">{{ rd.description }}</p>
+                        {% endif %}
+                      </div>
+                      {% if rd.description %}
+                        <p class="hidden md:block flex-1 text-sm text-greyscale-900 min-w-48">{{ rd.description }}</p>
+                      {% else %}
+                        <div class="hidden md:block flex-1"></div>
+                      {% endif %}
+                      <div class="shrink-0 flex flex-wrap items-center gap-2">
+                        {% if rd.filepath_local %}
+                          <c-button variant="dark" href="{{ rd.filepath_local.url }}" rel="nofollow" class="text-sm px-3 py-1.5">
+                            Download PDF
+                          </c-button>
+                        {% elif rd.url|http_url %}
+                          <c-button
+                            variant="outline"
+                            href="{{ rd.url|http_url }}"
+                            target="_blank"
+                            rel="nofollow noreferrer noopener"
+                            class="text-sm px-3 py-1.5"
+                            aria-label="View on SCOTUS (opens in new tab)"
+                          >
+                            {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+                            View on SCOTUS
+                          </c-button>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endwith %}
+        {% else %}
         {% with documents=de.recap_documents.all %}
           {% if documents %}
             <ul role="list" class="list-none p-0 m-0" aria-label="Documents for this entry">
@@ -183,6 +232,7 @@
             </ul>
           {% endif %}
         {% endwith %}
+        {% endif %}
       </li>
     {% endfor %}
   </ol>

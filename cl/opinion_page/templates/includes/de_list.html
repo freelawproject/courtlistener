@@ -1,3 +1,4 @@
+{% load extras %}
 {% load pacer %}
 {% load tz %}
 {% load waffle_tags %}
@@ -76,6 +77,62 @@
         {% if de.description %}
           <p>{{ de.description|safe }}</p>
         {% endif %}
+        {% if is_scotus %}
+          {% if de.scotusdocument_set.count %}
+            {% for rd in de.scotusdocument_set.all %}
+              <div class="row recap-documents">
+                <div class="col-xs-3">
+                  <p>
+                    {% if rd.attachment_number %}
+                      Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
+                    {% else %}
+                      Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
+                    {% endif %}
+                  </p>
+                </div>
+                <div class="col-xs-6 col-sm-5 col-md-6">
+                  <p>{{ rd.description|safe|default:'' }}</p>
+                </div>
+                <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
+                  {% if rd.filepath_local %}
+                    <a href="{{ rd.filepath_local.url }}"
+                       rel="nofollow"
+                       role="button"
+                       class="btn btn-primary btn-xs">
+                      Download PDF
+                    </a>
+                  {% elif rd.url|http_url %}
+                    <a href="{{ rd.url|http_url }}"
+                       rel="nofollow noopener noreferrer"
+                       target="_blank"
+                       role="button"
+                       class="btn btn-default btn-xs">
+                      <i class="fa fa-external-link"></i> View on SCOTUS
+                    </a>
+                  {% endif %}
+                </div>
+                <div class="col-xs-3 hidden-sm hidden-md hidden-lg hidden-print">
+                  {% if rd.filepath_local %}
+                    <a href="{{ rd.filepath_local.url }}"
+                       role="button"
+                       class="btn btn-primary btn-xs"
+                       rel="nofollow"
+                       title="Download PDF"><i class="fa fa-download"></i>
+                    </a>
+                  {% elif rd.url|http_url %}
+                    <a href="{{ rd.url|http_url }}"
+                       role="button"
+                       class="btn btn-default btn-xs"
+                       target="_blank"
+                       rel="nofollow noopener noreferrer"
+                       title="View on SCOTUS"><i class="fa fa-external-link"></i>
+                    </a>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% else %}
         {% if de.recap_documents.count %}
           {% for rd in de.recap_documents.all %}
             <div class="row recap-documents">
@@ -248,6 +305,7 @@
               {% endif %}
             </div>
           {% endfor %}
+        {% endif %}
         {% endif %}
       </div>
       <div class="hidden-xs col-sm-1 col-lg-2 right">

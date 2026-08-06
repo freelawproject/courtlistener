@@ -1,4 +1,4 @@
-{% if docket.pacer_docket_url %}
+{% if not is_scotus and docket.pacer_docket_url %}
   <a href="{% url "toggle_docket_alert" %}"
      data-id="{{ docket.pk }}"
      data-enable-message="Get Alerts"

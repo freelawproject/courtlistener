@@ -11,7 +11,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.urls import reverse
 from django.utils.http import urlencode
@@ -21,6 +21,7 @@ from elasticsearch.dsl import Q
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
+from cl.custom_filters.templatetags.extras import http_url
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -44,6 +45,7 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
+    ScotusDocketMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -316,6 +318,56 @@ def build_bankruptcy_metadata(
     return items
 
 
+def build_scotus_metadata(
+    scotus_metadata: ScotusDocketMetadata | None,
+) -> list[MetadataItem]:
+    """Build metadata items for the SCOTUS docket metadata section."""
+    if not scotus_metadata:
+        return []
+
+    items: list[MetadataItem] = []
+
+    if scotus_metadata.capital_case:
+        items.append({"label": "Capital Case", "value": "Yes"})
+
+    if scotus_metadata.date_discretionary_court_decision:
+        items.append(
+            {
+                "label": "Date of Discretionary Court Decision",
+                "value": (
+                    scotus_metadata.date_discretionary_court_decision.strftime(
+                        "%b. %d, %Y"
+                    )
+                ),
+            }
+        )
+
+    if scotus_metadata.linked_with:
+        items.append(
+            {"label": "Linked With", "value": scotus_metadata.linked_with}
+        )
+
+    if http_url(scotus_metadata.questions_presented_url):
+        items.append(
+            {
+                "label": "Questions Presented",
+                "value": "View",
+                "url": scotus_metadata.questions_presented_url,
+                "is_external": True,
+            }
+        )
+    elif scotus_metadata.questions_presented_file:
+        items.append(
+            {
+                "label": "Questions Presented",
+                "value": "View",
+                "url": scotus_metadata.questions_presented_file.url,
+            }
+        )
+
+    return items
+
+
 def build_originating_court_metadata(
     docket: Docket, og_info: OriginatingCourtInformation | None
 ) -> list[MetadataItem]:
@@ -494,6 +546,15 @@ async def core_docket_data(
 ) -> tuple[Docket, dict[str, bool | str | Docket | NoteForm]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
+
+    # SCOTUS content is made available using a waffle flag:
+    # every docket-related view shares this helper, so access
+    # control resides here.
+    if docket.court_id == "scotus" and not await sync_to_async(
+        waffle.flag_is_active
+    )(request, "scotus_docket_page"):
+        raise Http404("Docket not found.")
+
     title = make_docket_title(docket)
 
     try:

@@ -10,6 +10,7 @@ from cl.custom_filters.templatetags.extras import (
     get_item,
     granular_date,
     highlight_query,
+    http_url,
     humanize_number,
     render_field_with_id,
 )
@@ -528,3 +529,20 @@ class TestSvgTag(SimpleTestCase):
         with self.settings(DEBUG=False):
             result = svg("nonexistent_svg_that_does_not_exist")
             self.assertEqual(result, "")
+
+
+class TestHttpUrlFilter(SimpleTestCase):
+    """Tests for the http_url template filter."""
+
+    def test_allows_http_and_https(self) -> None:
+        self.assertEqual(
+            http_url("https://example.com"), "https://example.com"
+        )
+        self.assertEqual(http_url("http://example.com"), "http://example.com")
+
+    def test_blocks_javascript_scheme(self) -> None:
+        self.assertEqual(http_url("javascript:alert(1)"), "")
+
+    def test_blocks_empty_and_none(self) -> None:
+        self.assertEqual(http_url(""), "")
+        self.assertEqual(http_url(None), "")

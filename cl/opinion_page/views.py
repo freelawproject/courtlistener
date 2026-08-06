@@ -70,6 +70,10 @@ from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
+from cl.opinion_page.docket_entry_sources import (
+    RECAP_SOURCE,
+    get_docket_entry_source,
+)
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -85,6 +89,7 @@ from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
     build_originating_court_metadata,
+    build_scotus_metadata,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -107,6 +112,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     Parenthetical,
     RECAPDocument,
+    ScotusDocketMetadata,
     sort_cites,
 )
 from cl.search.selectors import get_clusters_from_citation_str
@@ -333,18 +339,16 @@ async def redirect_docket_recap(
 
 
 async def fetch_docket_entries(docket):
-    """Fetch docket entries asociated to docket
+    """Fetch docket entries associated with a docket.
+
+    Uses the source-appropriate model for the docket's court (see
+    cl.opinion_page.docket_entry_sources).
 
     param docket: docket.id to get related docket_entries.
     returns: DocketEntry Queryset.
     """
-    de_list = docket.docket_entries.all().prefetch_related(
-        Prefetch(
-            "recap_documents",
-            queryset=RECAPDocument.objects.defer("plain_text"),
-        )
-    )
-    return de_list
+    source = get_docket_entry_source(docket)
+    return source.entries_queryset(docket)
 
 
 @track_view_counter(tracks="docket", label_format="d.%s:view")
@@ -355,6 +359,7 @@ async def view_docket(
     form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
+    source = get_docket_entry_source(docket)
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
@@ -370,9 +375,14 @@ async def view_docket(
             de_list = de_list.filter(date_filed__lte=cd["filed_before"])
         if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
             sort_order_asc = False
-            de_list = de_list.order_by(
-                "-recap_sequence_number", "-entry_number"
-            )
+
+    # Always order explicitly from the source config rather than relying on
+    # each model's Meta.ordering fallback -- DocketEntry defaults ascending
+    # but SCOTUSDocketEntry defaults descending, so an implicit fallback
+    # would silently contradict the sort_order_asc flag used by the template.
+    de_list = de_list.order_by(
+        *(source.order_by_asc if sort_order_asc else source.order_by_desc)
+    )
 
     page = request.GET.get("page", "1")
 
@@ -382,27 +392,37 @@ async def view_docket(
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
-    # Extract recap documents from the current page.
-    recap_documents = [
-        rd
-        for entry in await sync_to_async(list)(paginated_entries)
-        async for rd in entry.recap_documents.all()
-    ]
-    # Get prayer counts in bulk.
-    prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
-    existing_prayers = {}
+    prayer_counts: dict[int, int] = {}
+    existing_prayers: dict[int, bool] = {}
 
-    user = await request.auser()
-    if user.is_authenticated:
-        # Check prayer existence in bulk.
-        existing_prayers = await get_existing_prayers_in_bulk(
-            user, recap_documents
+    if source.has_pay_and_pray:
+
+        @sync_to_async
+        def _get_page_documents(entries) -> list:
+            return [
+                doc
+                for entry in entries
+                for doc in source.documents_for_entry(entry)
+            ]
+
+        # Extract documents from the current page.
+        page_documents = await _get_page_documents(
+            await sync_to_async(list)(paginated_entries)
         )
+        # Get prayer counts in bulk.
+        prayer_counts = await get_prayer_counts_in_bulk(page_documents)
 
-    # Merge counts and existing prayer status to RECAPDocuments.
-    for rd in recap_documents:
-        rd.prayer_count = prayer_counts.get(rd.id, 0)
-        rd.prayer_exists = existing_prayers.get(rd.id, False)
+        user = await request.auser()
+        if user.is_authenticated:
+            # Check prayer existence in bulk.
+            existing_prayers = await get_existing_prayers_in_bulk(
+                user, page_documents
+            )
+
+        # Merge counts and existing prayer status onto the documents.
+        for doc in page_documents:
+            doc.prayer_count = prayer_counts.get(doc.id, 0)
+            doc.prayer_exists = existing_prayers.get(doc.id, False)
 
     parties = await docket.parties.aexists()
     has_idb_data = bool(docket.idb_data_id)
@@ -414,13 +434,15 @@ async def view_docket(
     ) -> tuple[
         BankruptcyInformation | None,
         OriginatingCourtInformation | None,
+        ScotusDocketMetadata | None,
     ]:
         return (
             getattr(d, "bankruptcy_information", None),
             getattr(d, "originating_court_information", None),
+            getattr(d, "scotus_metadata", None),
         )
 
-    bankr_info, og_info = await _get_related(docket)
+    bankr_info, og_info, scotus_metadata = await _get_related(docket)
 
     context.update(
         {
@@ -429,6 +451,8 @@ async def view_docket(
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
+            "is_scotus": docket.court_id == "scotus",
+            "hide_docket_alerts": not source.has_docket_alerts,
             "get_string": make_get_string(request),
             "metadata": await sync_to_async(build_docket_metadata)(
                 docket, context["timezone"]
@@ -437,6 +461,7 @@ async def view_docket(
             "originating_court_metadata": await sync_to_async(
                 build_originating_court_metadata
             )(docket, og_info),
+            "scotus_metadata": build_scotus_metadata(scotus_metadata),
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),
@@ -615,7 +640,20 @@ def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    csv_content = generate_docket_entries_csv_data(de_list) if de_list else b""
+    try:
+        csv_content = (
+            generate_docket_entries_csv_data(de_list) if de_list else b""
+        )
+    except (NotImplementedError, AttributeError):
+        # Some docket sources (e.g. SCOTUS) don't support CSV export yet.
+        # Only return a handled 501 for those. A RECAP docket hitting
+        # this branch means a real bug in the CSV path, and that should
+        # still raise a error 500.
+        if get_docket_entry_source(docket) is RECAP_SOURCE:
+            raise
+        # A handled 501 triggers the existing "There was a problem. Try
+        # again later." message in export-csv.js instead of crashing.
+        return HttpResponse(status=501)
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response

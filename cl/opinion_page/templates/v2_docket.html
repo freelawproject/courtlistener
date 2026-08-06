@@ -16,9 +16,12 @@
       :metadata="metadata"
       :bankruptcy_metadata="bankruptcy_metadata"
       :originating_court_metadata="originating_court_metadata"
+      :scotus_metadata="scotus_metadata"
       :tabs="tabs"
       :has_alert="has_alert"
       :note_form="note_form"
+      :is_scotus="is_scotus"
+      :hide_docket_alerts="hide_docket_alerts"
     >
       {# CSV export #}
       {% if user.is_authenticated %}
@@ -39,11 +42,12 @@
         :form="form"
         :page_obj="docket_entries"
         :sort_order_asc="sort_order_asc"
+        :is_scotus="is_scotus"
         class="mb-4"
       />
 
       {# Docket entry rows #}
-      <c-docket-entry-rows :docket_entries="docket_entries" />
+      <c-docket-entry-rows :docket_entries="docket_entries" :is_scotus="is_scotus" />
 
       <c-pagination
         :page_obj="docket_entries"
