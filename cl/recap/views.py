@@ -7,6 +7,7 @@ from rest_framework.permissions import (
     DjangoModelPermissions,
     IsAuthenticatedOrReadOnly,
 )
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import V3APIPermission
