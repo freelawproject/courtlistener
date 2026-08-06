@@ -21,7 +21,7 @@ from cl.search.fields import (
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
 
 OPINION_ORDER_BY_CHOICES = (
-    ("score desc", "Relevance"),
+    ("score desc", "CiteGeist"),
     ("dateFiled desc", "Newest First"),
     ("dateFiled asc", "Oldest First"),
     ("citeCount desc", "Most Cited First"),
