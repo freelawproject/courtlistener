@@ -29,6 +29,7 @@ REST_FRAMEWORK = {
         "citations": "60/min",
         "tags": "1000/hour",
         "api_usage": ["10/min", "120/hour"],
+        "events": "60/hour",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
