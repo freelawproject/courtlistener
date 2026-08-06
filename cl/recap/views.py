@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import (
     DjangoModelPermissions,
-    IsAuthenticatedOrReadOnly,
+    IsAuthenticated,
 )
 from rest_framework.viewsets import ModelViewSet
 
@@ -122,7 +122,10 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     queryset = PacerFetchQueue.objects.all().order_by("-id")
     serializer_class = PacerFetchQueueSerializer
     filterset_class = PacerFetchQueueFilter
-    permission_classes = (IsAuthenticatedOrReadOnly, V3APIPermission)
+    # Anonymous access is blocked entirely (not just throttled) because
+    # FetchRateThrottle's generous rate is meant for authenticated buyers
+    # of PACER documents, not anonymous callers. See #7503.
+    permission_classes = (IsAuthenticated, V3APIPermission)
     # Dedicated, more generous rate than the global per-user API throttle,
     # applied regardless of membership status. See #7503.
     throttle_classes = (FetchRateThrottle,)
