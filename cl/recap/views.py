@@ -13,6 +13,7 @@ from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import BigPagination
 from cl.api.utils import (
     EmailProcessingQueueAPIUsersWithView,
+    FetchRateThrottle,
     LoggingMixin,
     NoFilterCacheListMixin,
     RECAPUploaders,
@@ -122,6 +123,9 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     serializer_class = PacerFetchQueueSerializer
     filterset_class = PacerFetchQueueFilter
     permission_classes = (IsAuthenticatedOrReadOnly, V3APIPermission)
+    # Dedicated, more generous rate than the global per-user API throttle,
+    # applied regardless of membership status. See #7503.
+    throttle_classes = (AnonRateThrottle, FetchRateThrottle)
     ordering_fields = (
         "id",
         "date_created",

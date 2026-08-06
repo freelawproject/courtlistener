@@ -55,6 +55,7 @@ from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import (
     DOUBLE_API_THROTTLES_SWITCH,
     ExceptionalUserRateThrottle,
+    FetchRateThrottle,
     LoggingMixin,
     apply_membership_throttles,
     clear_membership_throttles,
@@ -5409,6 +5410,104 @@ class MultiRateThrottleTest(TestCase):
 
 
 @override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "fetch-rate-throttle-test",
+        }
+    }
+)
+class FetchRateThrottleTest(TestCase):
+    """Tests for FetchRateThrottle, the Fetch API's dedicated throttle.
+
+    See #7503: the Fetch API runs at its own generous default rate,
+    independent of the global per-user API throttle.
+    """
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    def test_default_rate_applies(self) -> None:
+        """The default 'fetch' rate is enforced when a user has no override."""
+        user = UserFactory()
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        num_requests, _ = FetchRateThrottle().parse_rate(
+            FetchRateThrottle.THROTTLE_RATES["fetch"]
+        )
+        assert num_requests is not None  # for mypy
+        for _ in range(num_requests):
+            throttle = FetchRateThrottle()
+            self.assertTrue(throttle.allow_request(request, view=None))
+
+        throttle = FetchRateThrottle()
+        with self.assertRaises(Throttled):
+            throttle.allow_request(request, view=None)
+
+    def test_default_rate_is_independent_of_global_user_throttle(
+        self,
+    ) -> None:
+        """A tight global API override doesn't affect the fetch scope."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.API,
+            rate="1/min",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        for _ in range(5):
+            throttle = FetchRateThrottle()
+            self.assertTrue(throttle.allow_request(request, view=None))
+
+    def test_manual_override_tightens_default_rate(self) -> None:
+        """A MANUAL RECAP_FETCH override replaces the default fetch rate."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="1/min",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = FetchRateThrottle()
+        self.assertTrue(throttle.allow_request(request, view=None))
+
+        throttle = FetchRateThrottle()
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        self.assertIn("1/min", str(ctx.exception.detail))
+
+    def test_zero_rate_blocks(self) -> None:
+        """A 0/min RECAP_FETCH override blocks the user entirely."""
+        user = UserFactory()
+        APIThrottleFactory(
+            user=user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="0/min",
+        )
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = user
+
+        throttle = FetchRateThrottle()
+        with self.assertRaises(Throttled) as ctx:
+            throttle.allow_request(request, view=None)
+        self.assertIn("blocked", str(ctx.exception.detail).lower())
+
+
+@override_settings(
     WAFFLE_CACHE_PREFIX="PromoDoubleThrottleTest",
     CACHES={
         "default": {
@@ -5805,6 +5904,55 @@ class TestApiUsageEndpoint(TestCase):
         self.assertGreaterEqual(
             self._row(data, "api_usage", "10/min")["used"], 3
         )
+
+    def test_fetch_scope_reflects_dedicated_throttle(self):
+        """The Fetch API's own throttle (#7503) is reported like any other
+        scope, keyed off its own cache entry and independent of the "user"
+        scope's usage.
+        """
+        default_cache = caches["default"]
+        default_cache.delete(f"throttle_fetch_{self.user.pk}")
+
+        data = self.client.get(self.url).json()
+        fetch_usage = next(
+            u for u in data["current_usage"] if u["scope"] == "fetch"
+        )
+        self.assertEqual(fetch_usage["rate"], "30/min")
+        self.assertEqual(fetch_usage["used"], 0)
+        self.assertIsNone(fetch_usage["reset_at"])
+
+    def test_fetch_override_reported_independently_of_user_scope(self):
+        """A RECAP_FETCH override changes the "fetch" row's limit without
+        affecting the "user" scope's rows.
+        """
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="500/hour",
+        )
+        # An unrelated "user" scope override, so its row's rate is known
+        # rather than whatever DEFAULT_THROTTLE_RATES["user"] resolves to
+        # under test settings.
+        APIThrottleFactory(
+            user=self.user, throttle_type=ThrottleType.API, rate="50/hour"
+        )
+        now = time.time()
+        caches["default"].set(
+            f"throttle_fetch_{self.user.pk}",
+            [now - i for i in range(5)],
+            timeout=3600,
+        )
+        # Other tests in this class write directly to this cache key and
+        # don't clean up after themselves; start from a known-empty state.
+        caches["default"].delete(f"throttle_user_{self.user.pk}")
+        clear_tiered_cache()
+        data = self.client.get(self.url).json()
+        self.assertEqual(
+            self._row(data, "fetch", "500/hour")["used"],
+            5,
+        )
+        # The unrelated "user" row is untouched by the fetch-only override.
+        self.assertEqual(self._row(data, "user", "50/hour")["used"], 0)
 
     def test_endpoint_not_throttled_when_user_is_throttled(self):
         """The endpoint stays reachable after the user is throttled."""

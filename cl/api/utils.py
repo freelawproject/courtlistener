@@ -1078,7 +1078,8 @@ def _build_usage_rows(
 def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
     """Per-(scope, rate) live throttle usage for an authenticated user.
 
-    Mirrors enforcement exactly: effective rates come from
+    Covers the "user" (API), "citations", and "fetch" scopes. Mirrors
+    enforcement exactly: effective rates come from
     ``get_all_throttle_overrides`` (MANUAL/MEMBERSHIP precedence + membership
     expiry honored), falling back to ``DEFAULT_THROTTLE_RATES``; the x2 promo
     is applied to the API scope when it applies to this user; counts come from
@@ -1129,6 +1130,18 @@ def get_current_throttle_usage(user: User) -> list[ThrottleUsageRow]:
         api_usage_rates,
         now,
         [(1, ts) for ts in api_usage_history],
+    )
+
+    # --- Fetch scope ("fetch"): one timestamp per request ---------------
+    # No promo doubling here: the x2 promo only ever applies to "user".
+    fetch_rates = _effective_rates(
+        ThrottleType.RECAP_FETCH, username, default_rates, "fetch"
+    )
+    fetch_history: list[float] = default_cache.get(
+        f"throttle_fetch_{user.pk}", []
+    )
+    usage_rows += _build_usage_rows(
+        "fetch", fetch_rates, now, [(1, ts) for ts in fetch_history]
     )
 
     # Limit closest to being hit first; blocked rows float to the top.
@@ -1359,6 +1372,21 @@ class AlertThrottle(ExceptionalUserRateThrottle):
         self.history = self.cache.get(self.key, [])
         self.now = self.timer()
         return self._check_multi_rate(rates)
+
+
+class FetchRateThrottle(ExceptionalUserRateThrottle):
+    """Dedicated rate limit for the RECAP Fetch API (scope 'fetch').
+
+    Buying PACER documents via the Fetch API is something CourtListener
+    wants to encourage, so it runs at its own generous default rate instead
+    of being capped by the global per-user API throttle, and that rate
+    applies to every authenticated user regardless of membership status.
+    See #7503. Individual abusive users can still be capped or blocked via
+    a MANUAL ``APIThrottle`` row of this type, same as other scopes.
+    """
+
+    scope = "fetch"
+    throttle_type = ThrottleType.RECAP_FETCH
 
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
