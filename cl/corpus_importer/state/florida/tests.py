@@ -1027,7 +1027,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged = FloridaDocument.objects.get()
         self.assertEqual(merged.content_type, "")
 
-    @merger_test(expected_query_count=30)
+    @merger_test(expected_query_count=31)
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice avoid duplicating documents?"""
         document = FloridaDocumentFactory.create()
@@ -1090,6 +1090,21 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertIsNone(merged.processing_error)
         self.assertFalse(merged.filepath_local)
         self.assertIsNone(merged.ocr_status)
+
+    @merger_test(expected_query_count=31)
+    def test_remerge_missing_file_is_update(self):
+        """Is an unchanged document with no stored file and no processing
+        error reported as updated, so a re-ingest retries its failed
+        download?"""
+        document = FloridaDocumentFactory.create()
+        docket_data = self._make_case(document)
+        FloridaDocketMerger(docket_data, params=None).merge()
+        merged = FloridaDocument.objects.get()
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertIn(merged.pk, result.updates["FloridaDocument"])
 
     @merger_test(expected_query_count=30)
     def test_remerge_unchanged_document_keeps_download_state(self):

@@ -121,17 +121,21 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     link_uuid = models.UUIDField()
 
     def make_filename(self) -> str:
+        """Build the stored filename from the document name and link UUID."""
         return f"{self.document_name}-{self.link_uuid}"
 
     @classmethod
     def tmp_prefix(cls) -> str:
+        """Prefix for temporary download files."""
         return "fl_"
 
     @classmethod
     def expected_extensions(cls) -> set[str]:
+        """File extensions Florida ACIS is known to serve."""
         return EXPECTED_EXTENSIONS
 
     def can_extract(self, extension: str) -> bool:
+        """Whether text extraction supports files with this extension."""
         return extension in EXTRACTABLE_EXTENSIONS
 
     class Meta:

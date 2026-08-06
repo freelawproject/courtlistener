@@ -918,6 +918,15 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
         return []
 
+    def needs_update(self) -> bool:
+        """Whether `self.existing` should take the update path even when no
+        merged attribute changed. Useful for re-triggering downstream
+        processing (e.g. a re-download) driven by the merge result's updates.
+
+        :return: True to force the update path."""
+
+        return False
+
     def after(self) -> None:
         """Run extra processes after the merge operation completes or fails."""
         ...
@@ -1022,7 +1031,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             if o2o_result.update or o2o_result.create:
                 updated.append(name)
             result |= o2o_result
-        if updated:
+        if updated or self.needs_update():
             result |= MergeResult.updated(
                 self.model.__name__, self.existing.pk
             )

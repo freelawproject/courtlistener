@@ -56,16 +56,31 @@ class DocumentMerger[
     url: str = Attribute(_document_url, strategy=overwrite)
 
     @override
+    def needs_update(self) -> bool:
+        """Force the update path for a document with no stored file and no
+        recorded processing error -- its download failed transiently, and
+        reporting an update gets the download re-dispatched on re-ingest."""
+        return (
+            self.existing is not None
+            and not self.existing.filepath_local
+            and self.existing.processing_error is None
+        )
+
+    @override
     def pre_update(self) -> list[str]:
         updated = super().pre_update()
-        if self.existing.processing_error == ProcessingError.BAD_URL:
-            self.existing.processing_error = None
+        # This hook only runs on the update path, so `existing` is set; the
+        # guard narrows the type for mypy.
+        if (existing := self.existing) is None:
+            return updated
+        if existing.processing_error == ProcessingError.BAD_URL:
+            existing.processing_error = None
             updated.append("processing_error")
-        if self.existing.filepath_local:
-            self.existing.filepath_local.delete(save=False)
+        if existing.filepath_local:
+            existing.filepath_local.delete(save=False)
             updated.append("filepath_local")
-        self.existing.filepath_local = ""
-        self.existing.ocr_status = None
+        existing.filepath_local = ""
+        existing.ocr_status = None
         updated.append("ocr_status")
         return updated
 

@@ -93,20 +93,26 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
     media_version_id = models.UUIDField()
 
     def make_filename(self) -> str:
+        """Build the stored filename from the media ID and version ID."""
         return f"{self.media_id}-{self.media_version_id}"
 
     @classmethod
     def tmp_prefix(cls) -> str:
+        """Prefix for temporary download files."""
         return "texas_"
 
     @classmethod
     def expected_extensions(cls) -> set[str]:
+        """File extensions TAMES is known to serve."""
         return EXPECTED_EXTENSIONS
 
     def can_extract(self, extension: str) -> bool:
+        """Whether text extraction supports files with this extension."""
         return extension in EXTRACTABLE_EXTENSIONS
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
+        """Flag downloads where TAMES returned its "missing file" HTML page
+        instead of the document, so the bad URL isn't retried."""
         if extension == ".html":
             content.seek(0, 2)
             file_size = content.tell()
