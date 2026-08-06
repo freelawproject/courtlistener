@@ -114,11 +114,16 @@ async def find_docket_object_query(
     federal_dn_judge_initials_referred: str | None,
     using: str = "default",
     skip_dn_core_confirmation: bool = False,
+    cheap_count: bool = True,
 ) -> QuerySet[Docket]:
     """Construct a queryset to be used by `find_docket_object` and other methods which need to use the same docket-finding
     process. Parameters have the same meaning as `find_docket_object` except `skip_dn_core_confirmation`, which tells
     the function to just return the first result with one match without doing any further verification (`True` for state
     and SCOTUS, `False` otherwise).
+
+    The `cheap_count` parameter determines whether we use `COUNT pk WHERE ... LIMIT 2` or the length of the results from
+    `SELECT * WHERE ... LIMIT 2`. The second format can allow us to save a query in subsequent methods which may need
+    the count or elements of the results.
 
     Will only ever return querysets with zero or one results."""
 
@@ -218,10 +223,14 @@ async def find_docket_object_query(
             .order_by("date_created")
             .using(using)
         )
-        # The `[:2]` slice here turns the query Django sends from `COUNT pk WHERE ...` to `COUNT pk WHERE ... LIMIT 2`,
-        # which we found in testing to have significantly better performance, presumably because Postgres can stop
-        # counting after it hits 2. This is fine since we don't actually care about the value of any count above 1.
-        count = await ds.values("pk")[:2].acount()
+        if cheap_count:
+            # The `[:2]` slice here turns the query Django sends from `COUNT pk WHERE ...` to `COUNT pk WHERE ... LIMIT 2`,
+            # which we found in testing to have significantly better performance, presumably because Postgres can stop
+            # counting after it hits 2. This is fine since we don't actually care about the value of any count above 1.
+            count = await ds.values("pk")[:2].acount()
+        else:
+            ds = ds[:2]
+            count = len(await sync_to_async(list)(ds))
         if count == 0:
             continue  # Try a looser lookup.
         if count == 1:
@@ -237,7 +246,11 @@ async def find_docket_object_query(
         # If more than one docket matches, try refining the results using
         # available docket_number components.
         dqs = ds.filter(component_query)
-        count = await dqs.values("pk")[:2].acount()
+        if cheap_count:
+            count = await dqs.values("pk")[:2].acount()
+        else:
+            dqs = dqs[:2]
+            count = len(await sync_to_async(list)(dqs))
         if count == 1:
             return dqs
 

@@ -200,6 +200,7 @@ for prefix, viewset, basename in router.registry:
     # the "search" route.
     if basename != "search":
         router_v4.register(prefix, viewset, basename)
+router_v4.register(r"api-usage", views.ApiUsageViewSet, basename="api-usage")
 
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
