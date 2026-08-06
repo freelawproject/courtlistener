@@ -1026,16 +1026,51 @@ Sample code here.
   <c-layout-with-navigation.section class="border-t-2 border-greyscale-200" id="dialog">
     <h2 class="mt-6 mb-3">Dialog</h2>
     <p>Renders a button that opens a dialog with an overlay. This component uses named slots.</p>
-    <h4 class="mt-3">Demo</h4>
-    <c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20">
-      <c-slot name="button_content">Click me!</c-slot>
-      <c-slot name="panel">
-        Place any content you want here.
-        <div class="flex flex-row justify-end gap-2">
-          <c-button variant="outline" x-on:click="close" aria-label="Close modal">Close</c-button>
-        </div>
-      </c-slot>
-    </c-dialog>
+    <h3 class="mt-3">Demo</h3>
+    <h4 class="mt-3">Variants</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20">
+        <c-slot name="button_content">Centered dialog</c-slot>
+        <c-slot name="panel">
+          Place any content you want here.
+          <div class="flex flex-row justify-end gap-2">
+            <c-button variant="outline" x-on:click="close" aria-label="Close modal">Close</c-button>
+          </div>
+        </c-slot>
+      </c-dialog>
+      <c-dialog panel_class="p-5" dialog_class="items-center z-20" variant="drawer">
+        <c-slot name="button_content">Drawer variant</c-slot>
+        <c-slot name="panel">
+          Place any content you want here.
+          <div class="flex flex-row justify-end gap-2">
+            <c-button variant="outline" x-on:click="close" aria-label="Close modal">Close</c-button>
+          </div>
+        </c-slot>
+      </c-dialog>
+    </div>
+    <h4 class="mt-3">Transitions</h4>
+    <div class="flex flex-wrap gap-3 items-center">
+      <c-dialog panel_class="p-5" dialog_class="items-center z-20" variant="drawer">
+        <c-slot name="button_content">Animated drawer</c-slot>
+        <c-slot name="panel">
+          Place any content you want here.
+          <div class="flex flex-row justify-end gap-2">
+            <c-button variant="outline" x-on:click="close" aria-label="Close modal">Close</c-button>
+          </div>
+        </c-slot>
+      </c-dialog>
+      <c-dialog panel_class="p-5" dialog_class="items-center z-20" variant="drawer" disable_transitions>
+        <c-slot name="button_content">Flat drawer</c-slot>
+        <c-slot name="panel">
+          Place any content you want here.
+          <div class="flex flex-row justify-end gap-2">
+            <c-button variant="outline" x-on:click="close" aria-label="Close modal">Close</c-button>
+          </div>
+        </c-slot>
+      </c-dialog>
+    </div>
+
+
 
     <c-library.list title="Props" only>
       <c-library.item only>
@@ -1045,6 +1080,14 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>panel_class</code></c-slot>
         <c-slot name="description">CSS classes added to the panel itself.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Visual style. Options: <code>drawer</code>. When omitted, the default centered dialog is displayed.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>disable_transitions</code></c-slot>
+        <c-slot name="description">Opt-out of dialog transitions on open and close. Only affects the <code>drawer</code> variant</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1061,15 +1104,48 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-dialog panel_class="p-5 banner max-w-70" dialog_class="items-center z-20"&gt;
-  &lt;c-slot name="button_content"&gt;Click me!&lt;/c-slot&gt;
-  &lt;c-slot name="panel"&gt;
-    Place any content you want here.
-    &lt;div class="flex flex-row justify-end gap-2"&gt;
-      &lt;c-button variant="outline" x-on:click="close" aria-label="Close modal"&gt;Close&lt;/c-button&gt;
-    &lt;/div&gt;
-  &lt;/c-slot&gt;
-&lt;/c-dialog&gt;
+&lt;h4 class=&quot;mt-3&quot;&gt;Variants&lt;/h4&gt;
+&lt;div class=&quot;flex flex-wrap gap-3 items-center&quot;&gt;
+  &lt;c-dialog panel_class=&quot;p-5 banner max-w-70&quot; dialog_class=&quot;items-center z-20&quot;&gt;
+    &lt;c-slot name=&quot;button_content&quot;&gt;Centered dialog&lt;/c-slot&gt;
+    &lt;c-slot name=&quot;panel&quot;&gt;
+      Place any content you want here.
+      &lt;div class=&quot;flex flex-row justify-end gap-2&quot;&gt;
+        &lt;c-button variant=&quot;outline&quot; x-on:click=&quot;close&quot; aria-label=&quot;Close modal&quot;&gt;Close&lt;/c-button&gt;
+      &lt;/div&gt;
+    &lt;/c-slot&gt;
+  &lt;/c-dialog&gt;
+  &lt;c-dialog panel_class=&quot;p-5&quot; dialog_class=&quot;items-center z-20&quot; variant=&quot;drawer&quot;&gt;
+    &lt;c-slot name=&quot;button_content&quot;&gt;Drawer variant&lt;/c-slot&gt;
+    &lt;c-slot name=&quot;panel&quot;&gt;
+      Place any content you want here.
+      &lt;div class=&quot;flex flex-row justify-end gap-2&quot;&gt;
+        &lt;c-button variant=&quot;outline&quot; x-on:click=&quot;close&quot; aria-label=&quot;Close modal&quot;&gt;Close&lt;/c-button&gt;
+      &lt;/div&gt;
+    &lt;/c-slot&gt;
+  &lt;/c-dialog&gt;
+&lt;/div&gt;
+&lt;h4 class=&quot;mt-3&quot;&gt;Transitions&lt;/h4&gt;
+&lt;div class=&quot;flex flex-wrap gap-3 items-center&quot;&gt;
+  &lt;c-dialog panel_class=&quot;p-5&quot; dialog_class=&quot;items-center z-20&quot; variant=&quot;drawer&quot;&gt;
+    &lt;c-slot name=&quot;button_content&quot;&gt;Animated drawer&lt;/c-slot&gt;
+    &lt;c-slot name=&quot;panel&quot;&gt;
+      Place any content you want here.
+      &lt;div class=&quot;flex flex-row justify-end gap-2&quot;&gt;
+        &lt;c-button variant=&quot;outline&quot; x-on:click=&quot;close&quot; aria-label=&quot;Close modal&quot;&gt;Close&lt;/c-button&gt;
+      &lt;/div&gt;
+    &lt;/c-slot&gt;
+  &lt;/c-dialog&gt;
+  &lt;c-dialog panel_class=&quot;p-5&quot; dialog_class=&quot;items-center z-20&quot; variant=&quot;drawer&quot; disable_transitions&gt;
+    &lt;c-slot name=&quot;button_content&quot;&gt;Flat drawer&lt;/c-slot&gt;
+    &lt;c-slot name=&quot;panel&quot;&gt;
+      Place any content you want here.
+      &lt;div class=&quot;flex flex-row justify-end gap-2&quot;&gt;
+        &lt;c-button variant=&quot;outline&quot; x-on:click=&quot;close&quot; aria-label=&quot;Close modal&quot;&gt;Close&lt;/c-button&gt;
+      &lt;/div&gt;
+    &lt;/c-slot&gt;
+  &lt;/c-dialog&gt;
+&lt;/div&gt;
       </c-code>
     </c-expansion-panel>
   </c-layout-with-navigation.section>
@@ -1410,7 +1486,7 @@ Sample code here.
   {# FILTER DRAWER #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="filter-drawer">
     <h2 class="mt-6 mb-3">Filter drawer</h2>
-    <p>A mobile slide-in panel for filter controls. Only visible below the <code>md</code> breakpoint. Reuses the dialog composable for open/close, escape key, and auto-close on breakpoint change. Auto-opens when <code>data-has-errors</code> is present.</p>
+    <p>A mobile slide-in panel for filter controls. Only visible below the <code>md</code> breakpoint. Reuses the <code>c-dialog</code> component which provides open/close, escape key, and auto-close on breakpoint change. Auto-opens when <code>data-has-errors</code> is present.</p>
 
     <h4 class="mt-3">Demo</h4>
     <p class="text-sm text-greyscale-600 mb-2">Resize your browser below the <code>md</code> breakpoint (768px) to see the trigger button, then click it to open the drawer.</p>
