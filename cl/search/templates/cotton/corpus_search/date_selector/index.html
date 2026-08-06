@@ -46,7 +46,7 @@
       <div class="text-sm font-medium text-greyscale-600" x-bind:id="labelId">{{ label }}</div>
       {% if relative %}
         <a
-          href="{% url "relative_dates" %}"
+          href="{{ WIKI_HELP_URL }}/search/use-relative-date-queries-to-keep-alerts-fresh"
           aria-label="Learn about relative date queries"
         >
           {% svg "circle_question_mark" aria_hidden="true" class="text-greyscale-400" %}

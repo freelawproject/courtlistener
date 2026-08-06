@@ -169,7 +169,7 @@
 
       <c-icon-link
         x-on:focus="scrollIntoView"
-        href="{% url "alert_help" %}"
+        href="{{ WIKI_HELP_URL }}/alerts/"
         aria-label="Learn about creating alerts in CourtListener"
         icon="bell"
       >
@@ -187,7 +187,7 @@
 
       <c-icon-link
         x-on:focus="scrollIntoView"
-        href="{% url "podcasts" %}"
+        href="{{ WIKI_HELP_URL }}/general/custom-podcasts-of-oral-argument-audio-recordings"
         aria-label="Subscribe to our oral argument podcasts or create your own"
         icon="microphone"
       >

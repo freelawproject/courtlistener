@@ -1,4 +1,5 @@
 import json
+import logging
 import random
 from datetime import timedelta
 from enum import Enum
@@ -25,6 +26,8 @@ from cl.users.email_handlers import (
 )
 from cl.users.models import UserProfile, generate_recap_email
 from cl.users.tasks import notify_new_or_updated_webhook
+
+logger = logging.getLogger(__name__)
 
 
 class SESEventType(str, Enum):
@@ -83,6 +86,11 @@ def store_bounce_or_complaint_obj(
         # Save to S3
         storage.save(str(s3_path), ContentFile(file_contents))
     except Exception:
+        logger.exception(
+            "Failed to store SES %s event for %s",
+            obj_type.value,
+            email_recipient,
+        )
         return None
 
 
@@ -107,7 +115,7 @@ def bounce_handler(sender, mail_obj, bounce_obj, raw_message, *args, **kwargs):
             ]
             handle_hard_bounce(bounce_sub_type, hard_recipient_emails)
             normalized_recipients = normalize_addresses(hard_recipient_emails)
-        elif bounce_type == "Transient" or "Undetermined":
+        elif bounce_type in ("Transient", "Undetermined"):
             # Only consider a soft bounce those that contains a "failed" action
             # in its bounce recipient, avoiding other bounces that might not
             # be related to failed deliveries, like auto-responders.

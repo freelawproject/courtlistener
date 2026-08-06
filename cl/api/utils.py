@@ -54,7 +54,6 @@ from cl.api.models import (
 )
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.donate.models import (
-    MembershipPaymentStatus,
     NeonMembership,
     NeonMembershipLevel,
 )
@@ -753,9 +752,9 @@ def get_all_throttle_overrides(
 
     - MANUAL overrides always apply.
     - MEMBERSHIP overrides apply only if the user's NeonMembership is active
-      (payment_status=SUCCEEDED and termination_date is null or in the future),
-      and no MANUAL overrides exist. If any MANUAL overrides are present, they
-      fully replace the MEMBERSHIP set.
+      (payment_status in ACTIVE_PAYMENT_STATUSES and termination_date is null
+      or in the future), and no MANUAL overrides exist. If any MANUAL overrides
+      are present, they fully replace the MEMBERSHIP set.
 
     :param throttle_type: The ThrottleType integer value (API or CITATION_LOOKUP).
     :return: Dictionary mapping username to a list of rate strings. A list
@@ -770,7 +769,7 @@ def get_all_throttle_overrides(
     today = now().date()
     active_member_ids = (
         NeonMembership.objects.filter(
-            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES,
         )
         .filter(
             Q(termination_date__isnull=True)
@@ -837,7 +836,7 @@ def get_promo_excluded_usernames() -> set[str]:
     today = now().date()
     edu_members = set(
         NeonMembership.objects.filter(
-            payment_status=MembershipPaymentStatus.SUCCEEDED,
+            payment_status__in=NeonMembership.ACTIVE_PAYMENT_STATUSES,
             level=NeonMembershipLevel.EDU,
         )
         .filter(
@@ -963,6 +962,12 @@ class TagRateThrottle(UserRateThrottle):
     """Higher dedicated rate limit for the tag endpoints."""
 
     scope = "tags"
+
+
+class EventCounterThrottle(UserRateThrottle):
+    """Throttles increment-event"""
+
+    scope = "events"
 
 
 def has_throttle_override(user: User, throttle_type: int) -> bool:
