@@ -37,6 +37,7 @@ from cl.search.api_serializers import (
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
+    ParentheticalSerializer,
     PersonESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
@@ -61,6 +62,7 @@ from cl.search.filters import (
     OpinionClusterFilter,
     OpinionFilter,
     OpinionsCitedFilter,
+    ParentheticalFilter,
     RECAPDocumentFilter,
 )
 from cl.search.forms import SearchForm
@@ -75,6 +77,7 @@ from cl.search.models import (
     OpinionCluster,
     OpinionsCited,
     OriginatingCourtInformation,
+    Parenthetical,
     RECAPDocument,
     Tag,
 )
@@ -391,6 +394,33 @@ class OpinionsCitedViewSet(
     # Additional cursor ordering fields
     cursor_ordering_fields = ["id"]
     queryset = OpinionsCited.objects.all().order_by("-id")
+
+
+class ParentheticalViewSet(
+    LoggingMixin,
+    NoFilterCacheListMixin,
+    DeferredFieldsMixin,
+    viewsets.ModelViewSet,
+):
+    serializer_class = ParentheticalSerializer
+    filterset_class = ParentheticalFilter
+    permission_classes = [
+        DjangoModelPermissions,
+        V3APIPermission,
+    ]
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = ["id"]
+    queryset = (
+        Parenthetical.objects.select_related(
+            "describing_opinion__cluster",
+            "described_opinion__cluster",
+            "group",
+        )
+        .all()
+        .order_by("-id")
+    )
 
 
 class TagViewSet(LoggingMixin, DeferredFieldsMixin, viewsets.ModelViewSet):
