@@ -5142,6 +5142,35 @@ def texas_corpus_download_task(
     return content, meta
 
 
+@app.task(
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+@time_call(logger)
+def fl_corpus_download_task(bucket: str, key: str) -> bytes:
+    """Downloads a scraped file from S3 and returns it for parsing.
+
+    :param bucket: S3 bucket name docket data is stored.
+    :param key: S3 key where docket data is stored
+
+    :return: The bytes of the parsed JSON retrieved from S3."""
+    storage = AWSMediaStorage(bucket_name=bucket)
+    logger.info(
+        "Downloading docket JSON from S3: (Bucket: %s; Path: %s)",
+        bucket,
+        key,
+    )
+    with storage.open(key, "rb") as f:
+        content = f.read()
+
+    return content
+
+
 FL_EXTRACTABLE_EXTENSIONS: set[str] = {
     ".pdf",
     ".html",
