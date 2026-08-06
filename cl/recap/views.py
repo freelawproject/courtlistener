@@ -125,7 +125,7 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly, V3APIPermission)
     # Dedicated, more generous rate than the global per-user API throttle,
     # applied regardless of membership status. See #7503.
-    throttle_classes = (FetchRateThrottle,)
+    throttle_classes = (AnonRateThrottle, FetchRateThrottle)
     ordering_fields = (
         "id",
         "date_created",
