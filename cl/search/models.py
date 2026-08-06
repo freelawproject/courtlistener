@@ -43,6 +43,12 @@ from cl.corpus_importer.state.florida.utils import (
 from cl.corpus_importer.state.florida.utils import (
     make_docket_number_core as make_florida_docket_number_core,
 )
+from cl.corpus_importer.state.new_york.utils import (
+    is_nycoa_court,
+)
+from cl.corpus_importer.state.new_york.utils import (
+    make_docket_number_core as make_nycoa_docket_number_core,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.decorators import document_model
@@ -64,6 +70,7 @@ from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
 from cl.search.state.florida.models import *
+from cl.search.state.new_york.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
 
@@ -713,6 +720,10 @@ class Docket(AbstractDateTimeModel, DocketSources):
             elif is_florida_court(self.court_id):
                 self.docket_number_core = make_florida_docket_number_core(
                     self.docket_number_raw, court_id=self.court_id
+                )
+            elif is_nycoa_court(self.court_id):
+                self.docket_number_core = make_nycoa_docket_number_core(
+                    self.docket_number_raw
                 )
             else:
                 self.docket_number_core = make_docket_number_core(
