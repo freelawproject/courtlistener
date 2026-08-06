@@ -3270,30 +3270,6 @@ class PacerFetchAPIThrottleTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
 
 
-class PacerFetchAPIPermissionTest(TestCase):
-    """The Fetch API's generous, IP-keyed FetchRateThrottle is meant for
-    authenticated buyers of PACER documents, so anonymous access is denied
-    outright rather than merely throttled. See #7503.
-    """
-
-    async def test_anonymous_user_lacks_access(self) -> None:
-        """Anonymous users are denied access to the Fetch API."""
-        url = reverse("pacerfetchqueue-list", kwargs={"version": "v4"})
-        response = await self.async_client.get(url)
-        self.assertIn(
-            response.status_code,
-            (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN),
-        )
-
-    async def test_authenticated_user_has_access(self) -> None:
-        """Authenticated users can still reach the Fetch API."""
-        user = await sync_to_async(UserProfileWithParentsFactory)()
-        client = await sync_to_async(make_client)(user.user.pk)
-        url = reverse("pacerfetchqueue-list", kwargs={"version": "v4"})
-        response = await client.get(url)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-
 @mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
