@@ -5904,6 +5904,55 @@ class TestApiUsageEndpoint(TestCase):
             self._row(data, "api_usage", "10/min")["used"], 3
         )
 
+    def test_fetch_scope_reflects_dedicated_throttle(self):
+        """The Fetch API's own throttle (#7503) is reported like any other
+        scope, keyed off its own cache entry and independent of the "user"
+        scope's usage.
+        """
+        default_cache = caches["default"]
+        default_cache.delete(f"throttle_fetch_{self.user.pk}")
+
+        data = self.client.get(self.url).json()
+        fetch_usage = next(
+            u for u in data["current_usage"] if u["scope"] == "fetch"
+        )
+        self.assertEqual(fetch_usage["rate"], "30/min")
+        self.assertEqual(fetch_usage["used"], 0)
+        self.assertIsNone(fetch_usage["reset_at"])
+
+    def test_fetch_override_reported_independently_of_user_scope(self):
+        """A RECAP_FETCH override changes the "fetch" row's limit without
+        affecting the "user" scope's rows.
+        """
+        APIThrottleFactory(
+            user=self.user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="500/hour",
+        )
+        # An unrelated "user" scope override, so its row's rate is known
+        # rather than whatever DEFAULT_THROTTLE_RATES["user"] resolves to
+        # under test settings.
+        APIThrottleFactory(
+            user=self.user, throttle_type=ThrottleType.API, rate="50/hour"
+        )
+        now = time.time()
+        caches["default"].set(
+            f"throttle_fetch_{self.user.pk}",
+            [now - i for i in range(5)],
+            timeout=3600,
+        )
+        # Other tests in this class write directly to this cache key and
+        # don't clean up after themselves; start from a known-empty state.
+        caches["default"].delete(f"throttle_user_{self.user.pk}")
+        clear_tiered_cache()
+        data = self.client.get(self.url).json()
+        self.assertEqual(
+            self._row(data, "fetch", "500/hour")["used"],
+            5,
+        )
+        # The unrelated "user" row is untouched by the fetch-only override.
+        self.assertEqual(self._row(data, "user", "50/hour")["used"], 0)
+
     def test_endpoint_not_throttled_when_user_is_throttled(self):
         """The endpoint stays reachable after the user is throttled."""
         APIThrottleFactory(
