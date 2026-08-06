@@ -32,6 +32,7 @@ REST_FRAMEWORK = {
         # Fetch API (buying PACER documents). Deliberately much higher than
         # the global "user" rate and not gated by membership: see #7503.
         "fetch": "30/min",
+        "events": "60/hour",
     },
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
