@@ -63,6 +63,7 @@ from juriscraper.scotus import (
     SCOTUSDocketReportHTM,
     SCOTUSDocketReportHTML,
 )
+from juriscraper.state.florida import FloridaCase
 from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
@@ -115,6 +116,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
+from cl.corpus_importer.state.florida.mergers import FloridaDocketMerger
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
@@ -218,6 +220,7 @@ from cl.search.models import (
     Tag,
     TrialCourtData,
 )
+from cl.search.state.florida.models import FloridaDocument
 from cl.search.state.texas.models import (
     ProcessingError,
     TexasDocketEntry,
@@ -4347,14 +4350,16 @@ def merge_texas_document(
                 # object around. It needs to be wrapped in another lambda to
                 # prevent mypy from complaining.
                 (
-                    lambda pk: lambda: chain(
-                        download_texas_document.si(pk),
-                        extract_formatted_text_document.s(
-                            check_if_needed=False,
-                            model_name="search.TexasDocument",
-                            strip_html_tags=True,
-                        ),
-                    ).apply_async()
+                    lambda pk: (
+                        lambda: chain(
+                            download_texas_document.si(pk),
+                            extract_formatted_text_document.s(
+                                check_if_needed=False,
+                                model_name="search.TexasDocument",
+                                strip_html_tags=True,
+                            ),
+                        ).apply_async()
+                    )
                 )(texas_document.pk)
             )
         if existed:
@@ -5135,3 +5140,159 @@ def texas_corpus_download_task(
         meta = TexasDocketMeta.model_validate_json(f.read())
 
     return content, meta
+
+
+FL_EXTRACTABLE_EXTENSIONS: set[str] = {
+    ".pdf",
+    ".html",
+    ".wpd",
+    ".txt",
+    ".tiff",
+}
+FL_EXPECTED_EXTENSIONS: set[str] = {".pdf", ".tiff"}
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+    # No retries because download_document_in_stream already has retry logic
+)
+@throttle_task("2/s")
+def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
+    """Download a Florida document and save it locally.
+
+    Accepts any file type. PDF-specific processing (page count) is only
+    performed for PDFs.
+
+    :param self: The Celery task instance (used to break the chain on failure).
+    :param fl_document_pk: The primary key of the `FloridaDocument` instance to
+    update the attachment for.
+    :return: The primary key of the downloaded `FloridaDocument` instance, or None
+    if the process failed.
+    """
+    try:
+        fl_document = FloridaDocument.objects.get(pk=fl_document_pk)
+    except FloridaDocument.DoesNotExist:
+        logger.warning(
+            "Florida document download: FloridaDocument %s does not exist; skipping.",
+            fl_document_pk,
+        )
+        self.request.chain = None
+        return None
+
+    if fl_document.processing_error == ProcessingError.BAD_URL:
+        logger.warning(
+            "Florida document download: FloridaDocument %s has a bad URL. "
+            "Skipping.",
+            fl_document_pk,
+        )
+        self.request.chain = None
+        return None
+
+    url = fl_document.url
+
+    logger.info(
+        "Florida document download: Fetching document for FloridaDocument %s from %s",
+        fl_document_pk,
+        url,
+    )
+
+    with download_document_in_stream(
+        url, fl_document.pk, "fl_", require_pdf=False
+    ) as result:
+        if result is None:
+            logger.error(
+                "Failed to download document for FloridaDocument %s from URL %s.",
+                fl_document.pk,
+                url,
+            )
+            self.request.chain = None
+            return None
+
+        tmp, sha1_hash = result
+        content = tmp.read(8192)
+        tmp.seek(0)
+
+        extension = get_extension(content)
+
+        if extension not in FL_EXPECTED_EXTENSIONS:
+            logger.warning(
+                "Florida document download: Unexpected extension "
+                "'%s' for FloridaDocument %s from %s. Proceeding anyway.",
+                extension,
+                fl_document.pk,
+                url,
+            )
+
+        filename = (
+            f"{fl_document.document_name}-{fl_document.link_uuid}{extension}"
+        )
+        downloaded_file = File(tmp)
+        fl_document.filepath_local.save(filename, downloaded_file, save=False)
+        fl_document.file_size = downloaded_file.size
+        fl_document.sha1 = sha1_hash
+
+        if extension == ".pdf":
+            response = async_to_sync(doc_page_count_service)(fl_document)
+            if response.is_success:
+                fl_document.page_count = int(response.text)
+        elif extension not in FL_EXTRACTABLE_EXTENSIONS:
+            fl_document.ocr_status = FloridaDocument.OCR_UNNECESSARY
+
+        fl_document.save()
+
+        if extension not in FL_EXTRACTABLE_EXTENSIONS:
+            self.request.chain = None
+            return None
+
+        return fl_document_pk
+
+
+@app.task(bind=True, max_retries=5, ignore_result=True)
+def fl_ingest_docket_task(
+    task: Task, case_bytes: bytes, download_attachments: bool = True
+) -> MergeResult[Any]:
+    """
+    Task to parse and merge a Florida docket.
+
+    :param task: The Celery task.
+
+    :param case_bytes: The bytes of the parsed JSON retrieved from S3.
+    :param download_attachments: Whether to download docket entry attachments.
+
+    :return: The result of the merge operation.
+    """
+    try:
+        case = FloridaCase.model_validate_json(
+            case_bytes, by_name=True, context={"deserialize": True}
+        )
+    except Exception:
+        logger.exception("Failed to deserialize Florida case")
+        return MergeResult.failed("Docket")
+    logger.info(
+        "Attempting to merge Florida case %s",
+        case.docket_number,
+    )
+    merger = FloridaDocketMerger(scrape=case, params=None)
+    result = merger.merge()
+    if result.failures:
+        logger.error(
+            "An error occurred while merging Florida case %s: %s",
+            case.docket_number,
+            result.failures,
+        )
+    if download_attachments:
+        attachment_pks = result.creates.get(
+            FloridaDocument.__name__, set()
+        ) | result.updates.get(FloridaDocument.__name__, set())
+        logger.info("Downloading FloridaDocuments: %r", attachment_pks)
+        for pk in attachment_pks:
+            chain(
+                download_fl_document.si(pk),
+                extract_formatted_text_document.s(
+                    check_if_needed=False,
+                    model_name="search.FloridaDocument",
+                    strip_html_tags=True,
+                ),
+            ).apply_async()
+    return result
