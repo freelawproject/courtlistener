@@ -5442,6 +5442,7 @@ class FetchRateThrottleTest(TestCase):
         num_requests, _ = FetchRateThrottle().parse_rate(
             FetchRateThrottle.THROTTLE_RATES["fetch"]
         )
+        assert num_requests is not None  # for mypy
         for _ in range(num_requests):
             throttle = FetchRateThrottle()
             self.assertTrue(throttle.allow_request(request, view=None))
