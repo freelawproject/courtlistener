@@ -117,7 +117,6 @@ from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
 from cl.corpus_importer.state.florida.mergers import FloridaDocketMerger
-from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
@@ -197,11 +196,9 @@ from cl.recap.models import (
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import (
-    extract_formatted_text_document,
     extract_pdf_document,
     extract_pdf_document_base,
 )
-from cl.scrapers.utils import get_extension
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -222,7 +219,6 @@ from cl.search.models import (
 )
 from cl.search.state.florida.models import FloridaDocument
 from cl.search.state.texas.models import (
-    ProcessingError,
     TexasDocketEntry,
     TexasDocument,
 )
@@ -3973,122 +3969,20 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     process_scotus_docket.delay(docket_data)
 
 
-KNOWN_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
-EXTRACTABLE_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd"}
-
-
-def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
+def _download_texas_document(texas_document_pk: int) -> int | None:
     """Download a Texas document and save it locally.
 
     Accepts any file type. PDF-specific processing (page count) is only
     performed for PDFs. Non-PDF documents are marked as OCR_UNNECESSARY.
-    For non-extractable types (.mp3, unknown), the extract chain is
-    broken so extract_formatted_text_document is skipped.
+    Extraction is only dispatched for extractable types.
 
-    :param task: The Celery task instance (used to break the chain on failure).
     :param texas_document_pk: The primary key of the TexasDocument instance to
     update the attachment for.
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    try:
-        texas_document = TexasDocument.objects.get(pk=texas_document_pk)
-    except TexasDocument.DoesNotExist:
-        logger.warning(
-            "Texas document download: TexasDocument %s does not exist; skipping.",
-            texas_document_pk,
-        )
-        task.request.chain = None
-        return None
-
-    if texas_document.processing_error == ProcessingError.BAD_URL:
-        logger.warning(
-            "Texas document download: TexasDocument %s has a bad URL. "
-            "Skipping.",
-            texas_document_pk,
-        )
-        task.request.chain = None
-        return None
-
-    url = texas_document.url
-
-    logger.info(
-        "Texas document download: Fetching document for TexasDocument %s from %s",
-        texas_document_pk,
-        url,
-    )
-
-    with download_document_in_stream(
-        url, texas_document.pk, "texas_", require_pdf=False
-    ) as result:
-        if result is None:
-            logger.error(
-                "Failed to download document for TexasDocument %s from URL %s.",
-                texas_document.pk,
-                url,
-            )
-            task.request.chain = None
-            return None
-
-        tmp, sha1_hash = result
-        content = tmp.read(8192)
-        tmp.seek(0)
-
-        extension = get_extension(content)
-        if extension not in KNOWN_TEXAS_EXTENSIONS:
-            logger.warning(
-                "Texas document download: Unexpected file extension "
-                "'%s' for TexasDocument %s from %s. Proceeding anyway.",
-                extension,
-                texas_document.pk,
-                url,
-            )
-
-        if extension == ".html":
-            tmp.seek(0, 2)
-            file_size = tmp.tell()
-            tmp.seek(0)
-            if file_size <= 25_000:
-                full_content = tmp.read()
-                tmp.seek(0)
-                if is_missing_file_page(full_content):
-                    logger.warning(
-                        "Texas document download: TexasDocument %s at %s "
-                        "returned a missing file page.",
-                        texas_document.pk,
-                        url,
-                    )
-                    texas_document.processing_error = ProcessingError.BAD_URL
-                    texas_document.save()
-                    task.request.chain = None
-                    return None
-
-        filename = (
-            f"{texas_document.media_id}"
-            f"-{texas_document.media_version_id}{extension}"
-        )
-        downloaded_file = File(tmp)
-        texas_document.filepath_local.save(
-            filename, downloaded_file, save=False
-        )
-        texas_document.file_size = downloaded_file.size
-        texas_document.sha1 = sha1_hash
-
-        if extension == ".pdf":
-            response = async_to_sync(doc_page_count_service)(texas_document)
-            if response.is_success:
-                texas_document.page_count = int(response.text)
-        elif extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
-            # A slight misnomer, this is a flag for needing the rest of the plain_text extraction pipeline
-            texas_document.ocr_status = TexasDocument.OCR_UNNECESSARY
-
-        texas_document.save()
-
-        if extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
-            task.request.chain = None
-            return None
-
-        return texas_document_pk
+    document = TexasDocument.download(texas_document_pk)
+    return document.pk if document else None
 
 
 @app.task(
@@ -4105,7 +3999,7 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    return _download_texas_document(self, texas_document_pk)
+    return _download_texas_document(texas_document_pk)
 
 
 @app.task(
@@ -4125,7 +4019,7 @@ def download_texas_document_unthrottled(
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    return _download_texas_document(self, texas_document_pk)
+    return _download_texas_document(texas_document_pk)
 
 
 TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
@@ -4351,14 +4245,7 @@ def merge_texas_document(
                 # prevent mypy from complaining.
                 (
                     lambda pk: (
-                        lambda: chain(
-                            download_texas_document.si(pk),
-                            extract_formatted_text_document.s(
-                                check_if_needed=False,
-                                model_name="search.TexasDocument",
-                                strip_html_tags=True,
-                            ),
-                        ).apply_async()
+                        lambda: download_texas_document.si(pk).apply_async()
                     )
                 )(texas_document.pk)
             )
@@ -5171,16 +5058,6 @@ def fl_corpus_download_task(bucket: str, key: str) -> bytes:
     return content
 
 
-FL_EXTRACTABLE_EXTENSIONS: set[str] = {
-    ".pdf",
-    ".html",
-    ".wpd",
-    ".txt",
-    ".tiff",
-}
-FL_EXPECTED_EXTENSIONS: set[str] = {".pdf", ".tiff"}
-
-
 @app.task(
     bind=True,
     ignore_result=True,
@@ -5193,88 +5070,14 @@ def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
     Accepts any file type. PDF-specific processing (page count) is only
     performed for PDFs.
 
-    :param self: The Celery task instance (used to break the chain on failure).
+    :param self: The Celery task instance.
     :param fl_document_pk: The primary key of the `FloridaDocument` instance to
     update the attachment for.
     :return: The primary key of the downloaded `FloridaDocument` instance, or None
     if the process failed.
     """
-    try:
-        fl_document = FloridaDocument.objects.get(pk=fl_document_pk)
-    except FloridaDocument.DoesNotExist:
-        logger.warning(
-            "Florida document download: FloridaDocument %s does not exist; skipping.",
-            fl_document_pk,
-        )
-        self.request.chain = None
-        return None
-
-    if fl_document.processing_error == ProcessingError.BAD_URL:
-        logger.warning(
-            "Florida document download: FloridaDocument %s has a bad URL. "
-            "Skipping.",
-            fl_document_pk,
-        )
-        self.request.chain = None
-        return None
-
-    url = fl_document.url
-
-    logger.info(
-        "Florida document download: Fetching document for FloridaDocument %s from %s",
-        fl_document_pk,
-        url,
-    )
-
-    with download_document_in_stream(
-        url, fl_document.pk, "fl_", require_pdf=False
-    ) as result:
-        if result is None:
-            logger.error(
-                "Failed to download document for FloridaDocument %s from URL %s.",
-                fl_document.pk,
-                url,
-            )
-            self.request.chain = None
-            return None
-
-        tmp, sha1_hash = result
-        content = tmp.read(8192)
-        tmp.seek(0)
-
-        extension = get_extension(content)
-
-        if extension not in FL_EXPECTED_EXTENSIONS:
-            logger.warning(
-                "Florida document download: Unexpected extension "
-                "'%s' for FloridaDocument %s from %s. Proceeding anyway.",
-                extension,
-                fl_document.pk,
-                url,
-            )
-
-        filename = (
-            f"{fl_document.document_name}-{fl_document.link_uuid}{extension}"
-        )
-        downloaded_file = File(tmp)
-        fl_document.filepath_local.save(filename, downloaded_file, save=False)
-        fl_document.file_size = downloaded_file.size
-        fl_document.sha1 = sha1_hash
-
-        if extension == ".pdf":
-            response = async_to_sync(doc_page_count_service)(fl_document)
-            if response.is_success:
-                fl_document.page_count = int(response.text)
-        elif extension not in FL_EXTRACTABLE_EXTENSIONS:
-            fl_document.ocr_status = FloridaDocument.OCR_UNNECESSARY
-
-        fl_document.save()
-
-        if extension not in FL_EXTRACTABLE_EXTENSIONS:
-            self.request.chain = None
-            return None
-
-        return fl_document_pk
+    document = FloridaDocument.download(fl_document_pk)
+    return document.pk if document else None
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -5316,12 +5119,5 @@ def fl_ingest_docket_task(
         ) | result.updates.get(FloridaDocument.__name__, set())
         logger.info("Downloading FloridaDocuments: %r", attachment_pks)
         for pk in attachment_pks:
-            chain(
-                download_fl_document.si(pk),
-                extract_formatted_text_document.s(
-                    check_if_needed=False,
-                    model_name="search.FloridaDocument",
-                    strip_html_tags=True,
-                ),
-            ).apply_async()
+            download_fl_document.si(pk).apply_async()
     return result

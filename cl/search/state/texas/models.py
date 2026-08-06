@@ -1,15 +1,21 @@
 """Models unique to Texas dockets."""
 
+import logging
+from typing import IO
+
 import pghistory
 from django.db import models
 
+from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
-from cl.lib.models import AbstractDateTimeModel, AbstractPDF
+from cl.lib.models import AbstractDateTimeModel
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
 
-from cl.search.state.shared import ProcessingError
+from cl.search.state.shared import AbstractStateDocument, ProcessingError
+
+logger = logging.getLogger(__name__)
 
 
 @pghistory.track()
@@ -60,9 +66,13 @@ class TexasDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         # verbose_name_plural = "Texas Docket Entries"
 
 
+EXPECTED_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
+EXTRACTABLE_EXTENSIONS = {".pdf", ".html", ".wpd"}
+
+
 @pghistory.track()
 @document_model
-class TexasDocument(AbstractDateTimeModel, AbstractPDF):
+class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
     """
     Represents an attachment to a Texas docket entry.
 
@@ -73,7 +83,6 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     :ivar media_version_id: The MediaVersionID parameter from the download
     URL that TAMES provided. Used to perform document merging.
     :ivar url: The download URL that TAMES provided for this document.
-    :ivar processing_error: The processing error for the document, if any.
     """
 
     docket_entry = models.ForeignKey(
@@ -82,14 +91,37 @@ class TexasDocument(AbstractDateTimeModel, AbstractPDF):
     description = models.TextField(blank=True)
     media_id = models.UUIDField()
     media_version_id = models.UUIDField()
-    url = models.URLField(max_length=250)
-    processing_error = models.SmallIntegerField(
-        choices=ProcessingError.CHOICES,
-        null=True,
-        blank=True,
-        help_text="The processing error for the document, if any.",
-        db_comment="The processing error for the document, if any.",
-    )
+
+    def make_filename(self) -> str:
+        return f"{self.media_id}-{self.media_version_id}"
+
+    @classmethod
+    def tmp_prefix(cls) -> str:
+        return "texas_"
+
+    @classmethod
+    def expected_extensions(cls) -> set[str]:
+        return EXPECTED_EXTENSIONS
+
+    def can_extract(self, extension: str) -> bool:
+        return extension in EXTRACTABLE_EXTENSIONS
+
+    def validate_file(self, content: IO[bytes], extension: str) -> int | None:
+        if extension == ".html":
+            content.seek(0, 2)
+            file_size = content.tell()
+            content.seek(0)
+            if file_size <= 25_000:
+                full_content = content.read()
+                content.seek(0)
+                if is_missing_file_page(full_content):
+                    logger.warning(
+                        "Texas document download: TexasDocument %s at %s returned a missing file page.",
+                        self.pk,
+                        self.url,
+                    )
+                    return ProcessingError.BAD_URL
+        return None
 
     class Meta:
         app_label = "search"
