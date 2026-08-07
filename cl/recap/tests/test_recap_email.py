@@ -27,6 +27,7 @@ from cl.recap.factories import (
     RECAPEmailNotificationDataFactory,
 )
 from cl.recap.models import (
+    PROCESSING_QUEUE_SOURCE,
     PROCESSING_STATUS,
     UPLOAD_TYPE,
     EmailProcessingQueue,
@@ -4018,6 +4019,85 @@ class RecapEmailContentReplication(TestCase):
             # successful processing.
             with self.subTest(pq=pq):
                 self.assertFalse(pq.filepath_local)
+
+    @mock.patch(
+        "cl.recap.tasks.get_pacer_cookie_from_cache",
+        side_effect=lambda x: True,
+    )
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        side_effect=lambda z, x, c, v, b, d, e, a: (
+            MockResponse(200, b"Hello World"),
+            "OK",
+        ),
+    )
+    @mock.patch(
+        "cl.recap.tasks.requests.get",
+        side_effect=lambda *args, **kwargs: MockResponse(200, b"Att content."),
+    )
+    async def test_source_field_set_for_email_and_replication_pqs(
+        self,
+        mock_att_request,
+        mock_download_pdf,
+        mock_cookie,
+        mock_docket_entry_sealed,
+        mock_pacer_court_accessible,
+        mock_cookies,
+        mock_bucket_open,
+        mock_enqueue_alert,
+    ):
+        """The PQ created directly from a recap.email notification
+        must be tagged EMAIL, while the PQ created for a subdocket
+        case that wasn't mentioned in the notification must be tagged
+        REPLICATION.
+        """
+        # Create a subdocket and RD not mentioned in the email notification.
+        de_1 = await sync_to_async(DocketEntryFactory)(
+            docket=await sync_to_async(DocketFactory)(
+                court=self.court_canb,
+                case_name="Subdocket 1",
+                docket_number="1:20-cv-01296",
+                pacer_case_id="1309089",
+            ),
+            entry_number=18,
+        )
+        await sync_to_async(RECAPDocumentFactory)(
+            docket_entry=de_1,
+            pacer_doc_id="85001321035",
+            document_number="18",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[
+                        RECAPEmailDocketEntryDataFactory(
+                            pacer_doc_id="85001321035",
+                            document_number="1",
+                            pacer_case_id="1309088",
+                        )
+                    ],
+                )
+            ],
+        )
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            side_effect=lambda x, y: (email_data, "HTML"),
+        ):
+            await self.async_client.post(
+                self.path, self.data_multi_canb, format="json"
+            )
+
+        main_pq = await ProcessingQueue.objects.aget(pacer_case_id="1309088")
+        replica_pq = await ProcessingQueue.objects.aget(
+            pacer_case_id="1309089"
+        )
+        self.assertEqual(main_pq.source, PROCESSING_QUEUE_SOURCE.EMAIL)
+        self.assertEqual(
+            replica_pq.source, PROCESSING_QUEUE_SOURCE.REPLICATION
+        )
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
