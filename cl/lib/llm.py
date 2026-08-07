@@ -1,7 +1,11 @@
-from typing import IO
+from typing import IO, cast
 
 import instructor
 from openai import OpenAI
+from openai.types.chat import (
+    ChatCompletionContentPartParam,
+    ChatCompletionMessageParam,
+)
 from pydantic import BaseModel
 
 
@@ -33,18 +37,18 @@ def call_llm(
     # if api_key is provided, inject it, else fallback to env var
     client = instructor.from_provider(model, api_key=api_key)
 
-    def to_content_part(x: str | dict) -> dict:
+    def to_content_part(x: str | dict) -> ChatCompletionContentPartParam:
         if isinstance(x, str):
             return {"type": "text", "text": x}
         # Assume already a valid content part dict, e.g. {"type": "text", "text": "..."}
-        return x
+        return cast(ChatCompletionContentPartParam, x)
 
     if isinstance(user_prompt, str):
         user_content = [to_content_part(user_prompt)]
     else:
         user_content = [to_content_part(p) for p in user_prompt]
 
-    messages = [
+    messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]

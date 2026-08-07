@@ -1,3 +1,5 @@
+from typing import cast
+
 import environ
 import sentry_sdk
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
@@ -5,6 +7,7 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.types import Event, Hint
 
 env = environ.FileAwareEnv()
 SENTRY_DSN = env("SENTRY_DSN", default="")
@@ -15,7 +18,7 @@ ignore_logger("internetarchive.session")
 ignore_logger("internetarchive.item")
 
 
-def fingerprint_sentry_error(event: dict, hint: dict) -> dict:
+def fingerprint_sentry_error(event: Event, hint: Hint) -> Event:
     """Captures fingerprint information from logger.error call, if present
 
     logger.error calls allow to pass an `extra` dictionary with arbitrary keys
@@ -35,7 +38,9 @@ def fingerprint_sentry_error(event: dict, hint: dict) -> dict:
     :return: the event that will be sent to Sentry,
                 with explicit fingerprint values
     """
-    if fingerprint := event.get("extra", {}).pop("fingerprint", []):
+    if fingerprint := cast(
+        list[str], event.get("extra", {}).pop("fingerprint", [])
+    ):
         event["fingerprint"] = fingerprint
 
     return event

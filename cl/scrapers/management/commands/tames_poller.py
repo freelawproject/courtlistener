@@ -77,7 +77,8 @@ def verify_subscription_success(html: str) -> tuple[bool, str]:
         message = font_children[0].text or ""
     else:
         message = span.text or ""
-    message = message.strip()
+    # lxml-stubs types `.text` with a `# type:` comment pyrefly can't read.
+    message = cast(str, message).strip()
 
     if not message:
         return False, "Empty message"

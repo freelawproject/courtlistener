@@ -2,6 +2,7 @@ import copy
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
+from typing import Any
 from urllib.parse import urlencode
 
 from celery import Task
@@ -223,7 +224,7 @@ def make_alert_messages(
         "count": de_count,
         "case_name": case_name,
     }
-    email_context = {
+    email_context: dict[str, Any] = {
         "new_des": new_des,
         "count": de_count,
         "docket": d,

@@ -237,12 +237,12 @@ class PodcastTest(ESIndexTestCase, TestCase):
         self.assertIn("magnitsky", description)
 
         # iTunes subtitle should also contain the query
-        subtitle = xml_tree.xpath(
+        subtitle = xml_tree.xpath(  # type: ignore
             "//channel/itunes:subtitle",
             namespaces={
                 "itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
             },
-        )[0].text  # type: ignore
+        )[0].text
         self.assertIn("magnitsky", subtitle)
 
     def test_podcast_excludes_audios_without_processed_mp3(self) -> None:

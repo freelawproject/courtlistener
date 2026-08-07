@@ -372,6 +372,10 @@ def index_daily_recap_documents(
         )
     else:
         task_id = r.get("alert_sweep:task_id")
+        # Narrowing for the type checker: this branch only runs when
+        # r.exists("alert_sweep:task_id") was true above, so the key is
+        # present and get() cannot return None.
+        assert task_id is not None
         logger.info(
             "Resuming re-index task for index %s with ID: %s",
             target_index._index._name,
@@ -745,7 +749,8 @@ def query_and_schedule_alerts(
         app_label="search", model="docket"
     )
     for user in alert_users:
-        alerts = user.alerts.filter(
+        alerts = Alert.objects.filter(
+            user=user,
             rate=rate,
             alert_type__in=[SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS],
         )

@@ -37,6 +37,7 @@ class Audio(AbstractDateTimeModel):
     ]
 
     # Annotation required b/c this FK is nullable, which breaks absolute_url
+    docket_id: int
     docket: Docket = models.ForeignKey(
         Docket,
         help_text="The docket that the oral argument is a part of",

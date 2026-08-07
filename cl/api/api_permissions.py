@@ -1,7 +1,7 @@
 import random
 
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from rest_framework import permissions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
@@ -28,7 +28,7 @@ class V3APIPermission(permissions.BasePermission):
     v3_blocked_list_key = "v3-blocked-users-list"
     v3_users_list_key = "v3-users-list"
 
-    def is_new_v3_user(self, user: User) -> bool:
+    def is_new_v3_user(self, user: AbstractBaseUser) -> bool:
         """Check if the user is new for V3 by determining their presence in the
         v3-users-list.
 
@@ -38,7 +38,7 @@ class V3APIPermission(permissions.BasePermission):
         is_new_user = self.r.sismember(self.v3_users_list_key, user.id) != 1
         return is_new_user
 
-    def is_user_v3_blocked(self, user: User) -> bool:
+    def is_user_v3_blocked(self, user: AbstractBaseUser) -> bool:
         """Check if the user is already blocked form V3 by determining their
         presence in the v3-blocked-users-list.
 

@@ -1,6 +1,7 @@
 import random
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.urls import reverse
 
@@ -118,8 +119,9 @@ def inject_email_ban_status(
     :param request: Contains the user for checking if their email is valid.
     return dict: The message and date for the user's email status.
     """
-    if request.user.is_authenticated:
-        email = request.user.email
+    user = request.user
+    if isinstance(user, User):
+        email = user.email
         email_banned = EmailFlag.objects.filter(
             email_address=email, flag_type=FLAG_TYPES.BAN
         )

@@ -3,7 +3,7 @@ import time
 from collections import OrderedDict, defaultdict
 from datetime import UTC, date, datetime, timedelta
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 from unittest import mock
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
@@ -748,7 +748,8 @@ class ApiEventCreationTestCase(TestCase):
 
         # Create the view and change the milestones to be something we can test
         # (Otherwise, we need to make 1,000 requests in this test)
-        view = AudioViewSet.as_view({"get": "list"})
+        # Cast to Any so the milestones monkeypatch below type-checks.
+        view = cast(Any, AudioViewSet.as_view({"get": "list"}))
         view.milestones = [1]
 
         # Set the attributes needed in the absence of middleware
@@ -852,7 +853,7 @@ class ApiEventCreationTestCase(TestCase):
         self.assertEqual(mock_logging_prefix.called, 0)
         await self.hit_the_api("v3")
         self.assertEqual(mock_logging_prefix.called, 1)
-        self.assertEqual(int(self.r.get("api:v3-Test.count")), 1)
+        self.assertEqual(int(self.r.get("api:v3-Test.count") or 0), 1)
 
         # User stats
         self.assertEqual(
@@ -871,7 +872,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Timings
         self.assertAlmostEqual(
-            int(self.r.get("api:v3-Test.timing")), 10, delta=2000
+            int(self.r.get("api:v3-Test.timing") or 0), 10, delta=2000
         )
 
     @mock.patch("cl.api.utils.create_or_update_zoho_account")
@@ -888,7 +889,7 @@ class ApiEventCreationTestCase(TestCase):
         await self.hit_the_api("v4")
 
         self.assertEqual(mock_logging_prefix.called, 1)
-        self.assertEqual(int(self.r.get("api:v4-Test.count")), 1)
+        self.assertEqual(int(self.r.get("api:v4-Test.count") or 0), 1)
 
         # User stats
         self.assertEqual(
@@ -907,7 +908,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Timings
         self.assertAlmostEqual(
-            int(self.r.get("api:v4-Test.timing")), 10, delta=2000
+            int(self.r.get("api:v4-Test.timing") or 0), 10, delta=2000
         )
 
 
