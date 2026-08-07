@@ -3297,7 +3297,7 @@ def classify_case_name_by_llm(self, cluster_pk: int, recap_document_id: int):
         raise
 
     if not isinstance(llm_response, CaseNameExtractionResponse):
-        # Added this to avoid mypy errors
+        # Added this to avoid type checker errors
         logger.error("LLM - Invalid response type: %s", type(llm_response))
         return
 
@@ -4345,7 +4345,7 @@ def merge_texas_document(
             transaction.on_commit(
                 # Lambda captures the pk without needing to keep the whole
                 # object around. It needs to be wrapped in another lambda to
-                # prevent mypy from complaining.
+                # prevent the type checker from complaining.
                 (
                     lambda pk: lambda: chain(
                         download_texas_document.si(pk),

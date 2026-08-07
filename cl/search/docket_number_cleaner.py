@@ -324,7 +324,7 @@ def extract_with_llm(
         return None
 
     if not isinstance(llm_response, CleanDocketNumber):
-        # Added this to avoid mypy errors
+        # Added this to avoid type checker errors
         logger.error("LLM - Invalid response type: %s", type(llm_response))
         return None
 
