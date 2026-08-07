@@ -53,6 +53,7 @@ document.addEventListener('alpine:init', () => {
     ...createUtils(),
     advancedFiltersExpanded: false,
     advancedFiltersExpandedDesktop: false,
+    activeFilterCount: 0,
     get scopeMenuExpanded() {
       return this.$store.corpusSearch.scopeMenuExpanded;
     },
@@ -120,6 +121,15 @@ document.addEventListener('alpine:init', () => {
     get advancedFiltersCollapsed() {
       return !this.advancedFiltersExpanded;
     },
+    get hasActiveFilters() {
+      return this.activeFilterCount > 0;
+    },
+    get activeFilterCountLabel() {
+      return `(${this.activeFilterCount})`;
+    },
+    get filtersButtonAriaLabel() {
+      return this.hasActiveFilters ? `Filters, ${this.activeFilterCount} active` : 'Filters';
+    },
     updateKeyword(event) {
       this.$store.corpusSearch.keywordQuery = event.target.value;
     },
@@ -183,11 +193,32 @@ document.addEventListener('alpine:init', () => {
       });
     },
 
+    /**
+     * Count filter inputs (scoped to [data-filters-root]) that currently hold a value,
+     * excluding disabled fields (e.g. inactive scope fieldsets) and fields flagged
+     * with data-ignore-input (e.g. the date-selector's calendar/relative radios).
+     *  */
+    updateActiveFilterCount() {
+      const root = this.$el.querySelector('[data-filters-root]');
+      if (!root) return;
+      const filterInputs = Array.from(root.querySelectorAll('input, select'));
+      this.activeFilterCount = filterInputs.filter((el) => {
+        if (el.disabled) return false;
+        if (el.dataset?.ignoreInput === 'true') return false;
+        if (el.type === 'checkbox' || el.type === 'radio') return el.checked;
+        return !!el.value.trim();
+      }).length;
+    },
+
     init() {
-      this.$watch('selectedScope', (newVal) => this.updateFieldsets(newVal.label));
+      this.$watch('selectedScope', (newVal) => {
+        this.updateFieldsets(newVal.label);
+        this.updateActiveFilterCount();
+      });
       this.onBreakpointChange(() => {
         this.advancedFiltersExpandedDesktop = false;
       });
+      this.updateActiveFilterCount();
     },
   }));
 });
