@@ -14,7 +14,7 @@ from io import BytesIO
 from pyexpat import ExpatError
 from re import Pattern
 from tempfile import NamedTemporaryFile
-from typing import IO, Any
+from typing import IO, Any, NamedTuple
 from urllib.parse import urljoin
 
 import botocore.exceptions
@@ -414,6 +414,21 @@ def download_recap_item(
                 shutil.copyfile(tmp.name, location)
 
 
+class FreeOpinionScrapeCounts(NamedTuple):
+    """How many documents survived each stage of a free-opinion scrape.
+
+    The three counts narrow from what PACER claimed to what we can actually
+    ingest, so a shortfall can be attributed to a stage rather than merely
+    noticed. Only produced for a scrape that got far enough to parse a
+    report; a failed scrape has no counts at all (None) rather than zeros,
+    since "we saw nothing" and "we never looked" are different facts.
+    """
+
+    reported: int
+    parsed: int
+    saved: int
+
+
 @app.task(
     bind=True,
     autoretry_for=(PacerLoginException, RedisConnectionError),
@@ -427,7 +442,7 @@ def get_and_save_free_document_report(
     end: date,
     log_id: int = 0,
     day_span: int = 1,
-) -> tuple[int, int]:
+) -> tuple[int, FreeOpinionScrapeCounts | None]:
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
@@ -438,7 +453,8 @@ def get_and_save_free_document_report(
     :param day_span: how many days each PACER sub-query should cover. Smaller
     values produce more, smaller requests, which is friendlier to proxy
     read timeouts.
-    :return: The status code of the scrape
+    :return: a two-tuple of the scrape status code and the scrape's document
+    counts (None when the scrape failed and the counts are unknown)
     """
     session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
@@ -490,18 +506,37 @@ def get_and_save_free_document_report(
 
         if self.request.retries == self.max_retries:
             logger.error(f"{msg} at %s (%s to %s).", court_id, start, end)  # noqa: G004
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, None
         logger.info(f"{msg} Retrying.", court_id, start, end)  # noqa: G004
         raise self.retry(exc=exc, countdown=5)
 
     try:
         results = report.data
+        # PACER's own tally, which is what `data` parses against. Read it
+        # here, under the same handler: both walk the report's parsed pages,
+        # so a page malformed enough to break one breaks the other.
+        reported_count = report.reported_opinion_count
     except (IndexError, HTTPError) as exc:
         # IndexError: When the page isn't downloaded properly.
         # HTTPError: raise_for_status in parse hit bad status.
         if self.request.retries == self.max_retries:
-            return PACERFreeDocumentLog.SCRAPE_FAILED
+            return PACERFreeDocumentLog.SCRAPE_FAILED, None
         raise self.retry(exc=exc, countdown=5)
+
+    if reported_count > len(results):
+        # PACER offered more opinions than we could turn into rows. Usually
+        # this means the docket-number/case-name/date repair logic in
+        # juriscraper's FreeOpinionRow is out of date for this court.
+        logger.error(
+            "Parsed only %s of the %s opinions PACER reported for %s (%s to "
+            "%s). The written opinion parser may be out of date for this "
+            "court.",
+            len(results),
+            reported_count,
+            court_id,
+            start,
+            end,
+        )
 
     if log_id and not settings.DEVELOPMENT:
         # We only save the html when the script is run automatically every day and
@@ -556,7 +591,11 @@ def get_and_save_free_document_report(
     # Create PACERFreeDocumentRow in bulk
     PACERFreeDocumentRow.objects.bulk_create(document_rows_to_create)
 
-    return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL, len(document_rows_to_create)
+    return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL, FreeOpinionScrapeCounts(
+        reported=reported_count,
+        parsed=len(results),
+        saved=len(document_rows_to_create),
+    )
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -1014,15 +1053,35 @@ def upload_to_ia(
 
 
 @app.task
-def mark_court_done_on_date(log_id: int, status: int) -> int | None:
+def mark_court_done_on_date(
+    log_id: int, status: int, counts: FreeOpinionScrapeCounts | None = None
+) -> int | None:
+    """Update a free-opinion scrape log row with its final outcome.
+
+    :param log_id: the PACERFreeDocumentLog primary key
+    :param status: the final scrape status
+    :param counts: the scrape's document counts, or None when they are
+    unknown (e.g. the scrape failed), which leaves them null on the log
+    :returns: the status that was saved, or None if the log row is gone
+    :rtype: int | None
+    """
     try:
         doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
         return None
-    else:
-        doc_log.status = status
-        doc_log.date_completed = now()
-        doc_log.save()
+
+    if counts is not None:
+        # Rebuild the tuple by position: dispatched through Celery rather
+        # than called in-process, JSON serialization would have flattened it
+        # to a plain list on the way here.
+        counts = FreeOpinionScrapeCounts(*counts)
+
+    doc_log.status = status
+    doc_log.date_completed = now()
+    doc_log.reported_document_count = counts.reported if counts else None
+    doc_log.parsed_document_count = counts.parsed if counts else None
+    doc_log.saved_document_count = counts.saved if counts else None
+    doc_log.save()
 
     return status
 

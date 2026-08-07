@@ -80,6 +80,7 @@ from cl.corpus_importer.management.commands.scrape_pacer_free_opinions import (
     EXCLUDED_COURT_IDS,
     OUTSTANDING_FAILED_LOOKBACK_DAYS,
     do_everything,
+    fetch_doc_report,
     get_and_save_free_document_reports,
     get_outstanding_failed_dates,
     report_free_document_scrape_stalls,
@@ -95,6 +96,7 @@ from cl.corpus_importer.signals import (
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.tasks import (
+    FreeOpinionScrapeCounts,
     classify_case_name_by_llm,
     download_texas_document,
     generate_ia_json,
@@ -614,10 +616,12 @@ class PacerDocketParserTest(TestCase):
             "cl.corpus_importer.tasks.FreeOpinionReport",
             new=FakeFreeOpinionReport,
         ):
-            get_and_save_free_document_report(
+            status, counts = get_and_save_free_document_report(
                 "cand", now().date(), now().date()
             )
 
+        self.assertEqual(status, PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        self.assertEqual(counts, FreeOpinionScrapeCounts(1, 1, 1))
         row = PACERFreeDocumentRow.objects.all()
         self.assertEqual(row.count(), 1)
         self.assertEqual(row[0].court_id, "cand")
@@ -629,6 +633,49 @@ class PacerDocketParserTest(TestCase):
         self.assertTrue(row[0].pacer_case_id)
         self.assertTrue(row[0].pacer_doc_id)
         self.assertTrue(row[0].pacer_seq_no)
+
+    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
+    def test_free_document_report_counts_each_stage(
+        self, mock_cookies
+    ) -> None:
+        """Documents lost to the parser and to skipped rows stay counted.
+
+        PACER reports 4 opinions, juriscraper parses 3 of them, and one of
+        those 3 is unusable (no docket number). Each loss has to show up in
+        its own count, otherwise a silent gap looks like a quiet day.
+        """
+
+        class GappyFreeOpinionReport(FakeFreeOpinionReport):
+            reported_count = 4
+            rows = [
+                {"court_id": "cand", "docket_number": "5:18-ap-07075"},
+                {"court_id": "cand", "docket_number": "5:18-ap-07076"},
+                # Skipped at save time: no case number in PACER (issue #4547).
+                {"court_id": "cand", "docket_number": ""},
+            ]
+
+        with (
+            patch(
+                "cl.corpus_importer.tasks.FreeOpinionReport",
+                new=GappyFreeOpinionReport,
+            ),
+            # Patch the logger rather than using assertLogs: the test runner
+            # calls logging.disable(), so no record would ever be emitted.
+            patch("cl.corpus_importer.tasks.logger.error") as mock_error,
+        ):
+            status, counts = get_and_save_free_document_report(
+                "cand", now().date(), now().date()
+            )
+
+        self.assertEqual(status, PACERFreeDocumentLog.SCRAPE_SUCCESSFUL)
+        self.assertEqual(counts, FreeOpinionScrapeCounts(4, 3, 2))
+        self.assertEqual(PACERFreeDocumentRow.objects.count(), 2)
+        # The reported-vs-parsed gap is loud, since it usually means the
+        # parser is out of date for this court.
+        mock_error.assert_called_once()
+        log_args = mock_error.call_args.args
+        self.assertIn("Parsed only %s of the %s opinions", log_args[0])
+        self.assertEqual(log_args[1:4], (3, 4, "cand"))
 
 
 class FreeOpinionExcludedCourtsTest(SimpleTestCase):
@@ -695,6 +742,81 @@ class ScrapeFreeOpinionsLoopTest(TestCase):
             [date(2025, 11, 1), date(2025, 11, 2), date(2025, 11, 3)],
             "All three days should be attempted despite the middle failure.",
         )
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_and_save_free_document_report"
+    )
+    def test_fetch_doc_report_stores_document_counts(
+        self, mock_report
+    ) -> None:
+        """A successful scrape persists all three of the scrape's counts."""
+        count_sets = [
+            # A clean scrape: everything PACER reported was parsed and saved.
+            FreeOpinionScrapeCounts(reported=3, parsed=3, saved=3),
+            # A silent gap at each stage, which is the point of the fields.
+            FreeOpinionScrapeCounts(reported=52, parsed=12, saved=10),
+            # A day with genuinely nothing in it.
+            FreeOpinionScrapeCounts(reported=0, parsed=0, saved=0),
+        ]
+        for counts in count_sets:
+            with self.subTest(counts=counts):
+                mock_report.return_value = (
+                    PACERFreeDocumentLog.SCRAPE_SUCCESSFUL,
+                    counts,
+                )
+
+                failed = fetch_doc_report(
+                    self.court.pk, date(2026, 5, 1), date(2026, 5, 1)
+                )
+
+                self.assertFalse(failed)
+                log = PACERFreeDocumentLog.objects.latest("pk")
+                self.assertEqual(
+                    log.status, PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+                )
+                self.assertEqual(log.reported_document_count, counts.reported)
+                self.assertEqual(log.parsed_document_count, counts.parsed)
+                self.assertEqual(log.saved_document_count, counts.saved)
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_and_save_free_document_report"
+    )
+    def test_fetch_doc_report_exception_leaves_counts_null(
+        self, mock_report
+    ) -> None:
+        """A scrape that raises is marked failed with unknown counts."""
+        mock_report.side_effect = requests.RequestException("proxy timeout")
+
+        failed = fetch_doc_report(
+            self.court.pk, date(2026, 5, 1), date(2026, 5, 1)
+        )
+
+        self.assertTrue(failed)
+        log = PACERFreeDocumentLog.objects.latest("pk")
+        self.assertEqual(log.status, PACERFreeDocumentLog.SCRAPE_FAILED)
+        self.assertIsNone(log.reported_document_count)
+        self.assertIsNone(log.parsed_document_count)
+        self.assertIsNone(log.saved_document_count)
+
+    @patch(
+        "cl.corpus_importer.management.commands.scrape_pacer_free_opinions.get_and_save_free_document_report"
+    )
+    def test_fetch_doc_report_failed_status_leaves_counts_null(
+        self, mock_report
+    ) -> None:
+        """A retries-exhausted failure return is recorded as failed too."""
+        mock_report.return_value = (PACERFreeDocumentLog.SCRAPE_FAILED, None)
+
+        failed = fetch_doc_report(
+            self.court.pk, date(2026, 5, 1), date(2026, 5, 1)
+        )
+
+        self.assertTrue(failed)
+        log = PACERFreeDocumentLog.objects.latest("pk")
+        self.assertEqual(log.status, PACERFreeDocumentLog.SCRAPE_FAILED)
+        self.assertIsNone(log.reported_document_count)
+        self.assertIsNone(log.parsed_document_count)
+        self.assertIsNone(log.saved_document_count)
 
     def test_get_outstanding_failed_dates(self) -> None:
         """Only never-succeeded days within the look-back are returned."""
