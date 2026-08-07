@@ -112,7 +112,9 @@ dependencies = [
   "django-cotton>=2.6.0",
   "django-cursor-pagination>=0.3.0",
   "django-elasticsearch-dsl>=9.0",
-  "juriscraper>=3.0.0",
+  # 3.0.34 exposes FreeOpinionReport.reported_opinion_count, which the
+  # free-opinion scrape log depends on to detect silent parse gaps.
+  "juriscraper>=3.0.34",
   "instructor>=1.15.4",
   "django-s3-express-cache>=0.2.0",
   "zohocrmsdk8-0==4.0.0",
