@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
+from types import SimpleNamespace
 from typing import cast
 from unittest import mock
 
@@ -13,7 +14,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.mail import send_mail
 from django.core.management import call_command
-from django.test import AsyncClient, override_settings
+from django.test import AsyncClient, SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
@@ -47,6 +48,7 @@ from cl.alerts.utils import (
     InvalidDateError,
     add_document_hit_to_alert_set,
     build_alert_email_subject,
+    fetch_all_search_alerts_results,
     has_document_alert_hit_been_triggered,
     is_match_all_query,
     percolate_es_document,
@@ -91,6 +93,7 @@ from cl.search.models import (
     DocketEntry,
     RECAPDocument,
 )
+from cl.search.types import PercolatorResponses
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import (
     APITestCase,
@@ -5007,6 +5010,83 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         self.assertTrue(
             AudioPercolator.exists(id=valid_alert.pk),
             msg=f"Alert id: {valid_alert.pk} was not indexed.",
+        )
+
+
+class FetchAllSearchAlertsResultsTest(SimpleTestCase):
+    class FakeHits:
+        def __init__(self, total, markers):
+            self.total = SimpleNamespace(value=total)
+            self.hits = [
+                SimpleNamespace(meta=SimpleNamespace(sort=[marker]))
+                for marker in markers
+            ]
+
+        def __iter__(self):
+            return iter(self.hits)
+
+        def __getitem__(self, item):
+            return self.hits[item]
+
+    @classmethod
+    def make_response(cls, total, *markers):
+        return SimpleNamespace(hits=cls.FakeHits(total, markers))
+
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=1)
+    @mock.patch("cl.alerts.utils.percolate_es_document")
+    def test_paginates_dataclass_responses(self, mock_percolate):
+        initial = PercolatorResponses(
+            self.make_response(3, "main-1"),
+            self.make_response(1, "rd-1"),
+            self.make_response(1, "d-1"),
+        )
+        mock_percolate.side_effect = [
+            PercolatorResponses(
+                self.make_response(3, "main-2"),
+                self.make_response(1, "rd-2"),
+                self.make_response(1, "d-2"),
+            ),
+            PercolatorResponses(
+                self.make_response(3, "main-3"),
+                self.make_response(1, "rd-3"),
+                self.make_response(1, "d-3"),
+            ),
+        ]
+
+        main_hits, rd_hits, d_hits = fetch_all_search_alerts_results(
+            initial, "document-id", "percolator-index"
+        )
+
+        self.assertEqual(len(main_hits), 3)
+        self.assertEqual(len(rd_hits), 3)
+        self.assertEqual(len(d_hits), 3)
+        self.assertEqual(mock_percolate.call_count, 2)
+
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=1)
+    @mock.patch("cl.alerts.utils.percolate_es_document")
+    def test_handles_empty_auxiliary_responses(self, mock_percolate):
+        initial = PercolatorResponses(
+            self.make_response(2, "main-1"),
+            self.make_response(0),
+            self.make_response(0),
+        )
+        mock_percolate.return_value = PercolatorResponses(
+            self.make_response(2, "main-2"), None, None
+        )
+
+        main_hits, rd_hits, d_hits = fetch_all_search_alerts_results(
+            initial, "document-id", "percolator-index"
+        )
+
+        self.assertEqual(len(main_hits), 2)
+        self.assertEqual(rd_hits, [])
+        self.assertEqual(d_hits, [])
+        mock_percolate.assert_called_once_with(
+            "document-id",
+            "percolator-index",
+            main_search_after=["main-1"],
+            rd_search_after=None,
+            d_search_after=None,
         )
 
 
