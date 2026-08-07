@@ -6,6 +6,7 @@ import shutil
 import threading
 from datetime import date
 from http import HTTPStatus
+from typing import Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -18,8 +19,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
+from django.forms import ModelChoiceField
 from django.http import HttpResponse
 from django.template import engines
+from django.template.response import TemplateResponse
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
@@ -568,7 +571,8 @@ class ViewRecapDocumentTest(TestCase):
             docket_entry__docket=self.docket
         )
         rd.is_available = True
-        rd.filepath_local = "/tmp/test.pdf"
+        # Cast so later `.url` reads aren't narrowed to str's attributes.
+        rd.filepath_local = cast(Any, "/tmp/test.pdf")
         await sync_to_async(rd.save)()
         with self.subTest("Check download_redirect download"):
             r = await self.get(
@@ -622,11 +626,18 @@ class ViewRecapDocumentTest(TestCase):
         )
         req.user = AnonymousUser()
         req.auser = AsyncMock(return_value=req.user)
-        r = await view_recap_document(
-            req, self.docket.id, rd.document_number, is_og_bot=True
+        r = cast(
+            TemplateResponse,
+            await view_recap_document(
+                req, self.docket.id, rd.document_number, is_og_bot=True
+            ),
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         c = r.context_data
+        # Narrowing for the type checker: context_data is None only before
+        # the view builds the TemplateResponse, and the OK status asserted
+        # above proves the view rendered one.
+        assert c is not None
         self.assertEqual(rd, c["rd"])
         self.assertIsNotNone(c["og_file_path"])
 
@@ -1894,7 +1905,9 @@ class UploadPublication(TestCase):
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
         )
-        form.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            ModelChoiceField, form.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
 
@@ -1934,7 +1947,9 @@ class UploadPublication(TestCase):
             pk="tennworkcompcl",
             files={"pdf_upload": self.png},
         )
-        form.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            ModelChoiceField, form.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
         self.assertFalse(form.is_valid(), form.errors)
@@ -1954,9 +1969,9 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
-        form.fields["third_judge"].queryset = qs
+        cast(ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(ModelChoiceField, form.fields["second_judge"]).queryset = qs
+        cast(ModelChoiceField, form.fields["third_judge"]).queryset = qs
 
         # Check no citations exist before upload
         count = OpinionCluster.objects.all().count()
@@ -1996,9 +2011,9 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
-        form.fields["third_judge"].queryset = qs
+        cast(ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(ModelChoiceField, form.fields["second_judge"]).queryset = qs
+        cast(ModelChoiceField, form.fields["third_judge"]).queryset = qs
         form.is_valid()
         self.assertEqual(
             form.errors["case_title"], ["This field is required."]
@@ -2015,9 +2030,9 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
-        form.fields["third_judge"].queryset = qs
+        cast(ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(ModelChoiceField, form.fields["second_judge"]).queryset = qs
+        cast(ModelChoiceField, form.fields["third_judge"]).queryset = qs
 
         self.assertEqual(form.is_valid(), True, msg=form.errors)
 
@@ -2103,8 +2118,8 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
         qs = Person.objects.filter(positions__court_id="tennworkcompapp")
-        form.fields["lead_author"].queryset = qs
-        form.fields["second_judge"].queryset = qs
+        cast(ModelChoiceField, form.fields["lead_author"]).queryset = qs
+        cast(ModelChoiceField, form.fields["second_judge"]).queryset = qs
         # form.fields["third_judge"].queryset = qs
 
         if form.is_valid():
@@ -2138,7 +2153,9 @@ class UploadPublication(TestCase):
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
         )
-        form2.fields["lead_author"].queryset = Person.objects.filter(
+        cast(
+            ModelChoiceField, form2.fields["lead_author"]
+        ).queryset = Person.objects.filter(
             positions__court_id="tennworkcompcl"
         )
         if form2.is_valid():
@@ -3223,7 +3240,9 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
         isn't first-class in XPath.
         """
         for el in fromstring(html).iter():
-            if "x-on:open-filter-drawer" in el.attrib:
+            # lxml-stubs types `.attrib` with a `# type:` comment pyrefly
+            # can't read.
+            if "x-on:open-filter-drawer" in cast(dict, el.attrib):
                 return el
         return None
 
@@ -3285,9 +3304,7 @@ class DocketFilterPaginationWiringTest(TestCase):
             ]
         )
 
-    async def _get_docket_and_verify_v2(
-        self, data: dict | None = None
-    ) -> HttpResponse:
+    async def _get_docket_and_verify_v2(self, data: dict | None = None) -> Any:
         """Fetch the docket page, assert that v2 actually rendered, and
         return the response.
         """

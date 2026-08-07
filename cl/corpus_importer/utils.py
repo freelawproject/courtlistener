@@ -9,9 +9,10 @@ from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
+import numpy as np
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
@@ -332,7 +333,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
 
 def similarity_scores(
     texts_to_compare_1: list[str], texts_to_compare_2: list[str]
-) -> list[list[float]]:
+) -> np.ndarray:
     """Get similarity scores between two sets of lists
 
     Using TF-IDF/Term Frequency-Inverse Document Frequency
@@ -345,13 +346,18 @@ def similarity_scores(
 
     # We import the library inside the function to avoid loading it if it is
     # not required
+    from scipy.sparse import csr_matrix
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
 
     # Weights the word counts by a measure of how often they appear in the
-    # documents, and it returns a sparse matrix
-    X = TfidfVectorizer().fit_transform(
-        texts_to_compare_1 + texts_to_compare_2
+    # documents, and it returns a sparse matrix. The cast is needed because
+    # the stubs return the spmatrix base class, which isn't indexable.
+    X = cast(
+        csr_matrix,
+        TfidfVectorizer().fit_transform(
+            texts_to_compare_1 + texts_to_compare_2
+        ),
     )
 
     # Calculate cosine similarity between weight of words for each text in list

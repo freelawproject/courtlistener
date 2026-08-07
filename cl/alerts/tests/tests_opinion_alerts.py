@@ -1,5 +1,6 @@
 import datetime
 import random
+from typing import Any
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -349,7 +350,7 @@ class OpinionAlertsPercolatorTest(
             len(webhook_events), 2, msg="Webhook events don't match."
         )
 
-        alert_data = {
+        alert_data: dict[int, dict[str, Any]] = {
             opinion_cluster_alert.pk: {
                 "alert": opinion_cluster_alert,
                 "result": opinion,

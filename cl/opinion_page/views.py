@@ -169,8 +169,11 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
                 "order_by": "dateFiled desc",
                 "type": SEARCH_TYPES.OPINION,
                 "court": court,
-                "filed_after": (
-                    datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
+                # The form's date field accepts datetime objects, even though
+                # QueryDict values are nominally strings.
+                "filed_after": cast(
+                    str,
+                    datetime.datetime.today() - datetime.timedelta(days=28),
                 ),
             }
         )

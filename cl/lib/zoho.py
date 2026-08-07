@@ -1,4 +1,4 @@
-from typing import Any, Literal, Protocol
+from typing import Any, Protocol
 
 import requests
 from django.conf import settings
@@ -42,7 +42,7 @@ class HasModuleName(Protocol):
     def _build_body_wrapper(
         records: list[Record],
         process: list[str] | None = None,
-        trigger: list[str] | None = None,
+        triggers: list[str] | None = None,
     ) -> BodyWrapper: ...
 
 
@@ -50,9 +50,7 @@ def get_zoho_cache_key() -> str:
     return "zoho_token"
 
 
-def build_zoho_payload_from_user(
-    user, module: Literal["Contacts", "Leads"]
-) -> dict[str | Field, Any]:
+def build_zoho_payload_from_user(user, module: str) -> dict[str | Field, Any]:
     """
     Build a Zoho CRM payload dictionary from a User instance.
 

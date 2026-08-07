@@ -5,7 +5,7 @@ from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from itertools import batched, chain
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import eyecite
 from celery import chain as celery_chain
@@ -20,6 +20,7 @@ from django.core.cache.backends.base import BaseCache
 from django.db import transaction
 from django.db.models import F, Model, Prefetch, Q, QuerySet
 from django.db.models.constants import LOOKUP_SEP
+from django.http import QueryDict
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
@@ -286,7 +287,13 @@ class FilterManyToManyMixin:
 
     join_table_cleanup_mapping: dict[str, str] = {}
 
-    def _get_filter_label(self: FilterSet, field_name: str) -> str:
+    if TYPE_CHECKING:
+        # Attributes provided by the FilterSet the mixin is combined with.
+        data: QueryDict
+        filters: dict[str, Any]
+        related_filtersets: dict[str, FilterSet]
+
+    def _get_filter_label(self, field_name: str) -> str:
         """
         Maps a filter field name to its corresponding label.
 
@@ -332,7 +339,7 @@ class FilterManyToManyMixin:
             join_table_key = join_table_key.replace(url_key, new_key, 1)
         return join_table_key
 
-    def get_filters_for_join_table(self: FilterSet) -> dict[str, Any]:
+    def get_filters_for_join_table(self) -> dict[str, Any]:
         """
         Processes request filters for use in a join table query.
 

@@ -59,6 +59,8 @@ class AWSMediaStorage(S3Storage):
 
     location = ""
     file_overwrite = True
+    # Populated by django-storages from AWS_S3_OBJECT_PARAMETERS.
+    object_parameters: dict[str, str]
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
         # Set extremely long caches b/c we hash our content anyway
@@ -143,6 +145,8 @@ class S3GlacierInstantRetrievalStorage(S3Storage):
     default_acl = "private"
     bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
     file_overwrite = True
+    # Populated by django-storages from AWS_S3_OBJECT_PARAMETERS.
+    object_parameters: dict[str, str]
 
     def __init__(self, naming_strategy=get_name_by_incrementing, **settings):
         self.naming_strategy = naming_strategy
@@ -176,6 +180,8 @@ class S3IntelligentTieringStorage(S3Storage):
 
     location = ""
     file_overwrite = True
+    # Populated by django-storages from AWS_S3_OBJECT_PARAMETERS.
+    object_parameters: dict[str, str]
 
     def get_object_parameters(self, name: str) -> dict[str, str]:
         params = self.object_parameters.copy()

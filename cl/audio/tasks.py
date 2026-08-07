@@ -1,4 +1,5 @@
 from math import ceil
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -147,7 +148,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
 
     # Prevent default openai client retrying
     with OpenAI(max_retries=0) as client:
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "file": file,
             "model": "whisper-1",
             "language": "en",

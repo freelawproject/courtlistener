@@ -852,7 +852,7 @@ async def es_get_cited_clusters_with_cache(
         response = None
         timeout_cited = True
 
-    citing_clusters = list(response) if not timeout_cited else []
+    citing_clusters = list(response) if response is not None else []
     cluster_results.citing_clusters = citing_clusters
     cluster_results.citing_cluster_count = (
         response.hits.total.value if response is not None else 0

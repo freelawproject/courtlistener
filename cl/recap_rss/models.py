@@ -29,6 +29,7 @@ class RssFeedStatus(AbstractDateTimeModel):
         (PROCESSING_IN_PROGRESS, "Feed is currently being processed."),
         (QUEUED_FOR_RETRY, "Feed failed processing, but will be retried."),
     )
+    court_id: str
     court = models.ForeignKey(
         Court,
         help_text="The court where the upload was from",
@@ -79,6 +80,7 @@ def make_rss_feed_path(instance, filename: str) -> str:
 class RssFeedData(AbstractDateTimeModel):
     """Store all old RSS data to disk for future analysis."""
 
+    court_id: str
     court = models.ForeignKey(
         Court,
         help_text="The court where the RSS feed was found",

@@ -2,7 +2,7 @@ import datetime
 import unittest
 from collections.abc import Sized
 from functools import wraps
-from typing import cast
+from typing import Any, cast
 
 from django.apps import apps
 from django.conf import settings
@@ -243,7 +243,7 @@ opinion_document_v4_api_keys = {
 }
 opinion_document_v4_api_keys.update(opinion_document_v3_v4_common_fields)
 
-docket_api_common_keys = {
+docket_api_common_keys: dict[str, Any] = {
     "assignedTo": lambda x: (
         x["assignedTo"]
         if x.get("assignedTo")
@@ -399,12 +399,12 @@ recap_type_v4_api_keys.update(
             )
             else None
         ),
-        "meta": [],  # type: ignore
+        "meta": [],
         "recap_documents": [],  # type: ignore
     }
 )
 
-recap_document_common_api_keys = {
+recap_document_common_api_keys: dict[str, Any] = {
     "id": lambda x: x["result"].pk,
     "docket_entry_id": lambda x: x["result"].docket_entry.pk,
     "description": lambda x: (
@@ -454,7 +454,7 @@ recap_document_v4_api_keys.update(
             .cited_opinions.all()
             .values_list("cited_opinion_id", flat=True)
         ),
-        "meta": [],  # type: ignore
+        "meta": [],
     }
 )
 
@@ -675,7 +675,7 @@ position_v4_fields = {
     "meta": [],
 }
 
-audio_common_fields = {
+audio_common_fields: dict[str, Any] = {
     "absolute_url": lambda x: x["result"].get_absolute_url(),
     "caseName": lambda x: (
         x["caseName"] if x.get("caseName") else x["result"].case_name
@@ -782,7 +782,7 @@ audio_v4_fields = audio_common_fields.copy()
 audio_v4_fields.update(
     {
         "case_name_full": lambda x: x["result"].case_name_full,
-        "meta": [],  # type: ignore
+        "meta": [],
     }
 )
 

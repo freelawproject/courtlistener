@@ -148,6 +148,7 @@ class DocketAlert(AbstractDateTimeModel):
     date_last_hit = models.DateTimeField(
         verbose_name="time of last trigger", blank=True, null=True
     )
+    docket_id: int
     docket = models.ForeignKey(
         Docket,
         help_text="The docket that we are subscribed to.",

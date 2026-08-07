@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import Any
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -43,7 +44,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
         return citation_serializer.validated_data
 
     def create(self, request: Request, *args, **kwargs):
-        citations = []
+        citations: list[dict[str, Any]] = []
         data = self.validate_request_data(request)
         text = data.get("text", None)
         if text:
@@ -186,6 +187,10 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
                 "error_message": f"Citation not found: '{citation_str}'",
             }
 
+        # Narrowing for the type checker: both branches above return
+        # clusters=None only together with cluster_count=0, and that case
+        # already returned NOT_FOUND, so clusters cannot be None here.
+        assert clusters is not None
         return {
             "normalized_citations": normalized_citations,
             **self._format_cluster_response(clusters, cluster_count),

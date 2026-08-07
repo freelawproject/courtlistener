@@ -40,6 +40,7 @@ from httpx import (
     RemoteProtocolError,
     TimeoutException,
 )
+from httpx import Response as HttpxResponse
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -3076,7 +3077,7 @@ def query_and_save_list_of_creditors(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> HttpxResponse:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
