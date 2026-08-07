@@ -911,6 +911,24 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             )
         )
 
+    def pre_update(self, updated_fields: list[str]) -> list[str]:
+        """Called before an updated instance is saved. Useful for setting attributes that are dependent on the result of the merge operation.
+
+        :param updated_fields: The fields that were updated.
+
+        :return: A list of additional attribute names that should be updated."""
+
+        return []
+
+    def needs_update(self) -> bool:
+        """Whether `self.existing` should take the update path even when no
+        merged attribute changed. Useful for re-triggering downstream
+        processing (e.g. a re-download) driven by the merge result's updates.
+
+        :return: True to force the update path."""
+
+        return False
+
     def after(self) -> None:
         """Run extra processes after the merge operation completes or fails."""
         ...
@@ -1015,10 +1033,11 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             if o2o_result.update or o2o_result.create:
                 updated.append(name)
             result |= o2o_result
-        if updated:
+        if updated or self.needs_update():
             result |= MergeResult.updated(
                 self.model.__name__, self.existing.pk
             )
+            updated += self.pre_update(updated)
             self.existing.save(update_fields=updated)
 
         return result
