@@ -5082,25 +5082,26 @@ def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def fl_ingest_docket_task(
-    task: Task, case_bytes: bytes, download_attachments: bool = True
+    task: Task, case: bytes | FloridaCase, download_attachments: bool = True
 ) -> MergeResult[Any]:
     """
     Task to parse and merge a Florida docket.
 
     :param task: The Celery task.
 
-    :param case_bytes: The bytes of the parsed JSON retrieved from S3.
+    :param case: The bytes of the parsed JSON retrieved from S3 or the fully parsed case.
     :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation.
     """
-    try:
-        case = FloridaCase.model_validate_json(
-            case_bytes, by_name=True, context={"deserialize": True}
-        )
-    except Exception:
-        logger.exception("Failed to deserialize Florida case")
-        return MergeResult.failed("Docket")
+    if isinstance(case, bytes):
+        try:
+            case = FloridaCase.model_validate_json(
+                case, by_name=True, context={"deserialize": True}
+            )
+        except Exception:
+            logger.exception("Failed to deserialize Florida case")
+            return MergeResult.failed("Docket")
     logger.info(
         "Attempting to merge Florida case %s",
         case.docket_number,

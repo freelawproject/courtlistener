@@ -15,6 +15,7 @@ from juriscraper.state.florida.scraper import CourtMetadata, PaginationFailed
 from pydantic import AliasPath, BaseModel, ConfigDict, Field
 from pydantic.types import UUID4
 
+from cl.corpus_importer.tasks import fl_ingest_docket_task
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
 from cl.scrapers.management.commands.back_scrape_fl_dockets import (
@@ -54,6 +55,13 @@ class Command(FLScrapeCommand, StatePollCommand):
     def add_arguments(self, parser: CommandParser):
         super().add_arguments(parser)
 
+        parser.add_argument(
+            "--download-attachments",
+            type=bool,
+            default=True,
+            help="Set to download attachments for newly discovered dockets.",
+        )
+
     def handle(
         self,
         *args,
@@ -66,6 +74,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         throttle_min_items: int,
         polling_delay: int,
         case_backfill_days: int,
+        download_attachments: bool,
         courts: str | None,
         **options,
     ):
@@ -92,17 +101,20 @@ class Command(FLScrapeCommand, StatePollCommand):
             polling_delay,
             case_backfill_days,
             queue,
+            download_attachments,
         )
 
     def send_merge_task(
         self,
-        court_id: FloridaCourtID,
         case: FloridaCase,
         throttle: CeleryThrottle,
         queue_name: str,
+        download_attachments: bool,
     ):
-        # TODO: Spawn merge task here when that's ready
-        logger.error("Florida merge task not implemented")
+        throttle.maybe_wait()
+        fl_ingest_docket_task.si(case, download_attachments).set(
+            queue=queue_name
+        ).apply_async()
 
     async def poll(
         self,
@@ -112,6 +124,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         polling_delay: int,
         case_backfill_days: int,
         queue_name: str,
+        download_attachments: bool,
     ):
         scraper_courts = await scraper.courts
         external_id_map = {
@@ -170,7 +183,9 @@ class Command(FLScrapeCommand, StatePollCommand):
                     throttle,
                     queue_name,
                 )
-                self.send_merge_task(court_id, case, throttle, queue_name)
+                self.send_merge_task(
+                    case, throttle, queue_name, download_attachments
+                )
             last_polled = now
             await asyncio.sleep(polling_delay * 60)
 
