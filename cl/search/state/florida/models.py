@@ -3,8 +3,11 @@ from django.db import models
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
-from cl.lib.models import AbstractDateTimeModel, AbstractPDF
-from cl.search.state.shared import DocketEntryType, ProcessingError
+from cl.lib.models import AbstractDateTimeModel
+from cl.search.state.shared import (
+    AbstractStateDocument,
+    DocketEntryType,
+)
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
 
@@ -83,9 +86,19 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         ]
 
 
+EXTRACTABLE_EXTENSIONS: set[str] = {
+    ".pdf",
+    ".html",
+    ".wpd",
+    ".txt",
+    ".tiff",
+}
+EXPECTED_EXTENSIONS: set[str] = {".pdf", ".tiff"}
+
+
 @pghistory.track()
 @document_model
-class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
+class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
     """
     Represents an attachment to a Florida docket entry.
 
@@ -95,7 +108,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     :ivar document_type: The type of the document in Florida ACIS
     :ivar link_uuid: The attachment link UUID retrieved from Florida ACIS. Used to generate document download URL.
     :ivar url: Download URL for attachment. Derived from uuid and link_uuid. Stored for safety.
-    :ivar processing_error: The processing error for the document, if any.
     """
 
     docket_entry = models.ForeignKey(
@@ -107,12 +119,24 @@ class FloridaDocument(AbstractDateTimeModel, AbstractPDF):
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
     link_uuid = models.UUIDField()
-    url = models.URLField(max_length=250)
-    processing_error = models.SmallIntegerField(
-        choices=ProcessingError.CHOICES,
-        null=True,
-        blank=True,
-    )
+
+    def make_filename(self) -> str:
+        """Build the stored filename from the document name and link UUID."""
+        return f"{self.document_name}-{self.link_uuid}"
+
+    @classmethod
+    def tmp_prefix(cls) -> str:
+        """Prefix for temporary download files."""
+        return "fl_"
+
+    @classmethod
+    def expected_extensions(cls) -> set[str]:
+        """File extensions Florida ACIS is known to serve."""
+        return EXPECTED_EXTENSIONS
+
+    def can_extract(self, extension: str) -> bool:
+        """Whether text extraction supports files with this extension."""
+        return extension in EXTRACTABLE_EXTENSIONS
 
     class Meta:
         app_label = "search"
