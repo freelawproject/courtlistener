@@ -1,6 +1,8 @@
+import base64
+import json
 import os
 from datetime import date
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 import time_machine
@@ -9,6 +11,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from google.genai.types import JobState
 
+from cl.ai.llm_providers.anthropic import AnthropicBatchWrapper
 from cl.ai.llm_providers.google import (
     GoogleGenAIBatchWrapper,
     _ResponseValidator,
@@ -1973,3 +1976,258 @@ class DeduplicationTest(TestCase):
             status=LLMTaskStatusChoices.UNPROCESSED,
         )
         self.assertEqual(new_tasks.count(), 1)
+
+
+class ValidateAnthropicModelTest(SimpleTestCase):
+    """Tests for the AnthropicBatchWrapper.validate_model function."""
+
+    @patch("cl.ai.llm_providers.anthropic.logger")
+    def test_no_retirement_date_logs_warning(self, mock_logger):
+        """A model without a retirement date logs a warning."""
+        AnthropicBatchWrapper.validate_model("claude-opus-4-8")
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        self.assertIn("does not have a retirement date", warning_msg)
+        self.assertIn("deprecations", warning_msg)
+
+    @patch.dict(
+        "cl.ai.llm_providers.anthropic.SUPPORTED_ANTHROPIC_MODELS",
+        {"test-model": date(2026, 1, 2)},
+    )
+    @patch("cl.ai.llm_providers.anthropic.date")
+    def test_model_before_retirement_date(self, mock_date):
+        """A model before its retirement date passes validation."""
+        mock_date.today.return_value = date(2026, 1, 1)
+        mock_date.side_effect = lambda *args, **kw: date(*args, **kw)
+        AnthropicBatchWrapper.validate_model("test-model")
+
+    @patch.dict(
+        "cl.ai.llm_providers.anthropic.SUPPORTED_ANTHROPIC_MODELS",
+        {"test-model": date(2026, 1, 1)},
+    )
+    @patch("cl.ai.llm_providers.anthropic.date")
+    def test_model_past_retirement_date_raises_error(self, mock_date):
+        """A model past its retirement date raises ValueError."""
+        mock_date.today.return_value = date(2026, 1, 2)
+        mock_date.side_effect = lambda *args, **kw: date(*args, **kw)
+        with self.assertRaises(ValueError) as context:
+            AnthropicBatchWrapper.validate_model("test-model")
+        self.assertIn("retired", str(context.exception))
+        self.assertIn("2026-01-01", str(context.exception))
+
+    def test_unsupported_model_raises_error(self):
+        """An unsupported model raises ValueError."""
+        with self.assertRaises(ValueError) as context:
+            AnthropicBatchWrapper.validate_model("invalid-model")
+        self.assertIn("Invalid Anthropic model", str(context.exception))
+        self.assertIn("Supported models", str(context.exception))
+
+
+class AnthropicBatchWrapperTest(SimpleTestCase):
+    """Tests for the AnthropicBatchWrapper class."""
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_init_with_api_key(self, mock_client_class):
+        """Test wrapper initialization with an API key."""
+        wrapper = AnthropicBatchWrapper(api_key="test-api-key-123")
+        mock_client_class.assert_called_once_with(api_key="test-api-key-123")
+        self.assertIsNotNone(wrapper.client)
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_init_without_api_key_raises_error(self, mock_client_class):
+        """Test that initialization fails without a valid API key."""
+        for api_key in ["", None]:
+            with self.subTest(api_key=api_key):
+                with self.assertRaises(ValueError) as context:
+                    AnthropicBatchWrapper(api_key=api_key)
+                self.assertIn("API key is required", str(context.exception))
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_prepare_batch_requests_with_file(self, mock_client_class):
+        """Test preparing batch requests with an inline document."""
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        with patch("builtins.open", mock_open(read_data=b"%PDF-1.7 fake")):
+            result = wrapper.prepare_batch_requests(
+                tasks_data=[
+                    {"llm_key": "task-1", "input_file_path": "/x/test.pdf"}
+                ],
+                user_prompt="Extract text from this PDF",
+            )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["custom_id"], "task-1")
+
+        content = result[0]["content"]
+        # Should have: document block + user prompt
+        self.assertEqual(len(content), 2)
+        self.assertEqual(content[0]["type"], "document")
+        self.assertEqual(content[0]["source"]["type"], "base64")
+        self.assertEqual(
+            content[0]["source"]["data"],
+            base64.standard_b64encode(b"%PDF-1.7 fake").decode("utf-8"),
+        )
+        self.assertEqual(
+            content[1],
+            {"type": "text", "text": "Extract text from this PDF"},
+        )
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_prepare_batch_requests_with_text_only(self, mock_client_class):
+        """Test preparing batch requests with text input only."""
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        result = wrapper.prepare_batch_requests(
+            tasks_data=[
+                {"llm_key": "task-2", "input_text": "A sample document."}
+            ],
+            user_prompt="Summarize this text",
+        )
+
+        self.assertEqual(len(result), 1)
+        content = result[0]["content"]
+        self.assertEqual(len(content), 2)
+        self.assertEqual(
+            content[0], {"type": "text", "text": "A sample document."}
+        )
+        self.assertEqual(
+            content[1], {"type": "text", "text": "Summarize this text"}
+        )
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_prepare_batch_requests_skips_missing_key(self, mock_client):
+        """Test that tasks without an llm_key are skipped."""
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        result = wrapper.prepare_batch_requests(
+            tasks_data=[
+                {"input_text": "No key provided"},
+                {"llm_key": "task-3", "input_text": "Has key"},
+            ],
+            user_prompt="Process this",
+        )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["custom_id"], "task-3")
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_execute_batch_attaches_system_cache(self, mock_client_class):
+        """Test that the system prompt is sent with a cache breakpoint."""
+        mock_batch = MagicMock()
+        mock_batch.id = "msgbatch_01abc"
+        mock_client_instance = MagicMock()
+        mock_client_instance.messages.batches.create.return_value = mock_batch
+        mock_client_class.return_value = mock_client_instance
+
+        wrapper = AnthropicBatchWrapper(
+            api_key="test-key", model_name="claude-haiku-4-5"
+        )
+        requests = [
+            {
+                "custom_id": "req-1",
+                "content": [{"type": "text", "text": "hi"}],
+            }
+        ]
+        batch_id = wrapper.execute_batch(
+            requests=requests,
+            system_prompt="You are a precise extractor.",
+        )
+
+        self.assertEqual(batch_id, "msgbatch_01abc")
+        create = mock_client_instance.messages.batches.create
+        create.assert_called_once()
+        sent = create.call_args.kwargs["requests"]
+        self.assertEqual(sent[0]["custom_id"], "req-1")
+        system = sent[0]["params"]["system"]
+        self.assertEqual(
+            system[0]["cache_control"],
+            {"type": "ephemeral", "ttl": "1h"},
+        )
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_execute_batch_requires_model_name(self, mock_client_class):
+        """Test that execute_batch needs a model name."""
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        with self.assertRaises(ValueError) as context:
+            wrapper.execute_batch(requests=[], system_prompt=None)
+        self.assertIn("model_name is required", str(context.exception))
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_get_job(self, mock_client_class):
+        """Test retrieving a batch by ID."""
+        mock_batch = MagicMock()
+        mock_batch.processing_status = "in_progress"
+        mock_client_instance = MagicMock()
+        retrieve = mock_client_instance.messages.batches.retrieve
+        retrieve.return_value = mock_batch
+        mock_client_class.return_value = mock_client_instance
+
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        result = wrapper.get_job("msgbatch_01xyz")
+
+        self.assertEqual(result.processing_status, "in_progress")
+        retrieve.assert_called_once_with("msgbatch_01xyz")
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_download_results_rejects_unfinished(self, mock_client_class):
+        """Test that downloading an unfinished batch raises ValueError."""
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        job = MagicMock()
+        job.processing_status = "in_progress"
+        with self.assertRaises(ValueError) as context:
+            wrapper.download_results(job)
+        self.assertIn("Cannot download results", str(context.exception))
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_process_results_success_and_error(self, mock_client_class):
+        """Test that succeeded and errored results are mapped correctly."""
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        jsonl = "\n".join(
+            [
+                json.dumps(
+                    {
+                        "custom_id": "task-1",
+                        "result": {
+                            "type": "succeeded",
+                            "message": {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "extracted text",
+                                    }
+                                ]
+                            },
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "custom_id": "task-2",
+                        "result": {
+                            "type": "errored",
+                            "error": {
+                                "type": "error",
+                                "error": {
+                                    "type": "invalid_request_error",
+                                    "message": "too large",
+                                },
+                            },
+                        },
+                    }
+                ),
+            ]
+        )
+        results = wrapper.process_results(jsonl)
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0]["key"], "task-1")
+        self.assertEqual(results[0]["status"], "SUCCEEDED")
+        self.assertEqual(results[0]["content"], "extracted text")
+        self.assertIsNone(results[0]["error_message"])
+        self.assertEqual(results[1]["status"], "FAILED")
+        self.assertEqual(
+            results[1]["error_message"],
+            "invalid_request_error: too large",
+        )
+
+    @patch("cl.ai.llm_providers.anthropic.anthropic.Anthropic")
+    def test_process_results_empty_input(self, mock_client_class):
+        """Test that empty content yields no results."""
+        wrapper = AnthropicBatchWrapper(api_key="test-key")
+        self.assertEqual(wrapper.process_results(""), [])
