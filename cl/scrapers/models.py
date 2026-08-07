@@ -59,11 +59,33 @@ class PACERFreeDocumentLog(models.Model):
     status = models.SmallIntegerField(
         help_text="The status of the scrape.", choices=SCRAPE_STATUSES
     )
-    document_count = models.IntegerField(
-        help_text="The number of results the Written Opinions report "
-        "returned for this scrape. Null means unknown (the scrape failed "
-        "or predates this field); 0 means the scrape succeeded with no "
-        "results.",
+    # Three counts, narrowing from what PACER claims to what we can actually
+    # ingest. Comparing them localizes where a scrape lost documents:
+    # reported > parsed means our parser dropped rows, and parsed > saved
+    # means the rows themselves were unusable. Null always means unknown (the
+    # scrape failed, or the row predates these fields); 0 means the scrape
+    # genuinely produced nothing.
+    reported_document_count = models.PositiveIntegerField(
+        help_text="The number of opinions PACER's Written Opinions report "
+        "said it had for this scrape ('Total number of opinions reported', "
+        "summed over every page queried). Null means unknown (the scrape "
+        "failed or predates this field).",
+        null=True,
+        blank=True,
+    )
+    parsed_document_count = models.PositiveIntegerField(
+        help_text="The number of rows we parsed out of the Written Opinions "
+        "report for this scrape. Lower than the reported count means the "
+        "parser silently dropped rows. Null means unknown (the scrape failed "
+        "or predates this field).",
+        null=True,
+        blank=True,
+    )
+    saved_document_count = models.PositiveIntegerField(
+        help_text="The number of parsed rows we saved for ingestion from "
+        "this scrape. Lower than the parsed count means rows were skipped as "
+        "unusable, e.g. missing a docket number. Null means unknown (the "
+        "scrape failed or predates this field).",
         null=True,
         blank=True,
     )
