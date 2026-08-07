@@ -2447,7 +2447,7 @@ class TexasMergerTest(TestCase):
         )
         self.download_task_mock = self.download_task_patch.start()
         self.extract_document_patch = patch(
-            "cl.corpus_importer.tasks.extract_formatted_text_document.s"
+            "cl.scrapers.tasks.extract_formatted_text_document.si"
         )
         self.extract_document_mock = self.extract_document_patch.start()
         self.download_document_patch = patch(
@@ -2727,8 +2727,8 @@ class TexasMergerTest(TestCase):
         self.download_task_mock.assert_not_called()
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
     @responses.activate
     def test_merge_texas_document_plaintext_extraction(
         self, ext_mock, pcs_mock, throttle_mock
@@ -2791,25 +2791,30 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is True
-        assert output.update is False
-        assert output.success is True
-        assert "TexasDocketEntry" in output.creates
+        self.assertTrue(output.create)
+        self.assertFalse(output.update)
+        self.assertTrue(output.success)
+        self.assertIn("TexasDocketEntry", output.creates)
         entry_pk = next(iter(output.creates["TexasDocketEntry"]))
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
         )
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == 1
-        assert self.extract_document_mock.call_count == 1
+        self.assertEqual(n_attachments, 1)
+        self.assertEqual(self.download_task_mock.call_count, 1)
 
     def test_merge_texas_docket_entry_no_update(self):
         """Can we correctly handle a docket entry update noop?"""
@@ -2836,7 +2841,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_document_mock.reset_mock()
+        self.download_task_mock.reset_mock()
 
         # noop
         with self.captureOnCommitCallbacks(execute=True):
@@ -2844,24 +2849,29 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is False
-        assert output.update is True
-        assert output.success is True
-        assert entry_pk in output.updates["TexasDocketEntry"]
+        self.assertFalse(output.create)
+        self.assertTrue(output.update)
+        self.assertTrue(output.success)
+        self.assertIn(entry_pk, output.updates["TexasDocketEntry"])
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
         )
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == len(case_event["attachments"])
-        assert self.extract_document_mock.call_count == 0
+        self.assertEqual(n_attachments, len(case_event["attachments"]))
+        self.assertEqual(self.download_task_mock.call_count, 0)
 
     def test_merge_texas_docket_entry_add_document(self):
         """Can we correctly add a new document to an existing docket entry?"""
@@ -2889,7 +2899,7 @@ class TexasMergerTest(TestCase):
             document.filepath_local = "a"
             document.save()
         # Reset call count
-        self.extract_document_mock.reset_mock()
+        self.download_task_mock.reset_mock()
 
         case_event["attachments"].append(TexasCaseDocumentDictFactory())
         with self.captureOnCommitCallbacks(execute=True):
@@ -2897,24 +2907,29 @@ class TexasMergerTest(TestCase):
                 self.docket_coa1, "2025-01-02.000", case_event, appellate_brief
             )
 
-        assert output.create is True
-        assert output.update is True
-        assert output.success is True
-        assert entry_pk in output.updates["TexasDocketEntry"]
+        self.assertTrue(output.create)
+        self.assertTrue(output.update)
+        self.assertTrue(output.success)
+        self.assertIn(entry_pk, output.updates["TexasDocketEntry"])
         created_docket_entry = TexasDocketEntry.objects.get(pk=entry_pk)
-        assert created_docket_entry.docket_id == self.docket_coa1.id
-        assert created_docket_entry.entry_type == case_event["type"]
-        assert created_docket_entry.remarks == case_event.get("remarks", "")
-        assert created_docket_entry.description == (
-            appellate_brief["description"] if appellate_brief else ""
+        self.assertEqual(created_docket_entry.docket_id, self.docket_coa1.id)
+        self.assertEqual(created_docket_entry.entry_type, case_event["type"])
+        self.assertEqual(
+            created_docket_entry.remarks, case_event.get("remarks", "")
         )
-        assert created_docket_entry.disposition == case_event["disposition"]
-        assert created_docket_entry.date_filed == case_event["date"]
+        self.assertEqual(
+            created_docket_entry.description,
+            appellate_brief["description"] if appellate_brief else "",
+        )
+        self.assertEqual(
+            created_docket_entry.disposition, case_event["disposition"]
+        )
+        self.assertEqual(created_docket_entry.date_filed, case_event["date"])
         n_attachments = TexasDocument.objects.filter(
             docket_entry_id=created_docket_entry.id
         ).count()
-        assert n_attachments == initial_n_attachments + 1
-        assert self.extract_document_mock.call_count == 1
+        self.assertEqual(n_attachments, initial_n_attachments + 1)
+        self.assertEqual(self.download_task_mock.call_count, 1)
 
     def test_merge_texas_docket_entry_multiple_matches_with_sequence(self):
         """When multiple entries match by date/type/brief, use the one with matching sequence number."""
@@ -3237,8 +3252,8 @@ class TexasMergerTest(TestCase):
         assert result == []
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.doc_page_count_service")
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".pdf")
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
     @responses.activate
     def test_download_texas_document_pdf_success(
         self, ext_mock, pcs_mock, throttle_mock
@@ -3263,13 +3278,13 @@ class TexasMergerTest(TestCase):
 
         result = download_texas_document(texas_document.pk)
 
-        assert result is not None
+        self.assertIsNotNone(result)
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local is not None
-        assert texas_document.page_count == 1
-        assert texas_document.processing_error is None
-        assert pdf_response.call_count == 1
-        assert pcs_mock.call_count == 1
+        self.assertIsNotNone(texas_document.filepath_local)
+        self.assertEqual(texas_document.page_count, 1)
+        self.assertIsNone(texas_document.processing_error)
+        self.assertEqual(pdf_response.call_count, 1)
+        self.assertEqual(pcs_mock.call_count, 1)
 
     def test_download_texas_document_not_found(self):
         """Do we handle a missing TexasDocument gracefully?"""
@@ -3302,7 +3317,7 @@ class TexasMergerTest(TestCase):
         assert not texas_document.filepath_local
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
     def test_download_texas_document_html(self, ext_mock, throttle_mock):
         """Does an HTML document get saved to filepath_local?"""
         from tempfile import NamedTemporaryFile
@@ -3320,22 +3335,23 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # HTML is extractable, so pk is returned and chain continues
-        assert result == texas_document.pk
+        # HTML is extractable, so extraction is dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_called_once()
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "abc123sha1"
-        assert ".html" in texas_document.filepath_local.name
-        assert texas_document.processing_error is None
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "abc123sha1")
+        self.assertIn(".html", texas_document.filepath_local.name)
+        self.assertIsNone(texas_document.processing_error)
         # No page_count for non-PDFs
-        assert texas_document.page_count is None
+        self.assertIsNone(texas_document.page_count)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".mp3")
-    def test_download_texas_document_mp3_breaks_chain(
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".mp3")
+    def test_download_texas_document_mp3_skips_extraction(
         self, ext_mock, throttle_mock
     ):
-        """Does an MP3 get saved but skip the extract chain?"""
+        """Does an MP3 get saved but skip extraction?"""
         from tempfile import NamedTemporaryFile
 
         texas_document = TexasDocumentFactory.create()
@@ -3351,19 +3367,22 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # MP3 is not extractable — chain broken, None returned
-        assert result is None
+        # MP3 is not extractable — no extraction dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_not_called()
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "mp3sha1hash"
-        assert ".mp3" in texas_document.filepath_local.name
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
-        assert not texas_document.plain_text
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "mp3sha1hash")
+        self.assertIn(".mp3", texas_document.filepath_local.name)
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
+        self.assertFalse(texas_document.plain_text)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".docx")
-    @mock.patch("cl.corpus_importer.tasks.logger")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".docx")
+    @mock.patch("cl.search.state.shared.logger")
     def test_download_texas_document_unknown_extension_logged(
         self, logger_mock, ext_mock, throttle_mock
     ):
@@ -3383,21 +3402,24 @@ class TexasMergerTest(TestCase):
 
             result = download_texas_document(texas_document.pk)
 
-        # Unknown extension is not extractable — chain broken, None returned
-        assert result is None
+        # Unknown extension is not extractable — no extraction dispatched
+        self.assertEqual(result, texas_document.pk)
+        self.extract_document_mock.assert_not_called()
         # Should log a warning about the unknown extension
         logger_mock.warning.assert_any_call(
-            "Texas document download: Unexpected file extension "
-            "'%s' for TexasDocument %s from %s. Proceeding anyway.",
+            "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
             ".docx",
+            "TexasDocument",
             texas_document.pk,
             texas_document.url,
         )
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert texas_document.sha1 == "docxsha1"
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
+        self.assertTrue(texas_document.filepath_local)
+        self.assertEqual(texas_document.sha1, "docxsha1")
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @responses.activate
@@ -3445,7 +3467,7 @@ class TexasMergerTest(TestCase):
 
     @mock.patch("cl.lib.celery_utils.get_task_wait", return_value=0)
     @mock.patch("cl.scrapers.tasks.microservice", new_callable=mock.AsyncMock)
-    @mock.patch("cl.corpus_importer.tasks.get_extension", return_value=".html")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
     def test_html_download_and_extraction_strips_tags(
         self, ext_mock, microservice_mock, throttle_mock
     ):
@@ -3473,11 +3495,11 @@ class TexasMergerTest(TestCase):
 
             download_result = download_texas_document(texas_document.pk)
 
-        # HTML is extractable — pk returned and chain continues
-        assert download_result == texas_document.pk
+        # HTML is extractable — pk returned and extraction dispatched
+        self.assertEqual(download_result, texas_document.pk)
         texas_document.refresh_from_db()
-        assert texas_document.filepath_local
-        assert ".html" in texas_document.filepath_local.name
+        self.assertTrue(texas_document.filepath_local)
+        self.assertIn(".html", texas_document.filepath_local.name)
 
         # Mock Doctor returning HTML content
         microservice_mock.return_value = httpx.Response(
@@ -3498,11 +3520,13 @@ class TexasMergerTest(TestCase):
         )
 
         texas_document.refresh_from_db()
-        assert texas_document.ocr_status == TexasDocument.OCR_UNNECESSARY
-        assert texas_document.processing_error is None
-        assert "<" not in texas_document.plain_text
-        assert "Hello" in texas_document.plain_text
-        assert "world" in texas_document.plain_text
+        self.assertEqual(
+            texas_document.ocr_status, TexasDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(texas_document.processing_error)
+        self.assertNotIn("<", texas_document.plain_text)
+        self.assertIn("Hello", texas_document.plain_text)
+        self.assertIn("world", texas_document.plain_text)
 
     def test_merge_texas_docket_originating_court_creates_new(self):
         """Can we create new originating court information?"""
