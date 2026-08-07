@@ -409,11 +409,30 @@ class V2PagesRegisterTest(PageLoadTestMixin, SimpleUserDataMixin, TestCase):
         ({"viewname": "components"}, "v2_components.html"),
     ]
 
+    AUTHENTICATED_V2_PAGES: list[tuple[dict[str, Any], str]] = [
+        ({"viewname": "view_api"}, "v2_profile/api.html"),
+    ]
+
     async def test_v2_pages(self) -> None:
         """Do all registered v2 pages load properly with the redesign flag?"""
         for reverse_param, v2_template in self.V2_PAGES:
             with self.subTest(
                 "Checking v2 page", reverse_params=reverse_param
+            ):
+                r = await self.assert_page_loads_ok(reverse_param)
+                self.assertTemplateUsed(r, v2_template)
+
+    async def test_authenticated_v2_pages(self) -> None:
+        """Do authenticated v2 pages load with their redesigned templates?"""
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        for reverse_param, v2_template in self.AUTHENTICATED_V2_PAGES:
+            with self.subTest(
+                "Checking authenticated v2 page",
+                reverse_params=reverse_param,
             ):
                 r = await self.assert_page_loads_ok(reverse_param)
                 self.assertTemplateUsed(r, v2_template)
