@@ -216,7 +216,7 @@ def fetch_doc_report(
         end,
     )
     try:
-        status, document_count = get_and_save_free_document_report(
+        status, counts = get_and_save_free_document_report(
             pacer_court_id, start, end, log.pk, day_span=day_span
         )  # type: ignore
     except (
@@ -251,7 +251,7 @@ def fetch_doc_report(
 
     if status != PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
         # The task exhausted its retries and reported failure without
-        # raising. The result count is unknown, so it stays null.
+        # raising. The counts are unknown, so they stay null.
         logger.error(
             "Failed to get free document references for %s between %s and %s.",
             pacer_court_id,
@@ -262,13 +262,16 @@ def fetch_doc_report(
         return True
 
     logger.info(
-        "Got %s document references for %s between %s and %s",
-        document_count,
+        "Got %s document references for %s between %s and %s "
+        "(%s reported by PACER, %s parsed)",
+        counts.saved,
         pacer_court_id,
         start,
         end,
+        counts.reported,
+        counts.parsed,
     )
-    mark_court_done_on_date(log.pk, status, document_count=document_count)
+    mark_court_done_on_date(log.pk, status, counts=counts)
     return False
 
 
