@@ -911,10 +911,12 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             )
         )
 
-    def pre_update(self) -> list[str]:
+    def pre_update(self, updated_fields: list[str]) -> list[str]:
         """Called before an updated instance is saved. Useful for setting attributes that are dependent on the result of the merge operation.
 
-        :return: A list of attribute names that should be updated."""
+        :param updated_fields: The fields that were updated.
+
+        :return: A list of additional attribute names that should be updated."""
 
         return []
 
@@ -1035,7 +1037,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             result |= MergeResult.updated(
                 self.model.__name__, self.existing.pk
             )
-            updated += self.pre_update()
+            updated += self.pre_update(updated)
             self.existing.save(update_fields=updated)
 
         return result

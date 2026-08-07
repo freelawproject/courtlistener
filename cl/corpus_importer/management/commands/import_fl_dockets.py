@@ -16,6 +16,21 @@ class Command(CorpusImporterCommand):
 
     compose_redis_key = "florida_docket_import:log"
 
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument(
+            "--fill-case-transfer",
+            action="store_true",
+            help="Fill null dockets in CaseTransfer table",
+            default=False,
+        )
+        parser.add_argument(
+            "--skip-case-merge",
+            action="store_true",
+            help="Skip merging cases from the inventory file",
+            default=False,
+        )
+
     @staticmethod
     def transform_inventory_iterator(
         csv_reader: Iterable[list[str]],
@@ -30,6 +45,10 @@ class Command(CorpusImporterCommand):
     def merge_task() -> app.Task:
         return fl_ingest_docket_task
 
-    def handle(self, *args, **options):
-        super().handle(*args, **options)
-        CaseTransfer.fill_null_dockets()
+    def handle(
+        self, *args, fill_case_transfer: bool, skip_case_merge: bool, **options
+    ):
+        if not skip_case_merge:
+            super().handle(*args, **options)
+        if fill_case_transfer:
+            CaseTransfer.fill_null_dockets()

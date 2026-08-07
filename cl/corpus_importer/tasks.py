@@ -5039,13 +5039,16 @@ def texas_corpus_download_task(
     ignore_result=True,
 )
 @time_call(logger)
-def fl_corpus_download_task(bucket: str, key: str) -> bytes:
+def fl_corpus_download_task(bucket: str, key: str) -> tuple[bytes, str, str]:
     """Downloads a scraped file from S3 and returns it for parsing.
 
     :param bucket: S3 bucket name docket data is stored.
     :param key: S3 key where docket data is stored
 
-    :return: The bytes of the parsed JSON retrieved from S3."""
+    :return: Tuple of:
+    - The bytes of the parsed JSON retrieved from S3
+    - The bucket name
+    - The S3 key"""
     storage = AWSMediaStorage(bucket_name=bucket)
     logger.info(
         "Downloading docket JSON from S3: (Bucket: %s; Path: %s)",
@@ -5055,7 +5058,7 @@ def fl_corpus_download_task(bucket: str, key: str) -> bytes:
     with storage.open(key, "rb") as f:
         content = f.read()
 
-    return content
+    return content, bucket, key
 
 
 @app.task(
@@ -5082,7 +5085,11 @@ def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def fl_ingest_docket_task(
-    task: Task, case_bytes: bytes, download_attachments: bool = True
+    task: Task,
+    case_bytes: bytes,
+    bucket: str,
+    key: str,
+    download_attachments: bool = True,
 ) -> MergeResult[Any]:
     """
     Task to parse and merge a Florida docket.
@@ -5090,6 +5097,8 @@ def fl_ingest_docket_task(
     :param task: The Celery task.
 
     :param case_bytes: The bytes of the parsed JSON retrieved from S3.
+    :param bucket: The S3 bucket this case was retrieved from. Used for error messages.
+    :param key: The S3 key this case was retrieved from. Used for error messages.
     :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation.
@@ -5099,7 +5108,11 @@ def fl_ingest_docket_task(
             case_bytes, by_name=True, context={"deserialize": True}
         )
     except Exception:
-        logger.exception("Failed to deserialize Florida case")
+        logger.exception(
+            "Failed to deserialize Florida case stored in %s at %s",
+            bucket,
+            key,
+        )
         return MergeResult.failed("Docket")
     logger.info(
         "Attempting to merge Florida case %s",

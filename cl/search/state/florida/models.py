@@ -138,6 +138,10 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         """Whether text extraction supports files with this extension."""
         return extension in EXTRACTABLE_EXTENSIONS
 
+    async def fetch_page_count(self) -> int | None:
+        """Florida ACIS gives us the page count directly, so skip sending to the microservice."""
+        return self.page_count
+
     class Meta:
         app_label = "search"
         ordering = ["link_uuid"]
