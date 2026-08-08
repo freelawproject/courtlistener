@@ -392,23 +392,25 @@ async def view_docket(
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
+    @sync_to_async
+    def _attach_documents(entries: list) -> list:
+        # Attach each entry's documents via the source config,
+        # so de_list.html just loops over de.documents,
+        # regardless of source.
+        page_documents = []
+        for entry in entries:
+            entry.documents = list(source.documents_for_entry(entry))
+            page_documents.extend(entry.documents)
+        return page_documents
+
+    page_documents = await _attach_documents(
+        await sync_to_async(list)(paginated_entries)
+    )
+
     prayer_counts: dict[int, int] = {}
     existing_prayers: dict[int, bool] = {}
 
     if source.has_pay_and_pray:
-
-        @sync_to_async
-        def _get_page_documents(entries) -> list:
-            return [
-                doc
-                for entry in entries
-                for doc in source.documents_for_entry(entry)
-            ]
-
-        # Extract documents from the current page.
-        page_documents = await _get_page_documents(
-            await sync_to_async(list)(paginated_entries)
-        )
         # Get prayer counts in bulk.
         prayer_counts = await get_prayer_counts_in_bulk(page_documents)
 
@@ -451,7 +453,6 @@ async def view_docket(
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
-            "is_scotus": docket.court_id == "scotus",
             "hide_docket_alerts": not source.has_docket_alerts,
             "get_string": make_get_string(request),
             "metadata": await sync_to_async(build_docket_metadata)(

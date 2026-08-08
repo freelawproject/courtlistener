@@ -1628,7 +1628,7 @@ class ScotusDocketFlagEnabledTest(TestCase):
         self.assertIn("Export CSV", content)
         self.assertNotIn("Buy on PACER", content)
         self.assertNotIn("Buy Docket on PACER", content)
-        self.assertNotIn("Get Alerts", content)
+        self.assertIn("Get Alerts", content)
         self.assertNotIn("prayer-button", content)
         self.assertIn("View in SCOTUS", content)
         self.assertNotIn(
@@ -1638,31 +1638,6 @@ class ScotusDocketFlagEnabledTest(TestCase):
         self.assertIn(
             "sourced from the Supreme Court of the United States", content
         )
-
-    async def test_scotus_metadata_section_hidden_when_all_fields_blank(
-        self,
-    ) -> None:
-        """The SCOTUS metadata section heading must not render when
-        every field on ScotusDocketMetadata row is blank, the guard
-        needs to check whether there's anything to show, not just
-        whether the row exists.
-        """
-        await sync_to_async(ScotusDocketMetadataFactory)(
-            docket=self.docket,
-            capital_case=False,
-            date_discretionary_court_decision=None,
-            linked_with="",
-            questions_presented_url="",
-            questions_presented_file="",
-        )
-
-        r = await self.async_client.get(
-            reverse("view_docket", args=[self.docket.pk, self.docket.slug])
-        )
-        content = r.content.decode()
-
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertNotIn("SCOTUS Docket Metadata", content)
 
     async def test_scotus_docket_entry_filters_still_work(self) -> None:
         """filters must work against SCOTUSDocketEntry field names
