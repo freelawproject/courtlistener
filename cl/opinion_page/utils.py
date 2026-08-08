@@ -584,6 +584,7 @@ async def core_docket_data(
             "has_alert": has_alert,
             "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
             "private": docket.blocked,
+            "is_scotus": docket.court_id == "scotus",
         },
     )
 
