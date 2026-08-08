@@ -15,12 +15,13 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission, User
 from django.core import mail
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection, transaction
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
@@ -29,6 +30,7 @@ from juriscraper.pacer import PacerRssFeed
 from cl.alerts.factories import DocketAlertFactory
 from cl.api.factories import (
     WEBHOOK_EVENT_STATUS,
+    APIThrottleFactory,
     WebhookEventFactory,
     WebhookFactory,
 )
@@ -38,7 +40,7 @@ from cl.api.management.commands.cl_retry_webhooks import (
     execute_additional_tasks,
     retry_webhook_events,
 )
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import ThrottleType, Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import (
     get_next_webhook_retry_date,
     get_webhook_deprecation_date,
@@ -47,6 +49,7 @@ from cl.corpus_importer.utils import (
     is_appellate_court,
     should_check_acms_court,
 )
+from cl.lib.decorators import clear_tiered_cache
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
@@ -159,6 +162,7 @@ from cl.tests.utils import (
     MockACMSAttachmentPage,
     MockACMSDocketReport,
     MockResponse,
+    make_client,
 )
 from cl.users.factories import (
     UserProfileWithParentsFactory,
@@ -3200,6 +3204,70 @@ class RecapFetchApiSerializationTestCase(TestCase):
                 "de_number_end",
             ],
         )
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "pacer-fetch-throttle-test",
+        }
+    }
+)
+class PacerFetchAPIThrottleTest(TestCase):
+    """The Fetch API runs on its own FetchRateThrottle, not the global
+    per-user API throttle. See #7503.
+    """
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    async def test_bypasses_global_user_throttle(self) -> None:
+        """A tight global API throttle doesn't block Fetch API requests."""
+        user = await sync_to_async(UserProfileWithParentsFactory)()
+        # A tight global API throttle that would block these requests if it
+        # applied to the Fetch API.
+        await sync_to_async(APIThrottleFactory)(
+            user=user.user,
+            throttle_type=ThrottleType.API,
+            rate="1/min",
+        )
+        await sync_to_async(clear_tiered_cache)()
+        client = await sync_to_async(make_client)(user.user.pk)
+        url = reverse("pacerfetchqueue-list", kwargs={"version": "v4"})
+
+        # Several requests, well past the global 1/min throttle.
+        for i in range(5):
+            response = await client.get(url)
+            self.assertEqual(
+                response.status_code,
+                HTTPStatus.OK,
+                msg=f"Request {i} should not be blocked by the global "
+                "user throttle.",
+            )
+
+    async def test_enforces_its_own_rate(self) -> None:
+        """A tight RECAP_FETCH override still throttles Fetch API requests."""
+        user = await sync_to_async(UserProfileWithParentsFactory)()
+        await sync_to_async(APIThrottleFactory)(
+            user=user.user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="1/min",
+        )
+        await sync_to_async(clear_tiered_cache)()
+        client = await sync_to_async(make_client)(user.user.pk)
+        url = reverse("pacerfetchqueue-list", kwargs={"version": "v4"})
+
+        response = await client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        response = await client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
 
 
 @mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
