@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models.fields.related_descriptors import RelatedManager
 
 from cl.lib.model_helpers import (
     make_llm_request_response_file_path,
@@ -12,6 +11,9 @@ from cl.lib.model_helpers import (
 )
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.storage import S3PrivateLLMStorage
+
+if TYPE_CHECKING:
+    from django.db.models.fields.related_descriptors import RelatedManager
 
 
 class LLMProvider(models.IntegerChoices):
