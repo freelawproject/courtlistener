@@ -5102,17 +5102,16 @@ def fl_ingest_docket_task(
 
     :return: The result of the merge operation.
     """
-    case, bucket, key = download_result
-    if isinstance(case, bytes):
-        try:
-            case = FloridaCase.deserialize()
-        except Exception:
-            logger.exception(
-                "Failed to deserialize Florida case stored in %s at %s",
-                bucket,
-                key,
-            )
-            return MergeResult.failed("Docket")
+    case_bytes, bucket, key = download_result
+    try:
+        case = FloridaCase.deserialize(case_bytes.decode())
+    except Exception:
+        logger.exception(
+            "Failed to deserialize Florida case stored in %s at %s",
+            bucket,
+            key,
+        )
+        return MergeResult.failed("Docket")
     logger.info(
         "Attempting to merge Florida case %s",
         case.docket_number,
