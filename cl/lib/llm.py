@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 def call_llm(
     system_prompt: str,
-    user_prompt: str | list[str] | list[dict],
+    user_prompt: str | list[str] | list[ChatCompletionContentPartParam],
     model: str = "openai/gpt-4o-mini",
     response_model: type[BaseModel] | None = None,
     temperature: float = 0.0,
@@ -35,9 +35,13 @@ def call_llm(
     """
 
     # if api_key is provided, inject it, else fallback to env var
-    client = instructor.from_provider(model, api_key=api_key)
+    client = instructor.from_provider(
+        model, async_client=False, api_key=api_key
+    )
 
-    def to_content_part(x: str | dict) -> ChatCompletionContentPartParam:
+    def to_content_part(
+        x: str | ChatCompletionContentPartParam,
+    ) -> ChatCompletionContentPartParam:
         if isinstance(x, str):
             return {"type": "text", "text": x}
         # Assume already a valid content part dict, e.g. {"type": "text", "text": "..."}
