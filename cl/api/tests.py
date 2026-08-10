@@ -68,7 +68,12 @@ from cl.api.utils import (
     promo_doubling_applies,
     promo_switch_is_active,
 )
-from cl.api.views import build_chart_data, coverage_data, make_court_variable
+from cl.api.views import (
+    build_chart_data,
+    coverage_data,
+    make_court_variable,
+    make_oral_argument_court_table,
+)
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.audio_sources import AudioSources
@@ -409,6 +414,120 @@ class WikiDataRssFeedTests(TestCase):
         self.assertIn("rss_feeds", data)
         cached = await caches["default"].aget("wiki-data")
         self.assertIn("rss_feeds", cached)
+
+
+class WikiCoverageDataTests(TestCase):
+    def setUp(self) -> None:
+        self.async_client = AsyncClient()
+
+    async def test_wiki_coverage_data_endpoint(self) -> None:
+        """Does the coverage data endpoint return the expected JSON structure?"""
+        await caches["default"].adelete("wiki-coverage-data")
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/json")
+        data = json.loads(r.content)
+        expected_keys = {"judges", "oral_arguments", "financial_disclosures"}
+        self.assertEqual(set(data.keys()), expected_keys)
+        self.assertIsInstance(data["judges"]["count"], int)
+        oral_arguments = data["oral_arguments"]
+        self.assertIn("duration_minutes", oral_arguments)
+        self.assertIsInstance(oral_arguments["courts"], str)
+        financial_disclosures = data["financial_disclosures"]
+        for key in (
+            "disclosures",
+            "investments",
+            "positions",
+            "agreements",
+            "non_investment_income",
+            "spousal_income",
+            "reimbursements",
+            "gifts",
+            "debts",
+        ):
+            self.assertIsInstance(financial_disclosures[key], int)
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+)
+class WikiCoverageDataCourtTableTests(TestCase):
+    """Test the markdown fragments rendered by the coverage data endpoint."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.oa_court = CourtFactory(
+            full_name="Supreme Court of Testlandia",
+            short_name="Testlandia",
+            has_oral_argument_scraper=True,
+        )
+        cls.oa_court_two = CourtFactory(
+            full_name="Court of Appeals of Testlandia",
+            short_name="Testlandia App.",
+            has_oral_argument_scraper=True,
+        )
+        cls.no_scraper_court = CourtFactory(
+            full_name="District Court of Testlandia",
+            short_name="D. Testlandia",
+            has_oral_argument_scraper=False,
+        )
+
+    def setUp(self) -> None:
+        self.async_client = AsyncClient()
+        caches["default"].delete("wiki-coverage-data")
+
+    async def test_oral_argument_court_table_markdown(self) -> None:
+        """Are OA-scraped courts rendered as a linked two-column table?"""
+        courts = Court.objects.filter(has_oral_argument_scraper=True)
+        table = await make_oral_argument_court_table(courts)
+        pk = self.oa_court.pk
+        url = f"{BASE_URL}/?q=&court_{pk}=on&order_by=dateArgued+desc&type=oa"
+        self.assertIn(f"| [Testlandia]({url})", table)
+        self.assertNotIn("D. Testlandia", table)
+
+    async def test_wiki_coverage_data_court_table(self) -> None:
+        """Does the live endpoint include the rendered court table?"""
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        self.assertEqual(r.status_code, 200)
+        courts = json.loads(r.content)["oral_arguments"]["courts"]
+        self.assertIn("Testlandia", courts)
+        self.assertNotIn("D. Testlandia", courts)
+
+    async def test_bust_cache_param(self) -> None:
+        """Does ?bust_cache rebuild the cached response for staff only?"""
+        sentinel = {"sentinel": True}
+        await caches["default"].aset("wiki-coverage-data", sentinel)
+
+        # Without the param, the cached payload is served.
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # Anonymous and non-staff users can't bust the cache.
+        r = await self.async_client.get(
+            reverse("wiki_coverage_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+        non_staff = await sync_to_async(UserFactory)(is_staff=False)
+        await self.async_client.aforce_login(non_staff)
+        r = await self.async_client.get(
+            reverse("wiki_coverage_data"), {"bust_cache": ""}
+        )
+        self.assertEqual(json.loads(r.content), sentinel)
+
+        # Staff can: the response is rebuilt and re-cached.
+        staff = await sync_to_async(UserFactory)(is_staff=True)
+        await self.async_client.aforce_login(staff)
+        r = await self.async_client.get(
+            reverse("wiki_coverage_data"), {"bust_cache": ""}
+        )
+        data = json.loads(r.content)
+        self.assertIn("financial_disclosures", data)
+        cached = await caches["default"].aget("wiki-coverage-data")
+        self.assertIn("financial_disclosures", cached)
 
 
 class CoverageTests(ESIndexTestCase, TestCase):
