@@ -1387,10 +1387,10 @@ class FloridaIngestTaskTest(TestCase):
         case = self._make_case()
 
         with mock.patch(
-            "cl.corpus_importer.tasks.FloridaCase.model_validate_json",
+            "cl.corpus_importer.tasks.FloridaCase.deserialize",
             return_value=case,
         ):
-            result = fl_ingest_docket_task(b"{}", "bucket", "key")
+            result = fl_ingest_docket_task((b"{}", "bucket", "key"))
 
         self.assertTrue(result.success)
         self.assertIn("Docket", result.creates)
@@ -1408,11 +1408,11 @@ class FloridaIngestTaskTest(TestCase):
         case = self._make_case()
 
         with mock.patch(
-            "cl.corpus_importer.tasks.FloridaCase.model_validate_json",
+            "cl.corpus_importer.tasks.FloridaCase.deserialize",
             return_value=case,
         ):
             result = fl_ingest_docket_task(
-                b"{}", "bucket", "key", download_attachments=False
+                (b"{}", "bucket", "key"), download_attachments=False
             )
 
         self.assertTrue(result.success)
@@ -1423,7 +1423,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_ingest_invalid_case_fails(self, download_mock: mock.Mock) -> None:
         """Does an undeserializable payload fail the merge without raising or
         downloading anything?"""
-        result = fl_ingest_docket_task(b"not json", "bucket", "key")
+        result = fl_ingest_docket_task((b"not json", "bucket", "key"))
 
         self.assertFalse(result.success)
         self.assertIn("Docket", result.failures)

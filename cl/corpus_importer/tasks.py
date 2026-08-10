@@ -5086,9 +5086,7 @@ def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def fl_ingest_docket_task(
     task: Task,
-    case_bytes: bytes,
-    bucket: str,
-    key: str,
+    download_result: tuple[bytes, str, str],
     download_attachments: bool = True,
 ) -> MergeResult[Any]:
     """
@@ -5096,17 +5094,17 @@ def fl_ingest_docket_task(
 
     :param task: The Celery task.
 
-    :param case_bytes: The bytes of the parsed JSON retrieved from S3.
-    :param bucket: The S3 bucket this case was retrieved from. Used for error messages.
-    :param key: The S3 key this case was retrieved from. Used for error messages.
+    :param download_result: Tuple of:
+    - The bytes of the parsed JSON retrieved from S3.
+    - The S3 bucket this case was retrieved from. Used for error messages.
+    - The S3 key this case was retrieved from. Used for error messages.
     :param download_attachments: Whether to download docket entry attachments.
 
     :return: The result of the merge operation.
     """
+    case_bytes, bucket, key = download_result
     try:
-        case = FloridaCase.model_validate_json(
-            case_bytes, by_name=True, context={"deserialize": True}
-        )
+        case = FloridaCase.deserialize()
     except Exception:
         logger.exception(
             "Failed to deserialize Florida case stored in %s at %s",
