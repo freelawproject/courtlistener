@@ -84,16 +84,9 @@ replace-imports-with-any = [
   "cl.urls",
   "cl.workers",
   "eyecite", "eyecite.*",
-  "pandas", "pandas.*",
   "elasticsearch", "elasticsearch.*",
-  "elasticsearch_dsl", "elasticsearch_dsl.*",
-  "django_elasticsearch_dsl", "django_elasticsearch_dsl.*",
   "bs4", "bs4.*",
-  "tqdm", "tqdm.*",
-  "celery", "celery.*",
   "juriscraper", "juriscraper.*",
-  "courts_db", "courts_db.*",
-  "reporters_db", "reporters_db.*",
 ]
 # Pre-existing errors are grandfathered here; only new errors fail the check.
 baseline = ".pyrefly-baseline.json"
