@@ -83,11 +83,7 @@
               <div class="col-xs-3">
                 <p>
                   {% if is_scotus %}
-                    {% if rd.attachment_number %}
-                      Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
-                    {% else %}
-                      Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
-                    {% endif %}
+                    Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
                   {% else %}
                     {% if rd.document_type == rd.ATTACHMENT %}
                       {% if rd.filepath_local %}
