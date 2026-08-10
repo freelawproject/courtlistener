@@ -3569,6 +3569,7 @@ def merge_scotus_docket_entry(
         - The pk of the updated SCOTUSDocketEntry object.
         - A list of PKs of SCOTUSDocument objects that were created or updated.
     """
+    normalize_long_description(input_docket_entry)
     with transaction.atomic():
         # Acquire lock on the docket to prevent race conditions
         Docket.objects.select_for_update().get(pk=docket.pk)
@@ -3598,12 +3599,15 @@ def merge_scotus_docket_entry(
                 return False, None, []
 
         if de is None:
-            normalize_long_description(input_docket_entry)
+            unnumbered_lookup = (
+                {"entry_number__isnull": True} if entry_number else {}
+            )
             try:
                 de = SCOTUSDocketEntry.objects.get(
                     docket=docket,
                     description=input_docket_entry["description"],
                     date_filed=input_docket_entry["date_filed"],
+                    **unnumbered_lookup,
                 )
             except SCOTUSDocketEntry.DoesNotExist:
                 # Check if sequence_number already exists
@@ -3611,28 +3615,32 @@ def merge_scotus_docket_entry(
                     de = SCOTUSDocketEntry.objects.get(
                         docket=docket,
                         sequence_number=sequence_number,
+                        **unnumbered_lookup,
                     )
                 except SCOTUSDocketEntry.DoesNotExist:
                     de = SCOTUSDocketEntry(
                         docket=docket,
                         date_filed=date_filed,
                         sequence_number=sequence_number,
+                        **unnumbered_lookup,
                     )
                     de_created = True
                 except SCOTUSDocketEntry.MultipleObjectsReturned:
                     logger.error(
                         "Multiple matching SCOTUSDocketEntries found for sequence_number "
-                        "%s on Docket %s.",
+                        "%s on Docket %s (extra %r).",
                         sequence_number,
                         docket.pk,
+                        unnumbered_lookup,
                     )
                     return False, None, []
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
-                    "Multiple matching unnumbered SCOTUSDocketEntries found for description "
-                    "%s on Docket %s.",
+                    "Multiple matching SCOTUSDocketEntries found for description "
+                    "%s on Docket %s (extra %r).",
                     input_docket_entry["description"],
                     docket.pk,
+                    unnumbered_lookup,
                 )
                 return False, None, []
 
@@ -4349,14 +4357,16 @@ def merge_texas_document(
                 # object around. It needs to be wrapped in another lambda to
                 # prevent mypy from complaining.
                 (
-                    lambda pk: lambda: chain(
-                        download_texas_document.si(pk),
-                        extract_formatted_text_document.s(
-                            check_if_needed=False,
-                            model_name="search.TexasDocument",
-                            strip_html_tags=True,
-                        ),
-                    ).apply_async()
+                    lambda pk: (
+                        lambda: chain(
+                            download_texas_document.si(pk),
+                            extract_formatted_text_document.s(
+                                check_if_needed=False,
+                                model_name="search.TexasDocument",
+                                strip_html_tags=True,
+                            ),
+                        ).apply_async()
+                    )
                 )(texas_document.pk)
             )
         if existed:
