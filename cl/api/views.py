@@ -8,7 +8,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
@@ -25,6 +25,7 @@ from cl.api.utils import (
     get_current_throttle_usage,
     get_user_api_usage,
 )
+from cl.audio.models import Audio
 from cl.custom_filters.templatetags.partition_util import columns
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.favorites.models import Prayer
@@ -34,6 +35,7 @@ from cl.lib.elasticsearch_utils import (
     get_opinions_coverage_over_time,
 )
 from cl.lib.url_utils import BASE_URL
+from cl.people_db.models import Person
 from cl.search.documents import (
     OpinionClusterDocument,
 )
@@ -421,6 +423,85 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
                 ),
                 "jurisdiction_podcast",
             ),
+        },
+    }
+    one_day = 60 * 60 * 24
+    await cache.aset(cache_key, data, one_day)
+    return JsonResponse(data)
+
+
+async def make_oral_argument_court_table(courts: QuerySet) -> str:
+    """Render oral argument courts as a two-column markdown table of links.
+
+    Each link points at a pre-filtered oral argument search for that court,
+    matching the old coverage_oa help page.
+
+    :param courts: Courts with oral argument scrapers.
+    :return: A markdown table with one linked court name per cell.
+    """
+    links = [
+        f"[{court.short_name}]({BASE_URL}/?q=&court_{court.pk}=on&order_by=dateArgued+desc&type=oa)"
+        async for court in courts
+    ]
+    lines = ["| | |", "|---|---|"]
+    for row in columns(links, 2):
+        left = row[0]
+        right = row[1] if len(row) > 1 else ""
+        lines.append(f"| {left} | {right} |")
+    return "\n".join(lines)
+
+
+async def wiki_coverage_data(request: HttpRequest) -> JsonResponse:
+    """Provide data for the external wiki's coverage help pages.
+
+    Returns counts and pre-rendered fragments used across the coverage help
+    pages so the wiki can display them via external data connectors. This is
+    kept separate from wiki_data() so that endpoint doesn't keep growing
+    without bound — new coverage stats belong here instead.
+
+    Staff users can pass ?bust_cache to skip the cached response and rebuild
+    it, e.g. after new financial disclosures land. The rebuild is expensive,
+    so the param is ignored for everybody else.
+    """
+    cache_key = "wiki-coverage-data"
+    bust_cache = (
+        "bust_cache" in request.GET and (await request.auser()).is_staff  # type: ignore[attr-defined]
+    )
+    if not bust_cache:
+        data = await cache.aget(cache_key)
+        if data is not None:
+            return JsonResponse(data)
+
+    fd_data = await get_coverage_data_fds()
+    judge_count = await Person.objects.all().acount()
+
+    oa_aggregate = await Audio.objects.aaggregate(Sum("duration"))
+    oa_duration = oa_aggregate["duration__sum"]
+    if oa_duration:
+        oa_duration /= 60  # Avoids a "unsupported operand type" error
+
+    oa_courts = Court.objects.filter(
+        in_use=True, has_oral_argument_scraper=True
+    )
+
+    data = {
+        "judges": {
+            "count": judge_count,
+        },
+        "oral_arguments": {
+            "duration_minutes": oa_duration,
+            "courts": await make_oral_argument_court_table(oa_courts),
+        },
+        "financial_disclosures": {
+            "disclosures": fd_data["disclosures"],
+            "investments": fd_data["investments"],
+            "positions": fd_data["positions"],
+            "agreements": fd_data["agreements"],
+            "non_investment_income": fd_data["non_investment_income"],
+            "spousal_income": fd_data["spousal_income"],
+            "reimbursements": fd_data["reimbursements"],
+            "gifts": fd_data["gifts"],
+            "debts": fd_data["debts"],
         },
     }
     one_day = 60 * 60 * 24
