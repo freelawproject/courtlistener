@@ -1,8 +1,10 @@
 """Tests for Florida docket and originating-court-information merger."""
 
 from datetime import date, datetime
+from tempfile import NamedTemporaryFile
 from unittest import mock
 
+import httpx
 from juriscraper.state.docket import (
     DocketEntryType as ScrapeDocketEntryType,
 )
@@ -33,6 +35,10 @@ from cl.corpus_importer.state.florida.utils import make_docket_number_core
 from cl.corpus_importer.state.merger import RelatedParams
 from cl.corpus_importer.state.tests import merger_test
 from cl.corpus_importer.state.utils import MergeResult
+from cl.corpus_importer.tasks import (
+    download_fl_document,
+    fl_ingest_docket_task,
+)
 from cl.people_db.factories import (
     AttorneyFactory,
     PartyFactory,
@@ -41,11 +47,14 @@ from cl.people_db.factories import (
 from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import CaseTransfer, Docket, OriginatingCourtInformation
+from cl.search.state.florida.factories import (
+    FloridaDocumentFactory as FloridaDocumentModelFactory,
+)
 from cl.search.state.florida.models import (
     FloridaDocketEntry,
     FloridaDocument,
 )
-from cl.search.state.shared import DocketEntryType
+from cl.search.state.shared import DocketEntryType, ProcessingError
 from cl.tests.cases import TestCase
 
 
@@ -1018,7 +1027,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged = FloridaDocument.objects.get()
         self.assertEqual(merged.content_type, "")
 
-    @merger_test(expected_query_count=31)
+    @merger_test(expected_query_count=30)
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice avoid duplicating documents?"""
         document = FloridaDocumentFactory.create()
@@ -1044,6 +1053,75 @@ class FloridaDocumentMergerTest(TestCase):
 
         assert result.success is True
         assert FloridaDocument.objects.count() == 2
+
+    def _merge_downloaded_bad_url_document(self):
+        """Merge a case, then flag its document as downloaded with a bad URL.
+
+        Returns the scrape document and the merged FloridaDocument, set up so
+        a re-merge exercises the pre_update download-state reset."""
+        document = FloridaDocumentFactory.create(
+            url="https://acis.flcourts.gov/docs/old",
+        )
+        docket_data = self._make_case(document)
+        FloridaDocketMerger(docket_data, params=None).merge()
+
+        merged = FloridaDocument.objects.get()
+        merged.processing_error = ProcessingError.BAD_URL
+        merged.filepath_local = "florida/old-file.pdf"
+        merged.ocr_status = FloridaDocument.OCR_UNNECESSARY
+        merged.save()
+        return document, docket_data, merged
+
+    @merger_test(expected_query_count=31)
+    def test_remerge_changed_url_resets_download_state(self):
+        """Does updating a document clear its bad-URL flag, stored file, and
+        OCR status so it gets downloaded again?"""
+        document, docket_data, merged = (
+            self._merge_downloaded_bad_url_document()
+        )
+
+        document.url = "https://acis.flcourts.gov/docs/new"
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertIn(merged.pk, result.updates["FloridaDocument"])
+        merged.refresh_from_db()
+        self.assertEqual(merged.url, "https://acis.flcourts.gov/docs/new")
+        self.assertIsNone(merged.processing_error)
+        self.assertFalse(merged.filepath_local)
+        self.assertIsNone(merged.ocr_status)
+
+    @merger_test(expected_query_count=30)
+    def test_remerge_missing_file_is_update(self):
+        """Is an unchanged document with no stored file and no processing
+        error reported as updated, so a re-ingest retries its failed
+        download?"""
+        document = FloridaDocumentFactory.create()
+        docket_data = self._make_case(document)
+        FloridaDocketMerger(docket_data, params=None).merge()
+        merged = FloridaDocument.objects.get()
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertIn(merged.pk, result.updates["FloridaDocument"])
+
+    @merger_test(expected_query_count=30)
+    def test_remerge_unchanged_document_keeps_download_state(self):
+        """Is download state (bad-URL flag, stored file, OCR status) left
+        alone when the rescraped document is unchanged?"""
+        _document, docket_data, merged = (
+            self._merge_downloaded_bad_url_document()
+        )
+
+        result = FloridaDocketMerger(docket_data, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertNotIn("FloridaDocument", result.updates)
+        merged.refresh_from_db()
+        self.assertEqual(merged.processing_error, ProcessingError.BAD_URL)
+        self.assertEqual(merged.filepath_local, "florida/old-file.pdf")
+        self.assertEqual(merged.ocr_status, FloridaDocument.OCR_UNNECESSARY)
 
 
 class FloridaCaseTransferMergerTest(TestCase):
@@ -1280,3 +1358,271 @@ class FloridaCaseTransferMergerTest(TestCase):
 
         assert result.success is True
         assert CaseTransfer.objects.count() == 0
+
+
+class FloridaIngestTaskTest(TestCase):
+    """Tests for the fl_ingest_docket_task Celery task."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.flsc = CourtFactory.create(id="fla")
+
+    @staticmethod
+    def _make_case() -> FloridaCase:
+        """Build a supreme court case with one entry holding one attachment."""
+        entry = FloridaDocketEntryFactory.create(
+            attachments=[FloridaDocumentFactory.create()],
+        )
+        return FloridaCaseFactory.create(
+            court_id=FloridaCourtID.SUPREME_COURT.value,
+            entries=[entry],
+        )
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_ingest_merges_docket_and_dispatches_downloads(
+        self, download_mock: mock.Mock
+    ) -> None:
+        """Does ingesting a case merge the docket and dispatch a download for
+        each created document?"""
+        case = self._make_case()
+
+        with mock.patch(
+            "cl.corpus_importer.tasks.FloridaCase.deserialize",
+            return_value=case,
+        ):
+            result = fl_ingest_docket_task((b"{}", "bucket", "key"))
+
+        self.assertTrue(result.success)
+        self.assertIn("Docket", result.creates)
+        self.assertIn("FloridaDocument", result.creates)
+        document_pk = next(iter(result.creates["FloridaDocument"]))
+        download_mock.assert_called_once_with(document_pk)
+        download_mock.return_value.apply_async.assert_called_once()
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_ingest_skips_downloads_when_disabled(
+        self, download_mock: mock.Mock
+    ) -> None:
+        """Does download_attachments=False merge documents without
+        downloading them?"""
+        case = self._make_case()
+
+        with mock.patch(
+            "cl.corpus_importer.tasks.FloridaCase.deserialize",
+            return_value=case,
+        ):
+            result = fl_ingest_docket_task(
+                (b"{}", "bucket", "key"), download_attachments=False
+            )
+
+        self.assertTrue(result.success)
+        self.assertIn("FloridaDocument", result.creates)
+        download_mock.assert_not_called()
+
+    @mock.patch("cl.corpus_importer.tasks.download_fl_document.si")
+    def test_ingest_invalid_case_fails(self, download_mock: mock.Mock) -> None:
+        """Does an undeserializable payload fail the merge without raising or
+        downloading anything?"""
+        result = fl_ingest_docket_task((b"not json", "bucket", "key"))
+
+        self.assertFalse(result.success)
+        self.assertIn("Docket", result.failures)
+        download_mock.assert_not_called()
+
+
+class FloridaDocumentDownloadTest(TestCase):
+    """Tests for the download_fl_document Celery task."""
+
+    def setUp(self) -> None:
+        """Mock the task throttle, the download stream, and the extraction
+        task dispatch."""
+        self.throttle_patch = mock.patch(
+            "cl.lib.celery_utils.get_task_wait", return_value=0
+        )
+        self.throttle_patch.start()
+        self.addCleanup(self.throttle_patch.stop)
+        self.download_document_patch = mock.patch(
+            "cl.corpus_importer.tasks.download_document_in_stream"
+        )
+        self.download_document_mock = self.download_document_patch.start()
+        self.addCleanup(self.download_document_patch.stop)
+        self.extract_document_patch = mock.patch(
+            "cl.scrapers.tasks.extract_formatted_text_document.si"
+        )
+        self.extract_document_mock = self.extract_document_patch.start()
+        self.addCleanup(self.extract_document_patch.stop)
+
+    def _mock_downloaded_file(self, tmp, sha1: str) -> None:
+        """Point the mocked download stream at an open temporary file."""
+        self.download_document_mock.return_value.__enter__.return_value = (
+            tmp,
+            sha1,
+        )
+
+    @mock.patch("cl.lib.microservice_utils.doc_page_count_service")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".pdf")
+    def test_download_pdf_success(
+        self,
+        ext_mock: mock.Mock,
+        pcs_mock: mock.Mock,
+    ) -> None:
+        """Does a PDF download store the file, and dispatch extraction?"""
+        fl_document = FloridaDocumentModelFactory.create()
+        pcs_mock.return_value = httpx.Response(200, text="1")
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake pdf data")
+            tmp.flush()
+            tmp.seek(0)
+            self._mock_downloaded_file(tmp, "pdfsha1")
+
+            result = download_fl_document(fl_document.pk)
+
+        self.assertEqual(result, fl_document.pk)
+        self.download_document_mock.assert_called_once_with(
+            fl_document.url, fl_document.pk, "fl_", require_pdf=False
+        )
+        fl_document.refresh_from_db()
+        self.assertTrue(fl_document.filepath_local)
+        self.assertIn(".pdf", fl_document.filepath_local.name)
+        self.assertEqual(fl_document.sha1, "pdfsha1")
+        self.assertIsNone(fl_document.processing_error)
+        self.extract_document_mock.assert_called_once_with(
+            pks=fl_document.pk,
+            check_if_needed=False,
+            model_name="search.FloridaDocument",
+            strip_html_tags=True,
+        )
+
+    def test_download_not_found(self) -> None:
+        """Is a missing FloridaDocument handled gracefully?"""
+        result = download_fl_document(99999)
+
+        self.assertIsNone(result)
+        self.download_document_mock.assert_not_called()
+
+    def test_download_bad_url_skipped(self) -> None:
+        """Is a document flagged with a bad URL skipped without downloading?"""
+        fl_document = FloridaDocumentModelFactory.create(
+            processing_error=ProcessingError.BAD_URL,
+        )
+
+        result = download_fl_document(fl_document.pk)
+
+        self.assertIsNone(result)
+        self.download_document_mock.assert_not_called()
+
+    def test_download_failure(self) -> None:
+        """Is a failed download handled gracefully?"""
+        fl_document = FloridaDocumentModelFactory.create(
+            url="https://example.com/sample.pdf",
+        )
+        self.download_document_mock.return_value.__enter__.return_value = None
+
+        result = download_fl_document(fl_document.pk)
+
+        self.assertIsNone(result)
+        self.download_document_mock.assert_called_once_with(
+            "https://example.com/sample.pdf",
+            fl_document.pk,
+            "fl_",
+            require_pdf=False,
+        )
+        fl_document.refresh_from_db()
+        self.assertFalse(fl_document.filepath_local)
+        self.extract_document_mock.assert_not_called()
+
+    @mock.patch("cl.search.state.shared.logger")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".tiff")
+    def test_download_tiff_extracts_without_warning(
+        self,
+        ext_mock: mock.Mock,
+        logger_mock: mock.Mock,
+    ) -> None:
+        """Is a TIFF (expected and extractable) stored and extracted with no
+        unexpected-extension warning?"""
+        fl_document = FloridaDocumentModelFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake tiff data")
+            tmp.flush()
+            tmp.seek(0)
+            self._mock_downloaded_file(tmp, "tiffsha1")
+
+            result = download_fl_document(fl_document.pk)
+
+        self.assertEqual(result, fl_document.pk)
+        logger_mock.warning.assert_not_called()
+        fl_document.refresh_from_db()
+        self.assertTrue(fl_document.filepath_local)
+        self.assertIn(".tiff", fl_document.filepath_local.name)
+        self.assertEqual(fl_document.sha1, "tiffsha1")
+        self.assertIsNone(fl_document.ocr_status)
+        self.extract_document_mock.assert_called_once()
+
+    @mock.patch("cl.search.state.shared.logger")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".html")
+    def test_download_html_unexpected_but_extractable(
+        self,
+        ext_mock: mock.Mock,
+        logger_mock: mock.Mock,
+    ) -> None:
+        """Is an HTML file (unexpected but extractable) stored with a warning
+        and still sent to extraction?"""
+        fl_document = FloridaDocumentModelFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"<html>test</html>")
+            tmp.flush()
+            tmp.seek(0)
+            self._mock_downloaded_file(tmp, "htmlsha1")
+
+            result = download_fl_document(fl_document.pk)
+
+        self.assertEqual(result, fl_document.pk)
+        logger_mock.warning.assert_any_call(
+            "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
+            ".html",
+            "FloridaDocument",
+            fl_document.pk,
+            fl_document.url,
+        )
+        fl_document.refresh_from_db()
+        self.assertIn(".html", fl_document.filepath_local.name)
+        self.assertIsNone(fl_document.ocr_status)
+        self.extract_document_mock.assert_called_once()
+
+    @mock.patch("cl.search.state.shared.logger")
+    @mock.patch("cl.scrapers.utils.get_extension", return_value=".docx")
+    def test_download_unknown_extension_skips_extraction(
+        self,
+        ext_mock: mock.Mock,
+        logger_mock: mock.Mock,
+    ) -> None:
+        """Is an unknown file type stored with a warning, marked
+        OCR_UNNECESSARY, and kept out of extraction?"""
+        fl_document = FloridaDocumentModelFactory.create()
+
+        with NamedTemporaryFile(suffix=".tmp") as tmp:
+            tmp.write(b"fake docx data")
+            tmp.flush()
+            tmp.seek(0)
+            self._mock_downloaded_file(tmp, "docxsha1")
+
+            result = download_fl_document(fl_document.pk)
+
+        self.assertEqual(result, fl_document.pk)
+        logger_mock.warning.assert_any_call(
+            "Document download: Unexpected extension '%s' for %s %s from %s. Proceeding anyway.",
+            ".docx",
+            "FloridaDocument",
+            fl_document.pk,
+            fl_document.url,
+        )
+        fl_document.refresh_from_db()
+        self.assertTrue(fl_document.filepath_local)
+        self.assertEqual(
+            fl_document.ocr_status, FloridaDocument.OCR_UNNECESSARY
+        )
+        self.assertIsNone(fl_document.processing_error)
+        self.extract_document_mock.assert_not_called()
