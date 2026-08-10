@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 from urllib.parse import quote
 
 import nh3
@@ -67,6 +67,9 @@ from cl.search.docket_sources import DocketSources
 from cl.search.state.florida.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
+
+if TYPE_CHECKING:
+    from cl.opinion_page.docket_sources_utils import DocketEntrySource
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -897,6 +900,17 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "https://www.supremecourt.gov/search.aspx"
             f"?filename=/docket/docketfiles/html/public/{quote(self.docket_number)}.html"
         )
+
+    def get_entry_source(self) -> "DocketEntrySource":
+        """Return the DocketEntrySource config for this docket's court -
+        RECAP/PACER by default, with per-court overrides.
+        """
+        from cl.opinion_page.docket_sources_utils import (
+            _SOURCES_BY_COURT_ID,
+            RECAP_SOURCE,
+        )
+
+        return _SOURCES_BY_COURT_ID.get(self.court_id, RECAP_SOURCE)
 
     @property
     def pacer_alias_url(self):

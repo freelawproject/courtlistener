@@ -439,45 +439,22 @@
     {% endif %}
     {% endwith %}{# No more og_info variable #}
 
-    {% if is_scotus %}
-    {% with scotus_meta=docket.scotus_metadata %}
-    {% if scotus_metadata %}
+    {% if is_scotus and scotus_metadata %}
       <hr class="top v-offset-above-3">
-      {% if scotus_meta.capital_case %}
+      {% for item in scotus_metadata %}
         <p class="bottom">
-          <span class="meta-data-header">Capital Case:</span>
-          <span class="meta-data-value">Yes</span>
-        </p>
-      {% endif %}
-      {% if scotus_meta.date_discretionary_court_decision %}
-        <p class="bottom">
-          <span class="meta-data-header">Date of Discretionary Court Decision:</span>
-          <span class="meta-data-value">{{ scotus_meta.date_discretionary_court_decision|date:"N j, Y" }}</span>
-        </p>
-      {% endif %}
-      {% if scotus_meta.linked_with %}
-        <p class="bottom">
-          <span class="meta-data-header">Linked With:</span>
-          <span class="meta-data-value">{{ scotus_meta.linked_with }}</span>
-        </p>
-      {% endif %}
-      {% if scotus_meta.questions_presented_url|http_url %}
-        <p class="bottom">
-          <span class="meta-data-header">Questions Presented:</span>
+          <span class="meta-data-header">{{ item.label }}:</span>
           <span class="meta-data-value">
-            <a href="{{ scotus_meta.questions_presented_url|http_url }}" target="_blank" rel="nofollow noopener noreferrer">View <i class="fa fa-external-link"></i></a>
+            {% if item.url %}
+              <a href="{{ item.url }}"
+                 {% if item.is_external %}target="_blank" rel="nofollow noopener noreferrer"{% endif %}
+              >{{ item.value }}{% if item.is_external %} <i class="fa fa-external-link"></i>{% endif %}</a>
+            {% else %}
+              {{ item.value }}
+            {% endif %}
           </span>
         </p>
-      {% elif scotus_meta.questions_presented_file %}
-        <p class="bottom">
-          <span class="meta-data-header">Questions Presented:</span>
-          <span class="meta-data-value">
-            <a href="{{ scotus_meta.questions_presented_file.url }}" target="_blank" rel="nofollow noopener noreferrer">View</a>
-          </span>
-        </p>
-      {% endif %}
-    {% endif %}
-    {% endwith %}{# No more scotus_meta variable #}
+      {% endfor %}
     {% endif %}
   </div>
 

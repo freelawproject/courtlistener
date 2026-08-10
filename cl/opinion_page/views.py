@@ -70,10 +70,7 @@ from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
-from cl.opinion_page.docket_entry_sources import (
-    RECAP_SOURCE,
-    get_docket_entry_source,
-)
+from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -89,7 +86,6 @@ from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
     build_originating_court_metadata,
-    build_scotus_metadata,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -112,7 +108,6 @@ from cl.search.models import (
     OriginatingCourtInformation,
     Parenthetical,
     RECAPDocument,
-    ScotusDocketMetadata,
     sort_cites,
 )
 from cl.search.selectors import get_clusters_from_citation_str
@@ -342,12 +337,12 @@ async def fetch_docket_entries(docket):
     """Fetch docket entries associated with a docket.
 
     Uses the source-appropriate model for the docket's court (see
-    cl.opinion_page.docket_entry_sources).
+    cl.opinion_page.docket_sources_utils).
 
     param docket: docket.id to get related docket_entries.
     returns: DocketEntry Queryset.
     """
-    source = get_docket_entry_source(docket)
+    source = docket.get_entry_source()
     return source.entries_queryset(docket)
 
 
@@ -359,7 +354,7 @@ async def view_docket(
     form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
 
-    source = get_docket_entry_source(docket)
+    source = docket.get_entry_source()
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
@@ -436,15 +431,13 @@ async def view_docket(
     ) -> tuple[
         BankruptcyInformation | None,
         OriginatingCourtInformation | None,
-        ScotusDocketMetadata | None,
     ]:
         return (
             getattr(d, "bankruptcy_information", None),
             getattr(d, "originating_court_information", None),
-            getattr(d, "scotus_metadata", None),
         )
 
-    bankr_info, og_info, scotus_metadata = await _get_related(docket)
+    bankr_info, og_info = await _get_related(docket)
 
     context.update(
         {
@@ -453,7 +446,6 @@ async def view_docket(
             "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
-            "hide_docket_alerts": not source.has_docket_alerts,
             "get_string": make_get_string(request),
             "metadata": await sync_to_async(build_docket_metadata)(
                 docket, context["timezone"]
@@ -462,7 +454,6 @@ async def view_docket(
             "originating_court_metadata": await sync_to_async(
                 build_originating_court_metadata
             )(docket, og_info),
-            "scotus_metadata": build_scotus_metadata(scotus_metadata),
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),
@@ -650,7 +641,7 @@ def download_docket_entries_csv(
         # Only return a handled 501 for those. A RECAP docket hitting
         # this branch means a real bug in the CSV path, and that should
         # still raise a error 500.
-        if get_docket_entry_source(docket) is RECAP_SOURCE:
+        if docket.get_entry_source() is RECAP_SOURCE:
             raise
         # A handled 501 triggers the existing "There was a problem. Try
         # again later." message in export-csv.js instead of crashing.

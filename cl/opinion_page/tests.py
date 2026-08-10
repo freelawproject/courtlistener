@@ -47,10 +47,10 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     SitemapTest,
 )
-from cl.opinion_page.docket_entry_sources import (
+from cl.opinion_page.docket_sources_utils import (
     RECAP_SOURCE,
     SCOTUS_SOURCE,
-    get_docket_entry_source,
+    build_scotus_metadata,
 )
 from cl.opinion_page.forms import (
     DocketEntryFilterForm,
@@ -64,7 +64,6 @@ from cl.opinion_page.utils import (
     build_docket_metadata,
     build_docket_tabs,
     build_originating_court_metadata,
-    build_scotus_metadata,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
     es_get_related_clusters_with_cache,
@@ -1485,17 +1484,15 @@ class DocketEntrySourceTest(TestCase):
         )
 
     def test_resolves_scotus_source_for_scotus_court(self) -> None:
-        self.assertIs(
-            get_docket_entry_source(self.scotus_docket), SCOTUS_SOURCE
-        )
+        self.assertIs(self.scotus_docket.get_entry_source(), SCOTUS_SOURCE)
 
     def test_resolves_recap_source_for_other_courts(self) -> None:
-        self.assertIs(get_docket_entry_source(self.recap_docket), RECAP_SOURCE)
+        self.assertIs(self.recap_docket.get_entry_source(), RECAP_SOURCE)
 
     def test_scotus_source_callables_execute_without_raising(self) -> None:
         entry = SCOTUSDocketEntryFactory(docket=self.scotus_docket)
         document = SCOTUSDocumentFactory(docket_entry=entry)
-        source = get_docket_entry_source(self.scotus_docket)
+        source = self.scotus_docket.get_entry_source()
         entries = list(source.entries_queryset(self.scotus_docket))
         self.assertIn(entry, entries)
         documents = list(source.documents_for_entry(entry))
@@ -1504,7 +1501,7 @@ class DocketEntrySourceTest(TestCase):
     def test_recap_source_callables_execute_without_raising(self) -> None:
         entry = DocketEntryFactory(docket=self.recap_docket)
         document = RECAPDocumentFactory(docket_entry=entry)
-        source = get_docket_entry_source(self.recap_docket)
+        source = self.recap_docket.get_entry_source()
         entries = list(source.entries_queryset(self.recap_docket))
         self.assertIn(entry, entries)
         documents = list(source.documents_for_entry(entry))
@@ -1743,7 +1740,7 @@ class ScotusDocketV2ContentRenderTest(TestCase):
         self.assertIn("No. 23-999", content)
         self.assertIn("Export CSV", content)
         self.assertNotIn("Buy on PACER", content)
-        self.assertNotIn("Get Alerts", content)
+        self.assertIn("Get Alerts", content)
         self.assertIn("View in SCOTUS", content)
 
 
