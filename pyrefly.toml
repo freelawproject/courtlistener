@@ -1,6 +1,7 @@
 # Add modules here as they're ready (remove them from replace-imports-with-any
 # below as you do so).
 project-includes = [
+  "cl/ai/**",
   "cl/alerts/**",
   "cl/audio/**",
   "cl/citations/**",
@@ -61,7 +62,6 @@ ignore-missing-imports = ["*"]
 # (py.typed) rather than stubs; the codebase has never been checked against
 # them, so their types stay hidden until someone fixes the fallout.
 replace-imports-with-any = [
-  "cl.ai", "cl.ai.*",
   "cl.api", "cl.api.*",
   "cl.custom_filters", "cl.custom_filters.*",
   "cl.disclosures", "cl.disclosures.*",

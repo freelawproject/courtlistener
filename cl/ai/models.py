@@ -1,6 +1,9 @@
+from typing import TYPE_CHECKING
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db.models.fields.related_descriptors import RelatedManager
 
 from cl.lib.model_helpers import (
     make_llm_request_response_file_path,
@@ -98,6 +101,9 @@ class LLMRequest(AbstractDateTimeModel):
     Tracks request status, API costs, and groups related tasks together.
     Can be used for batch processing (multiple tasks) or single requests.
     """
+
+    if TYPE_CHECKING:
+        tasks: RelatedManager[LLMTask]
 
     name = models.CharField(
         help_text="Human-readable request name. e.g., 'Batch run for Jan 20 scans'",

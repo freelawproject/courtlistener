@@ -182,7 +182,7 @@ class GoogleGenAIBatchWrapper:
             )
 
         for cache in self.client.caches.list():
-            if cache.display_name == cache_display_name:
+            if cache.display_name == cache_display_name and cache.name:
                 logger.info(f"Found existing cache: {cache_display_name}")
                 return cache.name
 
@@ -197,6 +197,11 @@ class GoogleGenAIBatchWrapper:
                 ttl=cache_ttl,
             ),
         )
+        if not cached_content.name:
+            raise ValueError(
+                f"Cache creation for '{cache_display_name}' returned no "
+                "resource name."
+            )
         logger.info(f"Cache created successfully: {cache_display_name}")
         return cached_content.name
 
@@ -221,7 +226,7 @@ class GoogleGenAIBatchWrapper:
             if not llm_key:
                 continue
 
-            parts = []
+            parts: list[dict[str, Any]] = []
             if file_path := task_data.get("input_file_path"):
                 mime_type, _ = mimetypes.guess_type(file_path)
                 if not mime_type:
@@ -281,6 +286,11 @@ class GoogleGenAIBatchWrapper:
             )
 
         if system_prompt:
+            if not cache_display_name:
+                raise ValueError(
+                    "cache_display_name is required when system_prompt is "
+                    "provided."
+                )
             cache_name = self.get_or_create_cache(
                 system_prompt, cache_display_name
             )
@@ -307,6 +317,9 @@ class GoogleGenAIBatchWrapper:
         finally:
             os.remove(temp_file_path)
 
+        if not jsonl_file.name:
+            raise ValueError("Uploaded JSONL file has no resource name.")
+
         config = types.CreateBatchJobConfig(display_name=batch_display_name)
 
         job = self.client.batches.create(
@@ -314,6 +327,8 @@ class GoogleGenAIBatchWrapper:
             src=jsonl_file.name,
             config=config,
         )
+        if not job.name:
+            raise ValueError("Created batch job has no resource name.")
         return job.name
 
     def get_job(self, batch_id: str) -> types.BatchJob:
@@ -334,9 +349,15 @@ class GoogleGenAIBatchWrapper:
         :raises ValueError: If the job has not succeeded.
         """
         if job.state not in DOWNLOADABLE_JOB_STATES:
+            state_name = job.state.name if job.state else "UNKNOWN"
             raise ValueError(
-                f"Cannot download results for job in state {job.state.name}. "
+                f"Cannot download results for job in state {state_name}. "
                 f"Expected one of: {', '.join(s.name for s in DOWNLOADABLE_JOB_STATES)}."
+            )
+
+        if job.dest is None or not job.dest.file_name:
+            raise ValueError(
+                "Completed job has no destination file to download."
             )
 
         return self.client.files.download(file=job.dest.file_name).decode(
@@ -354,7 +375,7 @@ class GoogleGenAIBatchWrapper:
         if not jsonl_content or not jsonl_content.strip():
             return []
 
-        processed_results = []
+        processed_results: list[ProcessedResult] = []
         results = [
             json.loads(line)
             for line in jsonl_content.splitlines()

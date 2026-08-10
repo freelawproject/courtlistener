@@ -206,6 +206,7 @@ def get_s3_file_list(
             if session_token:
                 client_kwargs["aws_session_token"] = session_token
 
+        # pyrefly: ignore [no-matching-overload]
         s3_client = boto3.client(**client_kwargs)
     except (BotoCoreError, ClientError) as e:
         raise CommandError(f"Failed to create S3 client: {e}")

@@ -204,11 +204,10 @@ def handle_request(
     """
     try:
         job = wrapper.get_job(request.batch_id)
+        state_name = job.state.name if job.state else "UNKNOWN"
 
         if job.state not in COMPLETED_STATES:
-            logger.info(
-                f"  - Job state is '{job.state.name}'. Skipping for now."
-            )
+            logger.info(f"  - Job state is '{state_name}'. Skipping for now.")
             return
 
         if job.state in SUCCEEDED_STATES:
@@ -217,10 +216,8 @@ def handle_request(
             )
             process_succeeded_request(wrapper, request, job)
         else:
-            logger.info(
-                f"  - Job ended with non-success state: {job.state.name}"
-            )
-            process_failed_request(request, job.state.name)
+            logger.info(f"  - Job ended with non-success state: {state_name}")
+            process_failed_request(request, state_name)
 
     except ValueError as e:
         logger.warning(

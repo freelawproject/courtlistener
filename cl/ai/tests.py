@@ -133,6 +133,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         for api_key in test_cases:
             with self.subTest(api_key=api_key):
                 with self.assertRaises(ValueError) as context:
+                    # pyrefly: ignore [bad-argument-type]
                     GoogleGenAIBatchWrapper(api_key=api_key)
                 self.assertIn("API key is required", str(context.exception))
 
@@ -406,6 +407,7 @@ class GoogleGenAIBatchWrapperTest(SimpleTestCase):
         self.assertEqual(
             result.name, "batches/h3j6k9m2n5p8q1r4s7t0u3v6w9x2y5z8a1b4c7d0"
         )
+        self.assertIsNotNone(result.state)
         self.assertEqual(result.state.name, "JOB_STATE_RUNNING")
         mock_client_instance.batches.get.assert_called_once_with(
             name="batches/h3j6k9m2n5p8q1r4s7t0u3v6w9x2y5z8a1b4c7d0"
@@ -824,6 +826,7 @@ class SendGeminiBatchesTest(TestCase):
         # Assertions
         self.assertEqual(LLMRequest.objects.count(), 1)
         llm_request = LLMRequest.objects.first()
+        self.assertIsNotNone(llm_request)
         self.assertEqual(
             llm_request.status, LLMRequestStatusChoices.IN_PROGRESS
         )
