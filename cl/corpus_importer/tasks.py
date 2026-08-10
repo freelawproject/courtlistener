@@ -5104,7 +5104,7 @@ def fl_ingest_docket_task(
     """
     case_bytes, bucket, key = download_result
     try:
-        case = FloridaCase.deserialize()
+        case = FloridaCase.deserialize(case_bytes.decode())
     except Exception:
         logger.exception(
             "Failed to deserialize Florida case stored in %s at %s",
