@@ -102,6 +102,15 @@ class AbstractStateDocument(AbstractPDF):
 
         return None
 
+    async def fetch_page_count(self) -> int | None:
+        """Fetch the page count of the document."""
+        from cl.lib.microservice_utils import doc_page_count_service
+
+        response = await doc_page_count_service(self)
+        if response.is_success:
+            return int(response.text)
+        return None
+
     @classmethod
     def download(cls, pk: int) -> Self | None:
         """Download the document from the URL, save it to a local file. Returns the document if download was
@@ -109,7 +118,6 @@ class AbstractStateDocument(AbstractPDF):
         # Imported here to avoid a circular import: this module is loaded with
         # cl.search.models, which the task modules import.
         from cl.corpus_importer.tasks import download_document_in_stream
-        from cl.lib.microservice_utils import doc_page_count_service
         from cl.scrapers.tasks import extract_formatted_text_document
         from cl.scrapers.utils import get_extension
 
@@ -179,9 +187,8 @@ class AbstractStateDocument(AbstractPDF):
             document.sha1 = sha1_hash
 
             if extension == ".pdf":
-                response = async_to_sync(doc_page_count_service)(document)
-                if response.is_success:
-                    document.page_count = int(response.text)
+                if pages := async_to_sync(document.fetch_page_count)():
+                    document.page_count = pages
             elif not document.can_extract(extension):
                 document.ocr_status = cls.OCR_UNNECESSARY
 

@@ -67,11 +67,13 @@ class DocumentMerger[
         )
 
     @override
-    def pre_update(self) -> list[str]:
-        updated = super().pre_update()
+    def pre_update(self, updated_fields: list[str]) -> list[str]:
+        updated = super().pre_update(updated_fields)
         # This hook only runs on the update path, so `existing` is set; the
         # guard narrows the type for mypy.
         if (existing := self.existing) is None:
+            return updated
+        if "url" not in updated_fields:
             return updated
         if existing.processing_error == ProcessingError.BAD_URL:
             existing.processing_error = None

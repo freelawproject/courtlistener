@@ -44,6 +44,7 @@ class FloridaDocumentFactory(DjangoModelFactory):
     document_name = Faker("text", max_nb_chars=25)
     document_type = Faker("word")
     link_uuid = Faker("uuid4")
+    page_count = Faker("pyint")
     url = Faker("url")
 
     class Meta:

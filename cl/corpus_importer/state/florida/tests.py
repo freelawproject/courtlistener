@@ -1027,7 +1027,7 @@ class FloridaDocumentMergerTest(TestCase):
         merged = FloridaDocument.objects.get()
         self.assertEqual(merged.content_type, "")
 
-    @merger_test(expected_query_count=31)
+    @merger_test(expected_query_count=30)
     def test_remerge_documents_is_idempotent(self):
         """Does merging the same case twice avoid duplicating documents?"""
         document = FloridaDocumentFactory.create()
@@ -1091,7 +1091,7 @@ class FloridaDocumentMergerTest(TestCase):
         self.assertFalse(merged.filepath_local)
         self.assertIsNone(merged.ocr_status)
 
-    @merger_test(expected_query_count=31)
+    @merger_test(expected_query_count=30)
     def test_remerge_missing_file_is_update(self):
         """Is an unchanged document with no stored file and no processing
         error reported as updated, so a re-ingest retries its failed
@@ -1387,10 +1387,10 @@ class FloridaIngestTaskTest(TestCase):
         case = self._make_case()
 
         with mock.patch(
-            "cl.corpus_importer.tasks.FloridaCase.model_validate_json",
+            "cl.corpus_importer.tasks.FloridaCase.deserialize",
             return_value=case,
         ):
-            result = fl_ingest_docket_task(b"{}")
+            result = fl_ingest_docket_task((b"{}", "bucket", "key"))
 
         self.assertTrue(result.success)
         self.assertIn("Docket", result.creates)
@@ -1408,10 +1408,12 @@ class FloridaIngestTaskTest(TestCase):
         case = self._make_case()
 
         with mock.patch(
-            "cl.corpus_importer.tasks.FloridaCase.model_validate_json",
+            "cl.corpus_importer.tasks.FloridaCase.deserialize",
             return_value=case,
         ):
-            result = fl_ingest_docket_task(b"{}", download_attachments=False)
+            result = fl_ingest_docket_task(
+                (b"{}", "bucket", "key"), download_attachments=False
+            )
 
         self.assertTrue(result.success)
         self.assertIn("FloridaDocument", result.creates)
@@ -1421,7 +1423,7 @@ class FloridaIngestTaskTest(TestCase):
     def test_ingest_invalid_case_fails(self, download_mock: mock.Mock) -> None:
         """Does an undeserializable payload fail the merge without raising or
         downloading anything?"""
-        result = fl_ingest_docket_task(b"not json")
+        result = fl_ingest_docket_task((b"not json", "bucket", "key"))
 
         self.assertFalse(result.success)
         self.assertIn("Docket", result.failures)
@@ -1464,8 +1466,7 @@ class FloridaDocumentDownloadTest(TestCase):
         ext_mock: mock.Mock,
         pcs_mock: mock.Mock,
     ) -> None:
-        """Does a PDF download store the file, set the page count, and
-        dispatch extraction?"""
+        """Does a PDF download store the file, and dispatch extraction?"""
         fl_document = FloridaDocumentModelFactory.create()
         pcs_mock.return_value = httpx.Response(200, text="1")
 
@@ -1485,7 +1486,6 @@ class FloridaDocumentDownloadTest(TestCase):
         self.assertTrue(fl_document.filepath_local)
         self.assertIn(".pdf", fl_document.filepath_local.name)
         self.assertEqual(fl_document.sha1, "pdfsha1")
-        self.assertEqual(fl_document.page_count, 1)
         self.assertIsNone(fl_document.processing_error)
         self.extract_document_mock.assert_called_once_with(
             pks=fl_document.pk,
@@ -1557,8 +1557,6 @@ class FloridaDocumentDownloadTest(TestCase):
         self.assertTrue(fl_document.filepath_local)
         self.assertIn(".tiff", fl_document.filepath_local.name)
         self.assertEqual(fl_document.sha1, "tiffsha1")
-        # No page_count for non-PDFs
-        self.assertIsNone(fl_document.page_count)
         self.assertIsNone(fl_document.ocr_status)
         self.extract_document_mock.assert_called_once()
 
