@@ -19,7 +19,6 @@ from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.db import IntegrityError, connection
-from django.http import HttpRequest, JsonResponse
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
@@ -68,10 +67,7 @@ from cl.api.utils import (
     promo_doubling_applies,
     promo_switch_is_active,
 )
-from cl.api.views import (
-    coverage_data,
-    make_court_variable,
-)
+from cl.api.views import make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.audio_sources import AudioSources
@@ -183,7 +179,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        CourtFactory(id="ca1", jurisdiction=Court.FEDERAL_APPELLATE)
         cls.rebuild_index("search.OpinionCluster")
 
     def setUp(self) -> None:
@@ -202,16 +197,6 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
 
     async def test_court_index(self) -> None:
         r = await self.async_client.get(reverse("court_index"))
-        self.assertEqual(r.status_code, 200)
-
-    async def test_coverage_api(self) -> None:
-        r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": 4, "court": "ca1"})
-        )
-        self.assertEqual(r.status_code, 200)
-
-    async def test_coverage_api_via_url(self) -> None:
-        r = await self.async_client.get("/api/rest/v4/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
     async def test_wiki_data_endpoint(self) -> None:
@@ -526,45 +511,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
             pk_offset=0,
             testing_mode=True,
         )
-
-    async def test_coverage_data_view_provides_court_data(self) -> None:
-        response = await coverage_data(HttpRequest(), "v4", "ca1")
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response, JsonResponse)
-        self.assertContains(response, "annual_counts")
-        self.assertContains(response, "total")
-
-    async def test_coverage_data_all_courts(self) -> None:
-        r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": "4", "court": "all"})
-        )
-        j = json.loads(r.content)
-        self.assertTrue(len(j["annual_counts"].keys()) > 0)
-        self.assertIn("total", j)
-
-    async def test_coverage_data_specific_court(self) -> None:
-        r = await self.async_client.get(
-            reverse(
-                "coverage_data", kwargs={"version": "4", "court": "scotus"}
-            )
-        )
-        j = json.loads(r.content)
-        self.assertEqual(len(j["annual_counts"].keys()), 25)
-        self.assertEqual(j["annual_counts"]["2000"], 1)
-        self.assertEqual(j["annual_counts"]["2024"], 1)
-        self.assertEqual(j["total"], 2)
-
-        # Ensure that coverage can be filtered using a query string.
-        r = await self.async_client.get(
-            reverse(
-                "coverage_data", kwargs={"version": "3", "court": "scotus"}
-            ),
-            {"q": "America"},
-        )
-        j = json.loads(r.content)
-        self.assertEqual(len(j["annual_counts"].keys()), 1)
-        self.assertEqual(j["annual_counts"]["2024"], 1)
-        self.assertEqual(j["total"], 1)
 
     async def test_make_court_variable(self) -> None:
         """Confirm opinions counts per court are properly returned."""

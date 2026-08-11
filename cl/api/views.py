@@ -10,7 +10,6 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db.models import QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from rest_framework.permissions import IsAuthenticated
@@ -29,10 +28,7 @@ from cl.custom_filters.templatetags.partition_util import columns
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.favorites.models import Prayer
 from cl.favorites.utils import get_lifetime_prayer_stats
-from cl.lib.elasticsearch_utils import (
-    get_court_opinions_counts,
-    get_opinions_coverage_over_time,
-)
+from cl.lib.elasticsearch_utils import get_court_opinions_counts
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.models import Person
 from cl.search.documents import (
@@ -92,34 +88,6 @@ async def court_index(request: HttpRequest) -> HttpResponse:
     courts = await make_court_variable()
     return TemplateResponse(
         request, "jurisdictions.html", {"courts": courts, "private": False}
-    )
-
-
-async def coverage_data(request, version, court):
-    """Provides coverage data for a court.
-
-    Responds to either AJAX or regular requests.
-    """
-
-    if court != "all":
-        court_str = (await aget_object_or_404(Court, pk=court)).pk
-    else:
-        court_str = "all"
-    q = request.GET.get("q")
-    opinions_coverage = await sync_to_async(get_opinions_coverage_over_time)(
-        OpinionClusterDocument.search(), court_str, q, "dateFiled"
-    )
-    # Calculate the totals
-    annual_counts = {}
-    total_docs = 0
-    for year_coverage in opinions_coverage:
-        annual_counts[year_coverage["key_as_string"]] = year_coverage[
-            "doc_count"
-        ]
-        total_docs += year_coverage["doc_count"]
-
-    return JsonResponse(
-        {"annual_counts": annual_counts, "total": total_docs}, safe=True
     )
 
 
