@@ -59,6 +59,14 @@ WIKI_HELP_BASE_URL = "https://wiki.free.law/c/courtlistener/help"
 WIKI_API_BASE_URL = f"{WIKI_HELP_BASE_URL}/api"
 WIKI_TERMS_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-terms-of-service-and-policies"
 WIKI_REMOVAL_URL = "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-content-removal-policy"
+# Coverage help pages moved to the wiki (#7766). These slugs are placeholders
+# — confirm each against the real wiki pages before merging.
+WIKI_COVERAGE_BASE_URL = f"{WIKI_HELP_BASE_URL}/coverage"
+WIKI_COVERAGE_URL = f"{WIKI_COVERAGE_BASE_URL}/coverage"
+WIKI_COVERAGE_FDS_URL = f"{WIKI_COVERAGE_BASE_URL}/financial-disclosures"
+WIKI_COVERAGE_OA_URL = f"{WIKI_COVERAGE_BASE_URL}/oral-arguments"
+WIKI_COVERAGE_OPINIONS_URL = f"{WIKI_COVERAGE_BASE_URL}/opinions"
+WIKI_COVERAGE_RECAP_URL = f"{WIKI_COVERAGE_BASE_URL}/recap"
 
 
 ##############
