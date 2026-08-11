@@ -3621,7 +3621,6 @@ def merge_scotus_docket_entry(
                         docket=docket,
                         date_filed=date_filed,
                         sequence_number=sequence_number,
-                        **unnumbered_lookup,
                     )
                     de_created = True
                 except SCOTUSDocketEntry.MultipleObjectsReturned:
