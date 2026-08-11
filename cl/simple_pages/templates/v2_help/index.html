@@ -29,12 +29,12 @@
       </div>
       <div class="pl-4">
         <ol class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
-          <li><a class="links" href="{% url "coverage" %}">Coverage Homepage</a></li>
-          <li><a class="links" href="{% url "coverage_recap" %}">PACER Data Coverage</a></li>
-          <li><a class="links" href="{% url "coverage_opinions" %}">Case Law Coverage</a></li>
-          <li><a class="links" href="{% url "coverage_fds" %}">Financial Disclosure Coverage</a></li>
+          <li><a class="links" href="{{ WIKI_COVERAGE_URL }}">Coverage Homepage</a></li>
+          <li><a class="links" href="{{ WIKI_COVERAGE_RECAP_URL }}">PACER Data Coverage</a></li>
+          <li><a class="links" href="{{ WIKI_COVERAGE_OPINIONS_URL }}">Case Law Coverage</a></li>
+          <li><a class="links" href="{{ WIKI_COVERAGE_FDS_URL }}">Financial Disclosure Coverage</a></li>
           <li><a class="links-external" href="https://free.law/datasets#judges-db" target="_blank" rel="noopener noreferrer">Judge Coverage</a></li>
-          <li><a class="links" href="{% url "coverage_oa" %}">Oral Argument Recording Coverage</a></li>
+          <li><a class="links" href="{{ WIKI_COVERAGE_OA_URL }}">Oral Argument Recording Coverage</a></li>
         </ol>
       </div>
     </div>
