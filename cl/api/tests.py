@@ -272,6 +272,20 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         ):
             self.assertIsInstance(financial_disclosures[key], int)
 
+    async def test_wiki_coverage_data_rounds_oa_duration(self) -> None:
+        """Is the total oral argument duration rounded to the nearest minute?
+
+        The wiki renders this value as-is, so CourtListener has to do the
+        rounding itself rather than serving a raw float.
+        """
+        await caches["default"].adelete("wiki-coverage-data")
+        await sync_to_async(AudioFactory)(duration=250)
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        data = json.loads(r.content)
+        duration_minutes = data["oral_arguments"]["duration_minutes"]
+        self.assertIsInstance(duration_minutes, int)
+        self.assertEqual(duration_minutes, 4)
+
 
 @override_settings(
     CACHES={

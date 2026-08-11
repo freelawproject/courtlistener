@@ -437,7 +437,9 @@ async def build_wiki_coverage_data(bust_cache: bool = False) -> dict:
     oa_aggregate = await Audio.objects.aaggregate(Sum("duration"))
     oa_duration = oa_aggregate["duration__sum"]
     if oa_duration:
-        oa_duration /= 60  # Avoids a "unsupported operand type" error
+        # Round to the nearest minute — the wiki renders this value as-is,
+        # so it can't do any rounding of its own.
+        oa_duration = round(oa_duration / 60)
 
     return {
         "judges": {
