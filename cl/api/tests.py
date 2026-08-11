@@ -421,6 +421,10 @@ class WikiDataRssFeedTests(TestCase):
         ]
         for url_name, cache_key, marker_key in cases:
             with self.subTest(url_name=url_name):
+                # A fresh, logged-out client per case, so the previous
+                # case's aforce_login(staff) can't leak into this one's
+                # anonymous/non-staff assertions.
+                self.async_client = AsyncClient()
                 sentinel = {"sentinel": True}
                 await caches["default"].aset(cache_key, sentinel)
 
