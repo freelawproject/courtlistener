@@ -449,6 +449,41 @@ class WikiDataRssFeedTests(TestCase):
                 cached = await caches["default"].aget(cache_key)
                 self.assertIn(marker_key, cached)
 
+    async def test_bust_cache_refreshes_nested_fd_cache(self) -> None:
+        """Does ?bust_cache also refresh get_coverage_data_fds()'s own,
+        separately-cached financial disclosure counts?
+
+        get_coverage_data_fds() caches its counts under "coverage-data.fd3"
+        for a week, independent of the wiki endpoints' own caches. Busting
+        wiki_data/wiki_coverage_data's cache must bust that nested cache
+        too, or staff see up to a week-old FD counts despite ?bust_cache.
+        """
+        stale_fd_data = {
+            "disclosures": -1,
+            "investments": -1,
+            "positions": -1,
+            "agreements": -1,
+            "non_investment_income": -1,
+            "spousal_income": -1,
+            "reimbursements": -1,
+            "gifts": -1,
+            "debts": -1,
+            "private": False,
+        }
+        await caches["default"].aset("coverage-data.fd3", stale_fd_data)
+        await caches["default"].adelete("wiki-coverage-data")
+
+        staff = await sync_to_async(UserFactory)(is_staff=True)
+        await self.async_client.aforce_login(staff)
+        r = await self.async_client.get(
+            reverse("wiki_coverage_data"), {"bust_cache": ""}
+        )
+        data = json.loads(r.content)["financial_disclosures"]
+        self.assertNotEqual(data["disclosures"], -1)
+
+        cached_fd_data = await caches["default"].aget("coverage-data.fd3")
+        self.assertNotEqual(cached_fd_data["disclosures"], -1)
+
 
 class CoverageTests(ESIndexTestCase, TestCase):
     @classmethod
