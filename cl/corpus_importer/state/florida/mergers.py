@@ -119,7 +119,11 @@ def _document_type(document: ScrapeFloridaDocument, params: Any) -> str:
 
 
 def _content_type(document: ScrapeFloridaDocument, params: Any) -> str:
-    return document.content_type or ""
+    m_len = FloridaDocument._meta.get_field("content_type").max_length
+    mime = document.content_type or ""
+    if len(mime) > m_len:
+        mime = mime[: (m_len - 3)] + "..."
+    return mime
 
 
 class FloridaDocumentMerger[ParamType](

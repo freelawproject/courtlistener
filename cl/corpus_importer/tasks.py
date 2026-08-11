@@ -5125,6 +5125,17 @@ def fl_ingest_docket_task(
         "Attempting to merge Florida case %s",
         case.docket_number,
     )
+    # Due to an oversight in the scraper, dockets with more than one page of entries may have duplicates. We want to log
+    # these so they can be captured and fixed later.
+    de_total = len(case.entries)
+    de_unique = len(set(e.docket_entry_uuid for e in case.entries))
+    if de_unique < de_total or de_total > 50:
+        logger.error(
+            "Florida case %s may have duplicate entries (%d total; %d unique)",
+            case.docket_number,
+            de_total,
+            de_unique,
+        )
     merger = FloridaDocketMerger(scrape=case, params=None)
     result = merger.merge()
     if result.failures:
