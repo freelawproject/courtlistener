@@ -107,6 +107,33 @@ _HELP_PATH_REDIRECTS: list[tuple[str, str, str]] = [
     ),
 ]
 
+# Coverage help pages moved to the wiki (#7766). Unlike the tables above,
+# these point at the WIKI_COVERAGE_*_URL settings directly by name rather
+# than a wiki_suffix, since those settings are also the single source of
+# truth consumed by inject_settings() for direct internal links — this
+# avoids encoding the same wiki slugs in two places.
+# Started: 2026-08-11
+# (old_path, settings_name, url_name | "")
+_COVERAGE_REDIRECTS: list[tuple[str, str, str]] = [
+    ("help/coverage/", "WIKI_COVERAGE_URL", "coverage"),
+    (
+        "help/coverage/financial-disclosures/",
+        "WIKI_COVERAGE_FDS_URL",
+        "coverage_fds",
+    ),
+    ("help/coverage/oral-arguments/", "WIKI_COVERAGE_OA_URL", "coverage_oa"),
+    (
+        "help/coverage/opinions/",
+        "WIKI_COVERAGE_OPINIONS_URL",
+        "coverage_opinions",
+    ),
+    ("help/coverage/recap/", "WIKI_COVERAGE_RECAP_URL", "coverage_recap"),
+    # Pre-2023 aliases (started 2023-01-17). Point straight at the wiki
+    # rather than bouncing through /help/coverage/'s own redirect.
+    ("coverage/", "WIKI_COVERAGE_URL", ""),
+    ("coverage/financial-disclosures/", "WIKI_COVERAGE_FDS_URL", ""),
+]
+
 # REST endpoint redirects using re_path for optional version prefix.
 # Pattern: ^help/api/rest/(?:v[34]/)?{slug}/$
 # All redirect to: settings.WIKI_API_BASE_URL/rest/v4/{wiki_slug}
@@ -157,6 +184,17 @@ def _build_patterns() -> list:
                 RedirectView.as_view(
                     url=f"{settings.WIKI_HELP_BASE_URL}/{wiki_suffix}",
                     permanent=True,
+                ),
+                name=name or None,
+            )
+        )
+
+    for old_path, settings_name, name in _COVERAGE_REDIRECTS:
+        patterns.append(
+            path(
+                old_path,
+                RedirectView.as_view(
+                    url=getattr(settings, settings_name), permanent=True
                 ),
                 name=name or None,
             )
