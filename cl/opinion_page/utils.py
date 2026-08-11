@@ -3,7 +3,6 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import NotRequired, TypedDict
 from zoneinfo import ZoneInfo
 
 import waffle
@@ -21,7 +20,6 @@ from elasticsearch.dsl import Q
 from elasticsearch.exceptions import ApiError, ConnectionTimeout, RequestError
 
 from cl.alerts.models import DocketAlert
-from cl.custom_filters.templatetags.extras import http_url
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -34,6 +32,10 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
+from cl.opinion_page.docket_sources_utils import (
+    MetadataItem,
+    build_scotus_metadata,
+)
 from cl.people_db.models import Person
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.documents import OpinionClusterDocument
@@ -45,27 +47,9 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
-    ScotusDocketMetadata,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class MetadataItem(TypedDict):
-    """Shape of a single item in a metadata description list (see the
-    c-metadata-section cotton component)."""
-
-    label: str
-    value: str
-    url: NotRequired[str]
-    nofollow: NotRequired[bool]
-    is_external: NotRequired[bool]
-    aria_label: NotRequired[str]
-    suffix_text: NotRequired[str]
-    suffix_url: NotRequired[str]
-    suffix_nofollow: NotRequired[bool]
-    suffix_is_external: NotRequired[bool]
-    suffix_aria_label: NotRequired[str]
 
 
 def _person_item(
@@ -318,56 +302,6 @@ def build_bankruptcy_metadata(
     return items
 
 
-def build_scotus_metadata(
-    scotus_metadata: ScotusDocketMetadata | None,
-) -> list[MetadataItem]:
-    """Build metadata items for the SCOTUS docket metadata section."""
-    if not scotus_metadata:
-        return []
-
-    items: list[MetadataItem] = []
-
-    if scotus_metadata.capital_case:
-        items.append({"label": "Capital Case", "value": "Yes"})
-
-    if scotus_metadata.date_discretionary_court_decision:
-        items.append(
-            {
-                "label": "Date of Discretionary Court Decision",
-                "value": (
-                    scotus_metadata.date_discretionary_court_decision.strftime(
-                        "%b. %d, %Y"
-                    )
-                ),
-            }
-        )
-
-    if scotus_metadata.linked_with:
-        items.append(
-            {"label": "Linked With", "value": scotus_metadata.linked_with}
-        )
-
-    if http_url(scotus_metadata.questions_presented_url):
-        items.append(
-            {
-                "label": "Questions Presented",
-                "value": "View",
-                "url": scotus_metadata.questions_presented_url,
-                "is_external": True,
-            }
-        )
-    elif scotus_metadata.questions_presented_file:
-        items.append(
-            {
-                "label": "Questions Presented",
-                "value": "View",
-                "url": scotus_metadata.questions_presented_file.url,
-            }
-        )
-
-    return items
-
-
 def build_originating_court_metadata(
     docket: Docket, og_info: OriginatingCourtInformation | None
 ) -> list[MetadataItem]:
@@ -575,6 +509,10 @@ async def core_docket_data(
 
     has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
 
+    scotus_metadata = await sync_to_async(getattr)(
+        docket, "scotus_metadata", None
+    )
+
     return (
         docket,
         {
@@ -585,6 +523,7 @@ async def core_docket_data(
             "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
             "private": docket.blocked,
             "is_scotus": docket.court_id == "scotus",
+            "scotus_metadata": build_scotus_metadata(scotus_metadata),
         },
     )
 
