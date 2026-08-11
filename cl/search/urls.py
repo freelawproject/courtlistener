@@ -1,5 +1,6 @@
 from django.urls import path, re_path
 
+from cl.lib.ratelimiter import ratelimit_deny_list
 from cl.search.feeds import (
     AllJurisdictionsFeed,
     JurisdictionFeed,
@@ -48,18 +49,18 @@ urlpatterns = [
     # Feeds & Podcasts
     re_path(
         r"^feed/(search)/$",
-        search_feed_error_handler(SearchFeed()),
+        ratelimit_deny_list(search_feed_error_handler(SearchFeed())),
         name="search_feed",
     ),
     # lacks URL capturing b/c it will use GET queries.
     path(
         "feed/court/all/",
-        search_feed_error_handler(AllJurisdictionsFeed()),
+        ratelimit_deny_list(search_feed_error_handler(AllJurisdictionsFeed())),
         name="all_jurisdictions_feed",
     ),
     path(
         "feed/court/<str:court>/",
-        search_feed_error_handler(JurisdictionFeed()),
+        ratelimit_deny_list(search_feed_error_handler(JurisdictionFeed())),
         name="jurisdiction_feed",
     ),
 ]
