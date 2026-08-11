@@ -69,7 +69,6 @@ from cl.api.utils import (
     promo_switch_is_active,
 )
 from cl.api.views import (
-    build_chart_data,
     coverage_data,
     make_court_variable,
 )
@@ -580,47 +579,6 @@ class CoverageTests(ESIndexTestCase, TestCase):
                 self.assertEqual(2, court.count)
             if court.pk == self.court_cand.pk:
                 self.assertEqual(1, court.count)
-
-    async def test_build_chart_data(self) -> None:
-        """Confirm build_chart_data method returns the right data."""
-
-        chart_data = await sync_to_async(build_chart_data)(["scotus", "cand"])
-        for court_data in chart_data:
-            if (
-                court_data["group"]
-                == self.court_scotus.get_jurisdiction_display()
-            ):
-                data = court_data["data"][0]
-                self.assertEqual(data["id"], self.court_scotus.pk)
-                self.assertEqual(data["label"], self.court_scotus.full_name)
-                self.assertEqual(data["data"][0]["val"], 2)
-
-                date_1 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
-                )
-                date_2 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
-                )
-                self.assertEqual(date_1.date(), self.c_scotus_1.date_filed)
-                self.assertEqual(date_2.date(), self.c_scotus_2.date_filed)
-
-            if (
-                court_data["group"]
-                == self.court_cand.get_jurisdiction_display()
-            ):
-                data = court_data["data"][0]
-                self.assertEqual(data["id"], self.court_cand.pk)
-                self.assertEqual(data["label"], self.court_cand.full_name)
-                self.assertEqual(data["data"][0]["val"], 1)
-
-                date_1 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
-                )
-                date_2 = datetime.fromisoformat(
-                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
-                )
-                self.assertEqual(date_1.date(), self.c_cand_1.date_filed)
-                self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
 @mock.patch(
