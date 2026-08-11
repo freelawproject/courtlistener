@@ -5124,8 +5124,8 @@ def fl_ingest_docket_task(
         logger.error(
             "Florida case %s may have duplicate entries (%d total; %d unique)",
             case.docket_number,
-            len(case.entries),
-            len(set(e for e in case.entries)),
+            de_total,
+            de_unique,
         )
     merger = FloridaDocketMerger(scrape=case, params=None)
     result = merger.merge()
