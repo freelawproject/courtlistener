@@ -1,5 +1,6 @@
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from typing import TypedDict, cast
@@ -8,7 +9,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
@@ -25,6 +26,7 @@ from cl.api.utils import (
     get_current_throttle_usage,
     get_user_api_usage,
 )
+from cl.audio.models import Audio
 from cl.custom_filters.templatetags.partition_util import columns
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.favorites.models import Prayer
@@ -34,6 +36,7 @@ from cl.lib.elasticsearch_utils import (
     get_opinions_coverage_over_time,
 )
 from cl.lib.url_utils import BASE_URL
+from cl.people_db.models import Person
 from cl.search.documents import (
     OpinionClusterDocument,
 )
@@ -315,6 +318,44 @@ async def make_court_link_list(courts: QuerySet, url_name: str) -> str:
     return "\n".join(lines)
 
 
+async def get_or_build_wiki_json(
+    request: HttpRequest,
+    cache_key: str,
+    build_data: Callable[[bool], Awaitable[dict]],
+) -> JsonResponse:
+    """Serve a cached JSON payload for the wiki, rebuilding it on request.
+
+    Shared by the wiki-data endpoints so each one only has to describe how
+    to build its own payload, not how to cache it.
+
+    Staff users can pass ?bust_cache to skip the cached response and rebuild
+    it, e.g. after the underlying data changes. The rebuild is expensive, so
+    the param is ignored for everybody else. The flag is also passed to
+    build_data() so it can bust any caches of its own nested in the data it
+    fetches — otherwise a "fresh" rebuild here could still return
+    data that's stale by as much as those inner caches' own TTLs.
+
+    :param request: The request. Only used to check for ?bust_cache + staff.
+    :param cache_key: The cache key this payload is stored under.
+    :param build_data: An async callable that computes a fresh payload. It
+        receives the bust_cache flag so it can propagate it to any caches
+        of its own.
+    :return: The cached or freshly-built payload as a JsonResponse.
+    """
+    bust_cache = (
+        "bust_cache" in request.GET and (await request.auser()).is_staff  # type: ignore[attr-defined]
+    )
+    if not bust_cache:
+        data = await cache.aget(cache_key)
+        if data is not None:
+            return JsonResponse(data)
+
+    data = await build_data(bust_cache)
+    one_day = 60 * 60 * 24
+    await cache.aset(cache_key, data, one_day)
+    return JsonResponse(data)
+
+
 async def wiki_data(request: HttpRequest) -> JsonResponse:
     """Provide data for the external wiki's help pages.
 
@@ -325,15 +366,20 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     it, e.g. after court metadata changes. The rebuild is expensive, so the
     param is ignored for everybody else.
     """
-    cache_key = "wiki-data"
-    bust_cache = (
-        "bust_cache" in request.GET and (await request.auser()).is_staff  # type: ignore[attr-defined]
-    )
-    if not bust_cache:
-        data = await cache.aget(cache_key)
-        if data is not None:
-            return JsonResponse(data)
+    return await get_or_build_wiki_json(request, "wiki-data", build_wiki_data)
 
+
+async def build_wiki_data(bust_cache: bool = False) -> dict:
+    """Build the payload served by wiki_data().
+
+    Kept separate from the view so get_or_build_wiki_json() can call it only
+    when the cached payload is missing or busted.
+
+    :param bust_cache: Passed through to nested caches (e.g. financial
+        disclosure counts) so busting this endpoint's cache doesn't leave
+        stale data behind in those.
+    :return: The wiki-data payload.
+    """
     court_count = await Court.objects.exclude(
         jurisdiction=Court.TESTING_COURT
     ).acount()
@@ -342,7 +388,7 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore[misc]
     count, period = parse_throttle_rate_for_template(rate)  # type: ignore[misc]
 
-    fd_data = await get_coverage_data_fds()
+    fd_data = await get_coverage_data_fds(bust_cache=bust_cache)
     # Yesterday's alert total; start=1 skips today's still-filling bucket.
     alerts_sent_count = await sync_to_async(get_redis_stat_sum)(
         f"{StatMetric.ALERTS_SENT}.{{date}}", days=1, start=1
@@ -423,9 +469,65 @@ async def wiki_data(request: HttpRequest) -> JsonResponse:
             ),
         },
     }
-    one_day = 60 * 60 * 24
-    await cache.aset(cache_key, data, one_day)
-    return JsonResponse(data)
+    return data
+
+
+async def wiki_coverage_data(request: HttpRequest) -> JsonResponse:
+    """Provide data for the external wiki's coverage help pages.
+
+    Returns counts used across the coverage help pages so the wiki can
+    display them via external data connectors. This is kept separate from
+    wiki_data() so that endpoint doesn't keep growing without bound — new
+    coverage stats belong here instead.
+
+    Staff users can pass ?bust_cache to skip the cached response and rebuild
+    it, e.g. after new financial disclosures land. The rebuild is expensive,
+    so the param is ignored for everybody else.
+    """
+    return await get_or_build_wiki_json(
+        request, "wiki-coverage-data", build_wiki_coverage_data
+    )
+
+
+async def build_wiki_coverage_data(bust_cache: bool = False) -> dict:
+    """Build the payload served by wiki_coverage_data().
+
+    Kept separate from the view so get_or_build_wiki_json() can call it only
+    when the cached payload is missing or busted.
+
+    :param bust_cache: Passed through to get_coverage_data_fds() so busting
+        this endpoint's cache actually refreshes the financial disclosure
+        counts too, instead of leaving up to a week-old counts from that
+        function's own cache in place.
+    :return: The wiki-coverage-data payload.
+    """
+    fd_data = await get_coverage_data_fds(bust_cache=bust_cache)
+    judge_count = await Person.objects.all().acount()
+
+    oa_aggregate = await Audio.objects.aaggregate(Sum("duration"))
+    oa_duration = oa_aggregate["duration__sum"]
+    if oa_duration:
+        oa_duration /= 60  # Avoids a "unsupported operand type" error
+
+    return {
+        "judges": {
+            "count": judge_count,
+        },
+        "oral_arguments": {
+            "duration_minutes": oa_duration,
+        },
+        "financial_disclosures": {
+            "disclosures": fd_data["disclosures"],
+            "investments": fd_data["investments"],
+            "positions": fd_data["positions"],
+            "agreements": fd_data["agreements"],
+            "non_investment_income": fd_data["non_investment_income"],
+            "spousal_income": fd_data["spousal_income"],
+            "reimbursements": fd_data["reimbursements"],
+            "gifts": fd_data["gifts"],
+            "debts": fd_data["debts"],
+        },
+    }
 
 
 class MembershipInfo(TypedDict):

@@ -219,6 +219,11 @@ urlpatterns = [
     path("help/api/jurisdictions/", views.court_index, name="court_index"),
     # Live API endpoints
     path("api/rest/v4/wiki-data/", views.wiki_data, name="wiki_data"),
+    path(
+        "api/rest/v4/wiki-data/coverage/",
+        views.wiki_coverage_data,
+        name="wiki_coverage_data",
+    ),
     re_path(
         r"^api/rest/v4/coverage/opinions/",
         views.coverage_data_opinions,
