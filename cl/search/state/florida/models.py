@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import pghistory
 from django.db import models
+from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
@@ -152,3 +155,14 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
                 name="unique_link_uuid_per_docket_entry",
             )
         ]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        slug = slugify(Path(filename).stem)
+        ext = Path(filename).suffix or ".pdf"
+        court_id = self.docket_entry.docket.court_id
+        # Thumbnails live in a sibling directory so they can't collide with
+        # the document they were generated from.
+        directory = f"{court_id}-thumbnails" if thumbs else court_id
+        return str(
+            Path("us/state/fl") / directory / f"gov.fl.{court_id}.{slug}{ext}"
+        )

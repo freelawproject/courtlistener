@@ -5,6 +5,7 @@ from typing import IO
 
 import pghistory
 from django.db import models
+from django.utils.text import slugify
 
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
@@ -134,3 +135,14 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
             models.Index(fields=["filepath_local"]),
         ]
         unique_together = [["docket_entry", "media_id"]]
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        slug = slugify(Path(filename).stem)
+        ext = Path(filename).suffix or ".pdf"
+        court_id = self.docket_entry.docket.court_id
+        # Thumbnails live in a sibling directory so they can't collide with
+        # the document they were generated from.
+        directory = f"{court_id}-thumbnails" if thumbs else court_id
+        return str(
+            Path("us/state/tx") / directory / f"gov.tx.{court_id}.{slug}{ext}"
+        )

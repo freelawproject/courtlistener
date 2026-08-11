@@ -1,13 +1,13 @@
 import logging
-import os
 import re
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
+from typing import Protocol
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
-from django.utils.text import get_valid_filename, slugify
+from django.utils.text import get_valid_filename
 from django.utils.timezone import now
 from juriscraper.state.texas.common import (
     DOCKET_NUMBER_REGEXES as TEXAS_DN_REGEXES,
@@ -15,7 +15,7 @@ from juriscraper.state.texas.common import (
 
 from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.lib.recap_utils import get_bucket_name
-from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.string_utils import normalize_dashes
 
 dist_d_num_regex = r"(?:\d:)?(\d\d)-[a-zA-Z]{1,5}-(\d+)"
 appellate_bankr_d_num_regex = r"(\d\d)-(\d+)"
@@ -319,8 +319,8 @@ def make_path(root: str, filename: str) -> str:
     Start with the `root` node, and use the current date as the subdirectories.
     """
     d = now()
-    return os.path.join(
-        root, f"{d.year}", f"{d.month:02d}", f"{d.day:02d}", filename
+    return str(
+        Path(root) / f"{d.year}" / f"{d.month:02d}" / f"{d.day:02d}" / filename
     )
 
 
@@ -353,8 +353,8 @@ def make_lasc_path(instance, filename):
 
     Start with the `root` node, and use the current date as the subdirectories.
     """
-    return os.path.join(
-        "lasc-data", f"{instance.sha1[0:2]}", f"{instance.sha1[2:]}.json"
+    return str(
+        Path("lasc-data") / instance.sha1[0:2] / f"{instance.sha1[2:]}.json"
     )
 
 
@@ -372,84 +372,37 @@ def base_recap_path(instance, filename, base_dir):
 
     Mirrors technique used by original RECAP server to upload PDFs to IA.
     """
-    return os.path.join(
-        base_dir,
-        get_bucket_name(
+    return str(
+        Path(base_dir)
+        / get_bucket_name(
             instance.docket_entry.docket.court_id,
             instance.docket_entry.docket.pacer_case_id,
-        ),
-        filename,
-    )
-
-
-def make_pdf_path(instance, filename, thumbs=False):
-    from cl.lasc.models import LASCPDF
-    from cl.search.models import (
-        ClaimHistory,
-        FloridaDocument,
-        NYCoADocument,
-        RECAPDocument,
-        ScotusDocketMetadata,
-        SCOTUSDocument,
-        TexasDocument,
-    )
-
-    if isinstance(instance, RECAPDocument):
-        root = "recap"
-        court_id = instance.docket_entry.docket.court_id
-        pacer_case_id = instance.docket_entry.docket.pacer_case_id
-    elif isinstance(instance, ClaimHistory):
-        root = "claim"
-        court_id = instance.claim.docket.court_id
-        pacer_case_id = instance.pacer_case_id
-    elif isinstance(instance, LASCPDF):
-        slug = slugify(trunc(filename, 40))
-        root = f"/us/state/ca/lasc/{instance.docket_number}/"
-        file_name = f"gov.ca.lasc.{instance.docket_number}.{instance.document_id}.{slug}.pdf"
-
-        return os.path.join(root, file_name)
-    elif isinstance(instance, ScotusDocketMetadata):
-        slug = slugify(Path(filename).stem)
-        file_name = f"gov.scotus.{slug}.pdf"
-        return str(Path("scotus") / "qp" / file_name)
-    elif isinstance(instance, SCOTUSDocument):
-        slug = slugify(Path(filename).stem)
-        file_name = f"gov.scotus.{slug}.pdf"
-        return str(Path("scotus") / "documents" / file_name)
-    elif isinstance(instance, TexasDocument):
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = instance.docket_entry.docket.court_id
-        root = Path(f"us/state/tx/{court_id}")
-        file_name = f"gov.tx.{court_id}.{slug}{ext}"
-        return str(root / file_name)
-    elif isinstance(instance, FloridaDocument):
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = instance.docket_entry.docket.court_id
-        root = Path(f"us/state/fl/{court_id}")
-        file_name = f"gov.fl.{court_id}.{slug}{ext}"
-        return str(root / file_name)
-    elif isinstance(instance, NYCoADocument):
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = instance.docket_entry.docket.court_id
-        # Thumbnails live in a sibling directory so they can't collide with the
-        # document they were generated from.
-        directory = f"{court_id}-thumbnails" if thumbs else court_id
-        root = Path(f"us/state/ny/{directory}")
-        file_name = f"gov.ny.{court_id}.{slug}{ext}"
-        return str(root / file_name)
-    else:
-        raise ValueError(
-            f"Unknown model type in make_pdf_path function: {type(instance)}"
         )
-
-    if thumbs:
-        root = f"{root}-thumbnails"
-    return os.path.join(
-        root, get_bucket_name(court_id, pacer_case_id), filename
+        / filename
     )
+
+
+class SupportsPdfPath(Protocol):
+    """A model that knows where its own PDFs live.
+
+    Most implementors get this by subclassing `AbstractPDF`, but not all do --
+    `ScotusDocketMetadata` stores a PDF on a model that is not itself a
+    document -- so the contract is a Protocol rather than the base class.
+    """
+
+    def get_pdf_path(self, filename: str, thumbs: bool = False) -> str: ...
+
+
+def make_pdf_path(
+    instance: SupportsPdfPath, filename: str, thumbs: bool = False
+) -> str:
+    """`upload_to` callback for PDF `FileField`s.
+
+    Existing migrations reference this function by its dotted path, so it must
+    remain importable from here even though the path logic itself now lives on
+    each model's `get_pdf_path`.
+    """
+    return instance.get_pdf_path(filename, thumbs=thumbs)
 
 
 def make_json_path(instance, filename):
@@ -464,7 +417,7 @@ def make_lasc_json_path(instance, filename):
     return make_lasc_path(instance, filename)
 
 
-def make_pdf_thumb_path(instance, filename):
+def make_pdf_thumb_path(instance: SupportsPdfPath, filename: str) -> str:
     return make_pdf_path(instance, filename, thumbs=True)
 
 
