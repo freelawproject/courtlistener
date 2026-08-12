@@ -18,18 +18,8 @@ from cl.visualizations.utils import build_visualization
 
 
 class JSONViewSet(LoggingMixin, ReadOnlyModelViewSet):
-    """Read-only endpoint for a visualization's JSON data.
-
-    JSONVersions are only ever created server-side, by
-    ``build_visualization()`` as part of ``VisualizationViewSet``'s create
-    flow, so this viewset never needs to support create/update/delete. It
-    used to be a full ModelViewSet gated by an object-level owner check that
-    only DRF invokes for retrieve/update/delete, which left the create path
-    unguarded and let any authenticated user attach a JSONVersion to
-    someone else's map (GHSA-cvh7-rv7v-wx2j). Removing the write actions
-    removes that attack surface entirely, rather than trying to patch the
-    permission check.
-    """
+    """Read-only: JSONVersions are only ever created server-side, by
+    build_visualization() (GHSA-cvh7-rv7v-wx2j)."""
 
     permission_classes = [
         IsAuthenticated,

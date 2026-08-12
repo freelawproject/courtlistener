@@ -601,14 +601,10 @@ class APITests(APITestCase):
     ) -> None:
         """Can a user attach a *new* docket to a tag they don't own?
 
-        The two cases above reuse the same (docket, tag) pair as an
-        already-tagged one, so their 400s actually come from DocketTag's
-        `unique_together` constraint, not from any ownership check --
-        they'd pass even with no ownership enforcement at all. This tags a
-        docket that `tag` has never been attached to, which is the only
-        way to exercise IsTagOwner/the serializer's ownership scoping
-        directly (GHSA-cvh7-rv7v-wx2j-class: an unscoped `tag` FK on create
-        let any authenticated user attach a docket to someone else's tag).
+        Unlike the two cases above, this uses a (docket, tag) pair that's
+        never been used before, so a 400 here can only come from ownership
+        enforcement, not DocketTag's `unique_together` constraint
+        (GHSA-cvh7-rv7v-wx2j-class).
         """
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]

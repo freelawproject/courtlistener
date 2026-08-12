@@ -4,6 +4,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import DynamicFieldsMixin
@@ -45,14 +46,14 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # `IsTagOwner.has_object_permission()` (cl/favorites/api_permissions.py)
-        # is only invoked by DRF on retrieve/update/delete, never on create,
-        # so it was the only thing standing between an authenticated user
-        # and attaching a docket to someone else's private tag by pointing
-        # `tag` at its pk (same vulnerability class as GHSA-cvh7-rv7v-wx2j).
-        # Scoping the queryset here closes it for create and update alike.
+        # Scope writable `tag` values to the requester's own tags
+        # (GHSA-cvh7-rv7v-wx2j-class).
         request = self.context.get("request")
-        if request is not None and request.user.is_authenticated:
+        if (
+            request is not None
+            and request.method not in SAFE_METHODS
+            and request.user.is_authenticated
+        ):
             self.fields["tag"].queryset = UserTag.objects.filter(
                 user=request.user
             )

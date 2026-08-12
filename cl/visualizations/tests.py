@@ -168,15 +168,8 @@ class TestVizModels(TestCase):
         self.assertIsNone(viz.pk, None)
 
     async def test_embed_view_escapes_json_data(self) -> None:
-        """Is JSONVersion.json_data safely escaped in the embed view, even
-        for a private visualization loaded by a non-owner?
-
-        json_data is rendered inside a <script> block. If it's ever
-        interpolated raw (e.g. via the `safe` filter), a value containing
-        `</script>` can break out of that block and execute as
-        attacker-controlled JavaScript, regardless of who's viewing it or
-        whether the map is private (GHSA-cvh7-rv7v-wx2j). It must always be
-        decoded via JSON.parse() of an escapejs-encoded string instead.
+        """Is json_data safely escaped in the embed view, even for a
+        private visualization loaded by a non-owner (GHSA-cvh7-rv7v-wx2j)?
         """
         payload = "</script><script>alert(1)</script>"
         viz = await sync_to_async(VisualizationFactory.create)(
@@ -388,15 +381,8 @@ class APIVisualizationTestCase(APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
 
     async def test_json_data_is_read_only(self) -> None:
-        """Is the visualization JSON API read-only for owners and non-owners
-        alike?
-
-        JSONVersions are only ever created server-side, by
-        build_visualization(). The API used to also allow authenticated
-        users to create and update them directly, which let any user attach
-        a JSONVersion to someone else's map, whose json_data was then
-        rendered unescaped in the public embed view (GHSA-cvh7-rv7v-wx2j).
-        Removing the write actions closes that off entirely.
+        """Is the visualization JSON API read-only, for owners and
+        non-owners alike (GHSA-cvh7-rv7v-wx2j)?
         """
         response = await self.make_good_visualization("some title")
         j = response.json()

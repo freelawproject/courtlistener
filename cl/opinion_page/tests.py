@@ -2094,14 +2094,8 @@ class UploadPublication(TestCase):
     def test_court_upload_strips_html_from_free_text_fields(
         self, mock
     ) -> None:
-        """Are case_title/disposition/summary stripped of HTML on upload?
-
-        These fields are rendered with the `safe` filter wherever case
-        names/dispositions/summaries are displayed (e.g. best_case_name,
-        cluster.disposition, cluster.summary). The upload portal is
-        reachable by non-admin, group-scoped court-partner accounts, so
-        submitted HTML/JS would otherwise render unescaped on public
-        opinion pages (GHSA-cvh7-rv7v-wx2j-class).
+        """Are case_title/disposition/summary stripped of HTML on upload
+        (GHSA-cvh7-rv7v-wx2j-class)?
         """
         payload = "</script><script>alert(1)</script>"
         self.miss_data["case_title"] = f"Some Case {payload}"
