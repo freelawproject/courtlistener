@@ -25,6 +25,7 @@ import requests
 from asgiref.sync import async_to_sync
 from celery import Task, chain
 from celery.exceptions import SoftTimeLimitExceeded
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile, File
@@ -218,6 +219,7 @@ from cl.search.models import (
     TrialCourtData,
 )
 from cl.search.state.florida.models import FloridaDocument
+from cl.search.state.shared import AbstractStateDocument
 from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
@@ -5152,3 +5154,16 @@ def fl_ingest_docket_task(
         for pk in attachment_pks:
             download_fl_document.si(pk).apply_async()
     return result
+
+
+@app.task(bind=True, ignore_result=True)
+@throttle_task("2/s", key="model_name")
+def download_state_document(self: Task, model_name: str, pk: int) -> None:
+    """Celery task to download the file for a state document and store it in S3.
+
+    :param model_name: The name of the state document model (must be a subclass of `AbstractStateDocument`).
+    :param pk: The primary key of the object to download."""
+    model = apps.get_model(model_name)
+    # Any model passed in should already be an `AbstractStateDocument`. Verify it for the type checker.
+    assert issubclass(model, AbstractStateDocument)
+    model.download(pk)
