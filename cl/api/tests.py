@@ -68,7 +68,11 @@ from cl.api.utils import (
     promo_doubling_applies,
     promo_switch_is_active,
 )
-from cl.api.views import build_chart_data, coverage_data, make_court_variable
+from cl.api.views import (
+    build_chart_data,
+    coverage_data,
+    make_court_variable,
+)
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.audio_sources import AudioSources
@@ -178,14 +182,9 @@ from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 class BasicAPIPageTest(ESIndexTestCase, TestCase):
     """Test the basic views"""
 
-    fixtures = [
-        "judge_judy.json",
-        "test_court.json",
-        "test_objects_search.json",
-    ]
-
     @classmethod
     def setUpTestData(cls):
+        CourtFactory(id="ca1", jurisdiction=Court.FEDERAL_APPELLATE)
         cls.rebuild_index("search.OpinionCluster")
 
     def setUp(self) -> None:
@@ -263,6 +262,31 @@ class BasicAPIPageTest(ESIndexTestCase, TestCase):
         self.assertIsInstance(prayers["total_cost"], str)
         self.assertIsInstance(data["feeds"]["opinion_courts"], str)
         self.assertIsInstance(data["podcasts"]["oral_argument_courts"], str)
+
+    async def test_wiki_coverage_data_endpoint(self) -> None:
+        """Does the coverage data endpoint return the expected JSON structure?"""
+        await caches["default"].adelete("wiki-coverage-data")
+        r = await self.async_client.get(reverse("wiki_coverage_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/json")
+        data = json.loads(r.content)
+        expected_keys = {"judges", "oral_arguments", "financial_disclosures"}
+        self.assertEqual(set(data.keys()), expected_keys)
+        self.assertIsInstance(data["judges"]["count"], int)
+        self.assertIn("duration_minutes", data["oral_arguments"])
+        financial_disclosures = data["financial_disclosures"]
+        for key in (
+            "disclosures",
+            "investments",
+            "positions",
+            "agreements",
+            "non_investment_income",
+            "spousal_income",
+            "reimbursements",
+            "gifts",
+            "debts",
+        ):
+            self.assertIsInstance(financial_disclosures[key], int)
 
 
 @override_settings(
@@ -379,36 +403,90 @@ class WikiDataRssFeedTests(TestCase):
         )
 
     async def test_bust_cache_param(self) -> None:
-        """Does ?bust_cache rebuild the cached response for staff only?"""
-        sentinel = {"sentinel": True}
-        await caches["default"].aset("wiki-data", sentinel)
+        """Does ?bust_cache rebuild the cached response for staff only?
 
-        # Without the param, the cached payload is served.
-        r = await self.async_client.get(reverse("wiki_data"))
-        self.assertEqual(json.loads(r.content), sentinel)
-
-        # Anonymous and non-staff users can't bust the cache.
-        r = await self.async_client.get(
-            reverse("wiki_data"), {"bust_cache": ""}
-        )
-        self.assertEqual(json.loads(r.content), sentinel)
+        Both wiki-data endpoints share the same get_or_build_wiki_json()
+        caching logic, so one parametrized test covers both instead of
+        duplicating it per endpoint.
+        """
         non_staff = await sync_to_async(UserFactory)(is_staff=False)
-        await self.async_client.aforce_login(non_staff)
-        r = await self.async_client.get(
-            reverse("wiki_data"), {"bust_cache": ""}
-        )
-        self.assertEqual(json.loads(r.content), sentinel)
+        staff = await sync_to_async(UserFactory)(is_staff=True)
+        cases = [
+            ("wiki_data", "wiki-data", "rss_feeds"),
+            (
+                "wiki_coverage_data",
+                "wiki-coverage-data",
+                "financial_disclosures",
+            ),
+        ]
+        for url_name, cache_key, marker_key in cases:
+            with self.subTest(url_name=url_name):
+                # A fresh, logged-out client per case, so the previous
+                # case's aforce_login(staff) can't leak into this one's
+                # anonymous/non-staff assertions.
+                self.async_client = AsyncClient()
+                sentinel = {"sentinel": True}
+                await caches["default"].aset(cache_key, sentinel)
 
-        # Staff can: the response is rebuilt and re-cached.
+                # Without the param, the cached payload is served.
+                r = await self.async_client.get(reverse(url_name))
+                self.assertEqual(json.loads(r.content), sentinel)
+
+                # Anonymous and non-staff users can't bust the cache.
+                r = await self.async_client.get(
+                    reverse(url_name), {"bust_cache": ""}
+                )
+                self.assertEqual(json.loads(r.content), sentinel)
+                await self.async_client.aforce_login(non_staff)
+                r = await self.async_client.get(
+                    reverse(url_name), {"bust_cache": ""}
+                )
+                self.assertEqual(json.loads(r.content), sentinel)
+
+                # Staff can: the response is rebuilt and re-cached.
+                await self.async_client.aforce_login(staff)
+                r = await self.async_client.get(
+                    reverse(url_name), {"bust_cache": ""}
+                )
+                data = json.loads(r.content)
+                self.assertIn(marker_key, data)
+                cached = await caches["default"].aget(cache_key)
+                self.assertIn(marker_key, cached)
+
+    async def test_bust_cache_refreshes_nested_fd_cache(self) -> None:
+        """Does ?bust_cache also refresh get_coverage_data_fds()'s own,
+        separately-cached financial disclosure counts?
+
+        get_coverage_data_fds() caches its counts under "coverage-data.fd3"
+        for a week, independent of the wiki endpoints' own caches. Busting
+        wiki_data/wiki_coverage_data's cache must bust that nested cache
+        too, or staff see up to a week-old FD counts despite ?bust_cache.
+        """
+        stale_fd_data = {
+            "disclosures": -1,
+            "investments": -1,
+            "positions": -1,
+            "agreements": -1,
+            "non_investment_income": -1,
+            "spousal_income": -1,
+            "reimbursements": -1,
+            "gifts": -1,
+            "debts": -1,
+            "private": False,
+        }
+        await caches["default"].aset("coverage-data.fd3", stale_fd_data)
+        await caches["default"].adelete("wiki-coverage-data")
+
         staff = await sync_to_async(UserFactory)(is_staff=True)
         await self.async_client.aforce_login(staff)
         r = await self.async_client.get(
-            reverse("wiki_data"), {"bust_cache": ""}
+            reverse("wiki_coverage_data"), {"bust_cache": ""}
         )
-        data = json.loads(r.content)
-        self.assertIn("rss_feeds", data)
-        cached = await caches["default"].aget("wiki-data")
-        self.assertIn("rss_feeds", cached)
+        data = json.loads(r.content)["financial_disclosures"]
+        self.assertNotEqual(data["disclosures"], -1)
+
+        cached_fd_data = await caches["default"].aget("coverage-data.fd3")
+        self.assertNotEqual(cached_fd_data["disclosures"], -1)
 
 
 class CoverageTests(ESIndexTestCase, TestCase):

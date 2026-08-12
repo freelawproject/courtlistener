@@ -73,15 +73,18 @@ async def build_court_dicts(courts: QuerySet) -> list[dict[str, str]]:
     return court_dicts
 
 
-async def get_coverage_data_fds() -> dict[str, int]:
+async def get_coverage_data_fds(bust_cache: bool = False) -> dict[str, int]:
     """Get stats on the disclosure data
 
     Attempt the cache if possible.
 
+    :param bust_cache: If True, skip the cache and recompute fresh counts,
+        e.g. when a caller's own cache was just busted and needs this data
+        to actually be current rather than up to a week stale.
     :return: A dict mapping item types to their counts.
     """
     coverage_key = "coverage-data.fd3"
-    coverage_data = await cache.aget(coverage_key)
+    coverage_data = None if bust_cache else await cache.aget(coverage_key)
     if coverage_data is None:
         coverage_data = {
             "disclosures": FinancialDisclosure,
