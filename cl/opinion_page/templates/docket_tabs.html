@@ -446,7 +446,7 @@
           <span class="meta-data-header">{{ item.label }}:</span>
           <span class="meta-data-value">
             {% if item.url %}
-              <a href="{{ item.url }}"
+              <a href="{{ item.url|http_url }}"
                  {% if item.is_external %}target="_blank" rel="nofollow noopener noreferrer"{% endif %}
               >{{ item.value }}{% if item.is_external %} <i class="fa fa-external-link"></i>{% endif %}</a>
             {% else %}

@@ -82,22 +82,18 @@
             {% if rd.document_number %}
               <div class="col-xs-3">
                 <p>
-                  {% if is_scotus %}
-                    Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
-                  {% else %}
-                    {% if rd.document_type == rd.ATTACHMENT %}
-                      {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Att<span
-                                class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
-                      {% else %}
-                        Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
-                      {% endif %}
+                  {% if is_scotus or rd.document_type == rd.ATTACHMENT %}
+                    {% if rd.filepath_local %}
+                      <a href="{{ rd.get_absolute_url }}" rel="nofollow">Att<span
+                              class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}</a>
                     {% else %}
-                      {% if rd.filepath_local %}
-                        <a href="{{ rd.get_absolute_url }}" rel="nofollow">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
-                      {% else %}
-                        Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
-                      {% endif %}
+                      Att<span class="hidden-xs hidden-sm">ach&shy;ment</span>&nbsp;{{ rd.attachment_number }}
+                    {% endif %}
+                  {% else %}
+                    {% if rd.filepath_local %}
+                      <a href="{{ rd.get_absolute_url }}" rel="nofollow">Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span></a>
+                    {% else %}
+                      Main Doc<span class="hidden-xs hidden-sm">&shy;ument</span>
                     {% endif %}
                   {% endif %}
                 </p>
