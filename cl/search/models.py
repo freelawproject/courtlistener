@@ -37,7 +37,9 @@ from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 
 from cl.citations.utils import get_citation_depth_between_clusters
-from cl.corpus_importer.state.florida.utils import is_florida_court
+from cl.corpus_importer.state.florida.utils import (
+    is_florida_court,
+)
 from cl.corpus_importer.state.florida.utils import (
     make_docket_number_core as make_florida_docket_number_core,
 )
@@ -61,6 +63,7 @@ from cl.lib.storage import IncrementingAWSMediaStorage, S3PrivateUUIDStorage
 from cl.lib.string_utils import get_token_count_from_string, trunc
 from cl.search.cluster_sources import ClusterSources
 from cl.search.docket_sources import DocketSources
+from cl.search.state.florida.models import *
 from cl.search.state.texas.models import *
 from cl.users.models import User
 
@@ -4099,7 +4102,9 @@ class CaseTransfer(AbstractDateTimeModel):
             court = getattr(transfer, f"{side}_court")
             docket_number = getattr(transfer, f"{side}_docket_number")
 
-            if court.jurisdiction == Court.STATE_APPELLATE:
+            if court.jurisdiction == Court.STATE_APPELLATE and is_texas_court(
+                court.id
+            ):
                 docket_number = normalize_texas_appellate_docket_number(
                     docket_number
                 )

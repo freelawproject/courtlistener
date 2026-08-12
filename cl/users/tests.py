@@ -90,6 +90,7 @@ from cl.tests.cases import (
 )
 from cl.tests.utils import MockResponse as MockPostResponse
 from cl.tests.utils import make_session_client
+from cl.users import signals as user_signals
 from cl.users.admin import UserAdmin
 from cl.users.email_handlers import (
     add_bcc_random,
@@ -181,7 +182,7 @@ class UserTest(LiveServerTestCase):
             # No spaces
             ("/test test", True),
             # A safe redirect
-            (reverse("faq"), False),
+            (reverse("help_home"), False),
             # CRLF injection attack
             (
                 "/%0d/evil.com/&email=Your+Account+still+in+maintenance,please+click+Return+below",
@@ -221,9 +222,9 @@ class UserTest(LiveServerTestCase):
         evil_text = "visit https://evil.com/malware.exe to win $100 giftcard"
         url_params = [
             # A safe redirect and email
-            (reverse("faq"), "test@free.law", False),
+            (reverse("help_home"), "test@free.law", False),
             # Text injection attack
-            (reverse("faq"), evil_text, True),
+            (reverse("help_home"), evil_text, True),
             # open redirect and text injection attack
             ("https://evil.com&email=e%40e.net", evil_text, True),
         ]
@@ -258,7 +259,7 @@ class UserTest(LiveServerTestCase):
         """Do we allow good redirects in login while banning bad ones?"""
         next_params = [
             # A safe redirect
-            (reverse("faq"), False),
+            (reverse("help_home"), False),
             # Redirection to the register page
             (reverse("register"), True),
             # No open redirects (to a domain outside CL)
@@ -1215,6 +1216,22 @@ class SNSWebhookTest(TestCase):
         )
         # Check if handle_complaint is called
         mock_complaint.assert_called()
+
+    @mock.patch("cl.users.signals.S3PrivateUUIDStorage")
+    @mock.patch("cl.users.signals.logger")
+    @mock.patch("cl.users.signals.random.random", return_value=0)
+    @override_settings(BOUNCES_STORE_RATE=1)
+    def test_store_event_logs_storage_failure(
+        self, mock_random, mock_logger, mock_storage
+    ) -> None:
+        """Storage failures must be visible without failing the webhook."""
+        mock_storage.return_value.save.side_effect = RuntimeError("S3 failed")
+
+        user_signals.store_bounce_or_complaint_obj(
+            {}, "user@example.com", user_signals.SESEventType.BOUNCE
+        )
+
+        mock_logger.exception.assert_called_once()
 
     @mock.patch("cl.users.email_handlers.logging")
     def test_handle_soft_bounce_unexpected(self, mock_logging) -> None:

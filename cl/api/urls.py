@@ -200,6 +200,7 @@ for prefix, viewset, basename in router.registry:
     # the "search" route.
     if basename != "search":
         router_v4.register(prefix, viewset, basename)
+router_v4.register(r"api-usage", views.ApiUsageViewSet, basename="api-usage")
 
 # When we finally need to deprecate V3 of the API, the process to remove it, is:
 # - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
@@ -218,6 +219,11 @@ urlpatterns = [
     path("help/api/jurisdictions/", views.court_index, name="court_index"),
     # Live API endpoints
     path("api/rest/v4/wiki-data/", views.wiki_data, name="wiki_data"),
+    path(
+        "api/rest/v4/wiki-data/coverage/",
+        views.wiki_coverage_data,
+        name="wiki_coverage_data",
+    ),
     re_path(
         r"^api/rest/v4/coverage/opinions/",
         views.coverage_data_opinions,
