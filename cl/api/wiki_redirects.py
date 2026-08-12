@@ -5,6 +5,8 @@ wiki. These redirects preserve external links and bookmarks. Internal
 links point directly to wiki URLs to avoid double-hops.
 """
 
+from collections.abc import Callable
+
 from django.conf import settings
 from django.urls import path, re_path
 from django.views.generic import RedirectView
@@ -159,46 +161,63 @@ _REST_ENDPOINT_REDIRECTS: list[tuple[str, str, str]] = [
 ]
 
 
+def _add_redirects(
+    patterns: list,
+    table: list[tuple[str, str, str]],
+    url_resolver: Callable[[str], str],
+) -> None:
+    """Append path() redirects built from a redirect table.
+
+    Every table above shares this exact shape — the only thing that
+    differs between them is how a row's middle column resolves to a
+    destination URL, so that's the one piece each call site supplies.
+
+    :param patterns: The patterns list to append the built redirects to.
+    :param table: Rows of (old_path, url_key, url_name | "").
+    :param url_resolver: Converts a row's url_key into the destination
+        URL, e.g. a wiki_suffix appended to a base URL, or a settings
+        attribute name looked up via getattr.
+    """
+    for old_path, url_key, name in table:
+        patterns.append(
+            path(
+                old_path,
+                RedirectView.as_view(
+                    url=url_resolver(url_key), permanent=True
+                ),
+                name=name or None,
+            )
+        )
+
+
 def _build_patterns() -> list:
     """Build URL patterns from the redirect tables above."""
     patterns: list = []
 
-    for old_path, wiki_suffix, name in _PATH_REDIRECTS:
-        url = (
+    _add_redirects(
+        patterns,
+        _PATH_REDIRECTS,
+        lambda wiki_suffix: (
             f"{settings.WIKI_API_BASE_URL}/{wiki_suffix}"
             if wiki_suffix
             else settings.WIKI_API_BASE_URL
-        )
-        patterns.append(
-            path(
-                old_path,
-                RedirectView.as_view(url=url, permanent=True),
-                name=name or None,
-            )
-        )
+        ),
+    )
 
-    for old_path, wiki_suffix, name in _HELP_PATH_REDIRECTS:
-        patterns.append(
-            path(
-                old_path,
-                RedirectView.as_view(
-                    url=f"{settings.WIKI_HELP_BASE_URL}/{wiki_suffix}",
-                    permanent=True,
-                ),
-                name=name or None,
-            )
-        )
+    _add_redirects(
+        patterns,
+        _HELP_PATH_REDIRECTS,
+        lambda wiki_suffix: f"{settings.WIKI_HELP_BASE_URL}/{wiki_suffix}",
+    )
 
-    for old_path, settings_name, name in _COVERAGE_REDIRECTS:
-        patterns.append(
-            path(
-                old_path,
-                RedirectView.as_view(
-                    url=getattr(settings, settings_name), permanent=True
-                ),
-                name=name or None,
-            )
-        )
+    # Unlike the two tables above, these resolve via a settings attribute
+    # name rather than a wiki_suffix — see the settings_name note on
+    # _COVERAGE_REDIRECTS.
+    _add_redirects(
+        patterns,
+        _COVERAGE_REDIRECTS,
+        lambda settings_name: getattr(settings, settings_name),
+    )
 
     for slug, wiki_slug, name in _REST_ENDPOINT_REDIRECTS:
         patterns.append(
