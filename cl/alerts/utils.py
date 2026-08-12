@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from elasticsearch.dsl import MultiSearch, Q, Search
 from elasticsearch.dsl.query import Query
-from elasticsearch.dsl.response import Hit
+from elasticsearch.dsl.response import Hit, Response
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from redis import Redis
 
@@ -328,7 +328,7 @@ def fetch_all_search_alerts_results(
     percolator results (if applicable).
     """
 
-    def get_search_after(response):
+    def get_search_after(response: Response | None) -> Any:
         if response and response.hits.hits:
             return response.hits[-1].meta.sort
         return None

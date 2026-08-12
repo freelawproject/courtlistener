@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.mail import send_mail
 from django.core.management import call_command
-from django.test import AsyncClient, SimpleTestCase, override_settings
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
@@ -100,6 +100,7 @@ from cl.tests.cases import (
     ESIndexTestCase,
     MockTallyStatMixin,
     SearchAlertsAssertions,
+    SimpleTestCase,
     TestCase,
 )
 from cl.tests.utils import MockResponse, make_client
