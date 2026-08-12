@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, URLValidator
 from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils.encoding import force_bytes
-from django.utils.html import format_html
+from django.utils.html import format_html, strip_tags
 from juriscraper.lib.string_utils import titlecase
 
 from cl.lib.command_utils import logger
@@ -184,6 +184,18 @@ class BaseCourtUploadForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
+
+    def clean_case_title(self) -> str:
+        """Strip any HTML out of the submitted case title.
+
+        This is a plain text input with no legitimate use for markup, and
+        it ends up rendered with the `safe` filter wherever case names are
+        displayed (e.g. via best_case_name), so a submitter who isn't
+        CourtListener staff (only court-partner accounts in an
+        ``uploaders_<court>`` group) could otherwise plant a stored XSS
+        payload on public opinion pages (GHSA-cvh7-rv7v-wx2j-class).
+        """
+        return strip_tags(self.cleaned_data["case_title"])
 
     def add_author_field(self, required=False):
         """Add author field to form
@@ -765,6 +777,14 @@ class MoCourtUploadForm(BaseCourtUploadForm):
             ]
         )
 
+    def clean_disposition(self) -> str:
+        """Strip any HTML out of the submitted disposition text.
+
+        See BaseCourtUploadForm.clean_case_title for why this matters:
+        `OpinionCluster.disposition` is rendered with the `safe` filter.
+        """
+        return strip_tags(self.cleaned_data["disposition"])
+
 
 class MissCourtUploadForm(BaseCourtUploadForm):
     """Form for Mississippi Upload Portal
@@ -812,3 +832,19 @@ class MissCourtUploadForm(BaseCourtUploadForm):
                 "pdf_upload",
             ]
         )
+
+    def clean_disposition(self) -> str:
+        """Strip any HTML out of the submitted disposition text.
+
+        See BaseCourtUploadForm.clean_case_title for why this matters:
+        `OpinionCluster.disposition` is rendered with the `safe` filter.
+        """
+        return strip_tags(self.cleaned_data["disposition"])
+
+    def clean_summary(self) -> str:
+        """Strip any HTML out of the submitted summary text.
+
+        See BaseCourtUploadForm.clean_case_title for why this matters:
+        `OpinionCluster.summary` is rendered with the `safe` filter.
+        """
+        return strip_tags(self.cleaned_data["summary"])

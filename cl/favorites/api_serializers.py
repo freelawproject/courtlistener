@@ -35,7 +35,6 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
         queryset=Docket.objects.all(), style={"base_template": "input.html"}
     )
     tag = serializers.PrimaryKeyRelatedField(
-        # Should this block other people's from being submitted?
         queryset=UserTag.objects.all(),
         style={"base_template": "input.html"},
     )
@@ -43,6 +42,20 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
     class Meta:
         model = DocketTag
         fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # `IsTagOwner.has_object_permission()` (cl/favorites/api_permissions.py)
+        # is only invoked by DRF on retrieve/update/delete, never on create,
+        # so it was the only thing standing between an authenticated user
+        # and attaching a docket to someone else's private tag by pointing
+        # `tag` at its pk (same vulnerability class as GHSA-cvh7-rv7v-wx2j).
+        # Scoping the queryset here closes it for create and update alike.
+        request = self.context.get("request")
+        if request is not None and request.user.is_authenticated:
+            self.fields["tag"].queryset = UserTag.objects.filter(
+                user=request.user
+            )
 
 
 class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
