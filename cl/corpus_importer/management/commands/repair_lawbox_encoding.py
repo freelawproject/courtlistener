@@ -199,9 +199,7 @@ class Command(VerboseCommand):
         # if a future backfill does, this keeps the two stores consistent.
         contents_changed = False
         new_contents: list[OpinionContent] = []
-        for content in opinion.contents.filter(
-            source=OpinionContent.LAWBOX
-        ):
+        for content in opinion.contents.filter(source=OpinionContent.LAWBOX):
             new_content_text, content_changed = (
                 repair_lawbox_content_if_needed(content.content)
             )

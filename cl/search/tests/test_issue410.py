@@ -21,8 +21,8 @@ from django.test import TestCase
 
 from cl.lib.string_utils import (
     looks_like_lawbox_cp1252_corruption,
-    repair_lawbox_cp1252,
     repair_lawbox_content_if_needed,
+    repair_lawbox_cp1252,
 )
 
 
@@ -36,23 +36,37 @@ class LawboxCorruptionDetectionTest(TestCase):
         # 0x85 -> U+0085 (NEL, a C1 control char)
         self.assertTrue(looks_like_lawbox_cp1252_corruption("foo \u0085 bar"))
         # The bottom of the C1 block
-        self.assertTrue(looks_like_lawbox_cp1252_corruption("a\u009Fb"))
+        self.assertTrue(looks_like_lawbox_cp1252_corruption("a\u009fb"))
 
     def test_detects_replacement_character(self) -> None:
         # U+FFFD is what lxml inserts when it cannot map a byte at all.
-        self.assertTrue(looks_like_lawbox_cp1252_corruption("an \ufffd square"))
+        self.assertTrue(
+            looks_like_lawbox_cp1252_corruption("an \ufffd square")
+        )
 
     def test_clean_text_is_not_flagged(self) -> None:
         self.assertFalse(looks_like_lawbox_cp1252_corruption(""))
-        self.assertFalse(looks_like_lawbox_cp1252_corruption("A perfectly normal opinion."))
+        self.assertFalse(
+            looks_like_lawbox_cp1252_corruption("A perfectly normal opinion.")
+        )
         # The correctly-encoded versions of the characters we are trying to
         # recover must NOT be treated as corruption.
-        self.assertFalse(looks_like_lawbox_cp1252_corruption("an \u2014 em-dash"))
-        self.assertFalse(looks_like_lawbox_cp1252_corruption("an \u2026 ellipsis"))
-        self.assertFalse(looks_like_lawbox_cp1252_corruption("smart \u201cquotes\u201d"))
+        self.assertFalse(
+            looks_like_lawbox_cp1252_corruption("an \u2014 em-dash")
+        )
+        self.assertFalse(
+            looks_like_lawbox_cp1252_corruption("an \u2026 ellipsis")
+        )
+        self.assertFalse(
+            looks_like_lawbox_cp1252_corruption("smart \u201cquotes\u201d")
+        )
         # Accented Latin-1 characters that are valid in both ISO-8859-1 and
         # CP1252 must not be flagged.
-        self.assertFalse(looks_like_lawbox_cp1252_corruption("caf\u00e9 r\u00e9sum\u00e9 na\u00efve"))
+        self.assertFalse(
+            looks_like_lawbox_cp1252_corruption(
+                "caf\u00e9 r\u00e9sum\u00e9 na\u00efve"
+            )
+        )
 
     def test_non_string_input_is_safe(self) -> None:
         self.assertFalse(looks_like_lawbox_cp1252_corruption(None))  # type: ignore[arg-type]
@@ -73,7 +87,9 @@ class LawboxCorruptionRepairTest(TestCase):
 
     def test_repairs_c1_ellipsis(self) -> None:
         # 0x85 (CP1252 ellipsis) -> U+0085 (C1 NEL) -> \u2026 (real ellipsis)
-        self.assertEqual(repair_lawbox_cp1252("and so on\u0085"), "and so on\u2026")
+        self.assertEqual(
+            repair_lawbox_cp1252("and so on\u0085"), "and so on\u2026"
+        )
 
     def test_repairs_multiple_markers(self) -> None:
         corrupt = "MHL \u0097 discretion \u0086 and \u0091quotes\u0092"
@@ -141,7 +157,6 @@ class RepairLawboxEncodingCommandTest(TestCase):
 
     def _make_corrupt_opinion(self) -> "Opinion":
         from cl.search.factories import OpinionWithParentsFactory
-        from cl.search.models import Opinion
 
         html = f"<p>the MHL {self.MARKER} and discretion</p>"
         return OpinionWithParentsFactory(html_lawbox=html, plain_text="")
@@ -183,7 +198,9 @@ class RepairLawboxEncodingCommandTest(TestCase):
     ) -> None:
         opinion = self._make_corrupt_opinion()
         original = opinion.html_lawbox
-        call_command("repair_lawbox_encoding", doc_id=[opinion.pk], dry_run=True)
+        call_command(
+            "repair_lawbox_encoding", doc_id=[opinion.pk], dry_run=True
+        )
         opinion.refresh_from_db()
         self.assertEqual(opinion.html_lawbox, original)
         # Dry-run never mutates the DB, so there is nothing to re-annotate.
