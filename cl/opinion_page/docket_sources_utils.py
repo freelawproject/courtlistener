@@ -118,6 +118,8 @@ class DocketEntrySource:
 
 
 def _recap_entries(docket: Docket) -> QuerySet:
+    """Return this docket's DocketEntry queryset, with recap_documents
+    prefetched for the docket page's entry list."""
     return docket.docket_entries.all().prefetch_related(
         Prefetch(
             "recap_documents",
@@ -127,6 +129,8 @@ def _recap_entries(docket: Docket) -> QuerySet:
 
 
 def _scotus_entries(docket: Docket) -> QuerySet:
+    """Return this docket's SCOTUSDocketEntry queryset, with
+    scotusdocument_set prefetched for the docket page's entry list."""
     return docket.scotusdocketentry_set.all().prefetch_related(
         Prefetch(
             "scotusdocument_set",
@@ -136,16 +140,20 @@ def _scotus_entries(docket: Docket) -> QuerySet:
 
 
 def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
+    """Return the RECAPDocuments attached to this docket entry."""
     return de.recap_documents.all()
 
 
 def _scotus_documents_for_entry(de: SCOTUSDocketEntry) -> QuerySet:
+    """Return the SCOTUSDocuments attached to this docket entry."""
     return de.scotusdocument_set.all()
 
 
 def _recap_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet:
+    """Look up RECAPDocuments by docket and document_number, for the
+    document detail page."""
     return RECAPDocument.objects.filter(
         docket_entry__docket_id=docket_id, document_number=doc_num
     )
@@ -154,12 +162,17 @@ def _recap_documents_for_docket_and_number(
 def _scotus_documents_for_docket_and_number(
     docket_id: int, doc_num: str
 ) -> QuerySet:
+    """Look up SCOTUSDocuments by docket and document_number, for the
+    document detail page."""
     return SCOTUSDocument.objects.filter(
         docket_entry__docket_id=docket_id, document_number=doc_num
     )
 
 
 async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
+    """Fetch a single RECAPDocument for the document detail page, with
+    the docket/court relation and the authorities annotation it needs
+    already loaded."""
     return (
         await RECAPDocument.objects.select_related(
             "docket_entry__docket__court"
@@ -176,6 +189,8 @@ async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
 
 
 async def _get_scotus_document_for_render(pk: int) -> SCOTUSDocument:
+    """Fetch a single SCOTUSDocument for the document detail page, with
+    the docket/court relation it needs already loaded."""
     return await SCOTUSDocument.objects.select_related(
         "docket_entry__docket__court"
     ).aget(pk=pk)

@@ -70,7 +70,11 @@ from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
-from cl.opinion_page.docket_sources_utils import RECAP_SOURCE, document_url
+from cl.opinion_page.docket_sources_utils import (
+    RECAP_SOURCE,
+    SCOTUS_SOURCE,
+    document_url,
+)
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -714,25 +718,31 @@ async def recap_document_context(
     HttpResponseRedirect or a TemplateResponse.
     """
     docket = await aget_object_or_404(Docket, pk=docket_id)
+    source = docket.get_entry_source()
+    is_scotus = source is SCOTUS_SOURCE
 
-    if docket.court_id == "scotus" and not await sync_to_async(
-        waffle.flag_is_active
-    )(request, "scotus_docket_page"):
+    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
+        request, "scotus_docket_page"
+    ):
         raise Http404("Docket not found.")
 
-    source = docket.get_entry_source()
-    is_scotus = docket.court_id == "scotus"
-
     # Tuples of (pk, attachment_number, description)
-    rd_values = [
-        x
-        async for x in source.documents_for_docket_and_number(
-            docket_id,
-            doc_num,
-        )
-        .order_by("pk")
-        .values_list("pk", "attachment_number", "description")
-    ]
+    try:
+        rd_values = [
+            x
+            async for x in source.documents_for_docket_and_number(
+                docket_id,
+                doc_num,
+            )
+            .order_by("pk")
+            .values_list("pk", "attachment_number", "description")
+        ]
+    except ValueError:
+        # doc_num is a free-form <str:doc_num> URL segment, but some
+        # sources (e.g. SCOTUSDocument.document_number) store it as an
+        # IntegerField. A non-numeric doc_num raises here instead of
+        # just matching nothing. Treat it the same as "no match".
+        raise Http404("No document matches the given query.")
 
     if rd_values_tmp := list(filter(lambda x: x[1] == att_num, rd_values)):
         rd_value = rd_values_tmp[0]

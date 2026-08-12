@@ -33,6 +33,7 @@ from cl.lib.s3_cache import get_s3_cache, make_s3_cache_key
 from cl.lib.string_utils import trunc
 from cl.lib.types import CleanData
 from cl.opinion_page.docket_sources_utils import (
+    SCOTUS_SOURCE,
     MetadataItem,
     build_scotus_metadata,
 )
@@ -483,13 +484,15 @@ async def core_docket_data(
 ) -> tuple[Docket, dict[str, bool | str | Docket | NoteForm]]:
     """Gather the core data for a docket, party, or IDB page."""
     docket: Docket = await aget_object_or_404(Docket, pk=pk)
+    source = docket.get_entry_source()
+    is_scotus = source is SCOTUS_SOURCE
 
     # SCOTUS content is made available using a waffle flag:
     # every docket-related view shares this helper, so access
     # control resides here.
-    if docket.court_id == "scotus" and not await sync_to_async(
-        waffle.flag_is_active
-    )(request, "scotus_docket_page"):
+    if is_scotus and not await sync_to_async(waffle.flag_is_active)(
+        request, "scotus_docket_page"
+    ):
         raise Http404("Docket not found.")
 
     title = make_docket_title(docket)
@@ -525,7 +528,7 @@ async def core_docket_data(
             "has_alert": has_alert,
             "timezone": COURT_TIMEZONES.get(docket.court_id, "US/Eastern"),
             "private": docket.blocked,
-            "is_scotus": docket.court_id == "scotus",
+            "is_scotus": is_scotus,
             "scotus_metadata": build_scotus_metadata(scotus_metadata),
         },
     )

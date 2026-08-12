@@ -711,6 +711,14 @@ class ViewSCOTUSDocumentTest(TestCase):
         r = await self.get(docket_id=self.docket.id, doc_num=0)
         self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
+    async def test_non_numeric_doc_num_returns_404(self) -> None:
+        """SCOTUSDocument.document_number is an IntegerField,
+        so a non-numeric doc_num used to raise an uncaught
+        ValueError instead of the usual 404.
+        """
+        r = await self.get(docket_id=self.docket.id, doc_num="abc")
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
     async def test_valid_document_with_local_file(self) -> None:
         entry = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket
