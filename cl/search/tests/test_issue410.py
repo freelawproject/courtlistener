@@ -163,8 +163,15 @@ class RepairLawboxEncodingCommandTest(TestCase):
         # that html_with_citations (which is derived from html_lawbox) is
         # regenerated from the now-clean source.
         mock_annotate.apply_async.assert_called_once()
-        args, _ = mock_annotate.apply_async.call_args
-        self.assertEqual(args[0], [opinion.pk])
+        # The command dispatches with apply_async(args=(pks, ...), queue=...),
+        # i.e. via the ``args`` keyword, so read it through ``call_args.kwargs``
+        # (the repository convention for keyword-argument mock inspection, see
+        # e.g. cl/simple_pages/tests.py). ``kwargs["args"][0]`` is the list of
+        # repaired opinion PKs passed to the annotation task.
+        self.assertEqual(
+            mock_annotate.apply_async.call_args.kwargs["args"][0],
+            [opinion.pk],
+        )
 
     @patch("cl.lib.es_signal_processor.update_es_documents")
     @patch(
@@ -246,9 +253,13 @@ class RepairLawboxEncodingCommandTest(TestCase):
         # corrupt_b was outside the [start_id, end_id] window, so it is
         # untouched and still contains the corruption marker.
         self.assertIn(self.MARKER, corrupt_b.html_lawbox)
-        # Only corrupt_a (the in-range opinion) should be re-annotated.
-        args, _ = mock_annotate.apply_async.call_args
-        self.assertEqual(args[0], [corrupt_a.pk])
+        # Only corrupt_a (the in-range opinion) should be re-annotated. The
+        # command dispatches with apply_async(args=(pks, ...), queue=...), so
+        # the repaired-PK list is call_args.kwargs["args"][0].
+        self.assertEqual(
+            mock_annotate.apply_async.call_args.kwargs["args"][0],
+            [corrupt_a.pk],
+        )
 
     @patch("cl.lib.es_signal_processor.update_es_documents")
     @patch(
@@ -268,6 +279,8 @@ class RepairLawboxEncodingCommandTest(TestCase):
             opinion=opinion,
             content=f"content {self.MARKER} here",
             source=OpinionContent.LAWBOX,
+            extraction_type=OpinionContent.DEFAULT,
+            is_main_version=True,
         )
         call_command("repair_lawbox_encoding", doc_id=[opinion.pk])
         content = OpinionContent.objects.get(opinion=opinion)
