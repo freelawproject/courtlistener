@@ -5,7 +5,7 @@
   {% endif %}
   Document
   <a href="{{ rd.docket_entry.docket.get_absolute_url }}?entry_gte={{ rd.document_number }}#entry-{{ rd.document_number }}">
-    #{{ rd.document_number }}</a>{% if rd.document_type == rd.ATTACHMENT %},
+    #{{ rd.document_number }}</a>{% if rd.attachment_number %},
     Attachment #{{ rd.attachment_number }}{% endif %}
 </h3>
 {% if attachments %}

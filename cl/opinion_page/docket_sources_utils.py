@@ -1,14 +1,16 @@
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Iterable
+from dataclasses import dataclass, field
 from typing import Any, NotRequired, TypedDict
 
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Exists, OuterRef, Prefetch, QuerySet
+from django.urls import reverse
 from django.utils.formats import date_format
 
 from cl.custom_filters.templatetags.extras import http_url
 from cl.search.models import (
     Docket,
     DocketEntry,
+    OpinionsCitedByRECAPDocument,
     RECAPDocument,
     SCOTUSDocketEntry,
     ScotusDocketMetadata,
@@ -84,17 +86,19 @@ def build_scotus_metadata(
 
 @dataclass(frozen=True)
 class DocketEntrySource:
-    """Describes how to fetch, sort, and display docket entries for one
-    'flavor' of docket. RECAP/PACER is the default; SCOTUS is the first
-    override. A future state-specific model plugs in by adding one more
-    instance and a court_id mapping below -- view_docket itself doesn't
-    need to change.
+    """Describes how to fetch, sort, and display docket entries and
+    documents for one 'flavor' of docket. RECAP/PACER is the default;
+    SCOTUS is the first override. A future state-specific model plugs in
+    by adding one more instance and a court_id mapping below.
     """
 
     entries_queryset: Callable[[Docket], QuerySet]
     documents_for_entry: Callable[[Any], Iterable]
     order_by_asc: tuple[str, ...]
     order_by_desc: tuple[str, ...]
+    # Single-document lookup, for the document detail page.
+    documents_for_docket_and_number: Callable[[int, str], QuerySet]
+    get_document_for_render: Callable[[int], Awaitable[Any]]
     has_pay_and_pray: bool = True
 
 
@@ -124,11 +128,66 @@ def _scotus_documents_for_entry(de: SCOTUSDocketEntry) -> QuerySet:
     return de.scotusdocument_set.all()
 
 
+def _recap_documents_for_docket_and_number(
+    docket_id: int, doc_num: str
+) -> QuerySet:
+    return RECAPDocument.objects.filter(
+        docket_entry__docket_id=docket_id, document_number=doc_num
+    )
+
+
+def _scotus_documents_for_docket_and_number(
+    docket_id: int, doc_num: str
+) -> QuerySet:
+    return SCOTUSDocument.objects.filter(
+        docket_entry__docket_id=docket_id, document_number=doc_num
+    )
+
+
+async def _get_recap_document_for_render(pk: int) -> RECAPDocument:
+    return (
+        await RECAPDocument.objects.select_related(
+            "docket_entry__docket__court"
+        )
+        .annotate(
+            authorities=Exists(
+                OpinionsCitedByRECAPDocument.objects.filter(
+                    citing_document=OuterRef("pk")
+                )
+            )
+        )
+        .aget(pk=pk)
+    )
+
+
+async def _get_scotus_document_for_render(pk: int) -> SCOTUSDocument:
+    return await SCOTUSDocument.objects.select_related(
+        "docket_entry__docket__court"
+    ).aget(pk=pk)
+
+
+def document_url(
+    docket_id: int, slug: str, doc_num: str, att_num: int | None
+) -> str:
+    "Build a document/attachment page URL."
+    kwargs: dict[str, Any] = {
+        "docket_id": docket_id,
+        "doc_num": doc_num,
+        "slug": slug,
+    }
+    if att_num:
+        kwargs["att_num"] = att_num
+        return reverse("view_recap_attachment", kwargs=kwargs)
+    return reverse("view_recap_document", kwargs=kwargs)
+
+
 RECAP_SOURCE = DocketEntrySource(
     entries_queryset=_recap_entries,
     documents_for_entry=_recap_documents_for_entry,
     order_by_asc=("recap_sequence_number", "entry_number"),
     order_by_desc=("-recap_sequence_number", "-entry_number"),
+    documents_for_docket_and_number=_recap_documents_for_docket_and_number,
+    get_document_for_render=_get_recap_document_for_render,
 )
 
 SCOTUS_SOURCE = DocketEntrySource(
@@ -136,6 +195,8 @@ SCOTUS_SOURCE = DocketEntrySource(
     documents_for_entry=_scotus_documents_for_entry,
     order_by_asc=("sequence_number",),
     order_by_desc=("-sequence_number",),
+    documents_for_docket_and_number=_scotus_documents_for_docket_and_number,
+    get_document_for_render=_get_scotus_document_for_render,
     has_pay_and_pray=False,
 )
 

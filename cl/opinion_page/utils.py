@@ -47,6 +47,7 @@ from cl.search.models import (
     DocketEntry,
     OpinionCluster,
     OriginatingCourtInformation,
+    SCOTUSDocketEntry,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,9 @@ def _person_item(
     return None
 
 
-def build_citation_string(obj: Docket | DocketEntry) -> str:
+def build_citation_string(
+    obj: Docket | DocketEntry | SCOTUSDocketEntry,
+) -> str:
     """Build a Bluebook-style citation string for a docket or docket entry.
 
     For dockets: name, docket_number, (court)
@@ -88,7 +91,7 @@ def build_citation_string(obj: Docket | DocketEntry) -> str:
         docket = obj
         date_of_interest = None
         ecf = ""
-    elif isinstance(obj, DocketEntry):
+    elif isinstance(obj, DocketEntry | SCOTUSDocketEntry):
         docket = obj.docket
         date_of_interest = obj.date_filed
         ecf = obj.entry_number
