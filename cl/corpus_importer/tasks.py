@@ -4013,26 +4013,6 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
     return _download_texas_document(texas_document_pk)
 
 
-@app.task(
-    bind=True,
-    ignore_result=True,
-)
-def download_texas_document_unthrottled(
-    self: Task, texas_document_pk: int
-) -> int | None:
-    """Unthrottled version of the Texas document download task.
-
-    Use this when the caller already handles throttling (e.g. via
-    CeleryThrottle).
-
-    :param self: The Celery task instance.
-    :param texas_document_pk: The primary key of the TexasDocument instance.
-    :return: The primary key of the downloaded TexasDocument instance, or None
-    if the process failed.
-    """
-    return _download_texas_document(texas_document_pk)
-
-
 TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
 
 
@@ -5157,13 +5137,25 @@ def fl_ingest_docket_task(
 
 
 @app.task(bind=True, ignore_result=True)
-@throttle_task("2/s", key="model_name")
-def download_state_document(self: Task, model_name: str, pk: int) -> None:
+def download_state_document(
+    self: Task,
+    model_name: str,
+    pk: int,
+    skip_extraction: bool,
+    extraction_queue: str,
+) -> int | None:
     """Celery task to download the file for a state document and store it in S3.
 
     :param model_name: The name of the state document model (must be a subclass of `AbstractStateDocument`).
-    :param pk: The primary key of the object to download."""
+    :param pk: The primary key of the object to download.
+    :param skip_extraction: Skip the extraction step.
+    :param extraction_queue: The celery queue to use for OCR extraction.
+
+    :return: The pk of the downloaded document, or None if the download failed."""
     model = apps.get_model(model_name)
     # Any model passed in should already be an `AbstractStateDocument`. Verify it for the type checker.
     assert issubclass(model, AbstractStateDocument)
-    model.download(pk)
+    instance = model.download(
+        pk, extract=not skip_extraction, queue=extraction_queue
+    )
+    return instance.pk if instance else None

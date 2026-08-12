@@ -88,11 +88,10 @@ class AbstractStateDocument(AbstractPDF):
         """Return the set of expected file extensions for this document."""
         return set()
 
-    def can_extract(self, extension: str) -> bool:
-        """Whether this document is eligible for OCR extraction.
-
-        :param extension: The file extension of the document."""
-        return False
+    @classmethod
+    def extractable_extensions(cls) -> set[str]:
+        """Return the set of file extensions that can be extracted."""
+        return set()
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Validate the file content and return the processing error if any.
@@ -111,14 +110,67 @@ class AbstractStateDocument(AbstractPDF):
             return int(response.text)
         return None
 
+    def extract(self, queue: str = "celery") -> None:
+        """Run the OCR extraction task for this document.
+
+        :param queue: The queue to use for the extraction task."""
+        from cl.scrapers.tasks import extract_formatted_text_document
+
+        if (
+            self.ocr_status == self.OCR_UNNECESSARY
+            or self.ocr_status == self.OCR_COMPLETE
+        ):
+            logger.info(
+                "OCR extraction unnecessary for %s %s (%s)",
+                self._meta.label,
+                self.pk,
+                self.ocr_status,
+            )
+            return
+
+        if not self.filepath_local.name:
+            logger.info(
+                "No document to extract for %s %s (empty filepath_local.name)",
+                self._meta.label,
+                self.pk,
+            )
+            return
+
+        parts = self.filepath_local.name.split(".")
+
+        extension = "." + parts[-1]
+
+        if extension not in self.extractable_extensions():
+            logger.info(
+                "%s %s cannot be extracted (%s)",
+                self._meta.label,
+                self.pk,
+                self.filepath_local.name,
+            )
+            return
+
+        strip_html = extension != ".pdf"
+
+        extract_formatted_text_document.si(
+            pks=self.pk,
+            check_if_needed=False,
+            model_name=self._meta.label,
+            strip_html_tags=strip_html,
+        ).set(queue=queue).apply_async()
+
     @classmethod
-    def download(cls, pk: int) -> Self | None:
+    def download(
+        cls, pk: int, extract: bool = True, queue: str = "celery"
+    ) -> Self | None:
         """Download the document from the URL, save it to a local file. Returns the document if download was
-        successful and `None` otherwise."""
+        successful and `None` otherwise.
+
+        :param pk: The primary key of the document to download.
+        :param extract: Whether to extract the document after downloading.
+        :param queue: The queue to use for the extraction task."""
         # Imported here to avoid a circular import: this module is loaded with
         # cl.search.models, which the task modules import.
         from cl.corpus_importer.tasks import download_document_in_stream
-        from cl.scrapers.tasks import extract_formatted_text_document
         from cl.scrapers.utils import get_extension
 
         try:
@@ -189,18 +241,13 @@ class AbstractStateDocument(AbstractPDF):
             if extension == ".pdf":
                 if pages := async_to_sync(document.fetch_page_count)():
                     document.page_count = pages
-            elif not document.can_extract(extension):
+            elif extension not in cls.extractable_extensions():
                 document.ocr_status = cls.OCR_UNNECESSARY
 
             document.save()
 
-            if document.can_extract(extension):
-                extract_formatted_text_document.si(
-                    pks=document.pk,
-                    check_if_needed=False,
-                    model_name=cls._meta.label,
-                    strip_html_tags=True,
-                ).apply_async()
+            if extract:
+                document.extract(queue)
 
             return document
 
