@@ -766,6 +766,34 @@ class ViewSCOTUSDocumentTest(TestCase):
         self.assertNotIn("Buy on PACER", content)
         self.assertIn("From the Supreme Court", content)
 
+    async def test_admin_toolbar_links_to_scotus_admin_pages(self) -> None:
+        entry = await sync_to_async(SCOTUSDocketEntryFactory)(
+            docket=self.docket
+        )
+        document = await sync_to_async(SCOTUSDocumentFactory)(
+            docket_entry=entry, attachment_number=1
+        )
+        staff_user = await sync_to_async(UserFactory)(
+            is_staff=True, is_superuser=True
+        )
+        await self.async_client.aforce_login(staff_user)
+        r = await self.get(
+            docket_id=self.docket.id,
+            doc_num=document.document_number,
+            att_num=document.attachment_number,
+        )
+        content = r.content.decode()
+        self.assertIn(
+            reverse("admin:search_scotusdocketentry_change", args=[entry.pk]),
+            content,
+        )
+        self.assertIn(
+            reverse("admin:search_scotusdocument_change", args=[document.pk]),
+            content,
+        )
+        self.assertNotIn("search_docketentry_change", content)
+        self.assertNotIn("search_recapdocument_change", content)
+
     async def test_entry_row_links_to_document_page(self) -> None:
         entry = await sync_to_async(SCOTUSDocketEntryFactory)(
             docket=self.docket

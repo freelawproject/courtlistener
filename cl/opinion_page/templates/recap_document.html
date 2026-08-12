@@ -48,7 +48,7 @@
             </h4>
         </div>
 
-{% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry %}
+        {% include "includes/rd_admin_tools.html" with d=rd.docket_entry.docket de=rd.docket_entry admin_url_names=admin_url_names admin_perm_names=admin_perm_names admin_document_label=admin_document_label %}
 
         {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not note_form.instance.recap_doc_id %}hidden{% endif %} sidebar-section"
@@ -79,8 +79,8 @@
       <h2 class="inline"><a
               href="{{ rd.docket_entry.docket.get_absolute_url }}"
               class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
-      {% if not is_scotus %}
       {% include "includes/notes_modal.html" %}
+      {% if has_pay_and_pray %}
       {% include "includes/buy_pacer_modal.html" %}
       {% if redirect_to_pacer_modal %}
         {% include "includes/redirect_to_pacer_modal.html" %}

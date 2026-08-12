@@ -852,6 +852,10 @@ async def recap_document_context(
             "authorities": getattr(rd, "authorities", False),
             "attachments": attachments,
             "is_scotus": is_scotus,
+            "admin_url_names": source.admin_url_names,
+            "admin_perm_names": source.admin_perm_names,
+            "admin_document_label": source.admin_document_label,
+            "has_pay_and_pray": source.has_pay_and_pray,
         },
     )
 

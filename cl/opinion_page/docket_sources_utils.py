@@ -100,6 +100,21 @@ class DocketEntrySource:
     documents_for_docket_and_number: Callable[[int, str], QuerySet]
     get_document_for_render: Callable[[int], Awaitable[Any]]
     has_pay_and_pray: bool = True
+    admin_url_names: dict[str, str] = field(
+        default_factory=lambda: {
+            "entry": "admin:search_docketentry_change",
+            "document": "admin:search_recapdocument_change",
+        }
+    )
+    # Model names used to build the view/change/delete
+    # permission triad checked before showing an admin link.
+    admin_perm_names: dict[str, str] = field(
+        default_factory=lambda: {
+            "entry": "docketentry",
+            "document": "recapdocument",
+        }
+    )
+    admin_document_label: str = "RECAP Document"
 
 
 def _recap_entries(docket: Docket) -> QuerySet:
@@ -198,6 +213,15 @@ SCOTUS_SOURCE = DocketEntrySource(
     documents_for_docket_and_number=_scotus_documents_for_docket_and_number,
     get_document_for_render=_get_scotus_document_for_render,
     has_pay_and_pray=False,
+    admin_url_names={
+        "entry": "admin:search_scotusdocketentry_change",
+        "document": "admin:search_scotusdocument_change",
+    },
+    admin_perm_names={
+        "entry": "scotusdocketentry",
+        "document": "scotusdocument",
+    },
+    admin_document_label="SCOTUS Document",
 )
 
 _SOURCES_BY_COURT_ID: dict[str, DocketEntrySource] = {"scotus": SCOTUS_SOURCE}
