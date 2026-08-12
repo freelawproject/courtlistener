@@ -6,7 +6,6 @@
 
 {% block content %}
   <div class="flex flex-col items-center text-center gap-4 pb-11">
-    <c-eyebrow>CourtListener</c-eyebrow>
     <h1>Getting Help on CourtListener</h1>
     <p class="text-sm font-normal text-greyscale-600 max-w-lg">
       Most answers live in our help articles on the wiki. Can't find what
@@ -23,6 +22,14 @@
       Or Go Straight to a Topic
     </h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="flex flex-col gap-3 p-6 rounded-2xl bg-greyscale-100 border border-greyscale-200">
+        <div aria-hidden="true" class="w-10 h-10 flex items-center justify-center rounded-full bg-greyscale-200 text-greyscale-600">
+          {% svg "heart" class="w-5 h-5" %}
+        </div>
+        <h3 class="font-semibold text-greyscale-900">Donations &amp; Membership</h3>
+        <p class="text-sm font-normal text-greyscale-600 grow">Help with a donation, a membership, or a receipt.</p>
+        <a class="links" href="{% url "donation_help" %}">Get donation help</a>
+      </div>
       <div class="flex flex-col gap-3 p-6 rounded-2xl bg-greyscale-100 border border-greyscale-200">
         <div aria-hidden="true" class="w-10 h-10 flex items-center justify-center rounded-full bg-greyscale-200 text-greyscale-600">
           {% svg "graph_up" class="w-5 h-5" %}
@@ -46,14 +53,6 @@
         <h3 class="font-semibold text-greyscale-900">Removing Content</h3>
         <p class="text-sm font-normal text-greyscale-600 grow">When and how we remove content from CourtListener and search engines.</p>
         <a class="links" href="{{ WIKI_REMOVAL_URL }}">Read our policy</a>
-      </div>
-      <div class="flex flex-col gap-3 p-6 rounded-2xl bg-greyscale-100 border border-greyscale-200">
-        <div aria-hidden="true" class="w-10 h-10 flex items-center justify-center rounded-full bg-greyscale-200 text-greyscale-600">
-          {% svg "heart" class="w-5 h-5" %}
-        </div>
-        <h3 class="font-semibold text-greyscale-900">Donations &amp; Membership</h3>
-        <p class="text-sm font-normal text-greyscale-600 grow">Help with a donation, a membership, or a receipt.</p>
-        <a class="links" href="{% url "donation_help" %}">Get donation help</a>
       </div>
     </div>
   </div>
