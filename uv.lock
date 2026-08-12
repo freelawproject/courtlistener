@@ -468,7 +468,7 @@ requires-dist = [
     { name = "datasketch", specifier = ">=1.8.0" },
     { name = "dateparser", specifier = "==1.2.2" },
     { name = "disposable-email-domains" },
-    { name = "django", specifier = ">=6.0.5,<6.1" },
+    { name = "django", specifier = ">=6.0.7,<6.1" },
     { name = "django-admin-cursor-paginator", specifier = ">=0.1.7" },
     { name = "django-cache-memoize" },
     { name = "django-cors-headers", specifier = ">=4.9.0" },
@@ -798,16 +798,16 @@ wheels = [
 
 [[package]]
 name = "django"
-version = "6.0.5"
+version = "6.0.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "sqlparse" },
     { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/f1/bf85f0d29ef76abf901f193fe8fef4769d3da7794197832bc30151c071d8/django-6.0.5.tar.gz", hash = "sha256:bc6d6872e98a2864c836e42edd644b362db311147dd5aa8d5b82ba7a032f5269", size = 10924131, upload-time = "2026-05-05T13:54:39.329Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/89/55/664f24ff81c9ea19cb7dfc851afeae1f3c2390c7aee01d4ded68b5c1580d/django-6.0.7.tar.gz", hash = "sha256:2998503fc083124fb58037084bfa00de323c7c743f05f1b4284e77bff0ab8890", size = 10921299, upload-time = "2026-07-07T13:51:26.485Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/5b/1328f8b84fce040c404f76822bf8c57d254e368e8cbd8bd67ec2b26d75f5/django-6.0.5-py3-none-any.whl", hash = "sha256:9d58a7cb49244e74c8e161d5e403a46d6209f1009ba40f5a66d6aa0d0786a8f0", size = 8368680, upload-time = "2026-05-05T13:54:33.532Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/ec/1ce5334b6a2c52ce619c23a0be8d366a57a0e080ebb2d88266e5c849157c/django-6.0.7-py3-none-any.whl", hash = "sha256:a037427c2288443a8c02a1b02295a31c239663aa682bc50b1976afb7cf6a769e", size = 8373344, upload-time = "2026-07-07T13:51:20.007Z" },
 ]
 
 [[package]]
@@ -1851,7 +1851,7 @@ wheels = [
 
 [[package]]
 name = "juriscraper"
-version = "3.0.35"
+version = "3.0.36"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1871,9 +1871,9 @@ dependencies = [
     { name = "selenium" },
     { name = "tldextract" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/e5/509f8cb9e5bf8f9bbfe6f9126656bddcdb457b4a273cff8debed05f66bc8/juriscraper-3.0.35.tar.gz", hash = "sha256:7a905bdd4f1be1a5b0e220b0f919ce6d99743fd10a37b4675ab0b4adba01555f", size = 437925, upload-time = "2026-08-06T23:32:57.758Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/cd/1e93d99ed94b38ddc139670c1a949aabc73762a65dae84cc38e7dcdd865b/juriscraper-3.0.36.tar.gz", hash = "sha256:4e2a0b7d8dca5d951ff80d01d15c1852fe97b828c4662448b521f96f6626c7ca", size = 438097, upload-time = "2026-08-07T22:24:42.445Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/25/d9dd0d8e17659fceb4d1e0adb5b5bfebd3a57f0bab17ca6b5d80e8bfc255/juriscraper-3.0.35-py3-none-any.whl", hash = "sha256:3d51e91954dc411c4ac1546fbe507639f4a7303cbf6fe4dc5c1dcc12b4b99014", size = 674661, upload-time = "2026-08-06T23:32:56.378Z" },
+    { url = "https://files.pythonhosted.org/packages/97/b5/cf0a7bfda71a6bf511630ed6a9f2ac8ce605a47e046c52cb68b9abc73b16/juriscraper-3.0.36-py3-none-any.whl", hash = "sha256:12ce3da04f5ae11b09cc35290d4c1046c4b53d26058d996bd43c1fa3c577ef1a", size = 675081, upload-time = "2026-08-07T22:24:40.622Z" },
 ]
 
 [[package]]

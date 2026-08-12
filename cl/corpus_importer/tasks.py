@@ -63,6 +63,7 @@ from juriscraper.scotus import (
     SCOTUSDocketReportHTM,
     SCOTUSDocketReportHTML,
 )
+from juriscraper.state.florida import FloridaCase
 from juriscraper.state.texas import (
     TexasCaseEvent,
     TexasCaseParty,
@@ -115,7 +116,7 @@ from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.llm_models import CaseNameExtractionResponse
 from cl.corpus_importer.management.utils import TexasDocketMeta
 from cl.corpus_importer.prompts.system import CASE_NAME_EXTRACT_SYSTEM
-from cl.corpus_importer.state.texas.utils import is_missing_file_page
+from cl.corpus_importer.state.florida.mergers import FloridaDocketMerger
 from cl.corpus_importer.state.utils import MergeResult
 from cl.corpus_importer.utils import (
     DownloadPDFResult,
@@ -195,11 +196,9 @@ from cl.recap.models import (
 )
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import (
-    extract_formatted_text_document,
     extract_pdf_document,
     extract_pdf_document_base,
 )
-from cl.scrapers.utils import get_extension
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -218,8 +217,8 @@ from cl.search.models import (
     Tag,
     TrialCourtData,
 )
+from cl.search.state.florida.models import FloridaDocument
 from cl.search.state.texas.models import (
-    ProcessingError,
     TexasDocketEntry,
     TexasDocument,
 )
@@ -3628,23 +3627,26 @@ def merge_scotus_docket_entry(
         - The pk of the updated SCOTUSDocketEntry object.
         - A list of PKs of SCOTUSDocument objects that were created or updated.
     """
+    normalize_long_description(input_docket_entry)
     with transaction.atomic():
         # Acquire lock on the docket to prevent race conditions
         Docket.objects.select_for_update().get(pk=docket.pk)
         entry_number = input_docket_entry.get("document_number")
         date_filed = input_docket_entry["date_filed"]
         description = input_docket_entry["description"]
+        de = None
+        de_created = False
         if entry_number:
-            params = {
-                "docket": docket,
-                "entry_number": entry_number,
-            }
             try:
-                de = SCOTUSDocketEntry.objects.get(**params)
-                de_created = False
+                de = SCOTUSDocketEntry.objects.get(
+                    docket=docket,
+                    entry_number=entry_number,
+                )
             except SCOTUSDocketEntry.DoesNotExist:
-                de = SCOTUSDocketEntry(**params)
-                de_created = True
+                # The entry may have been merged before it had attachments,
+                # when no entry number could be parsed for it. Fall back to
+                # the unnumbered lookups to avoid creating a duplicate.
+                pass
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
                     "Multiple matching SCOTUSDocketEntries found for entry_number "
@@ -3654,23 +3656,25 @@ def merge_scotus_docket_entry(
                 )
                 return False, None, []
 
-        else:
-            normalize_long_description(input_docket_entry)
+        if de is None:
+            unnumbered_lookup = (
+                {"entry_number__isnull": True} if entry_number else {}
+            )
             try:
                 de = SCOTUSDocketEntry.objects.get(
                     docket=docket,
                     description=input_docket_entry["description"],
                     date_filed=input_docket_entry["date_filed"],
+                    **unnumbered_lookup,
                 )
-                de_created = False
             except SCOTUSDocketEntry.DoesNotExist:
                 # Check if sequence_number already exists
                 try:
                     de = SCOTUSDocketEntry.objects.get(
                         docket=docket,
                         sequence_number=sequence_number,
+                        **unnumbered_lookup,
                     )
-                    de_created = False
                 except SCOTUSDocketEntry.DoesNotExist:
                     de = SCOTUSDocketEntry(
                         docket=docket,
@@ -3681,21 +3685,25 @@ def merge_scotus_docket_entry(
                 except SCOTUSDocketEntry.MultipleObjectsReturned:
                     logger.error(
                         "Multiple matching SCOTUSDocketEntries found for sequence_number "
-                        "%s on Docket %s.",
+                        "%s on Docket %s (extra %r).",
                         sequence_number,
                         docket.pk,
+                        unnumbered_lookup,
                     )
                     return False, None, []
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
-                    "Multiple matching unnumbered SCOTUSDocketEntries found for description "
-                    "%s on Docket %s.",
+                    "Multiple matching SCOTUSDocketEntries found for description "
+                    "%s on Docket %s (extra %r).",
                     input_docket_entry["description"],
                     docket.pk,
+                    unnumbered_lookup,
                 )
                 return False, None, []
 
         # Update fields
+        if entry_number:
+            de.entry_number = entry_number
         de.sequence_number = sequence_number
         de.description = description
         de.date_filed = date_filed
@@ -4029,122 +4037,20 @@ def ingest_scotus_docket(docket_data: dict[str, Any]) -> None:
     process_scotus_docket.delay(docket_data)
 
 
-KNOWN_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd", ".mp3"}
-EXTRACTABLE_TEXAS_EXTENSIONS = {".pdf", ".html", ".wpd"}
-
-
-def _download_texas_document(task: Task, texas_document_pk: int) -> int | None:
+def _download_texas_document(texas_document_pk: int) -> int | None:
     """Download a Texas document and save it locally.
 
     Accepts any file type. PDF-specific processing (page count) is only
     performed for PDFs. Non-PDF documents are marked as OCR_UNNECESSARY.
-    For non-extractable types (.mp3, unknown), the extract chain is
-    broken so extract_formatted_text_document is skipped.
+    Extraction is only dispatched for extractable types.
 
-    :param task: The Celery task instance (used to break the chain on failure).
     :param texas_document_pk: The primary key of the TexasDocument instance to
     update the attachment for.
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    try:
-        texas_document = TexasDocument.objects.get(pk=texas_document_pk)
-    except TexasDocument.DoesNotExist:
-        logger.warning(
-            "Texas document download: TexasDocument %s does not exist; skipping.",
-            texas_document_pk,
-        )
-        task.request.chain = None
-        return None
-
-    if texas_document.processing_error == ProcessingError.BAD_URL:
-        logger.warning(
-            "Texas document download: TexasDocument %s has a bad URL. "
-            "Skipping.",
-            texas_document_pk,
-        )
-        task.request.chain = None
-        return None
-
-    url = texas_document.url
-
-    logger.info(
-        "Texas document download: Fetching document for TexasDocument %s from %s",
-        texas_document_pk,
-        url,
-    )
-
-    with download_document_in_stream(
-        url, texas_document.pk, "texas_", require_pdf=False
-    ) as result:
-        if result is None:
-            logger.error(
-                "Failed to download document for TexasDocument %s from URL %s.",
-                texas_document.pk,
-                url,
-            )
-            task.request.chain = None
-            return None
-
-        tmp, sha1_hash = result
-        content = tmp.read(8192)
-        tmp.seek(0)
-
-        extension = get_extension(content)
-        if extension not in KNOWN_TEXAS_EXTENSIONS:
-            logger.warning(
-                "Texas document download: Unexpected file extension "
-                "'%s' for TexasDocument %s from %s. Proceeding anyway.",
-                extension,
-                texas_document.pk,
-                url,
-            )
-
-        if extension == ".html":
-            tmp.seek(0, 2)
-            file_size = tmp.tell()
-            tmp.seek(0)
-            if file_size <= 25_000:
-                full_content = tmp.read()
-                tmp.seek(0)
-                if is_missing_file_page(full_content):
-                    logger.warning(
-                        "Texas document download: TexasDocument %s at %s "
-                        "returned a missing file page.",
-                        texas_document.pk,
-                        url,
-                    )
-                    texas_document.processing_error = ProcessingError.BAD_URL
-                    texas_document.save()
-                    task.request.chain = None
-                    return None
-
-        filename = (
-            f"{texas_document.media_id}"
-            f"-{texas_document.media_version_id}{extension}"
-        )
-        downloaded_file = File(tmp)
-        texas_document.filepath_local.save(
-            filename, downloaded_file, save=False
-        )
-        texas_document.file_size = downloaded_file.size
-        texas_document.sha1 = sha1_hash
-
-        if extension == ".pdf":
-            response = async_to_sync(doc_page_count_service)(texas_document)
-            if response.is_success:
-                texas_document.page_count = int(response.text)
-        elif extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
-            # A slight misnomer, this is a flag for needing the rest of the plain_text extraction pipeline
-            texas_document.ocr_status = TexasDocument.OCR_UNNECESSARY
-
-        texas_document.save()
-
-        if extension not in EXTRACTABLE_TEXAS_EXTENSIONS:
-            task.request.chain = None
-            return None
-
-        return texas_document_pk
+    document = TexasDocument.download(texas_document_pk)
+    return document.pk if document else None
 
 
 @app.task(
@@ -4161,7 +4067,7 @@ def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    return _download_texas_document(self, texas_document_pk)
+    return _download_texas_document(texas_document_pk)
 
 
 @app.task(
@@ -4181,7 +4087,7 @@ def download_texas_document_unthrottled(
     :return: The primary key of the downloaded TexasDocument instance, or None
     if the process failed.
     """
-    return _download_texas_document(self, texas_document_pk)
+    return _download_texas_document(texas_document_pk)
 
 
 TAMES_PENDING_SUBSCRIPTIONS_KEY = "tames:pending_subscriptions"
@@ -4406,14 +4312,9 @@ def merge_texas_document(
                 # object around. It needs to be wrapped in another lambda to
                 # prevent mypy from complaining.
                 (
-                    lambda pk: lambda: chain(
-                        download_texas_document.si(pk),
-                        extract_formatted_text_document.s(
-                            check_if_needed=False,
-                            model_name="search.TexasDocument",
-                            strip_html_tags=True,
-                        ),
-                    ).apply_async()
+                    lambda pk: (
+                        lambda: download_texas_document.si(pk).apply_async()
+                    )
                 )(texas_document.pk)
             )
         if existed:
@@ -5194,3 +5095,119 @@ def texas_corpus_download_task(
         meta = TexasDocketMeta.model_validate_json(f.read())
 
     return content, meta
+
+
+@app.task(
+    autoretry_for=(
+        botocore.exceptions.HTTPClientError,
+        botocore.exceptions.ConnectionError,
+    ),
+    max_retries=5,
+    retry_backoff=10,
+    ignore_result=True,
+)
+@time_call(logger)
+def fl_corpus_download_task(bucket: str, key: str) -> tuple[bytes, str, str]:
+    """Downloads a scraped file from S3 and returns it for parsing.
+
+    :param bucket: S3 bucket name docket data is stored.
+    :param key: S3 key where docket data is stored
+
+    :return: Tuple of:
+    - The bytes of the parsed JSON retrieved from S3
+    - The bucket name
+    - The S3 key"""
+    storage = AWSMediaStorage(bucket_name=bucket)
+    logger.info(
+        "Downloading docket JSON from S3: (Bucket: %s; Path: %s)",
+        bucket,
+        key,
+    )
+    with storage.open(key, "rb") as f:
+        content = f.read()
+
+    return content, bucket, key
+
+
+@app.task(
+    bind=True,
+    ignore_result=True,
+    # No retries because download_document_in_stream already has retry logic
+)
+@throttle_task("2/s")
+def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
+    """Download a Florida document and save it locally.
+
+    Accepts any file type. PDF-specific processing (page count) is only
+    performed for PDFs.
+
+    :param self: The Celery task instance.
+    :param fl_document_pk: The primary key of the `FloridaDocument` instance to
+    update the attachment for.
+    :return: The primary key of the downloaded `FloridaDocument` instance, or None
+    if the process failed.
+    """
+    document = FloridaDocument.download(fl_document_pk)
+    return document.pk if document else None
+
+
+@app.task(bind=True, max_retries=5, ignore_result=True)
+def fl_ingest_docket_task(
+    task: Task,
+    download_result: tuple[bytes, str, str],
+    download_attachments: bool = True,
+) -> MergeResult[Any]:
+    """
+    Task to parse and merge a Florida docket.
+
+    :param task: The Celery task.
+
+    :param download_result: Tuple of:
+    - The bytes of the parsed JSON retrieved from S3.
+    - The S3 bucket this case was retrieved from. Used for error messages.
+    - The S3 key this case was retrieved from. Used for error messages.
+    :param download_attachments: Whether to download docket entry attachments.
+
+    :return: The result of the merge operation.
+    """
+    case_bytes, bucket, key = download_result
+    try:
+        case = FloridaCase.deserialize(case_bytes.decode())
+    except Exception:
+        logger.exception(
+            "Failed to deserialize Florida case stored in %s at %s",
+            bucket,
+            key,
+        )
+        return MergeResult.failed("Docket")
+    logger.info(
+        "Attempting to merge Florida case %s",
+        case.docket_number,
+    )
+    # Due to an oversight in the scraper, dockets with more than one page of entries may have duplicates. We want to log
+    # these so they can be captured and fixed later.
+    de_total = len(case.entries)
+    de_unique = len(set(e.docket_entry_uuid for e in case.entries))
+    if de_unique < de_total or de_total > 50:
+        logger.error(
+            "Florida case %s may have duplicate entries (%d total; %d unique)",
+            case.docket_number,
+            de_total,
+            de_unique,
+        )
+    merger = FloridaDocketMerger(scrape=case, params=None)
+    result = merger.merge()
+    if result.failures:
+        logger.error(
+            "An error occurred while merging Florida case %s: %s",
+            case.docket_number,
+            result.failures,
+        )
+    if download_attachments:
+        attachment_pks = result.creates.get(
+            FloridaDocument.__name__, set()
+        ) | result.updates.get(FloridaDocument.__name__, set())
+        logger.info("Downloading FloridaDocuments: %r", attachment_pks)
+        for pk in attachment_pks:
+            download_fl_document.si(pk).apply_async()
+    return result
