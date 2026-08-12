@@ -731,8 +731,8 @@ async def recap_document_context(
         rd_values = [
             x
             async for x in source.documents_for_docket_and_number(
-                docket_id,
-                doc_num,
+                docket_id,  # type: ignore[arg-type]
+                doc_num,  # type: ignore[arg-type]
             )
             .order_by("pk")
             .values_list("pk", "attachment_number", "description")
@@ -762,9 +762,9 @@ async def recap_document_context(
             # Get the URL to the attachment page and use the querystring
             # if the request included one
             attachment_page = document_url(
-                docket_id,
+                docket_id,  # type: ignore[arg-type]
                 slug,
-                doc_num,
+                doc_num,  # type: ignore[arg-type]
                 1,
             )
             if request.GET.urlencode():
@@ -843,9 +843,9 @@ async def recap_document_context(
     attachments = get_attachment_values(
         rd,
         rd_values,
-        docket_id,
+        docket_id,  # type: ignore[arg-type]
         docket.slug,
-        doc_num,
+        doc_num,  # type: ignore[arg-type]
     )
 
     return TemplateResponse(
