@@ -596,6 +596,43 @@ class APITests(APITestCase):
         )
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
+    async def test_cannot_attach_a_different_docket_to_someone_elses_tag(
+        self,
+    ) -> None:
+        """Can a user attach a *new* docket to a tag they don't own?
+
+        Unlike the two cases above, this uses a (docket, tag) pair that's
+        never been used before, so a 400 here can only come from ownership
+        enforcement, not DocketTag's `unique_together` constraint
+        (GHSA-cvh7-rv7v-wx2j-class).
+        """
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+
+        # A different user, tagging a docket that this tag has never seen.
+        response = await self.tag_a_docket(
+            self.client2, self.docket_2.pk, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertFalse(
+            await DocketTag.objects.filter(
+                docket_id=self.docket_2.pk, tag_id=tag_id
+            ).aexists()
+        )
+
+        # Same, but with a public tag -- publishing a tag makes it visible,
+        # not writable, to other users.
+        await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
+        response = await self.tag_a_docket(
+            self.client2, self.docket_2.pk, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertFalse(
+            await DocketTag.objects.filter(
+                docket_id=self.docket_2.pk, tag_id=tag_id
+            ).aexists()
+        )
+
     async def test_can_filter_tag_associations_using_docket_id(self) -> None:
         """Test filter for the docket field in the docket-tags endpoint"""
 

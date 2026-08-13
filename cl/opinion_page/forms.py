@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, URLValidator
 from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils.encoding import force_bytes
-from django.utils.html import format_html
+from django.utils.html import format_html, strip_tags
 from juriscraper.lib.string_utils import titlecase
 
 from cl.lib.command_utils import logger
@@ -184,6 +184,16 @@ class BaseCourtUploadForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
+
+    def clean(self):
+        """Strip HTML out of every free-text field (GHSA-cvh7-rv7v-wx2j-class:
+        these render with the `safe` filter wherever case metadata is shown).
+        """
+        cleaned_data = super().clean()
+        for name, field in self.fields.items():
+            if isinstance(field, forms.CharField) and cleaned_data.get(name):
+                cleaned_data[name] = strip_tags(cleaned_data[name])
+        return cleaned_data
 
     def add_author_field(self, required=False):
         """Add author field to form
