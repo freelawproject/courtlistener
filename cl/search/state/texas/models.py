@@ -5,7 +5,6 @@ from typing import IO
 
 import pghistory
 from django.db import models
-from django.utils.text import slugify
 
 from cl.corpus_importer.state.texas.utils import is_missing_file_page
 from cl.lib.decorators import document_model
@@ -15,7 +14,11 @@ from cl.lib.models import AbstractDateTimeModel
 __all__ = ["TexasDocketEntry", "TexasDocument"]
 
 from cl.lib.types import NonEmptyTuple
-from cl.search.state.shared import AbstractStateDocument, ProcessingError
+from cl.search.state.shared import (
+    AbstractStateDocument,
+    ProcessingError,
+    state_pdf_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,12 +140,7 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
         unique_together = [["docket_entry", "media_id"]]
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = self.docket_entry.docket.court_id
-        # Thumbnails live in a sibling directory so they can't collide with
-        # the document they were generated from.
-        directory = f"{court_id}-thumbnails" if thumbs else court_id
-        return str(
-            Path("us/state/tx") / directory / f"gov.tx.{court_id}.{slug}{ext}"
+        """Store TAMES documents under the shared state layout."""
+        return state_pdf_path(
+            "tx", self.docket_entry.docket.court_id, filename, thumbs
         )

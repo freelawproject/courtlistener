@@ -1,8 +1,5 @@
-from pathlib import Path
-
 import pghistory
 from django.db import models
-from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
@@ -11,6 +8,7 @@ from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import (
     AbstractStateDocument,
     DocketEntryType,
+    state_pdf_path,
 )
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
@@ -109,7 +107,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         on_delete=models.CASCADE,
         related_name="documents",
     )
-    content_type = models.CharField(max_length=63, blank=True)
+    content_type = models.CharField(max_length=255, blank=True)
     document_name = models.TextField(blank=True)
     document_type = models.TextField(blank=True)
     link_uuid = models.UUIDField()
@@ -157,12 +155,7 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         ]
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = self.docket_entry.docket.court_id
-        # Thumbnails live in a sibling directory so they can't collide with
-        # the document they were generated from.
-        directory = f"{court_id}-thumbnails" if thumbs else court_id
-        return str(
-            Path("us/state/fl") / directory / f"gov.fl.{court_id}.{slug}{ext}"
+        """Store Florida ACIS documents under the shared state layout."""
+        return state_pdf_path(
+            "fl", self.docket_entry.docket.court_id, filename, thumbs
         )

@@ -1296,6 +1296,8 @@ class RECAPDocument(
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store PACER documents under the RECAP bucket layout, which the
+        original RECAP server also used, so paths stay compatible."""
         root = "recap-thumbnails" if thumbs else "recap"
         bucket = get_bucket_name(
             self.docket_entry.docket.court_id,
@@ -1821,6 +1823,8 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         verbose_name_plural = "Claim History Entries"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store claim documents under the claim bucket layout, keyed on the
+        claim's docket rather than the document's own docket entry."""
         root = "claim-thumbnails" if thumbs else "claim"
         bucket = get_bucket_name(
             self.claim.docket.court_id, self.pacer_case_id
@@ -4020,6 +4024,12 @@ class ScotusDocketMetadata(AbstractDateTimeModel):
         verbose_name_plural = "SCOTUS Docket Metadata"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store the questions-presented PDF under the SCOTUS `qp` directory.
+
+        This model is not itself a document -- the PDF hangs off the docket
+        metadata -- so it satisfies `SupportsPdfPath` without subclassing
+        `AbstractPDF`.
+        """
         slug = slugify(Path(filename).stem)
         root = Path("scotus") / ("qp-thumbnails" if thumbs else "qp")
         return str(root / f"gov.scotus.{slug}.pdf")
@@ -4282,6 +4292,7 @@ class SCOTUSDocument(AbstractDateTimeModel, AbstractPDF):
         return f"{self.pk}: Docket_{self.docket_entry.docket.docket_number} , document_number_{self.document_number} , attachment_number_{self.attachment_number}"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store SCOTUS documents under the SCOTUS `documents` directory."""
         slug = slugify(Path(filename).stem)
         root = Path("scotus") / (
             "documents-thumbnails" if thumbs else "documents"

@@ -74,6 +74,11 @@ class LASCPDF(AbstractPDF, AbstractDateTimeModel):
         verbose_name = "LASC PDF"
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
+        """Store LASC documents under a per-docket-number directory.
+
+        Note the leading slash on the root, which predates this method and is
+        preserved so existing objects stay reachable.
+        """
         slug = slugify(trunc(filename, 40))
         directory = (
             f"{self.docket_number}-thumbnails"
