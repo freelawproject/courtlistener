@@ -4,11 +4,10 @@ from pathlib import Path
 
 import pghistory
 from django.db import models
-from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
-from cl.lib.models import AbstractDateTimeModel, AbstractPDF
+from cl.lib.models import AbstractDateTimeModel
 from cl.search.state.new_york.vocabularies import (
     FILING_DOCTYPE_CHOICES,
     FILING_ROLE_CHOICES,
@@ -17,7 +16,7 @@ from cl.search.state.new_york.vocabularies import (
     ISSUE_SUBCATEGORY_CHOICES,
     UNKNOWN,
 )
-from cl.search.state.shared import ProcessingError
+from cl.search.state.shared import AbstractStateDocument, state_pdf_path
 
 __all__ = [
     "NYCoADocketEntry",
@@ -211,11 +210,14 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
 @pghistory.track()
 @document_model
-class NYCoADocument(AbstractDateTimeModel, AbstractPDF):
+class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     """
     Represents a document attached to a New York Court of Appeals docket entry.
 
     :ivar docket_entry: The Docket entry this document is associated with.
+    :ivar url: The endpoint the document is requested from. Court-PASS serves
+    every document from one URL by POST, so unlike the other states this is
+    the same value on every row and does not identify the document.
     :ivar file_name: The name of the file as Court-PASS published it. Filers
     are expected to follow the Court's naming convention, which encodes the
     party role, party name, and document type.
@@ -234,7 +236,6 @@ class NYCoADocument(AbstractDateTimeModel, AbstractPDF):
     :ivar volume: The volume number, for a record or appendix published in
     several volumes.
     :ivar part: The part number, for a volume that is itself split into parts.
-    :ivar processing_error: The processing error for the document, if any.
     """
 
     docket_entry = models.ForeignKey(
@@ -243,18 +244,28 @@ class NYCoADocument(AbstractDateTimeModel, AbstractPDF):
         related_name="documents",
     )
     file_name = models.TextField()
-    content_type = models.CharField(max_length=63, blank=True)
+    content_type = models.CharField(max_length=255, blank=True)
     available = models.BooleanField(default=True)
     doc_role = models.TextField(blank=True)
     doc_party = models.TextField(blank=True)
     doc_type = models.TextField(blank=True)
     volume = models.IntegerField(null=True, blank=True)
     part = models.IntegerField(null=True, blank=True)
-    processing_error = models.SmallIntegerField(
-        choices=ProcessingError.CHOICES,
-        null=True,
-        blank=True,
-    )
+
+    def make_filename(self) -> str:
+        """Build the stored filename from the docket entry and file name.
+
+        Overridden because the base implementation derives the name from
+        `url`, which is one shared POST endpoint for all of Court-PASS and so
+        would name every document identically. The entry plus file name is the
+        document's natural key, so it is unique and stable across scrapes.
+        """
+        return f"{self.docket_entry_id}-{Path(self.file_name).stem}"
+
+    @classmethod
+    def tmp_prefix(cls) -> str:
+        """Prefix for temporary download files."""
+        return "nycoa_"
 
     class Meta:
         app_label = "search"
@@ -270,12 +281,7 @@ class NYCoADocument(AbstractDateTimeModel, AbstractPDF):
         ]
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
-        slug = slugify(Path(filename).stem)
-        ext = Path(filename).suffix or ".pdf"
-        court_id = self.docket_entry.docket.court_id
-        # Thumbnails live in a sibling directory so they can't collide with
-        # the document they were generated from.
-        directory = f"{court_id}-thumbnails" if thumbs else court_id
-        return str(
-            Path("us/state/ny") / directory / f"gov.ny.{court_id}.{slug}{ext}"
+        """Store Court-PASS documents under the shared state layout."""
+        return state_pdf_path(
+            "ny", self.docket_entry.docket.court_id, filename, thumbs
         )
