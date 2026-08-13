@@ -4,6 +4,7 @@ from django.db import models
 from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel
+from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import (
     AbstractStateDocument,
     DocketEntryType,
@@ -86,16 +87,6 @@ class FloridaDocketEntry(AbstractDateTimeModel, CSVExportMixin):
         ]
 
 
-EXTRACTABLE_EXTENSIONS: set[str] = {
-    ".pdf",
-    ".html",
-    ".wpd",
-    ".txt",
-    ".tiff",
-}
-EXPECTED_EXTENSIONS: set[str] = {".pdf", ".tiff"}
-
-
 @pghistory.track()
 @document_model
 class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
@@ -130,13 +121,20 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
         return "fl_"
 
     @classmethod
-    def expected_extensions(cls) -> set[str]:
+    def expected_extensions(cls) -> NonEmptyTuple[str]:
         """File extensions Florida ACIS is known to serve."""
-        return EXPECTED_EXTENSIONS
+        return ".pdf", ".tiff"
 
-    def can_extract(self, extension: str) -> bool:
-        """Whether text extraction supports files with this extension."""
-        return extension in EXTRACTABLE_EXTENSIONS
+    @classmethod
+    def extractable_extensions(cls) -> NonEmptyTuple[str]:
+        """Extensions that can be sent to text extraction"""
+        return (
+            ".pdf",
+            ".html",
+            ".wpd",
+            ".txt",
+            ".tiff",
+        )
 
     async def fetch_page_count(self) -> int | None:
         """Florida ACIS gives us the page count directly, so skip sending to the microservice."""
