@@ -13,6 +13,7 @@ from cl.lib.models import AbstractDateTimeModel
 
 __all__ = ["TexasDocketEntry", "TexasDocument"]
 
+from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import AbstractStateDocument, ProcessingError
 
 logger = logging.getLogger(__name__)
@@ -98,14 +99,14 @@ class TexasDocument(AbstractDateTimeModel, AbstractStateDocument):
         return "texas_"
 
     @classmethod
-    def expected_extensions(cls) -> set[str]:
+    def expected_extensions(cls) -> NonEmptyTuple[str]:
         """File extensions TAMES is known to serve."""
-        return {".pdf", ".html", ".wpd", ".mp3"}
+        return ".pdf", ".html", ".wpd", ".mp3"
 
     @classmethod
-    def extractable_extensions(cls) -> set[str]:
+    def extractable_extensions(cls) -> NonEmptyTuple[str]:
         """Extensions that can be sent to text extraction"""
-        return {".pdf", ".html", ".wpd"}
+        return ".pdf", ".html", ".wpd"
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Flag downloads where TAMES returned its "missing file" HTML page

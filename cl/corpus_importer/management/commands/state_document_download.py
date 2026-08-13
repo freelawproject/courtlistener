@@ -54,6 +54,10 @@ def extract_state_documents(
     :return: None
     """
     extension_query = Q()
+    if not model.extractable_extensions():
+        raise TypeError(
+            f"{model.__name__} returned no extractable extensions."
+        )
     for extension in model.extractable_extensions():
         extension_query |= Q(filepath_local__endswith=f"{extension}")
     base_query = (
@@ -78,7 +82,7 @@ def extract_state_documents(
 
     pdf_count = pdf_docs.count()
     non_pdf_count = non_pdf_docs.count()
-    total_count = pdf_docs.count() + non_pdf_docs.count()
+    total_count = pdf_count + non_pdf_count
     logger.info(
         "Found %d %s needing extraction (%d PDF, %d other).",
         total_count,

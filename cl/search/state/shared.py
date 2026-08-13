@@ -1,4 +1,5 @@
 import logging
+from pathlib import PurePosixPath
 from typing import IO, Self
 
 from asgiref.sync import async_to_sync
@@ -7,6 +8,7 @@ from django.db import models
 
 from cl.lib.decorators import document_model
 from cl.lib.models import AbstractPDF
+from cl.lib.types import NonEmptyTuple
 
 logger = logging.getLogger(__name__)
 
@@ -84,14 +86,14 @@ class AbstractStateDocument(AbstractPDF):
         return "tmp_"
 
     @classmethod
-    def expected_extensions(cls) -> set[str]:
+    def expected_extensions(cls) -> NonEmptyTuple[str]:
         """Return the set of expected file extensions for this document."""
-        return set()
+        return (".pdf",)
 
     @classmethod
-    def extractable_extensions(cls) -> set[str]:
+    def extractable_extensions(cls) -> NonEmptyTuple[str]:
         """Return the set of file extensions that can be extracted."""
-        return set()
+        return (".pdf",)
 
     def validate_file(self, content: IO[bytes], extension: str) -> int | None:
         """Validate the file content and return the processing error if any.
@@ -136,9 +138,7 @@ class AbstractStateDocument(AbstractPDF):
             )
             return
 
-        parts = self.filepath_local.name.split(".")
-
-        extension = "." + parts[-1]
+        extension = PurePosixPath(self.filepath_local.name).suffix
 
         if extension not in self.extractable_extensions():
             logger.info(
