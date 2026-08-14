@@ -387,6 +387,11 @@ class UserDataTest(LiveServerTestCase):
             msg="Test string not found in response.content",
         )
 
+        # The key must be invalidated on success (GHSA-638g-xf9h-6qcg) so it
+        # can't be reused as a lookup value if it ever leaks.
+        await up.arefresh_from_db()
+        self.assertEqual(up.activation_key, "")
+
     async def test_confirming_an_email_when_it_is_associated_with_multiple_accounts(
         self,
     ) -> None:
@@ -415,6 +420,9 @@ class UserDataTest(LiveServerTestCase):
         ups = UserProfile.objects.filter(pk__in=[up.pk for up in ups])
         async for up in ups:
             self.assertTrue(up.email_confirmed)
+            # Every account sharing this key gets it invalidated, not just
+            # the one the confirmation link happened to name.
+            self.assertEqual(up.activation_key, "")
 
     def test_get_welcome_email_recipients(self) -> None:
         """This test verifies that we can get the welcome email recipients

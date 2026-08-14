@@ -711,6 +711,10 @@ def confirm_email(request, activation_key):
     # Tests pass; Save the profile
     for up in ups:
         up.email_confirmed = True
+        # Invalidate the key so it's single-use (GHSA-638g-xf9h-6qcg): once
+        # spent, it shouldn't still work as a lookup value if it ever leaks
+        # (server logs, browser history, a referrer header) or gets reused.
+        up.activation_key = ""
         up.save()
         if not settings.DEVELOPMENT:
             if up.neon_account_id:
