@@ -760,23 +760,28 @@ def request_email_confirmation(request: HttpRequest) -> HttpResponse:
                 )
                 return HttpResponseRedirect(reverse("email_confirm_success"))
 
-            activation_key = generate_activation_key()
             key_expires = now() + timedelta(days=5)
+            email: EmailType = emails["confirm_existing_account"]
 
             for user in users:
+                # Generate one activation key per user. This prevents an
+                # attacker from creating and gaining access to an account in
+                # between when a victim creates their account and when they
+                # confirm it. See: https://github.com/freelawproject/courtlistener-ghsa-638g-xf9h-6qcg/pull/1
+                activation_key = generate_activation_key()
+
                 # associate it with the user's accounts.
                 up = user.profile
                 up.activation_key = activation_key
                 up.key_expires = key_expires
                 up.save()
 
-            email: EmailType = emails["confirm_existing_account"]
-            send_mail(
-                email["subject"],
-                email["body"] % activation_key,
-                email["from_email"],
-                [user.email],
-            )
+                send_mail(
+                    email["subject"],
+                    email["body"] % activation_key,
+                    email["from_email"],
+                    [user.email],
+                )
             return HttpResponseRedirect(reverse("email_confirm_success"))
     else:
         form = EmailConfirmationForm()
