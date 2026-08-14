@@ -3,14 +3,18 @@ import asyncio
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
+from rest_framework.mixins import (
+    CreateModelMixin,
+    ListModelMixin,
+    RetrieveModelMixin,
+)
 from rest_framework.permissions import (
     DjangoModelPermissions,
-    IsAuthenticatedOrReadOnly,
+    IsAuthenticated,
 )
-from rest_framework.throttling import AnonRateThrottle
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from cl.api.api_permissions import V3APIPermission
+from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.pagination import BigPagination
 from cl.api.utils import (
     EmailProcessingQueueAPIUsersWithView,
@@ -119,14 +123,36 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
         return epq
 
 
-class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
+class PacerFetchRequestViewSet(
+    LoggingMixin,
+    CreateModelMixin,
+    ListModelMixin,
+    RetrieveModelMixin,
+    GenericViewSet,
+):
+    """Create and view your own PACER fetch requests.
+
+    Deliberately supports only create/list/retrieve -- no update or delete
+    action exists on this viewset at all, so PATCH/PUT/DELETE are never
+    routed to it (DRF's router omits a method from the URLconf unless the
+    viewset defines the matching action), and requests are never edited or
+    removed via the API once made.
+
+    Reads are scoped to the requesting user's own rows in get_queryset();
+    IsOwner is layered on top as defense in depth, so an object-level check
+    still fires even if a future change to get_queryset() stops scoping
+    correctly. See GHSA-5f8h-qjq5-6h64.
+    """
+
     queryset = PacerFetchQueue.objects.all().order_by("-id")
     serializer_class = PacerFetchQueueSerializer
     filterset_class = PacerFetchQueueFilter
-    permission_classes = (IsAuthenticatedOrReadOnly, V3APIPermission)
+    permission_classes = (IsAuthenticated, V3APIPermission, IsOwner)
     # Dedicated, more generous rate than the global per-user API throttle,
-    # applied regardless of membership status. See #7503.
-    throttle_classes = (AnonRateThrottle, FetchRateThrottle)
+    # applied regardless of membership status. See #7503. (No AnonRateThrottle
+    # here: every request now must be authenticated, so an anonymous request
+    # never survives long enough to reach the throttle check.)
+    throttle_classes = (FetchRateThrottle,)
     ordering_fields = (
         "id",
         "date_created",
@@ -142,6 +168,11 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
         "date_modified",
         "date_completed",
     ]
+
+    def get_queryset(self):
+        return PacerFetchQueue.objects.filter(user=self.request.user).order_by(
+            "-id"
+        )
 
     def perform_create(self, serializer):
         fq = serializer.save(user=self.request.user)

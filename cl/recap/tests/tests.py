@@ -3270,6 +3270,87 @@ class PacerFetchAPIThrottleTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
 
 
+class PacerFetchQueueScopedAccessTest(TestCase):
+    """The Fetch Queue API supports only create/list/retrieve, scoped to the
+    requesting user's own rows -- no one can see or edit another user's
+    fetch requests, and PATCH/PUT/DELETE aren't routed to the viewset at
+    all. See GHSA-5f8h-qjq5-6h64.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.owner = UserProfileWithParentsFactory()
+        cls.rando = UserProfileWithParentsFactory()
+        cls.court = CourtFactory(
+            id="canb", jurisdiction=Court.FEDERAL_DISTRICT, in_use=True
+        )
+
+    def setUp(self) -> None:
+        self.fq = PacerFetchQueueFactory(
+            user=self.owner.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.court.pk,
+            pacer_case_id="123456",
+        )
+        self.url = reverse(
+            "pacerfetchqueue-detail",
+            kwargs={"version": "v4", "pk": self.fq.pk},
+        )
+        self.list_url = reverse(
+            "pacerfetchqueue-list", kwargs={"version": "v4"}
+        )
+
+    async def test_owner_can_read_their_own_fetch_request(self) -> None:
+        client = await sync_to_async(make_client)(self.owner.user.pk)
+
+        response = await client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotIn("user", response.json())
+
+    async def test_non_owner_cannot_see_another_users_fetch_request(
+        self,
+    ) -> None:
+        """A stranger's retrieve 404s, and their list never surfaces
+        someone else's row, since get_queryset() scopes to request.user."""
+        rando_client = await sync_to_async(make_client)(self.rando.user.pk)
+
+        response = await rando_client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+        response = await rando_client.get(self.list_url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["results"], [])
+
+    async def test_patch_put_delete_are_not_allowed_for_anyone(self) -> None:
+        """PATCH/PUT/DELETE 405 for every caller, owner included -- these
+        actions simply aren't routed to this viewset."""
+        owner_client = await sync_to_async(make_client)(self.owner.user.pk)
+        rando_client = await sync_to_async(make_client)(self.rando.user.pk)
+
+        for client in (owner_client, rando_client):
+            response = await client.patch(
+                self.url, {"pacer_case_id": "999999"}, format="json"
+            )
+            self.assertEqual(
+                response.status_code, HTTPStatus.METHOD_NOT_ALLOWED
+            )
+
+            response = await client.put(
+                self.url, {"pacer_case_id": "999999"}, format="json"
+            )
+            self.assertEqual(
+                response.status_code, HTTPStatus.METHOD_NOT_ALLOWED
+            )
+
+            response = await client.delete(self.url)
+            self.assertEqual(
+                response.status_code, HTTPStatus.METHOD_NOT_ALLOWED
+            )
+
+        await sync_to_async(self.fq.refresh_from_db)()
+        self.assertEqual(self.fq.pacer_case_id, "123456")
+
+
 @mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
