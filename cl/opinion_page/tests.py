@@ -3395,7 +3395,7 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn("Contract", content)
 
     async def test_v2_docket_metadata_in_context(self) -> None:
-        """The view should pass metadata and tabs to the template."""
+        """The view should pass metadata sections and tabs to the template."""
         r = await self.async_client.get(
             reverse(
                 "view_docket",
@@ -3403,9 +3403,9 @@ class DocketPageV2TemplateTest(TestCase):
             )
         )
         self.assertTemplateUsed(r, "v2_docket.html")
-        self.assertIn("metadata", r.context)
+        self.assertIn("metadata_sections", r.context)
         self.assertIn("tabs", r.context)
-        self.assertTrue(len(r.context["metadata"]) > 0)
+        self.assertTrue(len(r.context["metadata_sections"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
 
 
@@ -3601,6 +3601,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
         return template.render(
             {
                 "docket": self.docket,
+                "docket_source": RECAP_SOURCE,
                 "form": form,
                 "page_obj": self.empty_page,
                 "request": request,

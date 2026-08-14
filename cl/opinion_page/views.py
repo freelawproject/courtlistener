@@ -70,7 +70,10 @@ from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
 from cl.lib.utils import human_sort
 from cl.opinion_page.decorators import handle_cluster_redirection
-from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
+from cl.opinion_page.docket_sources_utils import (
+    RECAP_SOURCE,
+    MetadataSection,
+)
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
@@ -82,10 +85,8 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    build_bankruptcy_metadata,
     build_docket_metadata,
     build_docket_tabs,
-    build_originating_court_metadata,
     core_docket_data,
     es_cited_case_count,
     es_get_cited_clusters_with_cache,
@@ -98,14 +99,12 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import (
     SEARCH_TYPES,
-    BankruptcyInformation,
     Citation,
     Court,
     Docket,
     Opinion,
     OpinionCluster,
     OpinionsCitedByRECAPDocument,
-    OriginatingCourtInformation,
     Parenthetical,
     RECAPDocument,
     sort_cites,
@@ -389,12 +388,13 @@ async def view_docket(
 
     @sync_to_async
     def _attach_documents(entries: list) -> list:
-        # Attach each entry's documents via the source config,
-        # so de_list.html just loops over de.documents,
-        # regardless of source.
         page_documents = []
         for entry in entries:
             entry.documents = list(source.documents_for_entry(entry))
+            for document in entry.documents:
+                document.label = source.document_label(document)
+                document.detail_url = source.document_detail_url(document)
+                document.external_url = source.document_external_url(document)
             page_documents.extend(entry.documents)
         return page_documents
 
@@ -425,19 +425,16 @@ async def view_docket(
     has_idb_data = bool(docket.idb_data_id)
     has_authorities = await docket.ahas_authorities()
 
-    @sync_to_async
-    def _get_related(
-        d: Docket,
-    ) -> tuple[
-        BankruptcyInformation | None,
-        OriginatingCourtInformation | None,
-    ]:
-        return (
-            getattr(d, "bankruptcy_information", None),
-            getattr(d, "originating_court_information", None),
-        )
-
-    bankr_info, og_info = await _get_related(docket)
+    docket_metadata = await sync_to_async(build_docket_metadata)(
+        docket, context["timezone"]
+    )
+    metadata_sections: list[MetadataSection] = [
+        {
+            "items": docket_metadata,
+            "list_class": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4",
+        },
+        *await sync_to_async(source.metadata_sections)(docket),
+    ]
 
     context.update(
         {
@@ -447,13 +444,10 @@ async def view_docket(
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
-            "metadata": await sync_to_async(build_docket_metadata)(
-                docket, context["timezone"]
-            ),
-            "bankruptcy_metadata": build_bankruptcy_metadata(bankr_info),
-            "originating_court_metadata": await sync_to_async(
-                build_originating_court_metadata
-            )(docket, og_info),
+            # Named docket_source, not source: docket.source is already the
+            # RECAP/IDB provenance field on the model.
+            "docket_source": source,
+            "metadata_sections": metadata_sections,
             "tabs": build_docket_tabs(
                 docket, parties, has_idb_data, has_authorities
             ),
