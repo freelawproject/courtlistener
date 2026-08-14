@@ -9,12 +9,12 @@ from cl.lib.decorators import document_model
 from cl.lib.model_helpers import CSVExportMixin
 from cl.lib.models import AbstractDateTimeModel
 from cl.search.state.new_york.vocabularies import (
-    FILING_DOCTYPE_CHOICES,
-    FILING_ROLE_CHOICES,
-    FILING_TYPE_CHOICES,
     ISSUE_CATEGORY_CHOICES,
     ISSUE_SUBCATEGORY_CHOICES,
     UNKNOWN,
+    FilingDocType,
+    FilingRole,
+    FilingType,
 )
 from cl.search.state.shared import AbstractStateDocument
 
@@ -165,14 +165,14 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket_entry_id = models.TextField()
     entry_index = models.IntegerField(null=True, blank=True)
     filing_type = models.SmallIntegerField(
-        choices=FILING_TYPE_CHOICES, default=UNKNOWN
+        choices=FilingType.choices, default=UNKNOWN
     )
     filing_type_raw = models.TextField(blank=True)
     filing_role = models.SmallIntegerField(
-        choices=FILING_ROLE_CHOICES, default=UNKNOWN
+        choices=FilingRole.choices, default=UNKNOWN
     )
     filing_doctype = models.SmallIntegerField(
-        choices=FILING_DOCTYPE_CHOICES, default=UNKNOWN
+        choices=FilingDocType.choices, default=UNKNOWN
     )
     filing_type_recognized = models.BooleanField(default=False)
     party = models.ForeignKey(

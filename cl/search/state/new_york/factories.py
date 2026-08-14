@@ -50,10 +50,10 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
     docket = SubFactory(DocketFactory)
     docket_entry_id = Sequence(lambda n: f"e:appellant-brief:smith:{n + 1}")
     entry_index = Sequence(lambda n: n)
-    filing_type = FilingType.APPELLANT_BRIEF.code
+    filing_type = FilingType.APPELLANT_BRIEF
     filing_type_raw = FilingType.APPELLANT_BRIEF.label
-    filing_role = FilingRole.APPELLANT.code
-    filing_doctype = FilingDocType.BRIEF.code
+    filing_role = FilingRole.APPELLANT
+    filing_doctype = FilingDocType.BRIEF
     filing_type_recognized = True
     party_name = Faker("name")
     date_filed = Faker("date_object")
