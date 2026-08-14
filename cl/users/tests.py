@@ -4334,7 +4334,6 @@ class RegisterViewTest(TestCase):
         collision within this test indicates a regression to a low
         entropy generation scheme.
         """
-        max_length = UserProfile._meta.get_field("activation_key").max_length
         keys = {generate_activation_key() for _ in range(1000)}
         self.assertEqual(len(keys), 1000, "Generated keys were not unique")
 
