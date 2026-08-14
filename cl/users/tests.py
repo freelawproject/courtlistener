@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -71,6 +72,7 @@ from cl.favorites.models import (
     UserTag,
     UserTagEvent,
 )
+from cl.lib.crypto import generate_activation_key
 from cl.lib.email_backends import get_email_count
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -123,6 +125,7 @@ from cl.users.models import (
     UserProxyEvent,
 )
 from cl.users.tasks import tag_zoho_record, tag_zoho_record_for_membership
+from cl.users.utils import create_stub_account
 from cl.visualizations.factories import VisualizationFactory
 from cl.visualizations.models import SCOTUSMap
 
@@ -4309,6 +4312,68 @@ class RegisterViewTest(TestCase):
         self.assertIsNotNone(form, "Expected 'form' in template context")
         # The username field should display an error.
         self.assertIn("username", form.errors)
+
+    def test_generate_activation_key_is_not_brute_forceable(self) -> None:
+        """Does the activation key generator produce a CSPRNG token that
+        fits UserProfile.activation_key and doesn't depend on caller input?
+
+        Regression test for GHSA-638g-xf9h-6qcg: the old sha1_activation_key()
+        derived its output from a 20-bit salt plus attacker-known input
+        (username/email), collapsing to a brute-forceable ~1M-value keyspace.
+        """
+        max_length = UserProfile._meta.get_field("activation_key").max_length
+        keys = {generate_activation_key() for _ in range(1000)}
+        self.assertEqual(len(keys), 1000, "Generated keys were not unique")
+        for key in keys:
+            self.assertLessEqual(len(key), max_length)
+            self.assertIsNotNone(
+                re.fullmatch(r"[0-9a-f]+", key),
+                f"{key} is not a lowercase hex string",
+            )
+
+    async def test_claiming_a_stub_account_issues_a_fresh_unguessable_key(
+        self,
+    ) -> None:
+        """Claiming a donor stub account via register() must not let the
+        claimant control or predict the resulting activation_key.
+        """
+        _, stub_profile = await sync_to_async(create_stub_account)(
+            {
+                "email": "donor@example.com",
+                "first_name": "Donor",
+                "last_name": "Person",
+            },
+            {
+                "address1": "123 Main St",
+                "address2": "",
+                "city": "Anytown",
+                "state": "XX",
+                "zip_code": "00000",
+            },
+        )
+        old_key = stub_profile.activation_key
+
+        data = {
+            "username": "attacker",
+            "email": "donor@example.com",
+            "first_name": "Attacker",
+            "last_name": "Person",
+            "password1": "TestPassw0rd!",
+            "password2": "TestPassw0rd!",
+            "consent": True,
+        }
+        response = await self.async_client.post(
+            reverse("register"), data, follow=True
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        await stub_profile.arefresh_from_db()
+        self.assertNotEqual(stub_profile.activation_key, old_key)
+        self.assertIsNotNone(
+            re.fullmatch(r"[0-9a-f]{40}", stub_profile.activation_key),
+            f"{stub_profile.activation_key} is not a 40-char lowercase hex "
+            "string",
+        )
 
 
 class UserAdminApiCallsCountTest(TestCase):
