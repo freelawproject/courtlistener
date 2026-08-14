@@ -529,6 +529,51 @@ class APITests(APITestCase):
         await tag.arefresh_from_db()
         self.assertEqual(tag.name, new_name)
 
+    async def test_cannot_modify_or_delete_someone_elses_tag(self) -> None:
+        """Can another user deface, delete, or hijack ownership of a tag
+        they don't own (GHSA-4587-9786-r6vp)?
+
+        get_queryset() returns every published tag so that reads work, but
+        without an object-level ownership permission that same queryset
+        backs update/destroy's object lookup too, letting any authenticated
+        user PATCH/PUT/DELETE anyone else's published tag -- and PUT would
+        additionally reassign ownership to the attacker via the `user`
+        HiddenField's default.
+        """
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+        detail_path = reverse(
+            "UserTag-detail", kwargs={"version": "v3", "pk": tag_id}
+        )
+
+        # Not published yet, so self.client2 can't even see it, let alone
+        # write to it.
+        response = await self.client2.patch(
+            detail_path, {"name": "defaced"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+        # Publishing makes a tag visible, not writable, to other users.
+        await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
+
+        for method, data in (
+            ("patch", {"name": "defaced"}),
+            ("put", {"name": "hijacked"}),
+        ):
+            response = await getattr(self.client2, method)(
+                detail_path, data, format="json"
+            )
+            self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+        response = await self.client2.delete(detail_path)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+        # The tag is untouched: not renamed, not deleted, and ownership
+        # was not reassigned to self.client2's user.
+        tag = await UserTag.objects.aget(pk=tag_id)
+        self.assertEqual(tag.name, "foo")
+        self.assertEqual(tag.user_id, self.pandora.user.pk)
+
     async def test_list_users_tags(self) -> None:
         """Cam we get a user's tags (and not other users tags)?"""
         # make some tags for some users
