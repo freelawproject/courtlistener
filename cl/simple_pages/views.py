@@ -29,6 +29,7 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
+from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
 from cl.people_db.models import Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
@@ -366,6 +367,11 @@ async def components(request: HttpRequest) -> HttpResponse:
             self.id = pk
             self.pk = pk
             self.date_upload = None
+            # Filled in from the source config when the document is attached
+            # to its entry, exactly as view_docket does it.
+            self.label: str = ""
+            self.detail_url: str | None = None
+            self.external_url: str | None = None
 
         @property
         def pacer_url(self) -> str:
@@ -378,16 +384,6 @@ async def components(request: HttpRequest) -> HttpResponse:
         def get_absolute_url(self) -> str:
             return f"/docket/{self.pk}/document/"
 
-    class MockRECAPDocManager:
-        def __init__(self, docs: list[MockRECAPDoc]):
-            self._docs = docs
-
-        def all(self) -> list[MockRECAPDoc]:
-            return self._docs
-
-        def count(self) -> int:
-            return len(self._docs)
-
     class MockDocketEntry:
         def __init__(
             self,
@@ -395,14 +391,25 @@ async def components(request: HttpRequest) -> HttpResponse:
             entry_number: int | None,
             date_filed: date,
             description: str,
-            recap_documents: list[MockRECAPDoc],
+            documents: list[MockRECAPDoc],
             pk: int = 0,
         ):
             self.entry_number = entry_number
             self.date_filed = date_filed
             self.datetime_filed = None
             self.description = description
-            self.recap_documents = MockRECAPDocManager(recap_documents)
+            # view_docket attaches documents plus their resolved label and
+            # URLs; the demo goes through the same source config so the
+            # library shows what the real page shows.
+            self.documents = documents
+            for document in documents:
+                document.label = RECAP_SOURCE.document_label(document)
+                document.detail_url = RECAP_SOURCE.document_detail_url(
+                    document
+                )
+                document.external_url = RECAP_SOURCE.document_external_url(
+                    document
+                )
             self.pk = pk
 
     demo_entries = [
@@ -414,7 +421,7 @@ async def components(request: HttpRequest) -> HttpResponse:
                 " (Filing fee $400 receipt number 0090-4495374)"
             ),
             pk=100,
-            recap_documents=[
+            documents=[
                 MockRECAPDoc(
                     document_type=RECAPDocument.PACER_DOCUMENT,
                     document_number="1",
@@ -451,7 +458,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             date_filed=date(2024, 4, 21),
             description="Case Assigned to Judge Ellen S. Huvelle. (jd)",
             pk=101,
-            recap_documents=[],
+            documents=[],
         ),
     ]
 
@@ -482,8 +489,22 @@ async def components(request: HttpRequest) -> HttpResponse:
         entry_gte = MockFieldValue()
         entry_lte = MockFieldValue()
 
+    class MockCourt:
+        FEDERAL_APPELLATE = Court.FEDERAL_APPELLATE
+        jurisdiction = Court.FEDERAL_DISTRICT
+
     class MockDocket:
         pk = 12345
+        court = MockCourt()
+
+        def __getattr__(self, name: str) -> str:
+            # Docket exposes one pacer_*_url property per PACER report. The
+            # library only needs them to be non-empty for the menu to render,
+            # so they all resolve to one placeholder rather than being listed
+            # out one by one.
+            if name.startswith("pacer_") and name.endswith("_url"):
+                return "https://ecf.dcd.uscourts.gov/cgi-bin/DktRpt.pl"
+            raise AttributeError(name)
 
     return TemplateResponse(
         request,
@@ -491,9 +512,26 @@ async def components(request: HttpRequest) -> HttpResponse:
         {
             "private": True,
             "demo_docket_entries": demo_entries,
+            "demo_document": demo_entries[0].documents[2],
+            "docket_source": RECAP_SOURCE,
             "demo_page_obj": MockPageObj(),
             "demo_docket": MockDocket(),
             "demo_filter_form": MockDocketFilterForm(),
+            "demo_metadata_items": [
+                {"label": "Date Filed", "value": "January 14, 2025"},
+                {
+                    "label": "Questions Presented",
+                    "value": "View",
+                    "url": "https://www.supremecourt.gov/qp/24-001qp.pdf",
+                    "is_external": True,
+                },
+                {
+                    "label": "Originating Court",
+                    "value": "N.D. Cal.",
+                    "suffix_text": "3:24-cv-01234",
+                    "suffix_url": "/docket/1/example/",
+                },
+            ],
         },
     )
 
