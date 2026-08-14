@@ -3270,6 +3270,88 @@ class PacerFetchAPIThrottleTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
 
 
+class PacerFetchQueuePermissionsTest(TestCase):
+    """Are non-owners blocked from modifying each other's Fetch Queue rows
+    via the API, while everyone can still read them (by design, since no
+    owner info is exposed by the serializer)? See GHSA-5f8h-qjq5-6h64.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.owner = UserProfileWithParentsFactory()
+        cls.rando = UserProfileWithParentsFactory()
+        cls.court = CourtFactory(
+            id="canb", jurisdiction=Court.FEDERAL_DISTRICT, in_use=True
+        )
+
+    def setUp(self) -> None:
+        self.fq = PacerFetchQueueFactory(
+            user=self.owner.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.court.pk,
+            pacer_case_id="123456",
+        )
+        self.url = reverse(
+            "pacerfetchqueue-detail",
+            kwargs={"version": "v4", "pk": self.fq.pk},
+        )
+
+    async def test_anyone_can_read_another_users_fetch_request(self) -> None:
+        """Reads stay open to everyone, by design."""
+        client = await sync_to_async(make_client)(self.rando.user.pk)
+
+        response = await client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotIn("user", response.json())
+
+    async def test_non_owner_cannot_modify_or_delete_fetch_request(
+        self,
+    ) -> None:
+        """A non-owner's PATCH/DELETE against someone else's fetch request
+        is rejected before it ever reaches serializer validation."""
+        rando_client = await sync_to_async(make_client)(self.rando.user.pk)
+
+        response = await rando_client.patch(
+            self.url, {"pacer_case_id": "999999"}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+        response = await rando_client.delete(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+        await sync_to_async(self.fq.refresh_from_db)()
+        self.assertEqual(self.fq.pacer_case_id, "123456")
+
+    @mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
+    async def test_owner_can_modify_and_delete_their_own_fetch_request(
+        self, mock_cookies
+    ) -> None:
+        """The owner's own PUT/DELETE against their own row still works.
+
+        Uses PUT rather than PATCH: HiddenField (the "user" field) skips
+        applying its default on partial updates, so PATCH against this
+        endpoint 500s independent of ownership -- a pre-existing bug outside
+        the scope of this fix.
+        """
+        owner_client = await sync_to_async(make_client)(self.owner.user.pk)
+
+        response = await owner_client.put(
+            self.url,
+            {
+                "request_type": REQUEST_TYPE.DOCKET,
+                "pacer_case_id": "999999",
+                "court": self.court.pk,
+                "pacer_username": "johncofey",
+                "pacer_password": "mrjangles",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        response = await owner_client.delete(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
+
+
 @mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",

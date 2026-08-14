@@ -10,7 +10,7 @@ from rest_framework.permissions import (
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.viewsets import ModelViewSet
 
-from cl.api.api_permissions import V3APIPermission
+from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.pagination import BigPagination
 from cl.api.utils import (
     EmailProcessingQueueAPIUsersWithView,
@@ -123,7 +123,13 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     queryset = PacerFetchQueue.objects.all().order_by("-id")
     serializer_class = PacerFetchQueueSerializer
     filterset_class = PacerFetchQueueFilter
-    permission_classes = (IsAuthenticatedOrReadOnly, V3APIPermission)
+    # IsOwner adds no restriction to safe methods (list/retrieve stay open to
+    # everyone, matching the anonymous-read design here), but requires the
+    # requesting user to own the row for PATCH/PUT/DELETE. Without it, any
+    # authenticated account could tamper with or cancel another user's
+    # in-progress PACER purchase, or reassign its ownership to themselves.
+    # See GHSA-5f8h-qjq5-6h64.
+    permission_classes = (IsAuthenticatedOrReadOnly, V3APIPermission, IsOwner)
     # Dedicated, more generous rate than the global per-user API throttle,
     # applied regardless of membership status. See #7503.
     throttle_classes = (AnonRateThrottle, FetchRateThrottle)
