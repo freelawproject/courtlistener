@@ -65,45 +65,6 @@ class ProcessingError:
     )
 
 
-def state_pdf_path(
-    state_code: str,
-    court_id: str,
-    filename: str,
-    thumbs: bool = False,
-) -> str:
-    """Build the S3 path for a state court document.
-
-    Every state scraper stores its documents under the same layout, so the
-    `get_pdf_path` implementations on `AbstractStateDocument` subclasses
-    delegate here rather than each repeating it:
-
-        us/state/<state_code>/<court_id>/gov.<state_code>.<court_id>.<slug><ext>
-
-    Thumbnails go in a `<court_id>-thumbnails` sibling directory so they
-    cannot collide with the document they were generated from.
-
-    Callers pass `court_id` rather than the document itself because each model
-    reaches its court by a different relation.
-
-    :param state_code: The two-letter USPS code for the state, lowercased.
-    :param court_id: The ID of the court the document was filed in.
-    :param filename: The filename Django hands to the `upload_to` callback.
-    :param thumbs: Whether to return the thumbnail path instead.
-    :return: The path to store the document at, relative to the bucket root.
-    """
-    slug = slugify(Path(filename).stem)
-    # Court-PASS serves oral argument playlists alongside PDFs, and TAMES
-    # serves .html and .wpd, so the original extension has to survive.
-    ext = Path(filename).suffix or ".pdf"
-    directory = f"{court_id}-thumbnails" if thumbs else court_id
-    return str(
-        Path("us/state")
-        / state_code
-        / directory
-        / f"gov.{state_code}.{court_id}.{slug}{ext}"
-    )
-
-
 @document_model
 class AbstractStateDocument(AbstractPDF):
     """
@@ -115,6 +76,47 @@ class AbstractStateDocument(AbstractPDF):
         null=True,
         blank=True,
     )
+
+    @classmethod
+    def state_pdf_path(
+        cls,
+        state_code: str,
+        court_id: str,
+        filename: str,
+        thumbs: bool = False,
+    ) -> str:
+        """Build the S3 path for a state court document.
+
+        Every state scraper stores its documents under the same layout, so
+        subclasses' `get_pdf_path` implementations delegate here rather than
+        each repeating it:
+
+            us/state/<state_code>/<court_id>/gov.<state_code>.<court_id>.<slug><ext>
+
+        Thumbnails go in a `<court_id>-thumbnails` sibling directory so they
+        cannot collide with the document they were generated from.
+
+        Callers pass `court_id` rather than reading it off the document because
+        each model reaches its court by a different relation.
+
+        :param state_code: The two-letter USPS code for the state, lowercased.
+        :param court_id: The ID of the court the document was filed in.
+        :param filename: The filename Django hands to the `upload_to` callback.
+        :param thumbs: Whether to return the thumbnail path instead.
+        :return: The path to store the document at, relative to the bucket
+            root.
+        """
+        slug = slugify(Path(filename).stem)
+        # Court-PASS serves oral argument playlists alongside PDFs, and TAMES
+        # serves .html and .wpd, so the original extension has to survive.
+        ext = Path(filename).suffix or ".pdf"
+        directory = f"{court_id}-thumbnails" if thumbs else court_id
+        return str(
+            Path("us/state")
+            / state_code
+            / directory
+            / f"gov.{state_code}.{court_id}.{slug}{ext}"
+        )
 
     def make_filename(self) -> str:
         """Create the filename to store this document's content under (no extension)."""

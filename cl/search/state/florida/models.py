@@ -8,7 +8,6 @@ from cl.lib.types import NonEmptyTuple
 from cl.search.state.shared import (
     AbstractStateDocument,
     DocketEntryType,
-    state_pdf_path,
 )
 
 __all__ = ["FloridaDocketEntry", "FloridaDocument"]
@@ -156,6 +155,6 @@ class FloridaDocument(AbstractDateTimeModel, AbstractStateDocument):
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
         """Store Florida ACIS documents under the shared state layout."""
-        return state_pdf_path(
+        return self.state_pdf_path(
             "fl", self.docket_entry.docket.court_id, filename, thumbs
         )

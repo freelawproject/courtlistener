@@ -16,7 +16,7 @@ from cl.search.state.new_york.vocabularies import (
     ISSUE_SUBCATEGORY_CHOICES,
     UNKNOWN,
 )
-from cl.search.state.shared import AbstractStateDocument, state_pdf_path
+from cl.search.state.shared import AbstractStateDocument
 
 __all__ = [
     "NYCoADocketEntry",
@@ -282,6 +282,6 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
 
     def get_pdf_path(self, filename: str, thumbs: bool = False) -> str:
         """Store Court-PASS documents under the shared state layout."""
-        return state_pdf_path(
+        return self.state_pdf_path(
             "ny", self.docket_entry.docket.court_id, filename, thumbs
         )
