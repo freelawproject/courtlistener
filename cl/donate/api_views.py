@@ -26,7 +26,7 @@ from cl.donate.models import (
     NeonMembershipLevel,
     NeonWebhookEvent,
 )
-from cl.lib.crypto import sha1_activation_key
+from cl.lib.crypto import generate_activation_key
 from cl.lib.neon_utils import NeonClient
 from cl.lib.types import EmailType
 from cl.users.tasks import tag_zoho_record_for_membership
@@ -363,7 +363,7 @@ class MembershipWebhookViewSet(
                 else:
                     # Build and save a new activation key for the account.
                     up = user.profile
-                    activation_key = sha1_activation_key(user.username)
+                    activation_key = generate_activation_key()
                     key_expires = now() + datetime.timedelta(5)
                     up.activation_key = activation_key
                     up.key_expires = key_expires
