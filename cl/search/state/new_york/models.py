@@ -1,6 +1,7 @@
 """Models unique to New York Court of Appeals (Court-PASS) dockets."""
 
 from pathlib import Path
+from typing import Self
 
 import pghistory
 from django.db import models
@@ -266,6 +267,21 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     def tmp_prefix(cls) -> str:
         """Prefix for temporary download files."""
         return "nycoa_"
+
+    @classmethod
+    def download(cls, pk: int) -> Self | None:
+        """Always raises: Court-PASS documents cannot be fetched by URL.
+
+        The inherited implementation GETs `url`, which for Court-PASS is one
+        POST endpoint shared by every document; the document is identified by
+        form data, and only within a session the site has handed a cookie.
+        Fetching one takes the Court-PASS scraper, so this raises rather than
+        silently GETting the endpoint and storing whatever comes back.
+        """
+        raise NotImplementedError(
+            "NYCoADocument cannot be downloaded by URL; Court-PASS serves "
+            "documents by POST from a single session-scoped endpoint."
+        )
 
     class Meta:
         app_label = "search"
