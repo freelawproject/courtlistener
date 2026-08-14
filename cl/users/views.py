@@ -674,10 +674,8 @@ def confirm_email(request, activation_key):
     Checks if a hash in a confirmation link is valid, and if so sets the user's
     email address as valid.
 
-    Rate limited per IP (GHSA-638g-xf9h-6qcg): this view has no other
-    protection against brute-forcing activation_key, unlike the POST-only
-    views in this file, whose ratelimiter_unsafe_* decorators only guard
-    unsafe methods and would silently do nothing here since this is GET-only.
+    Rate limited per IP (GHSA-638g-xf9h-6qcg) since this view has no other
+    protection against brute-forcing activation_key.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):

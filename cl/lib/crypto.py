@@ -81,13 +81,6 @@ def sha1_of_json_data(d):
 def generate_activation_key() -> str:
     """Make an unguessable activation key for confirming a user's email
 
-    Uses a CSPRNG instead of a value derived from attacker-known input
-    (GHSA-638g-xf9h-6qcg): the previous scheme hashed a 20-bit salt together
-    with the user's own username/email, both known to whoever requested the
-    key, collapsing the effective keyspace to ~1M brute-forceable values.
-    token_hex(20) produces 40 hex characters -- the same length
-    UserProfile.activation_key already allows -- so no migration is needed.
-
     :return: A 40-character unguessable hex token.
     """
     return secrets.token_hex(20)

@@ -697,9 +697,6 @@ class MembershipWebhookTest(TestCase):
         membership = await query.afirst()
         self.assertEqual(membership.user.email, "test@free.law")
         self.assertEqual(membership.user.profile.neon_account_id, "9524")
-        # first_name/last_name must actually persist on the stub account,
-        # not just get set on the in-memory object and dropped (regression
-        # test for the bug found alongside GHSA-638g-xf9h-6qcg).
         self.assertEqual(membership.user.first_name, "test")
         self.assertEqual(membership.user.last_name, "test")
 

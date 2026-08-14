@@ -4314,12 +4314,17 @@ class RegisterViewTest(TestCase):
         self.assertIn("username", form.errors)
 
     def test_generate_activation_key_is_not_brute_forceable(self) -> None:
-        """Does the activation key generator produce a CSPRNG token that
-        fits UserProfile.activation_key and doesn't depend on caller input?
+        """Is the activation key a high-entropy CSPRNG token?
 
         Regression test for GHSA-638g-xf9h-6qcg: the old sha1_activation_key()
         derived its output from a 20-bit salt plus attacker-known input
         (username/email), collapsing to a brute-forceable ~1M-value keyspace.
+
+        Our current key has 2^160 possible values while the old had 2^20. The
+        old token would have a 37% chance of collision within 1000 random
+        tokens. The high-entropy version has a 1 in 3×10^42 probability. ∴ a
+        collision within this test indicates a regression to a low
+        entropy generation scheme.
         """
         max_length = UserProfile._meta.get_field("activation_key").max_length
         keys = {generate_activation_key() for _ in range(1000)}
@@ -4334,8 +4339,8 @@ class RegisterViewTest(TestCase):
     async def test_claiming_a_stub_account_issues_a_fresh_unguessable_key(
         self,
     ) -> None:
-        """Claiming a donor stub account via register() must not let the
-        claimant control or predict the resulting activation_key.
+        """Claiming a donor stub account via register() must update the
+        activation key. See GHSA-638g-xf9h-6qcg.
         """
         _, stub_profile = await sync_to_async(create_stub_account)(
             {
