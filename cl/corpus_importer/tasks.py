@@ -3098,6 +3098,7 @@ def recap_document_into_opinions(
     task_data: TaskData | None = None,
     recap_document_id: int | None = None,
     skip_citation_finding: bool = False,
+    embedding_queue: str | None = None,
 ) -> TaskData | None:
     """Ingest recap document into Opinions
 
@@ -3108,6 +3109,8 @@ def recap_document_into_opinions(
     :param recap_document_id: The document id to inspect and import
     :param skip_citation_finding: send true when calling from bulk work command
         to prevent overloading the queues with single-opinion tasks
+    :param embedding_queue: Optional Celery queue for the embedding task created
+        after citation processing.
 
     :return: The same `task_data` that came as input
     """
@@ -3206,7 +3209,7 @@ def recap_document_into_opinions(
 
     if not skip_citation_finding:
         find_citations_and_parentheticals_for_opinion_by_pks.delay(
-            [opinion.pk]
+            [opinion.pk], embedding_queue=embedding_queue
         )
 
     # Return input task data to preserve the chain in scrape_pacer_free_opinion
