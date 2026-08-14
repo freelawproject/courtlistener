@@ -7,6 +7,7 @@ import shutil
 import threading
 from datetime import date
 from http import HTTPStatus
+from itertools import product
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -20,7 +21,8 @@ from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
 from django.http import HttpResponse
-from django.template import engines
+from django.template import TemplateDoesNotExist, engines
+from django.template.loader import get_template
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
@@ -48,6 +50,7 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.docket_sources_utils import (
+    _SOURCES_BY_COURT_ID,
     RECAP_SOURCE,
     SCOTUS_SOURCE,
     build_scotus_metadata,
@@ -1506,6 +1509,28 @@ class DocketEntrySourceTest(TestCase):
         self.assertIn(entry, entries)
         documents = list(source.documents_for_entry(entry))
         self.assertIn(document, documents)
+
+
+class DocketSourceComponentTest(SimpleTestCase):
+    FOLDERS = (
+        "docket_source_button",
+        "docket_source_attribution",
+        "document_source_link",
+    )
+
+    def test_every_source_resolves_its_components(self) -> None:
+        sources = {RECAP_SOURCE, *_SOURCES_BY_COURT_ID.values()}
+        for source, folder in product(sources, self.FOLDERS):
+            path = f"cotton/{folder}/{source.component}.html"
+            with self.subTest(path=path):
+                try:
+                    get_template(path)
+                except TemplateDoesNotExist:
+                    self.fail(
+                        f"Source component {source.component!r} has no "
+                        f"{path}. A component needs a file in each of "
+                        f"{', '.join(self.FOLDERS)}."
+                    )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
