@@ -532,18 +532,11 @@ class APITests(APITestCase):
     async def test_cannot_modify_or_delete_someone_elses_tag(self) -> None:
         """Can another user deface, delete, or hijack ownership of a tag
         they don't own (GHSA-4587-9786-r6vp)?
-
-        get_queryset() returns every published tag so that reads work, but
-        without an object-level ownership permission that same queryset
-        backs update/destroy's object lookup too, letting any authenticated
-        user PATCH/PUT/DELETE anyone else's published tag -- and PUT would
-        additionally reassign ownership to the attacker via the `user`
-        HiddenField's default.
         """
         response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
         detail_path = reverse(
-            "UserTag-detail", kwargs={"version": "v3", "pk": tag_id}
+            "UserTag-detail", kwargs={"version": "v4", "pk": tag_id}
         )
 
         # Not published yet, so self.client2 can't even see it, let alone
