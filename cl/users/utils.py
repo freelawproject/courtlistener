@@ -41,9 +41,9 @@ def create_stub_account(
             # to a real account with a real username.
             md5(email),
             email,
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
         )
-        new_user.first_name = user_data["first_name"]
-        new_user.last_name = user_data["last_name"]
 
         # Associate a profile
         profile = UserProfile.objects.create(

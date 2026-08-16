@@ -2091,6 +2091,30 @@ class UploadPublication(TestCase):
         ).count()
         self.assertEqual(pre_count + 1, post_save_count)
 
+    def test_court_upload_strips_html_from_free_text_fields(
+        self, mock
+    ) -> None:
+        """Are case_title/disposition/summary stripped of HTML on upload
+        (GHSA-cvh7-rv7v-wx2j-class)?
+        """
+        payload = "</script><script>alert(1)</script>"
+        self.miss_data["case_title"] = f"Some Case {payload}"
+        self.miss_data["disposition"] = payload
+        self.miss_data["summary"] = payload
+
+        form = MissCourtUploadForm(
+            self.miss_data,
+            pk="miss",
+            files={"pdf_upload": self.pdf},
+        )
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+        cluster = form.save()
+
+        self.assertNotIn("<script>", cluster.case_name)
+        self.assertNotIn("<script>", cluster.disposition)
+        self.assertNotIn("<script>", cluster.summary)
+        self.assertNotIn("<script>", cluster.docket.case_name)
+
     def test_form_two_judges_2042(self, mock) -> None:
         """Can we still save if there's only one or two judges on the panel?"""
         pre_count = Opinion.objects.all().count()
