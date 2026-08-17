@@ -25,6 +25,7 @@ import requests
 from asgiref.sync import async_to_sync
 from celery import Task, chain
 from celery.exceptions import SoftTimeLimitExceeded
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile, File
@@ -218,6 +219,7 @@ from cl.search.models import (
     TrialCourtData,
 )
 from cl.search.state.florida.models import FloridaDocument
+from cl.search.state.shared import AbstractStateDocument
 from cl.search.state.texas.models import (
     TexasDocketEntry,
     TexasDocument,
@@ -3568,23 +3570,26 @@ def merge_scotus_docket_entry(
         - The pk of the updated SCOTUSDocketEntry object.
         - A list of PKs of SCOTUSDocument objects that were created or updated.
     """
+    normalize_long_description(input_docket_entry)
     with transaction.atomic():
         # Acquire lock on the docket to prevent race conditions
         Docket.objects.select_for_update().get(pk=docket.pk)
         entry_number = input_docket_entry.get("document_number")
         date_filed = input_docket_entry["date_filed"]
         description = input_docket_entry["description"]
+        de = None
+        de_created = False
         if entry_number:
-            params = {
-                "docket": docket,
-                "entry_number": entry_number,
-            }
             try:
-                de = SCOTUSDocketEntry.objects.get(**params)
-                de_created = False
+                de = SCOTUSDocketEntry.objects.get(
+                    docket=docket,
+                    entry_number=entry_number,
+                )
             except SCOTUSDocketEntry.DoesNotExist:
-                de = SCOTUSDocketEntry(**params)
-                de_created = True
+                # The entry may have been merged before it had attachments,
+                # when no entry number could be parsed for it. Fall back to
+                # the unnumbered lookups to avoid creating a duplicate.
+                pass
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
                     "Multiple matching SCOTUSDocketEntries found for entry_number "
@@ -3594,23 +3599,25 @@ def merge_scotus_docket_entry(
                 )
                 return False, None, []
 
-        else:
-            normalize_long_description(input_docket_entry)
+        if de is None:
+            unnumbered_lookup = (
+                {"entry_number__isnull": True} if entry_number else {}
+            )
             try:
                 de = SCOTUSDocketEntry.objects.get(
                     docket=docket,
                     description=input_docket_entry["description"],
                     date_filed=input_docket_entry["date_filed"],
+                    **unnumbered_lookup,
                 )
-                de_created = False
             except SCOTUSDocketEntry.DoesNotExist:
                 # Check if sequence_number already exists
                 try:
                     de = SCOTUSDocketEntry.objects.get(
                         docket=docket,
                         sequence_number=sequence_number,
+                        **unnumbered_lookup,
                     )
-                    de_created = False
                 except SCOTUSDocketEntry.DoesNotExist:
                     de = SCOTUSDocketEntry(
                         docket=docket,
@@ -3621,21 +3628,25 @@ def merge_scotus_docket_entry(
                 except SCOTUSDocketEntry.MultipleObjectsReturned:
                     logger.error(
                         "Multiple matching SCOTUSDocketEntries found for sequence_number "
-                        "%s on Docket %s.",
+                        "%s on Docket %s (extra %r).",
                         sequence_number,
                         docket.pk,
+                        unnumbered_lookup,
                     )
                     return False, None, []
             except SCOTUSDocketEntry.MultipleObjectsReturned:
                 logger.error(
-                    "Multiple matching unnumbered SCOTUSDocketEntries found for description "
-                    "%s on Docket %s.",
+                    "Multiple matching SCOTUSDocketEntries found for description "
+                    "%s on Docket %s (extra %r).",
                     input_docket_entry["description"],
                     docket.pk,
+                    unnumbered_lookup,
                 )
                 return False, None, []
 
         # Update fields
+        if entry_number:
+            de.entry_number = entry_number
         de.sequence_number = sequence_number
         de.description = description
         de.date_filed = date_filed
@@ -3993,26 +4004,6 @@ def _download_texas_document(texas_document_pk: int) -> int | None:
 @throttle_task("2/s")
 def download_texas_document(self: Task, texas_document_pk: int) -> int | None:
     """Throttled version of the Texas document download task.
-
-    :param self: The Celery task instance.
-    :param texas_document_pk: The primary key of the TexasDocument instance.
-    :return: The primary key of the downloaded TexasDocument instance, or None
-    if the process failed.
-    """
-    return _download_texas_document(texas_document_pk)
-
-
-@app.task(
-    bind=True,
-    ignore_result=True,
-)
-def download_texas_document_unthrottled(
-    self: Task, texas_document_pk: int
-) -> int | None:
-    """Unthrottled version of the Texas document download task.
-
-    Use this when the caller already handles throttling (e.g. via
-    CeleryThrottle).
 
     :param self: The Celery task instance.
     :param texas_document_pk: The primary key of the TexasDocument instance.
@@ -5116,6 +5107,17 @@ def fl_ingest_docket_task(
         "Attempting to merge Florida case %s",
         case.docket_number,
     )
+    # Due to an oversight in the scraper, dockets with more than one page of entries may have duplicates. We want to log
+    # these so they can be captured and fixed later.
+    de_total = len(case.entries)
+    de_unique = len(set(e.docket_entry_uuid for e in case.entries))
+    if de_unique < de_total or de_total > 50:
+        logger.error(
+            "Florida case %s may have duplicate entries (%d total; %d unique)",
+            case.docket_number,
+            de_total,
+            de_unique,
+        )
     merger = FloridaDocketMerger(scrape=case, params=None)
     result = merger.merge()
     if result.failures:
@@ -5132,3 +5134,28 @@ def fl_ingest_docket_task(
         for pk in attachment_pks:
             download_fl_document.si(pk).apply_async()
     return result
+
+
+@app.task(bind=True, ignore_result=True)
+def download_state_document(
+    self: Task,
+    model_name: str,
+    pk: int,
+    skip_extraction: bool,
+    extraction_queue: str,
+) -> int | None:
+    """Celery task to download the file for a state document and store it in S3.
+
+    :param model_name: The name of the state document model (must be a subclass of `AbstractStateDocument`).
+    :param pk: The primary key of the object to download.
+    :param skip_extraction: Skip the extraction step.
+    :param extraction_queue: The celery queue to use for OCR extraction.
+
+    :return: The pk of the downloaded document, or None if the download failed."""
+    model = apps.get_model(model_name)
+    # Any model passed in should already be an `AbstractStateDocument`. Verify it for the type checker.
+    assert issubclass(model, AbstractStateDocument)
+    instance = model.download(
+        pk, extract=not skip_extraction, queue=extraction_queue
+    )
+    return instance.pk if instance else None

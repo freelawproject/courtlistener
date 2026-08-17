@@ -15,7 +15,7 @@ from django_ses.signals import bounce_received, complaint_received
 from rest_framework.authtoken.models import Token
 
 from cl.api.models import Webhook
-from cl.lib.crypto import sha1_activation_key
+from cl.lib.crypto import generate_activation_key
 from cl.lib.storage import S3PrivateUUIDStorage
 from cl.stats.metrics import accounts_created_total
 from cl.users.email_handlers import (
@@ -184,7 +184,7 @@ def superuser_creation(sender, instance, created, **kwargs):
     if created and instance.is_superuser:
         UserProfile.objects.create(
             user=instance,
-            activation_key=sha1_activation_key(instance.username),
+            activation_key=generate_activation_key(),
             key_expires=now() + timedelta(days=5),
             email_confirmed=True,
         )
