@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
@@ -20,6 +22,11 @@ from cl.lib.courts import (
 from cl.lib.date_time import midnight_pt
 from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
 from cl.lib.elasticsearch_utils import append_query_conjunctions
+from cl.lib.file_validation import (
+    is_pdf,
+    is_too_large,
+    validate_file_size,
+)
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -1193,6 +1200,50 @@ class TestPACERPartyParsing(SimpleTestCase):
             ),
             "officeoflissnerstrooklevin",
         )
+
+
+class TestFileValidation(SimpleTestCase):
+    def test_pdf_detection(self) -> None:
+        """Can we tell PDFs from files that merely claim to be PDFs?"""
+        qa_pairs = [
+            (b"%PDF-1.4\nlorem ipsum", True),
+            (b"%PDF-", True),
+            # Extension and content type are the uploader's to pick, so
+            # neither is enough on its own.
+            (b"<html><body>Hello</body></html>", False),
+            (b"\x89PNG\r\n\x1a\n", False),
+            (b"", False),
+            (b"%PDF", False),
+            # The header has to be at the start of the file.
+            (b"lorem ipsum %PDF-1.4", False),
+        ]
+        for content, expected in qa_pairs:
+            with self.subTest(content=content):
+                f = SimpleUploadedFile("file.pdf", content)
+                self.assertEqual(is_pdf(f), expected)
+
+    def test_pdf_detection_rewinds_the_file(self) -> None:
+        """Can the file still be read in full after checking it?"""
+        content = b"%PDF-1.4\nlorem ipsum"
+        f = SimpleUploadedFile("file.pdf", content)
+        self.assertTrue(is_pdf(f))
+        self.assertEqual(f.read(), content)
+
+    def test_file_size_validation(self) -> None:
+        """Do we reject files that are over the size limit?
+
+        The limit is patched down rather than tested at its real value, so
+        that the test doesn't have to build a 500 MB file to trip it.
+        """
+        small_file = SimpleUploadedFile("file.pdf", b"%PDF-1.4 small")
+        self.assertFalse(is_too_large(small_file))
+        validate_file_size(small_file)
+
+        with mock.patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            big_file = SimpleUploadedFile("file.pdf", b"%PDF-1.4 too big")
+            self.assertTrue(is_too_large(big_file))
+            with self.assertRaises(ValidationError):
+                validate_file_size(big_file)
 
 
 class TestFilesizeConversions(SimpleTestCase):
