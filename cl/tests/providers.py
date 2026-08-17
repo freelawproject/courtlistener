@@ -10,9 +10,8 @@ from cl.custom_filters.templatetags.text_filters import oxford_join
 
 fake = Faker()
 
-# Monotonic counter used to keep generated court names distinct. It lives at
-# module scope so it survives across provider instances and across the
-# per-test database rollback.
+# Module-level so it survives new provider instances and the per-test DB
+# rollback.
 court_name_counter = itertools.count()
 
 
@@ -55,11 +54,7 @@ class LegalProvider(BaseProvider):
                 "Eruptanyom",  # Kelvin's pretend world
             ]
         )
-        # The names only give us 5.58 bits of entropy, which repeats constantly
-        # at test sample sizes. Appending a counter rather than random bits
-        # makes each name unique by construction instead of merely unlikely to
-        # repeat, so tests that assert on a court name — or on how many results
-        # a search for one returns — can't be tripped up by a duplicate.
+        # Append a counter to create unique names.
         last_word = f"{last_word}-{next(court_name_counter)}"
 
         return " ".join([first_word, mid_word, last_word])

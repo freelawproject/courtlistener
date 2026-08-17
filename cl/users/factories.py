@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.utils.text import slugify
 from factory import (
     Faker,
+    LazyAttribute,
     LazyAttributeSequence,
     LazyFunction,
     RelatedFactory,
@@ -14,39 +15,24 @@ from pytz import utc
 from cl.users.models import EmailSent, UserProfile
 
 
-def _name_slug(user, n: int) -> str:
-    """Build a unique, human-readable handle from a user's name.
-
-    Faker's `user_name` and `email` providers both draw from a small namespace
-    (a first and/or last name, plus at most two digits or one letter — about 16
-    bits), which is not enough for the sample sizes our tests use. Appending
-    the factory's sequence counter makes the result unique by construction
-    rather than merely unlikely to repeat.
-
-    :param user: the factory stub holding the already-resolved name fields
-    :param n: the factory's sequence counter for this object
-    :return: a slug of the form "first.last.7"
-    """
-    return f"{slugify(user.first_name)}.{slugify(user.last_name)}.{n}"
-
-
 class UserFactory(DjangoModelFactory):
     class Meta:
         model = User
 
-    # `auth_user.username` is unique, so drawing this from Faker meant a test
-    # that created a couple dozen users could collide and die with an
-    # IntegrityError. See `_name_slug` above.
-    username = LazyAttributeSequence(_name_slug)
+    class Params:
+        # Faker's `user_name` and `email` providers draw from a namespace small
+        # enough (~16 bits) to repeat at our test sample sizes, which trips the
+        # unique constraint on `auth_user.username`. Derive both from the
+        # sequence counter instead: unique by construction, and computed once
+        # here so the two stay in sync. Excluded from the model's fields.
+        name_slug = LazyAttributeSequence(
+            lambda o, n: f"{slugify(o.first_name)}.{slugify(o.last_name)}.{n}"
+        )
+
+    username = LazyAttribute(lambda o: o.name_slug)
     first_name = Faker("first_name")
     last_name = Faker("last_name")
-    # `User.email` has no unique constraint, so a duplicate here fails silently
-    # rather than loudly: it makes the code paths that branch on an address
-    # being attached to more than one account behave differently than the test
-    # intended. Keep it unique, and in sync with the username.
-    email = LazyAttributeSequence(
-        lambda o, n: f"{_name_slug(o, n)}@example.com"
-    )
+    email = LazyAttribute(lambda o: f"{o.name_slug}@example.com")
     # If you override this, be sure to use make_password or else you'll just
     # put your string password into the DB without hashing and salting it and
     # you'll wonder why it doesn't work.
