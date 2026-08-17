@@ -82,9 +82,10 @@ class NYCoADocketIssue(AbstractDateTimeModel):
     :ivar category_raw: The issue exactly as Court-PASS stated it, category and
     subcategory together.
     :ivar detail: The Court's description of the issue. Blank when Court-PASS
-    stated none. Part of the natural key, because the Court does assign a case
-    two distinct issues under one category -- what separates them is what it
-    says about each.
+    stated none. Deliberately outside the key, because the Court does assign a
+    case two issues under one category pair, told apart only by this, and it
+    also rewords a description it has already published, so which of the two a
+    scrape is looking at is the merger's call rather than the database's.
     """
 
     metadata = models.ForeignKey(
@@ -106,11 +107,15 @@ class NYCoADocketIssue(AbstractDateTimeModel):
         ordering = ["category_raw"]
         verbose_name = "NYCoA Docket Issue"
         verbose_name_plural = "NYCoA Docket Issues"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["metadata", "category_raw", "detail"],
-                name="unique_nycoa_issue_per_docket",
-            )
+        indexes = [
+            # Serves the merger's lookup of the issues already stored for a
+            # docket. Not unique: a case can carry two issues under one
+            # category pair, so the merger picks create or update from
+            # `detail`, which is too long to key on and gets reworded anyway.
+            models.Index(
+                fields=["metadata", "category", "subcategory"],
+                name="nycoa_issue_category_idx",
+            ),
         ]
 
     def __str__(self) -> str:

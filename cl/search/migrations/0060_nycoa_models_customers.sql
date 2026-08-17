@@ -6,7 +6,7 @@ CREATE TABLE "search_nycoadocketissue" ("id" integer NOT NULL PRIMARY KEY GENERA
 COMMENT ON COLUMN "search_nycoadocketissue"."category" IS 'The issue''s category.';
 COMMENT ON COLUMN "search_nycoadocketissue"."subcategory" IS 'The issue''s subcategory. Unknown on the issues the Court states as a bare category.';
 COMMENT ON COLUMN "search_nycoadocketissue"."category_raw" IS 'The issue exactly as Court-PASS stated it, category and subcategory together.';
-COMMENT ON COLUMN "search_nycoadocketissue"."detail" IS 'The Court''s description of the issue. Blank when Court-PASS stated none. Part of the natural key, because the Court does assign a case two distinct issues under one category -- what separates them is what it says about each.';
+COMMENT ON COLUMN "search_nycoadocketissue"."detail" IS 'The Court''s description of the issue. Blank when Court-PASS stated none. Deliberately outside the key, because the Court does assign a case two issues under one category pair, told apart only by this, and it also rewords a description it has already published, so which of the two a scrape is looking at is the merger''s call rather than the database''s.';
 --
 -- Create model NYCoADocketEntry
 --
@@ -60,9 +60,9 @@ CREATE INDEX "nycoa_entry_docket_order_idx" ON "search_nycoadocketentry" ("docke
 --
 ALTER TABLE "search_nycoadocketentry" ADD CONSTRAINT "unique_nycoa_entry_id_per_docket" UNIQUE ("docket_id", "docket_entry_id");
 --
--- Create constraint unique_nycoa_issue_per_docket on model nycoadocketissue
+-- Create index nycoa_issue_category_idx on field(s) metadata, category, subcategory of model nycoadocketissue
 --
-ALTER TABLE "search_nycoadocketissue" ADD CONSTRAINT "unique_nycoa_issue_per_docket" UNIQUE ("metadata_id", "category_raw", "detail");
+CREATE INDEX "nycoa_issue_category_idx" ON "search_nycoadocketissue" ("metadata_id", "category", "subcategory");
 --
 -- Create index search_nyco_filepat_9734a0_idx on field(s) filepath_local of model nycoadocument
 --
