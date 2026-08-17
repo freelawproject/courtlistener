@@ -63,7 +63,6 @@ dependencies = [
   "pyopenssl",
   "pyparsing>=3.3.1",
   "python-dateutil>=2.9.0",
-  "python-magic>=0.4.27",
   "pytz",
   "pyyaml>=6.0.3",
   "redis>=8.0.1",
