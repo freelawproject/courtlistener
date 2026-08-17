@@ -1,6 +1,13 @@
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
-from factory import Faker, LazyFunction, RelatedFactory, SubFactory
+from django.utils.text import slugify
+from factory import (
+    Faker,
+    LazyAttributeSequence,
+    LazyFunction,
+    RelatedFactory,
+    SubFactory,
+)
 from factory.django import DjangoModelFactory
 from pytz import utc
 
@@ -11,7 +18,15 @@ class UserFactory(DjangoModelFactory):
     class Meta:
         model = User
 
-    username = Faker("user_name")
+    # Faker's `user_name` provider only gives us about 16 bits of entropy (a
+    # first and/or last name, plus at most two digits or one letter), so a test
+    # that creates a couple dozen users has a real chance of drawing the same
+    # name twice and violating the unique constraint on `auth_user.username`.
+    # Deriving it from the factory's sequence counter instead keeps the
+    # username human-readable while making it unique by construction.
+    username = LazyAttributeSequence(
+        lambda o, n: f"{slugify(o.first_name)}.{slugify(o.last_name)}.{n}"
+    )
     first_name = Faker("first_name")
     last_name = Faker("last_name")
     email = Faker("email")
