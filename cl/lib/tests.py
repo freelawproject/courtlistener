@@ -23,7 +23,7 @@ from cl.lib.date_time import midnight_pt
 from cl.lib.decorators import _memory_cache, clear_tiered_cache, tiered_cache
 from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.file_validation import (
-    is_pdf,
+    content_is_pdf,
     is_too_large,
     validate_file_size,
 )
@@ -1220,13 +1220,13 @@ class TestFileValidation(SimpleTestCase):
         for content, expected in qa_pairs:
             with self.subTest(content=content):
                 f = SimpleUploadedFile("file.pdf", content)
-                self.assertEqual(is_pdf(f), expected)
+                self.assertEqual(content_is_pdf(f), expected)
 
     def test_pdf_detection_rewinds_the_file(self) -> None:
         """Can the file still be read in full after checking it?"""
         content = b"%PDF-1.4\nlorem ipsum"
         f = SimpleUploadedFile("file.pdf", content)
-        self.assertTrue(is_pdf(f))
+        self.assertTrue(content_is_pdf(f))
         self.assertEqual(f.read(), content)
 
     def test_file_size_validation(self) -> None:

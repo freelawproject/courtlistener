@@ -15,7 +15,7 @@ from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.file_validation import (
     NOT_A_PDF_MESSAGE,
-    is_pdf,
+    content_is_pdf,
     validate_file_size,
 )
 from cl.people_db.lookup_utils import extract_judge_last_name
@@ -445,7 +445,7 @@ class BaseCourtUploadForm(forms.Form):
         :raises ValidationError: If the file isn't a PDF.
         """
         pdf_file = self.cleaned_data["pdf_upload"]
-        if not is_pdf(pdf_file):
+        if not content_is_pdf(pdf_file):
             raise ValidationError(NOT_A_PDF_MESSAGE)
 
         pdf_data = pdf_file.read()

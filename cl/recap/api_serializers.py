@@ -6,7 +6,7 @@ from cl.corpus_importer.utils import is_appellate_court
 from cl.lib.file_validation import (
     FILE_TOO_LARGE_MESSAGE,
     NOT_A_PDF_MESSAGE,
-    is_pdf,
+    content_is_pdf,
     is_too_large,
 )
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
@@ -160,7 +160,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             # The upload_type is just a claim by the uploader, and these
             # files get served back to the public, so confirm the contents
             # really are a PDF.
-            if uploaded_file is not None and not is_pdf(uploaded_file):
+            if uploaded_file is not None and not content_is_pdf(uploaded_file):
                 raise ValidationError({"filepath_local": NOT_A_PDF_MESSAGE})
 
         if attrs["upload_type"] not in [

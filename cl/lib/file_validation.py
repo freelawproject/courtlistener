@@ -5,6 +5,12 @@ so both their size and their contents are attacker-controlled: a caller can
 name a file `opinion.pdf`, fill it with anything at all, and make it as big
 as they like. Check the size before anything reads the file into memory, and
 check the magic number rather than trusting the file's name.
+
+Not to be confused with the PDF checks used on downloads --
+`juriscraper.pacer.utils.is_pdf` and `cl.corpus_importer.tasks.is_pdf` --
+which read the Content-Type header of a `requests.Response`. A header is a
+claim by whoever sent it, which is fine for a server we chose to fetch
+from, but not for a file a user handed us.
 """
 
 from django.core.exceptions import ValidationError
@@ -28,7 +34,7 @@ NOT_A_PDF_MESSAGE = (
 )
 
 
-def is_pdf(f: File) -> bool:
+def content_is_pdf(f: File) -> bool:
     """Check whether a file's contents are a PDF.
 
     Only the header is read, so this is cheap enough to call on files of any
