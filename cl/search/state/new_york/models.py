@@ -274,7 +274,9 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
         return "nycoa_"
 
     @classmethod
-    def download(cls, pk: int) -> Self | None:
+    def download(
+        cls, pk: int, extract: bool = True, queue: str = "celery"
+    ) -> Self | None:
         """Always raises: Court-PASS documents cannot be fetched by URL.
 
         The inherited implementation GETs `url`, which for Court-PASS is one
@@ -282,6 +284,13 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
         form data, and only within a session the site has handed a cookie.
         Fetching one takes the Court-PASS scraper, so this raises rather than
         silently GETting the endpoint and storing whatever comes back.
+
+        Takes the base signature so a caller reaching it through
+        `AbstractStateDocument` gets the error rather than a `TypeError`.
+
+        :param pk: Unused; the primary key the base implementation would load.
+        :param extract: Unused; see the base implementation.
+        :param queue: Unused; see the base implementation.
         """
         raise NotImplementedError(
             "NYCoADocument cannot be downloaded by URL; Court-PASS serves "
