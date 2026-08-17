@@ -3,6 +3,12 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from cl.corpus_importer.utils import is_appellate_court
+from cl.lib.file_validation import (
+    FILE_TOO_LARGE_MESSAGE,
+    NOT_A_PDF_MESSAGE,
+    is_pdf,
+    is_too_large,
+)
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import (
     REQUEST_TYPE,
@@ -69,6 +75,13 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     f"'{attr_name}' field cannot have the literal value 'undefined'."
                 )
+
+        # Check the size of every upload before it's written to storage. The
+        # uploader controls it, and downstream processing loads these files
+        # into memory.
+        uploaded_file = attrs.get("filepath_local")
+        if uploaded_file is not None and is_too_large(uploaded_file):
+            raise ValidationError({"filepath_local": FILE_TOO_LARGE_MESSAGE})
 
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
@@ -143,6 +156,12 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "Uploaded PDFs must have the pacer_doc_id and "
                     "document_number fields completed."
                 )
+
+            # The upload_type is just a claim by the uploader, and these
+            # files get served back to the public, so confirm the contents
+            # really are a PDF.
+            if uploaded_file is not None and not is_pdf(uploaded_file):
+                raise ValidationError({"filepath_local": NOT_A_PDF_MESSAGE})
 
         if attrs["upload_type"] not in [
             UPLOAD_TYPE.PDF,

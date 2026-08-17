@@ -6,6 +6,7 @@ from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY, MagicMock
+from unittest.mock import patch as mock_patch
 
 import requests
 import time_machine
@@ -50,6 +51,10 @@ from cl.corpus_importer.utils import (
     should_check_acms_court,
 )
 from cl.lib.decorators import clear_tiered_cache
+from cl.lib.file_validation import (
+    FILE_TOO_LARGE_MESSAGE,
+    NOT_A_PDF_MESSAGE,
+)
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
@@ -294,7 +299,11 @@ class RecapUploadsTest(TestCase):
         token = f"Token {self.user.auth_token.key}"
         self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
-        self.f = SimpleUploadedFile("file.txt", b"file content more content")
+        # PDF uploads are checked for a PDF header, so the default file has
+        # to carry one. Uploads of other types reuse it harmlessly.
+        self.f = SimpleUploadedFile(
+            "file.pdf", b"%PDF-1.4 file content more content"
+        )
         self.data = {
             "court": self.court.id,
             "pacer_case_id": "asdf",
@@ -314,6 +323,46 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(j["document_number"], 1)
         self.assertEqual(j["pacer_case_id"], "asdf")
         mock.assert_called()
+
+    async def test_uploading_a_pdf_that_is_not_a_pdf(self, mock):
+        """Are PDF uploads that aren't PDFs rejected?
+
+        The upload_type is the uploader's claim about the file, and these
+        files are served back to the public, so the contents get checked.
+        """
+        self.data["filepath_local"] = SimpleUploadedFile(
+            "file.pdf",
+            b"<html><body>Hello</body></html>",
+            content_type="application/pdf",
+        )
+        r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(NOT_A_PDF_MESSAGE, r.content.decode())
+        mock.assert_not_called()
+
+    async def test_uploading_a_file_that_is_too_large(self, mock):
+        """Are uploads over the size limit rejected?
+
+        The limit is patched down rather than tested at its real value, so
+        that the test doesn't have to send a 500 MB file to trip it.
+        """
+        with mock_patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(FILE_TOO_LARGE_MESSAGE, r.content.decode())
+        mock.assert_not_called()
+
+    async def test_uploading_a_docket_that_is_too_large(self, mock):
+        """Is the size limit enforced on non-PDF uploads too?"""
+        self.data.update(
+            {"upload_type": UPLOAD_TYPE.DOCKET, "document_number": ""}
+        )
+        del self.data["pacer_doc_id"]
+        with mock_patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(FILE_TOO_LARGE_MESSAGE, r.content.decode())
+        mock.assert_not_called()
 
     async def test_uploading_a_zip(self, mock):
         """Can we upload a zip?"""
