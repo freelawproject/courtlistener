@@ -3,10 +3,12 @@ import os
 from copy import deepcopy
 from datetime import UTC, date, datetime, time, timedelta
 from http import HTTPStatus
+from io import BytesIO
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY, MagicMock
 from unittest.mock import patch as mock_patch
+from zipfile import ZipFile
 
 import requests
 import time_machine
@@ -4448,6 +4450,68 @@ class RecapZipTaskTest(TestCase):
         # Was the mock called once per PDF in the zip?
         expected_call_count = len(results["new_pqs"])
         self.assertEqual(mock_extract.call_count, expected_call_count)
+
+    def _make_zip_pq(self, members: dict[str, bytes]) -> ProcessingQueue:
+        """Build a DOCUMENT_ZIP PQ whose zip holds the given members.
+
+        :param members: Mapping of file name inside the zip to its bytes.
+        :return: The ProcessingQueue to hand to process_recap_zip().
+        """
+        buffer = BytesIO()
+        with ZipFile(buffer, "w") as archive:
+            for name, content in members.items():
+                archive.writestr(name, content)
+        return ProcessingQueueFactory.create(
+            court_id="scotus",
+            uploader=User.objects.get(username="recap"),
+            pacer_case_id="asdf",
+            filepath_local__data=buffer.getvalue(),
+            filepath_local__filename="some.zip",
+            upload_type=UPLOAD_TYPE.DOCUMENT_ZIP,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.process_recap_pdf", new_callable=mock.AsyncMock
+    )
+    def test_zip_members_that_are_not_pdfs_are_skipped(self, mock_process):
+        """Does a zip member that only claims to be a PDF get stored?
+
+        The zip's members are named by whoever built it, and this path
+        creates its PQs directly rather than through the serializer, so the
+        contents have to be checked here (GHSA-6m5w-9h99-2c84). Downstream
+        processing is mocked out; what matters is which members survive to
+        become a ProcessingQueue.
+        """
+        pq = self._make_zip_pq(
+            {
+                "12-main.pdf": b"%PDF-1.4 a real one",
+                "13-main.pdf": b"<html><body>not a pdf</body></html>",
+            }
+        )
+        results = async_to_sync(process_recap_zip)(pq.pk)
+
+        # Only the real PDF became a PQ, and only it was processed.
+        self.assertEqual(len(results["new_pqs"]), 1)
+        new_pq = ProcessingQueue.objects.get(pk=results["new_pqs"][0])
+        self.assertEqual(new_pq.document_number, 12)
+        mock_process.assert_called_once_with(new_pq.pk)
+
+        # And the upload says what it dropped.
+        pq.refresh_from_db()
+        self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertIn("13-main.pdf", pq.error_message)
+
+    def test_zip_with_no_pdfs_at_all_is_invalid(self):
+        """Is a zip holding nothing but impostors rejected outright?"""
+        pq = self._make_zip_pq(
+            {"12-main.pdf": b"<html><body>not a pdf</body></html>"}
+        )
+        results = async_to_sync(process_recap_zip)(pq.pk)
+
+        self.assertEqual(results["new_pqs"], [])
+        pq.refresh_from_db()
+        self.assertEqual(pq.status, PROCESSING_STATUS.INVALID_CONTENT)
+        self.assertIn("no PDFs", pq.error_message)
 
 
 class RecapAddAttorneyTest(TestCase):
