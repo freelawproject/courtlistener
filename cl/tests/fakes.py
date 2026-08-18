@@ -220,6 +220,12 @@ class FakeAcmsAttachmentPage(FakeAppellateAttachmentPage):
 
 
 class FakeFreeOpinionReport:
+    # How many opinions PACER claims the report holds, and how many rows the
+    # fake actually yields. They match by default; a subclass can pull them
+    # apart to stand in for a report we can't fully parse.
+    reported_count = 1
+    rows = [{"court_id": "cand", "docket_number": "5:18-ap-07075"}]
+
     def __init__(self, *args, **kwargs):
         pass
 
@@ -230,12 +236,12 @@ class FakeFreeOpinionReport:
         pass
 
     @property
+    def reported_opinion_count(self, *args, **kwargs) -> int:
+        return self.reported_count
+
+    @property
     def data(self, *args, **kwargs):
-        return [
-            FreeOpinionRowDataFactory(
-                court_id="cand", docket_number="5:18-ap-07075"
-            )
-        ]
+        return [FreeOpinionRowDataFactory(**row) for row in self.rows]
 
 
 class FakeConfirmationPage:
