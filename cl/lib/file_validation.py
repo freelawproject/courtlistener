@@ -15,38 +15,56 @@ from, but not for a file a user handed us.
 
 from django.core.exceptions import ValidationError
 from django.core.files import File
+from django.template.defaultfilters import filesizeformat
 
 # A ceiling to prevent resource exhaustion, not a limit legitimate uploads
 # should ever approach. The biggest PACER documents are a few hundred MB.
 MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500 MB
 
-# Every PDF begins with this header (ISO 32000-1, § 7.5.2).
 PDF_MAGIC_NUMBER = b"%PDF-"
 
-# Built without `filesizeformat`, which uses non-breaking spaces that would
-# be escaped in API error responses.
-FILE_TOO_LARGE_MESSAGE = (
-    f"The file is too large. The maximum upload size is "
-    f"{MAX_UPLOAD_SIZE // 1024 // 1024} MB."
-)
+# The spec puts the magic number at byte zero, but plenty of PDFs in the
+# wild carry junk ahead of it, and readers accept them: Acrobat looks for
+# the header within the first 1024 bytes, and so does doctor's Magika
+# fallback. Match that, so we don't reject documents the rest of the stack
+# is happy to read.
+PDF_HEADER_SEARCH_BYTES = 1024
+
 NOT_A_PDF_MESSAGE = (
-    "The file is not a PDF. Its contents must begin with the PDF header."
+    "The file is not a PDF. Its contents must start with the PDF header."
 )
+
+
+def file_too_large_message() -> str:
+    """Return the error message for an upload over `MAX_UPLOAD_SIZE`.
+
+    A function rather than a constant because `filesizeformat` translates
+    its units, which Django cannot do at import time.
+
+    :return: The message, naming the limit in human terms.
+    """
+    return (
+        f"The file is too large. The maximum upload size is "
+        f"{filesizeformat(MAX_UPLOAD_SIZE)}."
+    )
 
 
 def content_is_pdf(f: File) -> bool:
     """Check whether a file's contents are a PDF.
 
-    Only the header is read, so this is cheap enough to call on files of any
-    size. The file is rewound afterwards, so callers can read it as usual.
+    Only the start of the file is read, so this is cheap to call on files of
+    any size. The file is left at the position it arrived at, even if the
+    read raises, so callers can read it afterwards.
 
     :param f: The file to check.
-    :return: True if the file begins with the PDF magic number.
+    :return: True if the file carries the PDF magic number near its start.
     """
-    f.seek(0)
-    header = f.read(len(PDF_MAGIC_NUMBER))
-    f.seek(0)
-    return header == PDF_MAGIC_NUMBER
+    position = f.tell()
+    try:
+        f.seek(0)
+        return PDF_MAGIC_NUMBER in f.read(PDF_HEADER_SEARCH_BYTES)
+    finally:
+        f.seek(position)
 
 
 def is_too_large(f: File) -> bool:
@@ -70,4 +88,4 @@ def validate_file_size(f: File) -> None:
     :raises ValidationError: If the file is over the size limit.
     """
     if is_too_large(f):
-        raise ValidationError(FILE_TOO_LARGE_MESSAGE)
+        raise ValidationError(file_too_large_message())

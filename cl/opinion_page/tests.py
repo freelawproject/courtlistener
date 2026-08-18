@@ -38,8 +38,8 @@ from waffle.testutils import override_flag
 from cl.citations.utils import slugify_reporter
 from cl.favorites.models import GenericCount
 from cl.lib.file_validation import (
-    FILE_TOO_LARGE_MESSAGE,
     NOT_A_PDF_MESSAGE,
+    file_too_large_message,
 )
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.redis_utils import get_redis_interface
@@ -1987,7 +1987,10 @@ class UploadPublication(TestCase):
         )
         with patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
             self.assertFalse(form.is_valid(), form.errors)
-        self.assertEqual(form.errors["pdf_upload"], [FILE_TOO_LARGE_MESSAGE])
+            # Asserted under the patch: the message names the live limit.
+            self.assertEqual(
+                form.errors["pdf_upload"], [file_too_large_message()]
+            )
 
     def test_tn_wc_app_upload(self, mock) -> None:
         """Can we test appellate uploading?"""

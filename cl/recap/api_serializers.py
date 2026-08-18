@@ -4,9 +4,9 @@ from rest_framework.exceptions import ValidationError
 
 from cl.corpus_importer.utils import is_appellate_court
 from cl.lib.file_validation import (
-    FILE_TOO_LARGE_MESSAGE,
     NOT_A_PDF_MESSAGE,
     content_is_pdf,
+    file_too_large_message,
     is_too_large,
 )
 from cl.lib.pacer_session import get_or_cache_pacer_cookies
@@ -81,7 +81,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         # into memory.
         uploaded_file = attrs.get("filepath_local")
         if uploaded_file is not None and is_too_large(uploaded_file):
-            raise ValidationError({"filepath_local": FILE_TOO_LARGE_MESSAGE})
+            raise ValidationError({"filepath_local": file_too_large_message()})
 
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,

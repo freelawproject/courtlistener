@@ -52,8 +52,8 @@ from cl.corpus_importer.utils import (
 )
 from cl.lib.decorators import clear_tiered_cache
 from cl.lib.file_validation import (
-    FILE_TOO_LARGE_MESSAGE,
     NOT_A_PDF_MESSAGE,
+    file_too_large_message,
 )
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
@@ -348,8 +348,9 @@ class RecapUploadsTest(TestCase):
         """
         with mock_patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
             r = await self.async_client.post(self.path, self.data)
+            # Asserted under the patch: the message names the live limit.
+            self.assertIn(file_too_large_message(), r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
-        self.assertIn(FILE_TOO_LARGE_MESSAGE, r.content.decode())
         mock.assert_not_called()
 
     async def test_uploading_a_docket_that_is_too_large(self, mock):
@@ -360,8 +361,9 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         with mock_patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
             r = await self.async_client.post(self.path, self.data)
+            # Asserted under the patch: the message names the live limit.
+            self.assertIn(file_too_large_message(), r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
-        self.assertIn(FILE_TOO_LARGE_MESSAGE, r.content.decode())
         mock.assert_not_called()
 
     async def test_uploading_a_zip(self, mock):
