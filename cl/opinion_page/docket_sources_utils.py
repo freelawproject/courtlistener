@@ -288,7 +288,6 @@ def _scotus_metadata_sections(docket: Docket) -> list[MetadataSection]:
             "items": build_scotus_metadata(
                 getattr(docket, "scotus_metadata", None)
             ),
-            "title": "SCOTUS Docket Metadata",
         }
     ]
 
