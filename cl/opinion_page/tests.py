@@ -53,6 +53,7 @@ from cl.opinion_page.docket_sources_utils import (
     _SOURCES_BY_COURT_ID,
     RECAP_SOURCE,
     SCOTUS_SOURCE,
+    _recap_document_detail_url,
     build_scotus_metadata,
 )
 from cl.opinion_page.forms import (
@@ -3620,6 +3621,29 @@ class DocketEntryRowsV2Test(TestCase):
         # don't strip list semantics when list-style: none is applied.
         self.assertIn('<ol role="list"', content)
         self.assertIn('<ul role="list"', content)
+
+    def test_document_detail_urls_are_internal(self) -> None:
+        """Detail URLs must be CourtListener paths, since the template renders
+        them unfiltered into an href.
+
+        SCOTUS is deliberately left out: _scotus_document_detail_url returns
+        None only until the SCOTUS document detail page exists, so asserting
+        on it would pin a placeholder rather than the contract.
+        """
+        documents = [
+            self.rd_has_pdf,
+            self.rd_pacer_only,
+            self.rd_sealed,
+            self.rd_numberless,
+        ]
+        for document in documents:
+            with self.subTest(document=document.pk):
+                detail_url = _recap_document_detail_url(document)
+                if detail_url is not None:
+                    self.assertTrue(
+                        detail_url.startswith("/"),
+                        msg=f"{detail_url} is not an internal path.",
+                    )
 
 
 class DocketFilterDrawerAttrPropagationTest(TestCase):

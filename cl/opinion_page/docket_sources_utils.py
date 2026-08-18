@@ -114,6 +114,17 @@ class DocketEntrySource:
     resolves. Sources that render the same copy MAY share a component
     instead of copying files.
 
+    ``document_detail_url`` returns a CourtListener path that we build
+    ourselves, or None. docket_entry_rows.html renders it unfiltered into
+    an ``href``, so a source MUST NOT return an externally sourced URL
+    from it.
+
+    ``document_external_url`` points outside CourtListener, so its scheme
+    MUST be guaranteed by us: either build the URL from a hardcoded
+    prefix, as ``RECAPDocument.pacer_url`` does, or filter it through
+    ``http_url``, as ``_scotus_document_external_url`` does. A source MUST
+    NOT return a raw third-party string.
+
     Every callable below touches the ORM, so callers in async views MUST
     wrap them in ``sync_to_async``.
     """
