@@ -221,9 +221,8 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     Represents a document attached to a New York Court of Appeals docket entry.
 
     :ivar docket_entry: The Docket entry this document is associated with.
-    :ivar url: The endpoint the document is requested from. Court-PASS serves
-    every document from one URL by POST, so unlike the other states this is
-    the same value on every row and does not identify the document.
+    :ivar url: Not stored. Court-PASS serves every document by POST from one
+    endpoint, the same for every download, so it identifies nothing.
     :ivar file_name: The name of the file as Court-PASS published it. Filers
     are expected to follow the Court's naming convention, which encodes the
     party role, party name, and document type.
