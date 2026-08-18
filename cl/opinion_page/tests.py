@@ -3491,13 +3491,26 @@ class DocketEntryRowsV2Test(TestCase):
             pacer_doc_id="12347",
         )
 
-        # Entry 2: minute entry (no entry_number, no documents)
+        # Entry 2: minute entry (no entry_number)
         cls.minute_entry = DocketEntryFactory(
             docket=cls.docket,
             entry_number=None,
             date_filed=date(2024, 4, 21),
             description="Case Assigned to Judge Smith",
         )
+        # Numberless minute-entry document: not individually addressable on
+        # PACER, so it gets no action buttons. Built and saved by hand
+        # because RECAPDocumentFactory's _create hook backfills a
+        # document_number (and an entry_number on the entry) whenever it
+        # finds neither, which is exactly the state under test.
+        cls.rd_numberless = RECAPDocumentFactory.build(
+            docket_entry=cls.minute_entry,
+            document_number="",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            description="Numberless minute entry document",
+            pacer_doc_id="",
+        )
+        cls.rd_numberless.save()
 
     async def _get_docket_page(self) -> str:
         r = await self.async_client.get(
@@ -3552,6 +3565,24 @@ class DocketEntryRowsV2Test(TestCase):
         content = await self._get_docket_page()
         self.assertIn("Case Assigned to Judge Smith", content)
         self.assertIn(f'id="minute-entry-{self.minute_entry.pk}"', content)
+
+    async def test_numberless_document_renders_no_action_buttons(
+        self,
+    ) -> None:
+        """A numberless document should render none of its action buttons."""
+        content = await self._get_docket_page()
+        # The assertion is on the document's own PACER URL rather than on the
+        # string "Buy on PACER", because the other fixture documents
+        # legitimately render that button on the same page.
+        pacer_url = await sync_to_async(lambda: self.rd_numberless.pacer_url)()
+        self.assertNotIn(pacer_url, content)
+
+    async def test_numberless_document_still_renders_its_description(
+        self,
+    ) -> None:
+        """The guard drops a numberless document's buttons, not its row."""
+        content = await self._get_docket_page()
+        self.assertIn(self.rd_numberless.description, content)
 
     async def test_empty_state(self) -> None:
         """Empty state message should show when no entries exist."""

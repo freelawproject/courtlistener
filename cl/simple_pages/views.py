@@ -375,6 +375,7 @@ async def components(request: HttpRequest) -> HttpResponse:
             self.label: str = ""
             self.detail_url: str | None = None
             self.external_url: str | None = None
+            self.has_actions: bool = True
 
         @property
         def pacer_url(self) -> str:

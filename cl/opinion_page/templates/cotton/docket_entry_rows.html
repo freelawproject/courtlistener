@@ -85,60 +85,62 @@
                   {% endif %}
 
                   {# Action buttons #}
-                  <div class="shrink-0 flex flex-wrap items-center gap-2">
-                    {% if document.filepath_local %}
-                      {# State 1: We have the PDF — download dropdown #}
-                      <c-menu-button
-                        button_variant="dark"
-                        button_class="text-sm px-3 py-1.5"
-                        menu_class="z-20 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
-                        position="bottom-end"
-                        widget_aria_label="Download options for {{ document.label }}"
-                        trigger_aria_label="Download PDF"
-                        menu_aria_label="Download sources"
-                      >
-                        <c-slot name="button_content">
-                          Download PDF
-                          {% svg "chevron" class="w-3 h-3 text-white ml-1" aria_hidden="true" %}
-                        </c-slot>
-                        <c-slot name="menu_content">
-                          <c-menu-button.item
-                            href="{{ document.filepath_local.url }}"
-                            rel="nofollow"
-                          >
-                            From CourtListener
-                          </c-menu-button.item>
-                          {% if document.filepath_ia %}
+                  {% if document.has_actions %}
+                    <div class="shrink-0 flex flex-wrap items-center gap-2">
+                      {% if document.filepath_local %}
+                        {# State 1: We have the PDF — download dropdown #}
+                        <c-menu-button
+                          button_variant="dark"
+                          button_class="text-sm px-3 py-1.5"
+                          menu_class="z-20 w-55 border border-greyscale-200 shadow-lg rounded-lg bg-white py-2"
+                          position="bottom-end"
+                          widget_aria_label="Download options for {{ document.label }}"
+                          trigger_aria_label="Download PDF"
+                          menu_aria_label="Download sources"
+                        >
+                          <c-slot name="button_content">
+                            Download PDF
+                            {% svg "chevron" class="w-3 h-3 text-white ml-1" aria_hidden="true" %}
+                          </c-slot>
+                          <c-slot name="menu_content">
                             <c-menu-button.item
-                              href="{{ document.filepath_ia }}"
+                              href="{{ document.filepath_local.url }}"
                               rel="nofollow"
                             >
-                              From Internet Archive
+                              From CourtListener
                             </c-menu-button.item>
-                          {% endif %}
-                          <c-document-source-link :document="document" :docket_source="docket_source" variant="menu_item" />
-                        </c-slot>
-                      </c-menu-button>
-                    {% elif document.is_sealed %}
-                      {# State 2: Sealed. Only sources whose document model #}
-                      {# has the is_sealed field can reach this state. #}
-                      <c-button variant="outline" disabled aria-disabled="true" class="text-sm px-3 py-1.5">
-                        Unavailable
-                      </c-button>
-                      <c-document-source-link :document="document" :docket_source="docket_source" variant="check_availability" />
-                      {% if docket_source.has_pay_and_pray %}
-                        {# Pray-and-pay for sealed docs #}
-                        <c-pray-button :document_id="document.id" :count="document.prayer_count" :prayer_exists="document.prayer_exists" />
+                            {% if document.filepath_ia %}
+                              <c-menu-button.item
+                                href="{{ document.filepath_ia }}"
+                                rel="nofollow"
+                              >
+                                From Internet Archive
+                              </c-menu-button.item>
+                            {% endif %}
+                            <c-document-source-link :document="document" :docket_source="docket_source" variant="menu_item" />
+                          </c-slot>
+                        </c-menu-button>
+                      {% elif document.is_sealed %}
+                        {# State 2: Sealed. Only sources whose document model #}
+                        {# has the is_sealed field can reach this state. #}
+                        <c-button variant="outline" disabled aria-disabled="true" class="text-sm px-3 py-1.5">
+                          Unavailable
+                        </c-button>
+                        <c-document-source-link :document="document" :docket_source="docket_source" variant="check_availability" />
+                        {% if docket_source.has_pay_and_pray %}
+                          {# Pray-and-pay for sealed docs #}
+                          <c-pray-button :document_id="document.id" :count="document.prayer_count" :prayer_exists="document.prayer_exists" />
+                        {% endif %}
+                      {% elif document.external_url %}
+                        {# State 3: Only the source has it #}
+                        <c-document-source-link :document="document" :docket_source="docket_source" variant="button" />
+                        {% if docket_source.has_pay_and_pray %}
+                          {# Pray-and-pay for docs we'd have to buy #}
+                          <c-pray-button :document_id="document.id" :count="document.prayer_count" :prayer_exists="document.prayer_exists" />
+                        {% endif %}
                       {% endif %}
-                    {% elif document.external_url %}
-                      {# State 3: Only the source has it #}
-                      <c-document-source-link :document="document" :docket_source="docket_source" variant="button" />
-                      {% if docket_source.has_pay_and_pray %}
-                        {# Pray-and-pay for docs we'd have to buy #}
-                        <c-pray-button :document_id="document.id" :count="document.prayer_count" :prayer_exists="document.prayer_exists" />
-                      {% endif %}
-                    {% endif %}
-                  </div>
+                    </div>
+                  {% endif %}
                 </div>
               </li>
             {% endfor %}

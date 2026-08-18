@@ -92,6 +92,11 @@ def build_scotus_metadata(
     return items
 
 
+def _always_has_actions(document: Any) -> bool:
+    """Return True: by default every document gets its action buttons."""
+    return True
+
+
 @dataclass(frozen=True)
 class DocketEntrySource:
     """Describes how to fetch, sort, and display docket entries for one
@@ -123,6 +128,7 @@ class DocketEntrySource:
     metadata_sections: Callable[[Docket], list[MetadataSection]]
     component: str
     has_pay_and_pray: bool = True
+    document_has_actions: Callable[[Any], bool] = _always_has_actions
 
 
 def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
@@ -130,6 +136,7 @@ def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
     document.label = source.document_label(document)
     document.detail_url = source.document_detail_url(document)
     document.external_url = source.document_external_url(document)
+    document.has_actions = source.document_has_actions(document)
 
 
 # RECAP
@@ -169,6 +176,17 @@ def _recap_document_external_url(document: RECAPDocument) -> str | None:
     return document.pacer_url or None
 
 
+def _recap_document_has_actions(document: RECAPDocument) -> bool:
+    """Return whether one RECAP document gets action buttons.
+
+    Numberless minute entries are not individually addressable on PACER, so
+    there is nothing to download, buy or pray for. Legacy hides the whole
+    action area for them; see the `{# Hide this if an unnumbered minute
+    entry #}` guard in includes/de_list.html.
+    """
+    return bool(document.document_number)
+
+
 def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
     """Build the metadata sections specific to a RECAP/PACER docket."""
     # Imported here rather than at module scope because cl.opinion_page.utils
@@ -200,6 +218,7 @@ RECAP_SOURCE = DocketEntrySource(
     document_label=_recap_document_label,
     document_detail_url=_recap_document_detail_url,
     document_external_url=_recap_document_external_url,
+    document_has_actions=_recap_document_has_actions,
     metadata_sections=_recap_metadata_sections,
     component="recap",
 )
