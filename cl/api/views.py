@@ -1,20 +1,17 @@
 import logging
-import re
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from typing import TypedDict, cast
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db.models import QuerySet, Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.views.decorators.cache import cache_page
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,10 +28,7 @@ from cl.custom_filters.templatetags.partition_util import columns
 from cl.donate.models import NeonMembership, NeonMembershipLevel
 from cl.favorites.models import Prayer
 from cl.favorites.utils import get_lifetime_prayer_stats
-from cl.lib.elasticsearch_utils import (
-    get_court_opinions_counts,
-    get_opinions_coverage_over_time,
-)
+from cl.lib.elasticsearch_utils import get_court_opinions_counts
 from cl.lib.url_utils import BASE_URL
 from cl.people_db.models import Person
 from cl.search.documents import (
@@ -43,14 +37,10 @@ from cl.search.documents import (
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import Citation, Court, OpinionCluster
 from cl.search.utils import get_redis_stat_sum
-from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 from cl.stats.constants import StatMetric
 
 logger = logging.getLogger(__name__)
-
-max_court_id_length = Court._meta.get_field("id").max_length
-VALID_COURT_ID_REGEX = re.compile(rf"^\w{{1,{max_court_id_length}}}$")
 
 
 async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
@@ -101,34 +91,6 @@ async def court_index(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def coverage_data(request, version, court):
-    """Provides coverage data for a court.
-
-    Responds to either AJAX or regular requests.
-    """
-
-    if court != "all":
-        court_str = (await aget_object_or_404(Court, pk=court)).pk
-    else:
-        court_str = "all"
-    q = request.GET.get("q")
-    opinions_coverage = await sync_to_async(get_opinions_coverage_over_time)(
-        OpinionClusterDocument.search(), court_str, q, "dateFiled"
-    )
-    # Calculate the totals
-    annual_counts = {}
-    total_docs = 0
-    for year_coverage in opinions_coverage:
-        annual_counts[year_coverage["key_as_string"]] = year_coverage[
-            "doc_count"
-        ]
-        total_docs += year_coverage["doc_count"]
-
-    return JsonResponse(
-        {"annual_counts": annual_counts, "total": total_docs}, safe=True
-    )
-
-
 async def fetch_first_last_date_filed(
     court_id: str,
 ) -> tuple[date | None, date | None]:
@@ -144,38 +106,6 @@ async def fetch_first_last_date_filed(
     if first:
         return first.date_filed, last.date_filed
     return None, None
-
-
-@sync_to_async
-@cache_page(7 * 60 * 60 * 24, key_prefix="coverage")
-@async_to_sync
-async def coverage_data_opinions(request: HttpRequest):
-    """Generate Coverage Chart Data
-
-    Accept GET to query court data for timelines-chart on coverage page
-
-    :param request: The HTTP request
-    :return: Timeline data for court(s)
-    """
-
-    if request.method != "GET":
-        return JsonResponse([], safe=False)
-
-    court_ids = request.GET.get("court_ids", "").strip()  # type: ignore
-    if not court_ids:
-        return JsonResponse([], safe=False)
-
-    # Clean and validate court_ids
-    valid_court_ids = [
-        court_id.strip()
-        for court_id in court_ids.split(",")
-        if court_id.strip() and VALID_COURT_ID_REGEX.match(court_id.strip())
-    ]
-    if not valid_court_ids:
-        return JsonResponse([], safe=False)
-
-    chart_data = await sync_to_async(build_chart_data)(valid_court_ids)
-    return JsonResponse(chart_data, safe=False)
 
 
 async def get_result_count(request, version, day_count):
@@ -507,7 +437,9 @@ async def build_wiki_coverage_data(bust_cache: bool = False) -> dict:
     oa_aggregate = await Audio.objects.aaggregate(Sum("duration"))
     oa_duration = oa_aggregate["duration__sum"]
     if oa_duration:
-        oa_duration /= 60  # Avoids a "unsupported operand type" error
+        # Round to the nearest minute — the wiki renders this value as-is,
+        # so it can't do any rounding of its own.
+        oa_duration = round(oa_duration / 60)
 
     return {
         "judges": {
