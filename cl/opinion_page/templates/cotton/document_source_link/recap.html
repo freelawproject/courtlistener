@@ -11,7 +11,7 @@
     href="{{ document.external_url }}"
     target="_blank"
     rel="nofollow noreferrer noopener"
-    aria-label="{% if document.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% if document.page_count %} for ${{ document|price }}{% endif %}{% endif %} (opens in new tab)"
+    aria-label="{% if document.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if document.page_count %} (${{ document|price }}){% endif %} (opens in new tab)"
   >
     {% if document.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %}{% if document.page_count %} (${{ document|price }}){% endif %}
   </c-menu-button.item>
@@ -33,7 +33,7 @@
     target="_blank"
     rel="nofollow noreferrer noopener"
     class="text-sm px-3 py-1.5"
-    aria-label="Buy on PACER{% if document.page_count %} for ${{ document|price }}{% endif %} (opens in new tab)"
+    aria-label="Buy on PACER{% if document.page_count %} (${{ document|price }}){% endif %} (opens in new tab)"
   >
     Buy on PACER{% if document.page_count %} (${{ document|price }}){% endif %}
   </c-button>
