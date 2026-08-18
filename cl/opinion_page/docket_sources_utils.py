@@ -125,6 +125,13 @@ class DocketEntrySource:
     has_pay_and_pray: bool = True
 
 
+def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
+    """Resolve one document's display fields from its source, in place."""
+    document.label = source.document_label(document)
+    document.detail_url = source.document_detail_url(document)
+    document.external_url = source.document_external_url(document)
+
+
 # RECAP
 
 

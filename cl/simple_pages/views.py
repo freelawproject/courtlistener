@@ -29,7 +29,10 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
-from cl.opinion_page.docket_sources_utils import RECAP_SOURCE
+from cl.opinion_page.docket_sources_utils import (
+    RECAP_SOURCE,
+    attach_display_fields,
+)
 from cl.people_db.models import Person
 from cl.search.cluster_sources import ClusterSources
 from cl.search.models import (
@@ -398,18 +401,12 @@ async def components(request: HttpRequest) -> HttpResponse:
             self.date_filed = date_filed
             self.datetime_filed = None
             self.description = description
-            # view_docket attaches documents plus their resolved label and
-            # URLs; the demo goes through the same source config so the
+            # view_docket attaches documents plus their resolved display
+            # fields; the demo goes through the same source config so the
             # library shows what the real page shows.
             self.documents = documents
             for document in documents:
-                document.label = RECAP_SOURCE.document_label(document)
-                document.detail_url = RECAP_SOURCE.document_detail_url(
-                    document
-                )
-                document.external_url = RECAP_SOURCE.document_external_url(
-                    document
-                )
+                attach_display_fields(RECAP_SOURCE, document)
             self.pk = pk
 
     demo_entries = [

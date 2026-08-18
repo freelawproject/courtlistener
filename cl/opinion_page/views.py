@@ -73,6 +73,7 @@ from cl.opinion_page.decorators import handle_cluster_redirection
 from cl.opinion_page.docket_sources_utils import (
     RECAP_SOURCE,
     MetadataSection,
+    attach_display_fields,
 )
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
@@ -392,9 +393,7 @@ async def view_docket(
         for entry in entries:
             entry.documents = list(source.documents_for_entry(entry))
             for document in entry.documents:
-                document.label = source.document_label(document)
-                document.detail_url = source.document_detail_url(document)
-                document.external_url = source.document_external_url(document)
+                attach_display_fields(source, document)
             page_documents.extend(entry.documents)
         return page_documents
 
