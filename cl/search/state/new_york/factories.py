@@ -11,6 +11,7 @@ from factory.django import DjangoModelFactory
 from cl.people_db.factories import PartyFactory
 from cl.search.factories import DocketFactory
 from cl.search.state.new_york.models import (
+    COURT_PASS_DOCUMENT_URL,
     NYCoADocketEntry,
     NYCoADocketIssue,
     NYCoADocketMetadata,
@@ -85,8 +86,8 @@ class NYCoADocumentFactory(DjangoModelFactory):
     doc_party = Faker("name")
     doc_type = Faker("word")
     page_count = Faker("pyint")
-    # Court-PASS serves every document from one POST endpoint
-    url = "https://courtpass.nycourts.gov/Docket"
+    # Not a column; assigning the constant exercises the model's setter.
+    url = COURT_PASS_DOCUMENT_URL
     volume = LazyAttribute(
         lambda d: random.randint(1, 5) if random.random() < 0.2 else None
     )

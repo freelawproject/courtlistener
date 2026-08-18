@@ -20,11 +20,16 @@ from cl.search.state.new_york.vocabularies import (
 from cl.search.state.shared import AbstractStateDocument
 
 __all__ = [
+    "COURT_PASS_DOCUMENT_URL",
     "NYCoADocketEntry",
     "NYCoADocketIssue",
     "NYCoADocketMetadata",
     "NYCoADocument",
 ]
+
+COURT_PASS_DOCUMENT_URL = "https://courtpass.nycourts.gov/Docket"
+"""The endpoint Court-PASS serves every document from. See
+`NYCoADocument.url`."""
 
 
 @pghistory.track()
@@ -112,8 +117,13 @@ class NYCoADocketIssue(AbstractDateTimeModel):
             # docket. Not unique: a case can carry two issues under one
             # category pair, so the merger picks create or update from
             # `detail`, which is too long to key on and gets reworded anyway.
+            #
+            # `metadata` comes last even though the merger always filters on
+            # it, because the FK already gives it a standalone index. Leading
+            # with the categories makes the same index serve `category` and
+            # `category + subcategory` lookups as well.
             models.Index(
-                fields=["metadata", "category", "subcategory"],
+                fields=["category", "subcategory", "metadata"],
                 name="nycoa_issue_category_idx",
             ),
         ]
@@ -197,18 +207,23 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
         ordering = ["date_filed", "entry_index"]
         verbose_name_plural = "NYCoA Docket Entries"
         indexes = [
-            # Serves the docket page's `WHERE docket_id = ... ORDER BY
-            # date_filed, entry_index`. The unique constraint below cannot do
-            # this job: it is keyed on `docket_entry_id`, which shares no
-            # prefix with the sort.
+            # Leads with the model's own ordering, so date-ordered listings
+            # come off the index without a sort step, and `date_filed` alone
+            # is served too. `docket` trails because the FK already indexes it
+            # standalone; the docket page's `WHERE docket_id = ...` filters on
+            # that trailing column rather than range-scanning a prefix.
             models.Index(
-                fields=["docket", "date_filed", "entry_index"],
+                fields=["date_filed", "entry_index", "docket"],
                 name="nycoa_entry_docket_order_idx",
             ),
         ]
         constraints = [
+            # `docket_entry_id` leads so the index also serves lookups by the
+            # synthetic entry ID alone; `docket` has its own FK index, and
+            # both columns are matched by equality, so neither order costs the
+            # merger anything.
             models.UniqueConstraint(
-                fields=["docket", "docket_entry_id"],
+                fields=["docket_entry_id", "docket"],
                 name="unique_nycoa_entry_id_per_docket",
             )
         ]
@@ -220,16 +235,18 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     """
     Represents a document attached to a New York Court of Appeals docket entry.
 
+    The `url` every other state document carries is a property here rather
+    than a column; see below.
+
     :ivar docket_entry: The Docket entry this document is associated with.
-    :ivar url: Not stored. Court-PASS serves every document by POST from one
-    endpoint, the same for every download, so it identifies nothing.
     :ivar file_name: The name of the file as Court-PASS published it. Filers
     are expected to follow the Court's naming convention, which encodes the
     party role, party name, and document type.
     :ivar content_type: The MIME type of the file. Court-PASS publishes PDFs
     along with playlist files for oral argument recordings.
     :ivar available: Whether the file can be downloaded. False for sealed
-    files and files the site lists but does not serve.
+    files and files the site lists but does not serve, and the default, so a
+    document is not presumed downloadable until a scrape says it is.
     :ivar doc_role: The party role encoded in the file name, e.g. "appellant".
     Blank when the file name does not follow the naming convention.
     :ivar doc_party: The party name encoded in the file name. Blank when the
@@ -250,12 +267,42 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     )
     file_name = models.TextField()
     content_type = models.CharField(max_length=255, blank=True)
-    available = models.BooleanField(default=True)
+    available = models.BooleanField(default=False)
     doc_role = models.TextField(blank=True)
     doc_party = models.TextField(blank=True)
     doc_type = models.TextField(blank=True)
-    volume = models.IntegerField(null=True, blank=True)
-    part = models.IntegerField(null=True, blank=True)
+    volume = models.SmallIntegerField(null=True, blank=True)
+    part = models.SmallIntegerField(null=True, blank=True)
+
+    @property
+    def url(self) -> str:
+        """The Court-PASS endpoint this document is served from.
+
+        Court-PASS serves every document by POST from one endpoint, the same
+        for every download, so the value identifies nothing and a per-row copy
+        would be dead weight. Declaring the name here also drops the `url`
+        column `AbstractStateDocument` would otherwise contribute, so this
+        model cannot be queried or ordered by `url`.
+        """
+        return COURT_PASS_DOCUMENT_URL
+
+    @url.setter
+    def url(self, value: str) -> None:
+        """Accept the constant, reject anything else.
+
+        Assigning the constant is a no-op, so callers that populate every
+        document field uniformly keep working. Any other value means the
+        caller believes documents have distinct URLs, which is a bug worth
+        surfacing rather than a value worth silently dropping.
+
+        :param value: The URL being assigned.
+        :raises ValueError: If `value` is not `COURT_PASS_DOCUMENT_URL`.
+        """
+        if value != COURT_PASS_DOCUMENT_URL:
+            raise ValueError(
+                f"NYCoADocument.url is always {COURT_PASS_DOCUMENT_URL}; "
+                f"got {value!r}"
+            )
 
     def make_filename(self) -> str:
         """Build the stored filename from the docket entry and file name.
@@ -303,8 +350,11 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
             models.Index(fields=["filepath_local"]),
         ]
         constraints = [
+            # `file_name` leads so the index also serves lookups by file name
+            # alone, which the admin searches on; `docket_entry` has its own
+            # FK index, and both columns are matched by equality.
             models.UniqueConstraint(
-                fields=["docket_entry", "file_name"],
+                fields=["file_name", "docket_entry"],
                 name="unique_nycoa_file_name_per_docket_entry",
             )
         ]
