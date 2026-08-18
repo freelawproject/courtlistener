@@ -7,6 +7,7 @@ import shutil
 import threading
 from datetime import date
 from http import HTTPStatus
+from itertools import product
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -20,7 +21,8 @@ from django.core.management import call_command
 from django.core.paginator import Paginator
 from django.db import connection
 from django.http import HttpResponse
-from django.template import engines
+from django.template import TemplateDoesNotExist, engines
+from django.template.loader import get_template
 from django.test import (
     AsyncRequestFactory,
     RequestFactory,
@@ -48,8 +50,10 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.docket_sources_utils import (
+    _SOURCES_BY_COURT_ID,
     RECAP_SOURCE,
     SCOTUS_SOURCE,
+    _recap_document_detail_url,
     build_scotus_metadata,
 )
 from cl.opinion_page.forms import (
@@ -1506,6 +1510,28 @@ class DocketEntrySourceTest(TestCase):
         self.assertIn(entry, entries)
         documents = list(source.documents_for_entry(entry))
         self.assertIn(document, documents)
+
+
+class DocketSourceComponentTest(SimpleTestCase):
+    FOLDERS = (
+        "docket_source_button",
+        "docket_source_attribution",
+        "document_source_link",
+    )
+
+    def test_every_source_resolves_its_components(self) -> None:
+        sources = {RECAP_SOURCE, *_SOURCES_BY_COURT_ID.values()}
+        for source, folder in product(sources, self.FOLDERS):
+            path = f"cotton/{folder}/{source.component}.html"
+            with self.subTest(path=path):
+                try:
+                    get_template(path)
+                except TemplateDoesNotExist:
+                    self.fail(
+                        f"Source component {source.component!r} has no "
+                        f"{path}. A component needs a file in each of "
+                        f"{', '.join(self.FOLDERS)}."
+                    )
 
 
 @override_settings(WAFFLE_CACHE_PREFIX="test_scotus_docket_disabled_waffle")
@@ -3395,7 +3421,7 @@ class DocketPageV2TemplateTest(TestCase):
         self.assertIn("Contract", content)
 
     async def test_v2_docket_metadata_in_context(self) -> None:
-        """The view should pass metadata and tabs to the template."""
+        """The view should pass metadata sections and tabs to the template."""
         r = await self.async_client.get(
             reverse(
                 "view_docket",
@@ -3403,9 +3429,9 @@ class DocketPageV2TemplateTest(TestCase):
             )
         )
         self.assertTemplateUsed(r, "v2_docket.html")
-        self.assertIn("metadata", r.context)
+        self.assertIn("metadata_sections", r.context)
         self.assertIn("tabs", r.context)
-        self.assertTrue(len(r.context["metadata"]) > 0)
+        self.assertTrue(len(r.context["metadata_sections"]) > 0)
         self.assertTrue(len(r.context["tabs"]) > 0)
 
 
@@ -3466,13 +3492,26 @@ class DocketEntryRowsV2Test(TestCase):
             pacer_doc_id="12347",
         )
 
-        # Entry 2: minute entry (no entry_number, no documents)
+        # Entry 2: minute entry (no entry_number)
         cls.minute_entry = DocketEntryFactory(
             docket=cls.docket,
             entry_number=None,
             date_filed=date(2024, 4, 21),
             description="Case Assigned to Judge Smith",
         )
+        # Numberless minute-entry document: not individually addressable on
+        # PACER, so it gets no action buttons. Built and saved by hand
+        # because RECAPDocumentFactory's _create hook backfills a
+        # document_number (and an entry_number on the entry) whenever it
+        # finds neither, which is exactly the state under test.
+        cls.rd_numberless = RECAPDocumentFactory.build(
+            docket_entry=cls.minute_entry,
+            document_number="",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            description="Numberless minute entry document",
+            pacer_doc_id="",
+        )
+        cls.rd_numberless.save()
 
     async def _get_docket_page(self) -> str:
         r = await self.async_client.get(
@@ -3528,6 +3567,24 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn("Case Assigned to Judge Smith", content)
         self.assertIn(f'id="minute-entry-{self.minute_entry.pk}"', content)
 
+    async def test_numberless_document_renders_no_action_buttons(
+        self,
+    ) -> None:
+        """A numberless document should render none of its action buttons."""
+        content = await self._get_docket_page()
+        # The assertion is on the document's own PACER URL rather than on the
+        # string "Buy on PACER", because the other fixture documents
+        # legitimately render that button on the same page.
+        pacer_url = await sync_to_async(lambda: self.rd_numberless.pacer_url)()
+        self.assertNotIn(pacer_url, content)
+
+    async def test_numberless_document_still_renders_its_description(
+        self,
+    ) -> None:
+        """The guard drops a numberless document's buttons, not its row."""
+        content = await self._get_docket_page()
+        self.assertIn(self.rd_numberless.description, content)
+
     async def test_empty_state(self) -> None:
         """Empty state message should show when no entries exist."""
         empty_docket = await sync_to_async(DocketFactory)(
@@ -3565,6 +3622,29 @@ class DocketEntryRowsV2Test(TestCase):
         self.assertIn('<ol role="list"', content)
         self.assertIn('<ul role="list"', content)
 
+    def test_document_detail_urls_are_internal(self) -> None:
+        """Detail URLs must be CourtListener paths, since the template renders
+        them unfiltered into an href.
+
+        SCOTUS is deliberately left out: _scotus_document_detail_url returns
+        None only until the SCOTUS document detail page exists, so asserting
+        on it would pin a placeholder rather than the contract.
+        """
+        documents = [
+            self.rd_has_pdf,
+            self.rd_pacer_only,
+            self.rd_sealed,
+            self.rd_numberless,
+        ]
+        for document in documents:
+            with self.subTest(document=document.pk):
+                detail_url = _recap_document_detail_url(document)
+                if detail_url is not None:
+                    self.assertTrue(
+                        detail_url.startswith("/"),
+                        msg=f"{detail_url} is not an internal path.",
+                    )
+
 
 class DocketFilterDrawerAttrPropagationTest(TestCase):
     """The mobile filter drawer auto-opens when a filter submission fails
@@ -3601,6 +3681,7 @@ class DocketFilterDrawerAttrPropagationTest(TestCase):
         return template.render(
             {
                 "docket": self.docket,
+                "docket_source": RECAP_SOURCE,
                 "form": form,
                 "page_obj": self.empty_page,
                 "request": request,

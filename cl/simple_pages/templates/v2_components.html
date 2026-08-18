@@ -32,7 +32,10 @@
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#docket-page', 'text': 'Docket page'},
+        {'href': '#docket-source-button', 'text': 'Docket source button'},
+        {'href': '#docket-source-attribution', 'text': 'Docket source attribution'},
         {'href': '#docket-entry-rows', 'text': 'Docket entry rows'},
+        {'href': '#document-source-link', 'text': 'Document source link'},
         {'href': '#docket-filter', 'text': 'Docket filter'},
         {'href': '#metadata-section', 'text': 'Metadata section'},
       ]},
@@ -1473,20 +1476,16 @@ Sample code here.
         <c-slot name="description">The Docket model instance (required).</c-slot>
       </c-library.item>
       <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> from the view context, forwarded to the nested <code>&lt;c-docket-source-button&gt;</code> so it can pick the right source's copy.</c-slot>
+      </c-library.item>
+      <c-library.item only>
         <c-slot name="label"><code>active_tab</code></c-slot>
         <c-slot name="description">Which tab is active: <code>"entries"</code>, <code>"parties"</code>, <code>"idb"</code>, or <code>"authorities"</code>.</c-slot>
       </c-library.item>
       <c-library.item only>
-        <c-slot name="label"><code>metadata</code></c-slot>
-        <c-slot name="description">List of dicts for the main metadata description list. See <code>c-metadata-section</code> for the item shape.</c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>bankruptcy_metadata</code></c-slot>
-        <c-slot name="description">List of dicts for the optional bankruptcy information section.</c-slot>
-      </c-library.item>
-      <c-library.item only>
-        <c-slot name="label"><code>originating_court_metadata</code></c-slot>
-        <c-slot name="description">List of dicts for the optional originating court information section.</c-slot>
+        <c-slot name="label"><code>metadata_sections</code></c-slot>
+        <c-slot name="description">List of section dicts, rendered in order as <code>c-metadata-section</code>s. Each has <code>items</code> and optionally <code>title</code> and <code>list_class</code>. <code>view_docket</code> builds it as the generic section followed by whatever sections the docket's source adds, so the page never names a source. See <code>c-metadata-section</code> for the item shape.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>tabs</code></c-slot>
@@ -1517,10 +1516,9 @@ Sample code here.
       <c-code>
 &lt;c-docket-page
   :docket="docket"
+  :docket_source="docket_source"
   active_tab="entries"
-  :metadata="metadata"
-  :bankruptcy_metadata="bankruptcy_metadata"
-  :originating_court_metadata="originating_court_metadata"
+  :metadata_sections="metadata_sections"
   :tabs="tabs"
   :has_alert="has_alert"
   :note_form="note_form"
@@ -1531,21 +1529,25 @@ Sample code here.
     </c-expansion-panel>
   </section>
 
-  {# DOCKET ENTRY ROWS #}
-  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-entry-rows">
-    <h2 class="mt-6 mb-3">Docket entry rows</h2>
-    <p>Renders docket entries with their RECAP documents. Each entry shows document number, date filed, and description. RECAP documents display type badges, descriptions, and action buttons that vary by availability state (local PDF, PACER-only, sealed).</p>
+  {# DOCKET SOURCE BUTTON #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-source-button">
+    <h2 class="mt-6 mb-3">Docket source button</h2>
+    <p>The control that sends a reader to this docket on the site it came from — "View on PACER" for a RECAP docket, "View in SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/docket_source_button/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-page&gt;</code> stays source-agnostic and <code>DocketEntrySource</code> never carries user-facing strings. Adding a source means adding one file to that folder. Its per-document counterpart is <code>&lt;c-document-source-link&gt;</code>, and the sentence naming the source is <code>&lt;c-docket-source-attribution&gt;</code>.</p>
 
     <h4 class="mt-3">Demo</h4>
-    <p class="text-sm text-greyscale-600 mb-2">Entry 1 has a main document (PDF available with download dropdown), two attachments (one PACER-only with price, one with PDF). Entry 2 is a minute entry (no document number, no documents).</p>
+    <p class="text-sm text-greyscale-600 mb-2">A RECAP docket at a district court, so the menu shows the district-only reports as well as the docket report. An appellate docket shows the docket report alone.</p>
     <div class="my-4 rounded-lg border border-greyscale-200 p-4">
-      <c-docket-entry-rows :docket_entries="demo_docket_entries" />
+      <c-docket-source-button :docket="demo_docket" :docket_source="docket_source" />
     </div>
 
     <c-library.list title="Props" only>
       <c-library.item only>
-        <c-slot name="label"><code>:docket_entries</code></c-slot>
-        <c-slot name="description">Paginated queryset of <code>DocketEntry</code> objects with prefetched <code>recap_documents</code>. Each entry needs <code>entry_number</code>, <code>date_filed</code>, <code>datetime_filed</code>, <code>description</code>. Each RECAP document needs <code>document_type</code>, <code>document_number</code>, <code>attachment_number</code>, <code>description</code>, <code>filepath_local</code>, <code>filepath_ia</code>, <code>is_sealed</code>, <code>is_free_on_pacer</code>, <code>page_count</code>, <code>pacer_url</code>.</c-slot>
+        <c-slot name="label"><code>:docket</code></c-slot>
+        <c-slot name="description">The Docket model instance. Each per-source file reads its own URL fields off it — <code>pacer_docket_url</code> and the <code>pacer_*_url</code> reports for RECAP, <code>scotus_docket_url</code> for SCOTUS.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Its <code>component</code> picks which file renders.</c-slot>
       </c-library.item>
     </c-library.list>
 
@@ -1555,7 +1557,111 @@ Sample code here.
 
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-docket-entry-rows :docket_entries="docket_entries" /&gt;
+&lt;c-docket-source-button :docket="docket" :docket_source="docket_source" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET SOURCE ATTRIBUTION #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-source-attribution">
+    <h2 class="mt-6 mb-3">Docket source attribution</h2>
+    <p>The sentence attributing the page's contents to the site the docket came from. It dispatches to <code>cotton/docket_source_attribution/&lt;component&gt;.html</code> the same way <code>&lt;c-docket-source-button&gt;</code> does. The sentence carries no wrapper, so the caller supplies the surrounding <code>&lt;p&gt;</code> and icon.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4">
+      <p class="text-sm text-greyscale-500">
+        {% svg "circle_question_mark" class="w-4 h-4 inline" aria_hidden="true" %}
+        <c-docket-source-attribution :docket_source="docket_source" />
+      </p>
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Its <code>component</code> picks which file renders.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-source-attribution :docket_source="docket_source" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCKET ENTRY ROWS #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="docket-entry-rows">
+    <h2 class="mt-6 mb-3">Docket entry rows</h2>
+    <p>Renders docket entries with their documents, whatever source the docket came from. Each entry shows document number, date filed, and description. Documents display their label, description, and action buttons that vary by availability state (we host the PDF, sealed, external source only). Per-source wording comes from <code>&lt;c-document-source-link&gt;</code>.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">Entry 1 has a main document (PDF available with download dropdown), two attachments (one external-only with price, one with PDF). Entry 2 is a minute entry (no document number, no documents).</p>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4">
+      <c-docket-entry-rows :docket_entries="demo_docket_entries" :docket_source="docket_source" />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_entries</code></c-slot>
+        <c-slot name="description">Paginated queryset of docket entry objects. Each entry needs <code>entry_number</code>, <code>date_filed</code>, <code>datetime_filed</code>, <code>description</code>, and a <code>documents</code> list. <code>view_docket</code> attaches <code>documents</code> for the docket's source, and gives each document a <code>label</code>, a <code>detail_url</code> and an <code>external_url</code>.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Supplies <code>has_pay_and_pray</code> here and is forwarded to the nested <code>&lt;c-document-source-link&gt;</code> for its <code>component</code>.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-docket-entry-rows :docket_entries="docket_entries" :docket_source="docket_source" /&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# DOCUMENT SOURCE LINK #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="document-source-link">
+    <h2 class="mt-6 mb-3">Document source link</h2>
+    <p>Links a document back to the site it came from, in that site's own wording — "Buy on PACER" for a RECAP docket, "View on SCOTUS" for a SCOTUS one. It dispatches to <code>cotton/document_source_link/&lt;component&gt;.html</code>, where <code>component</code> comes from <code>DocketEntrySource</code>, so <code>&lt;c-docket-entry-rows&gt;</code> stays source-agnostic and <code>DocketEntrySource</code> never carries user-facing strings. Adding a source means adding one file to that folder. Renders nothing when the document has no external URL, so callers don't have to guard it.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">A RECAP document we don't host, so the price suffix shows. The <code>menu_item</code> variant is not shown here because it only renders inside a <code>&lt;c-menu-button&gt;</code> menu.</p>
+    <div class="my-4 flex flex-wrap items-center gap-2 rounded-lg border border-greyscale-200 p-4">
+      <c-document-source-link :document="demo_document" :docket_source="docket_source" variant="button" />
+      <c-document-source-link :document="demo_document" :docket_source="docket_source" variant="check_availability" />
+    </div>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>:document</code></c-slot>
+        <c-slot name="description">A document object carrying the <code>external_url</code> that <code>view_docket</code> resolved for it. Per-source files may also read source-specific fields on it, such as <code>is_free_on_pacer</code> and <code>page_count</code> for RECAP.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>variant</code></c-slot>
+        <c-slot name="description">Which control to render: <code>button</code> (default) for the standalone outline button, <code>menu_item</code> for an entry inside a download menu (preceded by a divider), or <code>check_availability</code> for the icon-only button shown beside a sealed document. A source renders nothing for a variant it has no wording for — <code>check_availability</code> is PACER-only.</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> the view put in the context. Its <code>component</code> picks which file renders.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+&lt;c-document-source-link :document="document" :docket_source="docket_source" variant="button" /&gt;
+&lt;c-document-source-link :document="document" :docket_source="docket_source" variant="menu_item" /&gt;
+&lt;c-document-source-link :document="document" :docket_source="docket_source" variant="check_availability" /&gt;
       </c-code>
     </c-expansion-panel>
   </section>
@@ -1569,6 +1675,7 @@ Sample code here.
     <p class="text-sm text-greyscale-600 mb-2">Desktop toolbar shown below. Resize below <code>md</code> breakpoint (768px) to see the mobile layout with search, prev/next, and filter drawer trigger.</p>
     <c-docket-filter
       :docket="demo_docket"
+      :docket_source="docket_source"
       :form="demo_filter_form"
       :page_obj="demo_page_obj"
     />
@@ -1577,6 +1684,10 @@ Sample code here.
       <c-library.item only>
         <c-slot name="label"><code>:docket</code></c-slot>
         <c-slot name="description">The Docket model instance (required).</c-slot>
+      </c-library.item>
+      <c-library.item only>
+        <c-slot name="label"><code>:docket_source</code></c-slot>
+        <c-slot name="description">The <code>DocketEntrySource</code> from the view context, forwarded to the nested <code>&lt;c-docket-source-attribution&gt;</code> that renders the source-attribution sentence below the toolbar.</c-slot>
       </c-library.item>
       <c-library.item only>
         <c-slot name="label"><code>:form</code></c-slot>
@@ -1604,6 +1715,7 @@ Sample code here.
       <c-code>
 &lt;c-docket-filter
   :docket="docket"
+  :docket_source="docket_source"
   :form="form"
   :page_obj="docket_entries"
   :sort_order_asc="sort_order_asc"
@@ -1616,7 +1728,17 @@ Sample code here.
   {# METADATA SECTION #}
   <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="metadata-section">
     <h2 class="mt-6 mb-3">Metadata section</h2>
-    <p>Renders an optional <code>&lt;h2&gt;</code> heading followed by a <code>c-description-list</code> built from a list of item dicts. Currently used by <code>c-docket-page</code> for its main metadata, bankruptcy, and originating court sections.</p>
+    <p>Renders an optional <code>&lt;h2&gt;</code> heading followed by a <code>c-description-list</code> built from a list of item dicts. <code>c-docket-page</code> renders one per entry in its <code>metadata_sections</code> prop, which is how a docket's source adds sections of its own.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <p class="text-sm text-greyscale-600 mb-2">One item of each shape: plain, linked out, and carrying a suffix link after the value.</p>
+    <div class="my-4 rounded-lg border border-greyscale-200 p-4">
+      <c-metadata-section
+        :items="demo_metadata_items"
+        title="Originating Court Information"
+        list_class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4"
+      />
+    </div>
 
     <c-library.list title="Props" only>
       <c-library.item only>
@@ -1633,17 +1755,19 @@ Sample code here.
       </c-library.item>
     </c-library.list>
 
+    <c-library.list title="Slots" only>
+      <p>No slots</p>
+    </c-library.list>
+
     <c-expansion-panel title="Code">
       <c-code>
-&lt;c-metadata-section
-  :items="metadata"
-  list_class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4"
-/&gt;
-
-&lt;c-metadata-section
-  :items="bankruptcy_metadata"
-  title="Bankruptcy Information"
-/&gt;
+{% verbatim %}{% for section in metadata_sections %}
+  &lt;c-metadata-section
+    :items="section.items"
+    :title="section.title"
+    :list_class="section.list_class"
+  /&gt;
+{% endfor %}{% endverbatim %}
       </c-code>
     </c-expansion-panel>
   </section>
