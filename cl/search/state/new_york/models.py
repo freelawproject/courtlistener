@@ -1,6 +1,5 @@
 """Models unique to New York Court of Appeals (Court-PASS) dockets."""
 
-from pathlib import Path
 from typing import Self
 
 import pghistory
@@ -301,14 +300,13 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
             )
 
     def make_filename(self) -> str:
-        """Build the stored filename from the docket entry and file name.
+        """Build the stored filename from this document's ID and file name.
 
-        Overridden because the base implementation derives the name from
-        `url`, which is one shared POST endpoint for all of Court-PASS and so
-        would name every document identically. The entry plus file name is the
-        document's natural key, so it is unique and stable across scrapes.
+        Overridden because the base implementation derives the name from `url`,
+        which is one shared POST endpoint for all of Court-PASS and so would
+        name every document identically.
         """
-        return f"{self.docket_entry_id}-{Path(self.file_name).stem}"
+        return f"{self.pk}-{self.file_name}"
 
     @classmethod
     def tmp_prefix(cls) -> str:
