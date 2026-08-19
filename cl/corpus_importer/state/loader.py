@@ -34,6 +34,7 @@ from pydantic import BaseModel, ValidationError
 
 from cl.corpus_importer.state.merger import Merger
 from cl.corpus_importer.state.utils import MergeResult
+from cl.search.state.shared import AbstractStateDocument
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +113,16 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         validated into. This is the merger's input type.
     :cvar merger: The merger to run for each scrape. A merger that takes
         parameters gets them from `params`.
+    :cvar document_model: The state document model this loader's merges write,
+        whose rows are sent for text extraction as the load goes. Leave `None`
+        for a loader that writes no documents.
     """
 
     query: ClassVar[str]
     payload_column: ClassVar[str] = "data_json"
     scrape_model: type[ScrapeType]
     merger: type[Merger[ScrapeType, ParamType, Model]]
+    document_model: ClassVar[type[AbstractStateDocument] | None] = None
 
     def __init__(
         self,
@@ -125,6 +130,8 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
         *,
         limit: int | None = None,
         dry_run: bool = False,
+        extract: bool = True,
+        extraction_queue: str = "celery",
     ) -> None:
         """
         :param database: Path to the run's SQLite database.
@@ -132,10 +139,15 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
             against a large run.
         :param dry_run: Roll back everything the load writes. The merge still
             runs in full, so the report is real; only the writes are undone.
+        :param extract: Dispatch text extraction for the documents the load
+            writes. Not rate-limited.
+        :param extraction_queue: The celery queue to extract on.
         """
         self.database = Path(database)
         self.limit = limit
         self.dry_run = dry_run
+        self.extract = extract
+        self.extraction_queue = extraction_queue
 
     def rows(self) -> Iterator[sqlite3.Row]:
         """Stream the rows `query` selects, honouring `limit`.
@@ -241,6 +253,8 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 "cost every row after it in this dry run.",
                 self.merger.__name__,
             )
+        if self.extract and self.document_model is not None:
+            logger.info("Dry run: dispatching no extraction.")
         # The merge still runs; `set_rollback` discards it on the way out.
         with transaction.atomic():
             report = self._load()
@@ -275,6 +289,15 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                 report.result |= MergeResult.failed(self.merger.model.__name__)
                 continue
             report.result |= result
+            try:
+                self.dispatch_extraction(result)
+            except Exception as error:
+                logger.exception(
+                    "Could not dispatch extraction for row %s of %s: %s",
+                    report.seen,
+                    self.database.name,
+                    error,
+                )
             if result.success:
                 report.merged += 1
             else:
@@ -286,3 +309,23 @@ class JKentScrapeLoader[ScrapeType: BaseModel, ParamType = None](ABC):
                     result.failures,
                 )
         return report
+
+    def dispatch_extraction(self, result: MergeResult[Any]) -> None:
+        """Send the documents one merge touched for text extraction.
+
+        :param result: One merge's result, read for the document PKs it
+            created or updated."""
+        if (model := self.document_model) is None or not self.extract:
+            return
+        if self.dry_run:
+            return
+        pks = result.creates.get(model.__name__, set()) | result.updates.get(
+            model.__name__, set()
+        )
+        if not pks:
+            return
+        logger.info(
+            "Dispatching extraction for %s %s", len(pks), model.__name__
+        )
+        for document in model._default_manager.filter(pk__in=pks):
+            document.extract(self.extraction_queue)
