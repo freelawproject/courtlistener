@@ -17,8 +17,14 @@ from cl.search.models import (
 
 
 class MetadataItem(TypedDict):
-    """Shape of a single item in a metadata description list (see the
-    c-metadata-section cotton component)."""
+    """Shape of a single item in a metadata description list. Rendered by
+    both the c-metadata-section cotton component and
+    includes/metadata_section.html.
+
+    is_copyable/has_tooltip/tooltip_message are flags + plain content,
+    -- each stack decides its own concrete styling/mechanism.
+    tooltip_message may contain HTML; the caller must mark_safe it.
+    """
 
     label: str
     value: str
@@ -31,6 +37,19 @@ class MetadataItem(TypedDict):
     suffix_nofollow: NotRequired[bool]
     suffix_is_external: NotRequired[bool]
     suffix_aria_label: NotRequired[str]
+    is_copyable: NotRequired[bool]
+    has_tooltip: NotRequired[bool]
+    tooltip_message: NotRequired[str]
+
+
+class MetadataSection(TypedDict):
+    """Shape of one rendered metadata section (see includes/metadata_section.html).
+    A section with no items renders nothing, so callers MAY return empty
+    sections rather than filtering them out."""
+
+    items: list[MetadataItem]
+    title: NotRequired[str]
+    list_class: NotRequired[str]
 
 
 def build_scotus_metadata(
