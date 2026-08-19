@@ -1,13 +1,16 @@
 import json
 import sqlite3
-from collections.abc import Callable, Iterable
-from contextlib import closing
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import closing, contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, ClassVar, ParamSpec, TypeVar
+from unittest.mock import patch
 
+from botocore.exceptions import ClientError
 from django.db import connection
 from django.db.models import Model, QuerySet
+from django.test import override_settings
 from pydantic import BaseModel
 
 from cl.corpus_importer.state.loader import (
@@ -25,6 +28,11 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     ThroughParameters,
 )
+from cl.corpus_importer.state.run_db import (
+    RunDatabaseUnavailable,
+    downloaded_run_database,
+    scrape_bucket_client,
+)
 from cl.people_db.factories import PersonFactory
 from cl.people_db.models import Party, PartyType, Person
 from cl.search.docket_sources import DocketSources
@@ -36,7 +44,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     TrialCourtData,
 )
-from cl.tests.cases import TestCase
+from cl.tests.cases import SimpleTestCase, TestCase
 
 Param = ParamSpec("Param")
 Return = TypeVar("Return")
@@ -1193,3 +1201,134 @@ class JKentScrapeLoaderTest(TestCase):
             str(report),
             "6 seen, 1 merged, 2 invalid, 1 failed",
         )
+
+
+class FakeBucket:
+    """Stands in for the boto3 client `downloaded_run_database` fetches with.
+
+    Records what was asked for so a test can assert on it, and writes
+    `contents` where the real client would write the object."""
+
+    def __init__(
+        self,
+        contents: bytes = b"SQLite format 3\x00",
+        error: Exception | None = None,
+    ) -> None:
+        self.contents = contents
+        self.error = error
+        self.calls: list[tuple[str, str, str]] = []
+
+    def download_file(self, bucket: str, key: str, destination: str) -> None:
+        self.calls.append((bucket, key, destination))
+        if self.error is not None:
+            raise self.error
+        Path(destination).write_bytes(self.contents)
+
+
+@override_settings(
+    AWS_STORAGE_BUCKET_NAME="scrapes",
+    AWS_ACCESS_KEY_ID="key",
+    AWS_SECRET_ACCESS_KEY="secret",
+)
+class RunDatabaseTest(SimpleTestCase):
+    """Tests for fetching a run database out of the scrape bucket."""
+
+    @contextmanager
+    def download(self, bucket: FakeBucket, key: str) -> Iterator[Path]:
+        """`downloaded_run_database` with `bucket` standing in for S3.
+
+        The patch has to outlive the download, so this wraps the whole context
+        rather than handing one back."""
+        with patch(
+            "cl.corpus_importer.state.run_db.scrape_bucket_client",
+            return_value=bucket,
+        ):
+            with downloaded_run_database(key) as database:
+                yield database
+
+    def test_downloads_the_key_to_a_temporary_file(self) -> None:
+        """Does the database arrive on local disk, under its own name, from
+        the configured bucket?"""
+        bucket = FakeBucket(contents=b"a run")
+
+        with self.download(bucket, "nycourts_gov/2026-08-08.db") as database:
+            self.assertTrue(database.exists())
+            self.assertEqual(database.name, "2026-08-08.db")
+            self.assertEqual(database.read_bytes(), b"a run")
+            self.assertEqual(
+                bucket.calls,
+                [("scrapes", "nycourts_gov/2026-08-08.db", str(database))],
+            )
+
+    def test_takes_the_download_away_afterwards(self) -> None:
+        """A run database is hundreds of megabytes. Is the temporary copy
+        cleaned up when the caller is done with it?"""
+        with self.download(FakeBucket(), "nycourts_gov/run.db") as database:
+            self.assertTrue(database.exists())
+
+        self.assertFalse(database.exists())
+        self.assertFalse(database.parent.exists())
+
+    def test_cleans_up_after_a_load_that_raises(self) -> None:
+        """Does the copy go away even when the caller fails mid-load?"""
+        with self.assertRaises(ValueError):
+            with self.download(
+                FakeBucket(), "nycourts_gov/run.db"
+            ) as database:
+                path = database
+                raise ValueError("the load blew up")
+
+        self.assertFalse(path.exists())
+
+    def test_reports_a_key_that_cannot_be_fetched(self) -> None:
+        """A missing key, or credentials that cannot read it, is all an
+        operator can act on. Is it reported with the key named?"""
+        bucket = FakeBucket(
+            error=ClientError(
+                {"Error": {"Code": "404", "Message": "Not Found"}},
+                "HeadObject",
+            )
+        )
+
+        with self.assertRaises(RunDatabaseUnavailable) as caught:
+            with self.download(bucket, "nycourts_gov/nope.db"):
+                pass
+
+        self.assertIn(
+            "s3://scrapes/nycourts_gov/nope.db", str(caught.exception)
+        )
+
+    def test_rejects_a_key_that_names_no_database(self) -> None:
+        """Is a prefix handed over in place of a database refused before
+        anything is downloaded?"""
+        bucket = FakeBucket()
+
+        with self.assertRaises(RunDatabaseUnavailable):
+            with self.download(bucket, "nycourts_gov/"):
+                pass
+
+        self.assertEqual(bucket.calls, [])
+
+    def test_client_reads_courtlistener_credentials(self) -> None:
+        """Is the client built with CourtListener's own S3 credentials?"""
+        with patch("cl.corpus_importer.state.run_db.boto3.client") as client:
+            scrape_bucket_client()
+
+        self.assertEqual(
+            client.call_args.kwargs,
+            {
+                "aws_access_key_id": "key",
+                "aws_secret_access_key": "secret",
+            },
+        )
+
+    @override_settings(AWS_ACCESS_KEY_ID="", AWS_SECRET_ACCESS_KEY="")
+    def test_unset_credentials_leave_boto3_its_own_chain(self) -> None:
+        """An empty credential setting means "nothing configured here", not
+        "sign anonymously" -- a deployment may be getting its credentials from
+        an instance role instead. Is it passed as `None`?"""
+        with patch("cl.corpus_importer.state.run_db.boto3.client") as client:
+            scrape_bucket_client()
+
+        self.assertIsNone(client.call_args.kwargs["aws_access_key_id"])
+        self.assertIsNone(client.call_args.kwargs["aws_secret_access_key"])
