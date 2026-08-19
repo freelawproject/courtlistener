@@ -13,6 +13,11 @@ from juriscraper.lib.string_utils import titlecase
 
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
+from cl.lib.file_validation import (
+    NOT_A_PDF_MESSAGE,
+    content_is_pdf,
+    validate_file_size,
+)
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.people_db.models import Person
 from cl.scrapers.management.commands.cl_scrape_opinions import (
@@ -175,7 +180,7 @@ class BaseCourtUploadForm(forms.Form):
     pdf_upload = forms.FileField(
         label="Opinion PDF",
         required=True,
-        validators=[FileExtensionValidator(["pdf"])],
+        validators=[FileExtensionValidator(["pdf"]), validate_file_size],
         widget=forms.FileInput(attrs={"accept": ".pdf"}),
     )
 
@@ -430,11 +435,20 @@ class BaseCourtUploadForm(forms.Form):
             self.cleaned_data["citations"] = f"{volume} {reporter} {page}"
 
     def clean_pdf_upload(self) -> bytes:
-        """Check if we already have the pdf in the system
+        """Check the upload is a PDF we don't already have
+
+        The field's validators cover the file's extension and size, but the
+        uploader picks the extension, so check the contents too before
+        reading the file into memory.
 
         :return: pdf data
+        :raises ValidationError: If the file isn't a PDF.
         """
-        pdf_data = self.cleaned_data["pdf_upload"].read()
+        pdf_file = self.cleaned_data["pdf_upload"]
+        if not content_is_pdf(pdf_file):
+            raise ValidationError(NOT_A_PDF_MESSAGE)
+
+        pdf_data = pdf_file.read()
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
         if len(ops) > 0:
