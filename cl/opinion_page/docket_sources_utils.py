@@ -89,13 +89,49 @@ class DocketEntrySource:
     override. A future state-specific model plugs in by adding one more
     instance and a court_id mapping below -- view_docket itself doesn't
     need to change.
+
+    ``component`` picks which file renders this source's copy. Three
+    folders under cotton/ hold one file per component --
+    docket_source_button/, docket_source_attribution/ and
+    document_source_link/ -- so a source named "xyz" needs xyz.html in
+    all three. A missing one fails at render time with an error that
+    doesn't name it, so the source tests check that every component
+    resolves. Sources that render the same copy MAY share a component
+    instead of copying files.
+
+    ``document_detail_url`` returns a CourtListener path that we build
+    ourselves, or None. docket_entry_rows.html renders it unfiltered into
+    an ``href``, so a source MUST NOT return an externally sourced URL
+    from it.
+
+    ``document_external_url`` points outside CourtListener, so its scheme
+    MUST be guaranteed by us: either build the URL from a hardcoded
+    prefix, as ``RECAPDocument.pacer_url`` does, or filter it through
+    ``http_url``, as ``_scotus_document_external_url`` does. A source MUST
+    NOT return a raw third-party string.
+
+    Every callable below touches the ORM, so callers in async views MUST
+    wrap them in ``sync_to_async``.
     """
 
     entries_queryset: Callable[[Docket], QuerySet]
     documents_for_entry: Callable[[Any], Iterable]
     order_by_asc: tuple[str, ...]
     order_by_desc: tuple[str, ...]
+    document_is_attachment: Callable[[Any], bool]
+    document_label: Callable[[Any], str]
+    document_detail_url: Callable[[Any], str | None]
+    document_external_url: Callable[[Any], str | None]
+    metadata_sections: Callable[[Docket], list[MetadataSection]]
+    component: str
     has_pay_and_pray: bool = True
+
+
+def attach_display_fields(source: DocketEntrySource, document: Any) -> None:
+    """Resolve one document's display fields from its source, in place."""
+    document.label = source.document_label(document)
+    document.detail_url = source.document_detail_url(document)
+    document.external_url = source.document_external_url(document)
 
 
 def _recap_entries(docket: Docket) -> QuerySet:
@@ -107,6 +143,76 @@ def _recap_entries(docket: Docket) -> QuerySet:
     )
 
 
+def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
+    return de.recap_documents.all()
+
+
+def _recap_document_is_attachment(document: RECAPDocument) -> bool:
+    """Return whether one RECAP document is an attachment (vs. the main
+    document) within its entry."""
+    return document.document_type == document.ATTACHMENT
+
+
+def _recap_document_label(document: RECAPDocument) -> str:
+    """Return the label identifying one RECAP document within its entry."""
+    if document.document_type == RECAPDocument.ATTACHMENT:
+        return f"Attachment {document.attachment_number}"
+    return "Main Document"
+
+
+def _recap_document_detail_url(document: RECAPDocument) -> str | None:
+    """Return the URL of the CourtListener page for one RECAP document, or
+    None if we don't have the file yet."""
+    if not document.filepath_local:
+        return None
+    # Numberless minute entries have no URL of their own; get_absolute_url
+    # returns an empty string for them.
+    return document.get_absolute_url() or None
+
+
+def _recap_document_external_url(document: RECAPDocument) -> str | None:
+    """Return the PACER URL for one RECAP document, or None if it has
+    none."""
+    return document.pacer_url or None
+
+
+def _recap_metadata_sections(docket: Docket) -> list[MetadataSection]:
+    """Build the metadata sections specific to a RECAP/PACER docket."""
+    # Imported here rather than at module scope because cl.opinion_page.utils
+    # imports from this module.
+    from cl.opinion_page.utils import (
+        build_bankruptcy_metadata,
+        build_originating_court_metadata,
+    )
+
+    bankr_info = getattr(docket, "bankruptcy_information", None)
+    og_info = getattr(docket, "originating_court_information", None)
+    return [
+        {
+            "items": build_bankruptcy_metadata(bankr_info),
+            "title": "Bankruptcy Information",
+        },
+        {
+            "items": build_originating_court_metadata(docket, og_info),
+            "title": "Originating Court Information",
+        },
+    ]
+
+
+RECAP_SOURCE = DocketEntrySource(
+    entries_queryset=_recap_entries,
+    documents_for_entry=_recap_documents_for_entry,
+    order_by_asc=("recap_sequence_number", "entry_number"),
+    order_by_desc=("-recap_sequence_number", "-entry_number"),
+    document_is_attachment=_recap_document_is_attachment,
+    document_label=_recap_document_label,
+    document_detail_url=_recap_document_detail_url,
+    document_external_url=_recap_document_external_url,
+    metadata_sections=_recap_metadata_sections,
+    component="recap",
+)
+
+
 def _scotus_entries(docket: Docket) -> QuerySet:
     return docket.scotusdocketentry_set.all().prefetch_related(
         Prefetch(
@@ -116,27 +222,70 @@ def _scotus_entries(docket: Docket) -> QuerySet:
     )
 
 
-def _recap_documents_for_entry(de: DocketEntry) -> QuerySet:
-    return de.recap_documents.all()
-
-
 def _scotus_documents_for_entry(de: SCOTUSDocketEntry) -> QuerySet:
     return de.scotusdocument_set.all()
 
 
-RECAP_SOURCE = DocketEntrySource(
-    entries_queryset=_recap_entries,
-    documents_for_entry=_recap_documents_for_entry,
-    order_by_asc=("recap_sequence_number", "entry_number"),
-    order_by_desc=("-recap_sequence_number", "-entry_number"),
-)
+def _scotus_document_is_attachment(document: SCOTUSDocument) -> bool:
+    """Return True always: SCOTUSDocument has no "main document" concept,
+    every SCOTUS document is an attachment."""
+    return True
+
+
+def _scotus_document_label(document: SCOTUSDocument) -> str:
+    """Return the label identifying one SCOTUS document within its entry.
+
+    SCOTUSDocument has no "main document" concept: every SCOTUS document is
+    an attachment. The scrapers always set attachment_number, but guard
+    against a null one so a stray row can't render as "Attachment None".
+    """
+    if document.attachment_number is None:
+        return "Attachment"
+    return f"Attachment {document.attachment_number}"
+
+
+def _scotus_document_detail_url(document: SCOTUSDocument) -> str | None:
+    """Return None: SCOTUS documents have no CourtListener page in the
+    legacy design yet.
+
+    When that page exists, returning its URL here is all it takes for the
+    docket entry templates to start linking SCOTUS document labels.
+    """
+    return None
+
+
+def _scotus_document_external_url(document: SCOTUSDocument) -> str | None:
+    """Return the supremecourt.gov URL for one SCOTUS document, or None.
+
+    The URL comes from the court rather than from us, so it is filtered
+    through http_url before being handed to a template.
+    """
+    return http_url(document.url) or None
+
+
+def _scotus_metadata_sections(docket: Docket) -> list[MetadataSection]:
+    """Build the metadata sections specific to a SCOTUS docket."""
+    return [
+        {
+            "items": build_scotus_metadata(
+                getattr(docket, "scotus_metadata", None)
+            ),
+        }
+    ]
+
 
 SCOTUS_SOURCE = DocketEntrySource(
     entries_queryset=_scotus_entries,
     documents_for_entry=_scotus_documents_for_entry,
     order_by_asc=("sequence_number",),
     order_by_desc=("-sequence_number",),
+    document_is_attachment=_scotus_document_is_attachment,
+    document_label=_scotus_document_label,
+    document_detail_url=_scotus_document_detail_url,
+    document_external_url=_scotus_document_external_url,
+    metadata_sections=_scotus_metadata_sections,
     has_pay_and_pray=False,
+    component="scotus",
 )
 
 _SOURCES_BY_COURT_ID: dict[str, DocketEntrySource] = {"scotus": SCOTUS_SOURCE}

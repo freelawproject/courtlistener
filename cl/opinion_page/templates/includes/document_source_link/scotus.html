@@ -1,0 +1,18 @@
+{# SCOTUS's extra download-source copy; no check_availability variant since SCOTUS documents are never sealed. Caller already gated this on document.external_url. #}
+{% if variant == "menu_item" %}
+  <li role="separator" class="divider"></li>
+  <li>
+    <a href="{{ document.external_url }}"
+       target="_blank"
+       rel="nofollow noopener noreferrer">
+      <i class="fa fa-external-link"></i> From the Supreme Court</a>
+  </li>
+{% elif variant == "button" %}
+  <a href="{{ document.external_url }}"
+     rel="nofollow noopener noreferrer"
+     target="_blank"
+     role="button"
+     class="btn btn-default btn-xs">
+    <i class="fa fa-external-link"></i> View on SCOTUS
+  </a>
+{% endif %}
