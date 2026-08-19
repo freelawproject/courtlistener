@@ -274,7 +274,7 @@ class NYCoADocument(AbstractDateTimeModel, AbstractStateDocument):
     volume = models.SmallIntegerField(null=True, blank=True)
     part = models.SmallIntegerField(null=True, blank=True)
 
-    @property
+    @property  # type: ignore[override]
     def url(self) -> str:
         """The Court-PASS endpoint this document is served from.
 

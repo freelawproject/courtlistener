@@ -216,7 +216,7 @@ class AbstractStateDocument(AbstractPDF):
         from cl.scrapers.utils import get_extension
 
         try:
-            document = cls.objects.get(pk=pk)
+            document = cls._default_manager.get(pk=pk)
         except cls.DoesNotExist:
             logger.warning(
                 "Document download: %s %s does not exist; skipping.",

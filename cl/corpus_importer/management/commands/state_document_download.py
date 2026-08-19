@@ -61,7 +61,7 @@ def extract_state_documents(
     for extension in model.extractable_extensions():
         extension_query |= Q(filepath_local__endswith=f"{extension}")
     base_query = (
-        model.objects.exclude(
+        model._default_manager.exclude(
             filepath_local="",
         )
         .exclude(
@@ -146,7 +146,7 @@ def download_state_documents(
     :return: None
     """
     desc = download_order == "desc"
-    docs = model.objects.filter(
+    docs = model._default_manager.filter(
         filepath_local="", processing_error__isnull=True
     ).values_list("pk", flat=True)
 
