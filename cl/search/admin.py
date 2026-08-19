@@ -113,10 +113,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "panel",
         "non_participating_judges",
     )
-    list_filter = (
-        "source",
-        "blocked",
-    )
+    list_filter = ("blocked",)
     readonly_fields = (
         "citation_count",
         "date_modified",
