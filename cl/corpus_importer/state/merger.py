@@ -19,12 +19,13 @@ from typing import (
 )
 
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.core.exceptions import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import (
     Field,
     ForeignObjectRel,
     Model,
+    OneToOneRel,
     QuerySet,
 )
 from django.db.models.manager import Manager
@@ -265,6 +266,77 @@ def OneToOneRelation[ParamType, ChildType, RM: Model](
     transform: Callable[..., ChildType | None] | None = None,
 ) -> Any:
     return OneToOneMerger(merger, transform)
+
+
+class ReverseOneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
+    RelatedMerger[
+        ScrapeType,
+        ParamType,
+        ChildType,
+        ChildType | None,
+        RM,
+    ]
+):
+    """Class encapsulating logic for merging the reverse side of a one-to-one
+    relationship, where the `OneToOneField` is declared on the child (i.e.
+    `NYCoADocketMetadata.docket`) rather than on the parent.
+
+    The parent has no column to point at the child, so the child merger is
+    responsible for its own foreign key -- declare it as an `Attribute` reading
+    `params.parent`, the way `RoleMerger` does. This runs after the parent has
+    been created or updated, so the parent is always available."""
+
+    def __init__(
+        self,
+        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+        transform: Callable[[ScrapeType, ParamType], ChildType | None]
+        | None = None,
+    ):
+        super().__init__(merger=merger, transform=transform, default=None)
+
+    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        errors = super().validate(field)
+        if not field.one_to_one:
+            errors.append(TypeError(f"{self.name}: Is not a one-to-one field"))
+        elif not isinstance(field, OneToOneRel):
+            errors.append(
+                TypeError(
+                    f"{self.name}: Is a forward one-to-one field; use OneToOneRelation"
+                )
+            )
+        return errors
+
+    def merge(
+        self, parent: RM | None, scrape: ScrapeType, params: ParamType
+    ) -> MergeResult[Any]:
+        """Run the merge method on the appropriate inputs for the given relationship."""
+        merger_input = self.transform(scrape, params)
+        if merger_input is None:
+            return MergeResult.unnecessary()
+
+        if parent is None:
+            logger.error("%s: No parent model specified", self.name)
+            return MergeResult.failed(self.merger.model.__name__)
+
+        try:
+            db_obj = cast(RM | None, getattr(parent, self.name))
+        except ObjectDoesNotExist:
+            # Unlike a forward one-to-one, an absent reverse relation raises
+            # instead of returning None.
+            db_obj = None
+
+        return self.merger(
+            merger_input,
+            existing=db_obj,
+            params=RelatedParams(params, parent=parent),
+        ).merge()
+
+
+def ReverseOneToOneRelation[ParamType, ChildType, RM: Model](
+    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
+    transform: Callable[..., ChildType | None] | None = None,
+) -> Any:
+    return ReverseOneToOneMerger(merger, transform)
 
 
 class ManyStrategy(Enum):
