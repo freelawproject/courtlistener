@@ -48,7 +48,8 @@ jobs:
           -p cl.opinion_page \
           -p cl.recap_rss \
           -p cl.settings \
-          -p cl.simple_pages
+          -p cl.simple_pages \
+          -p cl.search.state
 
       # Add files here as they're ready
       - name: mypy Static Type Checker (files)
@@ -91,3 +92,5 @@ jobs:
           cl/corpus_importer/management/commands/probe_scotus_dockets_daemon.py \
           cl/corpus_importer/scotus_daemon_utils.py \
           cl/scrapers/management/commands/tames_poller.py
+
+
