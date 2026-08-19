@@ -114,12 +114,45 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "non_participating_judges",
     )
     list_filter = ("blocked",)
+    # `search_fields` only needs to be non-empty for the admin to render the
+    # search box. The actual lookup is done by `get_search_results` below.
+    search_fields = ("pk",)
+    search_help_text = "Search by OpinionCluster ID (exact match)."
     readonly_fields = (
         "citation_count",
         "date_modified",
         "date_created",
     )
     actions = ("seal_clusters",)
+
+    def get_search_results(
+        self, request: HttpRequest, queryset: QuerySet, search_term: str
+    ) -> tuple[QuerySet, bool]:
+        """Look clusters up by PK instead of running the default ILIKE search
+
+        Django's default admin search builds an `icontains` lookup for every
+        entry in `search_fields`. Since 6.0 it casts non-text fields to
+        `CharField` to do so, which makes the query unable to use the PK index
+        and times out on a table this size. Doing the integer comparison
+        ourselves keeps the lookup on the index.
+
+        See: https://github.com/freelawproject/courtlistener/issues/6790
+
+        :param request: HttpRequest object
+        :param queryset: The changelist queryset to filter
+        :param search_term: The raw string typed into the search box
+        :return: Two-tuple of the filtered queryset and whether the caller
+            needs to de-duplicate the results (never, here)
+        """
+        if not search_term:
+            return queryset, False
+
+        try:
+            pk = int(search_term.strip())
+        except ValueError:
+            return queryset.none(), False
+
+        return queryset.filter(pk=pk), False
 
     # nosemgrep: python.lang.bad-return-outside-function
     SEAL_BLOCKERS_MAP = {

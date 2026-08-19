@@ -3786,6 +3786,49 @@ class AdminActionsTest(TestCase):
         self.assertTrue(note_qs.exists())
         self.assertIn(self.note_cluster_3_user_1, note_qs)
 
+    def test_get_search_results_valid_pk(self):
+        """get_search_results returns the matching cluster for a valid PK."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, str(self.cluster_1.pk)
+        )
+        self.assertIn(self.cluster_1, results)
+        self.assertEqual(results.count(), 1)
+        self.assertFalse(use_distinct)
+
+    def test_get_search_results_invalid_string(self):
+        """get_search_results returns an empty queryset for a non-integer."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, "not-a-pk"
+        )
+        self.assertEqual(results.count(), 0)
+        self.assertFalse(use_distinct)
+
+    def test_get_search_results_empty_string(self):
+        """get_search_results returns the full queryset for an empty term."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, ""
+        )
+        self.assertEqual(
+            set(results.values_list("pk", flat=True)),
+            set(qs.values_list("pk", flat=True)),
+        )
+        self.assertFalse(use_distinct)
+
 
 class PopulateDocketNumberRawCommandTest(TestCase):
     @classmethod
