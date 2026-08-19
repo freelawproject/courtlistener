@@ -1,9 +1,20 @@
+import json
+import sqlite3
 from collections.abc import Callable, Iterable
+from contextlib import closing
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, ClassVar, ParamSpec, TypeVar
 
 from django.db import connection
 from django.db.models import Model, QuerySet
+from pydantic import BaseModel
 
+from cl.corpus_importer.state.loader import (
+    JKentScrapeLoader,
+    LoadReport,
+    UnusableScrape,
+)
 from cl.corpus_importer.state.merger import (
     Attribute,
     ManyStrategy,
@@ -12,6 +23,7 @@ from cl.corpus_importer.state.merger import (
     OneToManyRelation,
     OneToOneRelation,
     RelatedParams,
+    ReverseOneToOneRelation,
     ThroughParameters,
 )
 from cl.people_db.factories import PersonFactory
@@ -23,6 +35,7 @@ from cl.search.models import (
     Docket,
     DocketEntry,
     OriginatingCourtInformation,
+    TrialCourtData,
 )
 from cl.tests.cases import TestCase
 
@@ -267,6 +280,82 @@ class BaseMergerTest(TestCase):
         oci = OriginatingCourtInformation.objects.get(pk=oci_pk)
         self.assertEqual(oci.docket_number, i["mctest"]["sr"])
         self.assertEqual(oci.docket.pk, result.creates["Docket"].pop())
+
+    @merger_test(expected_query_count=6)
+    def test_related_mergers_reverse_1to1_creates(self) -> None:
+        """Does a reverse one-to-one relation, where the OneToOneField lives on
+        the child, create the child pointing at the parent?"""
+        tc = self
+
+        class TestRelatedMerger(
+            Merger[dict[str, str], RelatedParams[None], TrialCourtData]
+        ):
+            model: ClassVar[type[Model]] = TrialCourtData
+            key: ClassVar[Iterable[str]] = ["docket"]
+
+            docket: Docket = Attribute(lambda d, params: params.parent)
+            docket_number_trial: str = Attribute(lambda d, params: d["dn"])
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            trialcourtdata: TrialCourtData = ReverseOneToOneRelation(
+                TestRelatedMerger, lambda d, params: d["trial"]
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        result = TestMerger({"trial": {"dn": "CR-123"}}, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertIn("TrialCourtData", result.creates)
+        self.docket.refresh_from_db()
+        self.assertEqual(
+            self.docket.trialcourtdata.docket_number_trial, "CR-123"
+        )
+
+    @merger_test(expected_query_count=5)
+    def test_related_mergers_reverse_1to1_updates(self) -> None:
+        """Does a reverse one-to-one relation update the row the parent already
+        has instead of creating a second one?"""
+        existing = TrialCourtData.objects.create(
+            docket=self.docket, docket_number_trial="CR-000"
+        )
+        tc = self
+
+        class TestRelatedMerger(
+            Merger[dict[str, str], RelatedParams[None], TrialCourtData]
+        ):
+            model: ClassVar[type[Model]] = TrialCourtData
+            key: ClassVar[Iterable[str]] = ["docket"]
+
+            docket: Docket = Attribute(lambda d, params: params.parent)
+            docket_number_trial: str = Attribute(lambda d, params: d["dn"])
+
+        class TestMerger(Merger[dict[str, Any], None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=tc.court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(default=tc.docket.docket_number)
+            trialcourtdata: TrialCourtData = ReverseOneToOneRelation(
+                TestRelatedMerger, lambda d, params: d["trial"]
+            )
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(pk=tc.docket.pk)
+
+        result = TestMerger({"trial": {"dn": "CR-999"}}, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertNotIn("TrialCourtData", result.creates)
+        self.assertEqual(TrialCourtData.objects.count(), 1)
+        existing.refresh_from_db()
+        self.assertEqual(existing.docket_number_trial, "CR-999")
 
     @merger_test(expected_query_count=5)
     def test_related_mergers_child(self) -> None:
@@ -741,3 +830,277 @@ class BaseMergerTest(TestCase):
         self.assertEqual(docket.docket_number, "ABCDEFGH")
         self.assertEqual(docket.source, DocketSources.SCRAPER)
         self.assertEqual(docket.assigned_to_str, ats)
+
+
+def _run_database(path: Path, payloads: list[dict[str, Any]]) -> None:
+    """Write a minimal stand-in for a jkent run database.
+
+    Only the columns `JKentScrapeLoader` reads are created, since the loader's
+    contract is with the `results` table rather than with the whole schema."""
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute(
+            "CREATE TABLE results ("
+            "  id INTEGER PRIMARY KEY,"
+            "  data_json VARCHAR NOT NULL"
+            ")"
+        )
+        connection.executemany(
+            "INSERT INTO results (data_json) VALUES (?)",
+            [(json.dumps(payload),) for payload in payloads],
+        )
+        connection.commit()
+
+
+class LoaderScrape(BaseModel):
+    """The scrape a `JKentScrapeLoader` test subclass validates rows into."""
+
+    docket_number: str
+    case_name: str = ""
+
+
+class JKentScrapeLoaderTest(TestCase):
+    """Tests for the generic jkent run-database loader.
+
+    The loader is court-agnostic, so these exercise it through a throwaway
+    scrape model and merger rather than through any one state's loader.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory.create()
+
+    def setUp(self) -> None:
+        self.directory = TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.database = Path(self.directory.name) / "run.db"
+
+    def loader_class(self, **attributes: Any) -> type[JKentScrapeLoader[Any]]:
+        """A loader over the test database, merging into `Docket`.
+
+        :param attributes: Overrides for the returned class, so a test can
+            supply its own `normalize` or merger.
+        :return: The loader class.
+        """
+        # Not named `court`: a class body cannot close over an enclosing local
+        # whose name it also assigns.
+        test_court = self.court
+
+        class TestMerger(Merger[LoaderScrape, None, Docket]):
+            model: ClassVar[type[Model]] = Docket
+
+            court: Court = Attribute(default=test_court)
+            source: int = Attribute(default=DocketSources.SCRAPER)
+            docket_number: str = Attribute(
+                lambda scrape, params: scrape.docket_number
+            )
+            case_name: str = Attribute(lambda scrape, params: scrape.case_name)
+
+            def query(self) -> QuerySet[Docket]:
+                return Docket.objects.filter(
+                    court=test_court, docket_number=self.scrape.docket_number
+                )
+
+        return type(
+            "TestLoader",
+            (JKentScrapeLoader,),
+            {
+                "query": "SELECT data_json FROM results ORDER BY id",
+                "scrape_model": LoaderScrape,
+                "merger": TestMerger,
+            }
+            | attributes,
+        )
+
+    def test_missing_database(self) -> None:
+        """Is a run database that isn't there reported as such, rather than
+        counted as an empty run?"""
+        loader = self.loader_class()(self.database)
+
+        with self.assertRaises(FileNotFoundError):
+            loader.load()
+
+    def test_load_merges_every_row(self) -> None:
+        """Does a clean run merge one object per row and report it?"""
+        _run_database(
+            self.database,
+            [
+                {"docket_number": "A-1", "case_name": "Smith v Jones"},
+                {"docket_number": "A-2", "case_name": "Roe v Doe"},
+            ],
+        )
+
+        report = self.loader_class()(self.database).load()
+
+        self.assertEqual((report.seen, report.merged), (2, 2))
+        self.assertEqual(
+            (report.skipped, report.invalid, report.rejected, report.failed),
+            (0, 0, 0, 0),
+        )
+        self.assertEqual(len(report.result.creates["Docket"]), 2)
+        self.assertEqual(
+            set(Docket.objects.values_list("docket_number", flat=True)),
+            {"A-1", "A-2"},
+        )
+
+    def test_scrapes_yields_without_writing(self) -> None:
+        """`scrapes()` is the seam for inspecting a run. Does it produce the
+        validated scrapes and leave the database alone?"""
+        _run_database(
+            self.database,
+            [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
+        )
+
+        scrapes = list(self.loader_class()(self.database).scrapes())
+
+        self.assertEqual([s.docket_number for s in scrapes], ["A-1", "A-2"])
+        self.assertFalse(Docket.objects.exists())
+
+    def test_limit_stops_the_run_early(self) -> None:
+        """Does `limit` stop the load after that many rows?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+
+        report = self.loader_class()(self.database, limit=2).load()
+
+        self.assertEqual((report.seen, report.merged), (2, 2))
+        self.assertEqual(Docket.objects.count(), 2)
+
+    def test_dry_run_reports_a_real_merge_but_writes_nothing(self) -> None:
+        """A dry run runs the merge in full and rolls it back. Is the report
+        real while the database is left untouched?"""
+        _run_database(self.database, [{"docket_number": "A-1"}])
+
+        report = self.loader_class()(self.database, dry_run=True).load()
+
+        self.assertEqual((report.seen, report.merged), (1, 1))
+        self.assertIn("Docket", report.result.creates)
+        self.assertFalse(Docket.objects.exists())
+
+    def test_normalize_returning_none_is_a_skip(self) -> None:
+        """`normalize` returning `None` is the loader's own judgment that there
+        is nothing to do with a row. Is it counted as skipped, not failed?"""
+
+        def normalize(
+            self: Any, payload: dict[str, Any], row: sqlite3.Row
+        ) -> dict[str, Any] | None:
+            return None if payload["docket_number"] == "A-1" else payload
+
+        _run_database(
+            self.database,
+            [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
+        )
+
+        report = self.loader_class(normalize=normalize)(self.database).load()
+
+        self.assertEqual(
+            (report.seen, report.skipped, report.merged, report.failed),
+            (2, 1, 1, 0),
+        )
+        self.assertEqual(Docket.objects.count(), 1)
+
+    def test_normalize_raising_unusable_scrape_is_a_failure(self) -> None:
+        """`UnusableScrape` says the run needs looking at. Is the row counted
+        as failed and recorded against the merger's model, so a run's failures
+        are all in one place?"""
+
+        def normalize(
+            self: Any, payload: dict[str, Any], row: sqlite3.Row
+        ) -> dict[str, Any] | None:
+            raise UnusableScrape(f"{payload['docket_number']} is unusable")
+
+        _run_database(self.database, [{"docket_number": "A-1"}])
+
+        report = self.loader_class(normalize=normalize)(self.database).load()
+
+        self.assertEqual(
+            (report.seen, report.failed, report.skipped, report.merged),
+            (1, 1, 0, 0),
+        )
+        # No PK, because the row was refused before anything was looked up.
+        self.assertEqual(report.result.failures, {"Docket": [None]})
+        self.assertFalse(Docket.objects.exists())
+
+    def test_payload_that_does_not_fit_the_model_is_invalid(self) -> None:
+        """A payload the scrape model rejects usually means scraper drift. Is
+        it reported rather than raised, so one bad row doesn't cost the run?"""
+        _run_database(
+            self.database,
+            [{"case_name": "No docket number here"}, {"docket_number": "A-2"}],
+        )
+
+        report = self.loader_class()(self.database).load()
+
+        self.assertEqual(
+            (report.seen, report.invalid, report.merged), (2, 1, 1)
+        )
+        self.assertEqual(
+            Docket.objects.get().docket_number,
+            "A-2",
+            "The row after the bad one still merges.",
+        )
+
+    def test_merger_declining_a_scrape_is_a_rejection(self) -> None:
+        """A merger's `validate` turning a scrape away is not a failure. Is it
+        counted separately?"""
+        loader_class = self.loader_class()
+
+        class RejectingMerger(loader_class.merger):  # type: ignore[misc, name-defined]
+            @staticmethod
+            def validate(scrape: LoaderScrape) -> bool:
+                return scrape.docket_number != "A-1"
+
+        _run_database(
+            self.database,
+            [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
+        )
+
+        report = self.loader_class(merger=RejectingMerger)(
+            self.database
+        ).load()
+
+        self.assertEqual(
+            (report.seen, report.rejected, report.merged, report.failed),
+            (2, 1, 1, 0),
+        )
+        self.assertEqual(Docket.objects.count(), 1)
+
+    def test_a_row_that_raises_does_not_cost_the_run(self) -> None:
+        """Each row is merged independently. Is a merge that raises counted as
+        a failure while the rest of the run continues?"""
+        loader_class = self.loader_class()
+
+        class RaisingMerger(loader_class.merger):  # type: ignore[misc, name-defined]
+            def merge(self) -> Any:
+                if self.scrape.docket_number == "A-1":
+                    raise ValueError("boom")
+                return super().merge()
+
+        _run_database(
+            self.database,
+            [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
+        )
+
+        report = self.loader_class(merger=RaisingMerger)(self.database).load()
+
+        self.assertEqual(
+            (report.seen, report.failed, report.merged), (2, 1, 1)
+        )
+        self.assertEqual(
+            Docket.objects.get().docket_number,
+            "A-2",
+            "The row after the raising one still merges.",
+        )
+
+    def test_report_str_names_every_count(self) -> None:
+        """The report is what an operator reads off a load. Does its summary
+        state all six counts?"""
+        report = LoadReport(
+            seen=6, merged=1, skipped=2, invalid=1, rejected=1, failed=1
+        )
+
+        self.assertEqual(
+            str(report),
+            "6 seen, 1 merged, 2 skipped, 1 invalid, 1 rejected, 1 failed",
+        )
