@@ -12,6 +12,7 @@ from django.utils.html import format_html
 from cl.alerts.models import DocketAlert
 from cl.lib.admin import (
     AdminLinkConfig,
+    IndexedPkSearchMixin,
     SealableDocumentAdmin,
     generate_admin_links,
 )
@@ -105,7 +106,7 @@ class CitationInline(admin.TabularInline):
 
 
 @admin.register(OpinionCluster)
-class OpinionClusterAdmin(CursorPaginatorAdmin):
+class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
     change_form_template = "admin/change_form_with_custom_links.html"
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (CitationInline,)
@@ -115,9 +116,9 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "non_participating_judges",
     )
     list_filter = ("blocked",)
-    # `search_fields` only needs to be non-empty for the admin to render the
-    # search box. The actual lookup is done by `get_search_results` below.
-    search_fields = ("pk",)
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by IndexedPkSearchMixin
     search_help_text = "Search by OpinionCluster ID (exact match)."
     readonly_fields = (
         "citation_count",
@@ -125,35 +126,6 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "date_created",
     )
     actions = ("seal_clusters",)
-
-    def get_search_results(
-        self, request: HttpRequest, queryset: QuerySet, search_term: str
-    ) -> tuple[QuerySet, bool]:
-        """Look clusters up by PK instead of running the default ILIKE search
-
-        Django's default admin search builds an `icontains` lookup for every
-        entry in `search_fields`. Since 6.0 it casts non-text fields to
-        `CharField` to do so, which makes the query unable to use the PK index
-        and times out on a table this size. Doing the integer comparison
-        ourselves keeps the lookup on the index.
-
-        See: https://github.com/freelawproject/courtlistener/issues/6790
-
-        :param request: HttpRequest object
-        :param queryset: The changelist queryset to filter
-        :param search_term: The raw string typed into the search box
-        :return: Two-tuple of the filtered queryset and whether the caller
-            needs to de-duplicate the results (never, here)
-        """
-        if not search_term:
-            return queryset, False
-
-        try:
-            pk = int(search_term.strip())
-        except ValueError:
-            return queryset.none(), False
-
-        return queryset.filter(pk=pk), False
 
     def change_view(
         self,
@@ -551,11 +523,13 @@ class CaseTransferAdmin(CursorPaginatorAdmin):
 
 
 @admin.register(RECAPDocument)
-class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+class RECAPDocumentAdmin(
+    IndexedPkSearchMixin, SealableDocumentAdmin, CursorPaginatorAdmin
+):
     change_form_template = "admin/change_form_with_custom_links.html"
     search_fields = (
         "pk",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by IndexedPkSearchMixin
     search_help_text = "Search by RECAP Document ID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry", "tags")
@@ -574,26 +548,6 @@ class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
 
     def get_seal_documents(self, obj):
         return [obj]
-
-    def get_search_results(
-        self, request: HttpRequest, queryset: QuerySet, search_term: str
-    ) -> tuple[QuerySet, bool]:
-        """Override to search by pk without varchar casting.
-
-        Django 6.0.1 casts non-text fields to CharField for text lookups,
-        which prevents index usage on large tables. This method handles
-        pk searches with direct integer comparison.
-
-        See: https://github.com/freelawproject/courtlistener/issues/6790
-        """
-        if not search_term:
-            return queryset, False
-
-        try:
-            pk_value = int(search_term.strip())
-            return queryset.filter(pk=pk_value), False
-        except ValueError:
-            return queryset.none(), False
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
