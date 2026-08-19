@@ -3847,6 +3847,10 @@ class OpinionClusterAdminSealViewTest(TestCase):
             date_filed=datetime.date.today(),
         )
 
+        # A staff user with no model permissions at all, to check that the
+        # seal view is gated on more than the admin's is_staff check.
+        cls.staff_user = UserFactory(is_staff=True, is_superuser=False)
+
         cls.cluster_with_blockers = OpinionClusterWithParentsFactory(
             docket=DocketFactory(
                 court=cls.court,
@@ -3917,6 +3921,20 @@ class OpinionClusterAdminSealViewTest(TestCase):
                 reason=ClusterRedirection.SEALED,
             ).exists(),
             "A ClusterRedirection record should have been created.",
+        )
+
+    def test_seal_cluster_view_requires_delete_permission(self):
+        """A staff user without delete permission can't seal a cluster."""
+        self.client.force_login(self.staff_user)
+        pk = self.cluster_no_blockers.pk
+        url = reverse("admin:opinioncluster_seal_confirmation", args=[pk])
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(url)
+                self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertTrue(
+            OpinionCluster.objects.filter(pk=pk).exists(),
+            "Cluster should not have been deleted.",
         )
 
 
