@@ -3830,6 +3830,96 @@ class AdminActionsTest(TestCase):
         self.assertFalse(use_distinct)
 
 
+class OpinionClusterAdminSealViewTest(TestCase):
+    """Tests for the single-cluster seal confirmation view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.superuser = UserFactory(is_staff=True, is_superuser=True)
+        cls.court = CourtFactory(id="ca9")
+
+        cls.cluster_no_blockers = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                case_name="No Blockers v. Test",
+            ),
+            case_name="No Blockers v. Test",
+            date_filed=datetime.date.today(),
+        )
+
+        cls.cluster_with_blockers = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                case_name="Has Blockers v. Test",
+            ),
+            case_name="Has Blockers v. Test",
+            date_filed=datetime.date.today(),
+        )
+        # Attach a UserTag to make this cluster unsealable via the view
+        user = UserFactory()
+        tag = UserTagFactory(user=user, name="blocker_tag")
+        tag.dockets.add(cls.cluster_with_blockers.docket.pk)
+
+    def setUp(self):
+        self.client = Client()
+        self.client.force_login(self.superuser)
+
+    def test_seal_cluster_view_get_no_blockers(self):
+        """GET with no blocking relations renders the confirmation page."""
+        url = reverse(
+            "admin:opinioncluster_seal_confirmation",
+            args=[self.cluster_no_blockers.pk],
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertIn("cluster", response.context)
+        self.assertEqual(response.context["cluster"], self.cluster_no_blockers)
+
+    def test_seal_cluster_view_get_with_cluster_blockers_redirects(self):
+        """GET with cluster-level blockers redirects to the blocking view."""
+        url = reverse(
+            "admin:opinioncluster_seal_confirmation",
+            args=[self.cluster_with_blockers.pk],
+        )
+        response = self.client.get(url)
+        self.assertRedirects(
+            response,
+            reverse(
+                "admin:opinioncluster_blocking_confirmation",
+                args=[self.cluster_with_blockers.pk],
+            ),
+        )
+
+    def test_seal_cluster_view_post_seals_cluster(self):
+        """POST seals the cluster and creates a ClusterRedirection."""
+        cluster = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Seal Me v. Test",
+            ),
+            case_name="Seal Me v. Test",
+            date_filed=datetime.date.today(),
+        )
+        pk = cluster.pk
+        url = reverse("admin:opinioncluster_seal_confirmation", args=[pk])
+        response = self.client.post(url)
+        self.assertRedirects(
+            response,
+            reverse("admin:search_opinioncluster_changelist"),
+        )
+        self.assertFalse(
+            OpinionCluster.objects.filter(pk=pk).exists(),
+            "Cluster should have been deleted after sealing.",
+        )
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=pk,
+                reason=ClusterRedirection.SEALED,
+            ).exists(),
+            "A ClusterRedirection record should have been created.",
+        )
+
+
 class PopulateDocketNumberRawCommandTest(TestCase):
     @classmethod
     def setUpTestData(cls):

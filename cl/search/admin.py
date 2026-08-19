@@ -4,7 +4,7 @@ from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Q, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils.html import format_html
@@ -106,6 +106,7 @@ class CitationInline(admin.TabularInline):
 
 @admin.register(OpinionCluster)
 class OpinionClusterAdmin(CursorPaginatorAdmin):
+    change_form_template = "admin/change_form_with_custom_links.html"
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (CitationInline,)
     raw_id_fields = (
@@ -153,6 +154,39 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
             return queryset.none(), False
 
         return queryset.filter(pk=pk), False
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Add a "Seal Cluster" button to the change form
+
+        :param request: HttpRequest object
+        :param object_id: PK of the OpinionCluster being edited
+        :param form_url: URL the change form posts to
+        :param extra_context: Additional template context
+        :return: The rendered change form
+        """
+        extra_context = extra_context or {}
+        if object_id.isdigit():
+            # Skip the button for malformed IDs so the admin can render its
+            # usual "object doesn't exist" redirect instead of blowing up on
+            # a NoReverseMatch.
+            extra_context["custom_links"] = [
+                {
+                    "href": reverse(
+                        "admin:opinioncluster_seal_confirmation",
+                        args=[object_id],
+                    ),
+                    "label": "Seal Cluster",
+                }
+            ]
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
 
     # nosemgrep: python.lang.bad-return-outside-function
     SEAL_BLOCKERS_MAP = {
@@ -250,7 +284,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         return blockers
 
     def get_urls(self):
-        """Add custom admin URLs for the blocking dependencies confirmation view
+        """Add custom admin URLs for sealing and blocking-dependency views
 
         :return: List of url patterns
         """
@@ -261,8 +295,81 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
                 self.admin_site.admin_view(self.blocking_confirmation_view),
                 name="opinioncluster_blocking_confirmation",
             ),
+            path(
+                "seal-cluster/<int:cluster_id>/",
+                self.admin_site.admin_view(self.seal_cluster_view),
+                name="opinioncluster_seal_confirmation",
+            ),
         ]
         return custom_urls + urls
+
+    def seal_cluster_view(
+        self, request: HttpRequest, cluster_id: int
+    ) -> HttpResponse:
+        """Confirmation page (GET) and execution (POST) for sealing one cluster
+
+        This is the single-object counterpart to the `seal_clusters` action,
+        reachable from the "Seal Cluster" button on the change form.
+
+        On GET, a cluster with dependencies that block deletion redirects to
+        the blocking-confirmation page so the admin can see what needs to be
+        resolved first. Otherwise we render a confirmation form that says
+        whether the associated docket will be removed along with the cluster.
+
+        On POST, we delete the cluster (and the docket, when nothing else
+        depends on it), create the ClusterRedirection record, and send the
+        admin back to the changelist.
+
+        :param request: HttpRequest object
+        :param cluster_id: ID of the OpinionCluster to seal
+        :return: Redirect or rendered confirmation page
+        """
+        cluster = get_object_or_404(OpinionCluster, pk=cluster_id)
+        blockers = self.check_blocking_relations(cluster)
+
+        cluster_deletion_blockers = any(
+            blockers.get(key, False) for key in self.CLUSTER_BLOCKER_KEYS
+        )
+        if cluster_deletion_blockers:
+            return HttpResponseRedirect(
+                reverse(
+                    "admin:opinioncluster_blocking_confirmation",
+                    args=[cluster_id],
+                )
+            )
+
+        docket_deletion_blockers = any(
+            blockers.get(key, False) for key in self.DOCKET_BLOCKER_KEYS
+        )
+
+        if request.method == "POST":
+            docket = cluster.docket
+            cluster_pk = cluster.pk
+            with transaction.atomic():
+                cluster.delete()
+                ClusterRedirection.objects.create(
+                    reason=ClusterRedirection.SEALED,
+                    deleted_cluster_id=cluster_pk,
+                    cluster=None,
+                )
+                if not docket_deletion_blockers:
+                    docket.delete()
+            self.message_user(
+                request,
+                f"Sealed cluster {cluster_pk}.",
+                messages.SUCCESS,
+            )
+            return HttpResponseRedirect(
+                reverse("admin:search_opinioncluster_changelist")
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Seal OpinionCluster #{cluster_id}?",
+            "cluster": cluster,
+            "docket_will_be_deleted": not docket_deletion_blockers,
+        }
+        return render(request, "admin/seal_cluster_confirmation.html", context)
 
     def blocking_confirmation_view(
         self, request: HttpRequest, cluster_id: int
