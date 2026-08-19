@@ -509,6 +509,17 @@ def make_docket_title(docket: Docket) -> str:
     return title
 
 
+async def get_scotus_metadata_items(docket: Docket) -> list[MetadataItem]:
+    """Build the SCOTUS metadata items for a docket, or [] if it isn't one.
+    Skips the query entirely for non-SCOTUS dockets."""
+    if docket.court_id != "scotus":
+        return []
+    metadata = await ScotusDocketMetadata.objects.filter(
+        docket=docket
+    ).afirst()
+    return build_scotus_metadata(metadata)
+
+
 async def core_docket_data(
     request: HttpRequest,
     pk: int,
@@ -563,17 +574,15 @@ async def core_docket_data(
     def _get_related(
         d: Docket,
     ) -> tuple[
-        ScotusDocketMetadata | None,
         BankruptcyInformation | None,
         OriginatingCourtInformation | None,
     ]:
         return (
-            getattr(d, "scotus_metadata", None),
             getattr(d, "bankruptcy_information", None),
             getattr(d, "originating_court_information", None),
         )
 
-    scotus_metadata, bankr_info, og_info = await _get_related(docket)
+    bankr_info, og_info = await _get_related(docket)
 
     docket_metadata = await sync_to_async(build_docket_metadata)(
         docket, timezone_str
@@ -604,7 +613,7 @@ async def core_docket_data(
             "originating_court_metadata": await sync_to_async(
                 build_originating_court_metadata
             )(docket, og_info),
-            "scotus_metadata": build_scotus_metadata(scotus_metadata),
+            "scotus_metadata": await get_scotus_metadata_items(docket),
             "metadata_sections": metadata_sections,
         },
     )
