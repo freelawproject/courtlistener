@@ -697,6 +697,8 @@ class MembershipWebhookTest(TestCase):
         membership = await query.afirst()
         self.assertEqual(membership.user.email, "test@free.law")
         self.assertEqual(membership.user.profile.neon_account_id, "9524")
+        self.assertEqual(membership.user.first_name, "test")
+        self.assertEqual(membership.user.last_name, "test")
 
     @patch(
         "cl.lib.neon_utils.NeonClient.get_account_by_id",

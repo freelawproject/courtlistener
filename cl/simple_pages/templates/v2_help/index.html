@@ -1,81 +1,65 @@
 {% extends "new_base.html" %}
+{% load svg_tags %}
 
 {% block title %}Getting Help – CourtListener.com{% endblock %}
 
 
 {% block content %}
-  <div class="pb-11">
-    <div class="flex flex-col gap-4 pr-13">
-      <c-eyebrow>CourtListener</c-eyebrow>
-      <h1>Getting Help on CourtListener</h1>
+  <div class="flex flex-col items-center text-center gap-4 pb-11">
+    <h1>Getting Help on CourtListener</h1>
+    <p class="text-sm font-normal text-greyscale-600 max-w-lg">
+      Most answers live in our help articles on the wiki. Can't find what
+      you need there? Jump to a topic below.
+    </p>
+    <c-button variant="primary" size="xl" href="{{ WIKI_HELP_URL }}">
+      {% svg "circle_question_mark" class="w-5 h-5" aria_hidden="true" %}
+      Browse Help Articles
+    </c-button>
+  </div>
+
+  <div class="flex flex-col gap-6 pb-11">
+    <h2 class="text-display-xs font-semibold text-greyscale-900 text-center">
+      Or Go Straight to a Topic
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="flex flex-col gap-3 p-6 rounded-2xl bg-greyscale-100 border border-greyscale-200">
+        <div aria-hidden="true" class="w-10 h-10 flex items-center justify-center rounded-full bg-greyscale-200 text-greyscale-600">
+          {% svg "heart" class="w-5 h-5" %}
+        </div>
+        <h3 class="font-semibold text-greyscale-900">Donations &amp; Membership</h3>
+        <p class="text-sm font-normal text-greyscale-600 grow">Help with a donation, a membership, or a receipt.</p>
+        <a class="links" href="{% url "donation_help" %}">Get donation help</a>
+      </div>
+      <div class="flex flex-col gap-3 p-6 rounded-2xl bg-greyscale-100 border border-greyscale-200">
+        <div aria-hidden="true" class="w-10 h-10 flex items-center justify-center rounded-full bg-greyscale-200 text-greyscale-600">
+          {% svg "graph_up" class="w-5 h-5" %}
+        </div>
+        <h3 class="font-semibold text-greyscale-900">Data Coverage</h3>
+        <p class="text-sm font-normal text-greyscale-600 grow">What's in our case law, PACER, disclosure, and oral argument collections.</p>
+        <a class="links" href="{{ WIKI_COVERAGE_URL }}">See our coverage</a>
+      </div>
+      <div class="flex flex-col gap-3 p-6 rounded-2xl bg-greyscale-100 border border-greyscale-200">
+        <div aria-hidden="true" class="w-10 h-10 flex items-center justify-center rounded-full bg-greyscale-200 text-greyscale-600">
+          {% svg "code" class="w-5 h-5" %}
+        </div>
+        <h3 class="font-semibold text-greyscale-900">Developer Docs</h3>
+        <p class="text-sm font-normal text-greyscale-600 grow">REST APIs, bulk data, webhooks, MCP, and database replication.</p>
+        <a class="links" href="{{ WIKI_API_URL }}">Read the docs</a>
+      </div>
+      <div class="flex flex-col gap-3 p-6 rounded-2xl bg-greyscale-100 border border-greyscale-200">
+        <div aria-hidden="true" class="w-10 h-10 flex items-center justify-center rounded-full bg-greyscale-200 text-greyscale-600">
+          {% svg "cross" class="w-5 h-5" %}
+        </div>
+        <h3 class="font-semibold text-greyscale-900">Removing Content</h3>
+        <p class="text-sm font-normal text-greyscale-600 grow">When and how we remove content from CourtListener and search engines.</p>
+        <a class="links" href="{{ WIKI_REMOVAL_URL }}">Read our policy</a>
+      </div>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-11 md:gap-y-20 md:gap-x-5">
-
-    <div class="flex flex-col gap-6">
-      <div class="flex flex-col gap-2">
-        <h2 class="text-display-xs font-semibold text-greyscale-900">Help Articles</h2>
-        <p class="text-sm font-normal text-greyscale-600">Our help articles are available on the Free Law Project wiki.</p>
-      </div>
-      <a href="{{ WIKI_HELP_URL }}" class="btn-primary max-md:btn-xl">Help Articles on the Wiki</a>
-      <a href="{% url "donation_help" %}" class="btn-outline max-md:btn-xl">Help with your Donations</a>
-    </div>
-
-    <div class="flex flex-col gap-6">
-      <div class="flex flex-col gap-2">
-        <h2 class="text-display-xs font-semibold text-greyscale-900">About our Data</h2>
-        <p class="text-sm font-normal text-greyscale-600">We've built some of the biggest open datasets in the world. Learn more about them:</p>
-      </div>
-      <div class="pl-4">
-        <ol class="list-decimal marker:text-greyscale-800 marker:font-normal text-sm font-normal space-y-2">
-          <li><a class="links" href="{% url "coverage" %}">Coverage Homepage</a></li>
-          <li><a class="links" href="{% url "coverage_recap" %}">PACER Data Coverage</a></li>
-          <li><a class="links" href="{% url "coverage_opinions" %}">Case Law Coverage</a></li>
-          <li><a class="links" href="{% url "coverage_fds" %}">Financial Disclosure Coverage</a></li>
-          <li><a class="links-external" href="https://free.law/datasets#judges-db" target="_blank" rel="noopener noreferrer">Judge Coverage</a></li>
-          <li><a class="links" href="{% url "coverage_oa" %}">Oral Argument Recording Coverage</a></li>
-        </ol>
-      </div>
-    </div>
-
-    <div class="flex flex-col gap-6">
-      <div class="flex flex-col gap-2">
-        <h2 class="text-display-xs font-semibold text-greyscale-900">Developer Documentation</h2>
-        <p class="text-sm font-normal text-greyscale-600">Our developer documentation &mdash; including REST APIs, bulk data, webhooks, MCP, and replication &mdash; has moved to our wiki.</p>
-      </div>
-      <a href="{{ WIKI_API_URL }}" class="btn-primary max-md:btn-xl">Developer Documentation on the Wiki</a>
-    </div>
-
-    <div class="flex flex-col gap-20">
-      <div class="flex flex-col gap-4">
-        <div class="flex flex-col gap-2">
-          <h2 class="text-display-xs font-semibold text-greyscale-900">Removing Content</h2>
-          <p class="text-sm font-normal text-greyscale-600">We will not remove content from our systems absent a valid court order, but we will usually remove content from public search engines like Google, upon request.
-          </p>
-        </div>
-        <a
-          href="{{ WIKI_REMOVAL_URL }}"
-          class="py-2.5 px-3.5 rounded-lg outline outline-1 outline-greyscale-300 w-fit text-sm font-normal text-greyscale-700"
-        >
-          Read our Removal Policy to Learn More
-        </a>
-      </div>
-
-      <div class="flex flex-col gap-4">
-        <div class="flex flex-col gap-4">
-          <h2 class="text-display-xs font-semibold text-greyscale-900">More Help?</h2>
-          <p class="text-sm font-normal text-greyscale-600">If you're unable to find what you're looking for above, get in touch:</p>
-        </div>
-        <div class="flex items-start gap-4">
-          <a
-            href="{% url "contact" %}"
-            class="py-2.5 px-3.5 rounded-lg w-fit text-sm font-normal text-white bg-primary-600"
-          >
-            Contact Us
-          </a>
-        </div>
-      </div>
-    </div>
+  <div class="flex flex-col items-center text-center gap-4">
+    <h2 class="text-display-xs font-semibold text-greyscale-900">Still Stuck?</h2>
+    <p class="text-sm font-normal text-greyscale-600">If you didn't find what you needed above, get in touch directly.</p>
+    <c-button variant="outline" href="{% url "contact" %}">Contact Us</c-button>
   </div>
 {% endblock %}

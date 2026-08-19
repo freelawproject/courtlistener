@@ -225,16 +225,6 @@ urlpatterns = [
         name="wiki_coverage_data",
     ),
     re_path(
-        r"^api/rest/v4/coverage/opinions/",
-        views.coverage_data_opinions,
-        name="coverage_data_opinions",
-    ),
-    re_path(
-        r"^api/rest/v(?P<version>[1234])/coverage/(?P<court>.+)/$",
-        views.coverage_data,
-        name="coverage_data",
-    ),
-    re_path(
         r"^api/rest/v(?P<version>[1234])/alert-frequency/(?P<day_count>\d+)/$",
         views.get_result_count,
         name="alert_frequency",

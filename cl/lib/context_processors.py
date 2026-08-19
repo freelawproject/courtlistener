@@ -21,6 +21,11 @@ def inject_settings(request):
         "WIKI_HELP_URL": settings.WIKI_HELP_BASE_URL,
         "WIKI_TERMS_URL": settings.WIKI_TERMS_URL,
         "WIKI_REMOVAL_URL": settings.WIKI_REMOVAL_URL,
+        "WIKI_COVERAGE_URL": settings.WIKI_COVERAGE_URL,
+        "WIKI_COVERAGE_FDS_URL": settings.WIKI_COVERAGE_FDS_URL,
+        "WIKI_COVERAGE_OA_URL": settings.WIKI_COVERAGE_OA_URL,
+        "WIKI_COVERAGE_OPINIONS_URL": settings.WIKI_COVERAGE_OPINIONS_URL,
+        "WIKI_COVERAGE_RECAP_URL": settings.WIKI_COVERAGE_RECAP_URL,
     }
 
 

@@ -1899,7 +1899,7 @@ class Court(models.Model):
 
     Note that a Courthouse object should be created alongside each new Court.
     Even if this is not enforced by the data model, there is some logic tied
-    to that relation. Examples in `find_citations` and `coverage_utils`
+    to that relation. Examples in `find_citations`.
     """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
