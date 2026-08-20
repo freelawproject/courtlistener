@@ -59,7 +59,8 @@
   [x-cloak] {
     display: none !important;
   }
-  input[type="checkbox"] {
+  /* Exclude role=switch — those are styled by the c-toggle-switch Cotton component. */
+  input[type="checkbox"]:not([role="switch"]) {
     @apply relative appearance-none flex-shrink-0 w-5 h-5 rounded border border-greyscale-300 bg-white; /* base checkbox */
     @apply checked:border-primary-600 checked:bg-primary-600 indeterminate:border-primary-600 indeterminate:bg-primary-600; /* checked or indeterminate */
     @apply focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-primary-600/60; /* focus */
@@ -67,7 +68,7 @@
     @apply before:absolute before:inset-0 before:m-auto before:w-4 before:h-4 before:bg-white; /* check icon container */
     @apply checked:before:scale-100 before:scale-0 before:transform before:duration-200 transition-colors; /* animate check icon */
   }
-  input[type="checkbox"]::before {
+  input[type="checkbox"]:not([role="switch"])::before {
     mask: url("/static/svg/check_thick.svg") no-repeat center/contain;
   }
   input[type="radio"] {
