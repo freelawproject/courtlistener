@@ -832,11 +832,15 @@ class BaseMergerTest(TestCase):
         self.assertEqual(docket.assigned_to_str, ats)
 
 
-def _run_database(path: Path, payloads: list[dict[str, Any]]) -> None:
+def _run_database(path: Path, payloads: list[dict[str, Any] | str]) -> None:
     """Write a minimal stand-in for a jkent run database.
 
     Only the columns `JKentScrapeLoader` reads are created, since the loader's
-    contract is with the `results` table rather than with the whole schema."""
+    contract is with the `results` table rather than with the whole schema.
+
+    :param path: Where to write the database.
+    :param payloads: One entry per row. A dict is serialized; a string is
+        stored as given, so a test can write a blob that will not decode."""
     with closing(sqlite3.connect(path)) as connection:
         connection.execute(
             "CREATE TABLE results ("
@@ -846,7 +850,10 @@ def _run_database(path: Path, payloads: list[dict[str, Any]]) -> None:
         )
         connection.executemany(
             "INSERT INTO results (data_json) VALUES (?)",
-            [(json.dumps(payload),) for payload in payloads],
+            [
+                (payload if isinstance(payload, str) else json.dumps(payload),)
+                for payload in payloads
+            ],
         )
         connection.commit()
 
@@ -933,8 +940,8 @@ class JKentScrapeLoaderTest(TestCase):
 
         self.assertEqual((report.seen, report.merged), (2, 2))
         self.assertEqual(
-            (report.skipped, report.invalid, report.rejected, report.failed),
-            (0, 0, 0, 0),
+            (report.invalid, report.rejected, report.failed),
+            (0, 0, 0),
         )
         self.assertEqual(len(report.result.creates["Docket"]), 2)
         self.assertEqual(
@@ -967,6 +974,19 @@ class JKentScrapeLoaderTest(TestCase):
         self.assertEqual((report.seen, report.merged), (2, 2))
         self.assertEqual(Docket.objects.count(), 2)
 
+    def test_limit_of_zero_loads_nothing(self) -> None:
+        """A limit computed at runtime can come out zero. Does that load no
+        rows at all, rather than the one row an off-by-one would let through?"""
+        _run_database(
+            self.database,
+            [{"docket_number": f"A-{n}"} for n in range(5)],
+        )
+
+        report = self.loader_class()(self.database, limit=0).load()
+
+        self.assertEqual((report.seen, report.merged), (0, 0))
+        self.assertFalse(Docket.objects.exists())
+
     def test_dry_run_reports_a_real_merge_but_writes_nothing(self) -> None:
         """A dry run runs the merge in full and rolls it back. Is the report
         real while the database is left untouched?"""
@@ -978,9 +998,9 @@ class JKentScrapeLoaderTest(TestCase):
         self.assertIn("Docket", report.result.creates)
         self.assertFalse(Docket.objects.exists())
 
-    def test_normalize_returning_none_is_a_skip(self) -> None:
+    def test_normalize_returning_none_is_invalid(self) -> None:
         """`normalize` returning `None` is the loader's own judgment that there
-        is nothing to do with a row. Is it counted as skipped, not failed?"""
+        is nothing to do with a row. Is it counted as invalid, not failed?"""
 
         def normalize(
             self: Any, payload: dict[str, Any], row: sqlite3.Row
@@ -995,7 +1015,7 @@ class JKentScrapeLoaderTest(TestCase):
         report = self.loader_class(normalize=normalize)(self.database).load()
 
         self.assertEqual(
-            (report.seen, report.skipped, report.merged, report.failed),
+            (report.seen, report.invalid, report.merged, report.failed),
             (2, 1, 1, 0),
         )
         self.assertEqual(Docket.objects.count(), 1)
@@ -1015,7 +1035,7 @@ class JKentScrapeLoaderTest(TestCase):
         report = self.loader_class(normalize=normalize)(self.database).load()
 
         self.assertEqual(
-            (report.seen, report.failed, report.skipped, report.merged),
+            (report.seen, report.failed, report.invalid, report.merged),
             (1, 1, 0, 0),
         )
         # No PK, because the row was refused before anything was looked up.
@@ -1039,6 +1059,26 @@ class JKentScrapeLoaderTest(TestCase):
             Docket.objects.get().docket_number,
             "A-2",
             "The row after the bad one still merges.",
+        )
+
+    def test_a_payload_that_will_not_decode_is_invalid(self) -> None:
+        """A scrape that stopped mid-write leaves a truncated blob behind. Is
+        it counted rather than raised, so the rest of the run still loads?"""
+        _run_database(
+            self.database,
+            ['{"docket_number": "A-1', {"docket_number": "A-2"}],
+        )
+
+        report = self.loader_class()(self.database).load()
+
+        self.assertEqual(
+            (report.seen, report.invalid, report.merged, report.failed),
+            (2, 1, 1, 0),
+        )
+        self.assertEqual(
+            Docket.objects.get().docket_number,
+            "A-2",
+            "The row after the undecodable one still merges.",
         )
 
     def test_merger_declining_a_scrape_is_a_rejection(self) -> None:
@@ -1087,20 +1127,51 @@ class JKentScrapeLoaderTest(TestCase):
         self.assertEqual(
             (report.seen, report.failed, report.merged), (2, 1, 1)
         )
+        # Recorded alongside the run's other failures, so a caller reading
+        # `result` sees the same failure the counters do.
+        self.assertEqual(report.result.failures, {"Docket": [None]})
+        self.assertFalse(report.result.success)
         self.assertEqual(
             Docket.objects.get().docket_number,
             "A-2",
             "The row after the raising one still merges.",
         )
 
+    def test_a_dry_run_survives_a_database_error(self) -> None:
+        """A dry run merges inside one transaction. Does a row that errors at
+        the database roll back to its own savepoint, leaving the rest of the
+        run to merge instead of failing on a poisoned connection?"""
+        loader_class = self.loader_class()
+
+        class DatabaseErrorMerger(loader_class.merger):  # type: ignore[misc, name-defined]
+            def merge(self) -> Any:
+                if self.scrape.docket_number == "A-1":
+                    # Any statement the database refuses will do; what matters
+                    # is that it aborts the transaction it runs in.
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT 1 / 0")
+                return super().merge()
+
+        _run_database(
+            self.database,
+            [{"docket_number": "A-1"}, {"docket_number": "A-2"}],
+        )
+
+        report = self.loader_class(merger=DatabaseErrorMerger)(
+            self.database, dry_run=True
+        ).load()
+
+        self.assertEqual(
+            (report.seen, report.failed, report.merged), (2, 1, 1)
+        )
+        self.assertFalse(Docket.objects.exists(), "The dry run rolled back.")
+
     def test_report_str_names_every_count(self) -> None:
         """The report is what an operator reads off a load. Does its summary
-        state all six counts?"""
-        report = LoadReport(
-            seen=6, merged=1, skipped=2, invalid=1, rejected=1, failed=1
-        )
+        state all five counts?"""
+        report = LoadReport(seen=6, merged=1, invalid=2, rejected=1, failed=1)
 
         self.assertEqual(
             str(report),
-            "6 seen, 1 merged, 2 skipped, 1 invalid, 1 rejected, 1 failed",
+            "6 seen, 1 merged, 2 invalid, 1 rejected, 1 failed",
         )
