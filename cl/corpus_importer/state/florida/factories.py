@@ -25,6 +25,10 @@ from juriscraper.state.florida.docket_entries import (
 from juriscraper.state.florida.documents import FloridaDocument
 from juriscraper.state.florida.parties import FloridaParty, PartyType
 
+from cl.tests.providers import LegalProvider
+
+Faker.add_provider(LegalProvider)
+
 
 class _PydanticConstructFactory(Factory):
     """Builds Pydantic models via ``model_construct`` so factories can use
