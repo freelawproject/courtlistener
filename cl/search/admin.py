@@ -184,6 +184,19 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         "search.OpinionCluster": lambda cluster: cluster.docket.clusters.exclude(
             pk=cluster.pk
         ),
+        "search.SCOTUSDocketEntry": lambda cluster: cluster.docket.scotusdocketentry_set,
+        "search.ScotusDocketMetadata": lambda cluster: getattr(
+            cluster.docket, "scotus_metadata", None
+        ),
+        "search.TexasDocketEntry": lambda cluster: cluster.docket.texasdocketentry_set,
+        "search.FloridaDocketEntry": lambda cluster: cluster.docket.florida_docket_entries,
+        "search.TrialCourtData": lambda cluster: getattr(
+            cluster.docket, "trialcourtdata", None
+        ),
+        "search.CaseTransfer": lambda cluster: CaseTransfer.objects.filter(
+            Q(origin_docket=cluster.docket)
+            | Q(destination_docket=cluster.docket)
+        ),
     }
 
     # Prevent cluster deletion
@@ -204,6 +217,12 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         "search.Claim",
         "search.DocketEntry",
         "search.OpinionCluster",
+        "search.SCOTUSDocketEntry",
+        "search.ScotusDocketMetadata",
+        "search.TexasDocketEntry",
+        "search.FloridaDocketEntry",
+        "search.TrialCourtData",
+        "search.CaseTransfer",
     ]
 
     def check_blocking_relations(
@@ -378,7 +397,9 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         cluster = get_object_or_404(OpinionCluster, pk=cluster_id)
 
         blocking_relations = self.get_blocking_relations(cluster)
-        has_blocking = any(qs.exists() for qs in blocking_relations.values())
+        # A one-to-one blocker comes back as a plain list, so ask about
+        # truthiness rather than calling `exists()`, which only querysets have.
+        has_blocking = any(blocking_relations.values())
         context = {
             **self.admin_site.each_context(request),
             "title": "Blocking dependencies preventing cluster sealing",
@@ -821,10 +842,10 @@ class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
 
 
 @admin.register(SCOTUSDocument)
-class SCOTUSDocumentAdmin(CursorPaginatorAdmin):
+class SCOTUSDocumentAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
     search_fields = (
         "pk",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by IndexedPkSearchMixin
     search_help_text = "Search by SCOTUSDocument Document ID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry",)
@@ -846,9 +867,7 @@ class TexasDocumentInline(admin.StackedInline):
 
 @admin.register(TexasDocument)
 class TexasDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = (
-        "media_version_id",
-    )  # Required for search box; actual search handled by get_search_results
+    search_fields = ("media_version_id",)
     search_help_text = (
         "Search by Texas Document media version ID (exact match)."
     )
@@ -912,9 +931,7 @@ class FloridaDocumentInline(admin.StackedInline):
 
 @admin.register(FloridaDocument)
 class FloridaDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = (
-        "link_uuid",
-    )  # Required for search box; actual search handled by get_search_results
+    search_fields = ("link_uuid",)
     search_help_text = "Search by Florida Document link UUID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry",)

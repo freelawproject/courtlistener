@@ -73,6 +73,8 @@ from cl.search.factories import (
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    TrialCourtDataFactory,
 )
 from cl.search.forms import SearchForm
 from cl.search.llm_models import CleanDocketNumber, DocketItem
@@ -98,9 +100,12 @@ from cl.search.models import (
     OpinionCluster,
     OpinionContent,
     RECAPDocument,
+    ScotusDocketMetadata,
     SearchQuery,
     sort_cites,
 )
+from cl.search.state.florida.factories import FloridaDocketEntryFactory
+from cl.search.state.texas.factories import TexasDocketEntryFactory
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -3936,6 +3941,84 @@ class OpinionClusterAdminSealViewTest(TestCase):
             OpinionCluster.objects.filter(pk=pk).exists(),
             "Cluster should not have been deleted.",
         )
+
+
+class OpinionClusterSealDocketBlockersTest(TestCase):
+    """Sealing a cluster must leave its docket alone when something still
+    points at the docket."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="ca8")
+
+    def make_cluster(self) -> OpinionCluster:
+        """Build a cluster on a docket of its own.
+
+        :return: The new OpinionCluster
+        """
+        return OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Blocker v. Test",
+            ),
+            case_name="Blocker v. Test",
+            date_filed=datetime.date.today(),
+        )
+
+    def test_docket_relations_block_docket_deletion(self):
+        """Each model pointing at Docket keeps the docket out of the seal."""
+        blocker_builders = {
+            "search.SCOTUSDocketEntry": lambda docket: SCOTUSDocketEntryFactory(
+                docket=docket
+            ),
+            "search.ScotusDocketMetadata": lambda docket: ScotusDocketMetadata.objects.create(
+                docket=docket
+            ),
+            "search.TexasDocketEntry": lambda docket: TexasDocketEntryFactory(
+                docket=docket
+            ),
+            "search.FloridaDocketEntry": lambda docket: FloridaDocketEntryFactory(
+                docket=docket
+            ),
+            "search.TrialCourtData": lambda docket: TrialCourtDataFactory(
+                docket=docket
+            ),
+            "search.CaseTransfer": lambda docket: CaseTransferFactory(
+                origin_docket=docket
+            ),
+        }
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
+        for key, build_blocker in blocker_builders.items():
+            with self.subTest(blocker=key):
+                cluster = self.make_cluster()
+                docket = cluster.docket
+                build_blocker(docket)
+
+                blockers = clusters_admin.check_blocking_relations(cluster)
+                self.assertTrue(
+                    blockers[key], f"{key} should block docket deletion."
+                )
+                cluster_blocked, docket_blocked = (
+                    clusters_admin.get_deletion_blockers(cluster)
+                )
+                self.assertFalse(
+                    cluster_blocked, f"{key} should not block the cluster."
+                )
+                self.assertTrue(
+                    docket_blocked, f"{key} should block the docket."
+                )
+
+                clusters_admin.seal_cluster(
+                    cluster, delete_docket=not docket_blocked
+                )
+                self.assertFalse(
+                    OpinionCluster.objects.filter(pk=cluster.pk).exists(),
+                    "Cluster should have been deleted.",
+                )
+                self.assertTrue(
+                    Docket.objects.filter(pk=docket.pk).exists(),
+                    f"Docket should have survived a {key} blocker.",
+                )
 
 
 class PopulateDocketNumberRawCommandTest(TestCase):
