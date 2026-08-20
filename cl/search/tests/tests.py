@@ -3633,6 +3633,7 @@ class AdminActionsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.factory = RequestFactory()
+        cls.superuser = UserFactory(is_staff=True, is_superuser=True)
         cls.court_1 = CourtFactory(id="nyappdiv")
         cls.court_2 = CourtFactory(id="ca6")
 
@@ -3701,6 +3702,9 @@ class AdminActionsTest(TestCase):
         clusters_admin.message_user = mock.Mock()
         url = reverse("admin:search_opinioncluster_changelist")
         request = self.factory.post(url)
+        # seal_clusters checks the delete permission, so a hand-built request
+        # needs a user the way a real admin request would have one.
+        request.user = self.superuser
 
         queryset = OpinionCluster.objects.filter(pk=cluster_pk)
         clusters_admin.seal_clusters(request, queryset)
