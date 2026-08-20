@@ -1,5 +1,11 @@
 {% extends "admin/base_site.html" %}
 
+{# `delete-confirmation` is what scopes the admin's paired submit/cancel-link #}
+{# styling (see .delete-confirmation form .cancel-link in admin/css/base.css). #}
+{# Without it the Cancel link falls back to plain `.button` and the two buttons #}
+{# don't match. It also colors the submit as destructive, which this is. #}
+{% block bodyclass %}{{ block.super }} delete-confirmation{% endblock %}
+
 {% block content %}
   <h2>{{ heading }}</h2>
 
@@ -50,8 +56,8 @@
       </table>
 
       <br>
-      <input type="submit" value="Seal Selected Documents" class="default">
-      <a href="{{ cancel_url }}" style="margin-left: 10px;">Cancel</a>
+      <input type="submit" value="Seal Selected Documents">
+      <a role="button" href="{{ cancel_url }}" class="button cancel-link">Cancel</a>
     </form>
 
     <script nonce="{{ request.csp_nonce }}">
