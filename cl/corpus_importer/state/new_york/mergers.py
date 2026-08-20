@@ -55,7 +55,7 @@ from cl.corpus_importer.state.new_york.utils import (
     issue_subcategory_value,
     make_docket_number_core,
 )
-from cl.people_db.models import Attorney, Party, Role
+from cl.people_db.models import Attorney, Party, PartyType, Role
 from cl.recap.mergers import find_docket_object_query
 from cl.search.models import Docket
 from cl.search.state.new_york.models import (
@@ -64,6 +64,7 @@ from cl.search.state.new_york.models import (
     NYCoADocketMetadata,
     NYCoADocument,
 )
+from cl.search.state.new_york.vocabularies import FilingRole
 
 logger = logging.getLogger(__name__)
 
@@ -82,13 +83,6 @@ def _storable_number(
     value: int | None, field: str, document: NYCoAFile
 ) -> int | None:
     """A file's volume or part number, or `None` when it cannot be stored.
-
-    A volume is whatever the file name's numbering reads as, and a name the
-    Court wrote as `...-Appdx-Vol6.1910` -- the extension is `.1910` -- reads as
-    volume 61910. Postgres refuses that, and because the docket merges
-    atomically the whole case would be lost over one misread number. Storing
-    nothing loses only the volume, and the error names the file so the scraper's
-    reading of it can be fixed.
 
     :param value: The number the scraper read.
     :param field: Which number it is, for the log message.
@@ -109,18 +103,7 @@ def _storable_number(
 
 def _keep_stored_file(scrape: Any, db: Any) -> Any:
     """Merge strategy that keeps the path already stored for a document when
-    this scrape reports none.
-
-    A file the scraper skipped this time -- a sealed one, or one a partial
-    scrape never reached -- is still where it left it last time, so a blank must
-    not clobber the path.
-
-    The default strategy will not do this, and not for the usual reason:
-    `filepath_local` is a `FileField`, whose descriptor wraps whatever it is
-    handed in a `FieldFile`. An absent value therefore arrives as an empty
-    `FieldFile` rather than as `None`, and `overwrite_if_present` reads it as a
-    real value. An empty `FieldFile` is falsy, which is what this tests
-    instead."""
+    this scrape reports none."""
     return scrape if scrape else db
 
 
@@ -190,13 +173,8 @@ class NYCoADocumentMerger[ParamType](
         `ocr_status` is what puts the document back in front of the extraction
         sweep.
 
-        Unlike `DocumentMerger`, the file the path pointed at is *not* deleted.
-        CourtListener did not put it there and does not own it -- it is the
-        scraper's own download, and deleting it would destroy the scrape rather
-        than a copy of it."""
+        We don't delete the old file here, preferring to keep historical copies."""
         updated = super().pre_update(updated_fields)
-        # This hook only runs on the update path, so `existing` is set; the
-        # guard narrows the type for mypy.
         if (existing := self.existing) is None:
             return updated
         if "filepath_local" not in updated_fields:
@@ -209,27 +187,42 @@ class NYCoADocumentMerger[ParamType](
 def _entry_party_id(
     entry: NYCoDocketEntry, params: RelatedParams[Any]
 ) -> int | None:
-    """Resolve the filing's party to a party on this docket, matching on name
-    the way `PartyMerger` does."""
+    """Resolve the filing's party to a party on this docket, matching on the
+    name the way `PartyMerger` does, with the filing's role breaking a tie.
+
+    :param entry: The filing whose party to resolve.
+    :param params: The parameters of the merge, whose parent is the docket.
+    :return: The party's pk, or `None` when the docket lists no party of that
+        name. A filer with no attorney of record is one the FILINGS table names
+        and the ATTORNEY DETAILS section never does; `party_name` keeps the
+        name whether or not this resolves.
+    """
     if not entry.party:
         return None
     docket = cast(Docket, params.parent)
-    return (
+    matched = list(
         docket.parties.filter(name=entry.party)
+        .order_by("pk")
         .values_list("pk", flat=True)
+    )
+    if len(matched) < 2:
+        return matched[0] if matched else None
+    # Only an ambiguous name is worth the second query the role costs.
+    role = FilingRole(filing_role_value(entry.entry_role)).label
+    by_role = (
+        PartyType.objects.filter(
+            docket=docket, party_id__in=matched, name__iexact=role
+        )
+        .order_by("party_id")
+        .values_list("party_id", flat=True)
         .first()
     )
+    return matched[0] if by_role is None else by_role
 
 
 def _keep_party_name(scrape: str | None, db: str | None) -> str:
     """Merge strategy that keeps the party name an earlier scrape recorded when
-    this one read none, rather than blanking it.
-
-    A filing's party is part of its `docket_entry_id`, so within one entry the
-    name never legitimately changes -- a clerk correcting it re-keys the entry
-    into a new row. A blank here therefore means this scrape did not see the
-    name, not that the Court withdrew it. The default strategy would not do:
-    it only protects a `None`, and Court-PASS reports a missing party as `""`."""
+    this one read none, rather than blanking it."""
     return scrape or db or ""
 
 
@@ -295,22 +288,15 @@ class NYCoADocketEntryMerger[ParamType](
 
 def _attorney_contact_raw(attorney: NYCoAAttorney, params: Any) -> str:
     """Fold the firm and address Court-PASS prints for an attorney into the one
-    free-text contact field CourtListener keeps for them.
-
-    The phone joins them when `_attorney_phone` had to shorten it, so the full
-    string the Court printed survives somewhere."""
+    free-text contact field CourtListener keeps for them."""
     parts = [attorney.firm, attorney.address]
-    if attorney.phone != _attorney_phone(attorney, params):
-        parts.append(attorney.phone)
+    if (phone := attorney.phone.strip()) != _attorney_phone(attorney, params):
+        parts.append(phone)
     return "\n".join(part for part in parts if part)
 
 
 def _attorney_phone(attorney: NYCoAAttorney, params: Any) -> str:
-    """The attorney's phone number, trimmed to fit `Attorney.phone`.
-
-    Court-PASS writes a direct line as `(516) 222-6200 ext: 284`, which is
-    longer than the 20 characters the column allows. Dropping the extension
-    keeps the field dialable; `_attorney_contact_raw` keeps the whole string."""
+    """The attorney's phone number, trimmed to fit `Attorney.phone`."""
     phone = attorney.phone.strip()
     if len(phone) <= PHONE_MAX_LENGTH:
         return phone
@@ -321,6 +307,8 @@ def _attorney_phone(attorney: NYCoAAttorney, params: Any) -> str:
 
 
 class NYCoAAttorneyMerger(AttorneyMerger[NYCoAAttorney, RelatedParams[None]]):
+    """Merger for an attorney on a Court-PASS docket."""
+
     contact_raw: str = Attribute(_attorney_contact_raw, strategy=overwrite)
     phone: str = Attribute(_attorney_phone, strategy=overwrite)
 
@@ -334,6 +322,11 @@ def _attorney_role(
 
 
 class NYCoARoleMerger(RoleMerger[NYCoAAttorney, RelatedParams[None]]):
+    """Merger for the link between a Court-PASS attorney and the party.
+
+    Overrides only `role`, which Court-PASS never states; see
+    `_attorney_role`."""
+
     role: int = Attribute(_attorney_role)
 
 
@@ -345,6 +338,8 @@ def _party_type_name(party: NYCoAParty, params: Any) -> str:
 
 
 class NYCoAPartyTypeMerger(PartyTypeMerger[NYCoAParty, RelatedParams[None]]):
+    """Merger for a party's role on a Court-PASS docket."""
+
     name: str = Attribute(_party_type_name)
 
 
@@ -423,7 +418,7 @@ class NYCoAIssueMerger[ParamType](
 ):
     """Merger for one issue the Court assigned to a case.
 
-    An issue is identified by its category and subcategory, which is what
+    An issue is identified by its category, subcategory, and details which is what
     `NYCoADocketIssue` is indexed on, so the Court rewording a description it
     has already published updates the issue in place rather than replacing the
     row. The Court does assign a case two issues under one category pair,
@@ -565,11 +560,34 @@ def _case_metadata(case: NYCoACase, params: None) -> NYCoACase | None:
 
 
 def _date_last_filing(case: NYCoACase, params: None) -> date | None:
+    """The date the case's most recent dated filing was received.
+
+    Court-PASS only dates the filings its FILINGS table lists, so on a docket
+    whose filings were all reconstructed from the file list none of them
+    carries a date. Those fall back to the case's own filing date -- itself the
+    earliest filing the scrape dated -- so the field states the last date known
+    for the case rather than nothing at all.
+
+    :param case: The scraped case.
+    :param params: Unused; the docket is the top-level merge.
+    :return: The latest filing date, the case's filing date when no filing
+        carries one, and `None` when the scrape dates nothing.
+    """
     filing_dates = sorted(e.date_filed for e in case.entries if e.date_filed)
     return filing_dates[-1] if filing_dates else case.date_filed
 
 
 class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
+    """Merger for a whole Court-PASS docket. This is the entry point: hand it a
+    scraped `NYCoACase` and it merges the docket, its parties and their
+    attorneys, its filings and their files, and the NYCoA-only metadata.
+
+    The merge is atomic, so a case either lands in full or not at all. That is
+    what makes a failure recoverable -- a re-scrape merges the case again from
+    scratch -- but it also means one unstorable value can cost the whole case,
+    which is why `_storable_number` drops a misread volume rather than letting
+    it raise."""
+
     model: ClassVar[type[Model]] = Docket
 
     atomic = True
@@ -581,8 +599,6 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
         lambda case, params: make_docket_number_core(case.docket_number),
         strategy=overwrite,
     )
-    # Court-PASS publishes no filing date for the case itself, so keep any date
-    # another source already established.
     date_filed: date | None = Attribute(lambda case, params: case.date_filed)
     date_argued: date | None = Attribute(
         lambda case, params: case.argument_date, strategy=overwrite
@@ -594,9 +610,6 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     parties: list[Party] = PartyRelation(
         NYCoAPartyMerger, party_type=NYCoAPartyTypeMerger
     )
-    # Court-PASS states a case's filings in full -- the loader refuses a scrape
-    # that never read the file list -- so a filing that is gone from the scrape
-    # is one the Court removed.
     nycoa_docket_entries: list[NYCoADocketEntry] = DocketEntryRelation(
         NYCoADocketEntryMerger, strategy=ManyStrategy.REPLACE
     )
@@ -606,6 +619,11 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
 
     @override
     def query(self) -> QuerySet[Docket]:
+        """The docket this case is, if CourtListener already has it.
+
+        :return: The candidate docket, of which the function returns at most
+            one.
+        """
         return async_to_sync(find_docket_object_query)(
             court_id=NYCOA_COURT_ID,
             pacer_case_id=None,
@@ -622,9 +640,12 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
 
     @staticmethod
     def validate(scrape: NYCoACase) -> bool:
+        """Whether this scrape can be merged at all.
+
+        :param scrape: The scraped case.
+        :return: Whether the merge may proceed.
+        """
         if not is_nycoa_court(scrape.court_id):
             logger.error("Unknown court id: %s", scrape.court_id)
             return False
-        # A docket number we can't normalize can't be matched against the
-        # dockets we already have, and `make_docket_number_core` logs why.
         return bool(make_docket_number_core(scrape.docket_number))
