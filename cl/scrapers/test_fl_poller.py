@@ -187,6 +187,7 @@ class FlPollerPollTest(SimpleTestCase):
         self.mock_save = mock.patch.object(
             fl_cmd_module, "save_case_to_s3"
         ).start()
+        self.mock_save.return_value = "test"
         self.mock_ingest = mock.patch.object(
             fl_cmd_module, "fl_ingest_docket_task"
         ).start()
@@ -260,7 +261,24 @@ class FlPollerPollTest(SimpleTestCase):
         )
         self.assertEqual(
             [c.args for c in self.mock_ingest.si.call_args_list],
-            [(case_a, True), (case_b, True)],
+            [
+                (
+                    (
+                        case_a,
+                        "",
+                        self.mock_save.return_value,
+                    ),
+                    True,
+                ),
+                (
+                    (
+                        case_b,
+                        "",
+                        self.mock_save.return_value,
+                    ),
+                    True,
+                ),
+            ],
         )
         self.mock_ingest.si.return_value.set.assert_called_with(
             queue="test_queue"
@@ -291,7 +309,14 @@ class FlPollerPollTest(SimpleTestCase):
             scraper.case_requests,
             [(str(update.case_uuid), FloridaCourtID.FIRST_COA.value)],
         )
-        self.mock_ingest.si.assert_called_once_with(case, True)
+        self.mock_ingest.si.assert_called_once_with(
+            (
+                case,
+                "",
+                self.mock_save.return_value,
+            ),
+            True,
+        )
 
     def test_fetch_failures_are_skipped(self):
         """A fetch that raises, returns an Exception, or returns errors must
@@ -326,7 +351,14 @@ class FlPollerPollTest(SimpleTestCase):
         self.run_poll(scraper)
 
         self.mock_save.assert_called_once()
-        self.mock_ingest.si.assert_called_once_with(good_case, True)
+        self.mock_ingest.si.assert_called_once_with(
+            (
+                good_case,
+                "",
+                self.mock_save.return_value,
+            ),
+            True,
+        )
 
     def test_pagination_failure_is_logged_and_polling_continues(self):
         """A PaginationFailed page must be logged as an error while updates
@@ -348,7 +380,14 @@ class FlPollerPollTest(SimpleTestCase):
             self.run_poll(scraper)
 
         self.assertTrue(mock_error.called)
-        self.mock_ingest.si.assert_called_once_with(case, True)
+        self.mock_ingest.si.assert_called_once_with(
+            (
+                case,
+                "",
+                self.mock_save.return_value,
+            ),
+            True,
+        )
 
     def test_poll_queries_both_endpoints_and_advances_window(self):
         """Each cycle must query both poll endpoints for the court, starting
@@ -403,7 +442,14 @@ class FlPollerPollTest(SimpleTestCase):
 
         self.run_poll(scraper, download_attachments=False)
 
-        self.mock_ingest.si.assert_called_once_with(case, False)
+        self.mock_ingest.si.assert_called_once_with(
+            (
+                case,
+                "",
+                self.mock_save.return_value,
+            ),
+            False,
+        )
 
 
 @time_machine.travel(FROZEN_NOW, tick=False)
