@@ -91,6 +91,7 @@ from cl.corpus_importer.utils import (
     should_check_acms_court,
 )
 from cl.custom_filters.templatetags.text_filters import oxford_join
+from cl.lib.file_validation import content_is_pdf
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import (
     check_redactions_service,
@@ -610,9 +611,19 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
             # For each document in the zip, create a new PQ
             new_pqs = []
             tasks = []
+            skipped_files = []
             for file_name in archive.namelist():
                 file_content = archive.read(file_name)
                 f = SimpleUploadedFile(file_name, file_content)
+
+                # Security: whoever built the zip named its members, and the
+                # PQs below are created directly, so they never pass through
+                # ProcessingQueueSerializer's PDF check. Confirm the contents
+                # here instead, or a member named `1-main.pdf` holding
+                # anything at all gets stored and served as a document.
+                if not content_is_pdf(f):
+                    skipped_files.append(file_name)
+                    continue
 
                 file_name = file_name.split(".pdf")[0]
                 if "-" in file_name:
@@ -647,12 +658,22 @@ async def process_recap_zip(pk: int) -> dict[str, list[int] | list[Task]]:
                 new_pqs.append(new_pq.pk)
                 await process_recap_pdf(new_pq.pk)
 
+            if skipped_files and not new_pqs:
+                await mark_pq_status(
+                    pq,
+                    f"Zip contained no PDFs. Skipped: {oxford_join(skipped_files)}.",
+                    PROCESSING_STATUS.INVALID_CONTENT,
+                )
+                return {"new_pqs": [], "tasks": []}
+
             # At the end, mark the pq as successful and return the PQ
-            await mark_pq_status(
-                pq,
-                f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}",
-                PROCESSING_STATUS.SUCCESSFUL,
-            )
+            message = f"Successfully created ProcessingQueue objects: {oxford_join(new_pqs)}"
+            if skipped_files:
+                message += (
+                    f". Skipped files that are not PDFs: "
+                    f"{oxford_join(skipped_files)}"
+                )
+            await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
 
             # Returning the tasks allows tests to wait() for the PDFs to complete
             # before checking assertions.

@@ -3,9 +3,12 @@ import os
 from copy import deepcopy
 from datetime import UTC, date, datetime, time, timedelta
 from http import HTTPStatus
+from io import BytesIO
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY, MagicMock
+from unittest.mock import patch as mock_patch
+from zipfile import ZipFile
 
 import requests
 import time_machine
@@ -15,12 +18,13 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission, User
 from django.core import mail
+from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection, transaction
-from django.test import RequestFactory, SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.timezone import now
@@ -29,6 +33,7 @@ from juriscraper.pacer import PacerRssFeed
 from cl.alerts.factories import DocketAlertFactory
 from cl.api.factories import (
     WEBHOOK_EVENT_STATUS,
+    APIThrottleFactory,
     WebhookEventFactory,
     WebhookFactory,
 )
@@ -38,7 +43,7 @@ from cl.api.management.commands.cl_retry_webhooks import (
     execute_additional_tasks,
     retry_webhook_events,
 )
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import ThrottleType, Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import (
     get_next_webhook_retry_date,
     get_webhook_deprecation_date,
@@ -47,6 +52,11 @@ from cl.corpus_importer.tasks import save_attachment_pq_object
 from cl.corpus_importer.utils import (
     is_appellate_court,
     should_check_acms_court,
+)
+from cl.lib.decorators import clear_tiered_cache
+from cl.lib.file_validation import (
+    NOT_A_PDF_MESSAGE,
+    file_too_large_message,
 )
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
@@ -161,6 +171,7 @@ from cl.tests.utils import (
     MockACMSAttachmentPage,
     MockACMSDocketReport,
     MockResponse,
+    make_client,
 )
 from cl.users.factories import (
     UserProfileWithParentsFactory,
@@ -348,7 +359,11 @@ class RecapUploadsTest(TestCase):
         token = f"Token {self.user.auth_token.key}"
         self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
-        self.f = SimpleUploadedFile("file.txt", b"file content more content")
+        # PDF uploads are checked for a PDF header, so the default file has
+        # to carry one. Uploads of other types reuse it harmlessly.
+        self.f = SimpleUploadedFile(
+            "file.pdf", b"%PDF-1.4 file content more content"
+        )
         self.data = {
             "court": self.court.id,
             "pacer_case_id": "asdf",
@@ -392,6 +407,48 @@ class RecapUploadsTest(TestCase):
         j = json.loads(r.content)
         pq = await ProcessingQueue.objects.aget(pk=j["id"])
         self.assertEqual(pq.source, PROCESSING_QUEUE_SOURCE.EXTENSION)
+
+    async def test_uploading_a_pdf_that_is_not_a_pdf(self, mock):
+        """Are PDF uploads that aren't PDFs rejected?
+
+        The upload_type is the uploader's claim about the file, and these
+        files are served back to the public, so the contents get checked.
+        """
+        self.data["filepath_local"] = SimpleUploadedFile(
+            "file.pdf",
+            b"<html><body>Hello</body></html>",
+            content_type="application/pdf",
+        )
+        r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(NOT_A_PDF_MESSAGE, r.content.decode())
+        mock.assert_not_called()
+
+    async def test_uploading_a_file_that_is_too_large(self, mock):
+        """Are uploads over the size limit rejected?
+
+        The limit is patched down rather than tested at its real value, so
+        that the test doesn't have to send a 500 MB file to trip it.
+        """
+        with mock_patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            r = await self.async_client.post(self.path, self.data)
+            # Asserted under the patch: the message names the live limit.
+            self.assertIn(file_too_large_message(), r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        mock.assert_not_called()
+
+    async def test_uploading_a_docket_that_is_too_large(self, mock):
+        """Is the size limit enforced on non-PDF uploads too?"""
+        self.data.update(
+            {"upload_type": UPLOAD_TYPE.DOCKET, "document_number": ""}
+        )
+        del self.data["pacer_doc_id"]
+        with mock_patch("cl.lib.file_validation.MAX_UPLOAD_SIZE", 10):
+            r = await self.async_client.post(self.path, self.data)
+            # Asserted under the patch: the message names the live limit.
+            self.assertIn(file_too_large_message(), r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        mock.assert_not_called()
 
     async def test_uploading_a_zip(self, mock):
         """Can we upload a zip?"""
@@ -3505,6 +3562,151 @@ class RecapFetchApiSerializationTestCase(TestCase):
         )
 
 
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "pacer-fetch-throttle-test",
+        }
+    }
+)
+class PacerFetchAPIThrottleTest(TestCase):
+    """The Fetch API runs on its own FetchRateThrottle, not the global
+    per-user API throttle. See #7503.
+    """
+
+    def setUp(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    def tearDown(self) -> None:
+        clear_tiered_cache()
+        caches["default"].clear()
+
+    async def test_bypasses_global_user_throttle(self) -> None:
+        """A tight global API throttle doesn't block Fetch API requests."""
+        user = await sync_to_async(UserProfileWithParentsFactory)()
+        # A tight global API throttle that would block these requests if it
+        # applied to the Fetch API.
+        await sync_to_async(APIThrottleFactory)(
+            user=user.user,
+            throttle_type=ThrottleType.API,
+            rate="1/min",
+        )
+        await sync_to_async(clear_tiered_cache)()
+        client = await sync_to_async(make_client)(user.user.pk)
+        url = reverse("pacerfetchqueue-list", kwargs={"version": "v4"})
+
+        # Several requests, well past the global 1/min throttle.
+        for i in range(5):
+            response = await client.get(url)
+            self.assertEqual(
+                response.status_code,
+                HTTPStatus.OK,
+                msg=f"Request {i} should not be blocked by the global "
+                "user throttle.",
+            )
+
+    async def test_enforces_its_own_rate(self) -> None:
+        """A tight RECAP_FETCH override still throttles Fetch API requests."""
+        user = await sync_to_async(UserProfileWithParentsFactory)()
+        await sync_to_async(APIThrottleFactory)(
+            user=user.user,
+            throttle_type=ThrottleType.RECAP_FETCH,
+            rate="1/min",
+        )
+        await sync_to_async(clear_tiered_cache)()
+        client = await sync_to_async(make_client)(user.user.pk)
+        url = reverse("pacerfetchqueue-list", kwargs={"version": "v4"})
+
+        response = await client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        response = await client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+
+
+class PacerFetchQueueScopedAccessTest(TestCase):
+    """The Fetch Queue API supports only create/list/retrieve, scoped to the
+    requesting user's own rows -- no one can see or edit another user's
+    fetch requests, and PATCH/PUT/DELETE aren't routed to the viewset at
+    all. See GHSA-5f8h-qjq5-6h64.
+    """
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.owner = UserProfileWithParentsFactory()
+        cls.rando = UserProfileWithParentsFactory()
+        cls.court = CourtFactory(
+            id="canb", jurisdiction=Court.FEDERAL_DISTRICT, in_use=True
+        )
+
+    def setUp(self) -> None:
+        self.fq = PacerFetchQueueFactory(
+            user=self.owner.user,
+            request_type=REQUEST_TYPE.DOCKET,
+            court_id=self.court.pk,
+            pacer_case_id="123456",
+        )
+        self.url = reverse(
+            "pacerfetchqueue-detail",
+            kwargs={"version": "v4", "pk": self.fq.pk},
+        )
+        self.list_url = reverse(
+            "pacerfetchqueue-list", kwargs={"version": "v4"}
+        )
+
+    async def test_owner_can_read_their_own_fetch_request(self) -> None:
+        client = await sync_to_async(make_client)(self.owner.user.pk)
+
+        response = await client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotIn("user", response.json())
+
+    async def test_non_owner_cannot_see_another_users_fetch_request(
+        self,
+    ) -> None:
+        """A stranger's retrieve 404s, and their list never surfaces
+        someone else's row, since get_queryset() scopes to request.user."""
+        rando_client = await sync_to_async(make_client)(self.rando.user.pk)
+
+        response = await rando_client.get(self.url)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+
+        response = await rando_client.get(self.list_url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["results"], [])
+
+    async def test_patch_put_delete_are_not_allowed_for_anyone(self) -> None:
+        """PATCH/PUT/DELETE 405 for every caller, owner included -- these
+        actions simply aren't routed to this viewset."""
+        owner_client = await sync_to_async(make_client)(self.owner.user.pk)
+        rando_client = await sync_to_async(make_client)(self.rando.user.pk)
+
+        for client in (owner_client, rando_client):
+            response = await client.patch(
+                self.url, {"pacer_case_id": "999999"}, format="json"
+            )
+            self.assertEqual(
+                response.status_code, HTTPStatus.METHOD_NOT_ALLOWED
+            )
+
+            response = await client.put(
+                self.url, {"pacer_case_id": "999999"}, format="json"
+            )
+            self.assertEqual(
+                response.status_code, HTTPStatus.METHOD_NOT_ALLOWED
+            )
+
+            response = await client.delete(self.url)
+            self.assertEqual(
+                response.status_code, HTTPStatus.METHOD_NOT_ALLOWED
+            )
+
+        await sync_to_async(self.fq.refresh_from_db)()
+        self.assertEqual(self.fq.pacer_case_id, "123456")
+
+
 @mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -4568,6 +4770,68 @@ class RecapZipTaskTest(TestCase):
             {p.source for p in child_pqs},
             {PROCESSING_QUEUE_SOURCE.EXTENSION},
         )
+
+    def _make_zip_pq(self, members: dict[str, bytes]) -> ProcessingQueue:
+        """Build a DOCUMENT_ZIP PQ whose zip holds the given members.
+
+        :param members: Mapping of file name inside the zip to its bytes.
+        :return: The ProcessingQueue to hand to process_recap_zip().
+        """
+        buffer = BytesIO()
+        with ZipFile(buffer, "w") as archive:
+            for name, content in members.items():
+                archive.writestr(name, content)
+        return ProcessingQueueFactory.create(
+            court_id="scotus",
+            uploader=User.objects.get(username="recap"),
+            pacer_case_id="asdf",
+            filepath_local__data=buffer.getvalue(),
+            filepath_local__filename="some.zip",
+            upload_type=UPLOAD_TYPE.DOCUMENT_ZIP,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.process_recap_pdf", new_callable=mock.AsyncMock
+    )
+    def test_zip_members_that_are_not_pdfs_are_skipped(self, mock_process):
+        """Does a zip member that only claims to be a PDF get stored?
+
+        The zip's members are named by whoever built it, and this path
+        creates its PQs directly rather than through the serializer, so the
+        contents have to be checked here (GHSA-6m5w-9h99-2c84). Downstream
+        processing is mocked out; what matters is which members survive to
+        become a ProcessingQueue.
+        """
+        pq = self._make_zip_pq(
+            {
+                "12-main.pdf": b"%PDF-1.4 a real one",
+                "13-main.pdf": b"<html><body>not a pdf</body></html>",
+            }
+        )
+        results = async_to_sync(process_recap_zip)(pq.pk)
+
+        # Only the real PDF became a PQ, and only it was processed.
+        self.assertEqual(len(results["new_pqs"]), 1)
+        new_pq = ProcessingQueue.objects.get(pk=results["new_pqs"][0])
+        self.assertEqual(new_pq.document_number, 12)
+        mock_process.assert_called_once_with(new_pq.pk)
+
+        # And the upload says what it dropped.
+        pq.refresh_from_db()
+        self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertIn("13-main.pdf", pq.error_message)
+
+    def test_zip_with_no_pdfs_at_all_is_invalid(self):
+        """Is a zip holding nothing but impostors rejected outright?"""
+        pq = self._make_zip_pq(
+            {"12-main.pdf": b"<html><body>not a pdf</body></html>"}
+        )
+        results = async_to_sync(process_recap_zip)(pq.pk)
+
+        self.assertEqual(results["new_pqs"], [])
+        pq.refresh_from_db()
+        self.assertEqual(pq.status, PROCESSING_STATUS.INVALID_CONTENT)
+        self.assertIn("no PDFs", pq.error_message)
 
 
 class RecapAddAttorneyTest(TestCase):

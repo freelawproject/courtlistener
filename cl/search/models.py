@@ -37,7 +37,9 @@ from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
 
 from cl.citations.utils import get_citation_depth_between_clusters
-from cl.corpus_importer.state.florida.utils import is_florida_court
+from cl.corpus_importer.state.florida.utils import (
+    is_florida_court,
+)
 from cl.corpus_importer.state.florida.utils import (
     make_docket_number_core as make_florida_docket_number_core,
 )
@@ -1873,7 +1875,7 @@ class Court(models.Model):
 
     Note that a Courthouse object should be created alongside each new Court.
     Even if this is not enforced by the data model, there is some logic tied
-    to that relation. Examples in `find_citations` and `coverage_utils`
+    to that relation. Examples in `find_citations`.
     """
 
     # Note that spaces cannot be used in the keys, or else the SearchForm won't
@@ -4100,7 +4102,9 @@ class CaseTransfer(AbstractDateTimeModel):
             court = getattr(transfer, f"{side}_court")
             docket_number = getattr(transfer, f"{side}_docket_number")
 
-            if court.jurisdiction == Court.STATE_APPELLATE:
+            if court.jurisdiction == Court.STATE_APPELLATE and is_texas_court(
+                court.id
+            ):
                 docket_number = normalize_texas_appellate_docket_number(
                     docket_number
                 )
