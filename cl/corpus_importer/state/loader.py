@@ -45,8 +45,8 @@ class UnusableScrape(Exception):
     that stopped short of data the merger prunes against, say -- as opposed to
     a row there is simply nothing to do with. The distinction is what the load
     report is counted on: returning `None` from `normalize` counts the row as
-    skipped, which an operator reads as routine, while raising this counts it
-    as failed, which says the run needs looking at.
+    invalid, alongside the payloads that don't fit the model, while raising
+    this counts it as failed, which says the run needs looking at.
 
     The message is logged, so it should name the row and say what is wrong
     with it.
@@ -57,10 +57,9 @@ class RowOutcome(Enum):
     """What became of one row on the way from the run database to a scrape."""
 
     OK = auto()
-    SKIPPED = auto()
-    """`normalize` returned `None`."""
     INVALID = auto()
-    """The payload did not validate against `scrape_model`."""
+    """The payload did not decode, did not validate against `scrape_model`,
+    or `normalize` returned `None` for it."""
     FAILED = auto()
     """`normalize` raised `UnusableScrape`."""
 
@@ -69,15 +68,15 @@ class RowOutcome(Enum):
 class LoadReport:
     """What a load run did.
 
-    The four rejection counts are separate because they call for different
-    responses: `skipped` is the loader's own judgment and expected, `invalid`
-    means the scrape does not fit the model and usually points at scraper
-    drift, `rejected` is the merger declining data it cannot place, and
-    `failed` is data that should have merged and did not.
+    The three rejection counts are separate because they call for different
+    responses: `invalid` means the loader could not make a scrape of the row,
+    which usually points at scraper drift, `rejected` is the merger declining
+    data it cannot place, and `failed` is data that should have merged and did
+    not.
 
     :ivar seen: Rows the query returned.
-    :ivar skipped: Rows `normalize` discarded.
-    :ivar invalid: Payloads that failed validation against `scrape_model`.
+    :ivar invalid: Payloads that would not decode, failed validation against
+        `scrape_model`, or that `normalize` passed over by returning `None`.
     :ivar rejected: Scrapes the merger's `validate` turned away.
     :ivar failed: Rows `normalize` refused with `UnusableScrape`, plus merges
         that ran and reported failures.
@@ -87,7 +86,6 @@ class LoadReport:
     """
 
     seen: int = 0
-    skipped: int = 0
     invalid: int = 0
     rejected: int = 0
     failed: int = 0
@@ -96,7 +94,7 @@ class LoadReport:
 
     def __str__(self) -> str:
         return (
-            f"{self.seen} seen, {self.merged} merged, {self.skipped} skipped, "
+            f"{self.seen} seen, {self.merged} merged, "
             f"{self.invalid} invalid, {self.rejected} rejected, "
             f"{self.failed} failed"
         )
@@ -154,27 +152,22 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
             connection.row_factory = sqlite3.Row
             with closing(connection.execute(self.query)) as cursor:
                 for count, row in enumerate(cursor, start=1):
-                    yield row
-                    if self.limit is not None and count >= self.limit:
+                    if self.limit is not None and count > self.limit:
                         return
+                    yield row
 
     def normalize(
         self, payload: dict[str, Any], row: sqlite3.Row
     ) -> dict[str, Any] | None:
         """Reshape one row's payload into something `scrape_model` accepts.
 
-        The default passes the payload through, which is right when the
-        scraper already emits the standard docket format. Override to do the
-        reshaping SQL is a poor fit for -- nesting children under their
-        parent, folding in columns the query joined on, deriving fields the
-        scraper does not state.
-
         :param payload: The decoded `payload_column` JSON.
         :param row: The whole row, for anything else the query selected.
-        :return: The payload to validate, or `None` to skip this row. Skipping
-            is for a row there is nothing useful to do with; a payload that
-            *should* merge but does not fit the model is better left to fail
-            validation, which says so loudly.
+        :return: The payload to validate, or `None` to pass over this row,
+            which the report counts as invalid. Pass over a row there is
+            nothing useful to do with; a payload that *should* merge but does
+            not fit the model is better left to fail validation, which names
+            the fields at fault.
         :raises UnusableScrape: For a row that should count as a failure
             rather than a routine skip. See `UnusableScrape`."""
         return payload
@@ -183,14 +176,23 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
         self, row: sqlite3.Row
     ) -> tuple[ScrapeType | None, RowOutcome]:
         """Turn one row into a scrape, saying why if it did not become one."""
-        payload = json.loads(row[self.payload_column])
+        try:
+            payload = json.loads(row[self.payload_column])
+        except json.JSONDecodeError as error:
+            logger.error(
+                "Could not decode %s from %s: %s",
+                self.payload_column,
+                self.database.name,
+                error,
+            )
+            return None, RowOutcome.INVALID
         try:
             normalized = self.normalize(payload, row)
         except UnusableScrape as error:
             logger.error("Refusing a row of %s: %s", self.database.name, error)
             return None, RowOutcome.FAILED
         if normalized is None:
-            return None, RowOutcome.SKIPPED
+            return None, RowOutcome.INVALID
         try:
             return self.scrape_model.model_validate(normalized), RowOutcome.OK
         except ValidationError as error:
@@ -241,22 +243,19 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
         report = LoadReport()
         for row in self.rows():
             report.seen += 1
+            if report.seen % 250 == 0:
+                logger.info("Loading %s: %s", self.database.name, report)
             scrape, outcome = self._prepare(row)
-            if outcome is RowOutcome.SKIPPED:
-                report.skipped += 1
-                continue
             if outcome is RowOutcome.FAILED:
                 report.failed += 1
-                # Recorded against the merger's own model so the run's
-                # failures are all in one place, with no PK because nothing
-                # was ever looked up.
                 report.result |= MergeResult.failed(self.merger.model.__name__)
                 continue
-            if outcome is RowOutcome.INVALID or scrape is None:
+            if outcome is not RowOutcome.OK or scrape is None:
                 report.invalid += 1
                 continue
             try:
-                result = self.merge_one(scrape)
+                with transaction.atomic():
+                    result = self.merge_one(scrape)
             except (DatabaseError, ValueError) as error:
                 logger.exception(
                     "Merge raised for row %s of %s: %s",
@@ -265,6 +264,7 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
                     error,
                 )
                 report.failed += 1
+                report.result |= MergeResult.failed(self.merger.model.__name__)
                 continue
             if result is None:
                 report.rejected += 1
@@ -280,6 +280,4 @@ class JKentScrapeLoader[ScrapeType: BaseModel](ABC):
                     self.database.name,
                     result.failures,
                 )
-            if report.seen % 250 == 0:
-                logger.info("Loading %s: %s", self.database.name, report)
         return report
