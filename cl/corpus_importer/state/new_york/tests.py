@@ -674,6 +674,41 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         self.assertEqual(merged.party, Party.objects.get(name="Smith"))
         self.assertEqual(merged.party_name, "Smith")
 
+    @merger_test(expected_query_count=22)
+    def test_merge_links_filing_to_party_in_the_filing_role(self) -> None:
+        """In a family case the Court lists one person under two roles, so a
+        filing's party name finds two parties. Is the filing linked to the one
+        whose role the filing itself states, rather than to whichever was
+        written first?"""
+        case = NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER,
+            parties=[
+                NYCoAPartyFactory.create(
+                    name="A. R.", party_role_raw="Child", representatives=[]
+                ),
+                NYCoAPartyFactory.create(
+                    name="A. R.",
+                    party_role_raw="Respondent",
+                    representatives=[],
+                ),
+            ],
+            entries=[
+                NYCoAFilingFactory.create(
+                    party="A. R.", entry_role=FilingRole.RESPONDENT
+                )
+            ],
+        )
+
+        result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertTrue(result.success)
+        self.assertEqual(Party.objects.filter(name="A. R.").count(), 2)
+        merged = self.merged_docket(result).nycoa_docket_entries.get()
+        self.assertEqual(
+            merged.party_id,
+            PartyType.objects.get(name="Respondent").party_id,
+        )
+
     @merger_test(expected_query_count=18)
     def test_merge_unknown_filing_party_leaves_fk_null(self) -> None:
         """A filer who isn't a party on the docket -- one with no attorney of
@@ -1124,6 +1159,39 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
             attorney.contact_raw,
             "Roe & Roe LLP\n1 Main St, Albany, NY\n(516) 222-6200 ext: 284",
             "The extension survives in the free-text contact field.",
+        )
+
+    @merger_test(expected_query_count=19)
+    def test_merge_attorney_phone_with_stray_whitespace(self) -> None:
+        """A scraped phone number carries whatever whitespace the page's text
+        node did. Trimming it is not shortening it, so does the number stay out
+        of the contact field?"""
+        case = NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER,
+            parties=[
+                NYCoAPartyFactory.create(
+                    name="Smith",
+                    representatives=[
+                        NYCoAAttorneyFactory.create(
+                            name="Jane Roe",
+                            firm="Roe & Roe LLP",
+                            address="1 Main St, Albany, NY",
+                            phone="  (518) 555-1212\n",
+                        )
+                    ],
+                )
+            ],
+        )
+
+        result = NYCoADocketMerger(case, params=None).merge()
+
+        self.assertTrue(result.success)
+        attorney = Role.objects.get(docket=self.merged_docket(result)).attorney
+        self.assertEqual(attorney.phone, "(518) 555-1212")
+        self.assertEqual(
+            attorney.contact_raw,
+            "Roe & Roe LLP\n1 Main St, Albany, NY",
+            "Nothing was lost from the phone, so it is not repeated here.",
         )
 
     @merger_test(expected_query_count=19)
