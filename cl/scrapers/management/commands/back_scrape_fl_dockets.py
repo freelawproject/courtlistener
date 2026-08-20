@@ -39,7 +39,7 @@ def save_case_to_s3(
 
 
 def _make_case_key(court_id: FloridaCourtID, docket_number: str) -> str:
-    return f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(docket_number)}.html"
+    return f"{S3_BASE}/parsed/{court_id.value}/{_make_case_number_key(docket_number)}.json"
 
 
 async def _get_full_case(  # type: ignore[return]
@@ -174,12 +174,6 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
             help="If set the scraper will use the cache to avoid re-downloading files. Useful when running a second pass with the --full-scrape option.",
         )
         parser.add_argument(
-            "--archive-responses",
-            action="store_true",
-            default=False,
-            help="If set the scraper will archive responses to S3.",
-        )
-        parser.add_argument(
             "--queue",
             default="batch1",
             help="The celery queue to dispatch S3 archive tasks to.",
@@ -219,16 +213,14 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
         archive_responses: bool,
         queue: str,
         throttle_min_items: int,
-        backscrape_start: str = "",
-        backscrape_end: str = "",
+        backscrape_start: str | None,
+        backscrape_end: str | None,
         courts: str,
         skip_parsed: bool,
         scrape_uuids: str,
         **options,
     ):
         logger.info("Setting up Florida back-scrape...")
-        start = _parse_date(backscrape_start)
-        end = _parse_date(backscrape_end)
         court_ids = self.parse_court_ids(courts)
 
         throttle, scraper, cache = self.throttle_scraper_and_cache(
@@ -266,6 +258,9 @@ class Command(StateBackScrapeCommand, FLScrapeCommand):
                 "Both --backscrape-start and --backscrape-end are required."
             )
             return
+
+        start = _parse_date(backscrape_start)
+        end = _parse_date(backscrape_end)
 
         if auto_resume:
             logger.info("Auto resume enabled. Getting checkpoints...")

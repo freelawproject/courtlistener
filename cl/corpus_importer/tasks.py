@@ -5086,7 +5086,7 @@ def download_fl_document(self: Task, fl_document_pk: int) -> int | None:
 @app.task(bind=True, max_retries=5, ignore_result=True)
 def fl_ingest_docket_task(
     task: Task,
-    download_result: tuple[bytes, str, str],
+    download_result: tuple[bytes | FloridaCase, str, str],
     download_attachments: bool = True,
 ) -> MergeResult[Any]:
     """
@@ -5103,15 +5103,18 @@ def fl_ingest_docket_task(
     :return: The result of the merge operation.
     """
     case_bytes, bucket, key = download_result
-    try:
-        case = FloridaCase.deserialize(case_bytes.decode())
-    except Exception:
-        logger.exception(
-            "Failed to deserialize Florida case stored in %s at %s",
-            bucket,
-            key,
-        )
-        return MergeResult.failed("Docket")
+    if isinstance(case_bytes, bytes):
+        try:
+            case = FloridaCase.deserialize(case_bytes.decode())
+        except Exception:
+            logger.exception(
+                "Failed to deserialize Florida case stored in %s at %s",
+                bucket,
+                key,
+            )
+            return MergeResult.failed("Docket")
+    else:
+        case = case_bytes
     logger.info(
         "Attempting to merge Florida case %s",
         case.docket_number,

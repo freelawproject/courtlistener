@@ -74,6 +74,8 @@ class ScraperCheckpointTracker:
         stored_checkpoint = stored_values.get("checkpoint")
         if not stored_checkpoint:
             return None
+        if stored_checkpoint is bytes:
+            stored_checkpoint = stored_checkpoint.decode()
         latest_checkpoint = datetime.strptime(
             stored_checkpoint,
             "%Y-%m-%d",

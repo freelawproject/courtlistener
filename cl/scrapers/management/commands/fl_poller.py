@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import ClassVar
 
 from asgiref.sync import async_to_sync
 from django.core.management import CommandParser
@@ -21,7 +22,11 @@ from cl.lib.command_utils import logger
 from cl.scrapers.management.commands.back_scrape_fl_dockets import (
     save_case_to_s3,
 )
-from cl.scrapers.management.utils import FLScrapeCommand, StatePollCommand
+from cl.scrapers.management.utils import (
+    FLScrapeCommand,
+    ScraperCheckpointTracker,
+    StatePollCommand,
+)
 
 
 class FloridaUpdate(BaseModel):
@@ -52,14 +57,24 @@ class FloridaDocumentPollParser(FloridaPaginatedResultsParser[FloridaUpdate]):
 class Command(FLScrapeCommand, StatePollCommand):
     help = "Continuously polls Florida ACIS for new cases and backfills when new entries are detected."
 
+    checkpoint_tracker: ClassVar[ScraperCheckpointTracker] = (
+        ScraperCheckpointTracker("flacis")
+    )
+
     def add_arguments(self, parser: CommandParser):
         super().add_arguments(parser)
 
         parser.add_argument(
-            "--download-attachments",
+            "--no-download-attachments",
             type=bool,
-            default=True,
+            default=False,
             help="Set to download attachments for newly discovered dockets.",
+        )
+        parser.add_argument(
+            "--auto-resume",
+            type=bool,
+            default=False,
+            help="Set to resume polling from the last saved checkpoint.",
         )
 
     def handle(
@@ -74,8 +89,9 @@ class Command(FLScrapeCommand, StatePollCommand):
         throttle_min_items: int,
         polling_delay: int,
         case_backfill_days: int,
-        download_attachments: bool,
+        no_download_attachments: bool,
         courts: str | None,
+        auto_resume: bool,
         **options,
     ):
         court_ids = self.parse_court_ids(courts)
@@ -94,14 +110,31 @@ class Command(FLScrapeCommand, StatePollCommand):
             S3_BASE,
         )
 
+        checkpoint = None
+        if auto_resume:
+            checkpoint = self.checkpoint_tracker.get()
+            if not checkpoint:
+                logger.warning(
+                    "No checkpoint found. Falling back to --case-backfill-days=%d",
+                    case_backfill_days,
+                )
+        if checkpoint:
+            start = datetime(
+                year=checkpoint.year,
+                month=checkpoint.month,
+                day=checkpoint.day,
+            )
+        else:
+            start = datetime.now(UTC) - timedelta(days=case_backfill_days)
+
         async_to_sync(self.poll)(
             throttle,
             scraper,
             court_ids,
             polling_delay,
-            case_backfill_days,
+            start,
             queue,
-            download_attachments,
+            not no_download_attachments,
         )
 
     def send_merge_task(
@@ -112,6 +145,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         download_attachments: bool,
     ):
         throttle.maybe_wait()
+        self.checkpoint_tracker.set(case.date_filed)
         fl_ingest_docket_task.si(case, download_attachments).set(
             queue=queue_name
         ).apply_async()
@@ -122,7 +156,7 @@ class Command(FLScrapeCommand, StatePollCommand):
         scraper: FloridaScraper,
         courts: list[FloridaCourtID],
         polling_delay: int,
-        case_backfill_days: int,
+        start: datetime,
         queue_name: str,
         download_attachments: bool,
     ):
@@ -131,7 +165,6 @@ class Command(FLScrapeCommand, StatePollCommand):
             metadata.court.external_identifier: court
             for court, metadata in scraper_courts.items()
         }
-        start = datetime.now(UTC) - timedelta(days=case_backfill_days)
         last_polled = start
         while True:
             # Add a little overlap between segments to make extra sure we don't miss anything
