@@ -29,6 +29,7 @@
         {'href': '#menu-button', 'text': 'Menu button'},
         {'href': '#pagination', 'text': 'Pagination'},
         {'href': '#filter-drawer', 'text': 'Filter drawer'},
+        {'href': '#info-card', 'text': 'Info Card'},
       ]},
       {'href': '#page-shells', 'text': 'Page shells', 'children': [
         {'href': '#docket-page', 'text': 'Docket page'},
@@ -1458,6 +1459,88 @@ Sample code here.
     &lt;/c-slot&gt;
   &lt;/form&gt;
 &lt;/c-filter-drawer&gt;
+      </c-code>
+    </c-expansion-panel>
+  </section>
+
+  {# INFO CARD #}
+  <section class="max-w-full w-full border-t-2 border-greyscale-200" x-intersect.margin.-100px="show" id="info-card">
+    <h2 class="mt-6 mb-3">Info Card</h2>
+    <p>A card element that allows to displayed highlighted information; it can be dismissed and hidden for a period of time. So far it has a default style, but has been built as customizable as possible.</p>
+
+    <h4 class="mt-3">Demo</h4>
+    <c-info-card card_variant="info" card_id="demo-card6" is_dismissible dismiss_days=10 search_input="Miranda v. Arizona," filters=" from 1966." icon="info" href="https://free.law/" link_text="Go to Case" link_type="button-link">
+      It looks like you're trying to search for
+    </c-info-card>
+    <c-info-card card-variant="info" link_text="Learn more." link_type="link-inline" href="https://free.law/">
+      The results below were contributed to the RECAP Archive by users of the RECAP Extension. If you use PACER, please install RECAP.
+    </c-info-card>
+
+    <c-library.list title="Props" only>
+      <c-library.item only>
+        <c-slot name="label"><code>card_variant</code></c-slot>
+        <c-slot name="description">Type of card, visually speaking.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>card_id</code></c-slot>
+        <c-slot name="description">Id for cookies purposes, please avoid leaving it empty if dismissed funtionality is gonna be used.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>is_dismissible</code></c-slot>
+        <c-slot name="description">In combination with card_id allows to hide the card.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>dismiss_days</code></c-slot>
+        <c-slot name="description">Duration of card being hidden.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>search_input</code></c-slot>
+        <c-slot name="description">Content inside strong tag.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>filters</code></c-slot>
+        <c-slot name="description">Extra information about filters used.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>icon</code></c-slot>
+        <c-slot name="description">Customizable icon for the card.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>href</code></c-slot>
+        <c-slot name="description">Card link.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>link_text</code></c-slot>
+        <c-slot name="description">Card link text.</c-slot>
+      </c-library.item>
+      <c-library.item optional only>
+        <c-slot name="label"><code>link_type</code></c-slot>
+        <c-slot name="description">Visual type of link, button-link or link-inline.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-library.list title="Slots" only>
+      <c-library.item only>
+        <c-slot name="label">Default</c-slot>
+        <c-slot name="description">Card Content — rendered inside the card.</c-slot>
+      </c-library.item>
+    </c-library.list>
+
+    <c-expansion-panel title="Code">
+      <c-code>
+        &lt;c-info-card
+          card_variant="info"
+          card_id="demo-card4"
+          is_dismissible
+          dismiss_days=10
+          search_input="Miranda v. Arizona,"
+          filters=" from 1966."
+          icon="info"
+          href="https://free.law/"
+          link_text="Go to Case"
+          link_type="button-link"&gt;
+          It looks like you're trying to place some content in this card.
+        &lt;/c-info-card &gt;
       </c-code>
     </c-expansion-panel>
   </section>
