@@ -574,10 +574,18 @@ class DocketAdmin(CursorPaginatorAdmin):
     def change_view(self, request, object_id, form_url="", extra_context=None):
         """Add links to pre-filtered related admin pages."""
         extra_context = extra_context or {}
+        docket = self.get_object(request, object_id)
+        # SCOTUS dockets keep their entries in SCOTUSDocketEntry, not
+        # DocketEntry -- read the model off entries_queryset itself.
+        entry_model = (
+            docket.get_entry_source().entries_queryset(docket).model
+            if docket
+            else DocketEntry
+        )
         custom_links: list[AdminLinkConfig] = [
             {
                 "label": "View Docket Entries",
-                "model_class": DocketEntry,
+                "model_class": entry_model,
                 "query_params": {"docket": object_id},
             },
             {
