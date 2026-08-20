@@ -177,7 +177,7 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         "people_db.PartyType": lambda cluster: cluster.docket.party_types,
         "people_db.Role": lambda cluster: cluster.docket.role_set,
         "search.BankruptcyInformation": lambda cluster: getattr(
-            cluster.docket, "bankruptcyinformation", None
+            cluster.docket, "bankruptcy_information", None
         ),
         "search.Claim": lambda cluster: cluster.docket.claims,
         "search.DocketEntry": lambda cluster: cluster.docket.docket_entries,
@@ -423,6 +423,13 @@ class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
         :param request: HttpRequest triggering the action
         :param queryset: Queryset of selected OpinionCluster
         """
+        # The changelist only requires view or change permission, so gate the
+        # deletion the way Django's own delete_selected action does. Checked
+        # once up front rather than per cluster, so a failure can't leave a
+        # partially sealed queryset behind.
+        if not self.has_delete_permission(request):
+            raise PermissionDenied
+
         error_messages = []
         sealed_count = 0
 

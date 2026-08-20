@@ -12,7 +12,7 @@ from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.hashers import make_password
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
@@ -62,6 +62,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
+    BankruptcyInformationFactory,
     CaseTransferFactory,
     CourtFactory,
     DocketEntryFactory,
@@ -3968,6 +3969,9 @@ class OpinionClusterSealDocketBlockersTest(TestCase):
     def test_docket_relations_block_docket_deletion(self):
         """Each model pointing at Docket keeps the docket out of the seal."""
         blocker_builders = {
+            "search.BankruptcyInformation": lambda docket: BankruptcyInformationFactory(
+                docket=docket
+            ),
             "search.SCOTUSDocketEntry": lambda docket: SCOTUSDocketEntryFactory(
                 docket=docket
             ),
@@ -4019,6 +4023,37 @@ class OpinionClusterSealDocketBlockersTest(TestCase):
                     Docket.objects.filter(pk=docket.pk).exists(),
                     f"Docket should have survived a {key} blocker.",
                 )
+
+
+class OpinionClusterSealActionPermissionTest(TestCase):
+    """The bulk seal action must require the delete permission."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="ca7")
+        cls.staff_user = UserFactory(is_staff=True, is_superuser=False)
+        cls.cluster = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(court=cls.court, case_name="Bulk v. Test"),
+            case_name="Bulk v. Test",
+            date_filed=datetime.date.today(),
+        )
+
+    def test_seal_clusters_requires_delete_permission(self):
+        """A staff user without delete permission can't run the action."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
+        request = RequestFactory().post(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        request.user = self.staff_user
+        queryset = OpinionCluster.objects.filter(pk=self.cluster.pk)
+
+        with self.assertRaises(PermissionDenied):
+            clusters_admin.seal_clusters(request, queryset)
+
+        self.assertTrue(
+            OpinionCluster.objects.filter(pk=self.cluster.pk).exists(),
+            "Cluster should not have been deleted.",
+        )
 
 
 class PopulateDocketNumberRawCommandTest(TestCase):
