@@ -160,9 +160,6 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
     rendered it. Blank when no table row listed this filing.
     :ivar filing_role: The role of the party that made this filing.
     :ivar filing_doctype: The kind of document this filing consists of.
-    :ivar filing_type_recognized: Whether the filing type resolved to a known
-    role and document type. False on an entry taken from the FILINGS table
-    means Court-PASS used a filing type we do not recognize yet.
     :ivar party: FK to the case party associated with this filing. May be null
     if the party cannot be found.
     :ivar party_name: The party as the FILINGS table named it. Court-PASS only
@@ -190,7 +187,6 @@ class NYCoADocketEntry(AbstractDateTimeModel, CSVExportMixin):
     filing_doctype = models.SmallIntegerField(
         choices=FilingDocType.choices, default=UNKNOWN
     )
-    filing_type_recognized = models.BooleanField(default=False)
     party = models.ForeignKey(
         "people_db.Party",
         on_delete=models.SET_NULL,

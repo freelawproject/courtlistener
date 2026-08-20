@@ -55,7 +55,6 @@ class NYCoADocketEntryFactory(DjangoModelFactory):
     filing_type_raw = FilingType.APPELLANT_BRIEF.label
     filing_role = FilingRole.APPELLANT
     filing_doctype = FilingDocType.BRIEF
-    filing_type_recognized = True
     party_name = Faker("name")
     date_filed = Faker("date_object")
     date_due = LazyAttribute(
