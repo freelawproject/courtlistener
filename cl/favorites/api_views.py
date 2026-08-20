@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from cl.api.api_permissions import V3APIPermission
+from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.pagination import MediumAdjustablePagination
 from cl.api.utils import EventCounterThrottle, LoggingMixin, TagRateThrottle
 from cl.favorites.api_permissions import IsTagOwner
@@ -24,8 +24,16 @@ from cl.lib.bot_detector import is_bot
 
 
 class UserTagViewSet(ModelViewSet):
+    # get_queryset() below returns every published tag (not just the
+    # requester's own) so that reads work, but that same queryset backs
+    # update/destroy's get_object() lookup. Without an object-level
+    # ownership check here, any authenticated user could PATCH/PUT/DELETE
+    # -- and PUT could reassign ownership of -- any other user's published
+    # tag (GHSA-4587-9786-r6vp). IsOwner is the same guard
+    # VisualizationViewSet already uses for this identical shape.
     permission_classes = [
         permissions.IsAuthenticatedOrReadOnly,
+        IsOwner,
         V3APIPermission,
     ]
     throttle_classes = [TagRateThrottle]
