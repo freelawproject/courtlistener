@@ -5095,8 +5095,9 @@ def fl_ingest_docket_task(
     :param task: The Celery task.
 
     :param download_result: Tuple of:
-    - The bytes of the parsed JSON retrieved from S3 or the fully parsed case..
-    - The S3 bucket this case was retrieved from. Used for error messages.
+    - The bytes of the parsed JSON retrieved from S3 or the fully parsed case.
+    - The S3 bucket this case was retrieved from. Used for error messages. May be blank for tasks spawned from the
+    poller daemon as we don't have a good way to access the bucket there.
     - The S3 key this case was retrieved from. Used for error messages.
     :param download_attachments: Whether to download docket entry attachments.
 

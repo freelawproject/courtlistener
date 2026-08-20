@@ -31,11 +31,16 @@ def save_case_to_s3(
     case: FloridaCase,
     throttle: CeleryThrottle,
     queue_name: str,
-):
+) -> str:
+    """Save a case to S3
+
+    :returns: The S3 key where the case was saved. The bucket is not known until the celery task runs or we would
+    return that as well."""
     key = _make_case_key(court_id, case.docket_number)
     content = case.model_dump_json(ensure_ascii=True).encode("utf-8")
     throttle.maybe_wait()
     save_response_to_s3.si(key, content).set(queue=queue_name).apply_async()
+    return key
 
 
 def _make_case_key(court_id: FloridaCourtID, docket_number: str) -> str:

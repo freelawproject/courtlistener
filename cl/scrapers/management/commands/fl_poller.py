@@ -141,12 +141,15 @@ class Command(FLScrapeCommand, StatePollCommand):
         self,
         case: FloridaCase,
         throttle: CeleryThrottle,
+        key: str,
         queue_name: str,
         download_attachments: bool,
     ):
         throttle.maybe_wait()
         self.checkpoint_tracker.set(case.date_filed)
-        fl_ingest_docket_task.si(case, download_attachments).set(
+        # We don't have access to the bucket here, but it should only be used for logging in fl_ingest_docket_task so
+        # this is fine.
+        fl_ingest_docket_task.si((case, "", key), download_attachments).set(
             queue=queue_name
         ).apply_async()
 
@@ -210,14 +213,14 @@ class Command(FLScrapeCommand, StatePollCommand):
                         errors,
                     )
                     continue
-                save_case_to_s3(
+                key = save_case_to_s3(
                     court_id,
                     case,
                     throttle,
                     queue_name,
                 )
                 self.send_merge_task(
-                    case, throttle, queue_name, download_attachments
+                    case, throttle, key, queue_name, download_attachments
                 )
             last_polled = now
             await asyncio.sleep(polling_delay * 60)
