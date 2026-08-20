@@ -1,5 +1,11 @@
 {% extends "admin/base_site.html" %}
 
+{# `delete-confirmation` is what scopes the admin's paired submit/cancel-link #}
+{# styling (see .delete-confirmation form .cancel-link in admin/css/base.css). #}
+{# Without it the Cancel link falls back to plain `.button` and the two buttons #}
+{# don't match. It also colors the submit as destructive, which this is. #}
+{% block bodyclass %}{{ block.super }} delete-confirmation{% endblock %}
+
 {% block content %}
 
     <p>You are about to permanently seal the cluster <strong>{{ cluster }}</strong>.</p>
@@ -16,8 +22,8 @@
 
     <form method="post">
         {% csrf_token %}
-        <input type="submit" value="Yes, seal this cluster" class="default">
-        <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}" class="button cancel-link">Cancel</a>
+        <input type="submit" value="Yes, seal this cluster">
+        <a role="button" href="{% url 'admin:search_opinioncluster_change' cluster.pk %}" class="button cancel-link">Cancel</a>
     </form>
 
 {% endblock %}
