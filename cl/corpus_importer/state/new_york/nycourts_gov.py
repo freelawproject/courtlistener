@@ -167,8 +167,6 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
     :ivar entry_doctype: The document type for this filing. The ``_``-prefixed
         members are court output rather than a party filing. ``None`` on the
         same terms as ``entry_role``.
-    :ivar filing_type_recognized: Whether the filing type resolved to a known
-        role and document type.
     """
 
     date_filed: date | None = None
@@ -180,7 +178,6 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
     date_due: date | None = None
     entry_role: CoveredFilingRole = None
     entry_doctype: CoveredFilingDocType = None
-    filing_type_recognized: bool = False
 
 
 class NYCoAIssue(BaseModel):

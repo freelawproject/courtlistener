@@ -194,9 +194,6 @@ class NYCoAFilingFactory(Factory):
     date_due = Faker("date_object")
     entry_role = LazyAttribute(lambda o: o.filing.role)
     entry_doctype = LazyAttribute(lambda o: o.filing.doctype)
-    filing_type_recognized = LazyAttribute(
-        lambda o: o.entry_filing_type is not None
-    )
     attachments = List([SubFactory(NYCoAFileFactory)])
 
 
