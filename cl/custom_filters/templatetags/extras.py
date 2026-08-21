@@ -466,3 +466,18 @@ def get_request_value(request_get, field_name):
 def render_field_with_id(field, field_id):
     """Render a form field with a custom ID attribute."""
     return field.as_widget(attrs={"id": field_id})
+
+
+@register.filter
+def http_url(url: str) -> str:
+    """Return the URL only if it uses the http/https scheme, else "".
+
+    Guards against rendering an unvalidated string as a
+    ``javascript:`` URI in an ``href`` attribute.
+
+    :param url: The URL to check.
+    :return: The URL if safe, otherwise an empty string.
+    """
+    if url and url.startswith(("http://", "https://")):
+        return url
+    return ""

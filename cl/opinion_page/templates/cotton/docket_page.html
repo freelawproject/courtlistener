@@ -7,9 +7,12 @@
   metadata=""
   bankruptcy_metadata=""
   originating_court_metadata=""
+  scotus_metadata=""
   tabs=""
   has_alert=""
   note_form=""
+  is_scotus=False
+  hide_docket_alerts=False
   tab_content_id="tab-content"
 />
 
@@ -47,7 +50,7 @@
     {% svg "tag" class="w-4 h-4" aria_hidden="true" %}
     Tags
   </c-button>
-  {% if docket.pacer_docket_url %}
+  {% if not hide_docket_alerts and docket.pacer_docket_url %}
     {# TODO: Wire up alert toggle interactivity (auth checks, AJAX toggle, state change). #}
     <c-menu-button
       button_variant="outline"
@@ -90,7 +93,19 @@
       </c-slot>
     </c-menu-button>
   {% endif %}
-  {% if docket.pacer_docket_url %}
+  {% if is_scotus %}
+    {% if docket.scotus_docket_url %}
+      <c-button
+        variant="outline"
+        href="{{ docket.scotus_docket_url }}"
+        target="_blank"
+        rel="nofollow noopener noreferrer"
+      >
+        {% svg "external" class="w-4 h-4" aria_hidden="true" %}
+        View in SCOTUS
+      </c-button>
+    {% endif %}
+  {% elif docket.pacer_docket_url %}
     <c-menu-button
       button_variant="outline"
       widget_aria_label="PACER links menu"
@@ -169,6 +184,12 @@
 <c-metadata-section
   :items="originating_court_metadata"
   title="Originating Court Information"
+/>
+
+{# SCOTUS DOCKET METADATA #}
+<c-metadata-section
+  :items="scotus_metadata"
+  title="SCOTUS Docket Metadata"
 />
 
 {# ORAL ARGUMENT RECORDINGS #}
