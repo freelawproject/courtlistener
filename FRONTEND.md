@@ -72,6 +72,13 @@ Sync notice format:
 - Don't create single-use utility classes — use inline Tailwind classes instead
 - Branding values (colors, spacing, fonts) go in `tailwind.config.js`, not as custom classes in `input.css`
 
+### Django form widgets
+
+- New-stack Django forms MUST use `TextInput` and `Select` from `cl.lib.widgets` for the standard new-stack widget configuration
+- Use `TextInput` for standard text-input styling and `autocomplete="off"`
+- Use `Select` for standard select styling, with `input_text=True` when the select requires the `input-text` component class
+- Keep field-specific attributes, such as `placeholder`, in the form field declaration
+
 ## Alpine.js
 
 CourtListener uses the CSP-friendly Alpine build. Nearly all Alpine documentation examples use inline JS that will NOT work here.
