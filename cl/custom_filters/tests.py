@@ -1,9 +1,19 @@
 import datetime
+import logging
+from unittest import mock
 
 from django import forms
-from django.template import Context
+from django.template import Context, TemplateSyntaxError
 from django.test import RequestFactory, SimpleTestCase
 
+from cl.custom_filters.templatetags import component_tags
+from cl.custom_filters.templatetags.component_tags import (
+    _coerce_defer,
+    _resolved_path,
+    _warn_about_missing_minified,
+    render_required_scripts,
+    require_script,
+)
 from cl.custom_filters.templatetags.extras import (
     get_canonical_element,
     get_full_host,
@@ -528,3 +538,104 @@ class TestSvgTag(SimpleTestCase):
         with self.settings(DEBUG=False):
             result = svg("nonexistent_svg_that_does_not_exist")
             self.assertEqual(result, "")
+
+
+LOGGER = component_tags.logger.name
+
+
+class TestComponentTags(SimpleTestCase):
+    """Tests for the require_script / render_required_scripts tag pair."""
+
+    def setUp(self) -> None:
+        self.request = RequestFactory().get("/")
+        self.context = Context({"request": self.request})
+
+        # Our test runner disables logging unless --enable-logging is
+        # passed (see cl.tests.runner), so opt back in here.
+        previous_level = logging.root.manager.disable
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, previous_level)
+
+    def _render(self) -> str:
+        return render_required_scripts(self.context)
+
+    def test_extension_resolution(self) -> None:
+        """The extension resolves to .js under DEBUG, .min.js otherwise."""
+        test_cases = (
+            # (path, DEBUG, expected)
+            ("js/alpine/plugins/focus", True, "js/alpine/plugins/focus.js"),
+            (
+                "js/alpine/plugins/focus",
+                False,
+                "js/alpine/plugins/focus.min.js",
+            ),
+            # An explicit extension is used verbatim in both environments,
+            # even when it's already minified.
+            ("js/foo.js", True, "js/foo.js"),
+            ("js/foo.js", False, "js/foo.js"),
+            ("js/foo.min.js", False, "js/foo.min.js"),
+        )
+        for path, debug, expected in test_cases:
+            with self.subTest(path=path, debug=debug):
+                with self.settings(DEBUG=debug):
+                    self.assertEqual(_resolved_path(path), expected)
+
+    def test_defer_flag_coercion(self) -> None:
+        """Booleans and their string spellings coerce; anything else raises."""
+        for value, expected in (
+            (True, True),
+            (False, False),
+            ("true", True),
+            ("false", False),
+            ("True", True),
+            ("FALSE", False),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(_coerce_defer(value, "js/foo.js"), expected)
+
+        for invalid in ("yes", "1", None, 2):
+            with self.subTest(value=invalid):
+                with self.assertRaises(TemplateSyntaxError):
+                    _coerce_defer(invalid, "js/foo.js")
+
+    def test_conflicting_defer_flags_raise(self) -> None:
+        """Requiring one script with conflicting defer flags is an error."""
+        require_script(self.context, "js/foo.js", defer=True)
+        with self.assertRaises(TemplateSyntaxError):
+            require_script(self.context, "js/foo.js", defer=False)
+
+    def test_scripts_are_deduplicated(self) -> None:
+        """Repeated requires render a single script tag."""
+        require_script(self.context, "js/foo.js")
+        require_script(self.context, "js/foo.js")
+        self.assertEqual(self._render().count("<script"), 1)
+
+    def test_render_emits_defer_and_nonce(self) -> None:
+        """Rendered tags carry the defer attribute and the CSP nonce."""
+        self.request.csp_nonce = "abc123"
+        require_script(self.context, "js/foo.js")
+        require_script(self.context, "js/bar.js", defer=True)
+        rendered = self._render()
+
+        self.assertIn('src="/static/js/foo.js" nonce="abc123"', rendered)
+        self.assertIn('src="/static/js/bar.js" defer nonce="abc123"', rendered)
+
+    def test_no_request_in_context_is_a_noop(self) -> None:
+        """Both tags are no-ops without a request in the context."""
+        empty = Context({})
+        self.assertEqual(require_script(empty, "js/foo"), "")
+        self.assertEqual(render_required_scripts(empty), "")
+
+    def test_render_without_required_scripts(self) -> None:
+        """Rendering with nothing required returns an empty string."""
+        self.assertEqual(self._render(), "")
+
+        """_warn_about_missing_minified is a no-op outside DEBUG."""
+        with self.settings(DEBUG=True):
+            require_script(self.context, "js/alpine/plugins/ghost")
+
+        with self.settings(DEBUG=False):
+            with self.assertNoLogs(LOGGER, level="WARNING"):
+                _warn_about_missing_minified(self.request)
+
+        mock_find.assert_not_called()
