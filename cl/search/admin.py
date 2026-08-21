@@ -2,9 +2,10 @@ from typing import Any
 
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils.html import format_html
@@ -12,6 +13,7 @@ from django.utils.html import format_html
 from cl.alerts.models import DocketAlert
 from cl.lib.admin import (
     AdminLinkConfig,
+    IndexedPkSearchMixin,
     SealableDocumentAdmin,
     generate_admin_links,
 )
@@ -105,7 +107,8 @@ class CitationInline(admin.TabularInline):
 
 
 @admin.register(OpinionCluster)
-class OpinionClusterAdmin(CursorPaginatorAdmin):
+class OpinionClusterAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
+    change_form_template = "admin/change_form_with_custom_links.html"
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (CitationInline,)
     raw_id_fields = (
@@ -113,16 +116,46 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "panel",
         "non_participating_judges",
     )
-    list_filter = (
-        "source",
-        "blocked",
-    )
+    list_filter = ("blocked",)
+    search_fields = (
+        "pk",
+    )  # Required for search box; actual search handled by IndexedPkSearchMixin
+    search_help_text = "Search by OpinionCluster ID (exact match)."
     readonly_fields = (
         "citation_count",
         "date_modified",
         "date_created",
     )
     actions = ("seal_clusters",)
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Add a "Seal Cluster" button to the change form
+
+        :param request: HttpRequest object
+        :param object_id: PK of the OpinionCluster being edited
+        :param form_url: URL the change form posts to
+        :param extra_context: Additional template context
+        :return: The rendered change form
+        """
+        extra_context = extra_context or {}
+        extra_context["custom_links"] = [
+            {
+                "href": reverse(
+                    "admin:opinioncluster_seal_confirmation",
+                    args=[object_id],
+                ),
+                "label": "Seal Cluster",
+            }
+        ]
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
 
     # nosemgrep: python.lang.bad-return-outside-function
     SEAL_BLOCKERS_MAP = {
@@ -144,12 +177,25 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "people_db.PartyType": lambda cluster: cluster.docket.party_types,
         "people_db.Role": lambda cluster: cluster.docket.role_set,
         "search.BankruptcyInformation": lambda cluster: getattr(
-            cluster.docket, "bankruptcyinformation", None
+            cluster.docket, "bankruptcy_information", None
         ),
         "search.Claim": lambda cluster: cluster.docket.claims,
         "search.DocketEntry": lambda cluster: cluster.docket.docket_entries,
         "search.OpinionCluster": lambda cluster: cluster.docket.clusters.exclude(
             pk=cluster.pk
+        ),
+        "search.SCOTUSDocketEntry": lambda cluster: cluster.docket.scotusdocketentry_set,
+        "search.ScotusDocketMetadata": lambda cluster: getattr(
+            cluster.docket, "scotus_metadata", None
+        ),
+        "search.TexasDocketEntry": lambda cluster: cluster.docket.texasdocketentry_set,
+        "search.FloridaDocketEntry": lambda cluster: cluster.docket.florida_docket_entries,
+        "search.TrialCourtData": lambda cluster: getattr(
+            cluster.docket, "trialcourtdata", None
+        ),
+        "search.CaseTransfer": lambda cluster: CaseTransfer.objects.filter(
+            Q(origin_docket=cluster.docket)
+            | Q(destination_docket=cluster.docket)
         ),
     }
 
@@ -171,6 +217,12 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "search.Claim",
         "search.DocketEntry",
         "search.OpinionCluster",
+        "search.SCOTUSDocketEntry",
+        "search.ScotusDocketMetadata",
+        "search.TexasDocketEntry",
+        "search.FloridaDocketEntry",
+        "search.TrialCourtData",
+        "search.CaseTransfer",
     ]
 
     def check_blocking_relations(
@@ -220,7 +272,7 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         return blockers
 
     def get_urls(self):
-        """Add custom admin URLs for the blocking dependencies confirmation view
+        """Add custom admin URLs for sealing and blocking-dependency views
 
         :return: List of url patterns
         """
@@ -231,8 +283,106 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
                 self.admin_site.admin_view(self.blocking_confirmation_view),
                 name="opinioncluster_blocking_confirmation",
             ),
+            path(
+                "seal-cluster/<int:cluster_id>/",
+                self.admin_site.admin_view(self.seal_cluster_view),
+                name="opinioncluster_seal_confirmation",
+            ),
         ]
         return custom_urls + urls
+
+    def get_deletion_blockers(
+        self, cluster: OpinionCluster
+    ) -> tuple[bool, bool]:
+        """Check whether anything blocks deleting a cluster or its docket
+
+        :param cluster: OpinionCluster to check
+        :return: Two-tuple of whether the cluster is blocked from being
+            deleted, and whether its docket is
+        """
+        blockers = self.check_blocking_relations(cluster)
+        return (
+            any(blockers.get(key, False) for key in self.CLUSTER_BLOCKER_KEYS),
+            any(blockers.get(key, False) for key in self.DOCKET_BLOCKER_KEYS),
+        )
+
+    def seal_cluster(
+        self, cluster: OpinionCluster, delete_docket: bool
+    ) -> None:
+        """Delete a cluster and record the redirection that makes its URLs 410
+
+        Callers MUST check `get_deletion_blockers` first: this does no blocker
+        checking of its own and will happily delete a cluster that something
+        else still points at.
+
+        :param cluster: OpinionCluster to seal
+        :param delete_docket: Whether to delete the cluster's docket too
+        :return: None
+        """
+        docket = cluster.docket
+        cluster_pk = cluster.pk
+        with transaction.atomic():
+            cluster.delete()
+            ClusterRedirection.objects.create(
+                reason=ClusterRedirection.SEALED,
+                deleted_cluster_id=cluster_pk,
+                cluster=None,
+            )
+            if delete_docket:
+                docket.delete()
+
+    def seal_cluster_view(
+        self, request: HttpRequest, cluster_id: int
+    ) -> HttpResponse:
+        """Confirmation page (GET) and execution (POST) for sealing one cluster
+
+        This is the single-object counterpart to the `seal_clusters` action,
+        reachable from the "Seal Cluster" button on the change form. Both go
+        through `get_deletion_blockers` and `seal_cluster`, so the two paths
+        can't drift.
+
+        On GET, a cluster with dependencies that block deletion redirects to
+        the blocking-confirmation page so the admin can see what needs to be
+        resolved first. Otherwise we render a confirmation form that says
+        whether the associated docket will be removed along with the cluster.
+
+        :param request: HttpRequest object
+        :param cluster_id: ID of the OpinionCluster to seal
+        :return: Redirect or rendered confirmation page
+        """
+        cluster = get_object_or_404(OpinionCluster, pk=cluster_id)
+        # `admin_view` only checks that the user is active staff, so gate the
+        # deletion on the model permission the way Django's delete_view does.
+        if not self.has_delete_permission(request, cluster):
+            raise PermissionDenied
+
+        cluster_blocked, docket_blocked = self.get_deletion_blockers(cluster)
+        if cluster_blocked:
+            return HttpResponseRedirect(
+                reverse(
+                    "admin:opinioncluster_blocking_confirmation",
+                    args=[cluster_id],
+                )
+            )
+
+        if request.method == "POST":
+            self.seal_cluster(cluster, delete_docket=not docket_blocked)
+            self.message_user(
+                request,
+                f"Sealed cluster {cluster_id}.",
+                messages.SUCCESS,
+            )
+            return HttpResponseRedirect(
+                reverse("admin:search_opinioncluster_changelist")
+            )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Seal OpinionCluster #{cluster_id}?",
+            "cluster": cluster,
+            "docket_will_be_deleted": not docket_blocked,
+        }
+        return render(request, "admin/seal_cluster_confirmation.html", context)
 
     def blocking_confirmation_view(
         self, request: HttpRequest, cluster_id: int
@@ -247,7 +397,9 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         cluster = get_object_or_404(OpinionCluster, pk=cluster_id)
 
         blocking_relations = self.get_blocking_relations(cluster)
-        has_blocking = any(qs.exists() for qs in blocking_relations.values())
+        # A one-to-one blocker comes back as a plain list, so ask about
+        # truthiness rather than calling `exists()`, which only querysets have.
+        has_blocking = any(blocking_relations.values())
         context = {
             **self.admin_site.each_context(request),
             "title": "Blocking dependencies preventing cluster sealing",
@@ -265,24 +417,27 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         no blocking dependencies exist. Creates a ClusterRedirection record
         for each sealed cluster
 
+        This is the bulk counterpart to `seal_cluster_view`; both share
+        `get_deletion_blockers` and `seal_cluster`.
+
         :param request: HttpRequest triggering the action
         :param queryset: Queryset of selected OpinionCluster
         """
+        # The changelist only requires view or change permission, so gate the
+        # deletion the way Django's own delete_selected action does. Checked
+        # once up front rather than per cluster, so a failure can't leave a
+        # partially sealed queryset behind.
+        if not self.has_delete_permission(request):
+            raise PermissionDenied
+
         error_messages = []
         sealed_count = 0
 
         for cluster in queryset.select_related("docket"):
-            docket = cluster.docket
-            blockers = self.check_blocking_relations(cluster)
-
-            cluster_deletion_blockers = any(
-                blockers.get(key, False) for key in self.CLUSTER_BLOCKER_KEYS
+            cluster_blocked, docket_blocked = self.get_deletion_blockers(
+                cluster
             )
-            docket_deletion_blockers = any(
-                blockers.get(key, False) for key in self.DOCKET_BLOCKER_KEYS
-            )
-
-            if cluster_deletion_blockers:
+            if cluster_blocked:
                 confirm_url = reverse(
                     "admin:opinioncluster_blocking_confirmation",
                     args=[cluster.pk],
@@ -290,19 +445,8 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
                 error_messages.append((cluster, confirm_url))
                 continue
 
-            with transaction.atomic():
-                cluster_pk = cluster.pk
-                cluster.delete()
-                ClusterRedirection.objects.create(
-                    reason=ClusterRedirection.SEALED,
-                    deleted_cluster_id=cluster_pk,
-                    cluster=None,
-                )
-
-                if not docket_deletion_blockers:
-                    docket.delete()
-
-                sealed_count += 1
+            self.seal_cluster(cluster, delete_docket=not docket_blocked)
+            sealed_count += 1
 
         if sealed_count:
             self.message_user(
@@ -414,11 +558,13 @@ class CaseTransferAdmin(CursorPaginatorAdmin):
 
 
 @admin.register(RECAPDocument)
-class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
+class RECAPDocumentAdmin(
+    IndexedPkSearchMixin, SealableDocumentAdmin, CursorPaginatorAdmin
+):
     change_form_template = "admin/change_form_with_custom_links.html"
     search_fields = (
         "pk",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by IndexedPkSearchMixin
     search_help_text = "Search by RECAP Document ID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry", "tags")
@@ -437,26 +583,6 @@ class RECAPDocumentAdmin(SealableDocumentAdmin, CursorPaginatorAdmin):
 
     def get_seal_documents(self, obj):
         return [obj]
-
-    def get_search_results(
-        self, request: HttpRequest, queryset: QuerySet, search_term: str
-    ) -> tuple[QuerySet, bool]:
-        """Override to search by pk without varchar casting.
-
-        Django 6.0.1 casts non-text fields to CharField for text lookups,
-        which prevents index usage on large tables. This method handles
-        pk searches with direct integer comparison.
-
-        See: https://github.com/freelawproject/courtlistener/issues/6790
-        """
-        if not search_term:
-            return queryset, False
-
-        try:
-            pk_value = int(search_term.strip())
-            return queryset.filter(pk=pk_value), False
-        except ValueError:
-            return queryset.none(), False
 
     @admin.action(description="Seal Document")
     def seal_documents(self, request: HttpRequest, queryset: QuerySet) -> None:
@@ -731,10 +857,10 @@ class SCOTUSDocketEntryAdmin(CursorPaginatorAdmin):
 
 
 @admin.register(SCOTUSDocument)
-class SCOTUSDocumentAdmin(CursorPaginatorAdmin):
+class SCOTUSDocumentAdmin(IndexedPkSearchMixin, CursorPaginatorAdmin):
     search_fields = (
         "pk",
-    )  # Required for search box; actual search handled by get_search_results
+    )  # Required for search box; actual search handled by IndexedPkSearchMixin
     search_help_text = "Search by SCOTUSDocument Document ID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry",)
@@ -756,9 +882,7 @@ class TexasDocumentInline(admin.StackedInline):
 
 @admin.register(TexasDocument)
 class TexasDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = (
-        "media_version_id",
-    )  # Required for search box; actual search handled by get_search_results
+    search_fields = ("media_version_id",)
     search_help_text = (
         "Search by Texas Document media version ID (exact match)."
     )
@@ -822,9 +946,7 @@ class FloridaDocumentInline(admin.StackedInline):
 
 @admin.register(FloridaDocument)
 class FloridaDocumentAdmin(CursorPaginatorAdmin):
-    search_fields = (
-        "link_uuid",
-    )  # Required for search box; actual search handled by get_search_results
+    search_fields = ("link_uuid",)
     search_help_text = "Search by Florida Document link UUID (exact match)."
     list_select_related = ("docket_entry__docket",)  # Fix N+1 from __str__
     raw_id_fields = ("docket_entry",)
