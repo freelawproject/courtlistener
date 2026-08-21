@@ -78,7 +78,7 @@ dependencies = [
   "django-waffle>=5.0.0",
   "nameparser>=1.1.3",
   "eyecite",
-  "scipy>=1.15.2",
+  "scipy>=1.18.0",
   "scikit-learn>=1.9.0",
   "numpy>=2.5.0",
   "datasketch>=1.8.0",
