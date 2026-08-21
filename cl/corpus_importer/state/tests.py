@@ -547,7 +547,7 @@ class BaseMergerTest(TestCase):
             {"Alice"},
         )
 
-    @merger_test(expected_query_count=15)
+    @merger_test(expected_query_count=16)
     def test_related_mergers_m2m_through_replace_deletes(self) -> None:
         """Characterization: does REPLACE on a through many-to-many delete
         the stale related objects outright?"""

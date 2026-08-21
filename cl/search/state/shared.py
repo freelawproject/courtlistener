@@ -1,10 +1,11 @@
 import logging
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import IO, Self
 
 from asgiref.sync import async_to_sync
 from django.core.files import File
 from django.db import models
+from django.utils.text import slugify
 
 from cl.lib.decorators import document_model
 from cl.lib.models import AbstractPDF
@@ -75,6 +76,47 @@ class AbstractStateDocument(AbstractPDF):
         null=True,
         blank=True,
     )
+
+    @classmethod
+    def state_pdf_path(
+        cls,
+        state_code: str,
+        court_id: str,
+        filename: str,
+        thumbs: bool = False,
+    ) -> str:
+        """Build the S3 path for a state court document.
+
+        Every state scraper stores its documents under the same layout, so
+        subclasses' `get_pdf_path` implementations delegate here rather than
+        each repeating it:
+
+            us/state/<state_code>/<court_id>/gov.<state_code>.<court_id>.<slug><ext>
+
+        Thumbnails go in a `<court_id>-thumbnails` sibling directory so they
+        cannot collide with the document they were generated from.
+
+        Callers pass `court_id` rather than reading it off the document because
+        each model reaches its court by a different relation.
+
+        :param state_code: The two-letter USPS code for the state, lowercased.
+        :param court_id: The ID of the court the document was filed in.
+        :param filename: The filename Django hands to the `upload_to` callback.
+        :param thumbs: Whether to return the thumbnail path instead.
+        :return: The path to store the document at, relative to the bucket
+            root.
+        """
+        slug = slugify(Path(filename).stem)
+        # Court-PASS serves oral argument playlists alongside PDFs, and TAMES
+        # serves .html and .wpd, so the original extension has to survive.
+        ext = Path(filename).suffix or ".pdf"
+        directory = f"{court_id}-thumbnails" if thumbs else court_id
+        return str(
+            Path("us/state")
+            / state_code
+            / directory
+            / f"gov.{state_code}.{court_id}.{slug}{ext}"
+        )
 
     def make_filename(self) -> str:
         """Create the filename to store this document's content under (no extension)."""
@@ -174,7 +216,7 @@ class AbstractStateDocument(AbstractPDF):
         from cl.scrapers.utils import get_extension
 
         try:
-            document = cls.objects.get(pk=pk)
+            document = cls._default_manager.get(pk=pk)
         except cls.DoesNotExist:
             logger.warning(
                 "Document download: %s %s does not exist; skipping.",
