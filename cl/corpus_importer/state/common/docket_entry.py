@@ -8,7 +8,7 @@ target model are per-state).
 
 from collections.abc import Callable, Sequence
 from datetime import date
-from typing import Any, cast
+from typing import Any, cast, override
 
 from django.db.models import Model
 from juriscraper.state.docket import DocketEntry as ScrapeDocketEntry
@@ -22,7 +22,11 @@ from cl.corpus_importer.state.merger import (
     RelatedParams,
     overwrite,
 )
-from cl.search.state.shared import DocketEntryType
+from cl.search.state.shared import (
+    AbstractStateDocument,
+    DocketEntryType,
+    ProcessingError,
+)
 
 
 def _entry_type(entry: ScrapeDocketEntry[Any], params: Any) -> int:
@@ -44,10 +48,43 @@ def _document_url(document: ScrapeDocument, params: Any) -> str:
     return document.url
 
 
-class DocumentMerger[DocType: ScrapeDocument, ParamType, M: Model](
-    Merger[DocType, RelatedParams[ParamType], M], abstract=True
-):
+class DocumentMerger[
+    DocType: ScrapeDocument,
+    ParamType,
+    M: AbstractStateDocument,
+](Merger[DocType, RelatedParams[ParamType], M], abstract=True):
     url: str = Attribute(_document_url, strategy=overwrite)
+
+    @override
+    def needs_update(self) -> bool:
+        """Force the update path for a document with no stored file and no
+        recorded processing error -- its download failed transiently, and
+        reporting an update gets the download re-dispatched on re-ingest."""
+        return (
+            self.existing is not None
+            and not self.existing.filepath_local
+            and self.existing.processing_error is None
+        )
+
+    @override
+    def pre_update(self, updated_fields: list[str]) -> list[str]:
+        updated = super().pre_update(updated_fields)
+        # This hook only runs on the update path, so `existing` is set; the
+        # guard narrows the type for mypy.
+        if (existing := self.existing) is None:
+            return updated
+        if "url" not in updated_fields:
+            return updated
+        if existing.processing_error == ProcessingError.BAD_URL:
+            existing.processing_error = None
+            updated.append("processing_error")
+        if existing.filepath_local:
+            existing.filepath_local.delete(save=False)
+            updated.append("filepath_local")
+        existing.filepath_local = ""
+        existing.ocr_status = None
+        updated.append("ocr_status")
+        return updated
 
 
 def AttachmentRelation(
