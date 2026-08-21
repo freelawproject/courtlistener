@@ -116,7 +116,7 @@ dependencies = [
   "django-s3-express-cache>=0.2.0",
   "zohocrmsdk8-0==4.0.0",
   "django-prometheus>=2.4.1",
-  "google-genai>=2.14.0",
+  "google-genai>=2.18.1",
   "django-oauth-toolkit[jwcrypto]==3.2.0",
 ]
 
