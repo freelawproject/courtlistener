@@ -198,20 +198,24 @@ class SealableDocumentAdmin(admin.ModelAdmin):
         """Render a seal confirmation page (GET) or seal selected
         documents (POST)."""
         obj = get_object_or_404(self.seal_model, pk=pk)
-        cancel_url = reverse(self.seal_change_url_name, args=[pk])
         documents = self.get_seal_documents(obj)
         heading = self.seal_heading_template.format(pk=pk)
 
         if request.method == "POST":
             self._seal_and_report(request)
-            return HttpResponseRedirect(cancel_url)
+            return HttpResponseRedirect(
+                reverse(self.seal_change_url_name, args=[pk])
+            )
 
         context = {
             **self.admin_site.each_context(request),
             "title": "Confirm document sealing",
             "heading": heading,
             "documents": documents,
-            "cancel_url": cancel_url,
+            # The template builds the cancel link with {% url %} rather than
+            # dropping a prebuilt string straight into an href.
+            "cancel_url_name": self.seal_change_url_name,
+            "object_pk": pk,
         }
         return render(
             request,
