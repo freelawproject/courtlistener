@@ -5,12 +5,13 @@ from unittest import mock
 from unittest.mock import MagicMock, patch
 
 from asgiref.sync import async_to_sync
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import ResolverMatch
 from django.utils.functional import SimpleLazyObject
 from requests.cookies import RequestsCookieJar
 
@@ -1919,7 +1920,9 @@ class TestQueryWrapper(TestCase):
     def test_get_context_without_user(self) -> None:
         """Does get_context return None user_id when request has no user?"""
         request = self.request_factory.get("/test/path/")
-        request.resolver_match = self.MockResolverMatch("test-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("test-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1932,7 +1935,9 @@ class TestQueryWrapper(TestCase):
         """Does get_context return user_id and url for authenticated user?"""
         request = self.request_factory.get("/test/path/")
         request.user = self.user
-        request.resolver_match = self.MockResolverMatch("test-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("test-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1947,7 +1952,9 @@ class TestQueryWrapper(TestCase):
         """Does get_context handle anonymous user correctly?"""
         request = self.request_factory.get("/anonymous/path/")
         request.user = AnonymousUser()
-        request.resolver_match = self.MockResolverMatch("anon-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("anon-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1960,7 +1967,9 @@ class TestQueryWrapper(TestCase):
     def test_get_context_truncates_path(self):
         request = self.request_factory.get("/very/long/path/")
         request.user = self.user
-        request.resolver_match = self.MockResolverMatch(view_name="test-view")
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch(view_name="test-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1977,8 +1986,10 @@ class TestQueryWrapper(TestCase):
         """
         request = self.request_factory.get("/lazy/user/path/")
         # Create an unevaluated SimpleLazyObject (simulating Django's lazy user)
-        request.user = SimpleLazyObject(lambda: self.user)
-        request.resolver_match = self.MockResolverMatch("lazy-view")
+        request.user = cast(User, SimpleLazyObject(lambda: self.user))
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("lazy-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
@@ -1994,8 +2005,10 @@ class TestQueryWrapper(TestCase):
         lazy_user = SimpleLazyObject(lambda: self.user)
         # Force evaluation of the lazy object
         _ = lazy_user.pk  # type: ignore[attr-defined]
-        request.user = lazy_user
-        request.resolver_match = self.MockResolverMatch("lazy-view")
+        request.user = cast(User, lazy_user)
+        request.resolver_match = cast(
+            ResolverMatch, self.MockResolverMatch("lazy-view")
+        )
 
         wrapper = QueryWrapper(request)
         result = wrapper.get_context()
