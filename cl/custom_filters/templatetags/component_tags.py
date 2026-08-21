@@ -1,9 +1,15 @@
+import logging
+
 from django import template
 from django.conf import settings
+from django.contrib.staticfiles import finders
+from django.http import HttpRequest
 from django.template import TemplateSyntaxError
 from django.templatetags.static import static
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+
+logger = logging.getLogger(__name__)
 
 register = template.Library()
 
@@ -15,6 +21,15 @@ def _script_registry_for(request):
     if not hasattr(request, "_required_component_scripts"):
         setattr(request, "_required_component_scripts", dict())
     return request._required_component_scripts
+
+
+def _extensionless_registry_for(request: HttpRequest) -> set[str]:
+    """
+    Gets or sets the registry of scripts required without an extension.
+    """
+    if not hasattr(request, "_extensionless_scripts"):
+        setattr(request, "_extensionless_scripts", set())
+    return request._extensionless_scripts
 
 
 def _coerce_defer(value, script_path):
@@ -46,6 +61,29 @@ def _resolved_path(path_stub):
     return f"{path_stub}{suffix}"
 
 
+def _minified_is_missing(path_stub: str) -> bool:
+    """True when the stub has no ``.min.js`` sibling in the static dirs."""
+    return finders.find(f"{path_stub}.min.js") is None
+
+
+def _warn_about_missing_minified(request: HttpRequest) -> None:
+    """Logs one warning per registered stub lacking a ``.min.js`` sibling.
+
+    No-op outside DEBUG.
+    """
+    if not settings.DEBUG:
+        return
+
+    for path_stub in getattr(request, "_extensionless_scripts", ()):
+        if not _minified_is_missing(path_stub):
+            continue
+        logger.warning(
+            f"require_script: '{path_stub}' has no '.min.js' sibling. "
+            "Production would 404 on it — commit the minified file or "
+            "require the script with its '.js' extension."
+        )
+
+
 @register.simple_tag(takes_context=True)
 def require_script(context, script_path, **kwargs):
     """
@@ -62,6 +100,8 @@ def require_script(context, script_path, **kwargs):
         - Alpine plugins ('js/alpine/plugins/') *SHOULD* be deferred.
         - If `script_path` **already ends with ".js"**, it is used verbatim.
         - If `script_path` has **no extension**, we append ".js" when settings.DEBUG is True and ".min.js" when it's False
+        - Omitting the extension requires a committed ".min.js". A missing
+          one warns during render under DEBUG, and fails CI.
 
     Raises:
         TemplateSyntaxError:
@@ -70,6 +110,9 @@ def require_script(context, script_path, **kwargs):
     """
     if "request" not in context:
         return ""
+
+    if not script_path.endswith(".js"):
+        _extensionless_registry_for(context["request"]).add(script_path)
 
     script_path = _resolved_path(script_path)
     defer_flag = _coerce_defer(kwargs.get("defer", False), script_path)
@@ -93,6 +136,8 @@ def render_required_scripts(context):
     """
     if "request" not in context:
         return ""
+
+    _warn_about_missing_minified(context["request"])
 
     registry = getattr(context["request"], "_required_component_scripts", None)
     if not registry:
