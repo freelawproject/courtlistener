@@ -6,7 +6,7 @@ import logging
 from datetime import date
 from enum import Enum
 from functools import partial
-from typing import Annotated
+from typing import Annotated, Any, ClassVar
 
 from juriscraper.state.docket import (
     Docket,
@@ -17,13 +17,14 @@ from juriscraper.state.docket import (
     Representative,
 )
 from juriscraper.state.new_york.nycourts_gov.vocabularies import (
+    CourtVocabulary,
     FilingDocType,
     FilingRole,
     FilingType,
     IssueCategory,
     IssueSubcategory,
 )
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -34,37 +35,48 @@ __all__ = [
     "NYCoDocketEntry",
     "NYCoAIssue",
     "NYCoAParty",
+    "Unclassified",
 ]
 
 
-def _covered[Vocabulary: Enum](
-    vocabulary: type[Vocabulary], value: Vocabulary | str | None
-) -> Vocabulary | None:
-    """The vocabulary member `value` names, or `None` when there is no such
-    member.
+class Unclassified(Enum):
+    """Why a vocabulary field on one of these models names no member.
 
-    Court-PASS states values the scraper's vocabularies do not cover yet: the
-    Court assigns an issue a subcategory nobody has seen, or names a filing
-    type the classifier has no member for. Refusing the value outright would
-    cost the whole docket -- pydantic rejects the model, the loader counts it
-    invalid, and every filing, party and issue on the case is lost over one
-    unrecognized string.
+    Every vocabulary field below holds either a Juriscraper member or one of
+    these, never `None`, so that a merger reading one of these models never has
+    to ask what nothing means.
 
-    `None` is what the mergers already expect for a value the vocabulary does
-    not cover. `cl.corpus_importer.state.new_york.utils` turns it into
-    `UNASSIGNED` in the database, telling it apart from `UNKNOWN` -- the Court
-    stated nothing at all -- by the raw string stored alongside it. So the
-    classification of one field is lost and the docket is kept, which is the
-    trade the mergers were built for.
+    These two names are the ones the mirrors in
+    `cl.search.state.new_york.vocabularies` reserve, which is what lets
+    `cl.corpus_importer.state.new_york.utils.mirrored_code` map a reading of
+    either kind onto a stored code the same way.
+    """
+
+    UNKNOWN = "unknown"
+    """The Court stated nothing for this field."""
+
+    UNASSIGNED = "unassigned"
+    """The Court stated something Juriscraper's vocabulary does not cover,
+    which is the signal that a member needs adding."""
+
+
+def _classify[Vocabulary: CourtVocabulary](
+    vocabulary: type[Vocabulary], value: Any
+) -> Vocabulary | Unclassified:
+    """The vocabulary member `value` names, or why there is none.
+    Logging for values we might want to add to our classifiers.
 
     :param vocabulary: The vocabulary to look `value` up in.
-    :param value: The string the scrape stated. `None` and members of
-        `vocabulary` pass through untouched, so this is safe to apply to a
-        model built in Python as well as one parsed from a scrape.
-    :return: The member, or `None` if the vocabulary does not cover `value`.
+    :param value: Whatever the scrape stated. `None` is `UNKNOWN`, and members
+        of `vocabulary` and of `Unclassified` pass through untouched, so this is
+        safe to apply to a model built in Python as well as one parsed from a
+        scrape.
+    :return: The member, or why the vocabulary names none.
     """
-    if value is None or isinstance(value, vocabulary):
+    if isinstance(value, Unclassified | vocabulary):
         return value
+    if not value:
+        return Unclassified.UNKNOWN
     try:
         return vocabulary(value)
     except ValueError:
@@ -76,28 +88,26 @@ def _covered[Vocabulary: Enum](
             value,
             vocabulary.__name__,
         )
-        return None
+        return Unclassified.UNASSIGNED
 
 
-# The vocabularies the scraper classifies Court-PASS's own wording into, each
-# paired with the fallback above so that a value it does not cover costs the
-# field rather than the docket. Every scrape-stated vocabulary field below is
-# annotated with one of these; see `_covered`.
-CoveredFilingRole = Annotated[
-    FilingRole | None, BeforeValidator(partial(_covered, FilingRole))
+ClassifiedFilingRole = Annotated[
+    FilingRole | Unclassified, BeforeValidator(partial(_classify, FilingRole))
 ]
-CoveredFilingDocType = Annotated[
-    FilingDocType | None, BeforeValidator(partial(_covered, FilingDocType))
+ClassifiedFilingDocType = Annotated[
+    FilingDocType | Unclassified,
+    BeforeValidator(partial(_classify, FilingDocType)),
 ]
-CoveredFilingType = Annotated[
-    FilingType | None, BeforeValidator(partial(_covered, FilingType))
+ClassifiedFilingType = Annotated[
+    FilingType | Unclassified, BeforeValidator(partial(_classify, FilingType))
 ]
-CoveredIssueCategory = Annotated[
-    IssueCategory | None, BeforeValidator(partial(_covered, IssueCategory))
+ClassifiedIssueCategory = Annotated[
+    IssueCategory | Unclassified,
+    BeforeValidator(partial(_classify, IssueCategory)),
 ]
-CoveredIssueSubcategory = Annotated[
-    IssueSubcategory | None,
-    BeforeValidator(partial(_covered, IssueSubcategory)),
+ClassifiedIssueSubcategory = Annotated[
+    IssueSubcategory | Unclassified,
+    BeforeValidator(partial(_classify, IssueSubcategory)),
 ]
 
 
@@ -107,18 +117,15 @@ class NYCoAFile(Document):
     :ivar file_name: The name of the file as Court-PASS published it.
     :ivar content_type: The MIME type of the file, when known. Court-PASS
         publishes PDFs along with playlist files for oral argument recordings.
-    :ivar url: Required by the standard docket format, but Court-PASS serves
-        files through form postbacks rather than addressable URLs, so it is
-        empty and CourtListener stores nothing from it.
     :ivar available: Whether the file can be downloaded. ``False`` for sealed
         files and files the site lists but does not serve.
-    :ivar doc_role: The party role the file name states. ``None`` when the name
-        does not follow the Court's naming convention, and also when it states
-        a role the vocabulary does not cover.
+    :ivar doc_role: The party role the file name states. ``UNKNOWN`` when the
+        name does not follow the Court's naming convention, and ``UNASSIGNED``
+        when it states a role the vocabulary does not cover.
     :ivar doc_party: The party name encoded in the file name.
     :ivar doc_type: The document type the file name states. The
-        ``_``-prefixed members are court output rather than a filing. ``None``
-        on the same terms as ``doc_role``.
+        ``_``-prefixed members are court output rather than a filing.
+        ``UNKNOWN`` and ``UNASSIGNED`` on the same terms as ``doc_role``.
     :ivar volume: Volume number, for a record or appendix spanning volumes.
     :ivar part: Part number, for a volume that is itself split.
     :ivar local_path: Where the scraper stored the downloaded file, as a key in
@@ -130,13 +137,19 @@ class NYCoAFile(Document):
         bucket and needs no fetching.
     """
 
-    url: str = ""
+    # Court-PASS serves files through form postbacks rather than addressable
+    # URLs, so nothing ever states one. Declaring the `url` the standard docket
+    # format requires as a `ClassVar` drops it from the model's fields, which is
+    # what `NYCoADocument` does with the column: it cannot be set, is not dumped,
+    # and no merger reads it -- `NYCoADocumentMerger` subclasses `Merger` rather
+    # than the shared `DocumentMerger`, which is the only thing that would.
+    url: ClassVar[str] = ""
     file_name: str
     content_type: str = ""
-    available: bool = True
-    doc_role: CoveredFilingRole = None
+    available: bool = False
+    doc_role: ClassifiedFilingRole = Unclassified.UNKNOWN
     doc_party: str = ""
-    doc_type: CoveredFilingDocType = None
+    doc_type: ClassifiedFilingDocType = Unclassified.UNKNOWN
     volume: int | None = None
     part: int | None = None
     local_path: str = ""
@@ -151,36 +164,46 @@ class NYCoDocketEntry(DocketEntry[NYCoAFile]):
         Reproduces display order but shifts between scrapes, so it is not an
         identifier.
     :ivar raw_filing_type: The filing type exactly as the FILINGS table
-        rendered it (e.g. ``Appellant Brief``). Empty when no table row listed
+        rendered it (e.g. ``Appellant Brief``). Blank when no table row listed
         this filing, which is what marks a filing as reconstructed.
-    :ivar entry_filing_type: The classified filing type. ``None`` both when no
-        table row named this filing and when the scraper's vocabulary does not
-        cover what the table named; ``raw_filing_type`` tells those apart.
+    :ivar entry_filing_type: The classified filing type. ``UNKNOWN`` when no
+        table row named this filing, ``UNASSIGNED`` when the scraper's
+        vocabulary does not cover what the table named; see
+        ``_tell_unlisted_from_uncovered``.
     :ivar party: Name of the party associated with this filing.
     :ivar date_filed: The date Court-PASS recorded the filing as received.
         ``None`` on a filing reconstructed from a document, since the file list
         carries no dates.
     :ivar date_due: The date Court-PASS recorded the filing as due.
-    :ivar entry_role: The party role for this filing. ``None`` when the filing
-        type implies no role, and also when it implies one the vocabulary does
-        not cover.
+    :ivar entry_role: The party role for this filing. ``UNKNOWN`` when the
+        filing type implies no role, ``UNASSIGNED`` when it implies one the
+        vocabulary does not cover.
     :ivar entry_doctype: The document type for this filing. The ``_``-prefixed
-        members are court output rather than a party filing. ``None`` on the
-        same terms as ``entry_role``.
-    :ivar filing_type_recognized: Whether the filing type resolved to a known
-        role and document type.
+        members are court output rather than a party filing. ``UNKNOWN`` and
+        ``UNASSIGNED`` on the same terms as ``entry_role``.
     """
 
     date_filed: date | None = None
     docket_entry_id: str
-    entry_index: int | None = None
-    raw_filing_type: str = ""
-    entry_filing_type: CoveredFilingType = None
+    entry_index: int
+    raw_filing_type: str
+    entry_filing_type: ClassifiedFilingType = Unclassified.UNKNOWN
     party: str = ""
     date_due: date | None = None
-    entry_role: CoveredFilingRole = None
-    entry_doctype: CoveredFilingDocType = None
-    filing_type_recognized: bool = False
+    entry_role: ClassifiedFilingRole = Unclassified.UNKNOWN
+    entry_doctype: ClassifiedFilingDocType = Unclassified.UNKNOWN
+
+    @model_validator(mode="after")
+    def _tell_unlisted_from_uncovered(self) -> "NYCoDocketEntry":
+        """Separate a filing no FILINGS row named from one whose row named a
+        type the vocabulary does not cover.
+        """
+        if (
+            self.entry_filing_type is Unclassified.UNKNOWN
+            and self.raw_filing_type.strip()
+        ):
+            self.entry_filing_type = Unclassified.UNASSIGNED
+        return self
 
 
 class NYCoAIssue(BaseModel):
@@ -189,19 +212,43 @@ class NYCoAIssue(BaseModel):
     :ivar category_raw: The issue exactly as Court-PASS stated it, its category
         and subcategory joined by a double dash (e.g.
         ``Judgments--Confession of Judgment``).
-    :ivar category: The classified category. ``None`` when the scraper's
+    :ivar category: The classified category. ``UNASSIGNED`` when the scraper's
         vocabulary does not cover what the Court stated.
-    :ivar subcategory: The classified subcategory. ``None`` when the Court stated
-        a bare category -- roughly 13% of issues -- and also ``None`` when the
-        vocabulary does not cover it.
+    :ivar subcategory: The classified subcategory. ``UNKNOWN`` when the Court
+        stated a bare category -- roughly 13% of issues -- and ``UNASSIGNED``
+        when the vocabulary does not cover the one it stated; see
+        ``_tell_unstated_from_uncovered``.
     :ivar detail: The Court's description of the issue. Empty when Court-PASS
         stated none, which happens on roughly 4% of the issues observed.
     """
 
     category_raw: str
-    category: CoveredIssueCategory = None
-    subcategory: CoveredIssueSubcategory = None
+    category: ClassifiedIssueCategory = Unclassified.UNKNOWN
+    subcategory: ClassifiedIssueSubcategory = Unclassified.UNKNOWN
     detail: str = ""
+
+    @model_validator(mode="after")
+    def _tell_unstated_from_uncovered(self) -> "NYCoAIssue":
+        """Separate a half of the issue the Court did not state from one it
+        stated in words the vocabulary does not cover.
+
+        Juriscraper reports both as `None`, so `_classify` can only read them
+        both as `UNKNOWN`. `category_raw` is the one thing that tells them
+        apart: the Court joins the two halves with a double dash, so an issue
+        stated at all has a category, and one stated as a bare category has no
+        subcategory.
+        """
+        stated_category, _, stated_subcategory = self.category_raw.partition(
+            "--"
+        )
+        if self.category is Unclassified.UNKNOWN and stated_category.strip():
+            self.category = Unclassified.UNASSIGNED
+        if (
+            self.subcategory is Unclassified.UNKNOWN
+            and stated_subcategory.strip()
+        ):
+            self.subcategory = Unclassified.UNASSIGNED
+        return self
 
 
 class NYCoAAttorney(Representative):
