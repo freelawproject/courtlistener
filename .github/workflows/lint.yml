@@ -35,8 +35,8 @@ jobs:
           pwd
           ls -al
 
-      # The checked modules and files are listed in [tool.pyrefly]
-      # project-includes in pyproject.toml; add them there as they're ready.
+      # The checked modules and files are listed in the project-includes of pyrefly.toml;
+      # add them there as they're ready.
       # Pre-existing errors are grandfathered in .pyrefly-baseline.json; only
       # new errors fail the check.
       - name: pyrefly Static Type Checker
