@@ -33,12 +33,12 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
    ```
 
 2. **Type Hints**: New code MUST include type hints and pass pyrefly. MUST add new files
-   to `project-includes` in the `[tool.pyrefly]` section of pyproject.toml as you go.
-   - Pre-existing type errors are grandfathered in `.pyrefly-baseline.json`. Fixed errors
-     linger there until pruned, so SHOULD occasionally run
-     `uv run pyrefly check --update-baseline` (e.g. when a diff shrinks it) and commit the
-     result. MUST NOT update the baseline to silence errors in new or changed code — fix
-     the code instead.
+   to the `project-includes` section of pyrefly.toml as you go.
+    - Pre-existing type errors are grandfathered in `.pyrefly-baseline.json`. Fixed errors
+      linger there until pruned, so SHOULD occasionally run
+      `uv run pyrefly check --update-baseline` (e.g. when a diff shrinks it) and commit
+      the result. MUST NOT update the baseline to silence errors in new or changed code —
+      fix the code instead.
 
 3. **Unused Code**: MUST delete unused code created during a task.
 
@@ -184,5 +184,7 @@ docker exec -it cl-django python manage.py shell
 
 - `rg` may be installed. Use it instead of `grep` if so.
 - `gh` → GitHub CLI for PRs, issues, actions
-- `pre-commit` → code quality checks (ruff, etc.)
+- `pre-commit` → code quality checks (ruff, pyrefly, etc.). Its `check python ast`
+  hook already validates Python syntax on every edited file — MUST rely on that instead of
+  ad hoc `python -c "import ast; ast.parse(...)"` snippets.
 - `uv` → Python dependency management (the only tool to use for deps)

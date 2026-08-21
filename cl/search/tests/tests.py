@@ -12,7 +12,7 @@ from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.auth.hashers import make_password
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
@@ -62,6 +62,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import InvalidRelativeDateSyntax
 from cl.search.factories import (
+    BankruptcyInformationFactory,
     CaseTransferFactory,
     CourtFactory,
     DocketEntryFactory,
@@ -73,6 +74,8 @@ from cl.search.factories import (
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
+    SCOTUSDocketEntryFactory,
+    TrialCourtDataFactory,
 )
 from cl.search.forms import SearchForm
 from cl.search.llm_models import CleanDocketNumber, DocketItem
@@ -98,9 +101,12 @@ from cl.search.models import (
     OpinionCluster,
     OpinionContent,
     RECAPDocument,
+    ScotusDocketMetadata,
     SearchQuery,
     sort_cites,
 )
+from cl.search.state.florida.factories import FloridaDocketEntryFactory
+from cl.search.state.texas.factories import TexasDocketEntryFactory
 from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -3627,6 +3633,7 @@ class AdminActionsTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.factory = RequestFactory()
+        cls.superuser = UserFactory(is_staff=True, is_superuser=True)
         cls.court_1 = CourtFactory(id="nyappdiv")
         cls.court_2 = CourtFactory(id="ca6")
 
@@ -3695,6 +3702,9 @@ class AdminActionsTest(TestCase):
         clusters_admin.message_user = mock.Mock()
         url = reverse("admin:search_opinioncluster_changelist")
         request = self.factory.post(url)
+        # seal_clusters checks the delete permission, so a hand-built request
+        # needs a user the way a real admin request would have one.
+        request.user = self.superuser
 
         queryset = OpinionCluster.objects.filter(pk=cluster_pk)
         clusters_admin.seal_clusters(request, queryset)
@@ -3785,6 +3795,269 @@ class AdminActionsTest(TestCase):
         note_qs = get_blocking_relations.get("favorites.Note")
         self.assertTrue(note_qs.exists())
         self.assertIn(self.note_cluster_3_user_1, note_qs)
+
+    def test_get_search_results_valid_pk(self):
+        """get_search_results returns the matching cluster for a valid PK."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, str(self.cluster_1.pk)
+        )
+        self.assertIn(self.cluster_1, results)
+        self.assertEqual(results.count(), 1)
+        self.assertFalse(use_distinct)
+
+    def test_get_search_results_invalid_string(self):
+        """get_search_results returns an empty queryset for a non-integer."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, "not-a-pk"
+        )
+        self.assertEqual(results.count(), 0)
+        self.assertFalse(use_distinct)
+
+    def test_get_search_results_empty_string(self):
+        """get_search_results returns the full queryset for an empty term."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, self.site)
+        request = self.factory.get(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        qs = OpinionCluster.objects.all()
+        results, use_distinct = clusters_admin.get_search_results(
+            request, qs, ""
+        )
+        self.assertEqual(
+            set(results.values_list("pk", flat=True)),
+            set(qs.values_list("pk", flat=True)),
+        )
+        self.assertFalse(use_distinct)
+
+
+class OpinionClusterAdminSealViewTest(TestCase):
+    """Tests for the single-cluster seal confirmation view."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.superuser = UserFactory(is_staff=True, is_superuser=True)
+        cls.court = CourtFactory(id="ca9")
+
+        cls.cluster_no_blockers = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                case_name="No Blockers v. Test",
+            ),
+            case_name="No Blockers v. Test",
+            date_filed=datetime.date.today(),
+        )
+
+        # A staff user with no model permissions at all, to check that the
+        # seal view is gated on more than the admin's is_staff check.
+        cls.staff_user = UserFactory(is_staff=True, is_superuser=False)
+
+        cls.cluster_with_blockers = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                case_name="Has Blockers v. Test",
+            ),
+            case_name="Has Blockers v. Test",
+            date_filed=datetime.date.today(),
+        )
+        # Attach a UserTag to make this cluster unsealable via the view
+        user = UserFactory()
+        tag = UserTagFactory(user=user, name="blocker_tag")
+        tag.dockets.add(cls.cluster_with_blockers.docket.pk)
+
+    def setUp(self):
+        self.client = Client()
+        self.client.force_login(self.superuser)
+
+    def test_seal_cluster_view_get_no_blockers(self):
+        """GET with no blocking relations renders the confirmation page."""
+        url = reverse(
+            "admin:opinioncluster_seal_confirmation",
+            args=[self.cluster_no_blockers.pk],
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertIn("cluster", response.context)
+        self.assertEqual(response.context["cluster"], self.cluster_no_blockers)
+
+    def test_seal_cluster_view_get_with_cluster_blockers_redirects(self):
+        """GET with cluster-level blockers redirects to the blocking view."""
+        url = reverse(
+            "admin:opinioncluster_seal_confirmation",
+            args=[self.cluster_with_blockers.pk],
+        )
+        response = self.client.get(url)
+        self.assertRedirects(
+            response,
+            reverse(
+                "admin:opinioncluster_blocking_confirmation",
+                args=[self.cluster_with_blockers.pk],
+            ),
+        )
+
+    def test_seal_cluster_view_post_seals_cluster(self):
+        """POST seals the cluster and creates a ClusterRedirection."""
+        cluster = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Seal Me v. Test",
+            ),
+            case_name="Seal Me v. Test",
+            date_filed=datetime.date.today(),
+        )
+        pk = cluster.pk
+        url = reverse("admin:opinioncluster_seal_confirmation", args=[pk])
+        response = self.client.post(url)
+        self.assertRedirects(
+            response,
+            reverse("admin:search_opinioncluster_changelist"),
+        )
+        self.assertFalse(
+            OpinionCluster.objects.filter(pk=pk).exists(),
+            "Cluster should have been deleted after sealing.",
+        )
+        self.assertTrue(
+            ClusterRedirection.objects.filter(
+                deleted_cluster_id=pk,
+                reason=ClusterRedirection.SEALED,
+            ).exists(),
+            "A ClusterRedirection record should have been created.",
+        )
+
+    def test_seal_cluster_view_requires_delete_permission(self):
+        """A staff user without delete permission can't seal a cluster."""
+        self.client.force_login(self.staff_user)
+        pk = self.cluster_no_blockers.pk
+        url = reverse("admin:opinioncluster_seal_confirmation", args=[pk])
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(url)
+                self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertTrue(
+            OpinionCluster.objects.filter(pk=pk).exists(),
+            "Cluster should not have been deleted.",
+        )
+
+
+class OpinionClusterSealDocketBlockersTest(TestCase):
+    """Sealing a cluster must leave its docket alone when something still
+    points at the docket."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="ca8")
+
+    def make_cluster(self) -> OpinionCluster:
+        """Build a cluster on a docket of its own.
+
+        :return: The new OpinionCluster
+        """
+        return OpinionClusterWithParentsFactory(
+            docket=DocketFactory(
+                court=self.court,
+                case_name="Blocker v. Test",
+            ),
+            case_name="Blocker v. Test",
+            date_filed=datetime.date.today(),
+        )
+
+    def test_docket_relations_block_docket_deletion(self):
+        """Each model pointing at Docket keeps the docket out of the seal."""
+        blocker_builders = {
+            "search.BankruptcyInformation": lambda docket: BankruptcyInformationFactory(
+                docket=docket
+            ),
+            "search.SCOTUSDocketEntry": lambda docket: SCOTUSDocketEntryFactory(
+                docket=docket
+            ),
+            "search.ScotusDocketMetadata": lambda docket: ScotusDocketMetadata.objects.create(
+                docket=docket
+            ),
+            "search.TexasDocketEntry": lambda docket: TexasDocketEntryFactory(
+                docket=docket
+            ),
+            "search.FloridaDocketEntry": lambda docket: FloridaDocketEntryFactory(
+                docket=docket
+            ),
+            "search.TrialCourtData": lambda docket: TrialCourtDataFactory(
+                docket=docket
+            ),
+            "search.CaseTransfer": lambda docket: CaseTransferFactory(
+                origin_docket=docket
+            ),
+        }
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
+        for key, build_blocker in blocker_builders.items():
+            with self.subTest(blocker=key):
+                cluster = self.make_cluster()
+                docket = cluster.docket
+                build_blocker(docket)
+
+                blockers = clusters_admin.check_blocking_relations(cluster)
+                self.assertTrue(
+                    blockers[key], f"{key} should block docket deletion."
+                )
+                cluster_blocked, docket_blocked = (
+                    clusters_admin.get_deletion_blockers(cluster)
+                )
+                self.assertFalse(
+                    cluster_blocked, f"{key} should not block the cluster."
+                )
+                self.assertTrue(
+                    docket_blocked, f"{key} should block the docket."
+                )
+
+                clusters_admin.seal_cluster(
+                    cluster, delete_docket=not docket_blocked
+                )
+                self.assertFalse(
+                    OpinionCluster.objects.filter(pk=cluster.pk).exists(),
+                    "Cluster should have been deleted.",
+                )
+                self.assertTrue(
+                    Docket.objects.filter(pk=docket.pk).exists(),
+                    f"Docket should have survived a {key} blocker.",
+                )
+
+
+class OpinionClusterSealActionPermissionTest(TestCase):
+    """The bulk seal action must require the delete permission."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="ca7")
+        cls.staff_user = UserFactory(is_staff=True, is_superuser=False)
+        cls.cluster = OpinionClusterWithParentsFactory(
+            docket=DocketFactory(court=cls.court, case_name="Bulk v. Test"),
+            case_name="Bulk v. Test",
+            date_filed=datetime.date.today(),
+        )
+
+    def test_seal_clusters_requires_delete_permission(self):
+        """A staff user without delete permission can't run the action."""
+        clusters_admin = OpinionClusterAdmin(OpinionCluster, admin.site)
+        request = RequestFactory().post(
+            reverse("admin:search_opinioncluster_changelist")
+        )
+        request.user = self.staff_user
+        queryset = OpinionCluster.objects.filter(pk=self.cluster.pk)
+
+        with self.assertRaises(PermissionDenied):
+            clusters_admin.seal_clusters(request, queryset)
+
+        self.assertTrue(
+            OpinionCluster.objects.filter(pk=self.cluster.pk).exists(),
+            "Cluster should not have been deleted.",
+        )
 
 
 class PopulateDocketNumberRawCommandTest(TestCase):

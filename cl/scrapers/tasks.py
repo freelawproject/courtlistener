@@ -57,7 +57,7 @@ from cl.search.models import (
     OriginatingCourtInformation,
     RECAPDocument,
 )
-from cl.search.state.texas.models import ProcessingError, TexasDocument
+from cl.search.state.shared import AbstractStateDocument, ProcessingError
 
 logger = logging.getLogger(__name__)
 
@@ -648,7 +648,7 @@ async def extract_formatted_text_document_base(
                 do_extraction=False,
                 update_fields=["ocr_status", "plain_text"],
             )
-        elif isinstance(rd, TexasDocument):
+        elif isinstance(rd, AbstractStateDocument):
             update_fields = ["ocr_status", "plain_text"]
             if not has_content:
                 rd.processing_error = ProcessingError.EXTRACTION_FAILURE
