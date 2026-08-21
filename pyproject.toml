@@ -94,7 +94,7 @@ dependencies = [
   "time-machine>=3.2.0",
   "dateparser==1.2.2",
   "types-dateparser>=1.2.2.20250809",
-  "uvicorn[standard]>=0.49.0",
+  "uvicorn[standard]>=0.52.3",
   "daphne>=4.2.2",
   "httpx[http2]>=0.28.1",
   "django-model-utils>=5.0.0",
