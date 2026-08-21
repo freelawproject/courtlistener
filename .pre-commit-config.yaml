@@ -7,25 +7,25 @@ ci:
   autoupdate_schedule: quarterly
   # pyrefly needs the project environment (uv); pre-commit.ci can't provide
   # it. The Lint workflow runs the same check.
-  skip: [pyrefly]
+  skip: [ pyrefly ]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-     - id: check-added-large-files
-     - id: check-ast
-     - id: check-json
-     - id: check-merge-conflict
-     - id: check-toml
-     - id: check-xml
-     - id: check-yaml
-     - id: debug-statements
-     - id: detect-private-key
-       exclude: '^docker/postgresql/cl-postgres.key$|^docker/elastic/cl-es.key$'
-     - id: fix-byte-order-marker
-     - id: trailing-whitespace
-       args: [--markdown-linebreak-ext=md]
-       exclude: '^cl/recap/test_assets/.*\.html$'
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+      - id: debug-statements
+      - id: detect-private-key
+        exclude: '^docker/postgresql/cl-postgres.key$|^docker/elastic/cl-es.key$'
+      - id: fix-byte-order-marker
+      - id: trailing-whitespace
+        args: [ --markdown-linebreak-ext=md ]
+        exclude: '^cl/recap/test_assets/.*\.html$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.11
@@ -44,7 +44,7 @@ repos:
         entry: uv run pyrefly check
         language: system
         pass_filenames: false
-        files: '(\.py$|^pyproject\.toml$|^\.pyrefly-baseline\.json$)'
+        files: '(\.py$|^pyrefly\.toml$|^\.pyrefly-baseline\.json$)'
 
 #
 # Tried and Failed

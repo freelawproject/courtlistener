@@ -33,12 +33,12 @@ you're working in and MUST read `FRONTEND.md` for stack-specific rules. Do not m
    ```
 
 2. **Type Hints**: New code MUST include type hints and pass pyrefly. MUST add new files
-   to `project-includes` in the `[tool.pyrefly]` section of pyproject.toml as you go.
-   - Pre-existing type errors are grandfathered in `.pyrefly-baseline.json`. Fixed errors
-     linger there until pruned, so SHOULD occasionally run
-     `uv run pyrefly check --update-baseline` (e.g. when a diff shrinks it) and commit the
-     result. MUST NOT update the baseline to silence errors in new or changed code — fix
-     the code instead.
+   to `project-includes` in the `[tool.pyrefly]` section of pyrefly.toml as you go.
+    - Pre-existing type errors are grandfathered in `.pyrefly-baseline.json`. Fixed errors
+      linger there until pruned, so SHOULD occasionally run
+      `uv run pyrefly check --update-baseline` (e.g. when a diff shrinks it) and commit
+      the result. MUST NOT update the baseline to silence errors in new or changed code —
+      fix the code instead.
 
 3. **Unused Code**: MUST delete unused code created during a task.
 
