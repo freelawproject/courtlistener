@@ -183,6 +183,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
             entry_type=DocketEntryType.UNKNOWN,
             attachments=[],
+            entry_index=0,
             raw_filing_type="Appellant Brief",
             entry_filing_type="Appellant Brief",
             entry_role="appellant",
@@ -200,6 +201,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
             entry_type=DocketEntryType.UNKNOWN,
             attachments=[],
+            entry_index=0,
             raw_filing_type="Appellant Sur-Reply Brief",
             entry_role="sur-appellant",
             entry_doctype="surbrf",
@@ -227,6 +229,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
                     docket_entry_id="d:none:none:smith:1",
                     entry_type=DocketEntryType.UNKNOWN,
                     attachments=[],
+                    entry_index=0,
                     raw_filing_type=raw,
                 )
 
@@ -239,6 +242,7 @@ class ClassifiedVocabularyTest(SimpleTestCase):
             docket_entry_id="e:appellant-brief:smith:1",
             entry_type=DocketEntryType.UNKNOWN,
             attachments=[],
+            entry_index=0,
             raw_filing_type="SCJC Determination",
             entry_role=None,
             entry_doctype=None,
