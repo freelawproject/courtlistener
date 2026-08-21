@@ -1,4 +1,4 @@
-from typing import IO, cast
+from typing import IO
 
 import instructor
 from openai import OpenAI
@@ -45,7 +45,7 @@ def call_llm(
         if isinstance(x, str):
             return {"type": "text", "text": x}
         # Assume already a valid content part dict, e.g. {"type": "text", "text": "..."}
-        return cast(ChatCompletionContentPartParam, x)
+        return x
 
     if isinstance(user_prompt, str):
         user_content = [to_content_part(user_prompt)]

@@ -226,7 +226,7 @@ class GoogleGenAIBatchWrapper:
             if not llm_key:
                 continue
 
-            parts: list[dict[str, Any]] = []
+            parts: list[dict[str, str | dict[str, str | None]]] = []
             if file_path := task_data.get("input_file_path"):
                 mime_type, _ = mimetypes.guess_type(file_path)
                 if not mime_type:

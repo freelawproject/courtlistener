@@ -9,10 +9,11 @@ from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import date
 from difflib import SequenceMatcher
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
@@ -930,9 +931,9 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
         opinions = []
         for op in soup.find_all(
             lambda tag: (
-                tag.name == "opinion" and tag.get("data-type") is None
+                (tag.name == "opinion" and tag.get("data-type") is None)
+                or tag.get("data-type") == "opinion"
             )
-            or tag.get("data-type") == "opinion"
         ):
             opinions.append(op.text)
         opinion_text = "".join(
@@ -940,9 +941,12 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
                 op.text
                 for op in soup.find_all(
                     lambda tag: (
-                        tag.name == "opinion" and tag.get("data-type") is None
+                        (
+                            tag.name == "opinion"
+                            and tag.get("data-type") is None
+                        )
+                        or tag.get("data-type") == "opinion"
                     )
-                    or tag.get("data-type") == "opinion"
                 )
             ]
         )

@@ -73,12 +73,12 @@ def verify_subscription_success(html: str) -> tuple[bool, str]:
     span = spans[0]
     # The message may be directly in the span or inside a <font> child.
     font_children = cast(list[etree._Element], span.xpath("font"))
-    if font_children:
-        message = font_children[0].text or ""
-    else:
-        message = span.text or ""
     # lxml-stubs types `.text` with a `# type:` comment pyrefly can't read.
-    message = cast(str, message).strip()
+    if font_children:
+        message = cast(str | None, font_children[0].text) or ""
+    else:
+        message = cast(str | None, span.text) or ""
+    message = message.strip()
 
     if not message:
         return False, "Empty message"
