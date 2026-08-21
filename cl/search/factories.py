@@ -2,6 +2,7 @@ import logging
 import string
 
 from django.conf import settings
+from django.db import transaction
 from django.db.utils import IntegrityError
 from factory import (
     DictFactory,
@@ -68,8 +69,10 @@ class CourtFactory(DjangoModelFactory):
         count = 1
         while True:
             try:
-                obj = model_class(*args, **kwargs)
-                obj.save()
+                # Prevent blowing up the whole transaction on a collision
+                with transaction.atomic():
+                    obj = model_class(*args, **kwargs)
+                    obj.save()
                 return obj
             except IntegrityError as exp:
                 logger.info("Unexpected exp=%s, type(exp)=%s", exp, type(exp))
