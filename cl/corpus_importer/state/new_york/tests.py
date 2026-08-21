@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from juriscraper.state.docket import PartyType as ScrapedPartyType
 from juriscraper.state.new_york.nycourts_gov.vocabularies import (
     FilingDocType,
     FilingRole,
@@ -74,6 +75,8 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
             case_name_short="Padilla-Zuniga",
             date_filed=date(2024, 3, 1),
             argument_date=date(2025, 1, 14),
+            entries=[],
+            parties=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -108,6 +111,8 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
             docket_number=DOCKET_NUMBER,
             case_name="Matter of Smith",
             argument_date=date(2025, 2, 11),
+            entries=[],
+            parties=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -148,7 +153,10 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
         docket.date_filed = date(2020, 5, 5)
         docket.save()
         case = NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, date_filed=None
+            docket_number=DOCKET_NUMBER,
+            date_filed=None,
+            entries=[],
+            parties=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -164,11 +172,18 @@ class NYCoADocketMergerTest(NYCoAMergerTestCase):
             docket_number=DOCKET_NUMBER,
             date_filed=date(2024, 3, 1),
             entries=[
-                NYCoAFilingFactory.create(date_filed=date(2024, 6, 1)),
-                NYCoAFilingFactory.create(date_filed=date(2024, 9, 15)),
+                NYCoAFilingFactory.create(
+                    date_filed=date(2024, 6, 1), attachments=[]
+                ),
+                NYCoAFilingFactory.create(
+                    date_filed=date(2024, 9, 15), attachments=[]
+                ),
                 # Reconstructed filings carry no date and must not win.
-                NYCoAFilingFactory.create(date_filed=None, raw_filing_type=""),
+                NYCoAFilingFactory.create(
+                    date_filed=None, raw_filing_type="", attachments=[]
+                ),
             ],
+            parties=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -187,6 +202,8 @@ class NYCoADocketMetadataMergerTest(NYCoAMergerTestCase):
         """Does merging a case create its metadata row?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[],
             decision_date=date(2025, 4, 17),
             official_citation="41 NY3d 1",
@@ -211,6 +228,8 @@ class NYCoADocketMetadataMergerTest(NYCoAMergerTestCase):
         )
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[],
             decision_date=date(2025, 4, 17),
             official_citation="41 NY3d 1",
@@ -234,6 +253,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         normalized and the Court's own string kept?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[
                 NYCoAIssueFactory.create(
                     category_raw="Judgments--Confession of Judgment",
@@ -264,6 +285,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         row, rather than the second colliding with the first?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[
                 NYCoAIssueFactory.create(
                     category_raw="Crimes--Witnesses",
@@ -299,6 +322,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         rows rather than replacing one with the other."""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[
                 NYCoAIssueFactory.create(
                     category_raw="Crimes--Witnesses", detail="First."
@@ -323,6 +348,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         issue keep its row, rather than the old one being replaced?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[
                 NYCoAIssueFactory.create(
                     category_raw="Crimes--Right to Counsel",
@@ -353,6 +380,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         either row, leaving the issue the Court did not touch alone?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[
                 NYCoAIssueFactory.create(
                     category_raw="Crimes--Witnesses", detail="Untouched."
@@ -387,6 +416,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         them. Is the other pruned, and does the survivor keep its row?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[
                 NYCoAIssueFactory.create(
                     category_raw="Crimes--Witnesses", detail="Kept."
@@ -414,6 +445,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         dropped, so the raw value survives?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[
                 # The scraper could classify neither half of this one.
                 NYCoAIssueFactory.create(
@@ -438,6 +471,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         left unknown?"""
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[NYCoAIssueFactory.create(category_raw="Crimes")],
         )
 
@@ -461,6 +496,8 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
         )
         case = NYCoACaseFactory.create(
             docket_number=DOCKET_NUMBER,
+            entries=[],
+            parties=[],
             issues=[NYCoAIssueFactory.create(category_raw="Crimes--Sentence")],
         )
 
@@ -486,7 +523,9 @@ class NYCoAIssueMergerTest(NYCoAMergerTestCase):
             category=IssueCategory.TAXATION.code,
             category_raw="Taxation--Sales Tax",
         )
-        case = NYCoACaseFactory.create(docket_number=DOCKET_NUMBER, issues=[])
+        case = NYCoACaseFactory.create(
+            docket_number=DOCKET_NUMBER, entries=[], parties=[], issues=[]
+        )
 
         result = NYCoADocketMerger(case, params=None).merge()
 
@@ -509,9 +548,10 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             date_due=date(2024, 5, 15),
             entry_role=FilingRole.APPELLANT,
             entry_doctype=FilingDocType.BRIEF,
+            attachments=[],
         )
         case = NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing]
+            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -532,14 +572,16 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
     @merger_test(expected_query_count=13)
     def test_merge_unrecognized_filing_type(self) -> None:
         """Court-PASS listing a filing type this vocabulary doesn't cover is
-        the drift signal. Is it flagged while the raw value survives?"""
+        the drift signal. Is it stored as unassigned while the raw value
+        survives?"""
         filing = NYCoAFilingFactory.create(
             raw_filing_type="Appellant Sur-Reply Brief",
             entry_role=FilingRole.APPELLANT,
             entry_doctype=FilingDocType.BRIEF,
+            attachments=[],
         )
         case = NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing]
+            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -562,9 +604,10 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             entry_role=None,
             entry_doctype=FilingDocType.DECISION,
             party="",
+            attachments=[],
         )
         case = NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing]
+            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -592,19 +635,24 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         filing = NYCoAFilingFactory.create(
             docket_entry_id="e:appellant-brief:smith:1",
             date_filed=None,
+            entry_index=None,
+            attachments=[],
         )
         case = NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing]
+            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
         NYCoADocketMerger(case, params=None).merge()
 
-        updated = filing.model_copy(update={"date_filed": date(2024, 6, 1)})
+        updated = filing.model_copy(
+            update={"date_filed": date(2024, 6, 1), "entry_index": 2}
+        )
         result = NYCoADocketMerger(
             # The same issues, because this is the same case scraped again and
             # an issue is identified by what the Court said about it.
             NYCoACaseFactory.create(
                 docket_number=DOCKET_NUMBER,
                 entries=[updated],
+                parties=[],
                 issues=case.issues,
             ),
             params=None,
@@ -614,6 +662,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
         self.assertEqual(NYCoADocketEntry.objects.count(), 1)
         merged = NYCoADocketEntry.objects.get()
         self.assertEqual(merged.date_filed, date(2024, 6, 1))
+        self.assertEqual(merged.entry_index, 2)
 
     @merger_test(expected_query_count=14)
     def test_merge_prunes_filings_missing_from_scrape(self) -> None:
@@ -626,10 +675,10 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             filing_type_raw="Withdrawn Brief",
         )
         filing = NYCoAFilingFactory.create(
-            docket_entry_id="e:appellant-brief:smith:1"
+            docket_entry_id="e:appellant-brief:smith:1", attachments=[]
         )
         case = NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing]
+            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -652,7 +701,7 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             parties=[
                 NYCoAPartyFactory.create(name="Smith", representatives=[])
             ],
-            entries=[NYCoAFilingFactory.create(party="Smith")],
+            entries=[NYCoAFilingFactory.create(party="Smith", attachments=[])],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -682,7 +731,9 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             ],
             entries=[
                 NYCoAFilingFactory.create(
-                    party="A. R.", entry_role=FilingRole.RESPONDENT
+                    party="A. R.",
+                    entry_role=FilingRole.RESPONDENT,
+                    attachments=[],
                 )
             ],
         )
@@ -707,7 +758,11 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             parties=[
                 NYCoAPartyFactory.create(name="Smith", representatives=[])
             ],
-            entries=[NYCoAFilingFactory.create(party="Board of Elections")],
+            entries=[
+                NYCoAFilingFactory.create(
+                    party="Board of Elections", attachments=[]
+                )
+            ],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -729,7 +784,9 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             ],
             entries=[
                 NYCoAFilingFactory.create(
-                    docket_entry_id="e:appellant-brief:smith:1", party="Smith"
+                    docket_entry_id="e:appellant-brief:smith:1",
+                    party="Smith",
+                    attachments=[],
                 )
             ],
         )
@@ -741,7 +798,9 @@ class NYCoADocketEntryMergerTest(NYCoAMergerTestCase):
             parties=[],
             entries=[
                 NYCoAFilingFactory.create(
-                    docket_entry_id="e:appellant-brief:smith:1", party=""
+                    docket_entry_id="e:appellant-brief:smith:1",
+                    party="",
+                    attachments=[],
                 )
             ],
             issues=case.issues,
@@ -766,7 +825,7 @@ class NYCoADocumentMergerTest(NYCoAMergerTestCase):
             attachments=list(files), **filing_kwargs
         )
         return NYCoACaseFactory.create(
-            docket_number=DOCKET_NUMBER, entries=[filing]
+            docket_number=DOCKET_NUMBER, entries=[filing], parties=[]
         )
 
     @merger_test(expected_query_count=16)
@@ -1093,6 +1152,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     representatives=[attorney],
                 )
             ],
+            entries=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -1173,6 +1233,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     ],
                 )
             ],
+            entries=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -1206,6 +1267,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     ],
                 )
             ],
+            entries=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -1232,6 +1294,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     representatives=[NYCoAAttorneyFactory.create()],
                 )
             ],
+            entries=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -1247,9 +1310,13 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
             docket_number=DOCKET_NUMBER,
             parties=[
                 NYCoAPartyFactory.create(
-                    name="Smith", party_role_raw="", representatives=[]
+                    name="Smith",
+                    party_role_raw="",
+                    party_type=ScrapedPartyType.APPELLANT,
+                    representatives=[],
                 )
             ],
+            entries=[],
         )
 
         result = NYCoADocketMerger(case, params=None).merge()
@@ -1281,6 +1348,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     ],
                 ),
             ],
+            entries=[],
         )
 
         first = NYCoADocketMerger(case, params=None).merge()
@@ -1392,6 +1460,7 @@ class NYCoAPartyMergerTest(NYCoAMergerTestCase):
                     name="Smith", party_role_raw="Respondent"
                 )
             ],
+            entries=[],
         )
         first = NYCoADocketMerger(case, params=None).merge()
         original = Party.objects.get(name="Smith")
