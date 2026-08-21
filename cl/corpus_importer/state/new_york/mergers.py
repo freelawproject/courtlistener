@@ -32,8 +32,8 @@ from cl.corpus_importer.state.merger import (
     ManyStrategy,
     Merger,
     OneToManyRelation,
+    OneToOneRelation,
     RelatedParams,
-    ReverseOneToOneRelation,
     ThroughParameters,
     overwrite,
 )
@@ -266,9 +266,6 @@ class NYCoADocketEntryMerger[ParamType](
     filing_doctype: int = Attribute(
         lambda e, params: filing_doctype_value(e.entry_doctype),
         strategy=overwrite,
-    )
-    filing_type_recognized: bool = Attribute(
-        lambda e, params: e.filing_type_recognized, strategy=overwrite
     )
     # Keep a party we resolved on an earlier scrape rather than clearing it
     # when this scrape can't find a match.
@@ -530,13 +527,12 @@ class NYCoADocketMetadataMerger(
 ):
     """Merger for the NYCoA-only docket fields.
 
-    The `OneToOneField` lives on this model rather than on `Docket`, so this
-    merger sets its own `docket` from the parent and matches on it."""
+    The `OneToOneField` lives on this model rather than on `Docket`, so the
+    relation fills in `docket` from the parent and matches on it; this merger
+    must not declare that field itself."""
 
     model: ClassVar[type[Model]] = NYCoADocketMetadata
-    key: ClassVar[Iterable[str]] = ["docket"]
 
-    docket: Docket = Attribute(lambda case, params: params.parent)
     # Court-PASS states a case's issues in full, so an issue that is gone from
     # the scrape is one the Court removed.
     issues: list[NYCoADocketIssue] = OneToManyRelation(
@@ -613,7 +609,7 @@ class NYCoADocketMerger(DocketMerger[NYCoACase, None]):
     nycoa_docket_entries: list[NYCoADocketEntry] = DocketEntryRelation(
         NYCoADocketEntryMerger, strategy=ManyStrategy.REPLACE
     )
-    nycoa_metadata: NYCoADocketMetadata = ReverseOneToOneRelation(
+    nycoa_metadata: NYCoADocketMetadata = OneToOneRelation(
         NYCoADocketMetadataMerger, _case_metadata
     )
 
