@@ -6,7 +6,7 @@ import logging
 from datetime import date
 from enum import Enum
 from functools import partial
-from typing import Annotated, Any
+from typing import Annotated
 
 from juriscraper.state.docket import (
     Docket,
@@ -38,7 +38,7 @@ __all__ = [
 
 
 def _covered[Vocabulary: Enum](
-    vocabulary: type[Vocabulary], value: Any
+    vocabulary: type[Vocabulary], value: Vocabulary | str | None
 ) -> Vocabulary | None:
     """The vocabulary member `value` names, or `None` when there is no such
     member.
@@ -58,7 +58,7 @@ def _covered[Vocabulary: Enum](
     trade the mergers were built for.
 
     :param vocabulary: The vocabulary to look `value` up in.
-    :param value: Whatever the scrape stated. `None` and members of
+    :param value: The string the scrape stated. `None` and members of
         `vocabulary` pass through untouched, so this is safe to apply to a
         model built in Python as well as one parsed from a scrape.
     :return: The member, or `None` if the vocabulary does not cover `value`.
