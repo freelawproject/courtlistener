@@ -212,8 +212,7 @@ class SealableDocumentAdmin(admin.ModelAdmin):
             "title": "Confirm document sealing",
             "heading": heading,
             "documents": documents,
-            # The template builds the cancel link with {% url %} rather than
-            # dropping a prebuilt string straight into an href.
+            # Resolved with {% url %} in the template, not a prebuilt href.
             "cancel_url_name": self.seal_change_url_name,
             "object_pk": pk,
         }
