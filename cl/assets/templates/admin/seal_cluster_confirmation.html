@@ -1,5 +1,7 @@
 {% extends "admin/base_site.html" %}
 
+{% block bodyclass %}{{ block.super }} delete-confirmation{% endblock %}
+
 {% block content %}
 
     <p>You are about to permanently seal the cluster <strong>{{ cluster }}</strong>.</p>
@@ -16,8 +18,8 @@
 
     <form method="post">
         {% csrf_token %}
-        <input type="submit" value="Yes, seal this cluster" class="default">
-        <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}" class="button cancel-link">Cancel</a>
+        <input type="submit" value="Yes, seal this cluster">
+        <a role="button" href="{% url 'admin:search_opinioncluster_change' cluster.pk %}" class="button cancel-link">Cancel</a>
     </form>
 
 {% endblock %}
