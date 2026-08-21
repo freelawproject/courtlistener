@@ -156,10 +156,18 @@ def Attribute[TransformType](
 
 @dataclass
 class RelatedParams[ParamType]:
-    """Wrapper for passing parameters to a related object."""
+    """Wrapper for passing parameters to a related object.
+
+    :ivar params: The parameters passed by the user to the merger
+    :ivar parent: The object the related object hangs off of
+    :ivar parent_field: The name of the child's field pointing back at
+        `parent`, set for the reverse side of a one-to-one relation. The child
+        merger fills that field in from `parent` itself, so a child merger
+        must not declare it."""
 
     params: ParamType
     parent: Model | None = field(kw_only=True)
+    parent_field: str | None = field(kw_only=True, default=None)
 
 
 class RelatedMerger[
@@ -226,7 +234,24 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         RM,
     ]
 ):
-    """Class encapsulating logic for merging a one-to-one relationship."""
+    """Class encapsulating logic for merging a one-to-one relationship, in
+    either direction.
+
+    Which side of the relation the field is declared on is read off the model
+    rather than asked of the caller, so a merger's specs go on reading like the
+    model's own field definitions.
+
+    On the forward side -- the `OneToOneField` is on this merger's model, as
+    `Docket.originating_court_information` is -- the child is merged first and
+    the parent is created or updated pointing at it.
+
+    On the reverse side -- the `OneToOneField` is on the child, as
+    `NYCoADocketMetadata.docket` is -- the parent has no column to point at the
+    child, so the child is merged once the parent exists and its foreign key is
+    set from the parent automatically. A child merger must not declare that
+    field itself."""
+
+    __slots__: tuple[str, ...] = "forward", "parent_field"
 
     def __init__(
         self,
@@ -235,11 +260,20 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         | None = None,
     ):
         super().__init__(merger=merger, transform=transform, default=None)
+        self.forward: bool = True
+        self.parent_field: str | None = None
 
     def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
+        """Validate the field and, along the way, learn which side of the
+        relation it is. A reverse relation is a `OneToOneRel` rather than a
+        `OneToOneField`, and carries the name of the child's own field."""
         errors = super().validate(field)
         if not field.one_to_one:
             errors.append(TypeError(f"{self.name}: Is not a one-to-one field"))
+            return errors
+        if isinstance(field, OneToOneRel):
+            self.forward = False
+            self.parent_field = field.field.name
         return errors
 
     def merge(
@@ -250,14 +284,27 @@ class OneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
         if merger_input is None:
             return MergeResult.unnecessary()
 
-        related_params = RelatedParams(params, parent=parent)
-
         if parent is None:
+            if not self.forward:
+                # A reverse relation is merged after its parent exists, so
+                # there is nothing to hang the child off of without one.
+                logger.error("%s: No parent model specified", self.name)
+                return MergeResult.failed(self.merger.model.__name__)
             db_obj = None
         else:
-            db_obj = cast(RM | None, getattr(parent, self.name))
+            try:
+                db_obj = cast(RM | None, getattr(parent, self.name))
+            except ObjectDoesNotExist:
+                # Unlike a forward one-to-one, an absent reverse relation
+                # raises instead of returning None.
+                db_obj = None
+
         return self.merger(
-            merger_input, existing=db_obj, params=related_params
+            merger_input,
+            existing=db_obj,
+            params=RelatedParams(
+                params, parent=parent, parent_field=self.parent_field
+            ),
         ).merge()
 
 
@@ -266,77 +313,6 @@ def OneToOneRelation[ParamType, ChildType, RM: Model](
     transform: Callable[..., ChildType | None] | None = None,
 ) -> Any:
     return OneToOneMerger(merger, transform)
-
-
-class ReverseOneToOneMerger[ScrapeType, ParamType, ChildType, RM: Model](
-    RelatedMerger[
-        ScrapeType,
-        ParamType,
-        ChildType,
-        ChildType | None,
-        RM,
-    ]
-):
-    """Class encapsulating logic for merging the reverse side of a one-to-one
-    relationship, where the `OneToOneField` is declared on the child (i.e.
-    `NYCoADocketMetadata.docket`) rather than on the parent.
-
-    The parent has no column to point at the child, so the child merger is
-    responsible for its own foreign key -- declare it as an `Attribute` reading
-    `params.parent`, the way `RoleMerger` does. This runs after the parent has
-    been created or updated, so the parent is always available."""
-
-    def __init__(
-        self,
-        merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
-        transform: Callable[[ScrapeType, ParamType], ChildType | None]
-        | None = None,
-    ):
-        super().__init__(merger=merger, transform=transform, default=None)
-
-    def validate(self, field: Field | ForeignObjectRel) -> list[Exception]:
-        errors = super().validate(field)
-        if not field.one_to_one:
-            errors.append(TypeError(f"{self.name}: Is not a one-to-one field"))
-        elif not isinstance(field, OneToOneRel):
-            errors.append(
-                TypeError(
-                    f"{self.name}: Is a forward one-to-one field; use OneToOneRelation"
-                )
-            )
-        return errors
-
-    def merge(
-        self, parent: RM | None, scrape: ScrapeType, params: ParamType
-    ) -> MergeResult[Any]:
-        """Run the merge method on the appropriate inputs for the given relationship."""
-        merger_input = self.transform(scrape, params)
-        if merger_input is None:
-            return MergeResult.unnecessary()
-
-        if parent is None:
-            logger.error("%s: No parent model specified", self.name)
-            return MergeResult.failed(self.merger.model.__name__)
-
-        try:
-            db_obj = cast(RM | None, getattr(parent, self.name))
-        except ObjectDoesNotExist:
-            # Unlike a forward one-to-one, an absent reverse relation raises
-            # instead of returning None.
-            db_obj = None
-
-        return self.merger(
-            merger_input,
-            existing=db_obj,
-            params=RelatedParams(params, parent=parent),
-        ).merge()
-
-
-def ReverseOneToOneRelation[ParamType, ChildType, RM: Model](
-    merger: "type[Merger[ChildType, RelatedParams[ParamType], RM]]",
-    transform: Callable[..., ChildType | None] | None = None,
-) -> Any:
-    return ReverseOneToOneMerger(merger, transform)
 
 
 class ManyStrategy(Enum):
@@ -672,7 +648,12 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
         self, merger: "type[Merger[ScrapeType, ParamType, Any]]"
     ) -> list[Exception]:
         """Run validation for every attached spec against the given merger. Used to defer running validation on base
-        classes which may not have required properties defined yet."""
+        classes which may not have required properties defined yet.
+
+        Validation is also the first point at which a one-to-one spec knows
+        which side of the relation it is on, so reverse specs are moved into
+        `related` here: they can only be merged once their parent exists, which
+        is when the `related` specs run."""
         errors = []
 
         for related_spec in self.related.values():
@@ -680,6 +661,12 @@ class MergerSpecRegistry[ScrapeType, ParamType]:
 
         for attr_spec in self.attr.values():
             errors += attr_spec.run_validation(merger)
+
+        for name, one_to_one_spec in list(self.one_to_one.items()):
+            errors += one_to_one_spec.run_validation(merger)
+            if not one_to_one_spec.forward:
+                del self.one_to_one[name]
+                self.related[name] = one_to_one_spec
 
         return errors
 
@@ -860,13 +847,13 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         query = reduce(
             lambda q1, q2: q1 | q2,
             (
-                merger.query().filter(**merger._through_params)
+                merger.query().filter(**merger._relation_params)
                 for merger in merger_hashed.values()
             ),
         )
-        through_names = next(iter(merger_hashed.values()))._through_params
+        relation_names = next(iter(merger_hashed.values()))._relation_params
         for obj in query.iterator():
-            k = cls._hash_natural_key_model(obj, through_names)
+            k = cls._hash_natural_key_model(obj, relation_names)
             if k in merger_hashed:
                 if merger_hashed[k].existing is not None:
                     logger.error(
@@ -939,15 +926,24 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
             else {}
         )
 
-        # It's hacky but it works
-        self._through_params: dict[str, Model] = (
-            {
+        # Relations the merger fills in itself rather than leaving to a spec: a
+        # `through` model's two ends, or the foreign key a reverse one-to-one
+        # child points back at its parent with. They are set on create, kept on
+        # update, and narrow the lookup for an existing object.
+        # It's hacky but it works.
+        relation_params: dict[str, Model] = {}
+        if isinstance(params, ThroughParameters):
+            relation_params = {
                 params.source_name: params.source,
                 params.target_name: params.target,
             }
-            if isinstance(params, ThroughParameters)
-            else {}
-        )
+        elif (
+            isinstance(params, RelatedParams)
+            and params.parent_field is not None
+            and params.parent is not None
+        ):
+            relation_params = {params.parent_field: params.parent}
+        self._relation_params: dict[str, Model] = relation_params
 
         if manager is None:
             manager = cast(Manager[M], self.model._default_manager)
@@ -962,7 +958,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                 {name: str(self.transformed[name]) for name in self.key}
                 | {
                     name: str(obj.pk)
-                    for name, obj in self._through_params.items()
+                    for name, obj in self._relation_params.items()
                 },
                 sort_keys=True,
             )
@@ -970,14 +966,14 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
 
     @classmethod
     def _hash_natural_key_model(
-        cls, obj: M, through_names: Iterable[str] = ()
+        cls, obj: M, relation_names: Iterable[str] = ()
     ) -> int:
         return hash(
             json.dumps(
                 {name: str(getattr(obj, name)) for name in cls.key}
                 | {
                     name: str(getattr(obj, f"{name}_id"))
-                    for name in through_names
+                    for name in relation_names
                 },
                 sort_keys=True,
             )
@@ -1036,8 +1032,8 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
         if self.existing is None and self.lookup:
             qs = self.query()
             # Filtering invalidates the cache even if the filter is empty. Try to avoid that.
-            if self._through_params:
-                qs = qs.filter(**self._through_params)
+            if self._relation_params:
+                qs = qs.filter(**self._relation_params)
             if qs._result_cache is None:
                 qs = qs[:2]
             valid, self.existing = self.resolve_query(qs)
@@ -1069,7 +1065,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                         name: self.transformed[name]
                         for name in self.__registry__.attr.keys()
                     }
-                    | self._through_params
+                    | self._relation_params
                 ),
             ),
         )
@@ -1130,7 +1126,7 @@ class Merger[ScrapeType, ParamType, M: Model](metaclass=MergerMeta):
                     name: self.transformed[name]
                     for name in self.__registry__.attr.keys()
                 }
-                | self._through_params
+                | self._relation_params
                 | o2o_params
             ),
         )
