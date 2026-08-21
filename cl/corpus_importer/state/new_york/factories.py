@@ -83,9 +83,9 @@ class NYCoAFilingFactory(Factory):
     party = Faker("name")
     date_filed = Faker("date_object")
     date_due = Faker("date_object")
-    entry_role = LazyAttribute(lambda o: o.filing.role)
-    entry_doctype = LazyAttribute(lambda o: o.filing.doctype)
-    attachments = List([SubFactory(NYCoAFileFactory)])
+    entry_role = FilingRole.APPELLANT
+    entry_doctype = FilingDocType.BRIEF
+    attachments = LazyFunction(list)
 
 
 class NYCoAAttorneyFactory(Factory):

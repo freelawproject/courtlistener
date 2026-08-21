@@ -38,6 +38,7 @@ from cl.corpus_importer.state.merger import (
     OneToOneRelation,
     OneToOneRelation,
     RelatedParams,
+    ReverseOneToOneRelation,
     ThroughParameters,
     overwrite,
 )
@@ -576,12 +577,13 @@ class NYCoADocketMetadataMerger(
 ):
     """Merger for the NYCoA-only docket fields.
 
-    The `OneToOneField` lives on this model rather than on `Docket`, so the
-    relation fills in `docket` from the parent and matches on it; this merger
-    must not declare that field itself."""
+    The `OneToOneField` lives on this model rather than on `Docket`, so this
+    merger sets its own `docket` from the parent and matches on it."""
 
     model: ClassVar[type[Model]] = NYCoADocketMetadata
+    key: ClassVar[Iterable[str]] = ["docket"]
 
+    docket: Docket = Attribute(lambda case, params: params.parent)
     # Court-PASS states a case's issues in full, so an issue that is gone from
     # the scrape is one the Court removed.
     issues: list[NYCoADocketIssue] = OneToManyRelation(
